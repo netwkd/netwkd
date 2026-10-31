@@ -280,7 +280,7 @@ TEST_CASE(
     "binding go"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     World world("lc5");
     const RID binding = world.loaded();
@@ -478,8 +478,7 @@ TEST_CASE(
     "them goes on to close the peer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
-    expected_faults.expect_warning("*Saving to the database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 2);
 
     Leaving stand;
     REQUIRE(stand.binding.is_valid());

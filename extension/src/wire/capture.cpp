@@ -75,7 +75,7 @@ bool CaptureWriter::open(const String &p_path, Dictionary p_header) {
         fault::raise(
             nullptr,
             NETW_FAULT_STORAGE_FAILED,
-            {vformat("the packet capture file '%s'", p_path),
+            {vformat("Opening the packet capture file '%s'", p_path),
              "the capture",
              "the path NETW_CAPTURE names"}
         );

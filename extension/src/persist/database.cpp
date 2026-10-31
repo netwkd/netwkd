@@ -680,7 +680,7 @@ Error Databases::stage_patch(
         fault::raise(
             nullptr,
             NETW_FAULT_STORAGE_FAILED,
-            {String("the stored record"),
+            {String("Reading the stored record"),
              String("the patch"),
              vformat("whether the stored record can be read (%s)", detail)}
         );

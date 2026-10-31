@@ -646,7 +646,8 @@ Error NetwMultiplayer::table_admit_frame(
 Node *NetwMultiplayer::repl_comp_node(
     int64_t p_route,
     int64_t p_comp,
-    const String &p_path
+    const String &p_path,
+    int64_t p_sender
 ) {
     const int64_t state = liveness_route_state(p_route);
     const bool lingering = state == int64_t(NetwLivenessCore::STATE_LINGERING);
@@ -675,11 +676,13 @@ Node *NetwMultiplayer::repl_comp_node(
     Node *held = root;
     switch (table.classify(p_comp, p_path)) {
         case NetwCompTable::ADDRESS_HOSTILE:
-            fault::raise(
-                this,
-                NETW_FAULT_MALFORMED_DATAGRAM,
-                {String(), String(), String(), 0}
-            );
+            if (p_sender != 0) {
+                fault::raise(
+                    this,
+                    NETW_FAULT_MALFORMED_DATAGRAM,
+                    {String(), String(), String(), p_sender}
+                );
+            }
             repl_drops.traversal++;
             return nullptr;
         case NetwCompTable::ADDRESS_UNMAPPED:
@@ -698,11 +701,13 @@ Node *NetwMultiplayer::repl_comp_node(
                 return nullptr;
             }
             if (held != root && !root->is_ancestor_of(held)) {
-                fault::raise(
-                    this,
-                    NETW_FAULT_MALFORMED_DATAGRAM,
-                    {String(), String(), String(), 0}
-                );
+                if (p_sender != 0) {
+                    fault::raise(
+                        this,
+                        NETW_FAULT_MALFORMED_DATAGRAM,
+                        {String(), String(), String(), p_sender}
+                    );
+                }
                 repl_drops.traversal++;
                 return nullptr;
             }

@@ -2,14 +2,14 @@
 
 .. _fault_nw1001:
 
-NW1001. Saving failed
-=====================
+NW1001. Reading or writing stored data failed
+=============================================
 
-Reported as a warning when a write to a database or to the packet capture
-file fails.
+Reported as a warning when a read from or a write to a database or the packet
+capture file fails.
 
-What the save was part of did not happen. The log line names what was written
-to, what did not happen, and what to check.
+What the read or write was part of did not happen. The log line names what
+failed, what did not happen, and what to check.
 
 For a database, check its file or service and call the operation again. For
 the capture file, check the path that the ``NETW_CAPTURE`` environment

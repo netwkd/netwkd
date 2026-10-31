@@ -889,7 +889,7 @@ void ReplicationCore::dispatch_frame(
         return;
     }
 
-    Node *comp_node = plane->repl_comp_node(p_route, p_comp, p_path);
+    Node *comp_node = plane->repl_comp_node(p_route, p_comp, p_path, p_sender);
     if (comp_node == nullptr) {
         if (p_channel == ids.call) {
             plane->rpc_refuse_unrouted_call(p_sender, p_route, p_payload);

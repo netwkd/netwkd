@@ -401,7 +401,7 @@ void NetwMultiplayer::transfer_follow_persistence(bool p_succeeds) {
         fault::raise(
             this,
             NETW_FAULT_STORAGE_FAILED,
-            {"the database on this peer",
+            {"Using the database on this peer",
              "saving entities after the server moved",
              "whether the database was opened again on this peer"}
         );

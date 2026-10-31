@@ -6,7 +6,6 @@
 #include "godot/physics_server.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/api/entity_record.hpp"
-#include "netw/log.hpp"
 #include "netw/tree_hook.hpp"
 
 using namespace godot;
@@ -35,12 +34,11 @@ Object *ObjectPort::resolve(SubsystemName) {
         return nullptr;
     }
     Object *found = gd::instance_from_id(id);
-    if (found != nullptr) {
-        return found;
+    if (found == nullptr) {
+        id = ObjectID();
+        lost += 1;
     }
-    id = ObjectID();
-    lost += 1;
-    NETW_BUG_V(nullptr);
+    return found;
 }
 
 namespace {

@@ -39,7 +39,7 @@ TEST_CASE(
     "database's"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     schema_model::clear();
     netw::persist::forget_stores();

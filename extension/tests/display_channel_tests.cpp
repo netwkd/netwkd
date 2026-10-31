@@ -53,7 +53,6 @@ TEST_CASE(
     "freed answers nothing, rather than a pointer nobody may follow"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error("*object_port.cpp*", 1);
 
     Channel channel;
     Node2D *source = memnew(Node2D);

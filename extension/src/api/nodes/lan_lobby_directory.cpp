@@ -125,14 +125,13 @@ void LANLobbyDirectory::keep_host_socket() {
     if (host_socket.is_null()) {
         fault::raise(
             session,
-            NETW_FAULT_LINK_FAILED,
-            {String("Listing this game on the LAN"),
+            NETW_FAULT_NO_FREE_PORT,
+            {String(),
              String(),
-             vformat(
-                 "the free ports %d to %d",
-                 int(port),
-                 int(port + port_count - 1)
-             )}
+             String(),
+             0,
+             port,
+             port + port_count - 1}
         );
     }
 }

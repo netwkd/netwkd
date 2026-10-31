@@ -2000,7 +2000,8 @@ void NetwMultiplayer::rpc_handle_call(
             arg_node = repl_comp_node(
                 slot.node.route,
                 slot.node.comp,
-                slot.node.path
+                slot.node.path,
+                p_sender
             );
         }
         args.push_back(arg_node);

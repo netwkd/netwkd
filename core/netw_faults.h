@@ -99,7 +99,8 @@ typedef enum netw_fault_site {
     X(LIMIT_EXCEEDED, 1018, PRACTICE, GAME, NONE, NONE, NO) \
     X(UNSENDABLE_VALUE, 1019, MISUSE, GAME, NONE, COLUMN, NO) \
     X(UNSUPPORTED, 1020, MISUSE, GAME, NONE, CALL, NO) \
-    X(LIVENESS_TIMEOUT, 1021, PRACTICE, GAME, ENTITY, HANDLER, NO)
+    X(LIVENESS_TIMEOUT, 1021, PRACTICE, GAME, ENTITY, HANDLER, NO) \
+    X(NO_FREE_PORT, 1022, ENVIRONMENT, GAME, NONE, NONE, NO)
 
 typedef enum netw_fault_code {
 #define NETW_FAULT_ENUM(m_name, m_id, m_class, m_aud, m_subj, m_site, m_fwd) \

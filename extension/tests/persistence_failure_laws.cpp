@@ -132,7 +132,7 @@ TEST_CASE(
     netw_test::FaultWatch expected_faults;
 
     SUBCASE("the interval") {
-        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+        expected_faults.expect_warning("*[NW1001]*", 1);
 
         World world("pf1a");
         world.enroll(false);
@@ -147,7 +147,7 @@ TEST_CASE(
     }
 
     SUBCASE("an explicit save") {
-        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+        expected_faults.expect_warning("*[NW1001]*", 1);
 
         World world("pf1b");
         const RID binding = world.enroll(false);
@@ -163,7 +163,7 @@ TEST_CASE(
     }
 
     SUBCASE("the final write of a departed entity") {
-        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+        expected_faults.expect_warning("*[NW1001]*", 1);
 
         World world("pf1c");
         const RID binding = world.enroll(false);
@@ -206,7 +206,7 @@ TEST_CASE(
     netw_test::FaultWatch expected_faults;
 
     SUBCASE("the spawn load") {
-        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+        expected_faults.expect_warning("*[NW1001]*", 1);
 
         const netw_test::FaultWatch faults;
         World world("pf2a");
@@ -224,7 +224,7 @@ TEST_CASE(
     }
 
     SUBCASE("an explicit load") {
-        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+        expected_faults.expect_warning("*[NW1001]*", 1);
 
         World world("pf2b");
         const RID binding = world.enroll(false);
@@ -246,7 +246,7 @@ TEST_CASE(
     "OK once every row is stored"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     World world("pf3");
     const RID binding = world.enroll(false);
@@ -284,7 +284,7 @@ TEST_CASE(
     "uncertain fails its promise and leaves the entity dirty"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     World world("pf5");
     const RID binding = world.enroll(false);

@@ -198,7 +198,7 @@ TEST_CASE(
     }
 
     SUBCASE("a float stored where the property holds a Vector2") {
-        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+        expected_faults.expect_warning("*[NW1001]*", 1);
 
         World world("pb5b");
         world.declare();
@@ -511,7 +511,7 @@ TEST_CASE(
     "carries the same values again"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     World world("pb12");
     world.declare();

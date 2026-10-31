@@ -1714,7 +1714,8 @@ public:
     godot::Node *repl_comp_node(
         int64_t p_route,
         int64_t p_comp,
-        const godot::String &p_path
+        const godot::String &p_path,
+        int64_t p_sender = 0
     );
     void repl_note_unknown_route();
     void repl_note_gate_verdict(int64_t p_verdict);

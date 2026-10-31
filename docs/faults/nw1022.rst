@@ -1,0 +1,16 @@
+:github_url: hide
+
+.. _fault_nw1022:
+
+NW1022. A LAN listing found no free port
+========================================
+
+Reported as a warning when every discovery port of a
+:ref:`LANLobbyDirectory <class_LANLobbyDirectory>` is already in use.
+
+The game runs, and browsers on the local network do not list it. The log line
+gives the range it tried.
+
+The fix is to set
+:ref:`port <class_LANLobbyDirectory_property_port>` or
+:ref:`port_count <class_LANLobbyDirectory_property_port_count>` to a free range.

@@ -11,5 +11,4 @@ its deadline.
 The peer was refused. The log line names the handler and the number of
 ticks it waited.
 
-The fix is to answer sooner, or to raise ``spawn_request_deadline_ticks`` on
-:ref:`NetwMemberConfig <class_NetwMemberConfig>`.
+The fix is to answer sooner.

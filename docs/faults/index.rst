@@ -64,6 +64,7 @@ Fault index
 - :doc:`nw1019`, MISUSE
 - :doc:`nw1020`, MISUSE
 - :doc:`nw1021`, PRACTICE
+- :doc:`nw1022`, ENVIRONMENT
 
 .. toctree::
    :hidden:
@@ -131,3 +132,4 @@ Fault index
    nw1019
    nw1020
    nw1021
+   nw1022

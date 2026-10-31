@@ -635,13 +635,6 @@ void NetwMultiplayer::persist_notify_failed(
     Error p_error,
     const String &p_detail
 ) {
-    fault::raise(
-        this,
-        NETW_FAULT_STORAGE_FAILED,
-        {vformat("database '%s'", String(databases.name_of(p_database))),
-         "the save",
-         p_detail}
-    );
     const HashMap<RID, Ref<RefCounted>>::Iterator held
         = database_handles.find(p_database);
     if (held != database_handles.end()) {
@@ -810,6 +803,16 @@ void NetwMultiplayer::persist_load_failed(
 ) {
     const persist::Binding *held = get_bindings()->at(p_binding);
     if (held != nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_STORAGE_FAILED,
+            {vformat(
+                 "Loading from database '%s'",
+                 String(databases.name_of(held->database))
+             ),
+             vformat("publishing record '%s'", String(held->record_id)),
+             vformat("its file or service (%s)", p_detail)}
+        );
         persist_notify_failed(
             held->database,
             p_error,
@@ -1126,6 +1129,18 @@ void NetwMultiplayer::persist_batch_settled(
         }
     }
     if (unsaved > 0) {
+        fault::raise(
+            this,
+            NETW_FAULT_STORAGE_FAILED,
+            {vformat(
+                 "Saving to database '%s'",
+                 String(databases.name_of(p_database))
+             ),
+             unsaved == 1
+                 ? vformat("saving record '%s'", String(first_record))
+                 : vformat("saving %d records", unsaved),
+             vformat("its file or service (%s)", first_failure)}
+        );
         persist_notify_failed(
             p_database,
             first_error,

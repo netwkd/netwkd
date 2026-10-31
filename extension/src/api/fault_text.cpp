@@ -35,8 +35,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.peer,
                     v.detail
                 ),
-                "Answer sooner, or raise "
-                "{NetwMemberConfig.spawn_request_deadline_ticks}."
+                "Answer sooner."
             };
         case NETW_FAULT_MALFORMED_DATAGRAM:
             return {
@@ -367,7 +366,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_STORAGE_FAILED:
             return {
                 vformat(
-                    "Saving to %s failed, so %s did not happen.",
+                    "%s failed, so %s did not happen.",
                     v.name,
                     v.owner
                 ),
@@ -567,6 +566,17 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 "Pass a longer timeout to "
                 "{NetwMultiplayer.liveness_when_live}, or wait only on a "
                 "route this peer will receive."
+            };
+        case NETW_FAULT_NO_FREE_PORT:
+            return {
+                vformat(
+                    "{LANLobbyDirectory} found no free port from %d to %d, so "
+                    "this game is not listed on the LAN.",
+                    v.a,
+                    v.b
+                ),
+                "Set {LANLobbyDirectory.port} or "
+                "{LANLobbyDirectory.port_count} to a free range."
             };
     }
     return {};

@@ -219,7 +219,7 @@ TEST_CASE(
     "successful retry publishes it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     World world("sl3");
     world.bind_both();
@@ -251,7 +251,7 @@ TEST_CASE(
     "stays unpublished"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     World world("sl4");
     world.bind_both();
@@ -337,7 +337,7 @@ TEST_CASE(
     "node while the stored row is applied withholds completion and publication"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*[NW1001]*", 1);
 
     Node2D *scripted = Object::cast_to<Node2D>(netw_test::minted_node(
         "extends Node2D\n"

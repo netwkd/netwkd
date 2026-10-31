@@ -5951,7 +5951,7 @@ void NetwMultiplayer::session_leave_drained(
         fault::raise(
             this,
             NETW_FAULT_STORAGE_FAILED,
-            {String("the database"),
+            {String("Saving to the database"),
              String("the leave"),
              String("its file or service before calling "
                     "{NetwSession.leave} again")}
