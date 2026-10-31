@@ -1311,11 +1311,12 @@ public:
                 break;
             }
             case 4: {
-                if (client->player_local().is_null()) {
+                const int64_t joined = client->get_unique_id();
+                if (client->player_local().is_null()
+                    || host->peer_get_player(joined).is_null()) {
                     break;
                 }
-                evidence.admitted
-                    = host->peer_get_player(client->get_unique_id()).is_valid();
+                evidence.admitted = true;
                 phase = 5;
                 break;
             }
