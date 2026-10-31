@@ -5,7 +5,9 @@
 
 #include "godot/engine.hpp"
 #include "godot/time.hpp"
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/subsystems.hpp"
@@ -279,16 +281,18 @@ void ClockEngine::physics_step(double delta) {
         cadence_started_usec = wall_usec();
     }
     mark_step();
-    NETW_WARN_COND_ONCE(
-        delta > stall_threshold,
-        sys::CLOCK,
-        "A frame took %.3f s, longer than NetwClockConfig.stall_threshold "
-        "(%.3f s), so it was skipped as a hitch. Raise stall_threshold if "
-        "frames this long are expected.",
-        delta,
-        stall_threshold
-    );
     if (delta > stall_threshold) {
+        fault::raise(
+            Object::cast_to<NetwMultiplayer>(gd::object_of(sink.id)),
+            NETW_FAULT_LIMIT_EXCEEDED,
+            {"A frame in milliseconds",
+             "the time it banked",
+             "a higher {NetwClockConfig.stall_threshold} if frames this long "
+             "are expected",
+             0,
+             int64_t(delta * 1000.0),
+             int64_t(stall_threshold * 1000.0)}
+        );
         accumulator = 0.0;
         simulation_credit = 0;
     }

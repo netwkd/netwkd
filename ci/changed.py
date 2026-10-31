@@ -11,18 +11,21 @@ from common import fail, github_output, main, run
 
 LANES: dict[str, tuple[str, ...]] = {
     "native": (
+        "core/**",
         "extension/**",
         "ci/**",
         "addons/networked/**",
         ".github/**",
     ),
     "hosted": (
+        "core/**",
         "extension/**",
         "ci/**",
         "tests/native/**",
         ".github/**",
     ),
     "module": (
+        "core/**",
         "extension/**",
         "ci/engines.json",
         "ci/platforms.json",
@@ -59,6 +62,7 @@ LANES: dict[str, tuple[str, ...]] = {
         ".github/**",
     ),
     "docs": (
+        "core/**",
         "docs/**",
         "extension/doc_classes/**",
         "addons/networked/**",

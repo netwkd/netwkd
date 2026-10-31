@@ -93,11 +93,7 @@ TEST_CASE(
     "after the insertion point"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn packet for route * ended early, so "
-        "it was dropped.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();
@@ -129,11 +125,7 @@ TEST_CASE(
     "whole, so a frame that did not decode to exhaustion applies nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn packet for route * ended early, so "
-        "it was dropped.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();

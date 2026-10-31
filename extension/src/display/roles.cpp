@@ -1,10 +1,14 @@
 #include "netw/display/roles.hpp"
 
+#include "godot/callable.hpp"
+#include "godot/node.hpp"
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/colors.hpp"
 #include "netw/display/build.hpp"
 #include "netw/display/channel.hpp"
 #include "netw/display/history.hpp"
 #include "netw/display/role_facts.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/subsystems.hpp"
@@ -20,25 +24,27 @@ bool owner_is_solver_body(Node *p_owner) {
 }
 
 void warn_self_feedback(Runtime *p_runtime) {
-    if (p_runtime->get_warned_self_feedback()) {
-        return;
-    }
     const LocalVector<Channel *> &states = p_runtime->channels();
     for (int at = 0; at < int(states.size()); ++at) {
         Channel *state = states[at];
         if (!state->get_self_feedback()) {
             continue;
         }
-        p_runtime->set_warned_self_feedback(true);
         Node *owner = p_runtime->owner();
-        NETW_WARN(
-            sys::INTERPOLATION,
-            "'%s' on '%s' is simulated on this peer, so smoothing it in place "
-            "would feed back into the simulation and it is not smoothed. "
-            "Write it elsewhere with NetwInterpolate.to or "
-            "NetwDisplay.visual_root.",
-            String(state->get_target_prop()),
-            owner != nullptr ? String(owner->get_name()) : String("?")
+        const String named
+            = owner != nullptr ? String(owner->get_name()) : String("?");
+        fault::raise(
+            owner != nullptr && owner->is_inside_tree()
+                ? NetwMultiplayer::of(owner)
+                : nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {named + String(":") + String(state->get_target_prop()),
+             String("simulation on this peer"),
+             String(
+                 "{NetwInterpolate.to} or {NetwDisplay.visual_root} to write "
+                 "it elsewhere"
+             )},
+            gd::instance_id(owner)
         );
         return;
     }

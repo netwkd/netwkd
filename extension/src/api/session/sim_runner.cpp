@@ -56,12 +56,13 @@ sim::Schedule NetwMultiplayer::sim_schedule_of(sim::Row &r_row, Node *p_owner) {
     if (r_row.declaration.schedule == sim::Schedule::STEPPED
         && !r_row.stepped_refused) {
         r_row.stepped_refused = true;
-        NETW_ERROR(
-            sys::PREDICTION,
-            "'%s' uses NetwSimulation.SCHEDULE_STEPPED without "
-            "prediction, so it runs SCHEDULE_FRAME. Declare prediction on it, "
-            "or choose another schedule.",
-            String(p_owner->get_name()).utf8().get_data()
+        fault::raise(
+            this,
+            NETW_FAULT_PREDICTION_DOWNGRADED,
+            {String(p_owner->get_name()),
+             "SCHEDULE_STEPPED without prediction",
+             "prediction declared on it, or another schedule"},
+            gd::instance_id(p_owner)
         );
     }
     return sim::resolved_schedule(r_row.declaration.schedule, has_body);

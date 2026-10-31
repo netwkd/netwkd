@@ -2,6 +2,7 @@
 
 #include "godot/class_db.hpp"
 #include "netw/game_call.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/subsystems.hpp"
 
@@ -15,13 +16,11 @@ const char *SIG_PEER_COMPLETED = "peer_completed";
 const char *SIG_SETTLED = "settled";
 
 const GameCall GROUP_THEN
-    = {sys::SESSION,
-       "The NetwGroupPromise.then callback",
+    = {"The NetwGroupPromise.then callback",
        "func(results: Dictionary)",
        1};
 const GameCall GROUP_CATCH
-    = {sys::SESSION,
-       "The NetwGroupPromise.catch_error callback",
+    = {"The NetwGroupPromise.catch_error callback",
        "func(code: Error, detail: String)",
        2};
 
@@ -172,13 +171,11 @@ void NetwGroupPromise::reject(Error p_code, const String &p_detail) {
     detail = p_detail;
     if (catch_callbacks.is_empty() && waiting.is_empty()
         && !has_connections(StringName(SIG_SETTLED))) {
-        NETW_WARN(
-            sys::SESSION,
-            "A NetwGroupPromise failed with error %d (%s) and nothing "
-            "handled it. Attach NetwGroupPromise.catch_error or await "
-            "NetwGroupPromise.wait.",
-            p_code,
-            p_detail
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNHANDLED_PROMISE,
+            {"{NetwGroupPromise}", String(), p_detail, 0, int64_t(p_code), 0},
+            get_instance_id()
         );
     }
     emit_signal(StringName(SIG_SETTLED));

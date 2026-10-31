@@ -26,6 +26,7 @@
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/lifecycle/rule.hpp"
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
@@ -311,12 +312,13 @@ void NetwMultiplayer::scene_root_settle_exit(
     if (p_moved) {
         if (root != nullptr && outer != nullptr && outer != root
             && scene_outer_of(root) != outer) {
-            NETW_WARN(
-                sys::SCENE,
-                "'%s' was moved out of the SubViewport that holds its world. "
-                "Reparent the node Netw.spawn returned for it, or use "
-                "Netw.reparent.",
-                root->get_name()
+            fault::raise(
+                this,
+                NETW_FAULT_ENTITY_MOVED,
+                {String(root->get_name()),
+                 "outside the SubViewport that holds its world",
+                 "{Netw.reparent}"},
+                gd::instance_id(root)
             );
         }
         return;
@@ -425,14 +427,13 @@ RID NetwMultiplayer::scene_presentation_derive() {
     scene_reached_by(int64_t(get_unique_id()), reached, stands);
     scene_presentation_split = reached.size() > 1;
     if (reached.size() == 1) {
-        scene_presentation_split_warned = false;
         return reached[0];
     }
     return RID();
 }
 
 void NetwMultiplayer::scene_presentation_warn_split() {
-    if (!scene_presentation_split || scene_presentation_split_warned) {
+    if (!scene_presentation_split) {
         return;
     }
     LocalVector<RID> reached;
@@ -440,19 +441,22 @@ void NetwMultiplayer::scene_presentation_warn_split() {
     scene_reached_by(int64_t(get_unique_id()), reached, stands);
     scene_presentation_split = reached.size() > 1;
     if (scene_presentation_split) {
-        scene_presentation_split_warned = true;
         String named;
         for (uint32_t at = 0; at < reached.size(); ++at) {
             named += at == 0 ? String("'") : String(", '");
             named += String(scene_stem(reached[at])) + String("'");
         }
         if (stands) {
-            NETW_WARN(
-                sys::SCENE,
-                "This peer has players in %d scenes at once, %s, so its "
-                "player is in none of them. Leave all but one of them.",
-                int(reached.size()),
-                named
+            fault::raise(
+                this,
+                NETW_FAULT_CONFLICTING_SETTINGS,
+                {vformat(
+                     "players in %d scenes at once, %s",
+                     int(reached.size()),
+                     named
+                 ),
+                 vformat("peer %d", int(get_unique_id())),
+                 String("a presentation that follows one scene")}
             );
         } else {
             NETW_TRACE(
@@ -551,12 +555,13 @@ void NetwMultiplayer::scene_on_native_change() {
         || gd::object_of(session_root_last_live) != nullptr) {
         return;
     }
-    NETW_ERROR(
-        sys::SCENE,
-        "A SceneTree scene change freed the scene that held this session, so "
-        "the session ended while its peers were still connected. Keep the "
-        "session in a scene you never change, and spawn levels with "
-        "Netw.spawn."
+    fault::raise(
+        this,
+        NETW_FAULT_UNSUPPORTED,
+        {"A SceneTree scene change",
+         "the scene that holds this session",
+         "a scene you never change for the session, and {Netw.spawn} for "
+         "levels"}
     );
 }
 
@@ -685,14 +690,14 @@ void NetwMultiplayer::scene_adopt_entity(const RID &p_entity) {
 
 Error NetwMultiplayer::scene_watch(const RID &p_scene, int64_t p_peer) {
     NETW_ZONE_NC("NetwMultiplayer scene_watch", colors::SCENE);
-    NETW_ERR_COND_V(
-        !is_host(),
-        ERR_UNAUTHORIZED,
-        sys::SCENE,
-        "NetwMultiplayer.scene_watch runs only on the server, and was called "
-        "for peer %d on a client.",
-        int(p_peer)
-    );
+    if (!is_host()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.scene_watch}", String(), String(), p_peer}
+        );
+        return ERR_UNAUTHORIZED;
+    }
     if (p_peer == 0) {
         return ERR_INVALID_PARAMETER;
     }
@@ -707,13 +712,7 @@ Error NetwMultiplayer::scene_watch(const RID &p_scene, int64_t p_peer) {
     }
     scene_admit_peer(p_scene, p_peer);
     if (!scene_subscribes(p_scene, p_peer)) {
-        NETW_WARN(
-            sys::SCENE,
-            "Peer %d could not be added to scene %d.",
-            int(p_peer),
-            int(p_scene.get_id())
-        );
-        return ERR_UNAVAILABLE;
+        NETW_BUG_V(ERR_UNAVAILABLE);
     }
     interest_flush_now();
     return OK;
@@ -721,14 +720,14 @@ Error NetwMultiplayer::scene_watch(const RID &p_scene, int64_t p_peer) {
 
 bool NetwMultiplayer::scene_unwatch(const RID &p_scene, int64_t p_peer) {
     NETW_ZONE_NC("NetwMultiplayer scene_unwatch", colors::SCENE);
-    NETW_ERR_COND_V(
-        !is_host(),
-        false,
-        sys::SCENE,
-        "NetwMultiplayer.scene_unwatch runs only on the server, and was "
-        "called for peer %d on a client.",
-        int(p_peer)
-    );
+    if (!is_host()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.scene_unwatch}", String(), String(), p_peer}
+        );
+        return false;
+    }
     if (!is_host() || scene_entity_node(p_scene) == nullptr) {
         return false;
     }
@@ -880,13 +879,15 @@ void NetwMultiplayer::scene_publish_viewers(const RID &p_scene) {
     scene_viewers_revision[route] = revision;
     LocalVector<uint64_t> members;
     if (!scene_collect_viewers(p_scene, members)) {
-        NETW_ERROR(
-            sys::SCENE,
-            "Scene %d has %d players and its player list holds at most %d, so "
-            "the list was not sent. Split the players across more scenes.",
-            int(route),
-            int(members.size()),
-            int(session::VIEWERS_MAX)
+        fault::raise(
+            this,
+            NETW_FAULT_LIMIT_EXCEEDED,
+            {vformat("Scene %d", int(route)),
+             "the player list",
+             "more scenes for these players",
+             0,
+             int64_t(members.size()),
+             int64_t(session::VIEWERS_MAX)}
         );
         return;
     }
@@ -1149,7 +1150,21 @@ Ref<NetwPromise> NetwMultiplayer::scene_move_entity(
                   "scene_move: only the session authority moves an entity "
                   "between scenes"
               );
-        NETW_ERROR(sys::SCENE, "%s", text);
+        Node *mover_node = wrapper_owner(p_entity);
+        fault::raise(
+            this,
+            NETW_FAULT_ENTITY_MOVED,
+            {mover_node != nullptr ? String(mover_node->get_name())
+                                   : String("<null>"),
+             structure_halted
+                 ? String("a scene while session authority moves to another "
+                          "peer")
+                 : String("a scene by a peer that may not move it"),
+             structure_halted
+                 ? String("the move again once session authority has moved")
+                 : String("the move on the server")},
+            mover_node != nullptr ? uint64_t(gd::instance_id(mover_node)) : 0
+        );
         promise->reject(ruling.code, text);
         return promise;
     }
@@ -1163,12 +1178,15 @@ Ref<NetwPromise> NetwMultiplayer::scene_move_entity(
         source == target
     );
     if (verdict == SCENE_MOVE_REFUSED) {
-        NETW_WARN(
-            sys::SCENE,
-            "Entity %d could not move to scene %d, because one of them is not "
-            "in the tree.",
-            int(p_entity.get_id()),
-            int(p_destination.get_id())
+        fault::raise(
+            this,
+            NETW_FAULT_ENTITY_MOVED,
+            {vformat("Entity %d", int(p_entity.get_id())),
+             vformat(
+                 "scene %d, which is not in the tree",
+                 int(p_destination.get_id())
+             ),
+             "an entity and a scene that are both in the tree"}
         );
         promise->reject(
             ERR_UNAVAILABLE,
@@ -1222,11 +1240,10 @@ Ref<NetwPromise> NetwMultiplayer::entity_reparent(
         return promise;
     }
     if (mover.is_null() || body == nullptr || p_parent == nullptr) {
-        NETW_WARN(
-            sys::SCENE,
-            "Netw.reparent could not move entity %d, because it or its new "
-            "parent is not in the tree.",
-            int(p_entity.get_id())
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_IN_SESSION,
+            {"{Netw.reparent}", vformat("entity %d", int(p_entity.get_id()))}
         );
         promise->reject(
             ERR_UNAVAILABLE,
@@ -1870,12 +1887,14 @@ void NetwMultiplayer::scene_unobserve(
 }
 
 Error NetwMultiplayer::write_scene_facet(const RID &p_entity, bool p_declared) {
-    NETW_ERR_COND_V(
-        !is_host() && entity_get_route(p_entity) <= 0,
-        ERR_UNAUTHORIZED,
-        sys::SCENE,
-        "A client cannot set the scene of an entity that has not spawned yet."
-    );
+    if (!is_host() && entity_get_route(p_entity) <= 0) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"Setting the scene of an entity that has not spawned yet"}
+        );
+        return ERR_UNAUTHORIZED;
+    }
 
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_null()) {
@@ -1954,12 +1973,14 @@ Error NetwMultiplayer::scene_set_param(
             return OK;
         }
         default:
-            NETW_ERR_V(
-                ERR_INVALID_PARAMETER,
-                sys::SCENE,
-                "Scene setting %d does not exist.",
-                p_param
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {"A scene setting",
+                 vformat("setting %d", int(p_param)),
+                 "a scene setting that exists"}
             );
+            return ERR_INVALID_PARAMETER;
     }
 }
 

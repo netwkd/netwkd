@@ -1,0 +1,16 @@
+:github_url: hide
+
+.. _fault_nw1018:
+
+NW1018. A limit was exceeded
+============================
+
+Reported as a warning when something needs more than a fixed limit allows,
+such as the player list or a spawn.
+
+What went over the limit was dropped. The log line gives the need, the limit
+and what was dropped.
+
+Stay under the limit. The log line names the setting, such as a higher
+``spawn_limit``, or the change, such as fewer spawned nodes or more scenes for
+the players.

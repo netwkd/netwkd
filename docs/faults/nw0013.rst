@@ -1,0 +1,44 @@
+:github_url: hide
+
+.. _fault_nw0013:
+
+NW0013. A peer wrote a property it may not write
+================================================
+
+Checked in every build. A debug server also sends it to the peer that
+wrote.
+
+A peer sent a value for a replicated property, and the property's
+:ref:`NetwMemberConfig.write_policy <class_NetwMemberConfig_property_write_policy>`
+does not allow that peer. The server dropped the value and kept its own.
+The first refusal for each peer and :ref:`NetwEntity <class_NetwEntity>`
+is reported once per session, and the rest are counted.
+
+The server declares ``health`` so that only it may send it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, "health").server()
+
+A client then sends it.
+
+.. code-block:: gdscript
+
+    func take_damage(amount: int) -> void:
+        health -= amount
+        Netw.sync_property(self, "health")
+
+Send it from the server, or let
+:ref:`NetwEntity.controller <class_NetwEntity_property_controller>`
+send it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, "health").controller()
+
+The server sends nothing back when it drops a value. The client keeps
+the value it wrote until the server's own value changes and is sent,
+or until the property sends again on a timer through
+:ref:`NetwPropertyConfig.heartbeat <class_NetwPropertyConfig_method_heartbeat>`.

@@ -167,12 +167,7 @@ TEST_CASE(
     "framework choosing between them would draw the wrong world in silence"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][scene] This peer has players in 2 scenes at once, "
-        "'*', '*', so its player is in none of them. Leave all but "
-        "one of them.",
-        1
-    );
+    expected_faults.expect_warning("*2 scenes*[NW0038]*", 1);
 
     const Ref<NetwMultiplayer> core = hosting();
     Node *root = memnew(Node);

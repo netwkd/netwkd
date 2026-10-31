@@ -1,0 +1,11 @@
+--- a/extension/src/api/decl_sites.cpp
++++ b/extension/src/api/decl_sites.cpp
+@@ -58,7 +58,7 @@
+     Object *p_declarer,
+     const StringName &p_member
+ ) {
+-    if (p_kind == NETW_SITE_CALL) {
++    if (p_kind == NETW_SITE_CALL || p_kind == NETW_SITE_COLUMN) {
+         return gd::capture_script_site(ADDON_PREFIX);
+     }
+     const gd::ScriptSite *held

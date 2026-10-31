@@ -5,7 +5,9 @@
 #include "godot/object.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/time.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -67,8 +69,7 @@ void answer_waits(Source &r_source, bool p_fetched) {
 }
 
 const GameCall TOKEN_FETCH
-    = {sys::SESSION,
-       "The NetwIdToken.provide fetch",
+    = {"The NetwIdToken.provide fetch",
        "func(nonce: String) -> NetwPromise",
        1};
 
@@ -249,11 +250,10 @@ void NetwIdToken::keys_answered(
     const id_token::Keys read = id_token::read_keys(p_result, p_code, p_body);
     if (read.is_empty() && !fetch_fault_reported) {
         fetch_fault_reported = true;
-        NETW_WARN(
-            sys::SESSION,
-            "NetwIdToken got no usable signing keys from '%s'. Check "
-            "NetwIdToken.keys_url and that this machine can reach it.",
-            keys_url
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {"the signing key fetch of {NetwIdToken}", String(), keys_url}
         );
     }
     if (!read.is_empty()) {
@@ -315,10 +315,12 @@ Variant NetwIdToken::prove_at(const String &p_challenge, double p_now) {
         Object::cast_to<NetwPromise>(gd::live_object(returned))
     );
     if (called && pending.is_null()) {
-        NETW_ERROR_ONCE(
-            sys::SESSION,
-            "The NetwIdToken.provide fetch did not return a NetwPromise, so "
-            "no token was sent. Return a NetwPromise of the token."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_RETURN,
+            {"The {NetwIdToken.provide} fetch",
+             "a value that is not a NetwPromise",
+             "a {NetwPromise} of the token"}
         );
     }
     source = sources().getptr(issuer);
@@ -386,12 +388,17 @@ void NetwIdToken::hold(
 }
 
 void NetwIdToken::provide(const String &p_issuer, const Callable &p_fetch) {
-    NETW_ERR_COND(
-        p_issuer.is_empty() || (!p_fetch.is_null() && !p_fetch.is_valid()),
-        sys::SESSION,
-        "NetwIdToken.provide needs an issuer and a Callable that takes a "
-        "nonce and returns a NetwPromise of a token."
-    );
+    if (p_issuer.is_empty() || (!p_fetch.is_null() && !p_fetch.is_valid())) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {"{NetwIdToken.provide}",
+             String(),
+             "an issuer and a Callable that takes a nonce and returns a "
+             "{NetwPromise} of a token"}
+        );
+        return;
+    }
     Source *replaced = sources().getptr(p_issuer);
     if (replaced != nullptr) {
         answer_waits(*replaced, false);

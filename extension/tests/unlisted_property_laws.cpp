@@ -266,12 +266,7 @@ TEST_CASE(
     node->set_name("LateProperty");
     netw::gd::scene_root()->add_child(node);
     FaultWatch faults;
-    faults.expect_error(
-        "[error][session] Netw.configure_property cannot declare "
-        "'position' on 'LateProperty' after it entered the tree. "
-        "Call it from _init.",
-        1
-    );
+    faults.expect_error("*'LateProperty'*[NW0036]*", 1);
     CHECK(netw::Netw::configure_property(node, "position").is_null());
     CHECK(
         netw::script::model::get_property_config(script, "position").is_null()

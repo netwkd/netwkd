@@ -104,13 +104,7 @@ PackedByteArray NetwCarrierFrame::build(
     stream.clear();
     if (!run_head(stream, kind, head) || !stream.align_verify()
         || !stream.ok()) {
-        NETW_WARN_ONCE(
-            sys::TRANSPORT,
-            "A packet header for tick %d could not be written, so the packet "
-            "was not sent.",
-            int(p_tick)
-        );
-        return PackedByteArray();
+        NETW_BUG_V(PackedByteArray());
     }
     PackedByteArray out = stream.to_bytes();
     out.append_array(p_payload);
@@ -132,13 +126,8 @@ NetwCarrierFrame NetwCarrierFrame::read(const PackedByteArray &p_packet) {
     } else if (magic == MAGIC_UNRELIABLE_ACKED) {
         out.kind = UNRELIABLE_ACKED;
     } else if (magic_is_retired(magic)) {
-        NETW_WARN_ONCE(
-            sys::TRANSPORT,
-            "A packet in an older Networked format (0x%x) was dropped. Run "
-            "the same Networked version on every peer.",
-            int(magic)
-        );
         out.kind = MALFORMED;
+        out.unreadable = true;
         return out;
     } else {
         out.kind = FOREIGN;
@@ -149,15 +138,9 @@ NetwCarrierFrame NetwCarrierFrame::read(const PackedByteArray &p_packet) {
     DatagramHead head;
     if (!run_head(stream, out.kind, head) || !stream.align_verify()
         || !stream.ok()) {
-        NETW_WARN_ONCE(
-            sys::TRANSPORT,
-            "A packet of %d bytes was dropped, because it is too short for "
-            "its header (0x%x).",
-            p_packet.size(),
-            int(magic)
-        );
         NetwCarrierFrame refused;
         refused.kind = MALFORMED;
+        refused.unreadable = true;
         return refused;
     }
 

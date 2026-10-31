@@ -30,7 +30,7 @@ void ObjectPort::unbind() {
     id = ObjectID();
 }
 
-Object *ObjectPort::resolve(SubsystemName p_module) {
+Object *ObjectPort::resolve(SubsystemName) {
     if (!id.is_valid()) {
         return nullptr;
     }
@@ -40,12 +40,7 @@ Object *ObjectPort::resolve(SubsystemName p_module) {
     }
     id = ObjectID();
     lost += 1;
-    NETW_WARN_ONCE(
-        p_module,
-        "A node with synced properties was freed while still bound, so its "
-        "properties stopped syncing."
-    );
-    return nullptr;
+    NETW_BUG_V(nullptr);
 }
 
 namespace {

@@ -83,6 +83,7 @@ struct NetwCarrierFrame {
     uint32_t history = 0;
     int64_t tick = -1;
     int64_t payload_offset = 0;
+    bool unreadable = false;
 };
 
 struct NetwCarrierDatagram {

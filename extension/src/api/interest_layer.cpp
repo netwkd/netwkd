@@ -4,6 +4,7 @@
 #include "godot/class_db.hpp"
 #include "netw/api/entity_record.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -241,12 +242,14 @@ bool NetwInterestLayer::add_viewer(int64_t p_peer_id) {
     if (owner != nullptr && owner->has_multiplayer_peer()
         && p_peer_id != godot::MultiplayerPeer::TARGET_PEER_SERVER
         && owner->interest_peer_bit(p_peer_id) < 0) {
-        NETW_WARN(
-            sys::INTEREST,
-            "Interest layer '%s' got viewer %d, which is not a connected "
-            "peer. Use a peer id from multiplayer.get_peers().",
-            String(layer_id).utf8().get_data(),
-            int(p_peer_id)
+        fault::raise(
+            owner,
+            NETW_FAULT_UNKNOWN_PEER,
+            {String("{NetwInterestLayer.add_viewer}"),
+             String(),
+             String(),
+             p_peer_id},
+            uint64_t(get_instance_id())
         );
     }
     if (!engine->layer_add_viewer(layer_id, p_peer_id)) {
@@ -271,14 +274,17 @@ bool NetwInterestLayer::has_viewer(int64_t p_peer_id) const {
 }
 
 bool NetwInterestLayer::add_entity(const Ref<NetwEntity> &p_entity) {
-    NETW_ERR_COND_V(
-        p_entity.is_null(),
-        false,
-        sys::INTEREST,
-        "NetwInterestLayer.add_entity on '%s' needs an entity, and it was "
-        "null.",
-        String(layer_id)
-    );
+    if (p_entity.is_null()) {
+        fault::raise(
+            host(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwInterestLayer.add_entity}"),
+             String(),
+             String("an entity")},
+            uint64_t(get_instance_id())
+        );
+        return false;
+    }
     if (!holds_authority()) {
         return false;
     }
@@ -291,14 +297,17 @@ bool NetwInterestLayer::add_entity(const Ref<NetwEntity> &p_entity) {
 }
 
 bool NetwInterestLayer::remove_entity(const Ref<NetwEntity> &p_entity) {
-    NETW_ERR_COND_V(
-        p_entity.is_null(),
-        false,
-        sys::INTEREST,
-        "NetwInterestLayer.remove_entity on '%s' needs an entity, and it "
-        "was null.",
-        String(layer_id)
-    );
+    if (p_entity.is_null()) {
+        fault::raise(
+            host(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwInterestLayer.remove_entity}"),
+             String(),
+             String("an entity")},
+            uint64_t(get_instance_id())
+        );
+        return false;
+    }
     if (!holds_authority()) {
         return false;
     }
@@ -315,13 +324,17 @@ bool NetwInterestLayer::has_entity(const Ref<NetwEntity> &p_entity) const {
 }
 
 void NetwInterestLayer::client_admit(const Ref<NetwEntity> &p_entity) {
-    NETW_ERR_COND(
-        p_entity.is_null(),
-        sys::INTEREST,
-        "NetwInterestLayer.client_admit on '%s' needs an entity, and it "
-        "was null.",
-        String(layer_id)
-    );
+    if (p_entity.is_null()) {
+        fault::raise(
+            host(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwInterestLayer.client_admit}"),
+             String(),
+             String("an entity")},
+            uint64_t(get_instance_id())
+        );
+        return;
+    }
     if (!engine->roster_add(layer_id, slot_of(p_entity))) {
         return;
     }
@@ -333,13 +346,17 @@ void NetwInterestLayer::client_admit(const Ref<NetwEntity> &p_entity) {
 }
 
 void NetwInterestLayer::client_revoke(const Ref<NetwEntity> &p_entity) {
-    NETW_ERR_COND(
-        p_entity.is_null(),
-        sys::INTEREST,
-        "NetwInterestLayer.client_revoke on '%s' needs an entity, and it "
-        "was null.",
-        String(layer_id)
-    );
+    if (p_entity.is_null()) {
+        fault::raise(
+            host(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwInterestLayer.client_revoke}"),
+             String(),
+             String("an entity")},
+            uint64_t(get_instance_id())
+        );
+        return;
+    }
     if (!engine->roster_remove(layer_id, slot_of(p_entity))) {
         return;
     }
@@ -349,13 +366,17 @@ void NetwInterestLayer::client_revoke(const Ref<NetwEntity> &p_entity) {
 }
 
 void NetwInterestLayer::client_untrack_entity(const Ref<NetwEntity> &p_entity) {
-    NETW_ERR_COND(
-        p_entity.is_null(),
-        sys::INTEREST,
-        "NetwInterestLayer.client_untrack_entity on '%s' needs an entity, "
-        "and it was null.",
-        String(layer_id)
-    );
+    if (p_entity.is_null()) {
+        fault::raise(
+            host(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwInterestLayer.client_untrack_entity}"),
+             String(),
+             String("an entity")},
+            uint64_t(get_instance_id())
+        );
+        return;
+    }
     if (!engine->roster_remove(layer_id, slot_of(p_entity))) {
         return;
     }
@@ -413,13 +434,15 @@ Array NetwInterestLayer::viewer_ids() const {
 
 void NetwInterestLayer::set_driver(const Callable &p_driver) {
     NetwMultiplayer *owner = host();
-    NETW_ERR_COND(
-        owner == nullptr,
-        sys::INTEREST,
-        "Layer '%s' is not in a session, so it cannot have a driver. Get "
-        "the layer with NetwMultiplayer.interest_layer.",
-        String(layer_id)
-    );
+    if (owner == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{NetwInterestLayer.set_driver}"), String(layer_id)},
+            uint64_t(get_instance_id())
+        );
+        return;
+    }
     owner->layer_set_driver(
         owner->interest_layer_find(layer_id),
         p_driver,
@@ -436,13 +459,15 @@ Callable NetwInterestLayer::get_driver() {
 
 void NetwInterestLayer::set_monitor(const Callable &p_monitor) {
     NetwMultiplayer *owner = host();
-    NETW_ERR_COND(
-        owner == nullptr,
-        sys::INTEREST,
-        "Layer '%s' is not in a session, so it cannot have a monitor. Get "
-        "the layer with NetwMultiplayer.interest_layer.",
-        String(layer_id)
-    );
+    if (owner == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{NetwInterestLayer.set_monitor}"), String(layer_id)},
+            uint64_t(get_instance_id())
+        );
+        return;
+    }
     owner->layer_set_monitor(
         owner->interest_layer_find(layer_id),
         p_monitor,

@@ -296,16 +296,6 @@ TEST_CASE(
     "[Networked][Predict][Hosted] a rewire discards the rules declared "
     "against the field table it replaced"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] Condition "
-        "\"row->carry_rules.is_empty()\" is true. Returning: "
-        "CARRY_DECLINED. Prediction tried to carry a value on an "
-        "entity with no NetwPropertyConfig.carry_along or "
-        "carry_step property.",
-        1
-    );
-
     NetwPredictionEngine held_pool;
     NetwPredictionEngine *const pool = &held_pool;
     const int64_t slot = carrying_slot(pool, int(Schedule::FRAME));

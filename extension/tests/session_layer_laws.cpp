@@ -180,10 +180,8 @@ TEST_CASE(
     "and a client is refused"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][interest] "
-        "NetwMultiplayer.interest_layer_remove_entity runs only on "
-        "the server.",
+    expected_faults.expect_error(
+        "*interest_layer_remove_entity*[NW0012]*",
         1
     );
 

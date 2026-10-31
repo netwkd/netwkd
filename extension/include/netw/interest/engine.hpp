@@ -10,6 +10,7 @@
 #include "netw/interest/decl.hpp"
 
 namespace netw {
+class NetwMultiplayer;
 struct PeerRename;
 } // namespace netw
 
@@ -259,6 +260,8 @@ public:
 #if defined(NETW_TESTS)
     int64_t mark_visits = 0;
 #endif
+
+    NetwMultiplayer *host = nullptr;
 
     Engine();
 

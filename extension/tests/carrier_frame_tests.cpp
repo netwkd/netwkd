@@ -97,13 +97,6 @@ TEST_CASE(
     "[Networked][Carrier][Hosted] F4 somebody else's packet is foreign, and "
     "ours-but-broken is not"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet of 2 bytes was dropped, because"
-        " it is too short for its header (0x78).",
-        1
-    );
-
     PackedByteArray theirs = payload(6, 0x11);
     NETW_CHECK_EQ(
         NetwCarrierFrame::read(theirs).kind,
@@ -113,10 +106,9 @@ TEST_CASE(
     truncated.resize(2);
     truncated.set(0, NetwCarrierFrame::MAGIC_UNRELIABLE);
     truncated.set(1, 0);
-    NETW_CHECK_EQ(
-        NetwCarrierFrame::read(truncated).kind,
-        NetwCarrierFrame::MALFORMED
-    );
+    const NetwCarrierFrame short_head = NetwCarrierFrame::read(truncated);
+    NETW_CHECK_EQ(short_head.kind, NetwCarrierFrame::MALFORMED);
+    CHECK(short_head.unreadable);
 
     PackedByteArray truncated_ack;
     truncated_ack.resize(4);
@@ -151,13 +143,6 @@ TEST_CASE(
     "[Networked][Carrier][Hosted] F6 a retired magic is ours and broken, "
     "because a byte that was ours one version ago is not a game's data"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet in an older Networked format "
-        "(0x4e) was dropped. Run the same Networked version on "
-        "every peer.",
-        1
-    );
     const uint8_t retired[] = {0x4E, 0x6E, 0x8E, 0x56, 0x76, 0x96};
     for (const uint8_t magic : retired) {
         NETW_FORMAT_INT(magic_text, int64_t(magic));
@@ -167,6 +152,7 @@ TEST_CASE(
         const NetwCarrierFrame header = NetwCarrierFrame::read(packet);
         const bool refused = header.kind == NetwCarrierFrame::MALFORMED;
         CHECK(refused);
+        CHECK(header.unreadable);
         const bool no_offset = header.payload_offset == 0;
         CHECK(no_offset);
     }

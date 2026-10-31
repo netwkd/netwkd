@@ -371,11 +371,7 @@ const SettleLaw LAWS[]
 
 TEST_CASE("[Networked][Settle][Hosted] the session settle laws hold") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Deferred session work did not finish in 8"
-        " passes. Still pending: cycle.",
-        1
-    );
+    expected_faults.expect_error("*'cycle'*[NW0010]*", 1);
 
     const SettleScenario CORPUS[] = {
         plain_effects(),

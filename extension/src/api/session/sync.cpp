@@ -30,6 +30,7 @@
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/game_call.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
@@ -58,8 +59,7 @@ using repl::PropertySet;
 namespace {
 
 const GameCall MIGRATION_STEP
-    = {sys::TABLE,
-       "The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
+    = {"The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
        "func(values: Dictionary) -> Dictionary",
        1};
 
@@ -425,32 +425,30 @@ Error NetwMultiplayer::sync_send_property(
     const StringName &p_property
 ) {
     Node *node = entity_component_node(p_entity, p_comp);
-    NETW_ERR_COND_V(
-        node == nullptr,
-        ERR_DOES_NOT_EXIST,
-        sys::WIRE,
-        "Property '%s' was not sent, because component %d of its entity has "
-        "no node.",
-        String(p_property),
-        int(p_comp)
-    );
-    NETW_ERR_COND_V(
-        !gd::has_property(node, p_property),
-        ERR_INVALID_DATA,
-        sys::WIRE,
-        "'%s' has no property '%s', so it was not sent.",
-        node->get_name(),
-        String(p_property)
-    );
+    NETW_BUG_COND_V(node == nullptr, ERR_DOES_NOT_EXIST);
+    if (!gd::has_property(node, p_property)) {
+        fault::raise(
+            this,
+            NETW_FAULT_UNKNOWN_NAME,
+            {"Sending a property",
+             String(node->get_name()),
+             String(p_property)},
+            gd::instance_id(node)
+        );
+        return ERR_INVALID_DATA;
+    }
     SyncPipeline *pipeline = sync_pipeline();
-    NETW_ERR_COND_V(
-        pipeline == nullptr,
-        ERR_UNCONFIGURED,
-        sys::WIRE,
-        "Property '%s' was not sent, because replication is not running on "
-        "this peer.",
-        String(p_property)
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {vformat("Sending property '%s'", String(p_property)),
+             String(),
+             "replication"},
+            gd::instance_id(node)
+        );
+        return ERR_UNCONFIGURED;
+    }
     pipeline->send_property(node, p_property);
     return OK;
 }
@@ -462,32 +460,28 @@ Error NetwMultiplayer::sync_send_signal(
     const Array &p_args
 ) {
     Node *node = entity_component_node(p_entity, p_comp);
-    NETW_ERR_COND_V(
-        node == nullptr,
-        ERR_DOES_NOT_EXIST,
-        sys::WIRE,
-        "Signal '%s' was not sent, because component %d of its entity has no "
-        "node.",
-        String(p_signal),
-        int(p_comp)
-    );
-    NETW_ERR_COND_V(
-        !node->has_signal(p_signal),
-        ERR_INVALID_DATA,
-        sys::WIRE,
-        "'%s' has no signal '%s', so it was not sent.",
-        node->get_name(),
-        String(p_signal)
-    );
+    NETW_BUG_COND_V(node == nullptr, ERR_DOES_NOT_EXIST);
+    if (!node->has_signal(p_signal)) {
+        fault::raise(
+            this,
+            NETW_FAULT_UNKNOWN_NAME,
+            {"Sending a signal", String(node->get_name()), String(p_signal)},
+            gd::instance_id(node)
+        );
+        return ERR_INVALID_DATA;
+    }
     SyncPipeline *pipeline = sync_pipeline();
-    NETW_ERR_COND_V(
-        pipeline == nullptr,
-        ERR_UNCONFIGURED,
-        sys::WIRE,
-        "Signal '%s' was not sent, because replication is not running on "
-        "this peer.",
-        String(p_signal)
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {vformat("Sending signal '%s'", String(p_signal)),
+             String(),
+             "replication"},
+            gd::instance_id(node)
+        );
+        return ERR_UNCONFIGURED;
+    }
     pipeline->send_signal(node, p_signal, p_args);
     return OK;
 }
@@ -681,12 +675,10 @@ Node *NetwMultiplayer::repl_comp_node(
     Node *held = root;
     switch (table.classify(p_comp, p_path)) {
         case NetwCompTable::ADDRESS_HOSTILE:
-            NETW_WARN(
-                sys::TRANSPORT,
-                "A packet named path '%s', which leaves entity '%s', so it "
-                "was dropped.",
-                String(p_path).utf8().get_data(),
-                String(root->get_name()).utf8().get_data()
+            fault::raise(
+                this,
+                NETW_FAULT_MALFORMED_DATAGRAM,
+                {String(), String(), String(), 0}
             );
             repl_drops.traversal++;
             return nullptr;
@@ -706,12 +698,10 @@ Node *NetwMultiplayer::repl_comp_node(
                 return nullptr;
             }
             if (held != root && !root->is_ancestor_of(held)) {
-                NETW_WARN(
-                    sys::TRANSPORT,
-                    "A packet named path '%s', which leaves entity '%s', so "
-                    "it was dropped.",
-                    String(p_path).utf8().get_data(),
-                    String(root->get_name()).utf8().get_data()
+                fault::raise(
+                    this,
+                    NETW_FAULT_MALFORMED_DATAGRAM,
+                    {String(), String(), String(), 0}
                 );
                 repl_drops.traversal++;
                 return nullptr;
@@ -809,15 +799,17 @@ void NetwMultiplayer::session_set_peer_bandwidth(
     int64_t p_peer,
     int64_t p_kbps
 ) {
-    NETW_ERR_COND(
-        p_kbps < 0,
-        sys::SESSION,
-        "NetwSession.set_peer_bandwidth got %d kbit/s for peer %d, "
-        "which is negative. Pass a rate in kbit/s, or 0 for the session's "
-        "rate.",
-        p_kbps,
-        p_peer
-    );
+    if (p_kbps < 0) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSession.set_peer_bandwidth}",
+             vformat("%d kbit/s", p_kbps),
+             "a rate in kbit/s, or 0 for the session's rate",
+             p_peer}
+        );
+        return;
+    }
     ReplicationSend *send = row_send_of(get_replication_plane());
     if (send != nullptr) {
         send->set_peer_rate(p_peer, double(p_kbps) * KBPS_BYTES);
@@ -1689,13 +1681,7 @@ Error NetwMultiplayer::display_pump_entity(
     const display::Timing &p_timing
 ) {
     display::Runtime *runtime = display_book->runtime_of(p_entity);
-    NETW_ERR_COND_V(
-        runtime == nullptr,
-        ERR_DOES_NOT_EXIST,
-        sys::INTERPOLATION,
-        "Entity %d has no display state, so it was not drawn.",
-        int(p_entity.get_id())
-    );
+    NETW_BUG_COND_V(runtime == nullptr, ERR_DOES_NOT_EXIST);
     display_pump_runtime(runtime, p_timing, display_book->get_stats());
     return OK;
 }
@@ -1732,36 +1718,37 @@ int64_t NetwMultiplayer::stats_get_verdict_count(Error p_verdict) const {
     return verdict_book.total(p_verdict);
 }
 
-bool NetwMultiplayer::claim_verdict_warning(Error p_verdict, int64_t p_route) {
-    return verdict_book.claim_warning(p_verdict, p_route);
-}
-
-bool NetwMultiplayer::warn_verdict(Error p_verdict, int64_t p_route) {
-    count_verdict(p_verdict, p_route);
-    return claim_verdict_warning(p_verdict, p_route);
-}
-
-Error NetwMultiplayer::sink_verdict(Error p_verdict, int64_t p_route) {
+Error NetwMultiplayer::sink_verdict(
+    Error p_verdict,
+    int64_t p_route,
+    int64_t p_peer
+) {
     switch (GateVerdictBook::report_of(p_verdict)) {
         case GateVerdictBook::QUIET:
             break;
         case GateVerdictBook::WARN:
-            if (verdict_book.claim_warning(p_verdict, p_route)) {
-                NETW_WARN(
-                    sys::TRANSPORT,
-                    "A packet for route %d was refused with error %d.",
-                    int(p_route),
-                    int(p_verdict)
+            if (p_peer != 0) {
+                fault::raise(
+                    this,
+                    NETW_FAULT_MALFORMED_DATAGRAM,
+                    {String(), String(), String(), p_peer}
+                );
+            } else {
+                fault::raise(
+                    this,
+                    NETW_FAULT_LINK_FAILED,
+                    {vformat(
+                         "the packet for route %d (error %d)",
+                         int(p_route),
+                         int(p_verdict)
+                     ),
+                     String(),
+                     String("a peer that refused a packet")}
                 );
             }
             break;
         case GateVerdictBook::DEFECT:
-            NETW_ERROR(
-                sys::TRANSPORT,
-                "A packet handler returned error %d, which it should never "
-                "return.",
-                int(p_verdict)
-            );
+            NETW_BUG_REPORT();
             break;
     }
     if (p_verdict != OK) {
@@ -1773,7 +1760,8 @@ Error NetwMultiplayer::sink_verdict(Error p_verdict, int64_t p_route) {
 Error NetwMultiplayer::finish_stage_verdict(
     int64_t p_stage,
     Error p_verdict,
-    int64_t p_route
+    int64_t p_route,
+    int64_t p_peer
 ) {
     if (plane.wants(p_stage, p_route)) {
         EventPlane::Emission fact(
@@ -1785,7 +1773,7 @@ Error NetwMultiplayer::finish_stage_verdict(
         fact.verdict = p_verdict;
         plane.emit(fact);
     }
-    return sink_verdict(p_verdict, p_route);
+    return sink_verdict(p_verdict, p_route, p_peer);
 }
 
 void NetwMultiplayer::clear_verdicts() {
@@ -1892,11 +1880,14 @@ void NetwMultiplayer::adopt_schema_declarations() {
             schema_core.add_migration(schema, int(froms[at_step]), step);
         }
         if (schema_seal(schema) != OK) {
-            NETW_ERROR(
-                sys::TABLE,
-                "Schema '%s' was declared twice with different columns, so "
-                "peers cannot read each other. Declare each schema name once.",
-                String(declaration->get_schema_name())
+            fault::raise(
+                this,
+                NETW_FAULT_DECLARED_TWICE,
+                {vformat(
+                     "Schema '%s'",
+                     String(declaration->get_schema_name())
+                 ),
+                 "this session"}
             );
         } else if (!declaration->adopters.has(gd::instance_id(this))) {
             declaration->adopters.push_back(gd::instance_id(this));
@@ -1917,12 +1908,15 @@ void NetwMultiplayer::adopt_table_declarations() {
         }
         const RID table = table_create(schema);
         if (!table.is_valid()) {
-            NETW_ERROR(
-                sys::TABLE,
-                "Schema '%s' is replicated but has a column whose size varies, "
-                "so it has no table. Send it through a NetwChannel, or remove "
-                "replicated from the schema.",
-                String(declaration->get_schema_name())
+            fault::raise(
+                this,
+                NETW_FAULT_SETTING_REFUSED,
+                {vformat(
+                     "{NetwSchema.replicated} on schema '%s'",
+                     String(declaration->get_schema_name())
+                 ),
+                 "a column whose size varies",
+                 "a {NetwChannel} for it, or a schema without replicated"}
             );
             continue;
         }
@@ -2101,13 +2095,16 @@ bool NetwMultiplayer::lagcomp_effect_watch(
     const Callable &p_denied
 ) {
     const bool watching = effects.watch(p_key, p_confirmed, p_denied);
-    NETW_WARN_COND(
-        !watching,
-        sys::PREDICTION,
-        "Effect '%s' is not armed, so there is nothing to watch. Call "
-        "NetwMultiplayer.lagcomp_effect_arm before lagcomp_effect_watch.",
-        p_key
-    );
+    if (!watching) {
+        fault::raise(
+            this,
+            NETW_FAULT_REWIND_MISUSE,
+            {String(p_key),
+             String("an effect that is not armed"),
+             String("{NetwMultiplayer.lagcomp_effect_arm} before "
+                    "lagcomp_effect_watch")}
+        );
+    }
     return watching;
 }
 
@@ -2560,19 +2557,17 @@ PropertySet *NetwMultiplayer::property_set_of(const RID &p_set) const {
 
 PropertySet *NetwMultiplayer::mutable_property_set(const RID &p_set) {
     PropertySet *record = property_set_of(p_set);
-    NETW_ERR_COND_V(
-        record == nullptr,
-        nullptr,
-        sys::TABLE,
-        "The property set RID is not valid."
-    );
-    NETW_ERR_COND_V(
-        record->get_sealed(),
-        nullptr,
-        sys::TABLE,
-        "The property set is sealed, so it cannot be changed. Change it "
-        "before NetwMultiplayer.property_set_seal."
-    );
+    NETW_BUG_COND_V(record == nullptr, nullptr);
+    if (record->get_sealed()) {
+        fault::raise(
+            this,
+            NETW_FAULT_TOO_LATE,
+            {"Changing a property set",
+             "a sealed property set",
+             "{NetwMultiplayer.property_set_seal}"}
+        );
+        return nullptr;
+    }
 
     return record;
 }
@@ -2659,7 +2654,13 @@ void NetwMultiplayer::property_set_set_column_param(
             target.converge_stiffness = double(p_value);
             return;
         default:
-            NETW_ERR(sys::TABLE, "Column setting %d does not exist.", p_param);
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {"A column setting",
+                 vformat("setting %d", int(p_param)),
+                 "a column setting that exists"}
+            );
     }
 }
 
@@ -2708,10 +2709,12 @@ void NetwMultiplayer::property_set_set_param(
             record->heartbeat = int64_t(p_value);
             return;
         default:
-            NETW_ERR(
-                sys::TABLE,
-                "Property set setting %d does not exist.",
-                p_param
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {"A property set setting",
+                 vformat("setting %d", int(p_param)),
+                 "a property set setting that exists"}
             );
     }
 }
@@ -2758,12 +2761,11 @@ RID NetwMultiplayer::script_schema(const Ref<Script> &p_script, Node *p_node) {
         }
     }
     if (schema_seal(schema) != OK) {
-        NETW_ERROR(
-            sys::TABLE,
-            "Two nodes of script '%s' replicate properties with different "
-            "types, so peers cannot read each other. Give each replicated "
-            "property a static type.",
-            String(name)
+        fault::raise(
+            this,
+            NETW_FAULT_DECLARED_TWICE,
+            {"The replicated properties", String(name)},
+            gd::instance_id(p_node)
         );
     }
     return schema;
@@ -2910,7 +2912,7 @@ int64_t NetwMultiplayer::event_watch(
     const Callable &p_sink,
     const Dictionary &p_opts
 ) {
-    return plane.watch(p_events, p_target, p_predicate, p_sink, p_opts);
+    return plane.watch(this, p_events, p_target, p_predicate, p_sink, p_opts);
 }
 
 bool NetwMultiplayer::event_unwatch(int64_t p_id) {

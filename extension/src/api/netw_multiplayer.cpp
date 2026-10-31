@@ -10,6 +10,7 @@
 #include "netw/api/scene.hpp"
 #include "netw/diag/hints.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/spawn/book.hpp"
 #include "netw/spawn/pipeline.hpp"
 #include "netw/spawn/record.hpp"
@@ -130,6 +131,7 @@ NetwMultiplayer::NetwMultiplayer() {
     session_set_inner(transport);
     liveness_core.instantiate();
     clock.sink.bind(this);
+    interest_engine.host = this;
     clock.hook_with(
         [](void *p_context,
            ClockEngine::Event p_event,
@@ -328,19 +330,26 @@ Error NetwMultiplayer::observe(
     Notification p_event,
     const Callable &p_callback
 ) {
-    NETW_ERR_COND_V(
-        p_event < 0 || p_event >= NOTIFICATION_COUNT,
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "NetwMultiplayer.observe got %d, which is not a Notification.",
-        int(p_event)
-    );
-    NETW_ERR_COND_V(
-        !p_callback.is_valid(),
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "NetwMultiplayer.observe needs a valid Callable."
-    );
+    if (p_event < 0 || p_event >= NOTIFICATION_COUNT) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwMultiplayer.observe}",
+             String::num_int64(int(p_event)),
+             "a {enum NetwMultiplayer.Notification} value"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    if (!p_callback.is_valid()) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_CALLABLE,
+            {"{NetwMultiplayer.observe}",
+             String(),
+             "a Callable that can be called"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     if (!is_observing(p_event, p_callback)) {
         observers[p_event].push_back(p_callback);
     }
@@ -886,12 +895,12 @@ void NetwMultiplayer::membership_place_entity(const Ref<NetwEntity> &p_entity) {
         scene = RID();
     }
     if (membership_destination_foreign(owner)) {
-        NETW_ERROR(
-            sys::SCENE,
-            "Entity %d was moved under another MultiplayerViewport, which is "
-            "not supported. Despawn it here and spawn it in the other "
-            "viewport.",
-            int(p_entity->get_route())
+        fault::raise(
+            this,
+            NETW_FAULT_UNSUPPORTED,
+            {vformat("Entity %d", int(p_entity->get_route())),
+             "a move under another {MultiplayerViewport}",
+             "a despawn here and a spawn in the other viewport"}
         );
         scene = RID();
     }
@@ -1128,26 +1137,33 @@ Error NetwMultiplayer::player_kick(
     const Ref<NetwPlayer> &p_who,
     const String &p_reason
 ) {
-    NETW_ERR_COND_V(
-        !is_host(),
-        ERR_UNAUTHORIZED,
-        sys::SESSION,
-        "NetwSession.kick runs only on the server."
-    );
-    NETW_ERR_COND_V(
-        !player_holds(p_who),
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "NetwSession.kick got a player who already left."
-    );
+    if (!is_host()) {
+        fault::raise(this, NETW_FAULT_SERVER_ONLY, {"{NetwSession.kick}"});
+        return ERR_UNAUTHORIZED;
+    }
+    if (!player_holds(p_who)) {
+        fault::raise(
+            this,
+            NETW_FAULT_UNKNOWN_PEER,
+            {"{NetwSession.kick}",
+             String(),
+             String(),
+             p_who.is_valid() ? p_who->get_peer_id() : 0}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     const int64_t peer = p_who->get_peer_id();
-    NETW_ERR_COND_V(
-        peer == get_unique_id(),
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "The server cannot kick its own player. Call "
-        "NetwSession.leave to end the session."
-    );
+    if (peer == get_unique_id()) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSession.kick}",
+             "the server's own player",
+             "a client's player, or call {NetwSession.leave} to end the "
+             "session"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     player_note_leave(peer, NetwPlayer::LEAVE_KICKED);
     player_release_id(p_who);
     session_turn_peer_away(peer, p_reason);
@@ -1429,12 +1445,10 @@ void NetwMultiplayer::service_register(Object *p_service, Object *p_type) {
             return;
         }
         if (held != nullptr) {
-            NETW_WARN(
-                sys::SESSION,
-                "A service of type %s was already registered, and the new "
-                "one replaces it. Call NetwSession.unregister_service "
-                "first.",
-                type->to_string()
+            fault::raise(
+                this,
+                NETW_FAULT_DECLARED_AGAIN,
+                {String("The service"), type->to_string()}
             );
         }
         services[at].service = gd::instance_id(p_service);
@@ -1649,13 +1663,10 @@ bool NetwMultiplayer::session_preflight_join(
     }
     if (plan.declared && p_request.arg_values.is_empty()
         && !join_arg_types(plan.handler).is_empty()) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d joined with no arguments, but the Netw.configure_join "
-            "handler needs %d. Pass the arguments to Netw.prepare_join on "
-            "the client.",
-            int(p_accepted.peer_id),
-            int(join_arg_types(plan.handler).size())
+        fault::raise(
+            this,
+            NETW_FAULT_JOIN_ARGS_MISMATCH,
+            {String(), String(), String(), p_accepted.peer_id}
         );
         session_fail_join(
             p_accepted.peer_id,
@@ -1788,12 +1799,10 @@ void NetwMultiplayer::session_run_join_handler(
         gd::call_checked(plan.handler, args, called);
     }
     if (!called) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Peer %d joined, but its join arguments do not match the "
-            "Netw.configure_join handler. Make the handler's parameters "
-            "match what the client passes to Netw.prepare_join.",
-            int(peer)
+        fault::raise(
+            this,
+            NETW_FAULT_JOIN_ARGS_MISMATCH,
+            {String(), String(), String(), peer}
         );
     }
 }
@@ -1820,10 +1829,10 @@ void NetwMultiplayer::session_apply_admitted_roster() {
     prepared_join.reset();
     LocalVector<session::AcceptFrame> rows;
     if (!session::roster_read(roster, rows)) {
-        NETW_WARN(
-            sys::SESSION,
-            "The server's list of players could not be read. Run the same "
-            "Networked version on both peers."
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), SERVER_PEER}
         );
         return;
     }
@@ -1878,6 +1887,10 @@ void NetwMultiplayer::session_after_edge(int64_t, int64_t p_new) {
         transfer_gone = PackedInt64Array();
         transfer_former = 0;
         clock_engine().set_held(false);
+        const PackedStringArray repeated = faults.end_session();
+        for (int at = 0; at < repeated.size(); ++at) {
+            gd::print(repeated[at]);
+        }
     }
 }
 
@@ -2101,11 +2114,10 @@ void NetwMultiplayer::session_receive_join(
             reading ? int64_t(reading->get_ticks_msec()) : 0
         )) {
         if (session_core.claim_flood_report(int(p_sender))) {
-            NETW_WARN(
-                sys::SESSION,
-                "Peer %d sent too many join requests, so the extra ones were "
-                "dropped.",
-                int(p_sender)
+            fault::raise(
+                this,
+                NETW_FAULT_JOIN_FLOOD,
+                {String(), String(), String(), p_sender}
             );
         }
         return;
@@ -2144,11 +2156,10 @@ void NetwMultiplayer::session_accept_join(
 ) {
     JoinRequest requested;
     if (!requested.deserialize(p_payload)) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d sent a join request that could not be read, so it "
-            "was dropped.",
-            int(p_sender)
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender}
         );
         auth_refuse(
             p_sender,
@@ -2161,12 +2172,13 @@ void NetwMultiplayer::session_accept_join(
     requested.peer_id = p_sender;
     const char *differs = session_identity_differs(requested);
     if (differs != nullptr) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d was refused, because its %s identity differs from "
-            "this server's. Run the same build on both peers.",
-            int(p_sender),
-            differs
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_MISMATCH,
+            {String("its join"),
+             String(),
+             String(differs) + String(" identity"),
+             p_sender}
         );
         session_fail_join(
             p_sender,
@@ -2326,14 +2338,16 @@ PackedByteArray NetwMultiplayer::session_accept_payload(
         if (length <= wire::STRING_CAP) {
             p_row.join_address = address;
         } else {
-            NETW_ERROR(
-                sys::TRANSPORT,
-                "NetwConnection.join_address is %d bytes long, and a join "
-                "packet carries at most %d, so peer %d joined without it. Use "
-                "a shorter address in the transport or lobby directory.",
-                int(length),
-                wire::STRING_CAP,
-                int(p_destination)
+            fault::raise(
+                nullptr,
+                NETW_FAULT_LIMIT_EXCEEDED,
+                {String("{NetwConnection.join_address}"),
+                 String("the address in the join packet"),
+                 String("a shorter address in the transport or lobby "
+                        "directory"),
+                 p_destination,
+                 length,
+                 int64_t(wire::STRING_CAP)}
             );
         }
         p_row.max_players = uint64_t(connection_max_players());
@@ -2392,22 +2406,26 @@ int64_t NetwMultiplayer::connection_max_players() const {
 
 Error NetwMultiplayer::connection_set_join_address(const String &p_address) {
     if (!has_server_role() || !is_online()) {
-        NETW_ERROR(
-            sys::TRANSPORT,
-            "Only an online server sets NetwConnection.join_address. Set it "
-            "after NetwConnection.host settles."
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwConnection.join_address}"}
         );
         return ERR_UNAVAILABLE;
     }
-    NETW_ERR_COND_V(
-        wire::string_bytes(p_address) > wire::STRING_CAP,
-        ERR_INVALID_PARAMETER,
-        sys::TRANSPORT,
-        "NetwConnection.join_address got an address %d bytes long, and a "
-        "join packet carries at most %d. Set a shorter address.",
-        int(wire::string_bytes(p_address)),
-        wire::STRING_CAP
-    );
+    if (wire::string_bytes(p_address) > wire::STRING_CAP) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwConnection.join_address}",
+             vformat(
+                 "an address %d bytes long",
+                 int(wire::string_bytes(p_address))
+             ),
+             vformat("an address of at most %d bytes", wire::STRING_CAP)}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     connect_core.advertise(p_address, 0);
     const int64_t mine = get_unique_id();
     for (const session::AcceptFrame &row : join_roster.accepted_joins()) {
@@ -2544,7 +2562,14 @@ void NetwMultiplayer::session_leave_for_schema(const String &p_node) {
         "Run the same build on both peers.",
         p_node
     );
-    NETW_ERROR(sys::SESSION, "%s", reason);
+    fault::raise(
+        this,
+        NETW_FAULT_PEER_MISMATCH,
+        {String("its session"),
+         String(),
+         String("the synchronized properties of '") + p_node + String("'"),
+         SERVER_PEER}
+    );
     session_note_exit(enums::NetwSession::KICKED, reason);
     notify(PEER_KICKED, reason);
     schema_leave_pending = true;
@@ -2624,7 +2649,6 @@ void NetwMultiplayer::session_clear_roster() {
     join_roster.clear();
     unreachable_peers.clear();
     settled_peer_departures.clear();
-    call_faults_reported.clear();
 }
 
 PackedInt32Array NetwMultiplayer::reachable_peer_ids() const {
@@ -2694,11 +2718,12 @@ void NetwMultiplayer::session_watch_serverless_mesh() {
     }
     serverless_mesh_polls += 1;
     if (serverless_mesh_polls == SERVERLESS_MESH_WARN_POLLS) {
-        NETW_WARN(
-            sys::SESSION,
-            "This peer is linked to other peers but not to peer 1, so it is "
-            "not online. Link it to the endpoint created with id 1, which is "
-            "the server."
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_REFUSED,
+            {String(),
+             "no link to peer 1",
+             "the peer after it links to the endpoint created with id 1"}
         );
     }
 }
@@ -2736,11 +2761,13 @@ void NetwMultiplayer::peer_mark_unreachable(int64_t p_peer) {
             int(p_peer)
         );
     } else {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "Peer %d refused a packet, so nothing more is sent to it until it "
-            "connects again.",
-            int(p_peer)
+        fault::raise(
+            this,
+            NETW_FAULT_LINK_FAILED,
+            {String("sending to it"),
+             String(),
+             vformat("peer %d, which refused a packet", int(p_peer)),
+             p_peer}
         );
     }
     session_settle_peer_loss(p_peer);
@@ -2788,13 +2815,16 @@ double NetwMultiplayer::get_auth_timeout() const {
 }
 
 void NetwMultiplayer::set_auth_timeout(double p_seconds) {
-    NETW_ERR_COND(
-        p_seconds < 0.0,
-        sys::SESSION,
-        "NetwMultiplayer.auth_timeout got %s seconds. Pass 0 for no limit "
-        "or a number of seconds above zero.",
-        String::num(p_seconds)
-    );
+    if (p_seconds < 0.0) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwMultiplayer.auth_timeout}",
+             vformat("%s seconds", String::num(p_seconds)),
+             "0 for no limit or a number of seconds above zero"}
+        );
+        return;
+    }
     auth_timeout_seconds = p_seconds;
     if (inner.is_valid() && !auth_is_armed()) {
         inner->set_auth_timeout(p_seconds);
@@ -2861,7 +2891,10 @@ TypedArray<NetwPlayer> NetwMultiplayer::get_connected_players() const {
     return player_all();
 }
 
-Error NetwMultiplayer::configuration_door_refuses_config(Object *p_config) {
+Error NetwMultiplayer::configuration_door_refuses_config(
+    NetwMultiplayer *p_session,
+    Object *p_config
+) {
     const char *verb = nullptr;
     if (Object::cast_to<NetwSessionConfig>(p_config) != nullptr) {
         verb = "Netw.configure_session";
@@ -2875,13 +2908,15 @@ Error NetwMultiplayer::configuration_door_refuses_config(Object *p_config) {
     if (verb == nullptr) {
         return OK;
     }
-    NETW_ERROR(
-        sys::SESSION,
-        "%s cannot be passed to MultiplayerAPI.object_configuration_add or "
-        "object_configuration_remove. Declare it with %s before the "
-        "session starts.",
-        p_config->get_class(),
-        verb
+    fault::raise(
+        p_session,
+        NETW_FAULT_UNSUPPORTED,
+        {vformat(
+             "A %s passed to {MultiplayerAPI.object_configuration_add}",
+             p_config->get_class()
+         ),
+         "the engine's configuration door",
+         vformat("{%s} before the session starts", verb)}
     );
     return ERR_UNAVAILABLE;
 }
@@ -3020,13 +3055,10 @@ void NetwMultiplayer::auth_receive(
         default:
             break;
     }
-    NETW_WARN(
-        sys::SESSION,
-        "Peer %d sent %d bytes of authentication this peer does not "
-        "understand, so it was disconnected. Run the same build on both "
-        "peers.",
-        int(p_peer),
-        p_data.size()
+    fault::raise(
+        this,
+        NETW_FAULT_MALFORMED_DATAGRAM,
+        {String(), String(), String(), p_peer}
     );
     disconnect_peer(p_peer);
 }
@@ -3064,13 +3096,13 @@ void NetwMultiplayer::auth_send_hello(int64_t p_peer) {
         auth::encode_client_hello(uint64_t(auth_app_tag), flags)
     );
     if (sent != OK) {
-        NETW_WARN(
-            sys::SESSION,
-            "Authentication could not reach peer %d (error %d). The "
-            "connection stays unauthenticated until "
-            "SceneMultiplayer.auth_timeout closes it.",
-            int(p_peer),
-            int(sent)
+        fault::raise(
+            this,
+            NETW_FAULT_LINK_FAILED,
+            {String("authentication"),
+             String(),
+             vformat("peer %d (error %d)", int(p_peer), int(sent)),
+             p_peer}
         );
         return;
     }
@@ -3138,12 +3170,10 @@ Error NetwMultiplayer::auth_complete_link(int64_t p_peer) {
     }
     const Error completed = inner->complete_auth(int32_t(p_peer));
     if (completed != OK) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Authentication with peer %d could not finish (error %d), so it "
-            "was disconnected.",
-            int(p_peer),
-            int(completed)
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_peer}
         );
         disconnect_peer(p_peer);
     }
@@ -3168,19 +3198,19 @@ void NetwMultiplayer::auth_receive_game(
     const PackedByteArray &p_data
 ) {
     if (!auth_app_callback.is_valid()) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d sent authentication for a NetwMultiplayer.auth_callback "
-            "this peer does not set, so it was disconnected. Set the same "
-            "auth_callback on both peers.",
-            int(p_peer)
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_MISMATCH,
+            {String("its authentication"),
+             String(),
+             String("NetwMultiplayer.auth_callback"),
+             p_peer}
         );
         disconnect_peer(p_peer);
         return;
     }
     static const GameCall AUTH_CALLBACK
-        = {sys::SESSION,
-           "NetwMultiplayer.auth_callback",
+        = {"NetwMultiplayer.auth_callback",
            "func(peer_id: int, data: PackedByteArray)",
            2};
     Array args;
@@ -3196,11 +3226,10 @@ void NetwMultiplayer::auth_receive_join(
     LinkHandshake *link = link_handshakes.getptr(p_peer);
     if (!has_server_role() || get_unique_id() != SERVER_PEER || link == nullptr
         || !link->hello_heard) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d sent a join before its hello, so it was disconnected. "
-            "Run the same Networked version on both peers.",
-            int(p_peer)
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_peer}
         );
         disconnect_peer(p_peer);
         return;
@@ -3236,11 +3265,10 @@ void NetwMultiplayer::auth_receive_answer(
         return;
     }
     if (!answer.ok) {
-        NETW_WARN(
-            sys::SESSION,
-            "The server's answer to the join could not be read, so the "
-            "connection was closed. Run the same Networked version on both "
-            "peers."
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), SERVER_PEER}
         );
         auth_refused_locally(
             ERR_UNCONFIGURED,
@@ -3367,25 +3395,20 @@ void NetwMultiplayer::auth_receive_hello(
     );
     if (!decoded.ok()) {
         if (decoded.refusal == auth::Refusal::APP) {
-            NETW_WARN(
-                sys::SESSION,
-                "Peer %d was refused, because its app tag %s differs from "
-                "this server's %s. Set the same tag on both with "
-                "NetwMultiplayer.auth_set_app_tag.",
-                int(p_peer),
-                String::num_uint64(int64_t(decoded.app_tag), 16),
-                String::num_uint64(auth_app_tag, 16)
+            fault::raise(
+                this,
+                NETW_FAULT_PEER_MISMATCH,
+                {String("its authentication"),
+                 String(),
+                 String("the app tag"),
+                 p_peer}
             );
             session_refuse(p_peer, "Incompatible game build");
         } else {
-            NETW_WARN(
-                sys::SESSION,
-                "Peer %d was disconnected, because its authentication could "
-                "not be read (%s). Run the same Networked version on both "
-                "peers.",
-                int(p_peer),
-                decoded.refusal == auth::Refusal::VERSION ? "version"
-                                                          : "framing"
+            fault::raise(
+                this,
+                NETW_FAULT_MALFORMED_DATAGRAM,
+                {String(), String(), String(), p_peer}
             );
         }
         if (decoded.refusal == auth::Refusal::FRAMING) {
@@ -3448,11 +3471,13 @@ void NetwMultiplayer::auth_receive_hello(
               "server does not. Set the same auth_callback on both peers."
             : "This server sets NetwMultiplayer.auth_callback and the joining "
               "peer does not. Set the same auth_callback on both peers.";
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d was refused. %s",
-            int(p_peer),
-            unmatched
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_MISMATCH,
+            {String("its authentication"),
+             String(),
+             String("NetwMultiplayer.auth_callback"),
+             p_peer}
         );
         session_refuse(p_peer, unmatched);
         if (!auth_refuse(p_peer, ERR_UNCONFIGURED, unmatched)) {
@@ -3505,8 +3530,7 @@ PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
         declaration_slots.report_unresolved(
             this,
             session_decl::KIND_SERVER_INFO,
-            declared.state,
-            "a probe"
+            declared.state
         );
         r_answered = false;
         return PackedByteArray();
@@ -3517,13 +3541,13 @@ PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
     const Ref<NetwServerInfo> info
         = Ref<NetwServerInfo>(Object::cast_to<NetwServerInfo>(answered));
     if (!called || info.is_null()) {
-        NETW_ERROR(
-            sys::TRANSPORT,
-            "A probe got no reply, because the Netw.configure_server_info "
-            "handler returned %s. Edit the NetwServerInfo it is given and "
-            "return it.",
-            called ? String(Variant::get_type_name(answered.get_type()))
-                   : String("nothing, because the call itself failed")
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_RETURN,
+            {"the {Netw.configure_server_info} handler",
+             called ? String(Variant::get_type_name(answered.get_type()))
+                    : String("nothing, because the call itself failed"),
+             "the {NetwServerInfo} it is given, edited"}
         );
         r_answered = false;
         return PackedByteArray();
@@ -3600,22 +3624,25 @@ Variant NetwMultiplayer::peer_get_bucket(
     int64_t p_peer,
     const Variant &p_type
 ) {
-    NETW_ERR_COND_V(
-        !session_has_accepted(p_peer),
-        Variant(),
-        sys::SESSION,
-        "NetwSession.bucket_of got peer %d, which has not joined "
-        "this session.",
-        int(p_peer)
-    );
+    if (!session_has_accepted(p_peer)) {
+        fault::raise(
+            this,
+            NETW_FAULT_UNKNOWN_PEER,
+            {"{NetwSession.bucket_of}", String(), String(), p_peer}
+        );
+        return Variant();
+    }
     Object *type = Object::cast_to<Object>(p_type);
-    NETW_ERR_COND_V(
-        type == nullptr,
-        Variant(),
-        sys::SESSION,
-        "NetwSession.bucket_of needs a script to build the bucket "
-        "from. Pass a script class that extends RefCounted."
-    );
+    if (type == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_SCRIPT,
+            {"{NetwSession.bucket_of}",
+             "no script",
+             "a script class that extends RefCounted"}
+        );
+        return Variant();
+    }
     if (!peer_buckets.has(p_peer)) {
         peer_buckets.insert(p_peer, Dictionary());
     }
@@ -3625,13 +3652,16 @@ Variant NetwMultiplayer::peer_get_bucket(
     }
     const Ref<RefCounted> minted
         = Ref<RefCounted>(type->call(StringName("new")));
-    NETW_ERR_COND_V(
-        minted.is_null(),
-        Variant(),
-        sys::SESSION,
-        "NetwSession.bucket_of could not build the bucket. Its "
-        "script must extend RefCounted."
-    );
+    if (minted.is_null()) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_SCRIPT,
+            {"{NetwSession.bucket_of}",
+             "a script that does not extend RefCounted",
+             "a script class that extends RefCounted"}
+        );
+        return Variant();
+    }
     held[p_type] = minted;
     return minted;
 }
@@ -3672,14 +3702,18 @@ bool is_session_core_state(int64_t p_state) {
 } // namespace
 
 void NetwMultiplayer::session_set_state(SessionState p_state) {
-    NETW_ERR_COND(
-        !is_session_core_state(p_state),
-        sys::SESSION,
-        "State %d cannot be set on a session. STATE_CREATING only reports a "
-        "peer being built, so pass STATE_OFFLINE, STATE_CONNECTING, "
-        "STATE_ONLINE or STATE_DISCONNECTING.",
-        int(p_state)
-    );
+    if (!is_session_core_state(p_state)) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwMultiplayer.session_set_state}",
+             vformat("state %d", int(p_state)),
+             "{NetwSession.STATE_OFFLINE}, {NetwSession.STATE_CONNECTING}, "
+             "{NetwSession.STATE_ONLINE} or "
+             "{NetwSession.STATE_DISCONNECTING}"}
+        );
+        return;
+    }
     session_core.set_state(SessionCore::State(p_state));
 }
 
@@ -3693,14 +3727,18 @@ void NetwMultiplayer::session_set_desired_role(Role p_role) {
 }
 
 void NetwMultiplayer::session_transition(SessionState p_state) {
-    NETW_ERR_COND(
-        !is_session_core_state(p_state),
-        sys::SESSION,
-        "State %d cannot be set on a session. STATE_CREATING only reports a "
-        "peer being built, so pass STATE_OFFLINE, STATE_CONNECTING, "
-        "STATE_ONLINE or STATE_DISCONNECTING.",
-        int(p_state)
-    );
+    if (!is_session_core_state(p_state)) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwMultiplayer.session_transition}",
+             vformat("state %d", int(p_state)),
+             "{NetwSession.STATE_OFFLINE}, {NetwSession.STATE_CONNECTING}, "
+             "{NetwSession.STATE_ONLINE} or "
+             "{NetwSession.STATE_DISCONNECTING}"}
+        );
+        return;
+    }
     session_core.transition(SessionCore::State(p_state));
 }
 
@@ -3753,12 +3791,10 @@ void NetwMultiplayer::session_broadcast_control(
 }
 
 void NetwMultiplayer::session_pause(const String &p_reason) {
-    NETW_ERR_COND(
-        !session_core.is_server_role(),
-        sys::SESSION,
-        "Only the server can pause the session. Check multiplayer.is_server() "
-        "before calling NetwSession.pause."
-    );
+    if (!session_core.is_server_role()) {
+        fault::raise(this, NETW_FAULT_SERVER_ONLY, {"{NetwSession.pause}"});
+        return;
+    }
     session_broadcast_control(
         control_channels.pause,
         session::frame_write(session::SessionReason{p_reason})
@@ -3766,12 +3802,10 @@ void NetwMultiplayer::session_pause(const String &p_reason) {
 }
 
 void NetwMultiplayer::session_unpause() {
-    NETW_ERR_COND(
-        !session_core.is_server_role(),
-        sys::SESSION,
-        "Only the server can unpause the session. Check "
-        "multiplayer.is_server() before calling NetwSession.unpause."
-    );
+    if (!session_core.is_server_role()) {
+        fault::raise(this, NETW_FAULT_SERVER_ONLY, {"{NetwSession.unpause}"});
+        return;
+    }
     session_broadcast_control(control_channels.unpause, PackedByteArray());
 }
 
@@ -3780,11 +3814,14 @@ bool NetwMultiplayer::session_is_paused() const {
 }
 
 void NetwMultiplayer::session_notify_shutdown(const String &p_reason) {
-    NETW_ERR_COND(
-        !session_core.is_server_role(),
-        sys::SESSION,
-        "NetwMultiplayer.session_notify_shutdown runs only on the server."
-    );
+    if (!session_core.is_server_role()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.session_notify_shutdown}"}
+        );
+        return;
+    }
     session_broadcast_control(
         control_channels.shutdown,
         session::frame_write(session::SessionReason{p_reason})
@@ -3815,11 +3852,14 @@ void NetwMultiplayer::session_request_leave(const String &p_reason) {
 }
 
 void NetwMultiplayer::peer_kick(int64_t p_peer_id, const String &p_reason) {
-    NETW_ERR_COND(
-        !is_host(),
-        sys::SESSION,
-        "NetwMultiplayer.peer_kick runs only on the server."
-    );
+    if (!is_host()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.peer_kick}", String(), String(), p_peer_id}
+        );
+        return;
+    }
     session_turn_peer_away(p_peer_id, p_reason);
 }
 
@@ -4074,16 +4114,16 @@ Ref<MultiplayerPeer> NetwMultiplayer::peer_shaped(
         return p_peer;
     }
     if (peer_relabels(p_peer)) {
-        if (!relabel_shaping_warned) {
-            relabel_shaping_warned = true;
-            NETW_WARN(
-                sys::TRANSPORT,
-                "%s can move the server, so the session link conditions are "
-                "not applied to it. Simulate lag inside the transport "
-                "instead.",
-                String(p_peer->get_class())
-            );
-        }
+        fault::raise(
+            const_cast<NetwMultiplayer *>(this),
+            NETW_FAULT_UNSUPPORTED,
+            {String("The session link conditions"),
+             vformat(
+                 "%s, which can move the server",
+                 String(p_peer->get_class())
+             ),
+             String("lag simulated inside the transport")}
+        );
         return p_peer;
     }
     Ref<link::ShapedPeer> shaped;
@@ -4102,30 +4142,39 @@ void NetwMultiplayer::NETW_API_VIRTUAL(set_multiplayer_peer)(
         return;
     }
     const connect::PeerOffer *offered = connect::offer_of_peer(p_peer);
-    NETW_ERR_COND(
-        offered != nullptr && !offered->claimed
-            && offered->session != gd::instance_id(this),
-        sys::TRANSPORT,
-        "This peer was created for another session, so the assignment was "
-        "ignored. Assign it to the session that created it."
-    );
-    NETW_ERR_COND(
-        p_peer.is_valid()
-            && p_peer->get_connection_status()
-                == MultiplayerPeer::CONNECTION_DISCONNECTED,
-        sys::TRANSPORT,
-        "The assigned peer is disconnected, so the assignment was ignored. "
-        "Assign the peer after create_server or create_client succeeds."
-    );
+    if (offered != nullptr && !offered->claimed
+        && offered->session != gd::instance_id(this)) {
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_REFUSED,
+            {String(),
+             "its link to another session",
+             "the peer to the session that created it"}
+        );
+        return;
+    }
+    if (p_peer.is_valid()
+        && p_peer->get_connection_status()
+            == MultiplayerPeer::CONNECTION_DISCONNECTED) {
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_REFUSED,
+            {String(),
+             "its disconnected state",
+             "the peer after create_server or create_client succeeds"}
+        );
+        return;
+    }
     const bool live
         = p_peer.is_valid() && !p_peer->is_class("OfflineMultiplayerPeer");
-    NETW_ERR_COND(
-        config_applying,
-        sys::SESSION,
-        "The peer was assigned while the session applied its Netw.configure_* "
-        "settings, so the assignment was ignored. Assign it outside the "
-        "callbacks that react to those settings."
-    );
+    if (config_applying) {
+        fault::raise(
+            this,
+            NETW_FAULT_BUSY_APPLYING,
+            {"{MultiplayerAPI.multiplayer_peer}"}
+        );
+        return;
+    }
     if (live) {
         if (apply_pending_config(false, "the peer assignment") != OK) {
             return;
@@ -4415,10 +4464,12 @@ RID NetwMultiplayer::transport_register(const Ref<Script> &p_type) {
     const Ref<Script> script
         = netw::script::model::declaring_script(p_type.ptr());
     if (script.is_null()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwMultiplayer.transport_register needs a script that extends "
-            "NetwTransport."
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_SCRIPT,
+            {"{NetwMultiplayer.transport_register}",
+             "no script",
+             "a script that extends {NetwTransport}"}
         );
         return RID();
     }
@@ -4831,7 +4882,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(object_configuration_add)(
     NETW_API_CONFIG_ARG p_configuration
 ) {
     Object *declared = p_configuration.get_validated_object();
-    const Error refused = configuration_door_refuses_config(declared);
+    const Error refused = configuration_door_refuses_config(this, declared);
     if (refused != OK) {
         return refused;
     }
@@ -4854,7 +4905,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(object_configuration_remove)(
     NETW_API_CONFIG_ARG p_configuration
 ) {
     Object *declared = p_configuration.get_validated_object();
-    const Error refused = configuration_door_refuses_config(declared);
+    const Error refused = configuration_door_refuses_config(this, declared);
     if (refused != OK) {
         return refused;
     }
@@ -5011,10 +5062,10 @@ void NetwMultiplayer::clock_receive_handshake_reply(
     }
     session::ClockRate answered;
     if (!session::frame_read(p_payload, answered)) {
-        NETW_ERROR(
-            sys::CLOCK,
-            "The server's clock reply could not be read, so this peer kept "
-            "its own tickrate. Run the same build on both peers."
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), SERVER_PEER}
         );
         return;
     }
@@ -5027,12 +5078,13 @@ void NetwMultiplayer::clock_receive_handshake_reply(
         } else if (clock_mismatch_action == MISMATCH_ACTION_SIGNAL) {
             notify(CLOCK_TICKRATE_MISMATCH, p_sender, server_tickrate);
         } else {
-            NETW_WARN(
-                sys::CLOCK,
-                "This peer runs at tickrate %d and the server at %d. Set the "
-                "same NetwClockConfig.tickrate on both.",
-                clock_engine().get_tickrate(),
-                server_tickrate
+            fault::raise(
+                this,
+                NETW_FAULT_PEER_MISMATCH,
+                {String("the clock"),
+                 String(),
+                 String("NetwClockConfig.tickrate"),
+                 SERVER_PEER}
             );
         }
     }
@@ -5474,8 +5526,7 @@ int64_t NetwMultiplayer::action_gate_count() const {
 Node *NetwMultiplayer::session_root() const {
     if (session_root_reader.is_valid()) {
         static const GameCall ROOT_READER
-            = {sys::SESSION,
-               "The NetwMultiplayer.session_set_root reader",
+            = {"The NetwMultiplayer.session_set_root reader",
                "func() -> Node",
                0};
         const Variant answered
@@ -5542,11 +5593,10 @@ Error NetwMultiplayer::session_initialize(
     const int slot = int(session_decl::KIND_SESSION_CONFIG)
         - int(session_decl::KIND_SESSION_CONFIG);
     if (config_consumption[slot].consumed) {
-        NETW_WARN(
-            sys::SESSION,
-            "Netw.configure_session ran after the session started, so the "
-            "running values are unchanged. Call it before startup and "
-            "finish the chain without awaiting."
+        fault::raise(
+            this,
+            NETW_FAULT_DECLARED_ONLINE,
+            {"{Netw.configure_session}", String(), "the session settings"}
         );
         return ERR_ALREADY_IN_USE;
     }
@@ -5600,8 +5650,7 @@ NetwMultiplayer::JoinPlan NetwMultiplayer::session_resolve_join() {
         declaration_slots.report_unresolved(
             this,
             session_decl::KIND_JOIN,
-            declared.state,
-            "a join"
+            declared.state
         );
         plan.available = false;
         return plan;
@@ -5666,7 +5715,8 @@ void NetwMultiplayer::session_encode_join_args(JoinRequest &r_request) {
             stream,
             r_request.arg_values,
             quantizers,
-            join_arg_types(handler)
+            join_arg_types(handler),
+            this
         )
         || !stream.align_verify()) {
         r_request.arg_bytes = PackedByteArray();
@@ -5767,12 +5817,10 @@ bool NetwMultiplayer::session_resolve_inbound_join(
     session::AcceptFrame &r_accepted
 ) {
     if (!session_decode_join_args(r_request)) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d was refused, because its join arguments do not match "
-            "the Netw.configure_join handler. Pass matching arguments to "
-            "Netw.prepare_join.",
-            int(p_sender)
+        fault::raise(
+            this,
+            NETW_FAULT_JOIN_ARGS_MISMATCH,
+            {String(), String(), String(), p_sender}
         );
         return false;
     }
@@ -5900,11 +5948,13 @@ void NetwMultiplayer::session_leave_drained(
     session_leaving.unref();
     const Error drained = Error(int(p_drained->get_result()));
     if (drained != OK) {
-        NETW_ERROR(
-            sys::SESSION,
-            "The session stayed online, because an entity could not be "
-            "saved. Call NetwSession.leave again to retry, or close "
-            "the peer to leave without saving."
+        fault::raise(
+            this,
+            NETW_FAULT_STORAGE_FAILED,
+            {String("the database"),
+             String("the leave"),
+             String("its file or service before calling "
+                    "{NetwSession.leave} again")}
         );
         p_left->resolve(int(drained));
         return;
@@ -6261,9 +6311,10 @@ Ref<NetwPromise> NetwMultiplayer::session_prepare_join(
     NETW_ZONE_NC("netw::session_prepare_join", colors::SESSION);
     session_clear_prepared_join();
     if (String(p_username).is_empty()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.prepare_join needs a username, and it was empty."
+        fault::raise(
+            this,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{Netw.prepare_join}", String(), "username"}
         );
         return NetwPromise::resolved(ERR_INVALID_PARAMETER);
     }
@@ -6319,14 +6370,7 @@ bool NetwMultiplayer::connect_once(
         return true;
     }
     count_verdict(ERR_UNAVAILABLE, 0);
-    NETW_ERROR(
-        sys::SESSION,
-        "Connecting to the signal '%s' failed with error %d, so its "
-        "callback will not run.",
-        String(p_signal.get_name()),
-        int(verdict)
-    );
-    return false;
+    NETW_BUG_V(false);
 }
 
 bool NetwMultiplayer::disconnect_once(
@@ -6411,10 +6455,12 @@ Ref<NetwMultiplayer> NetwMultiplayer::create(
     Ref<NetwMultiplayer> made;
     if (selected.is_valid()) {
         if (!is_extension_script(selected)) {
-            NETW_ERROR(
-                sys::SESSION,
-                "The script for a new NetwMultiplayer does not extend it. "
-                "Use a script that starts with 'extends NetwMultiplayer'."
+            fault::raise(
+                nullptr,
+                NETW_FAULT_BAD_SCRIPT,
+                {"{NetwMultiplayer.create}",
+                 "a script that does not extend {NetwMultiplayer}",
+                 "a script that extends {NetwMultiplayer}"}
             );
             return Ref<NetwMultiplayer>();
         }
@@ -6494,24 +6540,24 @@ Ref<Script> NetwMultiplayer::law_extension_script() {
     const Ref<Script> named = ResourceLoader::get_singleton()->load(path);
 #endif
     if (named.is_null()) {
-        NETW_ERR_V(
-            resolved,
-            sys::SESSION,
-            "%s names '%s', which is not a script. Point it at a script "
-            "that extends NetwMultiplayer.",
-            LAW_EXTENSION_ENV,
-            path
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_SCRIPT,
+            {String(LAW_EXTENSION_ENV),
+             vformat("'%s'", path),
+             "a script that extends {NetwMultiplayer}"}
         );
+        return resolved;
     }
     if (!is_extension_script(named)) {
-        NETW_ERR_V(
-            resolved,
-            sys::SESSION,
-            "%s names '%s', which does not extend NetwMultiplayer. Point it "
-            "at a script that does.",
-            LAW_EXTENSION_ENV,
-            path
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_SCRIPT,
+            {String(LAW_EXTENSION_ENV),
+             vformat("'%s'", path),
+             "a script that extends {NetwMultiplayer}"}
         );
+        return resolved;
     }
     resolved = named;
     return resolved;
@@ -6775,12 +6821,12 @@ void NetwMultiplayer::seam_refused(
 ) {
     if (!misused_seams.has(p_seam)) {
         misused_seams.insert(p_seam);
-        NETW_ERROR(
-            sys::EVENT,
-            "The override of %s returned %s, so the default ran instead. "
-            "Return what its documentation asks for.",
-            String(p_seam),
-            p_reason
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_RETURN,
+            {vformat("the override of %s", String(p_seam)),
+             p_reason,
+             "what its documentation asks for"}
         );
     }
     EventPlane::Emission misuse(

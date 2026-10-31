@@ -340,20 +340,6 @@ TEST_CASE(
     "[Networked][Entity][Hosted] R6 a facet a record cannot build is nothing, "
     "not a guess"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][entity] Condition \"p_part < 0 || p_part >= "
-        "PART_MAX\" is true. Returning: Variant(). Entity part 6 "
-        "does not exist.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Condition \"p_part < 0 || p_part >= "
-        "PART_MAX\" is true. Returning: Variant(). Entity part -1 "
-        "does not exist.",
-        1
-    );
-
     EntityFactories factories;
     Record record;
     Ref<RefCounted> wrapper = make_wrapper();
@@ -588,22 +574,14 @@ TEST_CASE(
     NETW_CHECK_EQ(input_sync->get_multiplayer_authority(), 4);
     NETW_CHECK_EQ(nested->get_multiplayer_authority(), 9);
     NETW_CHECK_EQ(nested_leaf->get_multiplayer_authority(), 9);
-    CHECK_FALSE(record->get_native_write_warned());
 
     SUBCASE("a native write the next projection replaces warns once") {
-        expected_faults.expect_warning(
-            "[warn][entity] InputSync had its multiplayer authority"
-            " set to 6 outside its entity, and the entity sets it "
-            "back to 5. Choose who holds it with "
-            "NetwEntity.authority.",
-            1
-        );
+        expected_faults.expect_error("*'InputSync'*[NW1012]*", 1);
 
         input_sync->set_multiplayer_authority(6, false);
         record->get_control()->set_controller(5);
         record->apply_control(nullptr, owner);
         NETW_CHECK_EQ(input_sync->get_multiplayer_authority(), 5);
-        CHECK(record->get_native_write_warned());
     }
 
     SUBCASE("a revoke returns every node to the server") {
@@ -612,7 +590,6 @@ TEST_CASE(
         NETW_CHECK_EQ(owner->get_multiplayer_authority(), 1);
         NETW_CHECK_EQ(server_leaf->get_multiplayer_authority(), 1);
         NETW_CHECK_EQ(input_sync->get_multiplayer_authority(), 1);
-        CHECK_FALSE(record->get_native_write_warned());
     }
 
     memdelete(owner);
@@ -647,7 +624,6 @@ TEST_CASE(
     NETW_CHECK_EQ(log.count("moved"), 2);
     NETW_CHECK_EQ(int(log.args("moved", 1)[0]), 4);
     NETW_CHECK_EQ(int(log.args("moved", 1)[1]), 5);
-    CHECK_FALSE(record->get_native_write_warned());
 
     memdelete(owner);
 }
@@ -724,13 +700,7 @@ TEST_CASE(
     NETW_CHECK_EQ(log.count("asked"), 0);
 
     SUBCASE("a requestable entity asks, and grants when nobody refuses") {
-        expected_faults.expect_warning(
-            "[warn][entity] Peer * asked for control, but "
-            "NetwEntity.transfer is TRANSFER_FIXED, so it was "
-            "refused. Set it to TRANSFER_REQUESTABLE to allow "
-            "requests.",
-            1
-        );
+        expected_faults.expect_warning("*[NW0024]*", 1);
 
         record->get_control()->set_transfer(
             int(netw::entity::Control::Transfer::REQUESTABLE)
@@ -742,13 +712,7 @@ TEST_CASE(
     }
 
     SUBCASE("a listener that denies stops the grant") {
-        expected_faults.expect_warning(
-            "[warn][entity] Peer * asked for control, but "
-            "NetwEntity.transfer is TRANSFER_FIXED, so it was "
-            "refused. Set it to TRANSFER_REQUESTABLE to allow "
-            "requests.",
-            1
-        );
+        expected_faults.expect_warning("*[NW0024]*", 1);
 
         record->get_control()->set_transfer(
             int(netw::entity::Control::Transfer::REQUESTABLE)

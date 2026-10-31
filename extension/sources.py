@@ -11,10 +11,23 @@ MODULE = "NETW_MODULE"
 PROFILING = "NETW_PROFILING"
 TESTS = "NETW_TESTS"
 
+FAULT_TEXT = ROOT / "src" / "api" / "fault_text.cpp"
+
+SWITCH_ERROR_FLAGS = {
+    "msvc": ["/we4062"],
+    "posix": ["-Werror=switch"],
+}
+
+
+def dialect(env):
+    """Which compiler family a build entry drives, msvc or posix."""
+    return "msvc" if str(env.get("CC", "")).endswith("cl") else "posix"
+
 
 def source_paths(netw_tests=False):
-    """Every translation unit both build entries compile, in a fixed order."""
-    paths = sorted((ROOT / "src").rglob("*.cpp"))
+    """Every translation unit both build entries compile, in a fixed order,
+    apart from FAULT_TEXT, which each entry compiles with SWITCH_ERROR_FLAGS."""
+    paths = sorted(path for path in (ROOT / "src").rglob("*.cpp") if path != FAULT_TEXT)
     paths += [ROOT / "register_types.cpp"]
     if netw_tests:
         paths += sorted((ROOT / "tests").rglob("*.cpp"))
@@ -108,8 +121,7 @@ def hold_determinism_floor(env, refuse, arguments=None):
             "instrument rather than failing a case." % (key, banned)
         )
         return
-    dialect = "msvc" if str(env.get("CC", "")).endswith("cl") else "posix"
-    env.Append(CCFLAGS=_FLOOR_REQUIRED[dialect])
+    env.Append(CCFLAGS=_FLOOR_REQUIRED[dialect(env)])
 
 
 def feature_defines(entry, netw_profiling, netw_tests):

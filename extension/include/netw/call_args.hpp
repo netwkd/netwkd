@@ -7,6 +7,12 @@
 #include "netw/api/quantize.hpp"
 #include "netw/wire/stream.hpp"
 
+namespace netw {
+
+class NetwMultiplayer;
+
+}
+
 namespace netw::call_args {
 
 enum RawType {
@@ -74,7 +80,8 @@ bool values_write(
     wire::WriteStream &stream,
     const godot::Array &values,
     const godot::Array &quantizers,
-    const godot::Array &types
+    const godot::Array &types,
+    NetwMultiplayer *session = nullptr
 );
 
 bool values_read(

@@ -3033,30 +3033,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Latch] a report-once latch starts unfired "
-    "and stays fired, which is what makes it report once"
-) {
-    NetwPredictionEngine held_pool;
-    NetwPredictionEngine *const pool = &held_pool;
-    const int64_t slot = pool->open(every_family_populated());
-
-    CHECK_FALSE(pool->invalid_witness_reported_of(slot));
-    CHECK_FALSE(pool->invalid_command_predictor_reported_of(slot));
-    CHECK_FALSE(pool->joint_refusal_reported_of(slot));
-    CHECK_FALSE(pool->island_gap_reported_of(slot));
-
-    pool->set_invalid_witness_reported(slot, true);
-    CHECK(pool->invalid_witness_reported_of(slot));
-    pool->set_invalid_witness_reported(slot, true);
-    CHECK(pool->invalid_witness_reported_of(slot));
-
-    pool->rewire(slot, every_family_populated());
-    CHECK(pool->invalid_witness_reported_of(slot));
-
-    CHECK_FALSE(pool->invalid_witness_reported_of(slot + 9000));
-}
-
-TEST_CASE(
     "[Networked][Predict][Latch] the joint window opens at -1, which "
     "is the reading that says no group has claimed this entity"
 ) {

@@ -2,7 +2,9 @@
 
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/entity/ids.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/entity/stage.hpp"
 #include "netw/log.hpp"
 #include "netw/scene_decl.hpp"
@@ -73,13 +75,7 @@ bool NetwEntityRecord::adopt_handle(const RID &p_handle) {
 }
 
 Variant NetwEntityRecord::part(int64_t p_part, Object *p_wrapper) {
-    NETW_ERR_COND_V(
-        p_part < 0 || p_part >= PART_MAX,
-        Variant(),
-        sys::ENTITY,
-        "Entity part %d does not exist.",
-        int(p_part)
-    );
+    NETW_BUG_COND_V(p_part < 0 || p_part >= PART_MAX, Variant());
     const Variant held = minted_part(p_part);
     if (Ref<RefCounted>(held).is_valid()) {
         return held;
@@ -95,15 +91,7 @@ Variant NetwEntityRecord::part(int64_t p_part, Object *p_wrapper) {
     }
     const Variant made = factory.call(p_wrapper);
     const Ref<RefCounted> minted = made;
-    NETW_WARN_COND(
-        minted.is_null(),
-        sys::ENTITY,
-        "The factory for entity part %d returned nothing.",
-        int(p_part)
-    );
-    if (minted.is_null()) {
-        return Variant();
-    }
+    NETW_BUG_COND_V(minted.is_null(), Variant());
     NETW_TRACE(sys::ENTITY, "Made entity part %d.", int(p_part));
     for (MintedPart &slot : parts) {
         if (slot.part == p_part) {
@@ -122,12 +110,7 @@ void NetwEntityRecord::set_part_factory(
     int64_t p_part,
     const Callable &p_factory
 ) {
-    NETW_ERR_COND(
-        p_part < 0 || p_part >= PART_MAX,
-        sys::ENTITY,
-        "Entity part %d does not exist.",
-        int(p_part)
-    );
+    NETW_BUG_COND(p_part < 0 || p_part >= PART_MAX);
     part_factories()[p_part] = p_factory;
 }
 
@@ -159,20 +142,11 @@ bool NetwEntityRecord::advance(int64_t p_stage) {
     return true;
 }
 
-bool NetwEntityRecord::transition(int64_t p_stage, Node *p_owner) {
-    const int64_t from = stage;
+bool NetwEntityRecord::transition(int64_t p_stage) {
     if (advance(p_stage)) {
         return true;
     }
-    Node *owner = p_owner;
-    NETW_ERROR(
-        sys::ENTITY,
-        "Entity '%s' cannot move from stage %d to stage %d.",
-        owner ? godot::String(owner->get_name()) : godot::String("<no owner>"),
-        int(from),
-        int(p_stage)
-    );
-    return false;
+    NETW_BUG_V(false);
 }
 
 void NetwEntityRecord::deactivate(Node *p_owner) {
@@ -208,19 +182,12 @@ void NetwEntityRecord::write_authority(
     if (now == p_to) {
         return;
     }
-    if (now != p_prior && !native_write_warned) {
-        native_write_warned = true;
-        const NodePath named = p_node->is_inside_tree()
-            ? p_node->get_path()
-            : NodePath(String(p_node->get_name()));
-        NETW_WARN(
-            sys::ENTITY,
-            "%s had its multiplayer authority set to %d outside its entity, "
-            "and the entity sets it back to %d. Choose who holds it with "
-            "NetwEntity.authority.",
-            String(named).utf8().get_data(),
-            int(now),
-            int(p_to)
+    if (now != p_prior) {
+        fault::raise(
+            p_node->is_inside_tree() ? NetwMultiplayer::of(p_node) : nullptr,
+            NETW_FAULT_AUTHORITY_OVERRIDDEN,
+            {String(p_node->get_name()), String(), String(), 0, now, p_to},
+            gd::instance_id(p_node)
         );
     }
     p_node->set_multiplayer_authority(int(p_to), false);
@@ -360,12 +327,15 @@ int64_t NetwEntityRecord::admit_control_request(
     int64_t p_hold
 ) {
     if (!control.admits_request()) {
-        NETW_WARN(
-            sys::ENTITY,
-            "Peer %d asked for control, but NetwEntity.transfer is "
-            "TRANSFER_FIXED, so it was refused. Set it to "
-            "TRANSFER_REQUESTABLE to allow requests.",
-            int(p_requester)
+        const NetwEntity *named = Object::cast_to<NetwEntity>(p_wrapper);
+        fault::raise(
+            nullptr,
+            NETW_FAULT_CONTROL_REFUSED,
+            {named != nullptr ? String(named->get_name()) : String(),
+             String(),
+             String(),
+             p_requester},
+            p_wrapper != nullptr ? uint64_t(gd::instance_id(p_wrapper)) : 0
         );
         return 0;
     }
@@ -417,7 +387,7 @@ bool NetwEntityRecord::begin_despawn(
     }
     despawning_opts = opts;
     const int64_t from = stage;
-    transition(int64_t(entity::Stage::DESPAWNING), p_owner);
+    transition(int64_t(entity::Stage::DESPAWNING));
     if (!publish_stage(p_wrapper, from)) {
         despawning_opts = Ref<NetwDespawnOpts>();
         return false;

@@ -16,6 +16,7 @@
 #include "netw/api/scene.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
@@ -34,8 +35,7 @@ using repl::PropertyBindingPtr;
 namespace {
 
 const GameCall SIMULATION_STEP
-    = {sys::PREDICTION,
-       "NetwSimulation.step",
+    = {"NetwSimulation.step",
        "func(delta: float, tick: int, is_fresh: bool) -> void",
        3};
 
@@ -143,20 +143,45 @@ const StringName &key_demoted() {
     return name;
 }
 
-const StringName &key_message() {
-    static const StringName name("message");
+const StringName &key_code() {
+    static const StringName name("code");
     return name;
 }
 
-const StringName &key_severity() {
-    static const StringName name("severity");
+const StringName &key_fields() {
+    static const StringName name("fields");
     return name;
 }
 
-const StringName &severity_error() {
-    static const StringName name("error");
-    return name;
-}
+struct FindingWords {
+    const char *code;
+    const char *reason;
+    const char *fix;
+};
+
+const FindingWords FINDING_WORDS[] = {
+    {"unquantized",
+     "causal state properties with no quantizer",
+     "a quantizer on each of them"},
+    {"uncompared",
+     "an epsilon on non-causal state properties",
+     "causal on them, or no epsilon"},
+    {"transport_without_epsilon",
+     "a transport reading causal non-pose properties with no epsilon",
+     "an epsilon on each of them"},
+    {"unobserved",
+     "reconcile_only properties with no epsilon",
+     "an epsilon on each, or no reconcile_only"},
+    {"unrepairable",
+     "teleport_only properties with no forward model",
+     "carry_along or carry_step on them, or reconcile_only"},
+    {"inert_forward_model",
+     "carry_step under the tick schedule",
+     "simulation.schedule FRAME, or carry_along on a replicated derivative"},
+    {"unit_unsafe_inheritance",
+     "properties that share one tolerance across different units",
+     "an epsilon or teleport_at on each, in its own units"},
+};
 
 bool role_drives_island(int p_role) {
     return p_role == NetwPrediction::ROLE_PREDICT
@@ -1091,13 +1116,24 @@ void NetwPredictSlotEngine::emit_reachability_findings(
 ) {
     for (int64_t at = 0; at < p_findings.size(); ++at) {
         const Dictionary finding = p_findings[at];
-        const String message = String(finding.get(key_message(), String()));
-        const StringName severity
-            = StringName(finding.get(key_severity(), StringName()));
-        if (severity == severity_error()) {
-            NETW_ERROR(sys::PREDICTION, "%s", message.utf8().get_data());
-        } else {
-            NETW_WARN(sys::PREDICTION, "%s", message.utf8().get_data());
+        const String code = String(finding.get(key_code(), StringName()));
+        const PackedStringArray fields
+            = finding.get(key_fields(), PackedStringArray());
+        for (const FindingWords &words : FINDING_WORDS) {
+            if (code != words.code) {
+                continue;
+            }
+            Node *owner = entity.is_valid() ? entity->get_owner() : nullptr;
+            fault::raise(
+                core_seated(),
+                NETW_FAULT_PREDICTION_DOWNGRADED,
+                {owner != nullptr ? String(owner->get_name())
+                                  : String("an entity with no node"),
+                 String(words.reason) + String(" [")
+                     + String(", ").join(fields) + String("]"),
+                 String(words.fix)},
+                owner != nullptr ? uint64_t(gd::instance_id(owner)) : 0
+            );
         }
     }
 }
@@ -2505,11 +2541,7 @@ void NetwPredictSlotEngine::restore(
             p_pool_planned,
             p_entry
         )) {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Prediction could not restore an entity to the server's state."
-        );
-        return;
+        NETW_BUG();
     }
     if (p_operator != int(predict::Operator::NONE) && !p_pool_planned) {
         episode_owner->sync_episode();
@@ -2538,11 +2570,7 @@ void NetwPredictSlotEngine::restore_row(
             false,
             p_entry
         )) {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Prediction could not restore an entity to the server's state."
-        );
-        return;
+        NETW_BUG();
     }
     if (p_operator != int(predict::Operator::NONE)) {
         episode_owner->sync_episode();

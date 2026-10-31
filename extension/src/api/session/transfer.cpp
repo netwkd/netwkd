@@ -13,6 +13,7 @@
 #include "netw/api/replication_core.hpp"
 #include "netw/api/session.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/liveness_core.hpp"
 #include "netw/log.hpp"
 #include "netw/peer_rename.hpp"
@@ -70,13 +71,13 @@ void NetwMultiplayer::relabel_follow(const Ref<MultiplayerPeer> &p_peer) {
 }
 
 void NetwMultiplayer::session_refuse_relabel(int64_t p_successor_was) {
-    NETW_ERROR(
-        sys::SESSION,
-        "%s moved the server to peer %d, which is not in this session, so the "
-        "session ended. A transport names a peer it links to as the "
-        "successor.",
-        transport_name(relabel_source),
-        int(p_successor_was)
+    fault::raise(
+        this,
+        NETW_FAULT_SERVER_MOVE_REFUSED,
+        {String(transport_name(relabel_source)),
+         String("a move to a peer outside this session"),
+         String("a successor it links to"),
+         p_successor_was}
     );
     session_note_exit(enums::NetwSession::CONNECTION_LOST, String());
     session_teardown_online();
@@ -199,12 +200,12 @@ void NetwMultiplayer::session_follow_relabel(
     }
     if (installing_transfer) {
         transfer_violated = true;
-        NETW_ERROR(
-            sys::SESSION,
-            "%s moved the server again while the last move was installing, so "
-            "the session ended. A transport finishes one move before it "
-            "starts the next.",
-            transport_name(relabel_source)
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_MOVE_REFUSED,
+            {String(transport_name(relabel_source)),
+             String("a second move during the last one"),
+             String("one move at a time")}
         );
         return;
     }
@@ -397,10 +398,12 @@ void NetwMultiplayer::transfer_follow_persistence(bool p_succeeds) {
             && script::model::get_persistence_config(owner).is_valid();
     });
     if (persisted) {
-        NETW_ERROR(
-            sys::SESSION,
-            "The server moved to this peer, and database state does not move "
-            "with it. Open the database again on this peer to save entities."
+        fault::raise(
+            this,
+            NETW_FAULT_STORAGE_FAILED,
+            {"the database on this peer",
+             "saving entities after the server moved",
+             "whether the database was opened again on this peer"}
         );
     }
 }
@@ -519,8 +522,7 @@ void NetwMultiplayer::transfer_run_keep(const PackedInt64Array &p_promoted) {
         declaration_book().report_unresolved(
             this,
             session_decl::KIND_TRANSFER,
-            declared.state,
-            "the transfer"
+            declared.state
         );
         return;
     }
@@ -548,12 +550,13 @@ void NetwMultiplayer::transfer_run_keep(const PackedInt64Array &p_promoted) {
         }
         if (!reported) {
             reported = true;
-            NETW_ERROR(
-                sys::SESSION,
-                "The Netw.configure_transfer handler did not return a bool "
-                "for '%s', so it was kept. Make it take a Node and return "
-                "true to keep it or false to despawn it.",
-                String(node->get_name())
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_RETURN,
+                {"the {Netw.configure_transfer} handler",
+                 vformat("nothing usable for '%s'", String(node->get_name())),
+                 "a bool, true to keep the node or false to despawn it"},
+                gd::instance_id(node)
             );
         }
     }
@@ -777,12 +780,10 @@ void NetwMultiplayer::session_receive_resync(
     const char *refused
         = transfer_check_report(chunk, p_payload.size(), intake);
     if (refused != nullptr) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d sent a world report %s, so it was disconnected. Run the "
-            "same Networked version on every peer.",
-            int(p_sender),
-            String(refused)
+        fault::raise(
+            this,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender}
         );
         transfer_drop_reporter(p_sender);
         return;
@@ -947,13 +948,10 @@ void NetwMultiplayer::transfer_watch_resync() {
         silent.push_back(peer);
     }
     for (const int64_t peer : silent) {
-        NETW_WARN(
-            sys::SESSION,
-            "Peer %d did not finish its world report within %d ticks of the "
-            "server moving, so it was disconnected. Run the same Networked "
-            "version on every peer.",
-            int(peer),
-            int(deadline)
+        fault::raise(
+            this,
+            NETW_FAULT_TRANSFER_TIMEOUT,
+            {String(), String(), String(), peer, int64_t(deadline)}
         );
         transfer_drop_reporter(peer);
     }
@@ -1008,25 +1006,28 @@ void NetwMultiplayer::transfer_raise_reported() {
 }
 
 Error NetwMultiplayer::session_transfer_server(int64_t p_peer) {
-    NETW_ERR_COND_V(
-        !is_online() || !session_core.is_server_role(),
-        ERR_UNAUTHORIZED,
-        sys::SESSION,
-        "NetwSession.transfer_server runs only on the server."
-    );
+    if (!is_online() || !session_core.is_server_role()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwSession.transfer_server}"}
+        );
+        return ERR_UNAUTHORIZED;
+    }
     const Ref<MultiplayerPeer> transport = assigned_peer;
     if (!peer_relabels(transport)
         || !transport->has_method(StringName(VERB_TRANSFER_SERVER))) {
         return ERR_UNAVAILABLE;
     }
-    NETW_ERR_COND_V(
-        p_peer == SERVER_PEER || !gd::api_peer_ids(inner).has(int32_t(p_peer)),
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "NetwSession.transfer_server got peer %d, which is not a client of "
-        "this session. Pass the peer id of a connected client.",
-        int(p_peer)
-    );
+    if (p_peer == SERVER_PEER
+        || !gd::api_peer_ids(inner).has(int32_t(p_peer))) {
+        fault::raise(
+            this,
+            NETW_FAULT_UNKNOWN_PEER,
+            {"{NetwSession.transfer_server}", String(), String(), p_peer}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     if (databases.holds_writes()) {
         return ERR_BUSY;
     }

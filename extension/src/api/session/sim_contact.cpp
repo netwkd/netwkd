@@ -7,12 +7,11 @@
 #include "godot/object.hpp"
 #include "godot/physics_body.hpp"
 #include "netw/api/entity.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/sim/contact.hpp"
 #include "netw/sim/install.hpp"
 #include "netw/sim/row.hpp"
 #include "netw/store/validate.hpp"
-#include "netw/subsystems.hpp"
 
 using namespace godot;
 
@@ -105,14 +104,15 @@ void NetwMultiplayer::sim_contact_arm(sim::Row &r_row) {
     const bool declares = r_row.declaration.claim_on_contact
         || r_row.declaration.release_on_rest > 0.0;
     r_row.contact.eligible = sim_contact_eligible(r_row, r_row.steering);
-    if (declares && !r_row.contact.eligible && !r_row.contact.warned) {
-        r_row.contact.warned = true;
-        NETW_WARN(
-            sys::PREDICTION,
-            "'%s' sets claim_on_contact or release_on_rest, which do nothing "
-            "here. They need NetwEntity.TRANSFER_IMMEDIATE on an entity with "
-            "no prediction and no state properties.",
-            String(r_row.view->get_name())
+    if (declares && !r_row.contact.eligible) {
+        fault::raise(
+            this,
+            NETW_FAULT_CONFLICTING_SETTINGS,
+            {String("claim_on_contact or release_on_rest"),
+             String("'") + String(r_row.view->get_name()) + String("'"),
+             String("a NetwEntity.transfer other than TRANSFER_IMMEDIATE, or "
+                    "an entity with prediction or state properties")},
+            uint64_t(gd::instance_id(r_row.view->get_owner()))
         );
     }
     if (r_row.contact.eligible && r_row.declaration.claim_on_contact

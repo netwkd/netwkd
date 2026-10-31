@@ -41,20 +41,14 @@ Error NetwMultiplayer::clock_commit(const Ref<NetwClockConfig> &p_from) {
     const int slot = int(session_decl::KIND_CLOCK_CONFIG)
         - int(session_decl::KIND_SESSION_CONFIG);
     if (config_consumption[slot].consumed) {
-        NETW_WARN(
-            sys::CLOCK,
-            "Netw.configure_clock came after the session started, so the "
-            "clock did not change. Configure it before the session starts, "
-            "and finish the chain without await."
+        fault::raise(
+            this,
+            NETW_FAULT_DECLARED_ONLINE,
+            {"{Netw.configure_clock}", String(), "the clock"}
         );
         return ERR_ALREADY_IN_USE;
     }
-    NETW_ERR_COND_V(
-        p_from.is_null(),
-        ERR_INVALID_PARAMETER,
-        sys::CLOCK,
-        "The clock was configured with a null NetwClockConfig."
-    );
+    NETW_BUG_COND_V(p_from.is_null(), ERR_INVALID_PARAMETER);
     config_consumption[slot].consumed = true;
     const Error configured = clock_configure(p_from);
     if (configured != OK) {
@@ -87,13 +81,16 @@ void NetwMultiplayer::clock_offer_fallback(
     Object *p_source
 ) {
     const ObjectID source = gd::instance_id(p_source);
-    NETW_ERR_COND(
-        clock_fallback.is_valid() && clock_fallback_source != source
-            && gd::object_of(clock_fallback_source) != nullptr,
-        sys::CLOCK,
-        "Two nodes set clock settings for one session, so the second was "
-        "ignored. Call Netw.configure_clock from one node only."
-    );
+    if (clock_fallback.is_valid() && clock_fallback_source != source
+        && gd::object_of(clock_fallback_source) != nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_DECLARED_TWICE,
+            {"{Netw.configure_clock}", "this session"},
+            source
+        );
+        return;
+    }
     clock_fallback = p_draft;
     clock_fallback_source = source;
     declarations_changed();
@@ -187,12 +184,14 @@ void NetwMultiplayer::clock_drop_synchronization() {
 }
 
 void NetwMultiplayer::clock_auto_configure_offset() {
-    NETW_ERR_COND(
-        !clock_engine().get_configured(),
-        sys::CLOCK,
-        "The display delay cannot be measured before the clock is "
-        "configured. Wait for the session to start."
-    );
+    if (!clock_engine().get_configured()) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"The display delay measurement", String(), "the clock"}
+        );
+        return;
+    }
     if (is_host()) {
         return;
     }

@@ -2,6 +2,7 @@
 
 #include "godot/class_db.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -192,13 +193,16 @@ void NetwSessionConfig::_bind_methods() {
 }
 
 void NetwSessionConfig::set_return_window_seconds(double p_seconds) {
-    NETW_ERR_COND(
-        !(p_seconds >= 0.0),
-        sys::SESSION,
-        "NetwSessionConfig.return_window_seconds got %f, which is negative. "
-        "Pass seconds, or 0 to despawn a player's entities when it leaves.",
-        p_seconds
-    );
+    if (!(p_seconds >= 0.0)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSessionConfig.return_window_seconds}",
+             String::num(p_seconds),
+             "seconds, or 0 to despawn a player's entities when it leaves"}
+        );
+        return;
+    }
     if (guard.takes("return_window_seconds")) {
         values.return_window_seconds = p_seconds;
     }
@@ -210,13 +214,16 @@ Ref<NetwSessionConfig> NetwSessionConfig::return_window(double p_seconds) {
 }
 
 void NetwSessionConfig::set_transfer_deadline_ticks(int64_t p_ticks) {
-    NETW_ERR_COND(
-        p_ticks < 0,
-        sys::SESSION,
-        "NetwSessionConfig.transfer_deadline_ticks got %d, which is "
-        "negative. Pass ticks, or 0 to wait without a limit.",
-        p_ticks
-    );
+    if (p_ticks < 0) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSessionConfig.transfer_deadline_ticks}",
+             String::num_int64(p_ticks),
+             "ticks, or 0 to wait without a limit"}
+        );
+        return;
+    }
     if (guard.takes("transfer_deadline_ticks")) {
         values.transfer_deadline_ticks = p_ticks;
     }
@@ -243,13 +250,16 @@ Ref<NetwSessionConfig> NetwSessionConfig::transfer(
 }
 
 void NetwSessionConfig::set_bandwidth_kbps(int64_t p_kbps) {
-    NETW_ERR_COND(
-        p_kbps < 0,
-        sys::SESSION,
-        "NetwSessionConfig.bandwidth_kbps got %d, which is negative. Pass "
-        "kbit/s, or 0 for one packet a tick.",
-        p_kbps
-    );
+    if (p_kbps < 0) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSessionConfig.bandwidth_kbps}",
+             String::num_int64(p_kbps),
+             "kbit/s, or 0 for one packet a tick"}
+        );
+        return;
+    }
     if (guard.takes("bandwidth_kbps")) {
         values.bandwidth_kbps = p_kbps;
     }

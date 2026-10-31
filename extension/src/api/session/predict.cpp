@@ -36,6 +36,7 @@
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
@@ -208,7 +209,22 @@ Variant NetwMultiplayer::lagcomp_rewind_of(
             slots.push_back(slot);
         }
     }
-    return lagcomp_core.rewind(slots, p_tick, p_body);
+    bool awaited = false;
+    const Variant answered
+        = lagcomp_core.rewind(slots, p_tick, p_body, nullptr, &awaited);
+    if (awaited) {
+        Node *runner = Object::cast_to<Node>(p_body.get_object());
+        fault::raise(
+            this,
+            NETW_FAULT_REWIND_MISUSE,
+            {runner != nullptr ? String(runner->get_name())
+                               : String(p_body.get_method()),
+             "an await in the rewind body",
+             "a rewind body that does not await"},
+            gd::instance_id(runner)
+        );
+    }
+    return answered;
 }
 
 Ref<DictionaryRecord> NetwMultiplayer::lagcomp_sample(
@@ -344,25 +360,22 @@ void space_set_active(
 } // namespace
 
 void NetwMultiplayer::warn_pacing_rate_mismatch_once() {
-    if (predict_pacing_rate_warned) {
-        return;
-    }
     const double factor = clock_engine().physics_factor();
     if (std::abs(factor - std::round(factor)) < 1e-6) {
         return;
     }
-    predict_pacing_rate_warned = true;
     const Engine *engine = Engine::get_singleton();
     const int physics_rate
         = engine != nullptr ? engine->get_physics_ticks_per_second() : 60;
-    NETW_WARN(
-        sys::PREDICTION,
-        "Physics runs at %d steps per second and the tickrate is %d, so a "
-        "tick is %.3f steps and peers drift apart. Make "
-        "physics_ticks_per_second a whole multiple of the tickrate.",
-        physics_rate,
-        clock_engine().get_tickrate(),
-        factor
+    fault::raise(
+        this,
+        NETW_FAULT_TICK_SPLITS_PHYSICS,
+        {String(),
+         String(),
+         String(),
+         0,
+         physics_rate,
+         clock_engine().get_tickrate()}
     );
 }
 
@@ -634,13 +647,16 @@ Error NetwMultiplayer::predict_stepper_install(
     const RID &p_space,
     const Ref<NetwPhysicsStepper> &p_stepper
 ) {
-    NETW_ERR_COND_V(
-        !p_space.is_valid(),
-        ERR_INVALID_PARAMETER,
-        sys::PREDICTION,
-        "A physics stepper needs a physics space. Pass the space of a World2D "
-        "or World3D."
-    );
+    if (!p_space.is_valid()) {
+        fault::raise(
+            this,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwSession.install_physics_stepper}",
+             String(),
+             "physics space"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     if (p_stepper.is_null() || !p_stepper->can_step()) {
         const SteppedSpace *held = space_steppers.getptr(p_space.get_id());
         if (held != nullptr && held->inactive) {
@@ -1161,24 +1177,29 @@ void NetwMultiplayer::action_receive_carrier(
         return;
     }
     if (!lagcomp_configured) {
-        NETW_WARN_ONCE(
-            sys::PREDICTION,
-            "Peer %d requested an action on '%s', but the server never "
-            "created one. Call Netw.action on every peer, the server "
-            "included.",
-            int(p_sender),
-            String(p_entity->get_owner()->get_name())
+        fault::raise(
+            this,
+            NETW_FAULT_PEER_MISMATCH,
+            {vformat(
+                 "an action on '%s'",
+                 String(p_entity->get_owner()->get_name())
+             ),
+             String(),
+             "the actions created with {Netw.action}",
+             p_sender},
+            gd::instance_id(p_entity->get_owner())
         );
         return;
     }
     if (p_sender != SERVER_PEER && p_sender != p_entity->get_controller()) {
-        NETW_WARN_ONCE(
-            sys::PREDICTION,
-            "Peer %d requested an action on '%s', which it does not "
-            "control, so the server ignored it. Only the peer in "
-            "NetwEntity.controller can request it.",
-            int(p_sender),
-            String(p_entity->get_owner()->get_name())
+        fault::raise(
+            this,
+            NETW_FAULT_RPC_REFUSED,
+            {"Netw.action",
+             String(p_entity->get_owner()->get_name()),
+             String(),
+             p_sender},
+            gd::instance_id(p_entity->get_owner())
         );
         return;
     }
@@ -1503,12 +1524,14 @@ void NetwMultiplayer::session_flush_deferred() {
     if (pending.is_empty()) {
         return;
     }
-    NETW_ERROR(
-        sys::SESSION,
-        "Deferred session work did not finish in %d passes. Still pending: "
-        "%s.",
-        settle_max_passes(),
-        String(", ").join(pending).utf8().get_data()
+    fault::raise(
+        this,
+        NETW_FAULT_SETTLE_BOUND,
+        {String(", ").join(pending),
+         String(),
+         String(),
+         0,
+         settle_max_passes()}
     );
 }
 
@@ -1542,11 +1565,13 @@ Ref<NetwMultiplayer> NetwMultiplayer::resolve_required(Node *p_node) {
     if (session->lagcomp_is_configured()) {
         return Ref<NetwMultiplayer>(session);
     }
-    NETW_ERROR(
-        sys::PREDICTION,
-        "%s needs lag compensation, which this session has not set up. Call "
-        "Netw.configure_lagcomp, or declare prediction on an entity.",
-        p_node != nullptr ? String(p_node->get_class()) : String("A node")
+    fault::raise(
+        session,
+        NETW_FAULT_PREDICTION_OFF,
+        {p_node != nullptr ? String(p_node->get_name()) : String("a node"),
+         "no lag compensation in this session",
+         "{Netw.configure_lagcomp}, or prediction on an entity"},
+        gd::instance_id(p_node)
     );
     return Ref<NetwMultiplayer>();
 }
@@ -1575,26 +1600,28 @@ void NetwMultiplayer::predict_readmit(const Ref<NetwEntity> &p_entity) {
         return;
     }
     Node *owner = p_entity->get_owner();
-    const CharString named = (owner != nullptr ? String(owner->get_path())
-                                               : String(p_entity->get_name()))
-                                 .utf8();
+    const String named = owner != nullptr ? String(owner->get_path())
+                                          : String(p_entity->get_name());
     if (p_entity->get_state_binding() == nullptr) {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "%s came back without prediction, because its state properties "
-            "were lost when it left. Declare prediction on it again.",
-            named.get_data()
+        fault::raise(
+            this,
+            NETW_FAULT_PREDICTION_OFF,
+            {named,
+             "state properties lost when it left",
+             "prediction on it again"},
+            gd::instance_id(owner)
         );
         return;
     }
     const Error declared = predict_declare(entity);
     if (declared != OK) {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "%s came back without prediction, because declaring it again "
-            "failed with error %d.",
-            named.get_data(),
-            int(declared)
+        fault::raise(
+            this,
+            NETW_FAULT_PREDICTION_OFF,
+            {named,
+             vformat("declaring it again failing with error %d", int(declared)),
+             "prediction on it again"},
+            gd::instance_id(owner)
         );
     }
 }
@@ -1747,11 +1774,14 @@ void NetwMultiplayer::predict_set_param(
         case PREDICT_PARAM_SLEEPING:
             return handle->set_sleeping(bool(p_value));
         default:
-            NETW_ERR(
-                sys::PREDICTION,
-                "Prediction setting %d does not exist.",
-                p_param
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {"A prediction setting",
+                 vformat("setting %d", int(p_param)),
+                 "a prediction setting that exists"}
             );
+            return;
     }
 }
 
@@ -1910,11 +1940,14 @@ void NetwMultiplayer::simulation_set_param(
         case SIMULATION_PARAM_MAX_RESTORE_TICKS:
             return handle->set_max_restore_ticks(int(p_value));
         default:
-            NETW_ERR(
-                sys::PREDICTION,
-                "Simulation setting %d does not exist.",
-                p_param
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {"A simulation setting",
+                 vformat("setting %d", int(p_param)),
+                 "a simulation setting that exists"}
             );
+            return;
     }
 }
 

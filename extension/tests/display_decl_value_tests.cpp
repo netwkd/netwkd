@@ -119,21 +119,12 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][interp] Condition \"value < 0 || value >= limit\" is"
-        " true. Returning: false. Display setting role got 5, which"
-        " is not one of its values.",
+        "*display role got 5*[NW0032]*",
         1
     );
+    expected_faults.expect_error("*display live mode got -1*[NW0032]*", 1);
     expected_faults.expect_error(
-        "[error][interp] Condition \"value < 0 || value >= limit\" is"
-        " true. Returning: false. Display setting live mode got -1,"
-        " which is not one of its values.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interp] Condition \"value < 0 || value >= limit\" is"
-        " true. Returning: false. Display setting timeline mode got"
-        " 2, which is not one of its values.",
+        "*display timeline mode got 2*[NW0032]*",
         1
     );
 
@@ -174,10 +165,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][interp] Condition \"type != Variant::NODE_PATH && "
-        "type != Variant::STRING && type != Variant::STRING_NAME\" "
-        "is true. Returning: DIRT_NONE. NetwDisplay.visual_root "
-        "must be a NodePath, not a int.",
+        "*NetwDisplay.visual_root got a int*[NW0032]*",
         1
     );
 
@@ -196,14 +184,8 @@ TEST_CASE(
     "doors"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interp] Display setting 14 does not exist.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interp] Display setting -1 does not exist.",
-        1
-    );
+    expected_faults.expect_error("*the setting 14*[NW0032]*", 1);
+    expected_faults.expect_error("*the setting -1*[NW0032]*", 1);
 
     Decl decl;
     NETW_CHECK_EQ(

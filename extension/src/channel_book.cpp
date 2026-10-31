@@ -77,12 +77,7 @@ Error NetwChannelBook::settle_protocol() const {
             continue;
         }
         if (!protocol_handler_of(id).is_valid()) {
-            NETW_WARN(
-                sys::SESSION,
-                "Built-in channel %d (%s) has no handler.",
-                id,
-                String(decl->name)
-            );
+            NETW_BUG_REPORT();
             verdict = ERR_UNCONFIGURED;
         }
     }

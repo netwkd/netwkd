@@ -177,13 +177,7 @@ TEST_CASE(
     "tree is refused and keeps the mounted api"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"is_inside_tree()\" is true. "
-        "MultiplayerViewport.api cannot change once the tree is in "
-        "the scene tree. Set it before adding the "
-        "MultiplayerViewport.",
-        1
-    );
+    expected_faults.expect_error("*MultiplayerViewport.api*[NW0036]*", 1);
 
     MultiplayerViewport *tree = memnew(MultiplayerViewport);
     tree->set_name("MT10Tree");

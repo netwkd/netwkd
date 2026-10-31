@@ -1,0 +1,21 @@
+:github_url: hide
+
+.. _fault_nw0029:
+
+NW0029. A peer did not finish its report after the server moved
+===============================================================
+
+Reported as a warning when the server moves to a new host and a peer has not
+sent its world report within the transfer deadline.
+
+The peer was disconnected. The log line names the peer and the number of
+ticks it was given.
+
+Raise
+:ref:`NetwSessionConfig.transfer_deadline_ticks <class_NetwSessionConfig_property_transfer_deadline_ticks>`,
+or run the same Networked version on every peer.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_session(self).transfer_deadline_ticks = 600

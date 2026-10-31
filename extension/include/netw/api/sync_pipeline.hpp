@@ -95,7 +95,6 @@ private:
     int64_t sends_dropped_not_live = 0;
     int64_t rows_refused_stale = 0;
     int64_t writes_refused = 0;
-    godot::HashMap<uint64_t, int64_t> write_refusals_by_peer_member;
 
     godot::PackedByteArray stage_bytes;
     godot::Array stage_values;
@@ -366,9 +365,6 @@ public:
         const godot::Dictionary &p_descriptors
     );
 
-    static godot::String missing_prediction_component_message(
-        const godot::String &p_entity_name
-    );
     static godot::String contract_subject_name(godot::Node *p_node);
 
     void clear_session();

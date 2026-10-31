@@ -3,6 +3,7 @@
 
 #include "godot/class_db.hpp"
 #include "godot/extension.hpp"
+#include "netw/decl_sites.hpp"
 
 #include "netw/api/action.hpp"
 #include "netw/api/admission_config.hpp"
@@ -308,6 +309,7 @@ void uninitialize_networked_module(ModuleInitializationLevel level) {
     netw::NetwIdToken::forget_sources();
     netw::schema_model::clear();
     netw::script::model::clear();
+    netw::decl_sites::clear();
     netw::entity::shutdown();
     netw::persist::remove_record_formats();
     netw::profile::remove_logger();

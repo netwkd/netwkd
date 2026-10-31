@@ -124,11 +124,7 @@ TEST_CASE(
     "and seals once it has"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] NetwWriteBatch.write ran after the batch "
-        "was submitted. Start a new batch for more writes.",
-        1
-    );
+    expected_faults.expect_error("*NetwWriteBatch.write*[NW0036]*", 1);
 
     World world("dd4");
     world.db->open("slot1");
@@ -164,11 +160,7 @@ TEST_CASE(
     "storage work, even when the caller ignored the builder's answer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] schema '*' declares 2 columns and the row "
-        "carries 1",
-        1
-    );
+    expected_faults.expect_error("*schema 'players'*[NW0032]*", 1);
 
     World world("dd5");
     world.db->open("slot1");

@@ -145,10 +145,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][table] Condition \"bound.is_empty()\" is true. "
-        "Returning: RID(). '*' saves into table '*', but no "
-        "property is marked to save. Call "
-        "NetwPropertyConfig.persisted on each property to save.",
+        "*no property marked to save*[NW0042]*",
         1
     );
 
@@ -166,10 +163,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][table] Condition \"bound[seen].key == key\" is true."
-        " Returning: RID(). '*' saves column '*' of table '*' "
-        "twice, from '*' and from '*'. Give one of them another "
-        "name in NetwPropertyConfig.persisted.",
+        "*Column 'where'*[NW0034]*",
         1
     );
 
@@ -190,10 +184,7 @@ TEST_CASE(
 
     SUBCASE("a name no node carries") {
         expected_faults.expect_error(
-            "[error][table] Condition \"!gd::has_property(node, "
-            "property)\" is true. Returning: RID(). '*' saves column"
-            " '*' of table '*' from '*', but that node has no such "
-            "property. Fix the property name.",
+            "*'no_such_property'*[NW0033]*",
             1
         );
 
@@ -207,12 +198,7 @@ TEST_CASE(
     }
 
     SUBCASE("a float stored where the property holds a Vector2") {
-        expected_faults.expect_error(
-            "[error][table] Database '*' failed. Loading record '*'"
-            " failed, so its entity is not published (the stored "
-            "record'*'players' at storage version 1).",
-            1
-        );
+        expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
 
         World world("pb5b");
         world.declare();
@@ -345,11 +331,7 @@ TEST_CASE(
 
     SUBCASE("a database no session declares") {
         expected_faults.expect_error(
-            "[error][table] Condition \"!database.is_valid()\" is "
-            "true. Returning: RID(). '*' saves into database '*', "
-            "which this session does not declare. "
-            "Declare it with Netw.configure_database in _init of a node "
-            "above this entity.",
+            "*the undeclared database 'elsewhere'*[NW0042]*",
             1
         );
 
@@ -362,10 +344,7 @@ TEST_CASE(
 
     SUBCASE("no provider at all") {
         expected_faults.expect_error(
-            "[error][table] Condition \"provider.is_null()\" is true."
-            " Returning: RID(). '*' declares no record id, so table"
-            " '*' has no row to save into. Pass a Callable to "
-            "NetwPersistenceConfig.record_id.",
+            "*no record id*[NW0042]*",
             1
         );
 
@@ -378,10 +357,7 @@ TEST_CASE(
 
     SUBCASE("a provider answering an empty id") {
         expected_faults.expect_error(
-            "[error][table] Condition "
-            "\"String(record_id).is_empty()\" is true. Returning: "
-            "RID(). The record id Callable of '*' returned an empty"
-            " id for table '*'. Return a non-empty id from it.",
+            "*record_id*an empty id*[NW1007]*",
             1
         );
 
@@ -535,11 +511,7 @@ TEST_CASE(
     "carries the same values again"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] Database '*' failed. Record '*' was not "
-        "saved (the memory store was told to fail).",
-        1
-    );
+    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
 
     World world("pb12");
     world.declare();

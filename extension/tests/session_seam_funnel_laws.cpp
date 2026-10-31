@@ -192,15 +192,11 @@ const FunnelLaw LAWS[] = {L_TYPED, L_STANDS, L_REPORTED};
 TEST_CASE("[Networked][Session] the seam funnel laws hold") {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][event] The override of _sync_admit_frame returned "
-        "coroutine, so the default ran instead. Return what its "
-        "documentation asks for.",
+        "*the override of _sync_admit_frame returned coroutine*[NW1007]*",
         1
     );
     expected_faults.expect_error(
-        "[error][event] The override of _sync_admit_frame returned "
-        "type, so the default ran instead. Return what its "
-        "documentation asks for.",
+        "*the override of _sync_admit_frame returned type*[NW1007]*",
         1
     );
 

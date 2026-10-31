@@ -7,6 +7,7 @@
 #include "netw/api/nodes/lobby_directory.hpp"
 #include "netw/auth_protocol.hpp"
 #include "netw/connect/directory_transport.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -165,13 +166,16 @@ void NetwMultiplayer::session_await(
 String NetwMultiplayer::session_mint_challenge() {
     const PackedByteArray bytes
         = gd::secure_random_bytes(auth::CHALLENGE_BYTES);
-    NETW_ERR_COND_V(
-        bytes.size() != auth::CHALLENGE_BYTES,
-        String(),
-        sys::SESSION,
-        "An admission challenge could not be made. Enable Godot's "
-        "cryptography support."
-    );
+    if (bytes.size() != auth::CHALLENGE_BYTES) {
+        fault::raise(
+            this,
+            NETW_FAULT_LINK_FAILED,
+            {"the admission challenge",
+             String(),
+             "a peer, because Godot's cryptography support is missing"}
+        );
+        return String();
+    }
     constexpr char digits[] = "0123456789abcdef";
     char challenge[auth::CHALLENGE_LENGTH + 1];
     for (int at = 0; at < auth::CHALLENGE_BYTES; ++at) {
@@ -342,11 +346,10 @@ void NetwMultiplayer::session_report_host_refusal(
     if (p_peer != get_unique_id() || !is_host()) {
         return;
     }
-    NETW_ERROR(
-        sys::SESSION,
-        "The host could not join its own session, so it has no NetwPlayer. "
-        "%s",
-        p_reason
+    fault::raise(
+        this,
+        NETW_FAULT_HOST_REFUSED,
+        {String(), String(), p_reason, p_peer}
     );
 }
 
@@ -379,8 +382,7 @@ void NetwMultiplayer::session_start_admission(const JoinRequest &p_request) {
         declaration_book().report_unresolved(
             this,
             session_decl::KIND_ADMISSION,
-            declared.state,
-            "a join"
+            declared.state
         );
         session_fail_join(
             peer,
@@ -505,7 +507,14 @@ void NetwMultiplayer::session_ask_admission(int64_t p_peer) {
           "was refused. Declare it as func admit(request: NetwJoinRequest) "
           "-> Error.";
     if (p_peer != get_unique_id()) {
-        NETW_ERROR(sys::SESSION, "%s", uncallable);
+        fault::raise(
+            this,
+            NETW_FAULT_HANDLER_UNCALLABLE,
+            {String("The admission handler"),
+             String(),
+             String("func admit(request: NetwJoinRequest) -> Error"),
+             p_peer}
+        );
     }
     session_await(
         p_peer,
@@ -545,14 +554,16 @@ void NetwMultiplayer::session_admission_settled(
     }
     const Variant verdict = result->get_result();
     if (verdict.get_type() != Variant::INT) {
-        NETW_ERROR(
-            sys::SESSION,
-            "%s returned %s. Return OK or an Error.",
-            String(
-                provider ? "NetwAccountProvider._verify"
-                         : "The admission handler"
-            ),
-            String(Variant::get_type_name(verdict.get_type()))
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_RETURN,
+            {String(
+                 provider ? "{NetwAccountProvider._verify}"
+                          : "the admission handler"
+             ),
+             String(Variant::get_type_name(verdict.get_type())),
+             "OK or an Error",
+             p_peer}
         );
         pending_admissions.erase(p_peer);
         session_fail_join(

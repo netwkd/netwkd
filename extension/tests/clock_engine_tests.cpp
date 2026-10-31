@@ -129,14 +129,7 @@ TEST_CASE(
     "before it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][clock] Condition \"delta > stall_threshold\" is true."
-        " A frame took 0.625 s, longer than "
-        "NetwClockConfig.stall_threshold (0.500 s), so it was "
-        "skipped as a hitch. Raise stall_threshold if frames this "
-        "long are expected.",
-        1
-    );
+    expected_faults.expect_warning("*[NW1018]*", 1);
 
     const Clocked kept = make_clock();
     kept->set_max_ticks_per_frame(100);

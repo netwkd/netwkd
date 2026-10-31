@@ -117,7 +117,6 @@ private:
 
     bool readmit();
     void readmitted_ready();
-    bool raw_move_warned = false;
     double replication_priority = 1.0;
     int64_t action_spawn_tick = -1;
     int64_t action_requester = 0;
@@ -254,11 +253,6 @@ public:
     void set_on_parent_despawn(ParentDespawnRule p_value);
     Lifecycle get_lifecycle() const;
     void set_lifecycle(Lifecycle p_value);
-    bool note_raw_move_warning() {
-        const bool first = !raw_move_warned;
-        raw_move_warned = true;
-        return first;
-    }
     void structure_op_issue(
         uint64_t p_base,
         const godot::Ref<NetwPromise> &p_promise

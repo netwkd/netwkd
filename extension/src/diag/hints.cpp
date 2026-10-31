@@ -5,6 +5,7 @@
 #include <atomic>
 
 #include "godot/os.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -84,11 +85,12 @@ void configure_hints() {
         gd::cmdline_args()
     );
     if (!request.unknown.is_empty()) {
-        NETW_WARN(
-            sys::SESSION,
-            "Unknown hint '%s' in --netw-hints or NETW_HINTS. Use one of %s.",
-            String("', '").join(request.unknown),
-            known_names()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("--netw-hints or NETW_HINTS"),
+             vformat("the hint '%s'", String("', '").join(request.unknown)),
+             vformat("one of %s", known_names())}
         );
     }
     configured_mask.store(request.mask, std::memory_order_relaxed);

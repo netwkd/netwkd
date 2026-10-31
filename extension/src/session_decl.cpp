@@ -1,7 +1,9 @@
 #include "netw/session_decl.hpp"
 
+#include "godot/callable.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -234,23 +236,26 @@ Error declare(
     const Variant &p_payload,
     const char *p_verb
 ) {
-    NETW_ERR_COND_V(
-        p_scope == nullptr,
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "Netw.%s needs a node, and it was null.",
-        p_verb
-    );
-    NETW_ERR_COND_V(
-        form_of(p_kind) == FORM_CALLABLE && !p_callable.is_null()
-            && !p_callable.is_valid(),
-        ERR_INVALID_PARAMETER,
-        sys::SESSION,
-        "Netw.%s got a handler that cannot be called, so '%s' keeps its "
-        "previous one. Pass a method, or an empty Callable to clear it.",
-        p_verb,
-        String(p_scope->get_name())
-    );
+    if (p_scope == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {vformat("{Netw.%s}", p_verb), String(), String("node")}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    if (form_of(p_kind) == FORM_CALLABLE && !p_callable.is_null()
+        && !p_callable.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("{Netw.%s}", p_verb),
+             String(),
+             String("a method, or an empty Callable to clear it")},
+            uint64_t(gd::instance_id(p_scope))
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     const KindRow &keys = row_of(p_kind);
     const uint64_t generation = ++next_generation();
     if (!eligible(p_kind, p_callable, p_payload)) {
@@ -302,15 +307,16 @@ Error declare_database(
     const Variant &p_config
 ) {
     Dictionary declared = databases_on(p_scope);
-    NETW_ERR_COND_V(
-        declared.has(p_name),
-        ERR_ALREADY_EXISTS,
-        sys::TABLE,
-        "Netw.configure_database was called twice on '%s' for '%s'. Keep the "
-        "config the first call returned and set its backend there.",
-        String(p_scope->get_name()),
-        String(p_name)
-    );
+    if (declared.has(p_name)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_TWICE,
+            {vformat("{Netw.configure_database} for '%s'", String(p_name)),
+             String(p_scope->get_name())},
+            uint64_t(gd::instance_id(p_scope))
+        );
+        return ERR_ALREADY_EXISTS;
+    }
     declared[p_name] = p_config;
     p_scope->set_meta(StringName(META_DATABASES), declared);
     arm(p_scope);
@@ -436,8 +442,7 @@ Resolved Book::resolve(NetwMultiplayer *p_api, Kind p_kind) {
 bool Book::report_unresolved(
     NetwMultiplayer *p_api,
     Kind p_kind,
-    Availability p_state,
-    const char *p_action
+    Availability p_state
 ) {
     if (p_state != UNAVAILABLE && p_state != AMBIGUOUS) {
         return false;
@@ -462,27 +467,24 @@ bool Book::report_unresolved(
             }
             append_sorted(scopes, scope_label(slot.scope));
         }
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.%s was called on more than one node (%s), so %s was "
-            "refused. Call it on one node per session.",
-            verb,
-            joined(scopes),
-            p_action
+        fault::raise(
+            p_api,
+            NETW_FAULT_DECLARED_TWICE,
+            {vformat("{Netw.%s}", verb), joined(scopes)},
+            held.is_empty() ? 0 : uint64_t(held[0].scope)
         );
         return true;
     }
     for (const Slot &slot : held) {
         append_sorted(scopes, scope_label(slot.scope));
     }
-    NETW_WARN(
-        sys::SESSION,
-        "Netw.%s was called by %s, which left the tree before the session "
-        "applied its settings, so %s was refused. Keep that node in the tree "
-        "until the session starts.",
-        verb,
-        joined(scopes),
-        p_action
+    fault::raise(
+        p_api,
+        NETW_FAULT_ENTITY_MOVED,
+        {joined(scopes),
+         vformat("outside the tree before {Netw.%s} applied", verb),
+         String("a node that stays in the tree until the session starts")},
+        held.is_empty() ? 0 : uint64_t(held[0].scope)
     );
     return true;
 }

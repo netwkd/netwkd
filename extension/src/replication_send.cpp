@@ -3,6 +3,7 @@
 #include "netw/repl/snapshot_frame.hpp"
 
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/wire/value_row.hpp"
@@ -17,12 +18,12 @@ bool ReplicationSend::declare_channel(
     bool p_fitted
 ) {
     if (wire::WireRegistry::id_is_builtin(uint8_t(p_id))) {
-        NETW_WARN(
-            sys::WIRE,
-            "Channel id %d belongs to a built-in channel, so '%s' cannot use "
-            "it. Pick another id.",
-            int(p_id),
-            String(p_name).utf8().get_data()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("Channel '") + String(p_name) + String("'"),
+             String("the built-in channel id ") + String::num_int64(p_id),
+             String("another channel id")}
         );
         return false;
     }

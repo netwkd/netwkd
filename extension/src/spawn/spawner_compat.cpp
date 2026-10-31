@@ -7,6 +7,7 @@
 #include "godot/scene_tree.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/scene_loads.hpp"
@@ -28,8 +29,7 @@ const char *SIG_DESPAWNED = "despawned";
 const char *KEY_CLEAR_SESSION = "spawner-compat-clear-session";
 
 const GameCall SPAWNER_FUNCTION
-    = {sys::SPAWN,
-       "The MultiplayerSpawner.spawn_function",
+    = {"The MultiplayerSpawner.spawn_function",
        "func(data: Variant) -> Node",
        1};
 
@@ -82,11 +82,12 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
     }
     NetwMultiplayer *plane = core();
     if (plane != nullptr && !plane->is_host()) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "'%s' was added under a MultiplayerSpawner on a client, and only "
-            "the server spawns. Add it on the server, or use Netw.spawn.",
-            p_node->get_name()
+        fault::raise(
+            plane,
+            NETW_FAULT_SERVER_ONLY,
+            {String("Adding '") + String(p_node->get_name())
+             + String("' under a MultiplayerSpawner")},
+            uint64_t(gd::instance_id(p_node))
         );
         return ERR_UNAUTHORIZED;
     }
@@ -102,12 +103,14 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
         scene_index = SpawnerRoster::scene_index_for(spawner, p_node);
         if (scene_index < 0) {
             drops_uncaptured_custom += 1;
-            NETW_WARN(
-                sys::SPAWN,
-                "'%s' was not spawned, because its scene is not in the "
-                "MultiplayerSpawner's spawnable scenes. Add the scene there, "
-                "or spawn it with MultiplayerSpawner.spawn.",
-                p_node->get_name()
+            fault::raise(
+                plane,
+                NETW_FAULT_UNSUPPORTED,
+                {String("'") + String(p_node->get_name()) + String("'"),
+                 String("a scene outside the spawnable scenes"),
+                 String("the scene in the MultiplayerSpawner's spawnable "
+                        "scenes, or MultiplayerSpawner.spawn")},
+                uint64_t(gd::instance_id(p_node))
             );
             return OK;
         }
@@ -203,11 +206,16 @@ Node *SpawnerCompat::instantiate(
     }
     const int limit = int(spawner->get_spawn_limit());
     if (limit > 0 && roster.produced_count(spawner) >= limit) {
-        NETW_WARN(
-            sys::SPAWN,
-            "MultiplayerSpawner '%s' reached its spawn_limit, so a spawn was "
-            "dropped. Raise spawn_limit or free spawned nodes.",
-            spawner->get_name()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LIMIT_EXCEEDED,
+            {vformat("MultiplayerSpawner '%s'", String(spawner->get_name())),
+             String("the spawn"),
+             String("a higher spawn_limit or fewer spawned nodes"),
+             0,
+             int64_t(limit) + 1,
+             int64_t(limit)},
+            gd::instance_id(spawner)
         );
         return nullptr;
     }

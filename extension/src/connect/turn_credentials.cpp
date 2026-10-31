@@ -4,7 +4,7 @@
 #include "godot/json.hpp"
 #include "godot/project_settings.hpp"
 #include "godot/variant.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 
 using namespace godot;
 
@@ -83,7 +83,6 @@ TurnCredentials::Answer TurnCredentials::read_answer(
             }
         }
         if (!answer.servers.is_empty()) {
-            answer.level = log::Level::INFO;
             return answer;
         }
         answer.message
@@ -100,7 +99,6 @@ TurnCredentials::Answer TurnCredentials::read_answer(
     } else if (p_code == 403) {
         answer.message = "The TURN credential server refused this game.";
     } else {
-        answer.level = log::Level::WARN;
         answer.message = String("The TURN credential server answered ")
             + itos(p_code) + ".";
     }
@@ -119,7 +117,6 @@ Error TurnCredentials::begin(const String &p_url, int64_t p_now_msec) {
     if ((!url.begins_with("https://") && !url.begins_with("http://"))
         || url.get_slice("://", 1).get_slice("/", 0).is_empty()) {
         refuse(
-            log::Level::ERROR,
             "networked/webrtc/turn_credentials_url is not an absolute URL. "
             "Set it to an https address."
         );
@@ -155,7 +152,6 @@ void TurnCredentials::poll(int64_t p_now_msec) {
     }
     if (double(p_now_msec - started_msec) > budget_msec) {
         refuse(
-            log::Level::WARN,
             "The TURN credential server did not answer within 5 seconds. "
             "Check that it is deployed."
         );
@@ -198,7 +194,7 @@ void TurnCredentials::poll(int64_t p_now_msec) {
     if (gd::http_status(client) != gd::HTTP_BODY) {
         const Answer answer = read_answer(gd::http_response_code(client), body);
         if (answer.servers.is_empty()) {
-            refuse(answer.level, answer.message);
+            refuse(answer.message);
             return;
         }
         settle(answer.servers);
@@ -224,24 +220,22 @@ void TurnCredentials::settle(const Array &p_servers) {
 
 void TurnCredentials::unreachable() {
     refuse(
-        log::Level::WARN,
         String("The TURN credential server at ") + host
             + " is unreachable. Check the URL and the network."
     );
 }
 
-void TurnCredentials::refuse(log::Level p_level, const String &p_reason) {
+void TurnCredentials::refuse(const String &p_reason) {
     reason = p_reason;
     stage = PHASE_FAILED;
     gd::http_close(client);
     client = Ref<RefCounted>();
-    log::write_at(
-        p_level,
-        sys::TRANSPORT,
-        p_reason,
-        __FUNCTION__,
-        __FILE__,
-        __LINE__
+    fault::raise(
+        nullptr,
+        NETW_FAULT_LINK_FAILED,
+        {String("the TURN credential fetch"),
+         String(),
+         String("the TURN credential server")}
     );
 }
 

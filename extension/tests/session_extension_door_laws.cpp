@@ -304,11 +304,7 @@ const DoorLaw LAWS[]
 
 TEST_CASE("[Networked][Session] the extension door laws hold") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     const DoorScenario CORPUS[] = {
         no_implementation_at_all(),

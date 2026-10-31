@@ -801,22 +801,8 @@ TEST_CASE(
     "peer that is not in the session, and moves nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"!is_online() || "
-        "!session_core.is_server_role()\" is true. Returning: "
-        "ERR_UNAUTHORIZED. NetwSession.transfer_server runs only on"
-        " the server.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] Condition \"p_peer == SERVER_PEER || "
-        "!gd::api_peer_ids(inner).has(int32_t(p_peer))\" is true. "
-        "Returning: ERR_INVALID_PARAMETER. "
-        "NetwSession.transfer_server got peer *, which is not a "
-        "client of this session. Pass the peer id of a connected "
-        "client.",
-        2
-    );
+    expected_faults.expect_error("*transfer_server*[NW0012]*", 1);
+    expected_faults.expect_error("*transfer_server*[NW0018]*", 2);
 
     Ref<MultiplayerPeer> enet;
     for (int port = ENET_PORT; port < ENET_PORT + ENET_PORTS; ++port) {
@@ -886,7 +872,8 @@ TEST_CASE(
     netw_test::FaultWatch faults;
     table.rig.peer(refusing)
         ->emit_signal(StringName("server_relabelled"), stranger, 0);
-    NETW_CHECK_EQ(faults.errors(), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW0030]"), 1);
+    NETW_CHECK_EQ(faults.errors(), 0);
     NETW_CHECK_EQ(
         int(seat->session_get_state()),
         int(NetwMultiplayer::SESSION_STATE_OFFLINE)
@@ -1195,8 +1182,11 @@ TEST_CASE(
     );
     table.rig.pump(SETTLE_PUMPS);
     NETW_CHECK_EQ(int64_t(table.seat(successor)->get_unique_id()), int64_t(1));
-    NETW_CHECK_EQ(faults.errors(), 1);
-    NETW_CHECK_EQ(faults.errors_containing("database state does not move"), 1);
+    NETW_CHECK_EQ(faults.errors(), 0);
+    NETW_CHECK_EQ(
+        faults.warnings_containing("saving entities after the server moved"),
+        1
+    );
     netw::schema_model::clear();
     netw::persist::forget_stores();
 }
@@ -2281,10 +2271,11 @@ TEST_CASE(
             NETW_CHECK_EQ(int(taken.has(player->player_id())), 0);
         }
     }
-    const int64_t stranded
-        = faults.errors_containing("which is not in this session");
-    NETW_CHECK_EQ(stranded, int64_t(MISSED_JOINS));
-    NETW_CHECK_EQ(faults.errors() - stranded, 0);
+    NETW_CHECK_EQ(
+        faults.warnings_containing("[NW0030]"),
+        int64_t(MISSED_JOINS)
+    );
+    NETW_CHECK_EQ(faults.errors(), 0);
 }
 
 TEST_CASE(
@@ -2663,10 +2654,10 @@ void report_refused(Tamper p_tamper) {
     NETW_CHECK_EQ(int(linked_to(host, table.was(liar))), 0);
     NETW_CHECK_EQ(int(linked_to(host, table.was(honest))), 1);
     NETW_CHECK_EQ(int(alive(table, shared, honest)), 1);
-    NETW_CHECK_EQ(faults.warnings_containing("world report"), int64_t(1));
+    NETW_CHECK_EQ(faults.warnings_containing("[NW0007]"), int64_t(1));
     NETW_CHECK_EQ(
         faults.warnings_containing(
-            vformat("Peer %d sent a world report", table.was(liar))
+            vformat("Peer %d sent a packet", table.was(liar))
         ),
         int64_t(1)
     );
@@ -2682,7 +2673,7 @@ void report_refused(Tamper p_tamper) {
     );
     NETW_CHECK_EQ(faults.errors(), 0);
     NETW_CHECK_EQ(
-        faults.warnings_containing("Authentication could not reach"),
+        faults.warnings_containing("so authentication did not happen"),
         0
     );
 }

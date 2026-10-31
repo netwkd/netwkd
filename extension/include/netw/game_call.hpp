@@ -2,14 +2,11 @@
 
 #include "godot/callable.hpp"
 #include "godot/variant.hpp"
-#include "netw/subsystems.hpp"
-
 #include <cstdint>
 
 namespace netw {
 
 struct GameCall {
-    SubsystemName system;
     const char *what;
     const char *signature;
     int64_t argument_count;

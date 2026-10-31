@@ -60,9 +60,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][session] NetwJoinConfig.quantize got 1 entries for"
-        " '*' in '*', which has 2 values. Pass one entry per value,"
-        " and null for a value to leave as it is.",
+        "*NetwJoinConfig.quantize*1 entries*[NW0032]*",
         1
     );
 
@@ -93,11 +91,7 @@ TEST_CASE(
     "silently unpack a schema already declared"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] NetwJoinConfig.quantize got a int for "
-        "value 0 of '*'. Pass a NetwQuantize or null there.",
-        1
-    );
+    expected_faults.expect_error("*NetwJoinConfig.quantize*[NW0032]*", 1);
 
     const Ref<NetwJoinConfig> config = make_config();
     const Ref<NetwQuantize> packer = make_quantizer();
@@ -126,11 +120,7 @@ TEST_CASE(
     "spelling it replaces was an assert a release build strips"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] NetwQuantizeScalar cannot pack the String "
-        "value of '*' in '*'. Use a quantizer that supports String.",
-        1
-    );
+    expected_faults.expect_error("*NetwQuantizeScalar*[NW1019]*", 1);
 
     const Ref<NetwJoinConfig> config = make_config();
     config->set_context_name(StringName("spawn_at"));
@@ -157,11 +147,7 @@ TEST_CASE(
     "standing one was already judged when it was declared"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] NetwJoinConfig.quantize got a int for "
-        "value 0 of '*'. Pass a NetwQuantize or null there.",
-        1
-    );
+    expected_faults.expect_error("*NetwJoinConfig.quantize*[NW0032]*", 1);
 
     const Ref<NetwJoinConfig> config = make_config();
     config->set_context_name(StringName("spawn_at"));

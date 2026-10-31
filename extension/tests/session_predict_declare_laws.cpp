@@ -500,13 +500,7 @@ TEST_CASE(
     "resolves to recovery"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][prediction] '*' is a physics body on "
-        "SCHEDULE_FRAME, which cannot replay, so it uses "
-        "NetwPrediction.RECOVERY_POLICY_REBASE_RECOVER. Use "
-        "SCHEDULE_STEPPED to get RECOVERY_POLICY_REBASE_REPLAY.",
-        1
-    );
+    expected_faults.expect_warning("*physics body on SCHEDULE_FRAME*[NW1014]*", 1);
 
     const ReplayScenario CORPUS[] = {
         a_frame_solver_body(),

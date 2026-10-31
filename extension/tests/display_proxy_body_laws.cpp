@@ -236,15 +236,7 @@ TEST_CASE(
     "in place is kept"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interp] Condition \"has_source && !split && "
-        "p_target_prop != p_source_prop && "
-        "p_runtime->holds_body(p_node)\" is true. Returning: "
-        "nullptr. '*' on '*' is not interpolated, because it "
-        "follows '*' but writes '*' on the simulated body itself. "
-        "Set NetwDisplay.visual_root to draw it on a child node.",
-        1
-    );
+    expected_faults.expect_warning("*[NW1016]*", 2);
 
     LoopbackRig rig(0);
     rig.declare_world(WorldDecl().clocked(30));
@@ -273,7 +265,7 @@ TEST_CASE(
     REQUIRE(kept != nullptr);
     NETW_CHECK_EQ(int(refused->channels().size()), 0);
     NETW_CHECK_EQ(int(kept->channels().size()), 1);
-    NETW_CHECK_EQ(faults.warnings_containing("is simulated on this peer"), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("global_position"), 1);
 }
 
 } // namespace TestNetwDisplayProxyBodyLaws

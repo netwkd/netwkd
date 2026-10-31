@@ -1,0 +1,20 @@
+:github_url: hide
+
+.. _fault_nw0028:
+
+NW0028. A peer sent too many join requests
+==========================================
+
+Reported as a warning when a peer sends more join requests than one join
+needs.
+
+The extra requests were dropped. The log line names the peer.
+
+Call :ref:`Netw.prepare_join <class_Netw_method_prepare_join>` once for each
+join on the client.
+
+.. code-block:: gdscript
+
+    func _on_join_pressed() -> void:
+        Netw.prepare_join(self, "Ana")
+        connection.join(address)

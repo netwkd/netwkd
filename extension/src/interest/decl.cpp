@@ -1,5 +1,6 @@
 #include "netw/interest/decl.hpp"
 
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 
@@ -10,13 +11,11 @@ namespace netw::interest {
 namespace {
 
 const GameCall INTEREST_ENTER
-    = {sys::INTEREST,
-       "The NetwInterest.on_enter callback",
+    = {"The NetwInterest.on_enter callback",
        "func(layer_id: StringName, peer_id: int)",
        2};
 const GameCall INTEREST_LEAVE
-    = {sys::INTEREST,
-       "The NetwInterest.on_leave callback",
+    = {"The NetwInterest.on_leave callback",
        "func(layer_id: StringName, peer_id: int)",
        2};
 
@@ -53,49 +52,55 @@ bool guard_pair(
     const Callable &custom,
     const char *verb
 ) {
-    NETW_ERR_COND_V(
-        layer_id.is_empty(),
-        false,
-        sys::INTEREST,
-        "%s needs a layer name, and it was empty.",
-        verb
-    );
-    NETW_ERR_COND_V(
-        policy < 0 || policy > custom_policy,
-        false,
-        sys::INTEREST,
-        "%s got policy %d, which does not exist.",
-        verb,
-        policy
-    );
-    NETW_ERR_COND_V(
-        policy == custom_policy && !custom.is_valid(),
-        false,
-        sys::INTEREST,
-        "%s got a CUSTOM policy with no callback. Pass the callback that "
-        "decides it.",
-        verb
-    );
-    NETW_ERR_COND_V(
-        policy != custom_policy && custom.is_valid(),
-        false,
-        sys::INTEREST,
-        "%s got a callback with a policy that is not CUSTOM. Use the CUSTOM "
-        "policy, or drop the callback.",
-        verb
-    );
+    const String name = vformat("{%s}", verb);
+    if (layer_id.is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {name, String(), String("a layer name")}
+        );
+        return false;
+    }
+    if (policy < 0 || policy > custom_policy) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {name, String::num_int64(policy), String("a policy constant")}
+        );
+        return false;
+    }
+    if (policy == custom_policy && !custom.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {name, String(), String("the callback that decides a CUSTOM policy")}
+        );
+        return false;
+    }
+    if (policy != custom_policy && custom.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_SETTING_REFUSED,
+            {String("A callback on ") + name,
+             String("a policy other than CUSTOM"),
+             String("the CUSTOM policy, or no callback")}
+        );
+        return false;
+    }
     return true;
 }
 
 } // namespace
 
 bool Decl::join(const StringName &layer_id) {
-    NETW_ERR_COND_V(
-        layer_id.is_empty(),
-        false,
-        sys::INTEREST,
-        "NetwInterest.join needs a layer name, and it was empty."
-    );
+    if (layer_id.is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwInterest.join}"), String(), String("a layer name")}
+        );
+        return false;
+    }
     if (index_of(label_ids, layer_id) >= 0) {
         return false;
     }
@@ -239,36 +244,48 @@ TypedArray<StringName> Facet::layer_ids() const {
 }
 
 bool Facet::on_enter(const StringName &layer_id, const Callable &callback) {
-    NETW_ERR_COND_V(
-        !callback.is_valid(),
-        false,
-        sys::INTEREST,
-        "NetwInterest.on_enter needs a valid Callable."
-    );
+    if (!callback.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwInterest.on_enter}"),
+             String(),
+             String("a method of a live object")}
+        );
+        return false;
+    }
     game_call_declared(callback, INTEREST_ENTER);
     remember(enter_callbacks, layer_id, callback);
     return true;
 }
 
 bool Facet::on_leave(const StringName &layer_id, const Callable &callback) {
-    NETW_ERR_COND_V(
-        !callback.is_valid(),
-        false,
-        sys::INTEREST,
-        "NetwInterest.on_leave needs a valid Callable."
-    );
+    if (!callback.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwInterest.on_leave}"),
+             String(),
+             String("a method of a live object")}
+        );
+        return false;
+    }
     game_call_declared(callback, INTEREST_LEAVE);
     remember(leave_callbacks, layer_id, callback);
     return true;
 }
 
 bool Facet::on_observed(const Callable &callback) {
-    NETW_ERR_COND_V(
-        !callback.is_valid(),
-        false,
-        sys::INTEREST,
-        "An observed callback needs a valid Callable."
-    );
+    if (!callback.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwInterest.on_observed}"),
+             String(),
+             String("a method of a live object")}
+        );
+        return false;
+    }
     decl.set_reports_observers(true);
     if (!observed_callbacks.has(callback)) {
         observed_callbacks.push_back(callback);
@@ -277,12 +294,16 @@ bool Facet::on_observed(const Callable &callback) {
 }
 
 bool Facet::on_unobserved(const Callable &callback) {
-    NETW_ERR_COND_V(
-        !callback.is_valid(),
-        false,
-        sys::INTEREST,
-        "An unobserved callback needs a valid Callable."
-    );
+    if (!callback.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwInterest.on_unobserved}"),
+             String(),
+             String("a method of a live object")}
+        );
+        return false;
+    }
     decl.set_reports_observers(true);
     if (!unobserved_callbacks.has(callback)) {
         unobserved_callbacks.push_back(callback);

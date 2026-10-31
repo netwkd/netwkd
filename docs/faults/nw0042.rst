@@ -1,0 +1,27 @@
+:github_url: hide
+
+.. _fault_nw0042:
+
+NW0042. An entity cannot save
+=============================
+
+Reported as an error when an entity is saved and has no persistence, no
+table, an undeclared database, no record id, no property marked to save, or a
+table that does not take its properties.
+
+Nothing was saved. The log line names the entity and the missing piece.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"gold").state()
+
+Declare persistence on the entity before it enters the tree, and mark each
+property to save with
+:ref:`NetwPropertyConfig.persisted <class_NetwPropertyConfig_method_persisted>`.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_persistence(self)
+        Netw.configure_property(self, &"gold").state().persisted()

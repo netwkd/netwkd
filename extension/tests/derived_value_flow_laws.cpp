@@ -297,9 +297,7 @@ public:
         record_bindings(pair);
         record_rings(rig, pair);
         NETW_CHECK_EQ(
-            faults.warnings_containing(
-                "declares state and input properties but no prediction"
-            ),
+            faults.warnings_containing("[NW1014]"),
             body_path() == DERIVED_BODY ? p_scenario.clients + 1 : 0
         );
     }

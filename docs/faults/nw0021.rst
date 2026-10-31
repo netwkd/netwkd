@@ -1,0 +1,36 @@
+:github_url: hide
+
+.. _fault_nw0021:
+
+NW0021. A peer called a method it may not call
+==============================================
+
+Reported as a warning when a peer calls a networked method and the method's
+policy does not allow that peer. It also covers an action on an entity the
+peer does not control.
+
+The server dropped the call. The first refusal for each peer, entity and
+method is reported once per session.
+
+The server declares ``apply_stun`` so that only it may call it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun).server()
+
+A client then calls it.
+
+.. code-block:: gdscript
+
+    Netw.rpc(target.apply_stun, attacker_root)
+
+Declare the method as
+:ref:`any_peer <class_NetwMemberConfig_method_any_peer>` or
+:ref:`controller <class_NetwMemberConfig_method_controller>` if that peer
+should call it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun).controller()

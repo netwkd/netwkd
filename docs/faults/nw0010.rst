@@ -1,0 +1,29 @@
+:github_url: hide
+
+.. _fault_nw0010:
+
+NW0010. Deferred calls kept queuing more deferred calls
+=======================================================
+
+Reported as an error when the calls queued with
+:ref:`NetwMultiplayer.session_defer <class_NetwMultiplayer_method_session_defer>`
+still have calls waiting after the last pass the session allows.
+
+The waiting calls were dropped. The log line names them.
+
+A deferred call that queues itself again never finishes.
+
+.. code-block:: gdscript
+
+    func refill() -> void:
+        multiplayer.session_defer(refill, &"refill")
+
+Queue the call again only while there is work left.
+
+.. code-block:: gdscript
+
+    func refill() -> void:
+        if queue.is_empty():
+            return
+        queue.pop_front().apply()
+        multiplayer.session_defer(refill, &"refill")

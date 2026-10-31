@@ -2,6 +2,7 @@
 
 #include "godot/class_db.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 
@@ -219,6 +220,7 @@ int64_t EventPlane::value_at(int p_index) {
 }
 
 int64_t EventPlane::watch(
+    NetwMultiplayer *p_session,
     const PackedInt64Array &p_events,
     const Dictionary &p_target,
     const Dictionary &p_predicate,
@@ -227,9 +229,10 @@ int64_t EventPlane::watch(
 ) {
     NETW_ZONE_NC("EventPlane watch", colors::SESSION);
     if (p_events.is_empty()) {
-        NETW_ERROR(
-            sys::EVENT,
-            "NetwMultiplayer.event_watch needs at least one event."
+        fault::raise(
+            p_session,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwMultiplayer.event_watch}", String(), "event"}
         );
         return -1;
     }
@@ -237,11 +240,12 @@ int64_t EventPlane::watch(
     for (int index = 0; index < p_events.size(); index++) {
         const int64_t event = p_events[index];
         if (!is_event(event)) {
-            NETW_ERROR(
-                sys::EVENT,
-                "NetwMultiplayer.event_watch got event %d, which does not "
-                "exist. Use a NetwMultiplayer.Event value.",
-                event
+            fault::raise(
+                p_session,
+                NETW_FAULT_BAD_VALUE,
+                {"{NetwMultiplayer.event_watch}",
+                 vformat("event %d", event),
+                 "a {enum NetwMultiplayer.Event} value"}
             );
             return -1;
         }
@@ -251,11 +255,12 @@ int64_t EventPlane::watch(
     for (int index = 0; index < target_keys.size(); index++) {
         const StringName key = target_keys[index];
         if (!is_target_key(key)) {
-            NETW_ERROR(
-                sys::EVENT,
-                "NetwMultiplayer.event_watch got the target key '%s', which "
-                "it does not read. Use a key its documentation lists.",
-                String(key)
+            fault::raise(
+                p_session,
+                NETW_FAULT_BAD_VALUE,
+                {"{NetwMultiplayer.event_watch}",
+                 vformat("the target key '%s'", String(key)),
+                 "a key its documentation lists"}
             );
             return -1;
         }
@@ -264,11 +269,12 @@ int64_t EventPlane::watch(
     for (int index = 0; index < predicate_keys.size(); index++) {
         const StringName key = predicate_keys[index];
         if (!is_predicate_key(key)) {
-            NETW_ERROR(
-                sys::EVENT,
-                "NetwMultiplayer.event_watch got the predicate key '%s', "
-                "which it does not read. Use a key its documentation lists.",
-                String(key)
+            fault::raise(
+                p_session,
+                NETW_FAULT_BAD_VALUE,
+                {"{NetwMultiplayer.event_watch}",
+                 vformat("the predicate key '%s'", String(key)),
+                 "a key its documentation lists"}
             );
             return -1;
         }
@@ -277,11 +283,12 @@ int64_t EventPlane::watch(
     for (int index = 0; index < option_keys.size(); index++) {
         const StringName key = option_keys[index];
         if (!is_option_key(key)) {
-            NETW_ERROR(
-                sys::EVENT,
-                "NetwMultiplayer.event_watch got the option key '%s', which "
-                "it does not read. Use a key its documentation lists.",
-                String(key)
+            fault::raise(
+                p_session,
+                NETW_FAULT_BAD_VALUE,
+                {"{NetwMultiplayer.event_watch}",
+                 vformat("the option key '%s'", String(key)),
+                 "a key its documentation lists"}
             );
             return -1;
         }
@@ -359,12 +366,7 @@ bool EventPlane::wants(int64_t p_event, int64_t) const {
 void EventPlane::emit(const Emission &p_fact) {
     NETW_ZONE_NC("EventPlane emit", colors::SESSION);
     if (!is_event(p_fact.event)) {
-        NETW_ERROR_ONCE(
-            sys::EVENT,
-            "Event %d does not exist, so it was not emitted.",
-            p_fact.event
-        );
-        return;
+        NETW_BUG();
     }
     Emission carried = p_fact;
     if (!carried.model.is_empty()) {

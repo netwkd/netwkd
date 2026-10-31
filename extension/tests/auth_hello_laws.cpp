@@ -84,12 +84,7 @@ TEST_CASE(
     "app tag is refused by name"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Peer * was refused, because its app tag * "
-        "differs from this server's *. Set the same tag on both "
-        "with NetwMultiplayer.auth_set_app_tag.",
-        1
-    );
+    expected_faults.expect_warning("*the app tag*[NW0025]*", 1);
 
     const Ref<NetwMultiplayer> session = tagged_session();
     session->auth_receive_hello(PEER, auth::encode_client_hello(0x11111111, 0));
@@ -104,12 +99,7 @@ TEST_CASE(
     "is dropped with no refusal recorded, because nothing decided about it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Peer * was disconnected, because its "
-        "authentication could not be read (framing). Run the same "
-        "Networked version on both peers.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     const Ref<NetwMultiplayer> session = tagged_session();
     session->auth_receive_hello(PEER, foreign_bytes());

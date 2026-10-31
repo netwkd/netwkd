@@ -44,6 +44,7 @@ TEST_CASE(
     "other than an array of entity RIDs stops the flush rather than folding"
 ) {
     netw_test::FaultWatch expected_faults;
+    expected_faults.expect_error("*not an Array*[NW1007]*", 1);
 
     Ref<NetwMultiplayer> session = hosting();
     const RID layer = session->interest_layer_create(StringName("sight"));
@@ -56,20 +57,6 @@ TEST_CASE(
     NETW_CHECK_EQ(session->interest_flush_now(), ERR_INVALID_DATA);
 
     SUBCASE("an RID that names no entity stops it too") {
-        expected_faults.expect_warning(
-            "[warn][interest] The driver of layer '*' did not "
-            "return an Array, so the layer was not changed. Return "
-            "the entities that belong in it.",
-            2
-        );
-        expected_faults.expect_warning(
-            "[warn][interest] The driver of layer '*' returned "
-            "something that is not an entity of this session, so "
-            "the layer was not changed. Return only entities "
-            "spawned in this session.",
-            1
-        );
-
         session->interest_layer_set_driver_callback(
             layer,
             callable_mp_static(&answer_a_stray_rid)
@@ -78,13 +65,6 @@ TEST_CASE(
     }
 
     SUBCASE("an empty roster is a clean fold") {
-        expected_faults.expect_warning(
-            "[warn][interest] The driver of layer '*' did not "
-            "return an Array, so the layer was not changed. Return "
-            "the entities that belong in it.",
-            2
-        );
-
         session->interest_layer_set_driver_callback(
             layer,
             callable_mp_static(&answer_nothing)
@@ -93,13 +73,6 @@ TEST_CASE(
     }
 
     SUBCASE("clearing the driver leaves nothing to run") {
-        expected_faults.expect_warning(
-            "[warn][interest] The driver of layer '*' did not "
-            "return an Array, so the layer was not changed. Return "
-            "the entities that belong in it.",
-            2
-        );
-
         session->interest_layer_set_driver_callback(layer, Callable());
         NETW_CHECK_EQ(session->run_layer_drivers(), OK);
     }
@@ -110,12 +83,7 @@ TEST_CASE(
     "later flush never calls back about a layer that is gone"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][interest] The driver of layer '*' did not return an"
-        " Array, so the layer was not changed. Return the entities "
-        "that belong in it.",
-        1
-    );
+    expected_faults.expect_error("*not an Array*[NW1007]*", 1);
 
     Ref<NetwMultiplayer> session = hosting();
     const RID layer = session->interest_layer_create(StringName("sight"));
@@ -257,13 +225,7 @@ TEST_CASE(
     "before the layer changes"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][interest] The driver of layer '*' returned "
-        "something that is not an entity of this session, so the "
-        "layer was not changed. Return only entities spawned in "
-        "this session.",
-        1
-    );
+    expected_faults.expect_error("*not an entity of this session*[NW1007]*", 1);
 
     Ref<NetwMultiplayer> session = hosting();
     Ref<NetwMultiplayer> elsewhere = hosting();

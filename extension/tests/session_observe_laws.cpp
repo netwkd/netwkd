@@ -34,19 +34,8 @@ TEST_CASE(
     "pair is one subscription"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"p_event < 0 || p_event >= "
-        "NOTIFICATION_COUNT\" is true. Returning: "
-        "ERR_INVALID_PARAMETER. NetwMultiplayer.observe got 999, "
-        "which is not a Notification.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] Condition \"!p_callback.is_valid()\" is "
-        "true. Returning: ERR_INVALID_PARAMETER. "
-        "NetwMultiplayer.observe needs a valid Callable.",
-        1
-    );
+    expected_faults.expect_error("*observe*999*[NW0032]*", 1);
+    expected_faults.expect_error("*observe*[NW1005]*", 1);
 
     Ref<NetwMultiplayer> session = make_session();
     const CallLog heard;

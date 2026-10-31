@@ -10,6 +10,7 @@
 #include "netw/connect/lan_query.hpp"
 #include "netw/connect/tracker_client.hpp"
 #include "netw/connect/transport.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -43,11 +44,13 @@ LANLobbyDirectory::LANLobbyDirectory() {
 
 void LANLobbyDirectory::set_port(int64_t p_port) {
     if (p_port < 1 || p_port > 65535) {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "LANLobbyDirectory.port was set to %d, so it was ignored. Set a "
-            "port from 1 to 65535.",
-            p_port
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{LANLobbyDirectory.port}",
+             String::num_int64(p_port),
+             "a port from 1 to 65535"},
+            gd::instance_id(this)
         );
         return;
     }
@@ -60,11 +63,13 @@ int64_t LANLobbyDirectory::get_port() const {
 
 void LANLobbyDirectory::set_port_count(int64_t p_count) {
     if (p_count < 1 || p_count > 64) {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "LANLobbyDirectory.port_count was set to %d, so it was ignored. "
-            "Set a count from 1 to 64.",
-            p_count
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{LANLobbyDirectory.port_count}",
+             String::num_int64(p_count),
+             "a count from 1 to 64"},
+            gd::instance_id(this)
         );
         return;
     }
@@ -117,14 +122,17 @@ void LANLobbyDirectory::keep_host_socket() {
     for (int64_t at = 0; host_socket.is_null() && at < port_count; at++) {
         host_socket = gd::udp_bind(port + at);
     }
-    if (host_socket.is_null() && !warned_ports) {
-        warned_ports = true;
-        NETW_WARN(
-            sys::TRANSPORT,
-            "LANLobbyDirectory found no free port from %d to %d, so this game "
-            "is not listed on the LAN. Set port or port_count to a free range.",
-            port,
-            port + port_count - 1
+    if (host_socket.is_null()) {
+        fault::raise(
+            session,
+            NETW_FAULT_LINK_FAILED,
+            {String("Listing this game on the LAN"),
+             String(),
+             vformat(
+                 "the free ports %d to %d",
+                 int(port),
+                 int(port + port_count - 1)
+             )}
         );
     }
 }

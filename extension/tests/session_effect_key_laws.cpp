@@ -58,13 +58,7 @@ TEST_CASE(
     ));
 
     SUBCASE("nothing is pending for a key that was never armed") {
-        expected_faults.expect_warning(
-            "[warn][prediction] Condition \"!watching\" is true. "
-            "Effect '*' is not armed, so there is nothing to watch."
-            " Call NetwMultiplayer.lagcomp_effect_arm before "
-            "lagcomp_effect_watch.",
-            1
-        );
+        expected_faults.expect_warning("*[NW1015]*", 1);
 
         CHECK_FALSE(session->lagcomp_effect_pending(StringName("act__1__0")));
         NETW_CHECK_EQ(session->lagcomp_effect_count(), 0);

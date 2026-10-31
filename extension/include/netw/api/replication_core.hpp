@@ -72,7 +72,6 @@ private:
     spawn::Pipeline spawn_pipeline;
     spawn::SpawnerCompat spawner_compat;
     SyncCompat sync_compat;
-    bool warned_rows_without_clock = false;
 
     Channels ids;
 
@@ -147,9 +146,6 @@ public:
     }
     SyncCompat *get_sync_compat() {
         return &sync_compat;
-    }
-    bool has_warned_rows_without_clock() const {
-        return warned_rows_without_clock;
     }
     bool get_is_applying_remote_frame() const;
 

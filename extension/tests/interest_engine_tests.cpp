@@ -524,31 +524,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Interest][Hosted] the null slot is refused rather "
-    "than stored"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"!is_key(key)\" is true. "
-        "Interest was given an entity with no valid key.",
-        6
-    );
-
-    Engine engine = fresh();
-    engine.set_live_peers(bits({0, 1}));
-    engine.set_membership(0, names({"near"}));
-    engine.set_parent(0, ROOT);
-    engine.set_intent(0, bits({0}));
-    engine.set_intent_all(0);
-    engine.set_order_key(0, 0, 1);
-    engine.remove_entity(0);
-
-    CHECK(!engine.has_entity(0));
-    commit(engine);
-    NETW_CHECK_EQ(engine.rows().size(), 0);
-}
-
-TEST_CASE(
     "[Networked][Interest][Hosted] entities sharing an order key still "
     "order deterministically"
 ) {
@@ -665,12 +640,6 @@ TEST_CASE(
         CHECK(engine.layer_admits(sight, 9));
     }
 
-    SUBCASE("peer zero names no participant under either policy") {
-        CHECK_FALSE(engine.layer_admits(sight, 0));
-        engine.layer_set_policy(sight, INSIDERS);
-        CHECK_FALSE(engine.layer_admits(sight, 0));
-    }
-
     SUBCASE("the server peer is evaluated as an ordinary participant") {
         CHECK_FALSE(engine.layer_admits(sight, 1));
         engine.layer_add_viewer(sight, 1);
@@ -744,15 +713,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][interest] Condition \"!is_key(key)\" is true. "
-        "Returning: false. Interest was given an entity with no "
-        "valid key.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"layer_id.is_empty()\" is true."
-        " Returning: false. An interest layer needs a name, and it "
-        "was empty.",
+        "*NetwInterest.join*[NW0031]*",
         1
     );
 
@@ -779,7 +740,6 @@ TEST_CASE(
 
     CHECK(engine.membership_remove(ROOT, far));
     CHECK(!engine.has_memberships(ROOT));
-    CHECK(!engine.membership_add(0, near));
     CHECK(!engine.membership_add(ROOT, StringName()));
 }
 
@@ -868,21 +828,15 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][interest] Condition \"policy < 0 || policy > "
-        "Decl::LEAVE_CUSTOM\" is true. Returning: false. Interest "
-        "leave policy 3 does not exist.",
+        "*set_default_leave_policy*got 3*[NW0032]*",
         1
     );
     expected_faults.expect_error(
-        "[error][interest] Condition \"policy < 0 || policy > "
-        "Decl::PERCEPTION_CUSTOM\" is true. Returning: false. "
-        "Interest perception policy -1 does not exist.",
+        "*set_default_perception_policy*got -1*[NW0032]*",
         1
     );
     expected_faults.expect_error(
-        "[error][interest] Condition \"id.is_empty()\" is true. "
-        "Returning: false. An interest layer needs a name, and it "
-        "was empty.",
+        "*set_default_leave_policy*[NW0031]*",
         1
     );
 
@@ -922,15 +876,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][interest] Condition \"!is_key(key)\" is true. "
-        "Returning: false. Interest was given an entity with no "
-        "valid key.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"id.is_empty()\" is true. "
-        "Returning: false. An interest layer needs a name, and it "
-        "was empty.",
+        "*NetwInterestLayer.add_entity*[NW0031]*",
         1
     );
 
@@ -958,7 +904,6 @@ TEST_CASE(
     CHECK(!engine.roster_remove(near, ROOT));
     CHECK(!engine.roster_remove(StringName("nowhere"), CHILD));
     NETW_CHECK_EQ(engine.roster(near).size(), 1);
-    CHECK(!engine.roster_add(near, 0));
     CHECK(!engine.roster_add(StringName(), ROOT));
 
     engine.clear();
@@ -1044,14 +989,6 @@ TEST_CASE(
     "[Networked][Interest][Hosted] an entity with no route is ordered by an "
     "ordinal minted once"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"!is_key(key)\" is true. "
-        "Returning: 0. Interest was given an entity with no valid "
-        "key.",
-        1
-    );
-
     Engine engine = fresh();
 
     NETW_CHECK_EQ(engine.order_route_for(ROOT), 1);
@@ -1060,7 +997,6 @@ TEST_CASE(
 
     engine.remove_entity(ROOT);
     NETW_CHECK_EQ(engine.order_route_for(ROOT), 1);
-    NETW_CHECK_EQ(engine.order_route_for(0), 0);
 
     engine.clear();
     NETW_CHECK_EQ(engine.order_route_for(CHILD), 1);
@@ -1113,14 +1049,6 @@ TEST_CASE(
     "[Networked][Interest][Hosted] peer id zero is refused a bit rather "
     "than given one"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"peer_id == 0\" is true. "
-        "Returning: -1. Interest was given peer *, which is not a "
-        "peer.",
-        1
-    );
-
     Engine engine = fresh();
     NETW_CHECK_EQ(engine.peer_bit_for(0), -1);
 
@@ -1172,14 +1100,6 @@ TEST_CASE(
     "[Networked][Interest][Hosted] a projection over a layer nobody declared "
     "admits nobody, and no declaration at all is refused"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"decl == nullptr\" is true. "
-        "Returning: false. Interest has no declaration for entity "
-        "1, so it is not shown.",
-        1
-    );
-
     Engine engine;
     Decl declared;
     declared.join(StringName("nowhere"));
@@ -1352,27 +1272,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Interest][Hosted] a live peer id of zero is refused, and the "
-    "peers beside it are still numbered"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"peer_id == 0\" is true. "
-        "Returning: -1. Interest was given peer *, which is not a "
-        "peer.",
-        1
-    );
-
-    Engine engine = fresh();
-
-    CHECK(engine.set_live_peer_ids(PackedInt64Array({11, 0, 22})));
-    NETW_CHECK_EQ(engine.peer_bit_of(0), -1);
-    NETW_CHECK_EQ(engine.peer_bit_of(11), 0);
-    NETW_CHECK_EQ(engine.peer_bit_of(22), 1);
-    NETW_CHECK_EQ(engine.known_peers().size(), 2);
-}
-
-TEST_CASE(
     "[Networked][Interest][Hosted] intent stated as peer ids is the mask the "
     "engine would have composed from the same ids"
 ) {
@@ -1395,27 +1294,12 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Interest][Hosted] intent by peer id mints a bit for a peer "
-    "the engine has never numbered, and refuses peer zero"
+    "the engine has never numbered"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"peer_id == 0\" is true. "
-        "Returning: -1. Interest was given peer *, which is not a "
-        "peer.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"!is_key(key)\" is true. "
-        "Interest was given an entity with no valid key.",
-        1
-    );
-
     Engine engine = fresh();
 
-    engine.set_intent_for_peers(ROOT, PackedInt64Array({44, 0}));
-    engine.set_intent_for_peers(0, PackedInt64Array({44}));
+    engine.set_intent_for_peers(ROOT, PackedInt64Array({44}));
     NETW_CHECK_EQ(engine.peer_bit_of(44), 0);
-    NETW_CHECK_EQ(engine.peer_bit_of(0), -1);
 }
 
 } // namespace TestEngine

@@ -220,20 +220,8 @@ TEST_CASE(
     "is refused and leaves the weight in place"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] Condition \"!(p_weight > 0.0)\" is true. "
-        "NetwEntity.replication_priority must be above 0, so "
-        "0.000000 was ignored. To hide an entity from peers, use "
-        "NetwEntity.interest.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][wire] Condition \"!(p_weight > 0.0)\" is true. "
-        "NetwEntity.replication_priority must be above 0, so "
-        "-3.000000 was ignored. To hide an entity from peers, use "
-        "NetwEntity.interest.",
-        1
-    );
+    expected_faults.expect_error("*got 0.0,*[NW0032]*", 1);
+    expected_faults.expect_error("*got -3.0,*[NW0032]*", 1);
 
     Ref<netw::NetwEntity> entity;
     entity.instantiate();

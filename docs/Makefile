@@ -11,6 +11,9 @@ help:
 
 api:
 	cd .. && python3 docs/tools/build_reference.py $(REFERENCEOPTS)
+	mkdir -p $(BUILDDIR) faults
+	cc -o $(BUILDDIR)/fault_index ../core/tools/fault_index.c
+	$(BUILDDIR)/fault_index > faults/index.rst
 	@echo
 	@echo "Class reference updated. Run 'make html' next."
 

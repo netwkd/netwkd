@@ -744,14 +744,6 @@ TEST_CASE(
     "[Networked][Predict][Hosted][Drive] an acknowledged transition retires "
     "the entry book and the input book by the transition it names"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] Condition \"row == nullptr\" is true. "
-        "Prediction trimmed the history of an entity it no longer "
-        "predicts (slot *).",
-        1
-    );
-
     NetwPredictionEngine held_pool;
     NetwPredictionEngine *const pool = &held_pool;
     const int64_t framed = framed_slot(pool);

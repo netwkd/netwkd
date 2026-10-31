@@ -53,14 +53,9 @@ CarryVerdict CarryTrack::judge(
     const CarryProbe &p_probe
 ) {
     NETW_ZONE_NC("NetwPredict carry judge", colors::PREDICTION);
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_field < 0 || p_field >= int(fields.size()),
-        CarryVerdict::DECLINED,
-        sys::PREDICTION,
-        "Prediction tried to carry property %d of an entity with %d "
-        "properties.",
-        p_field,
-        int(fields.size())
+        CarryVerdict::DECLINED
     );
     CarryFieldStats &stats = fields[uint32_t(p_field)];
     if (stats.retired) {
@@ -129,14 +124,9 @@ CarryVerdict CarryTrack::judge(
 }
 
 CarryVerdict CarryTrack::decline(int p_field, int p_schedule) {
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_field < 0 || p_field >= int(fields.size()),
-        CarryVerdict::DECLINED,
-        sys::PREDICTION,
-        "Prediction declined to carry property %d of an entity with %d "
-        "properties.",
-        p_field,
-        int(fields.size())
+        CarryVerdict::DECLINED
     );
     CarryFieldStats &stats = fields[uint32_t(p_field)];
     stats.declined += 1;

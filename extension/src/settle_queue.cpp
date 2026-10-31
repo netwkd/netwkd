@@ -9,8 +9,7 @@ namespace netw {
 namespace {
 
 const GameCall DEFERRED_CALL
-    = {sys::SESSION,
-       "The NetwMultiplayer.session_defer callback",
+    = {"The NetwMultiplayer.session_defer callback",
        "func() -> void",
        0};
 

@@ -611,11 +611,7 @@ TEST_CASE(
     stand.rig.pump(8);
 
     netw_test::FaultWatch faults;
-    faults.expect_warning(
-        "*'Arena' was moved out of the SubViewport that holds its world. "
-        "Reparent the node Netw.spawn returned for it, or use Netw.reparent.*",
-        1
-    );
+    faults.expect_error("*'Arena'*[NW0041]*", 1);
     root->reparent(stand.host);
     settle(stand);
 }
@@ -785,17 +781,12 @@ TEST_CASE(
     CHECK(world.stand.rig.route_node(crate_route, 0) == nullptr);
 
     NETW_CHECK_EQ(
-        int(faults.warnings_containing(
-            "Spawn function 'make_level' did not "
-            "return a Node"
-        )),
+        int(faults.errors_containing("spawn function 'make_level'")),
         1
     );
     NETW_CHECK_EQ(
-        int(faults.warnings_containing(
-            "Player 'ada' could not spawn a node, because 'make_level' "
-            "returned no Node on their peer. Make 'make_level' return a Node "
-            "on every peer."
+        int(faults.errors_containing(
+            "'make_level', which returned no Node on their peer"
         )),
         1
     );
@@ -829,16 +820,12 @@ TEST_CASE(
     CHECK(stand.rig.route_node(route, 1) != nullptr);
     CHECK(stand.rig.route_node(route, 0) == nullptr);
     NETW_CHECK_EQ(
-        int(faults.warnings_containing(
-            "Spawn constructor 'sr_crate' did not return a Node"
-        )),
+        int(faults.errors_containing("spawn constructor 'sr_crate'")),
         1
     );
     NETW_CHECK_EQ(
-        int(faults.warnings_containing(
-            "Player 'ada' could not spawn a node, because 'sr_crate' returned "
-            "no Node on their peer. Make 'sr_crate' return a Node on every "
-            "peer."
+        int(faults.errors_containing(
+            "'sr_crate', which returned no Node on their peer"
         )),
         1
     );

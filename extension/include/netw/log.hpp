@@ -49,23 +49,14 @@ godot::String format(const char *pattern, Args &&...args) {
 }
 
 void write(Level level, SubsystemName system, const godot::String &message);
-void write_at(
+void report(
     Level level,
-    SubsystemName system,
-    const godot::String &message,
+    const godot::String &line,
     const char *function,
     const char *file,
-    int line
+    int line_number
 );
-godot::String condition_message(
-    const char *condition,
-    const godot::String &message,
-    const char *return_expression = nullptr
-);
-godot::String assertion_message(
-    const char *condition,
-    const godot::String &message
-);
+void report_bug(const char *function, const char *file, int line);
 
 } // namespace netw::log
 
@@ -97,122 +88,50 @@ godot::String assertion_message(
 #define NETW_INFO(m_system, ...) \
     NETW_LOG_LAZY(netw::log::Level::INFO, m_system, __VA_ARGS__)
 
-#define NETW_WARN(m_system, ...) \
-    netw::log::write_at( \
-        netw::log::Level::WARN, \
-        m_system, \
-        netw::log::format(__VA_ARGS__), \
-        __FUNCTION__, \
-        __FILE__, \
-        __LINE__ \
-    )
-#define NETW_ERROR(m_system, ...) \
-    netw::log::write_at( \
-        netw::log::Level::ERROR, \
-        m_system, \
-        netw::log::format(__VA_ARGS__), \
-        __FUNCTION__, \
-        __FILE__, \
-        __LINE__ \
-    )
-
-#define NETW_LOG_ONCE(m_level, m_system, ...) \
+#define NETW_BUG_REPORT() \
     do { \
-        static std::atomic_bool netw_logged_once = false; \
-        if (!netw_logged_once.exchange(true, std::memory_order_relaxed)) { \
-            netw::log::write_at( \
-                m_level, \
-                m_system, \
-                netw::log::format(__VA_ARGS__), \
-                __FUNCTION__, \
-                __FILE__, \
-                __LINE__ \
-            ); \
+        static std::atomic_bool netw_bug_reported = false; \
+        if (!netw_bug_reported.exchange(true, std::memory_order_relaxed)) { \
+            netw::log::report_bug(__FUNCTION__, __FILE__, __LINE__); \
         } \
     } while (false)
 
-#define NETW_WARN_ONCE(m_system, ...) \
-    NETW_LOG_ONCE(netw::log::Level::WARN, m_system, __VA_ARGS__)
-#define NETW_ERROR_ONCE(m_system, ...) \
-    NETW_LOG_ONCE(netw::log::Level::ERROR, m_system, __VA_ARGS__)
-
-#define NETW_ERR(m_system, ...) \
+#define NETW_BUG() \
     do { \
-        NETW_ERROR(m_system, __VA_ARGS__); \
+        NETW_BUG_REPORT(); \
         return; \
     } while (false)
 
-#define NETW_ERR_V(m_value, m_system, ...) \
+#define NETW_BUG_V(m_value) \
     do { \
-        NETW_ERROR(m_system, __VA_ARGS__); \
+        NETW_BUG_REPORT(); \
         return m_value; \
     } while (false)
 
-#define NETW_WARN_COND(m_condition, m_system, ...) \
+#define NETW_BUG_COND(m_condition) \
     do { \
         if (m_condition) { \
-            NETW_WARN( \
-                m_system, \
-                netw::log::condition_message( \
-                    #m_condition, \
-                    netw::log::format(__VA_ARGS__) \
-                ) \
-            ); \
-        } \
-    } while (false)
-
-#define NETW_WARN_COND_ONCE(m_condition, m_system, ...) \
-    do { \
-        if (m_condition) { \
-            NETW_WARN_ONCE( \
-                m_system, \
-                netw::log::condition_message( \
-                    #m_condition, \
-                    netw::log::format(__VA_ARGS__) \
-                ) \
-            ); \
-        } \
-    } while (false)
-
-#define NETW_ERR_COND(m_condition, m_system, ...) \
-    do { \
-        if (m_condition) { \
-            NETW_ERROR( \
-                m_system, \
-                netw::log::condition_message( \
-                    #m_condition, \
-                    netw::log::format(__VA_ARGS__) \
-                ) \
-            ); \
+            NETW_BUG_REPORT(); \
             return; \
         } \
     } while (false)
 
-#define NETW_ERR_COND_V(m_condition, m_value, m_system, ...) \
+#define NETW_BUG_COND_V(m_condition, m_value) \
     do { \
         if (m_condition) { \
-            NETW_ERROR( \
-                m_system, \
-                netw::log::condition_message( \
-                    #m_condition, \
-                    netw::log::format(__VA_ARGS__), \
-                    #m_value \
-                ) \
-            ); \
+            NETW_BUG_REPORT(); \
             return m_value; \
         } \
     } while (false)
 
-#define NETW_ASSERT(m_condition, m_system, ...) \
+#if NETW_LOG_VERBOSE
+#define NETW_ASSERT(m_condition) \
     do { \
         if (!(m_condition)) { \
-            NETW_ERROR( \
-                m_system, \
-                netw::log::assertion_message( \
-                    #m_condition, \
-                    netw::log::format(__VA_ARGS__) \
-                ) \
-            ); \
+            NETW_BUG_REPORT(); \
             netw::gd::crash(); \
         } \
     } while (false)
+#else
+#define NETW_ASSERT(m_condition) ((void)0)
+#endif

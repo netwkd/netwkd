@@ -73,9 +73,4 @@ godot::String refusal_text(
     const Ruling &p_ruling
 );
 
-godot::String lease_empty_text(
-    const godot::String &p_verb,
-    const godot::String &p_root
-);
-
 } // namespace netw::lifecycle

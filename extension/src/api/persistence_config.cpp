@@ -1,7 +1,7 @@
 #include "netw/api/persistence_config.hpp"
 
 #include "godot/class_db.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 
 using namespace godot;
 
@@ -24,13 +24,17 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::table(
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::storage_version(
     int p_version
 ) {
-    NETW_ERR_COND_V(
-        p_version < 1,
-        Ref<NetwPersistenceConfig>(this),
-        sys::TABLE,
-        "NetwPersistenceConfig.storage_version got %d. Versions start at 1.",
-        p_version
-    );
+    if (p_version < 1) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwPersistenceConfig.storage_version}"),
+             String::num_int64(p_version),
+             String("a version from 1")},
+            uint64_t(get_instance_id())
+        );
+        return Ref<NetwPersistenceConfig>(this);
+    }
     version = p_version;
     return Ref<NetwPersistenceConfig>(this);
 }
@@ -39,13 +43,28 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::migrate(
     int p_from_version,
     const Callable &p_step
 ) {
-    NETW_ERR_COND_V(
-        p_from_version < 1 || p_step.is_null(),
-        Ref<NetwPersistenceConfig>(this),
-        sys::TABLE,
-        "NetwPersistenceConfig.migrate needs a version of 1 or more and a "
-        "valid step."
-    );
+    if (p_from_version < 1) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwPersistenceConfig.migrate}"),
+             String::num_int64(p_from_version),
+             String("a version from 1")},
+            uint64_t(get_instance_id())
+        );
+        return Ref<NetwPersistenceConfig>(this);
+    }
+    if (p_step.is_null()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwPersistenceConfig.migrate}"),
+             String(),
+             String("a Callable that takes the record")},
+            uint64_t(get_instance_id())
+        );
+        return Ref<NetwPersistenceConfig>(this);
+    }
     migrations[p_from_version] = p_step;
     return Ref<NetwPersistenceConfig>(this);
 }

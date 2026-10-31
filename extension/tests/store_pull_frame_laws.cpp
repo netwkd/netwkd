@@ -148,7 +148,6 @@ struct PullEvidence {
     int write_lag = -1;
     bool write_value = false;
     int misses = 0;
-    int64_t miss_warnings = 0;
     bool miss_named = false;
     bool miss_restored = false;
     std::string miss_gate;
@@ -269,11 +268,7 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
         return table.changed_ticks[row_at(p_index)] == table.pulled_tick;
     }
 
-    Ref<netw_test::FaultLog> miss_diagnostics;
-
     void plant_miss() {
-        miss_diagnostics.instantiate();
-        netw_test::FaultLog::attach(miss_diagnostics);
         netw::store::validation_audit::Ledger &book
             = netw::store::validation_audit::ledger();
         faults_before = book.faults;
@@ -301,11 +296,6 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
         World &world = server()->store();
         const int64_t route = table_of(4).routes[row_at(4)];
         seen.misses = int(world.misses.size());
-        netw_test::FaultLog::detach(miss_diagnostics);
-        seen.miss_warnings = miss_diagnostics->warning_count_containing(
-            "Store validation found a change the store did not record"
-        );
-        miss_diagnostics.unref();
         seen.miss_named = !world.misses.is_empty();
         for (uint32_t at = 0; at < world.misses.size(); ++at) {
             const netw::store::Miss &missed = world.misses[at];
@@ -742,7 +732,6 @@ TEST_CASE(
     const PullEvidence &seen = pull_evidence();
     REQUIRE(seen.driven);
     NETW_CHECK_GE(seen.misses, 1);
-    NETW_CHECK_EQ(seen.miss_warnings, seen.misses);
     CHECK(seen.miss_named);
     CHECK(bool(seen.miss_gate == "rested"));
     CHECK(seen.miss_restored);

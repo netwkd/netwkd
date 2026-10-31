@@ -168,12 +168,7 @@ TEST_CASE(
     "no door, because a door resolves through the tree"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] NetwTable.of got a node that is not inside "
-        "a session. Call it from a node in the scene tree under a "
-        "MultiplayerViewport.",
-        1
-    );
+    expected_faults.expect_error("*[NW1003]*", 1);
 
     CHECK(NetwTable::of(nullptr, "Mob").is_null());
 }

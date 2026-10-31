@@ -4,6 +4,7 @@
 
 #include "netw/api/quantize.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/wire/plan.hpp"
@@ -213,57 +214,63 @@ bool encode_scalar_column(
     if (p_slot.variable) {
         const bool textual = p_column.type != SchemaCore::STRING
             || Variant::can_convert_strict(p_value.get_type(), Variant::STRING);
-        NETW_ERR_COND_V(
-            !textual || SchemaCore::validate_storable(p_value) != OK,
-            false,
-            sys::WIRE,
-            "Column %d got a value that cannot be sent. Use a plain value, "
-            "not an Object.",
-            at
-        );
+        if (!textual || SchemaCore::validate_storable(p_value) != OK) {
+            fault::raise(
+                nullptr,
+                NETW_FAULT_UNSENDABLE_VALUE,
+                {vformat("Column %d", at),
+                 String("an Object"),
+                 String("a plain value, such as the object's data or its node "
+                        "path")}
+            );
+            return false;
+        }
         r_row.write_value(p_index, p_value);
         return true;
     }
-    NETW_ERR_COND_V(
-        !Variant::can_convert_strict(p_value.get_type(), expected),
-        false,
-        sys::WIRE,
-        "Column %d got a value of the wrong type. Write the type its schema "
-        "declares.",
-        at
-    );
-    if (p_column.quantizer.is_valid()) {
-        NETW_ERR_COND_V(
-            !p_column.quantizer->supports_type(expected),
-            false,
-            sys::WIRE,
-            "Column %d has a quantizer that does not support its type. Use "
-            "a quantizer made for that type.",
-            at
+    if (!Variant::can_convert_strict(p_value.get_type(), expected)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNSENDABLE_VALUE,
+            {vformat("Column %d", at),
+             String("a value of the wrong type"),
+             String("the type its schema declares")}
         );
+        return false;
+    }
+    if (p_column.quantizer.is_valid()) {
+        if (!p_column.quantizer->supports_type(expected)) {
+            fault::raise(
+                nullptr,
+                NETW_FAULT_UNSENDABLE_VALUE,
+                {vformat("Column %d", at),
+                 String("a quantizer that does not support its type"),
+                 String("a quantizer made for that type")}
+            );
+            return false;
+        }
         for (int element = 0; element < p_slot.stride; ++element) {
             const uint64_t code
                 = uint64_t(p_column.quantizer->encode(p_value, element));
-            NETW_ERR_COND_V(
-                !r_row.write(p_slot, element, code),
-                false,
-                sys::WIRE,
-                "Column %d's quantizer produced more bits than it declares. "
-                "Check the quantizer's bit count.",
-                at
-            );
+            if (!r_row.write(p_slot, element, code)) {
+                fault::raise(
+                    nullptr,
+                    NETW_FAULT_UNSENDABLE_VALUE,
+                    {vformat("Column %d", at),
+                     String("a quantizer code with more bits than it declares"),
+                     String("a quantizer whose bit count matches its codes")}
+                );
+                return false;
+            }
         }
         return true;
     }
     for (int element = 0; element < p_slot.stride; ++element) {
         uint64_t code = 0;
-        NETW_ERR_COND_V(
+        NETW_BUG_COND_V(
             !raw_code(p_column.type, p_slot.width, p_value, element, code)
                 || !r_row.write(p_slot, element, code),
-            false,
-            sys::WIRE,
-            "Column %d has a type that cannot be packed into a fixed row.",
-            at
+            false
         );
     }
     return true;
@@ -276,13 +283,10 @@ bool encode_scalar_row(
 ) {
     NETW_ZONE_NC("Wire value row encode", colors::WIRE);
     const WirePlan plan = WirePlan::compile(p_schema);
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         !scalar_schema(p_schema, plan)
             || p_values.size() != p_schema.column_count(),
-        false,
-        sys::WIRE,
-        "The row's values do not match its schema. Pass one value for each "
-        "column."
+        false
     );
     CodeRow staged = CodeRow::for_plan(plan);
     for (int at = 0; at < p_schema.column_count(); ++at) {

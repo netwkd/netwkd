@@ -28,16 +28,7 @@ TEST_CASE(
     "different one silently merges two conversations"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][liveness] Channel id 99 is not available to a "
-        "game. Use an id from 100 to 254.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][liveness] Channel id 255 is not available to a "
-        "game. Use an id from 100 to 254.",
-        1
-    );
+    expected_faults.expect_error("*Netw.channel*[NW0032]*", 1);
 
     LoopbackRig rig(0);
     rig.mount();
@@ -74,17 +65,8 @@ TEST_CASE(
     "refusal a watcher can read rather than a silent success"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] Condition \"!node->has_signal(p_signal)\" is "
-        "true. Returning: ERR_INVALID_DATA. '*' has no signal '*', "
-        "so it was not sent.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 30.",
-        1
-    );
+    expected_faults.expect_error("*Sending a signal*[NW0033]*", 1);
+    expected_faults.expect_warning("*(error 30)*[NW1000]*", 1);
 
     LoopbackRig rig(0);
     rig.mount();

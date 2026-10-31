@@ -172,12 +172,7 @@ TEST_CASE(
     "neither does one against an entity that never offered the transfer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] Peer * asked for control of '*', but its "
-        "NetwEntity.transfer is TRANSFER_FIXED. Set it to "
-        "TRANSFER_REQUESTABLE to allow requests.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0024]*", 1);
 
     LoopbackRig rig(2);
     rig.mount();
@@ -563,13 +558,7 @@ TEST_CASE(
     "is refused and moves nothing, and a write of 1 takes control back"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][entity] Condition \"!is_on_server()\" is true. "
-        "Returning: ERR_UNAUTHORIZED. Only the server can give '*' "
-        "to another peer. A client asks for it with "
-        "NetwEntity.claim_control.",
-        1
-    );
+    expected_faults.expect_error("*NetwEntity.controller*[NW0012]*", 1);
 
     LoopbackRig rig(2);
     rig.mount();
@@ -684,12 +673,7 @@ TEST_CASE(
     "peer warns as it moves the root back to the server"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] Handed had its multiplayer authority set to * "
-        "outside its entity, and the entity sets it back to 1. Choose who "
-        "holds it with NetwEntity.authority.",
-        3
-    );
+    expected_faults.expect_error("*'Handed'*[NW1012]*", 3);
 
     LoopbackRig rig(2);
     rig.mount();

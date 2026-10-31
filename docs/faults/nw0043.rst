@@ -1,0 +1,30 @@
+:github_url: hide
+
+.. _fault_nw0043:
+
+NW0043. A setting cannot be used with another setting
+=====================================================
+
+Reported as an error when a setting is declared next to one it cannot work
+with. This covers ``TRANSFER_IMMEDIATE`` on an entity, ``retained`` on
+predicted state, a variable size column in a replicated schema, and a callback
+with a policy other than the custom one.
+
+The setting was refused. The log line names it, the setting it conflicts with
+and what to use.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.transfer = NetwEntity.TRANSFER_IMMEDIATE
+
+Use what the log line asks for. For ``TRANSFER_IMMEDIATE``, set the authority
+to ``NetwEntity.AUTHORITY_CONTROLLER`` before the node enters the tree.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.authority = NetwEntity.AUTHORITY_CONTROLLER
+        entity.transfer = NetwEntity.TRANSFER_IMMEDIATE

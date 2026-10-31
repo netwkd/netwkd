@@ -81,15 +81,8 @@ TEST_CASE(
     "bytes and a value the wire claims is out of range produces no value"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] A packet field value needs more bytes than "
-        "its limit.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][wire] A packet field value is outside its range.",
-        1
-    );
+    expected_faults.expect_error("*more than its 3 byte limit*[NW0032]*", 1);
+    expected_faults.expect_error("*outside*[NW0032]*", 1);
 
     const Ref<NetwBitStream> writing = NetwBitStream::writer();
     writing->varuint(int64_t(1) << 40, 3);

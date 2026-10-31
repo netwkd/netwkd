@@ -145,11 +145,7 @@ TEST_CASE(
     "again once it is back"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][spawn] 'Wanderer' was added to the tree without Netw.spawn, "
-        "so no other peer has it. Spawn it with Netw.spawn.",
-        1
-    );
+    expected_faults.expect_error("*'Wanderer'*[NW0039]*", 1);
     LoopbackRig rig(1);
     rig.mount();
     Node *node = memnew(Node);

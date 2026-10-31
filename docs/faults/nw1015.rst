@@ -1,0 +1,16 @@
+:github_url: hide
+
+.. _fault_nw1015:
+
+NW1015. A rewind does not handle a node as declared
+===================================================
+
+Reported as a warning when a rewind meets a node, property or effect it
+cannot handle the way it was declared. The reasons include ``sync_to_physics``,
+a change made inside the rewind, and an ``await`` in the rewind body.
+
+The rewind handles it another way. The log line names the node and the reason.
+
+Use what the log line asks for. For a display node that sits under the node
+it follows, use a parent outside
+:ref:`NetwDisplay.visual_root <class_NetwDisplay_property_visual_root>`.

@@ -54,12 +54,16 @@ void NetwJoinRequest::merge(
     const String &p_name,
     bool p_bound
 ) {
-    NETW_ERR_COND(
-        p_account.is_empty(),
-        sys::SESSION,
-        "NetwJoinRequest.add_account got an empty account. Pass an id with "
-        "a prefix, such as \"club:ana\"."
-    );
+    if (p_account.is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwJoinRequest.add_account}",
+             String(),
+             "account id"}
+        );
+        return;
+    }
     for (Proven &row : proven) {
         if (row.account != p_account) {
             continue;
@@ -114,10 +118,10 @@ PackedStringArray NetwJoinRequest::get_accounts() const {
 Error NetwJoinRequest::refuse(Error p_code, const String &p_reason) {
     Error code = p_code;
     if (code == OK) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwJoinRequest.refuse was given OK, so the join was refused. "
-            "Pass the Error to refuse with, or return OK to admit the player."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwJoinRequest.refuse}", "OK", "the Error to refuse with"}
         );
         code = ERR_UNCONFIGURED;
     }

@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw0012:
+
+NW0012. A server call was made on a client
+==========================================
+
+Reported as an error when a client calls a method that only the server may
+run.
+
+The call did nothing. The log line names the method.
+
+.. code-block:: gdscript
+
+    func _on_kick_pressed(player: NetwPlayer) -> void:
+        session.kick(player)
+
+Check for the server before the call.
+
+.. code-block:: gdscript
+
+    func _on_kick_pressed(player: NetwPlayer) -> void:
+        if multiplayer.is_server():
+            session.kick(player)

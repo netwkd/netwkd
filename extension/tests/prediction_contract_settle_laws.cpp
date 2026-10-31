@@ -79,11 +79,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "[warn][prediction] PredictedWithoutComponent declares "
-        "state and input properties but no prediction, so its "
-        "controller sends input without predicting. Fill the "
-        "prediction block on its MultiplayerSynchronizer, or call "
-        "NetwMultiplayer.predict_declare.",
+        "*'PredictedWithoutComponent'*[NW1014]*",
         1
     );
 
@@ -109,22 +105,8 @@ TEST_CASE(
     "losing its turn to the second"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][prediction] FirstCovered declares state and input "
-        "properties but no prediction, so its controller sends "
-        "input without predicting. Fill the prediction block on its"
-        " MultiplayerSynchronizer, or call "
-        "NetwMultiplayer.predict_declare.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][prediction] SecondCovered declares state and input "
-        "properties but no prediction, so its controller sends "
-        "input without predicting. Fill the prediction block on its"
-        " MultiplayerSynchronizer, or call "
-        "NetwMultiplayer.predict_declare.",
-        1
-    );
+    expected_faults.expect_warning("*'FirstCovered'*[NW1014]*", 1);
+    expected_faults.expect_warning("*'SecondCovered'*[NW1014]*", 1);
 
     Stand stand;
     Node *first = declaring(netw_test::gdsrc::STATE_AND_INPUT, "FirstCovered");

@@ -3,8 +3,10 @@
 #include "godot/os.hpp"
 #include "godot/utility.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/profile.hpp"
 #include "netw/subsystems.hpp"
+#include "netw_faults.h"
 
 using namespace godot;
 
@@ -170,51 +172,31 @@ void write(Level p_level, SubsystemName p_system, const String &p_message) {
     }
 }
 
-void write_at(
+void report(
     Level level,
-    SubsystemName system,
-    const String &message,
+    const String &line,
     const char *function,
     const char *file,
-    int line
+    int line_number
 ) {
-    const String text = line_for(level, system.text, message);
-    profile_line(level, text);
-    if (is_fault(level)) {
-        if (level == Level::ERROR) {
-            gd::push_error_at(function, file, line, text);
-        } else {
-            gd::push_warning_at(function, file, line, text);
-        }
-    } else if (enabled(level)) {
-        gd::print(text);
+    profile_line(level, line);
+    if (level == Level::ERROR) {
+        gd::push_error_at(function, file, line_number, line);
+    } else {
+        gd::push_warning_at(function, file, line_number, line);
     }
 }
 
-String condition_message(
-    const char *condition,
-    const String &message,
-    const char *return_expression
-) {
-    String text
-        = String("Condition \"") + String(condition) + String("\" is true.");
-    if (return_expression != nullptr) {
-        text
-            += String(" Returning: ") + String(return_expression) + String(".");
-    }
-    if (!message.is_empty()) {
-        text += String(" ") + message;
-    }
-    return text;
-}
-
-String assertion_message(const char *condition, const String &message) {
-    String text
-        = String("Assertion \"") + String(condition) + String("\" failed.");
-    if (!message.is_empty()) {
-        text += String(" ") + message;
-    }
-    return text;
+void report_bug(const char *function, const char *file, int line) {
+    const FaultText text
+        = bug_text(vformat("%s:%d", String::utf8(file), line));
+    report(
+        Level::ERROR,
+        text.what + String(" ") + text.fix,
+        function,
+        file,
+        line
+    );
 }
 
 } // namespace netw::log

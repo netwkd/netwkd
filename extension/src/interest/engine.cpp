@@ -4,6 +4,7 @@
 
 #include "godot/utility.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/peer_rename.hpp"
 #include "netw/profile.hpp"
@@ -13,6 +14,30 @@ using namespace godot;
 namespace netw::interest {
 
 namespace {
+
+bool named_layer(
+    NetwMultiplayer *host,
+    const StringName &id,
+    const char *verb
+) {
+    if (!id.is_empty()) {
+        return true;
+    }
+    fault::raise(
+        host,
+        NETW_FAULT_EMPTY_ARGUMENT,
+        {String(verb), String(), String("a layer name")}
+    );
+    return false;
+}
+
+void bad_policy(NetwMultiplayer *host, const char *verb, int policy) {
+    fault::raise(
+        host,
+        NETW_FAULT_BAD_VALUE,
+        {String(verb), String::num_int64(policy), String("a policy constant")}
+    );
+}
 
 template <typename T, typename Less>
 void stable_sort(LocalVector<T> &values, Less less) {
@@ -108,12 +133,7 @@ PackedInt64Array BitSet::with_bit(
     int bit,
     bool value
 ) {
-    NETW_ERR_COND_V(
-        bit < 0,
-        row,
-        sys::INTEREST,
-        "Interest was given a negative peer index."
-    );
+    NETW_BUG_COND_V(bit < 0, row);
     const int word = bit / BITS_PER_WORD;
     PackedInt64Array out
         = resized(row, row.size() > word + 1 ? row.size() : word + 1);
@@ -457,17 +477,13 @@ void Engine::set_layer(
     const PackedInt64Array &viewers,
     int policy
 ) {
-    NETW_ERR_COND(
-        id.is_empty(),
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
-    NETW_ERR_COND(
-        policy != HIDE_FROM_OUTSIDERS && policy != HIDE_FROM_INSIDERS,
-        sys::INTEREST,
-        "Interest policy %d does not exist.",
-        policy
-    );
+    if (!named_layer(host, id, "{NetwMultiplayer.interest_layer}")) {
+        return;
+    }
+    if (policy != HIDE_FROM_OUTSIDERS && policy != HIDE_FROM_INSIDERS) {
+        bad_policy(host, "{NetwInterestLayer.set_policy}", policy);
+        return;
+    }
     const HashMap<StringName, Layer>::Iterator found = layers.find(id);
     if (found != layers.end() && found->value.policy == Policy(policy)
         && BitSet::equals(found->value.viewers, viewers)) {
@@ -493,11 +509,9 @@ void Engine::remove_layer(const StringName &id) {
 }
 
 void Engine::declare_layer(const StringName &id) {
-    NETW_ERR_COND(
-        id.is_empty(),
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
+    if (!named_layer(host, id, "{NetwMultiplayer.interest_layer}")) {
+        return;
+    }
     ensure_layer(id);
 }
 
@@ -506,12 +520,9 @@ bool Engine::has_layer(const StringName &id) const {
 }
 
 bool Engine::layer_add_viewer(const StringName &id, int64_t peer_id) {
-    NETW_ERR_COND_V(
-        id.is_empty(),
-        false,
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
+    if (!named_layer(host, id, "{NetwInterestLayer.add_viewer}")) {
+        return false;
+    }
     const int bit = peer_bit_for(peer_id);
     if (bit < 0) {
         return false;
@@ -581,19 +592,13 @@ bool Engine::layer_has_viewer(const StringName &id, int64_t peer_id) const {
 }
 
 bool Engine::layer_set_policy(const StringName &id, int policy) {
-    NETW_ERR_COND_V(
-        id.is_empty(),
-        false,
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
-    NETW_ERR_COND_V(
-        policy != HIDE_FROM_OUTSIDERS && policy != HIDE_FROM_INSIDERS,
-        false,
-        sys::INTEREST,
-        "Interest policy %d does not exist.",
-        policy
-    );
+    if (!named_layer(host, id, "{NetwInterestLayer.set_policy}")) {
+        return false;
+    }
+    if (policy != HIDE_FROM_OUTSIDERS && policy != HIDE_FROM_INSIDERS) {
+        bad_policy(host, "{NetwInterestLayer.set_policy}", policy);
+        return false;
+    }
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.policy == Policy(policy)) {
@@ -607,19 +612,21 @@ bool Engine::layer_set_policy(const StringName &id, int policy) {
 }
 
 bool Engine::layer_set_leave_policy(const StringName &id, int policy) {
-    NETW_ERR_COND_V(
-        id.is_empty(),
-        false,
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
-    NETW_ERR_COND_V(
-        policy < 0 || policy > Decl::LEAVE_CUSTOM,
-        false,
-        sys::INTEREST,
-        "Interest leave policy %d does not exist.",
-        policy
-    );
+    if (!named_layer(
+            host,
+            id,
+            "{NetwInterestLayer.set_default_leave_policy}"
+        )) {
+        return false;
+    }
+    if (policy < 0 || policy > Decl::LEAVE_CUSTOM) {
+        bad_policy(
+            host,
+            "{NetwInterestLayer.set_default_leave_policy}",
+            policy
+        );
+        return false;
+    }
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.leave_policy == policy) {
@@ -636,19 +643,21 @@ int Engine::layer_leave_policy(const StringName &id) const {
 }
 
 bool Engine::layer_set_perception_policy(const StringName &id, int policy) {
-    NETW_ERR_COND_V(
-        id.is_empty(),
-        false,
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
-    NETW_ERR_COND_V(
-        policy < 0 || policy > Decl::PERCEPTION_CUSTOM,
-        false,
-        sys::INTEREST,
-        "Interest perception policy %d does not exist.",
-        policy
-    );
+    if (!named_layer(
+            host,
+            id,
+            "{NetwInterestLayer.set_default_perception_policy}"
+        )) {
+        return false;
+    }
+    if (policy < 0 || policy > Decl::PERCEPTION_CUSTOM) {
+        bad_policy(
+            host,
+            "{NetwInterestLayer.set_default_perception_policy}",
+            policy
+        );
+        return false;
+    }
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.perception_policy == policy) {
@@ -713,18 +722,10 @@ PackedInt64Array Engine::layer_viewers(const StringName &id) const {
 }
 
 bool Engine::roster_add(const StringName &id, int64_t key) {
-    NETW_ERR_COND_V(
-        id.is_empty(),
-        false,
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
-    NETW_ERR_COND_V(
-        !is_key(key),
-        false,
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    if (!named_layer(host, id, "{NetwInterestLayer.add_entity}")) {
+        return false;
+    }
+    NETW_BUG_COND_V(!is_key(key), false);
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.member_set.has(key)) {
@@ -902,13 +903,7 @@ PackedInt64Array Engine::co_members(int64_t key, const Array &layer_ids) const {
 }
 
 bool Engine::projection_admits(int64_t key, const Decl *decl) const {
-    NETW_ERR_COND_V(
-        decl == nullptr,
-        false,
-        sys::INTEREST,
-        "Interest has no declaration for entity %d, so it is not shown.",
-        key
-    );
+    NETW_BUG_COND_V(decl == nullptr, false);
     const Array labels = decl->labels();
     if (labels.is_empty()) {
         return true;
@@ -963,11 +958,7 @@ PackedInt64Array Engine::viewer_peers() const {
 }
 
 void Engine::set_membership(int64_t key, const Array &layer_ids) {
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    NETW_BUG_COND(!is_key(key));
     LocalVector<StringName> normalized;
     for (int index = 0; index < layer_ids.size(); ++index) {
         const StringName id = layer_ids[index];
@@ -994,18 +985,10 @@ void Engine::set_membership(int64_t key, const Array &layer_ids) {
 }
 
 bool Engine::membership_add(int64_t key, const StringName &layer_id) {
-    NETW_ERR_COND_V(
-        !is_key(key),
-        false,
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
-    NETW_ERR_COND_V(
-        layer_id.is_empty(),
-        false,
-        sys::INTEREST,
-        "An interest layer needs a name, and it was empty."
-    );
+    NETW_BUG_COND_V(!is_key(key), false);
+    if (!named_layer(host, layer_id, "{NetwInterest.join}")) {
+        return false;
+    }
     Record &record = record_for(key);
     if (contains(record.layers, layer_id)) {
         return false;
@@ -1090,16 +1073,8 @@ PackedInt64Array Engine::membership_keys() const {
 }
 
 void Engine::set_parent(int64_t key, int64_t parent_key) {
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
-    NETW_ERR_COND(
-        key == parent_key,
-        sys::INTEREST,
-        "An entity cannot be its own parent."
-    );
+    NETW_BUG_COND(!is_key(key));
+    NETW_BUG_COND(key == parent_key);
     int64_t walk = parent_key;
     while (walk != 0) {
         const HashMap<int64_t, Record>::ConstIterator found
@@ -1107,11 +1082,7 @@ void Engine::set_parent(int64_t key, int64_t parent_key) {
         if (found == entities.end()) {
             break;
         }
-        NETW_ERR_COND(
-            walk == key,
-            sys::INTEREST,
-            "An entity cannot be the parent of its own parent."
-        );
+        NETW_BUG_COND(walk == key);
         walk = found->value.parent;
     }
     Record &record = record_for(key);
@@ -1126,11 +1097,7 @@ void Engine::set_parent(int64_t key, int64_t parent_key) {
 }
 
 void Engine::set_intent(int64_t key, const PackedInt64Array &mask) {
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    NETW_BUG_COND(!is_key(key));
     Record &record = record_for(key);
     if (!record.intent_all && BitSet::equals(record.intent, mask)) {
         return;
@@ -1146,11 +1113,7 @@ void Engine::set_intent_for_peers(
     const PackedInt64Array &peer_ids
 ) {
     NETW_ZONE_NC("interest::Engine intent by peer", colors::INTEREST);
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    NETW_BUG_COND(!is_key(key));
     PackedInt64Array mask;
     for (int at = 0; at < peer_ids.size(); ++at) {
         const int bit = peer_bit_for(peer_ids[at]);
@@ -1169,11 +1132,7 @@ void Engine::set_intent_for_peers(
 }
 
 void Engine::set_intent_all(int64_t key) {
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    NETW_BUG_COND(!is_key(key));
     Record &record = record_for(key);
     if (record.intent_all) {
         return;
@@ -1185,21 +1144,9 @@ void Engine::set_intent_all(int64_t key) {
 }
 
 void Engine::set_order_key(int64_t key, int depth, int route) {
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
-    NETW_ERR_COND(
-        depth < 0,
-        sys::INTEREST,
-        "Interest was given a negative tree depth."
-    );
-    NETW_ERR_COND(
-        route < 0,
-        sys::INTEREST,
-        "Interest was given a negative route."
-    );
+    NETW_BUG_COND(!is_key(key));
+    NETW_BUG_COND(depth < 0);
+    NETW_BUG_COND(route < 0);
     Record &record = record_for(key);
     if (record.depth == depth && record.route == route) {
         return;
@@ -1248,11 +1195,7 @@ bool Engine::set_live_peer_ids(const PackedInt64Array &peer_ids) {
 }
 
 void Engine::remove_entity(int64_t key) {
-    NETW_ERR_COND(
-        !is_key(key),
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    NETW_BUG_COND(!is_key(key));
     if (!entities.has(key) && !committed.has(key)) {
         return;
     }
@@ -1824,12 +1767,7 @@ String Engine::explain(int64_t key, int bit) const {
 }
 
 int Engine::order_route_for(int64_t key) {
-    NETW_ERR_COND_V(
-        !is_key(key),
-        0,
-        sys::INTEREST,
-        "Interest was given an entity with no valid key."
-    );
+    NETW_BUG_COND_V(!is_key(key), 0);
     const HashMap<int64_t, int32_t>::ConstIterator found
         = fallback_routes.find(key);
     if (found) {
@@ -1841,12 +1779,7 @@ int Engine::order_route_for(int64_t key) {
 }
 
 int Engine::peer_bit_for(int64_t peer_id) {
-    NETW_ERR_COND_V(
-        peer_id == 0,
-        -1,
-        sys::INTEREST,
-        "Interest was given peer 0, which is not a peer."
-    );
+    NETW_BUG_COND_V(peer_id == 0, -1);
     const HashMap<int64_t, int32_t>::ConstIterator found
         = peer_bits.find(peer_id);
     if (found) {

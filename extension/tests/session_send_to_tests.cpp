@@ -97,14 +97,6 @@ TEST_CASE(
     "[Networked][Transport][Hosted] S4 a negative route is refused and stages "
     "nothing, because it addresses no entity and no peer-scoped stream"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][transport] Condition \"p_route < 0\" is true. "
-        "Returning: ERR_INVALID_PARAMETER. Channel 19 cannot send "
-        "to peer * for an entity with a negative route.",
-        1
-    );
-
     const Ref<NetwMultiplayer> core = configured_core();
 
     NETW_CHECK_EQ(

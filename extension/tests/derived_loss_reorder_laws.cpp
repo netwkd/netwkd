@@ -256,7 +256,7 @@ public:
             const netw_test::FaultWatch faults;
             drive_property(rig, pair);
             seen.refused_write_warnings
-                = faults.warnings_containing("which may not write it");
+                = faults.warnings_containing("[NW0013]");
             seen.refused_writes
                 = stat_of(rig.server(), "drops_sync_bad_sender");
         } else {

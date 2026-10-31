@@ -194,12 +194,7 @@ Ref<NetwEntity> NetwMultiplayer::wrapper_ensure(Node *p_root) {
     }
     const Variant made = factory.call(root);
     Ref<NetwEntity> minted = made;
-    NETW_WARN_COND(
-        minted.is_null(),
-        sys::ENTITY,
-        "No NetwEntity could be made for '%s'.",
-        root->get_name()
-    );
+    NETW_BUG_COND_V(minted.is_null(), minted);
     return minted;
 }
 
@@ -234,14 +229,15 @@ Object *NetwMultiplayer::wrapper_stamp_identity(
     if (node == nullptr) {
         return nullptr;
     }
-    NETW_ERR_COND_V(
-        String(p_entity_id).is_empty(),
-        p_node,
-        sys::ENTITY,
-        "'%s' was given an empty entity id, so it was not renamed. Pass a "
-        "non-empty id.",
-        node->get_name()
-    );
+    if (String(p_entity_id).is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwEntity.id}", String(), "entity id"},
+            gd::instance_id(node)
+        );
+        return p_node;
+    }
     node->set_name(String(p_entity_id));
     const Ref<NetwEntity> wrapper = wrapper_ensure(node);
     if (wrapper.is_valid()) {
@@ -283,12 +279,14 @@ Ref<NetwScene> NetwMultiplayer::entity_scene_facet(
 void NetwMultiplayer::entity_move(Node *p_owner, Node *p_new_parent) {
     Node *owner = p_owner;
     Node *parent = p_new_parent;
-    NETW_ERR_COND(
-        owner == nullptr || parent == nullptr,
-        sys::ENTITY,
-        "An entity move needs both a node and a new parent, and one was "
-        "null."
-    );
+    if (owner == nullptr || parent == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{Netw.reparent}", String(), "node or new parent"}
+        );
+        return;
+    }
     owner = scene_outer_of(owner);
     NETW_TRACE(sys::ENTITY, "Moving an entity under %s.", parent->get_name());
     if (owner->is_inside_tree()) {
@@ -449,7 +447,7 @@ void NetwMultiplayer::entity_enter_tree(
         const int64_t from = p_record->get_stage();
         {
             NETW_ZONE_NC("entity enter transition live", colors::LIVENESS);
-            if (!p_record->transition(int64_t(entity::Stage::LIVE), owner)) {
+            if (!p_record->transition(int64_t(entity::Stage::LIVE))) {
                 return;
             }
         }
@@ -579,13 +577,14 @@ RID NetwMultiplayer::spawn_fn(
 ) {
     NETW_ZONE_NC("session spawn function", colors::LIVENESS);
     spawn::Pipeline *pipeline = spawn_plane();
-    NETW_ERR_COND_V(
-        pipeline == nullptr,
-        RID(),
-        sys::SPAWN,
-        "Netw.spawn did nothing, because replication is not running on this "
-        "peer."
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"{Netw.spawn}", String(), "replication"}
+        );
+        return RID();
+    }
     Object *node
         = pipeline->spawn(p_function, p_args, Ref<NetwPlayer>(p_owner));
     return node != nullptr ? entity_of(node) : RID();
@@ -598,13 +597,16 @@ void NetwMultiplayer::spawn_register_constructor(
     const Array &p_quantizers
 ) {
     spawn::Pipeline *pipeline = spawn_plane();
-    NETW_ERR_COND(
-        pipeline == nullptr,
-        sys::SPAWN,
-        "Spawn constructor '%s' was not registered, because replication is "
-        "not running on this peer.",
-        String(p_id)
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {vformat("Registering spawn constructor '%s'", String(p_id)),
+             String(),
+             "replication"}
+        );
+        return;
+    }
     pipeline->register_spawn_constructor(
         p_id,
         p_function,
@@ -620,14 +622,16 @@ RID NetwMultiplayer::spawn_registered(
 ) {
     NETW_ZONE_NC("session spawn registered", colors::LIVENESS);
     spawn::Pipeline *pipeline = spawn_plane();
-    NETW_ERR_COND_V(
-        pipeline == nullptr,
-        RID(),
-        sys::SPAWN,
-        "Spawn constructor '%s' did nothing, because replication is not "
-        "running on this peer.",
-        String(p_id)
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {vformat("Spawn constructor '%s'", String(p_id)),
+             String(),
+             "replication"}
+        );
+        return RID();
+    }
     Object *node = pipeline->spawn_registered(
         p_id,
         p_args,
@@ -639,13 +643,15 @@ RID NetwMultiplayer::spawn_registered(
 RID NetwMultiplayer::entity_adopt(Object *p_root) {
     NETW_ZONE_NC("session spawn adopt", colors::LIVENESS);
     spawn::Pipeline *pipeline = spawn_plane();
-    NETW_ERR_COND_V(
-        pipeline == nullptr,
-        RID(),
-        sys::SPAWN,
-        "A node could not be adopted, because replication is not running on "
-        "this peer."
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"Adopting a node", String(), "replication"},
+            gd::instance_id(p_root)
+        );
+        return RID();
+    }
     const Ref<NetwEntity> wrapper
         = pipeline->adopt_in_place(Object::cast_to<Node>(p_root));
     return wrapper.is_valid() ? wrapper->get_rid_handle() : RID();
@@ -653,13 +659,14 @@ RID NetwMultiplayer::entity_adopt(Object *p_root) {
 
 TypedArray<Dictionary> NetwMultiplayer::spawn_get_state(const RID &p_entity) {
     spawn::Pipeline *pipeline = spawn_plane();
-    NETW_ERR_COND_V(
-        pipeline == nullptr,
-        TypedArray<Dictionary>(),
-        sys::SPAWN,
-        "Spawn state was read while replication is not running on this "
-        "peer."
-    );
+    if (pipeline == nullptr) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"Reading spawn state", String(), "replication"}
+        );
+        return TypedArray<Dictionary>();
+    }
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     Node *owner = wrapper.is_valid() ? wrapper->get_owner() : nullptr;
     if (owner == nullptr) {
@@ -706,14 +713,7 @@ PropertyBindingPtr NetwMultiplayer::entity_record_binding(
         const PropertyBindingPtr scanned
             = entity_derived_binding(p_owner, p_record, p_route);
         if (scanned != seated) {
-            NETW_ERROR(
-                sys::WIRE,
-                "Record %d of '%s' points at a different node than the "
-                "entity holds.",
-                p_record,
-                String(p_owner->get_name())
-            );
-            return scanned;
+            NETW_BUG_V(scanned);
         }
     }
     return seated;
@@ -1491,11 +1491,15 @@ int64_t NetwMultiplayer::liveness_pending_live_count() const {
 void NetwMultiplayer::liveness_poll(int64_t p_clock_tick) {
     const PackedInt32Array expired = liveness_core->poll(int(p_clock_tick));
     for (int at = 0; at < expired.size(); at++) {
-        NETW_WARN(
-            sys::LIVENESS,
-            "Route %d never became live, so its "
-            "NetwMultiplayer.liveness_when_live callback was dropped.",
-            expired[at]
+        fault::raise(
+            this,
+            NETW_FAULT_LIVENESS_TIMEOUT,
+            {String::num_int64(expired[at]),
+             String(),
+             String(),
+             0,
+             expired[at],
+             0}
         );
     }
 }
@@ -1907,12 +1911,14 @@ Error NetwMultiplayer::entity_bind_node(const RID &p_entity, Node *p_node) {
 }
 
 int64_t NetwMultiplayer::entity_admit(const RID &p_entity) {
-    NETW_ERR_COND_V(
-        !is_host(),
-        0,
-        sys::LIVENESS,
-        "NetwMultiplayer.entity_admit runs only on the server."
-    );
+    if (!is_host()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.entity_admit}"}
+        );
+        return 0;
+    }
     if (!liveness_core->entity_is_valid(p_entity)) {
         return 0;
     }
@@ -2765,11 +2771,13 @@ bool NetwMultiplayer::spawn_send_reparent(
         || !anchor_encode(stream, scene_outer_of(p_node)->get_parent())
         || !stream.varuint(installed.revision, 5)
         || !stream.varuint(installed.author, 5) || !stream.align_verify()) {
-        NETW_WARN(
-            sys::SPAWN,
-            "'%s' was moved outside the multiplayer root, so other peers keep "
-            "its old parent. Move it under a node inside the root.",
-            String(p_node->get_name()).utf8().get_data()
+        fault::raise(
+            this,
+            NETW_FAULT_ENTITY_MOVED,
+            {String(p_node->get_name()),
+             "a parent outside the multiplayer root",
+             "a parent inside the multiplayer root"},
+            gd::instance_id(p_node)
         );
         return false;
     }
@@ -2914,21 +2922,23 @@ void NetwMultiplayer::spawn_receive_failed_frame(
         || !record->mark_failed(p_sender)) {
         return;
     }
-    const Ref<NetwPlayer> player = player_of(p_sender);
     const String method = String(
         record->get_recipe() == spawn::Book::RECIPE_FN_REGISTRY
             ? record->get_fn_registry_id()
             : record->get_fn_method()
     );
-    NETW_WARN(
-        sys::SPAWN,
-        "Player '%s' could not spawn a node, because '%s' %s on their "
-        "peer. Make '%s' return a Node on every peer.",
-        player.is_valid() ? String(player->get_username())
-                          : String::num_int64(p_sender),
-        method,
-        frame.reason,
-        method
+    const Ref<NetwPlayer> player = player_of(p_sender);
+    fault::raise(
+        this,
+        NETW_FAULT_SPAWN_REFUSED,
+        {vformat(
+             "The node for player '%s'",
+             player.is_valid() ? String(player->get_username())
+                               : String::num_int64(p_sender)
+         ),
+         vformat("'%s', which %s on their peer", method, frame.reason),
+         vformat("'%s' returning a Node on every peer", method),
+         p_sender}
     );
     const RID entity = liveness_core->rid_from_route(int(frame.route));
     if (scene_is_declared(entity)) {
@@ -3273,12 +3283,14 @@ void NetwMultiplayer::liveness_when_live(
 
 PackedInt64Array NetwMultiplayer::liveness_claim_routes(int p_count) {
     PackedInt64Array out;
-    NETW_ERR_COND_V(
-        !is_host(),
-        out,
-        sys::LIVENESS,
-        "NetwMultiplayer.liveness_claim_routes runs only on the server."
-    );
+    if (!is_host()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.liveness_claim_routes}"}
+        );
+        return out;
+    }
 
     if (p_count <= 0) {
         return out;
@@ -3294,12 +3306,14 @@ PackedInt64Array NetwMultiplayer::liveness_claim_routes(int p_count) {
 Error NetwMultiplayer::liveness_release_routes(
     const PackedInt64Array &p_routes
 ) {
-    NETW_ERR_COND_V(
-        !is_host(),
-        ERR_UNCONFIGURED,
-        sys::LIVENESS,
-        "NetwMultiplayer.liveness_release_routes runs only on the server."
-    );
+    if (!is_host()) {
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.liveness_release_routes}"}
+        );
+        return ERR_UNCONFIGURED;
+    }
 
     if (p_routes.is_empty()) {
         return OK;

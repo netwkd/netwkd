@@ -24,16 +24,8 @@ TEST_CASE(
     "server is refused and counted"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 30.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
+    expected_faults.expect_warning("*(error 30)*[NW1000]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -66,11 +58,7 @@ TEST_CASE(
     "carry is refused, because the gate reads the channel it was given"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 30.",
-        1
-    );
+    expected_faults.expect_warning("*(error 30)*[NW1000]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -138,11 +126,7 @@ TEST_CASE(
     "given up rather than retried, and counted as expired"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn was dropped, because its MultiplayerSpawner"
-        " never appeared on this peer.",
-        1
-    );
+    expected_faults.expect_warning("*MultiplayerSpawner*[NW0026]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -186,16 +170,8 @@ TEST_CASE(
     "when it did not come from the server"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 30.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
+    expected_faults.expect_warning("*(error 30)*[NW1000]*", 1);
 
     ParkedRelease world;
     PackedByteArray payload;
@@ -214,17 +190,8 @@ TEST_CASE(
     "the server applies nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn for route * was dropped, because "
-        "peer * lost its authority while the spawn waited for its "
-        "parent.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
+    expected_faults.expect_warning("*[NW0026]*", 1);
 
     ParkedRelease stale;
     stale.pipeline->park_spawn_for_scene(stale.frame(), 9101, 7);
@@ -240,7 +207,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(current.counted("spawn_park_refused"), int64_t(0));
     NETW_CHECK_EQ(current.counted("drops_spawn_truncated"), int64_t(1));
-    NETW_CHECK_EQ(faults.warnings_containing("ended early"), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW0007]"), 1);
 }
 
 TEST_CASE(
@@ -249,17 +216,8 @@ TEST_CASE(
     "server applies nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn for route * was dropped, because "
-        "peer * lost its authority while the spawn waited for its "
-        "parent.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
+    expected_faults.expect_warning("*[NW0026]*", 1);
 
     ParkedRelease stale;
     stale.pipeline->park_spawn_for_adopt(stale.frame(), 9102, 7);
@@ -275,7 +233,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(current.counted("spawn_park_refused"), int64_t(0));
     NETW_CHECK_EQ(current.counted("drops_spawn_truncated"), int64_t(1));
-    NETW_CHECK_EQ(faults.warnings_containing("ended early"), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW0007]"), 1);
 }
 
 TEST_CASE(
@@ -284,17 +242,8 @@ TEST_CASE(
     "server applies nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn for route * was dropped, because "
-        "peer * lost its authority while the spawn waited for its "
-        "parent.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
+    expected_faults.expect_warning("*[NW0026]*", 1);
 
     ParkedRelease stale;
     stale.pipeline->get_park()
@@ -312,7 +261,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(current.counted("spawn_park_refused"), int64_t(0));
     NETW_CHECK_EQ(current.counted("drops_spawn_truncated"), int64_t(1));
-    NETW_CHECK_EQ(faults.warnings_containing("ended early"), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW0007]"), 1);
 }
 
 TEST_CASE(

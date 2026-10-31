@@ -1,0 +1,23 @@
+:github_url: hide
+
+.. _fault_nw0035:
+
+NW0035. A setting was declared twice and the last one wins
+==========================================================
+
+Reported as a warning when a setting of a property, method or service is set
+a second time.
+
+The last value is kept. The log line names the setting and the node.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun).server().controller()
+
+Set it once.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun).controller()

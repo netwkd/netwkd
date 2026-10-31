@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1002:
+
+NW1002. A handler takes the wrong arguments
+===========================================
+
+Reported as an error the first time Networked cannot call a handler you
+declared because its arguments do not fit.
+
+The handler will not run. The log line names the handler and the signature
+it needs.
+
+.. code-block:: gdscript
+
+    func admit() -> Error:
+        return OK
+
+Declare it as the log line says.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> Error:
+        return OK

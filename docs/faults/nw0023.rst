@@ -1,0 +1,25 @@
+:github_url: hide
+
+.. _fault_nw0023:
+
+NW0023. A spawn function is still waiting
+=========================================
+
+Reported as a warning when a spawn function that awaits has not returned
+after the park timeout.
+
+The log line names the function and how many seconds it has waited.
+
+.. code-block:: gdscript
+
+    func make_car() -> Node:
+        await some_signal_that_never_comes
+        return CarScene.instantiate()
+
+Check that what the function awaits can finish.
+
+.. code-block:: gdscript
+
+    func make_car() -> Node:
+        await get_tree().process_frame
+        return CarScene.instantiate()

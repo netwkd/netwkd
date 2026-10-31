@@ -390,11 +390,7 @@ TEST_CASE(
     }
 
     SUBCASE("a tombstoned anchor drops the frame at once") {
-        expected_faults.expect_warning(
-            "[warn][spawn] A spawn for route * was dropped, because"
-            " its parent '*' does not exist on this peer.",
-            1
-        );
+        expected_faults.expect_warning("*its parent '*'*[NW0026]*", 1);
 
         Node *body = rig.route_node(anchor.route);
         body->get_parent()->remove_child(body);

@@ -1,0 +1,28 @@
+:github_url: hide
+
+.. _fault_nw1019:
+
+NW1019. A value cannot be sent
+==============================
+
+Reported as an error when a property or column holds a value that cannot be
+sent, such as an ``Object`` or a value of the wrong type.
+
+Null or nothing was sent in its place. The log line names the property, the
+value and what to use.
+
+.. code-block:: gdscript
+
+    var target: Node
+
+    func _init() -> void:
+        Netw.configure_property(self, &"target").broadcast()
+
+Send the object's data or its node path, or the type the schema declares.
+
+.. code-block:: gdscript
+
+    var target_path: NodePath
+
+    func _init() -> void:
+        Netw.configure_property(self, &"target_path").broadcast()

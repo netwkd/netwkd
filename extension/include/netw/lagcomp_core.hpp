@@ -124,7 +124,8 @@ public:
         const godot::PackedInt64Array &p_slots,
         int64_t p_tick,
         const godot::Callable &p_body,
-        int *r_moved = nullptr
+        int *r_moved = nullptr,
+        bool *r_awaited = nullptr
     );
 };
 

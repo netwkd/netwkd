@@ -81,12 +81,7 @@ TEST_CASE(
     "the class name identify it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] A transport for peer class '*' is already"
-        " registered, so this one was refused. Call "
-        "NetwMultiplayer.transport_unregister first.",
-        1
-    );
+    expected_faults.expect_error("*A transport for peer class*[NW0034]*", 1);
 
     const Ref<NetwMultiplayer> core = lone_session();
     const Ref<Script> held = script_at(HELD_SCRIPT);
@@ -274,12 +269,7 @@ TEST_CASE(
     "reports what the session actually took"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] A transport for peer class '*' is already"
-        " registered, so this one was refused. Call "
-        "NetwMultiplayer.transport_unregister first.",
-        1
-    );
+    expected_faults.expect_error("*A transport for peer class*[NW0034]*", 1);
 
     const Ref<NetwMultiplayer> core = lone_session();
     const Ref<NetwConnection> view = core->get_connection();

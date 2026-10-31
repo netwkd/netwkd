@@ -6,6 +6,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/connect/tracker_client.hpp"
 #include "netw/connect/webrtc_transport.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -53,11 +54,13 @@ void WebTorrentLobbyDirectory::set_trackers(
     trackers = p_trackers;
     for (int64_t at = 0; at < trackers.size(); at++) {
         if (!trackers[at].is_empty() && !is_tracker_url(trackers[at])) {
-            NETW_WARN(
-                sys::TRANSPORT,
-                "WebTorrentLobbyDirectory.trackers has '%s', which is not a "
-                "tracker URL, so it is skipped. Use a ws:// or wss:// URL.",
-                trackers[at]
+            fault::raise(
+                nullptr,
+                NETW_FAULT_BAD_VALUE,
+                {"{WebTorrentLobbyDirectory.trackers}",
+                 vformat("'%s'", trackers[at]),
+                 "a ws:// or wss:// URL"},
+                gd::instance_id(this)
             );
         }
     }

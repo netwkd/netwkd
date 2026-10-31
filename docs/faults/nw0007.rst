@@ -1,0 +1,15 @@
+:github_url: hide
+
+.. _fault_nw0007:
+
+NW0007. A peer sent a packet that could not be read
+===================================================
+
+Reported as a warning the first time a peer sends a packet this peer cannot
+read. The rest from that peer are counted, and the session end summary adds
+how many.
+
+The packet was dropped. This happens when two peers run different Networked
+versions, and when a packet is cut short or arrives damaged.
+
+Run the same Networked version on every peer.

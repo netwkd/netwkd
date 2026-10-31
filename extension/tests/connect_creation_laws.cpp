@@ -580,14 +580,7 @@ TEST_CASE(
     "nothing, so a stale answer cannot reach a newer match"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][transport] Condition \"offered != nullptr && "
-        "!offered->claimed && offered->session != "
-        "gd::instance_id(this)\" is true. This peer was created for "
-        "another session, so the assignment was ignored. Assign it "
-        "to the session that created it.",
-        1
-    );
+    expected_faults.expect_error("*another session*[NW1009]*", 1);
 
     Bench bench;
     Ref<NetwMultiplayer> other;
@@ -685,10 +678,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][transport] Condition \"!p_completed.is_valid()\" is "
-        "true. Returning: RID(). "
-        "NetwMultiplayer.transport_create_peer needs a valid "
-        "completion Callable.",
+        "*transport_create_peer*[NW1005]*",
         1
     );
 
@@ -856,10 +846,7 @@ TEST_CASE(
     }
     SUBCASE("two authors reject the start without building") {
         expected_faults.expect_error(
-            "[error][session] Netw.configure_session was called on "
-            "more than one node (/root/CreationTree/One, "
-            "/root/CreationTree/Two), so the connection was "
-            "refused. Call it on one node per session.",
+            "*Netw.configure_session*/root/CreationTree/One*[NW0034]*",
             1
         );
 

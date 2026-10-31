@@ -246,12 +246,7 @@ TEST_CASE(
     "config as it was, because there is no body such a rule could advance"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] NetwPropertyConfig.carry_step on '*' "
-        "needs a valid method of the node it moves. Pass a method "
-        "of that node.",
-        2
-    );
+    expected_faults.expect_error("*carry_step*[NW1005]*", 2);
 
     Ref<RefCounted> loose;
     loose.instantiate();

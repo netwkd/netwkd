@@ -39,13 +39,7 @@ TEST_CASE(
     "write, so a client peer is refused rather than silently parking one"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][scene] Condition \"!is_host() && "
-        "entity_get_route(p_entity) <= 0\" is true. Returning: "
-        "ERR_UNAUTHORIZED. A client cannot set the scene of an "
-        "entity that has not spawned yet.",
-        1
-    );
+    expected_faults.expect_error("*Setting the scene*[NW0012]*", 1);
 
     Ref<NetwMultiplayer> session;
     session.instantiate();

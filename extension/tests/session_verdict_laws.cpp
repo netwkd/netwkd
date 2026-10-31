@@ -271,16 +271,8 @@ const VerdictLaw LAWS[] = {L_ANSWERS, L_PARTITIONED, L_SERVICED};
 
 TEST_CASE("[Networked][Session][SceneTree] the gate verdict laws hold") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 30.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
+    expected_faults.expect_warning("*(error 30)*[NW1000]*", 1);
 
     const VerdictScenario CORPUS[] = {
         a_route_nobody_bound(),

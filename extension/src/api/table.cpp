@@ -6,6 +6,7 @@
 #include "netw/api/database_result.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/promise.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -36,10 +37,12 @@ Ref<NetwTable> NetwTable::over(const RID &p_table, NetwMultiplayer *p_session) {
 Ref<NetwTable> NetwTable::of(Node *p_node, const StringName &p_name) {
     NetwMultiplayer *api = NetwMultiplayer::of(p_node);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::TABLE,
-            "NetwTable.of got a node that is not inside a session. Call it "
-            "from a node in the scene tree under a MultiplayerViewport."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{NetwTable.of}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return Ref<NetwTable>();
     }
@@ -52,11 +55,10 @@ Ref<NetwTable> NetwTable::named(
 ) {
     const RID table = p_session->table_find_or_adopt(p_name);
     if (!table.is_valid()) {
-        NETW_ERROR(
-            sys::TABLE,
-            "There is no schema named '%s'. Declare it with "
-            "Netw.configure_schema first.",
-            String(p_name).utf8().get_data()
+        fault::raise(
+            p_session,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{NetwTable.of}"), String("this session"), p_name}
         );
         return Ref<NetwTable>();
     }

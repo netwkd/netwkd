@@ -90,12 +90,7 @@ TEST_CASE(
     "none of them"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"!is_host()\" is true. "
-        "Returning: ERR_UNAUTHORIZED. NetwSession.kick runs only on"
-        " the server.",
-        1
-    );
+    expected_faults.expect_error("*NetwSession.kick*[NW0012]*", 1);
 
     MeshStand mesh;
     mesh.seat_server();

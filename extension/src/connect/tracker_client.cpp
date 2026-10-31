@@ -6,6 +6,7 @@
 #include "godot/project_settings.hpp"
 #include "godot/variant.hpp"
 #include "godot/web_socket.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -161,11 +162,15 @@ void TrackerClient::poll(int64_t p_now_usec, int64_t p_frame) {
 
     if (sockets.size() == 0 && !any_opened && !reported_unreachable) {
         reported_unreachable = true;
-        NETW_WARN_ONCE(
-            sys::TRANSPORT,
-            "WebRTC could not reach any signaling tracker (%s). Check the "
-            "network, or pass your own NetwWebRTCSignaler.",
-            String(", ").join(failures)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {"the WebRTC connection",
+             String(),
+             vformat(
+                 "every signaling tracker (%s)",
+                 String(", ").join(failures)
+             )}
         );
         TrackerEvent none;
         none.kind = TrackerEvent::UNREACHABLE;
@@ -205,11 +210,12 @@ void TrackerClient::send(int64_t p_socket, const Dictionary &p_message) {
 void TrackerClient::note_failure(const String &p_url, const char *p_reason) {
     failures.push_back(vformat("%s (%s)", p_url, String(p_reason)));
     if (warns_on_failure()) {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "The signaling tracker %s could not be reached (%s).",
-            p_url,
-            String(p_reason)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {String("signaling"),
+             String(),
+             vformat("the signaling tracker %s (%s)", p_url, String(p_reason))}
         );
         return;
     }

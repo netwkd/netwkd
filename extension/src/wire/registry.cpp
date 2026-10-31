@@ -1,6 +1,7 @@
 #include "netw/wire/registry.hpp"
 
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 
@@ -16,23 +17,23 @@ uint64_t hash_combine(uint64_t h, uint64_t v) {
 
 bool WireRegistry::register_channel(const ChannelDecl &decl) {
     if (decl.id == 0 && !decl.is_reserved) {
-        NETW_WARN(
-            sys::WIRE,
-            "Channel '%s' was not registered, because id 0 is reserved. "
-            "Give it another id.",
-            godot::String(decl.name).utf8().get_data()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {godot::String("A channel registration"),
+             godot::vformat("id 0 for '%s'", godot::String(decl.name)),
+             godot::String("an id above 0")}
         );
         return false;
     }
-    NETW_WARN_COND(
-        registered[decl.id] && channels[decl.id].name != decl.name,
-        sys::WIRE,
-        "Channel id %d was registered as '%s' and now as '%s', and the last "
-        "one wins. Give each channel its own id.",
-        int(decl.id),
-        godot::String(channels[decl.id].name).utf8().get_data(),
-        godot::String(decl.name).utf8().get_data()
-    );
+    if (registered[decl.id] && channels[decl.id].name != decl.name) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {godot::vformat("Channel id %d", int(decl.id)),
+             godot::String(channels[decl.id].name)}
+        );
+    }
     channels[decl.id] = decl;
     registered[decl.id] = true;
     return true;
@@ -647,16 +648,8 @@ WireRegistry WireRegistry::create_default() {
     auto batches = [&](const char *name) {
         const ChannelDecl *decl
             = reg.find_channel_by_name(godot::StringName(name));
-        NETW_WARN_COND(
-            decl == nullptr,
-            sys::WIRE,
-            "Built-in channel '%s' is marked for batching but is not "
-            "declared.",
-            name
-        );
-        if (decl != nullptr) {
-            reg.channels[decl->id].aggregated = true;
-        }
+        NETW_BUG_COND(decl == nullptr);
+        reg.channels[decl->id].aggregated = true;
     };
     batches("SIGNAL");
     batches("PROPERTY_SYNC");
@@ -675,12 +668,7 @@ int64_t builtin_channel(const godot::StringName &name) {
     static const WireRegistry table = WireRegistry::create_default();
     const ChannelDecl *decl = table.find_channel_by_name(name);
     if (decl == nullptr) {
-        NETW_ERR_V(
-            -1,
-            sys::WIRE,
-            "No built-in channel is named '%s'.",
-            godot::String(name).utf8().get_data()
-        );
+        NETW_BUG_V(-1);
     }
     return int64_t(decl->id);
 }

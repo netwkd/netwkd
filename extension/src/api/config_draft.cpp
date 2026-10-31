@@ -1,7 +1,7 @@
 #include "netw/api/config_draft.hpp"
 
 #include "godot/math.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 
 using namespace godot;
 
@@ -19,26 +19,23 @@ bool late(Guard &p_guard, const char *p_field) {
         return true;
     }
     p_guard.late_reported = true;
-    NETW_WARN(
-        sys::SESSION,
-        "Netw.%s set '%s' on '%s' after the session started, so the running "
-        "value is unchanged. Set it before startup and finish the chain "
-        "without awaiting.",
-        p_guard.verb,
-        p_field,
-        p_guard.scope
+    fault::raise(
+        nullptr,
+        NETW_FAULT_DECLARED_ONLINE,
+        {vformat("{Netw.%s}", p_guard.verb),
+         String(),
+         vformat("'%s' on '%s'", p_field, p_guard.scope)}
     );
     return true;
 }
 
 bool refuse(const Guard &p_guard, const char *p_field, const String &p_saw) {
-    NETW_WARN(
-        sys::SESSION,
-        "Netw.%s got %s for '%s', which it does not accept, so the previous "
-        "value stays. Pass a value in the range its documentation gives.",
-        p_guard.verb,
-        p_saw,
-        p_field
+    fault::raise(
+        nullptr,
+        NETW_FAULT_BAD_VALUE,
+        {vformat("{Netw.%s}", p_guard.verb),
+         vformat("%s for '%s'", p_saw, p_field),
+         String("a value in the range its documentation gives")}
     );
     return false;
 }

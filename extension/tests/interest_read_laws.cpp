@@ -169,12 +169,7 @@ TEST_CASE(
     "than answered with a dead handle"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"p_name.is_empty()\" is true. "
-        "Returning: RID(). An interest layer needs a name. Pass a "
-        "non-empty name.",
-        1
-    );
+    expected_faults.expect_error("*[NW0031]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();

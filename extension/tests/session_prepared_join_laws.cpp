@@ -139,11 +139,7 @@ TEST_CASE(
     "in for one"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Netw.prepare_join needs a username, and "
-        "it was empty.",
-        1
-    );
+    expected_faults.expect_error("*Netw.prepare_join*[NW0031]*", 1);
 
     const Ref<NetwMultiplayer> session = a_session();
     NETW_CHECK_EQ(

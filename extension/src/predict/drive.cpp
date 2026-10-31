@@ -78,9 +78,7 @@ WritePlan apply_quarantine_plan(
         return out;
     }
     NETW_ASSERT(
-        r_slot.episode.active && r_slot.episode.state == EpisodeState::FALLBACK,
-        sys::PREDICTION,
-        "A quarantine write requires an active fallback episode."
+        r_slot.episode.active && r_slot.episode.state == EpisodeState::FALLBACK
     );
     out.restore = p_plan.payload;
     out.write = p_plan.payload;
@@ -167,15 +165,8 @@ void Slot::adopt_timing(const Timing &p_timing) {
         tick_delta = p_timing.ticktime;
     }
     frame_index = p_timing.frame;
-    if (p_timing.quantum < 1 && !quantum_declaration_warned) {
-        quantum_declaration_warned = true;
-        NETW_WARN_COND(
-            p_timing.quantum < 1,
-            sys::PREDICTION,
-            "Prediction was given %d physics steps per tick, which is not "
-            "positive, so it uses 1.",
-            p_timing.quantum
-        );
+    if (p_timing.quantum < 1) {
+        NETW_BUG_REPORT();
     }
     declared_quantum = p_timing.quantum < 1 ? 1 : p_timing.quantum;
 }
@@ -849,33 +840,27 @@ bool Slot::record_evidence(
     const Dictionary &p_environment,
     const Dictionary &p_topology,
     const LocalVector<WitnessContact> &p_contacts,
-    bool p_sleeping
+    bool p_sleeping,
+    int *r_rejected_contact
 ) {
     NETW_ZONE_LEAF(
         "Predict record evidence",
         colors::PREDICTION,
         profile::SUBSYSTEM_PREDICTION
     );
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         journal.slot_of(p_transition) < 0
             || (journal.flags_of(p_transition) & ROW_CLOSED) != 0,
-        false,
-        sys::PREDICTION,
-        "Prediction got physics results for tick %d, which it has no open "
-        "record of.",
-        p_transition
+        false
     );
-    NETW_ERR_COND_V(
-        !config.witness && !p_contacts.is_empty(),
-        false,
-        sys::PREDICTION,
-        "Prediction got contacts for an entity with no "
-        "NetwPrediction.witness_contacts, so it ignored them."
-    );
+    NETW_BUG_COND_V(!config.witness && !p_contacts.is_empty(), false);
     WitnessSummary witness;
     if (config.witness) {
         witness = summarize_witness(p_contacts, p_sleeping);
         if (!witness.valid) {
+            if (r_rejected_contact != nullptr) {
+                *r_rejected_contact = witness.rejected_contact;
+            }
             return false;
         }
         last_witness = witness;

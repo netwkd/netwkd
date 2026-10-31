@@ -61,8 +61,6 @@ private:
     int64_t scene_isolation = -1;
     int64_t projected_follower = 0;
     int64_t projected_steerer = 0;
-    bool native_write_warned = false;
-    bool synchronizer_warned = false;
 
     struct Projection {
         int64_t follower = SERVER_PEER;
@@ -154,7 +152,7 @@ public:
         return &control;
     }
 
-    bool transition(int64_t p_stage, godot::Node *p_owner);
+    bool transition(int64_t p_stage);
 
     void deactivate(godot::Node *p_owner);
 
@@ -172,16 +170,8 @@ public:
         uint64_t p_watch
     );
 
-    bool claim_synchronizer_warning() {
-        const bool first = !synchronizer_warned;
-        synchronizer_warned = true;
-        return first;
-    }
     bool projects_to_server() const {
         return projected_follower == SERVER_PEER;
-    }
-    bool get_native_write_warned() const {
-        return native_write_warned;
     }
 
     static godot::StringName entity_meta();

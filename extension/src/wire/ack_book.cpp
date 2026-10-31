@@ -1,7 +1,6 @@
 #include "netw/wire/ack_book.hpp"
 
 #include "netw/colors.hpp"
-#include "netw/log.hpp"
 #include "netw/profile.hpp"
 
 namespace netw::wire {
@@ -17,13 +16,6 @@ int slot_of(uint16_t seq) {
 bool AckBook::record_send(uint16_t seq, uint16_t frames, int64_t bits) {
     const int slot = slot_of(seq);
     if (active[slot] && ring[slot].seq != seq) {
-        NETW_WARN_ONCE(
-            sys::WIRE,
-            "Packet %d is not tracked for delivery, because packet %d still "
-            "waits for its ack. Too many packets to one peer are in flight.",
-            int(seq),
-            int(ring[slot].seq)
-        );
         return false;
     }
     ring[slot].seq = seq;

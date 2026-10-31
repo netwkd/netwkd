@@ -1,0 +1,20 @@
+:github_url: hide
+
+.. _fault_nw1017:
+
+NW1017. This Godot build cannot run the declared mode
+=====================================================
+
+Reported as a warning when an entity needs something the engine in use cannot
+do.
+
+The entity runs a simpler mode. The log line names the entity and what it
+needs.
+
+Install a :ref:`NetwPhysicsStepper <class_NetwPhysicsStepper>` with
+``NetwSession.install_physics_stepper``, or use the Networked engine build.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        session.install_physics_stepper(NetwPhysicsStepper.new())

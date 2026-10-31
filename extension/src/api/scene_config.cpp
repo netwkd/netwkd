@@ -4,7 +4,7 @@
 #include "godot/node.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/scene_core.hpp"
 #include "netw/script/model.hpp"
 
@@ -43,12 +43,15 @@ void NetwSceneConfig::write(const SceneDecl &p_decl) {
 }
 
 Ref<NetwSceneConfig> NetwSceneConfig::labeled(const StringName &p_stem) {
-    NETW_ERR_COND_V(
-        p_stem == StringName(),
-        Ref<NetwSceneConfig>(this),
-        sys::SCENE,
-        "NetwSceneConfig.labeled needs a label, and it was empty."
-    );
+    if (p_stem == StringName()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwSceneConfig.labeled}", String(), "a label"},
+            uint64_t(node_id)
+        );
+        return Ref<NetwSceneConfig>(this);
+    }
     SceneDecl decl = held();
     decl.label = p_stem;
     write(decl);

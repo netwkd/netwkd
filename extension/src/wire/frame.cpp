@@ -184,14 +184,7 @@ FrameWalk frame_unpack_all(const PackedByteArray &p_framed, int64_t p_from) {
     NETW_ZONE_NC("Frame unpack all", colors::WIRE);
 
     FrameWalk walk;
-    NETW_ERR_COND_V(
-        p_from < 0 || p_from > p_framed.size(),
-        walk,
-        sys::WIRE,
-        "A packet read started at byte %d of a %d byte packet.",
-        int(p_from),
-        int(p_framed.size())
-    );
+    NETW_BUG_COND_V(p_from < 0 || p_from > p_framed.size(), walk);
 
     ReadStream stream(
         p_from == 0 ? p_framed : p_framed.slice(int(p_from), p_framed.size())

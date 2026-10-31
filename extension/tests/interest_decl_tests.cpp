@@ -106,62 +106,17 @@ TEST_CASE(
     "exactly as it was"
 ) {
     netw_test::FaultWatch expected_faults;
+    expected_faults.expect_error("*on_leave_policy*[NW1005]*", 1);
+    expected_faults.expect_error("*on_leave_policy*[NW0043]*", 1);
+    expected_faults.expect_error("*on_leave_policy*got 7*[NW0032]*", 1);
+    expected_faults.expect_error("*on_leave_policy*[NW0031]*", 1);
+    expected_faults.expect_error("*on_perception_policy*[NW1005]*", 1);
+    expected_faults.expect_error("*on_perception_policy*[NW0043]*", 1);
     expected_faults.expect_error(
-        "[error][interest] Condition \"policy == custom_policy && "
-        "!custom.is_valid()\" is true. Returning: false. "
-        "NetwInterest.on_leave_policy got a CUSTOM policy with no "
-        "callback. Pass the callback that decides it.",
+        "*on_perception_policy*got -1*[NW0032]*",
         1
     );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"policy != custom_policy && "
-        "custom.is_valid()\" is true. Returning: false. "
-        "NetwInterest.on_leave_policy got a callback with a policy "
-        "that is not CUSTOM. Use the CUSTOM policy, or drop the "
-        "callback.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"policy < 0 || policy > "
-        "custom_policy\" is true. Returning: false. "
-        "NetwInterest.on_leave_policy got policy 7, which does not "
-        "exist.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"layer_id.is_empty()\" is true."
-        " Returning: false. NetwInterest.on_leave_policy needs a "
-        "layer name, and it was empty.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"policy == custom_policy && "
-        "!custom.is_valid()\" is true. Returning: false. "
-        "NetwInterest.on_perception_policy got a CUSTOM policy with"
-        " no callback. Pass the callback that decides it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"policy != custom_policy && "
-        "custom.is_valid()\" is true. Returning: false. "
-        "NetwInterest.on_perception_policy got a callback with a "
-        "policy that is not CUSTOM. Use the CUSTOM policy, or drop "
-        "the callback.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"policy < 0 || policy > "
-        "custom_policy\" is true. Returning: false. "
-        "NetwInterest.on_perception_policy got policy -1, which "
-        "does not exist.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][interest] Condition \"layer_id.is_empty()\" is true."
-        " Returning: false. NetwInterest.join needs a layer name, "
-        "and it was empty.",
-        1
-    );
+    expected_faults.expect_error("*NetwInterest.join*[NW0031]*", 1);
 
     Decl decl;
     const Ref<RefCounted> holder = callable_holder();

@@ -42,7 +42,7 @@ public:
         }
         netw_test::FaultLog::detach(writer);
         writer->error_count_containing(
-            "A SceneTree scene change freed the scene that held this session"
+            "A SceneTree scene change is not supported"
         );
         Array drained;
         for (const netw_test::FaultLine &line : writer->recorded()) {
@@ -190,7 +190,7 @@ class NativeChangeScenario final : public netw_test::FrameScenario {
         for (int at = 0; at < drained.size(); ++at) {
             const Dictionary row = drained[at];
             const String text = row[String("text")];
-            if (!text.contains("A SceneTree scene change freed")) {
+            if (!text.contains("A SceneTree scene change is not supported")) {
                 continue;
             }
             if (seen.reports == 0) {
@@ -285,10 +285,10 @@ TEST_CASE(
     CHECK_FALSE(seen.mount_alive_after);
     NETW_CHECK_EQ(seen.reports, 1);
     NETW_CHECK_EQ(seen.first_type, int(Logger::ERROR_TYPE_ERROR));
-    CHECK(seen.first_text.contains(
-        "A SceneTree scene change freed the scene that held this session"
-    ));
-    CHECK(seen.first_text.contains("spawn levels with Netw.spawn"));
+    CHECK(
+        seen.first_text.contains("A SceneTree scene change is not supported")
+    );
+    CHECK(seen.first_text.contains("[NW1020]"));
 }
 
 } // namespace NetwTests

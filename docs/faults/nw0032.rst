@@ -1,0 +1,21 @@
+:github_url: hide
+
+.. _fault_nw0032:
+
+NW0032. A call got a value it does not accept
+=============================================
+
+Reported as an error when a call is given a value outside what it accepts,
+such as a zero or negative count, a setting value that does not exist, a bad
+channel id, port or URL, or an option key it does not know.
+
+The value was ignored. The log line names the call, shows the value, and says
+what the call asks for.
+
+.. code-block:: text
+
+    Netw.configure_join got 0, which it does not accept, so it was ignored.
+    Pass a count from 1 to 64. [NW0032]
+
+Pass a value the log line asks for. The class reference lists the accepted
+values of each call.

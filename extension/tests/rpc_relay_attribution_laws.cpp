@@ -178,11 +178,7 @@ TEST_CASE(
     "a packet that reaches the wrong session leaves no effect behind"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A call for '*' was meant for peer * and "
-        "reached peer *, so it was dropped.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0021]*", 1);
 
     LoopbackRig rig(0);
     rig.mount();
@@ -342,11 +338,7 @@ TEST_CASE(
     "not, because the permission is the session's own"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] Only the authority can emit '*', because it "
-        "is not declared. Declare it with Netw.configure_signal.",
-        1
-    );
+    expected_faults.expect_error("*'Held'*[NW0033]*", 1);
 
     MeshStand stand;
     stand.seat_server();
@@ -490,8 +482,7 @@ const Refusal REFUSALS[] = {
      "guarded",
      ERR_UNAUTHORIZED,
      nullptr,
-     "[warn][transport] Peer * may not call 'guarded' on 'Sink', so the call "
-     "was dropped."},
+     "*'guarded' on 'Sink'*[NW0021]*"},
     {"RR2 a method that is not an RPC on the receiver",
      UNDECLARED_SINK,
      ANSWERING_SINK,
@@ -499,8 +490,7 @@ const Refusal REFUSALS[] = {
      "echo",
      ERR_METHOD_NOT_FOUND,
      nullptr,
-     "[warn][transport] A call on 'Sink' was dropped, because it names no RPC "
-     "on this peer. Declare it the same way on every peer."},
+     "*'Sink'*[NW0021]*"},
     {"RR3 a method whose promise rejects",
      ANSWERING_SINK,
      ANSWERING_SINK,
@@ -516,8 +506,7 @@ const Refusal REFUSALS[] = {
      "echo",
      ERR_METHOD_NOT_FOUND,
      nullptr,
-     "[warn][transport] A call on 'Sink' was dropped, because it names no RPC "
-     "on this peer. Declare it the same way on every peer."},
+     "*'Sink'*[NW0021]*"},
 };
 
 Node *sink_of(const char *p_source) {
@@ -698,21 +687,9 @@ TEST_CASE(
     "refused"
 ) {
     netw_test::FaultWatch faults;
-    faults.expect_warning(
-        "[warn][session] NetwMemberConfig.timeout does nothing on 'hp', "
-        "because only a requested method waits for a reply. Remove the call.",
-        1
-    );
-    faults.expect_warning(
-        "[warn][session] NetwMemberConfig.timeout does nothing on 'others', "
-        "because only a requested method waits for a reply. Remove the call.",
-        1
-    );
-    faults.expect_error(
-        "[error][session] NetwMemberConfig.timeout got * seconds for 'hasty'. "
-        "Pass a number of seconds above zero.",
-        1
-    );
+    faults.expect_warning("*'hp'*[NW0038]*", 1);
+    faults.expect_warning("*'others'*[NW0038]*", 1);
+    faults.expect_error("*'hasty'*[NW0032]*", 1);
     Node *sink = sink_of(DEADLINE_SINK);
     netw::Netw::configure_property(sink, StringName("hp"))->timeout(2.0);
     netw::Netw::configure_spawn(Callable(sink, StringName("others")))

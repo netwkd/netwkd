@@ -295,11 +295,7 @@ TEST_CASE(
     "observer, and the author loses its copy"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn for route * was dropped, because its"
-        " parent '*' does not exist on this peer.",
-        1
-    );
+    expected_faults.expect_warning("*its parent '*'*[NW0026]*", 1);
 
     SpawnStage stage;
     NetwMultiplayer *session = stage.rig.server();
@@ -391,11 +387,7 @@ TEST_CASE(
     "than parked"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] A spawn for route * was dropped, because its"
-        " parent '*' does not exist on this peer.",
-        1
-    );
+    expected_faults.expect_warning("*its parent '*'*[NW0026]*", 1);
 
     SpawnStage stage;
     NetwMultiplayer *session = stage.rig.server();
@@ -542,13 +534,7 @@ TEST_CASE(
     "nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][spawn] spawn_registered on '*' was refused, "
-        "because this peer used up the spawns the session authority"
-        " granted it. More are granted as its spawns are admitted, "
-        "so try again shortly.",
-        1
-    );
+    expected_faults.expect_error("*[NW0039]*", 1);
 
     SpawnStage stage;
     NetwMultiplayer *session = stage.rig.server();

@@ -37,7 +37,8 @@ public:
         int64_t key,
         int64_t peer,
         const Decl *p_decl,
-        const Engine &p_engine
+        const Engine &p_engine,
+        godot::StringName *r_freed_layer = nullptr
     ) const;
 
     void commit(

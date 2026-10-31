@@ -1,5 +1,6 @@
 #include "netw/display/channel.hpp"
 
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/subsystems.hpp"
 
@@ -38,14 +39,18 @@ void Channel::write(const Variant &p_value) {
     if (port.write(p_value) != Port::WRITE_REFUSED) {
         return;
     }
-    NETW_WARN_COND(
-        !refused_global,
-        sys::INTERPOLATION,
-        "'%s' is interpolated in global space, but a %s has no global "
-        "setter, so it is written in local space and moves with the body.",
-        String(port.get_target_prop()),
-        String(Variant::get_type_name(p_value.get_type()))
-    );
+    if (!refused_global) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {String(port.get_target_prop()),
+             vformat(
+                 "global space, which a %s has no setter for",
+                 String(Variant::get_type_name(p_value.get_type()))
+             ),
+             String("a value with a global setter")}
+        );
+    }
     refused_global = true;
 }
 

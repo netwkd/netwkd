@@ -193,11 +193,12 @@ void NetwMultiplayer::action_send_request(
         }
     }
     if (route <= 0) {
-        NETW_WARN(
-            sys::LAGCOMP,
-            "The action target '%s' is not a spawned entity, so the action "
-            "was denied. Target a node inside a replicated entity.",
-            String(p_target_path)
+        Node *target = node_from_tree_path(p_target_path);
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_ENTITY,
+            {"NetwAction.request", String(p_target_path)},
+            target != nullptr ? uint64_t(gd::instance_id(target)) : 0
         );
     }
     if (!is_remote) {

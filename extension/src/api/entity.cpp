@@ -14,6 +14,7 @@
 #include "netw/colors.hpp"
 #include "netw/entity/control.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/lifecycle/rule.hpp"
 #include "netw/log.hpp"
 #include "netw/peer_rename.hpp"
@@ -299,12 +300,17 @@ void NetwEntity::stamp_multiplayer(const Ref<NetwMultiplayer> &p_api) {
     if (current == p_api.ptr()) {
         return;
     }
-    NETW_ERR_COND(
-        current != nullptr,
-        sys::ENTITY,
-        "This entity already belongs to another session and cannot move to "
-        "a second one. Despawn it there and spawn it in the new session."
-    );
+    if (current != nullptr) {
+        fault::raise(
+            current,
+            NETW_FAULT_ENTITY_MOVED,
+            {String(get_name()),
+             String("a second session"),
+             String("a despawn there and a spawn in the new session")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     session_id = gd::instance_id(p_api.ptr());
 }
 
@@ -353,16 +359,21 @@ NetwEntity::Transfer NetwEntity::get_transfer() const {
 }
 
 void NetwEntity::set_transfer(Transfer p_value) {
-    NETW_ERR_COND(
-        p_value == TRANSFER_IMMEDIATE
-            && !control()->authority_follows_controller()
-            && get_stage() != int64_t(entity::Stage::UNBOUND),
-        sys::ENTITY,
-        "'%s' cannot use TRANSFER_IMMEDIATE while NetwEntity.authority is "
-        "AUTHORITY_SERVER, so NetwEntity.transfer did not change. Set "
-        "authority to AUTHORITY_CONTROLLER before the node enters the tree.",
-        String(get_name())
-    );
+    if (p_value == TRANSFER_IMMEDIATE
+        && !control()->authority_follows_controller()
+        && get_stage() != int64_t(entity::Stage::UNBOUND)) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_SETTING_REFUSED,
+            {String("{NetwEntity.TRANSFER_IMMEDIATE} on '") + String(get_name())
+                 + String("'"),
+             String("{NetwEntity.AUTHORITY_SERVER}"),
+             String("{NetwEntity.AUTHORITY_CONTROLLER} before the node enters "
+                    "the tree")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     control()->set_transfer(int64_t(p_value));
     NetwMultiplayer *core = session_core();
     if (core != nullptr) {
@@ -376,20 +387,29 @@ NetwEntity::Authority NetwEntity::get_authority() const {
 }
 
 void NetwEntity::set_authority(Authority p_value) {
-    NETW_ERR_COND(
-        p_value != AUTHORITY_SERVER && p_value != AUTHORITY_CONTROLLER,
-        sys::ENTITY,
-        "NetwEntity.authority got %d, which is not an Authority value. Use "
-        "AUTHORITY_SERVER or AUTHORITY_CONTROLLER.",
-        int(p_value)
-    );
-    NETW_ERR_COND(
-        get_stage() != int64_t(entity::Stage::UNBOUND),
-        sys::ENTITY,
-        "'%s' set NetwEntity.authority after it entered the tree, so the "
-        "change was ignored. Set it before the node enters the tree.",
-        String(get_name())
-    );
+    if (p_value != AUTHORITY_SERVER && p_value != AUTHORITY_CONTROLLER) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwEntity.authority}"),
+             String::num_int64(int64_t(p_value)),
+             String("{NetwEntity.AUTHORITY_SERVER} or "
+                    "{NetwEntity.AUTHORITY_CONTROLLER}")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
+    if (get_stage() != int64_t(entity::Stage::UNBOUND)) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_TOO_LATE,
+            {String("{NetwEntity.authority}"),
+             String("'") + String(get_name()) + String("'"),
+             String("the node enters the tree")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     control()->set_authority(int64_t(p_value));
 }
 
@@ -501,14 +521,17 @@ void NetwEntity::set_controller(int64_t p_value) {
         transfer_control(p_value);
         return;
     }
-    NETW_ERR_COND(
-        p_value <= 0,
-        sys::ENTITY,
-        "'%s' cannot be controlled by peer %d. Write a peer id, or 1 for the "
-        "server.",
-        String(get_name()),
-        p_value
-    );
+    if (p_value <= 0) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwEntity.controller}"),
+             String::num_int64(p_value),
+             String("a peer id, or 1 for the server")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     record_controller(entity::Control::from_public(p_value));
 }
 
@@ -560,13 +583,15 @@ int64_t NetwEntity::local_peer() const {
 
 void NetwEntity::set_controller_player(const Ref<NetwPlayer> &p_player) {
     const int64_t peer = p_player.is_valid() ? p_player->get_peer_id() : 0;
-    NETW_ERR_COND(
-        p_player.is_valid() && peer <= 0,
-        sys::ENTITY,
-        "'%s' cannot be given to a player that has left. Pass a seated "
-        "player, or null for the server.",
-        String(get_name())
-    );
+    if (p_player.is_valid() && peer <= 0) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_UNKNOWN_PEER,
+            {String("{NetwEntity.controller}"), String(), String(), peer},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     const int64_t steered
         = p_player.is_valid() ? peer : entity::Control::SERVER;
     if (get_stage() == int64_t(entity::Stage::UNBOUND)) {
@@ -577,35 +602,41 @@ void NetwEntity::set_controller_player(const Ref<NetwPlayer> &p_player) {
 }
 
 Error NetwEntity::transfer_control(int64_t p_peer) {
-    NETW_ERR_COND_V(
-        p_peer <= 0,
-        ERR_INVALID_PARAMETER,
-        sys::ENTITY,
-        "'%s' cannot be given to peer %d. Pass a peer id, or 1 for the "
-        "server.",
-        String(get_name()),
-        p_peer
-    );
+    if (p_peer <= 0) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwEntity.controller}"),
+             String::num_int64(p_peer),
+             String("a peer id, or 1 for the server")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     return transfer_steering(entity::Control::from_public(p_peer));
 }
 
 Error NetwEntity::transfer_steering(int64_t p_steering) {
-    NETW_ERR_COND_V(
-        get_stage() == int64_t(entity::Stage::UNBOUND),
-        ERR_UNCONFIGURED,
-        sys::ENTITY,
-        "'%s' is not spawned yet. Set NetwEntity.controller to choose its "
-        "first controller.",
-        String(get_name())
-    );
-    NETW_ERR_COND_V(
-        !is_on_server(),
-        ERR_UNAUTHORIZED,
-        sys::ENTITY,
-        "Only the server can give '%s' to another peer. A client asks for "
-        "it with NetwEntity.claim_control.",
-        String(get_name())
-    );
+    if (get_stage() == int64_t(entity::Stage::UNBOUND)) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_NOT_RUNNING,
+            {String("Giving '") + String(get_name()) + String("' to a peer"),
+             String(),
+             String("the entity")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return ERR_UNCONFIGURED;
+    }
+    if (!is_on_server()) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_SERVER_ONLY,
+            {String("{NetwEntity.controller}")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return ERR_UNAUTHORIZED;
+    }
     apply_control_change(p_steering);
     return OK;
 }
@@ -663,15 +694,14 @@ void NetwEntity::project_control(Object *p_announcer) {
     if (!control()->authority_follows_controller()
         && get_controller() != SERVER_PEER && get_owner() != nullptr
         && get_owner()->is_inside_tree() && streams_after_spawn(synchronizers())
-        && record->claim_synchronizer_warning()) {
-        NETW_WARN(
-            sys::ENTITY,
-            "'%s' is controlled by peer %d and has a MultiplayerSynchronizer, "
-            "which still sends from the server because NetwEntity.authority "
-            "is AUTHORITY_SERVER. Set authority to AUTHORITY_CONTROLLER if the "
-            "controller should write it.",
-            String(get_name()),
-            int(get_controller())
+        && api != nullptr) {
+        fault::raise(
+            api,
+            NETW_FAULT_CONFLICTING_SETTINGS,
+            {String("NetwEntity.controller"),
+             String("'") + String(get_name()) + String("'"),
+             String("NetwEntity.authority at AUTHORITY_SERVER")},
+            uint64_t(gd::instance_id(get_owner()))
         );
     }
     control_moved();
@@ -1042,14 +1072,16 @@ PackedByteArray NetwEntity::final_image(int64_t p_tick) {
     if (!bytes.is_empty() || measured <= session::CONTROL_FINAL_STATE_CAP) {
         return bytes;
     }
-    NETW_WARN(
-        sys::ENTITY,
-        "'%s' released authority with %d bytes of state, over the %d byte "
-        "limit, so the next authority starts from its own copy. Replicate "
-        "fewer or smaller properties on this entity.",
-        String(get_name()),
-        measured,
-        session::CONTROL_FINAL_STATE_CAP
+    fault::raise(
+        session_core(),
+        NETW_FAULT_LIMIT_EXCEEDED,
+        {String("'") + String(get_name()) + String("' released authority"),
+         String("the state handed to the next authority"),
+         String("fewer or smaller properties on this entity"),
+         0,
+         measured,
+         session::CONTROL_FINAL_STATE_CAP},
+        uint64_t(gd::instance_id(get_owner()))
     );
     return PackedByteArray();
 }
@@ -1426,11 +1458,11 @@ void NetwEntity::_handle_control_request(
 ) {
     Node *owner = get_owner();
     if (owner == nullptr || !owner->is_inside_tree() || !is_on_server()) {
-        NETW_WARN(
-            sys::ENTITY,
-            "A control request for '%s' reached a peer that is not the "
-            "server, so it was ignored.",
-            owner != nullptr ? String(owner->get_name()) : String("<no owner>")
+        fault::raise(
+            session_core(),
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender},
+            owner != nullptr ? uint64_t(gd::instance_id(owner)) : 0
         );
         return;
     }
@@ -1468,18 +1500,11 @@ entity::Control::Outcome NetwEntity::decide_request(
     const Ruling ruling = control()->rule(p_requester, p_hold, steering());
     Outcome outcome = Outcome::GRANTED;
     if (ruling == Ruling::UNAVAILABLE || immediate_unavailable()) {
-        NETW_WARN(
-            sys::ENTITY,
-            ruling == Ruling::UNAVAILABLE
-                ? "Peer %d asked for control of '%s', but its "
-                  "NetwEntity.transfer is TRANSFER_FIXED. Set it to "
-                  "TRANSFER_REQUESTABLE to allow requests."
-                : "Peer %d asked for control of '%s', but TRANSFER_IMMEDIATE "
-                  "is not available on an entity with state, prediction or "
-                  "a MultiplayerSynchronizer. Set NetwEntity.transfer to "
-                  "TRANSFER_REQUESTABLE.",
-            int(p_requester),
-            String(get_name())
+        fault::raise(
+            session_core(),
+            NETW_FAULT_CONTROL_REFUSED,
+            {String(get_name()), String(), String(), p_requester},
+            uint64_t(gd::instance_id(get_owner()))
         );
         outcome = Outcome::UNAVAILABLE;
     } else if (ruling == Ruling::EXCLUDED) {
@@ -1704,14 +1729,18 @@ void NetwEntity::_handle_control_apply(const session::ControlApply &p_applied) {
 }
 
 void NetwEntity::set_replication_priority(double p_weight) {
-    NETW_ERR_COND(
-        !(p_weight > 0.0),
-        sys::WIRE,
-        "NetwEntity.replication_priority must be above 0, so %f was "
-        "ignored. To hide an entity from peers, use "
-        "NetwEntity.interest.",
-        p_weight
-    );
+    if (!(p_weight > 0.0)) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwEntity.replication_priority}"),
+             String::num(p_weight),
+             String("a weight above 0, or {NetwEntity.interest} to hide the "
+                    "entity from peers")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     replication_priority = p_weight;
     control_moved();
 }
@@ -1737,13 +1766,17 @@ Ref<NetwPlayer> NetwEntity::get_player() const {
 }
 
 void NetwEntity::set_player(const Ref<NetwPlayer> &p_player) {
-    NETW_ERR_COND(
-        get_stage() != int64_t(entity::Stage::UNBOUND),
-        sys::ENTITY,
-        "'%s' set NetwEntity.player after it was spawned, so the change was "
-        "ignored. Set it in the spawn function.",
-        String(get_name())
-    );
+    if (get_stage() != int64_t(entity::Stage::UNBOUND)) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_TOO_LATE,
+            {String("{NetwEntity.player}"),
+             String("'") + String(get_name()) + String("'"),
+             String("the entity is spawned")},
+            uint64_t(gd::instance_id(get_owner()))
+        );
+        return;
+    }
     const int64_t previous = get_peer_id();
     const bool steers_previous = previous != 0 && steering() == previous;
     const int64_t peer = p_player.is_valid() ? p_player->get_peer_id() : 0;
@@ -1825,18 +1858,14 @@ void NetwEntity::reject_claims(const char *p_detail) {
 
 void NetwEntity::transition(int64_t p_stage) {
     const int64_t from = get_stage();
-    if (record->transition(p_stage, get_owner())) {
+    if (record->transition(p_stage)) {
         record->publish_stage(this, from);
     }
 }
 
 void NetwEntity::arm(const Ref<NetwMultiplayer> &p_api) {
     const Ref<NetwEntity> keep(this);
-    NETW_ERR_COND(
-        get_stage() != int64_t(entity::Stage::UNBOUND),
-        sys::ENTITY,
-        "An entity was set up for a session twice."
-    );
+    NETW_BUG_COND(get_stage() != int64_t(entity::Stage::UNBOUND));
     written_player.unref();
     stamp_multiplayer(p_api);
     Node *claimed = get_owner();
@@ -1849,13 +1878,13 @@ void NetwEntity::arm(const Ref<NetwMultiplayer> &p_api) {
     }
     if (get_transfer() == TRANSFER_IMMEDIATE
         && !control()->authority_follows_controller()) {
-        NETW_ERROR(
-            sys::ENTITY,
-            "'%s' sets NetwEntity.transfer to TRANSFER_IMMEDIATE while "
-            "NetwEntity.authority is AUTHORITY_SERVER, so it uses "
-            "TRANSFER_REQUESTABLE. Set authority to AUTHORITY_CONTROLLER, or "
-            "use TRANSFER_REQUESTABLE.",
-            String(get_name())
+        fault::raise(
+            session_core(),
+            NETW_FAULT_CONFLICTING_SETTINGS,
+            {String("{NetwEntity.TRANSFER_IMMEDIATE}"),
+             String(get_name()),
+             String("{NetwEntity.AUTHORITY_SERVER}")},
+            uint64_t(gd::instance_id(get_owner()))
         );
         control()->set_transfer(int64_t(TRANSFER_REQUESTABLE));
     }
@@ -1947,14 +1976,15 @@ void NetwEntity::hydrate_components() {
     }
     table.set_table_hash(structure);
     if (table.reconcile(is_on_server())) {
-        NETW_WARN(
-            sys::ENTITY,
-            "'%s' has different networked components here than on the "
-            "server (%d against %d), so its components do not replicate. "
-            "Build the entity with the same nodes on every peer.",
-            String(get_name()),
-            int(table.get_wire_hash()),
-            int(table.get_table_hash())
+        fault::raise(
+            session_core(),
+            NETW_FAULT_PEER_MISMATCH,
+            {String("the components of '") + String(get_name()) + String("'"),
+             String(),
+             String("the networked components of '") + String(get_name())
+                 + String("'"),
+             SERVER_PEER},
+            uint64_t(gd::instance_id(owner))
         );
     }
     if (NetwMultiplayer *core = session_core()) {
@@ -2028,13 +2058,14 @@ void NetwEntity::_on_owner_ready() {
     NetwMultiplayer *core = session_core();
     if (core != nullptr && core->predict_lacks_state_rows(this)) {
         Node *owner = get_owner();
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Prediction on %s is off, because no property is declared as "
-            "state. Call NetwPropertyConfig.state on the properties it "
-            "restores.",
-            owner != nullptr ? String(owner->get_path()).utf8().get_data()
-                             : String(get_name()).utf8().get_data()
+        fault::raise(
+            core,
+            NETW_FAULT_PREDICTION_OFF,
+            {owner != nullptr ? String(owner->get_path()) : String(get_name()),
+             String("no state property"),
+             String("{NetwPropertyConfig.state} on the properties it "
+                    "restores")},
+            uint64_t(gd::instance_id(owner))
         );
     }
     {
@@ -2186,14 +2217,16 @@ void NetwEntity::register_component(Node *p_component) {
         }
     }
     registered.push_back(id);
-    NETW_WARN_COND(
-        record->get_comp_table().get_table_hash() != 0,
-        sys::ENTITY,
-        "'%s' was configured after its entity spawned, so the spawn did not "
-        "carry it. Configure networked properties before the node enters the "
-        "tree.",
-        String(p_component->get_name())
-    );
+    if (record->get_comp_table().get_table_hash() != 0) {
+        fault::raise(
+            session_core(),
+            NETW_FAULT_TOO_LATE,
+            {String("{Netw.configure_property}"),
+             String("'") + String(p_component->get_name()) + String("'"),
+             String("the node enters the tree")},
+            uint64_t(gd::instance_id(p_component))
+        );
+    }
 }
 
 NodePath NetwEntity::relative_path(Node *p_source, Node *p_target) const {

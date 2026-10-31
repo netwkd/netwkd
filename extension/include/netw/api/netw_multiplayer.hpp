@@ -58,6 +58,7 @@
 #include "netw/display/roles.hpp"
 #include "netw/effect_ledger.hpp"
 #include "netw/entity/departure.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/gate_verdict_book.hpp"
 #include "netw/handle_ledger.hpp"
 #include "netw/interest/engine.hpp"
@@ -379,8 +380,6 @@ private:
     int64_t dispatching_sender = 0;
     int64_t rpc_dropped_unroutable = 0;
     int64_t rpc_dropped_not_live = 0;
-    godot::HashMap<uint64_t, uint8_t> call_faults_reported;
-    bool call_fault_first(godot::Node *p_node, godot::Error p_code);
 
     struct RpcSettle {
         godot::Ref<NetwPromise> single;
@@ -420,7 +419,7 @@ private:
         godot::Node *p_node,
         const godot::StringName &p_method,
         godot::String &r_detail
-    ) const;
+    );
     int64_t rpc_controller_peer(const godot::Ref<NetwEntity> &p_entity) const;
     void rpc_post_reply(
         int64_t p_peer,
@@ -718,6 +717,7 @@ private:
     godot::HashMap<int64_t, uint64_t> scene_viewers_applied;
     uint64_t scene_viewers_server_generation = 0;
     GateVerdictBook verdict_book;
+    FaultBook faults;
     SettleQueue settle_queue;
     NetwHandleLedger schemas;
     NetwHandleLedger property_sets;
@@ -755,7 +755,6 @@ private:
     bool scene_player_display_pending = false;
     godot::RID scene_presentation;
     bool scene_presentation_split = false;
-    bool scene_presentation_split_warned = false;
     godot::LocalVector<godot::RID> scene_despawned_roots;
     godot::HashMap<godot::StringName, godot::RID> table_by_name;
     godot::HashMap<int64_t, godot::RID> table_schema;
@@ -1255,7 +1254,6 @@ public:
     };
     godot::LocalVector<GatedBody> gated_bodies;
     int64_t predict_gate_arms = 0;
-    bool predict_pacing_rate_warned = false;
     void warn_pacing_rate_mismatch_once();
     void simulation_gate_set(const godot::RID &p_entity, bool p_wanted);
     void simulation_gate_apply();
@@ -1391,7 +1389,8 @@ public:
     godot::Error finish_stage_verdict(
         int64_t p_stage,
         godot::Error p_verdict,
-        int64_t p_route
+        int64_t p_route,
+        int64_t p_peer = 0
     );
 
 protected:
@@ -3350,7 +3349,6 @@ public:
     bool transfer_called = false;
     godot::PackedInt64Array transfer_gone;
     int64_t transfer_former = 0;
-    mutable bool relabel_shaping_warned = false;
 
     struct ResyncRaise {
         uint64_t anchor = 0;
@@ -3623,8 +3621,8 @@ public:
     ) const;
     godot::LocalVector<call_args::Slot> rpc_encoded_args(
         const godot::Array &p_args
-    ) const;
-    call_args::Slot rpc_encoded_arg(const godot::Variant &p_arg) const;
+    );
+    call_args::Slot rpc_encoded_arg(const godot::Variant &p_arg);
     godot::Error entity_call(
         const godot::RID &p_entity,
         int64_t p_comp,
@@ -3751,9 +3749,11 @@ public:
         const godot::Callable &p_callback
     );
     int64_t stats_get_verdict_count(godot::Error p_verdict) const;
-    bool claim_verdict_warning(godot::Error p_verdict, int64_t p_route);
-    bool warn_verdict(godot::Error p_verdict, int64_t p_route = 0);
-    godot::Error sink_verdict(godot::Error p_verdict, int64_t p_route);
+    godot::Error sink_verdict(
+        godot::Error p_verdict,
+        int64_t p_route,
+        int64_t p_peer = 0
+    );
     void clear_verdicts();
 
     void clear_flat_family_state();
@@ -3862,7 +3862,7 @@ public:
     godot::Error database_backend_of(
         const godot::RID &p_database,
         godot::Ref<NetwDatabaseBackend> &r_backend
-    ) const;
+    );
 
     persist::Bindings *get_bindings();
 
@@ -3903,6 +3903,7 @@ public:
     GDVIRTUAL1(_persist_tick, double)
 
     static godot::Error configuration_door_refuses_config(
+        NetwMultiplayer *p_session,
         godot::Object *p_config
     );
 
@@ -5334,10 +5335,7 @@ private:
         godot::Node *p_parent,
         const AnchorRevision &p_revision
     );
-    void lifecycle_undo_ungranted_move(
-        const EntityDeparture &p_row,
-        lifecycle::Facts p_facts
-    );
+    void lifecycle_undo_ungranted_move(const EntityDeparture &p_row);
     lifecycle::Facts lifecycle_entity_facts(
         NetwEntity *p_entity,
         lifecycle::Kind p_kind
@@ -5352,6 +5350,9 @@ private:
     );
 
 public:
+    FaultBook &fault_book() {
+        return faults;
+    }
     void entity_capture_exit(godot::Object *p_wrapper);
     void entity_settle_departure(int64_t p_instance);
     void liveness_owner_despawning(

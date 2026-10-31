@@ -174,11 +174,7 @@ TEST_CASE(
     "as unroutable and counted, and reports exactly once"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] 'Loose' is not part of a NetwEntity, so the call "
-        "to 'position' was dropped. Call Netw.configure_entity on its root.",
-        1
-    );
+    expected_faults.expect_error("*'Loose'*[NW1010]*", 1);
 
     Stand stand;
     Node *node = memnew(Node);
@@ -292,19 +288,6 @@ TEST_CASE(
     CHECK(sig_is_name);
 
     memdelete(node);
-}
-
-TEST_CASE(
-    "[Networked][Sync][Hosted] the contract warning names the entity and says "
-    "what is missing, so the law and the emitter cannot drift"
-) {
-    const String message = SyncPipeline::missing_prediction_component_message(
-        String("racer@31")
-    );
-
-    CHECK(message.begins_with("racer@31 declares"));
-    CHECK(message.contains("but no prediction"));
-    CHECK(message.contains("MultiplayerSynchronizer"));
 }
 
 TEST_CASE(

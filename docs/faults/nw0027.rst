@@ -1,0 +1,29 @@
+:github_url: hide
+
+.. _fault_nw0027:
+
+NW0027. A peer joined with arguments the handler does not take
+==============================================================
+
+Reported as a warning when a client's join arguments do not match the
+arguments the server's ``Netw.configure_join`` handler declares.
+
+The peer was refused. The log line names the peer.
+
+.. code-block:: gdscript
+
+    # server
+    Netw.configure_join(self, join_handler)
+
+    func join_handler(name: String, color: Color) -> Error:
+        return OK
+
+    # client
+    Netw.prepare_join(self, "Ana")
+
+Pass the arguments the handler declares to
+:ref:`Netw.prepare_join <class_Netw_method_prepare_join>` on the client.
+
+.. code-block:: gdscript
+
+    Netw.prepare_join(self, "Ana", Color.RED)

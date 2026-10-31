@@ -6,6 +6,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/persistence_config.hpp"
 #include "netw/api/property_config.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/object_port.hpp"
@@ -19,14 +20,12 @@ namespace netw::persist {
 namespace {
 
 const GameCall MIGRATION_STEP
-    = {sys::TABLE,
-       "The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
+    = {"The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
        "func(values: Dictionary) -> Dictionary",
        1};
 
 const GameCall RECORD_ID
-    = {sys::TABLE,
-       "The NetwPersistenceConfig.record_id provider",
+    = {"The NetwPersistenceConfig.record_id provider",
        "func() -> StringName",
        0};
 
@@ -327,75 +326,86 @@ void Bindings::sweep_unmounted() {
 }
 
 RID Bindings::compile(Node *p_root) {
-    NETW_ERR_COND_V(
-        session == nullptr || p_root == nullptr,
-        RID(),
-        sys::TABLE,
-        "Persistence was bound with no session or no entity root."
-    );
+    NETW_BUG_COND_V(session == nullptr || p_root == nullptr, RID());
     const RID standing = find(p_root);
     if (standing.is_valid()) {
         return standing;
     }
     const Ref<NetwPersistenceConfig> config
         = netw::script::model::get_persistence_config(p_root);
-    NETW_ERR_COND_V(
-        config.is_null(),
-        RID(),
-        sys::TABLE,
-        "'%s' was asked to save, but it declares no persistence. Call "
-        "Netw.configure_persistence on it before it enters the tree.",
-        name_of(p_root).utf8().get_data()
-    );
+    const uint64_t subject = uint64_t(gd::instance_id(p_root));
+    if (config.is_null()) {
+        fault::raise(
+            session,
+            NETW_FAULT_PERSIST_UNDECLARED,
+            {name_of(p_root),
+             String("no persistence"),
+             String("{Netw.configure_persistence} on it before it enters the "
+                    "tree")},
+            subject
+        );
+        return RID();
+    }
 
     const StringName schema_name = config->get_table_name();
-    NETW_ERR_COND_V(
-        String(schema_name).is_empty(),
-        RID(),
-        sys::TABLE,
-        "'%s' declares persistence with no table. Name one with "
-        "NetwPersistenceConfig.table.",
-        name_of(p_root).utf8().get_data()
-    );
+    if (String(schema_name).is_empty()) {
+        fault::raise(
+            session,
+            NETW_FAULT_PERSIST_UNDECLARED,
+            {name_of(p_root),
+             String("no table"),
+             String("{NetwPersistenceConfig.table} to name one")},
+            subject
+        );
+        return RID();
+    }
 
     const StringName database_name = config->get_database_name();
     const RID database = session->database_lookup(database_name);
-    NETW_ERR_COND_V(
-        !database.is_valid(),
-        RID(),
-        sys::TABLE,
-        "'%s' saves into database '%s', which this session does not "
-        "declare. Declare it with Netw.configure_database in _init of a node "
-        "above this entity.",
-        name_of(p_root).utf8().get_data(),
-        String(database_name).utf8().get_data()
-    );
+    if (!database.is_valid()) {
+        fault::raise(
+            session,
+            NETW_FAULT_PERSIST_UNDECLARED,
+            {name_of(p_root),
+             String("the undeclared database '") + String(database_name)
+                 + String("'"),
+             String("{Netw.configure_database} on a node above this entity "
+                    "before the node enters the tree")},
+            subject
+        );
+        return RID();
+    }
 
     const Callable provider = config->get_id_provider();
-    NETW_ERR_COND_V(
-        provider.is_null(),
-        RID(),
-        sys::TABLE,
-        "'%s' declares no record id, so table '%s' has no row to save "
-        "into. Pass a Callable to NetwPersistenceConfig.record_id.",
-        name_of(p_root).utf8().get_data(),
-        String(schema_name).utf8().get_data()
-    );
+    if (provider.is_null()) {
+        fault::raise(
+            session,
+            NETW_FAULT_PERSIST_UNDECLARED,
+            {name_of(p_root),
+             String("no record id"),
+             String("{NetwPersistenceConfig.record_id} with a Callable that "
+                    "returns the id")},
+            subject
+        );
+        return RID();
+    }
     bool called = false;
     const Variant answered = game_call(provider, Array(), RECORD_ID, &called);
     if (!called) {
         return RID();
     }
     const StringName record_id = answered;
-    NETW_ERR_COND_V(
-        String(record_id).is_empty(),
-        RID(),
-        sys::TABLE,
-        "The record id Callable of '%s' returned an empty id for table '%s'. "
-        "Return a non-empty id from it.",
-        name_of(p_root).utf8().get_data(),
-        String(schema_name).utf8().get_data()
-    );
+    if (String(record_id).is_empty()) {
+        fault::raise(
+            session,
+            NETW_FAULT_BAD_RETURN,
+            {String("{NetwPersistenceConfig.record_id}"),
+             String("an empty id"),
+             String("a non-empty id")},
+            subject
+        );
+        return RID();
+    }
 
     LocalVector<Node *> nodes;
     collect_nodes(p_root, nodes);
@@ -417,34 +427,30 @@ RID Bindings::compile(Node *p_root) {
                 ? property
                 : declaration->get_saved_column();
             for (uint32_t seen = 0; seen < bound.size(); ++seen) {
-                NETW_ERR_COND_V(
-                    bound[seen].key == key,
-                    RID(),
-                    sys::TABLE,
-                    "'%s' saves column '%s' of table '%s' twice, from "
-                    "'%s.%s' and from '%s.%s'. Give one of them another "
-                    "name in NetwPropertyConfig.persisted.",
-                    name_of(p_root).utf8().get_data(),
-                    String(key).utf8().get_data(),
-                    String(schema_name).utf8().get_data(),
-                    name_of(node_of(bound[seen].node)).utf8().get_data(),
-                    String(bound[seen].property).utf8().get_data(),
-                    name_of(node).utf8().get_data(),
-                    String(property).utf8().get_data()
-                );
+                if (bound[seen].key == key) {
+                    fault::raise(
+                        session,
+                        NETW_FAULT_DECLARED_TWICE,
+                        {String("Column '") + String(key)
+                             + String("' of table '") + String(schema_name)
+                             + String("'"),
+                         name_of(p_root)},
+                        subject
+                    );
+                    return RID();
+                }
             }
-            NETW_ERR_COND_V(
-                !gd::has_property(node, property),
-                RID(),
-                sys::TABLE,
-                "'%s' saves column '%s' of table '%s' from '%s.%s', but "
-                "that node has no such property. Fix the property name.",
-                name_of(p_root).utf8().get_data(),
-                String(key).utf8().get_data(),
-                String(schema_name).utf8().get_data(),
-                name_of(node).utf8().get_data(),
-                String(property).utf8().get_data()
-            );
+            if (!gd::has_property(node, property)) {
+                fault::raise(
+                    session,
+                    NETW_FAULT_UNKNOWN_NAME,
+                    {String("{NetwPropertyConfig.persisted}"),
+                     name_of(node),
+                     String(property)},
+                    subject
+                );
+                return RID();
+            }
             BoundColumn entry;
             entry.key = key;
             entry.node = gd::instance_id(node);
@@ -454,15 +460,17 @@ RID Bindings::compile(Node *p_root) {
         }
     }
 
-    NETW_ERR_COND_V(
-        bound.is_empty(),
-        RID(),
-        sys::TABLE,
-        "'%s' saves into table '%s', but no property is marked to save. "
-        "Call NetwPropertyConfig.persisted on each property to save.",
-        name_of(p_root).utf8().get_data(),
-        String(schema_name).utf8().get_data()
-    );
+    if (bound.is_empty()) {
+        fault::raise(
+            session,
+            NETW_FAULT_PERSIST_UNDECLARED,
+            {name_of(p_root),
+             String("no property marked to save"),
+             String("{NetwPropertyConfig.persisted} on each property to save")},
+            subject
+        );
+        return RID();
+    }
     order_by_key(bound, types);
     for (uint32_t at = 0; at < bound.size(); ++at) {
         bound[at].index = int(at);
@@ -470,15 +478,18 @@ RID Bindings::compile(Node *p_root) {
     String detail;
     const RID schema
         = durable_schema(session, schema_name, bound, types, config, detail);
-    NETW_ERR_COND_V(
-        !schema.is_valid(),
-        RID(),
-        sys::TABLE,
-        "'%s' cannot save into table '%s'. %s",
-        name_of(p_root).utf8().get_data(),
-        String(schema_name).utf8().get_data(),
-        detail.utf8().get_data()
-    );
+    if (!schema.is_valid()) {
+        fault::raise(
+            session,
+            NETW_FAULT_PERSIST_UNDECLARED,
+            {name_of(p_root),
+             String("a table that does not take its properties (") + detail
+                 + String(")"),
+             String("properties the table accepts")},
+            subject
+        );
+        return RID();
+    }
 
     Binding *made = memnew(Binding);
     made->root = gd::instance_id(p_root);

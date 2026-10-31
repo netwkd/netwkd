@@ -94,3 +94,9 @@ changes.
    :name: toc-class-ref
 
    classes/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Faults
+
+   faults/index

@@ -1,0 +1,19 @@
+:github_url: hide
+
+.. _fault_nw1000:
+
+NW1000. A link to a peer or service failed
+==========================================
+
+Reported as a warning when a transport, tracker, signing key or peer cannot
+be reached or refuses a packet.
+
+What the call set out to do did not happen. The log line names the peer or
+service and the step that failed.
+
+Check the network and the transport, and connect again.
+
+.. code-block:: gdscript
+
+    func _on_retry_pressed() -> void:
+        connection.join(address)

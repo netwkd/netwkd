@@ -2,7 +2,6 @@
 
 #include "godot/node.hpp"
 #include "netw/colors.hpp"
-#include "netw/log.hpp"
 #include "netw/profile.hpp"
 
 namespace netw {
@@ -208,14 +207,14 @@ void NetwSyncModel::clear_route(int64_t p_route) {
 
 void NetwSyncModel::clear() {
     impl.clear();
-    schema_drop_warned = false;
 }
 
 repl::PropertyBindingPtr NetwSyncModel::admit_row(
     int64_t p_route,
     int64_t p_ordinal,
     int64_t p_sender,
-    int64_t p_controller
+    int64_t p_controller,
+    bool *r_schema_dropped
 ) {
     if (p_ordinal < 0) {
         ++drops_no_set;
@@ -243,16 +242,8 @@ repl::PropertyBindingPtr NetwSyncModel::admit_row(
     }
     if (!admits_schema(p_route, p_ordinal)) {
         ++drops_schema;
-        if (!schema_drop_warned) {
-            schema_drop_warned = true;
-            NETW_WARN(
-                sys::WIRE,
-                "An update for '%s' from peer %d was dropped, because its "
-                "synchronized properties are configured differently on that "
-                "peer. Configure them the same way on every peer.",
-                String(node->get_name()),
-                int(p_sender)
-            );
+        if (r_schema_dropped != nullptr) {
+            *r_schema_dropped = true;
         }
         return nullptr;
     }

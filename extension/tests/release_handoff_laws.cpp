@@ -249,18 +249,8 @@ TEST_CASE(
     "budget is not sent, and the release still hands the entity on"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] A byte array is longer than its packet field"
-        " allows.",
-        2
-    );
-    expected_faults.expect_warning(
-        "[warn][entity] '*' released authority with 1121 bytes of "
-        "state, over the 1024 byte limit, so the next authority "
-        "starts from its own copy. Replicate fewer or smaller "
-        "properties on this entity.",
-        2
-    );
+    expected_faults.expect_error("*byte array*[NW0032]*", 2);
+    expected_faults.expect_warning("*released authority*[NW1018]*", 1);
 
     Stand stand(NOTED_BOARD_SOURCE, BOARD_ID, 3);
     stand.entity(-1)->set_controller(stand.rig.peer_id(0));

@@ -3,6 +3,7 @@
 #include "godot/class_db.hpp"
 #include "netw/api/connection.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -41,11 +42,11 @@ void LobbyDirectory::invite(
     NetwMultiplayer *session
         = Object::cast_to<NetwMultiplayer>(gd::object_of(watcher));
     if (session == nullptr) {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "'%s' got an invite before it joined a session, so the invite was "
-            "dropped. Place the directory under a MultiplayerViewport.",
-            String(get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {"{LobbyDirectory.invite}", String(get_name())},
+            gd::instance_id(this)
         );
         return;
     }
@@ -176,14 +177,13 @@ Ref<NetwServerInfo> LobbyDirectory::listed_info(NetwMultiplayer *p_session) {
         return Ref<NetwServerInfo>();
     }
     const int64_t visibility = info->get_visibility();
-    if (visibility == NetwServerInfo::VISIBILITY_FRIENDS_ONLY
-        && !warned_friends) {
-        warned_friends = true;
-        NETW_WARN(
-            sys::TRANSPORT,
-            "%s has no friends list, so this game is private. Use "
-            "VISIBILITY_PRIVATE or VISIBILITY_PUBLIC.",
-            get_class()
+    if (visibility == NetwServerInfo::VISIBILITY_FRIENDS_ONLY) {
+        fault::raise(
+            p_session,
+            NETW_FAULT_UNSUPPORTED,
+            {String("VISIBILITY_FRIENDS_ONLY"),
+             get_class(),
+             String("VISIBILITY_PRIVATE or VISIBILITY_PUBLIC")}
         );
     }
     return visibility == NetwServerInfo::VISIBILITY_PUBLIC

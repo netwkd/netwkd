@@ -1,0 +1,13 @@
+:github_url: hide
+
+.. _fault_nw1021:
+
+NW1021. A route did not become live in time
+===========================================
+
+Reported as a warning when a route is not live by the timeout given to
+:ref:`NetwMultiplayer.liveness_when_live <class_NetwMultiplayer_method_liveness_when_live>`.
+
+The callback was dropped. The log line gives the route.
+
+Pass a longer timeout, or wait only on a route this peer will receive.

@@ -97,12 +97,7 @@ TEST_CASE(
     "forever"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] 'Shared' at Shared exists on the server but not on "
-        "this peer. Place it in the same scene on every peer, or spawn it "
-        "with Netw.spawn.",
-        1
-    );
+    expected_faults.expect_warning("*'Shared'*[NW0026]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();
@@ -146,12 +141,7 @@ TEST_CASE(
     "of its level still binds"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] 'Crate' at Level/Props/Crate exists on the server but "
-        "not on this peer. Place it in the same scene on every peer, or spawn "
-        "it with Netw.spawn.",
-        1
-    );
+    expected_faults.expect_warning("*'Crate' at Level/*[NW0026]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();

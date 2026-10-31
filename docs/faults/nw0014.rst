@@ -1,0 +1,28 @@
+:github_url: hide
+
+.. _fault_nw0014:
+
+NW0014. Physics steps do not divide evenly into ticks
+=====================================================
+
+Reported as a warning when the physics rate is not a whole multiple of the
+tickrate.
+
+Peers drift apart because a tick then covers a different number of physics
+steps from one tick to the next. The log line gives both rates.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).ticks_per_second(45)
+
+With physics at 60 steps per second, 45 ticks do not fit. Set
+``physics_ticks_per_second`` under Physics, Common in the project settings to
+a whole multiple of
+:ref:`NetwClockConfig.tickrate <class_NetwClockConfig_property_tickrate>`,
+or change the tickrate to match.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).ticks_per_second(30)

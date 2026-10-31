@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0020:
+
+NW0020. The admission handler refused the host
+==============================================
+
+Reported as an error when the host asks to join its own session and the
+handler declared with ``Netw.configure_admission`` refuses it.
+
+The host has no :ref:`NetwPlayer <class_NetwPlayer>`. The log line gives the
+refusal.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> Error:
+        return OK if invited.has(request.peer_id) else ERR_UNAUTHORIZED
+
+Admit peer 1 in the handler.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> Error:
+        if request.peer_id == 1:
+            return OK
+        return OK if is_invited(request) else ERR_UNAUTHORIZED

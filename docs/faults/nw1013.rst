@@ -1,0 +1,27 @@
+:github_url: hide
+
+.. _fault_nw1013:
+
+NW1013. Prediction on an entity is off
+======================================
+
+Reported as an error when an entity declares prediction and the declaration
+leaves nothing to predict, such as an entity with no state property, a
+session with no lag compensation, or an entity whose state properties were
+lost.
+
+The entity runs without prediction. The log line gives the reason.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").broadcast()
+
+Declare what the log line asks for, such as
+:ref:`state <class_NetwPropertyConfig_method_state>` on the properties
+prediction restores.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state()

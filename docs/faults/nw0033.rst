@@ -1,0 +1,28 @@
+:github_url: hide
+
+.. _fault_nw0033:
+
+NW0033. A call named something that was never declared
+======================================================
+
+Reported as an error when a call names a method, property, signal or database
+that its owner does not declare.
+
+The call did nothing. The log line names the call, the missing name and the
+owner.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.aply_stun)
+
+Check the name, or declare it on the owner first.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun)
+
+    @rpc("authority", "reliable")
+    func apply_stun() -> void:
+        pass

@@ -737,9 +737,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "[warn][session] NetwIdToken got no usable signing keys from "
-        "'https://keys.invalid/jwks'. Check NetwIdToken.keys_url and that "
-        "this machine can reach it.",
+        "*https://keys.invalid/jwks*[NW1000]*",
         2
     );
     const Ref<CryptoKey> issuer = private_key(netw_test::ISSUER_RSA_KEY);

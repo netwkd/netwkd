@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1007:
+
+NW1007. A handler returned the wrong kind of value
+==================================================
+
+Reported as an error when a handler you declared returns nothing, or a value
+of another type than Networked asks for.
+
+The result was ignored. The log line names the handler, what it returned and
+what to return.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> void:
+        pass
+
+Return what the log line asks for, such as an ``Error``.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> Error:
+        return OK

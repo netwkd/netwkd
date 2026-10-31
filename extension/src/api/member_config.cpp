@@ -6,6 +6,7 @@
 #include "netw/api/interpolate.hpp"
 #include "netw/api/quantize.hpp"
 #include "netw/entity/control.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/member_packing.hpp"
 #include "netw/script/model.hpp"
@@ -133,13 +134,10 @@ void NetwMemberConfig::publish_policy() {
 
 void NetwMemberConfig::set_write_policy(Policy p_write_policy) {
     if (policy_configured && write_policy != p_write_policy) {
-        NETW_WARN(
-            sys::SESSION,
-            "The write policy of '%s' was declared as %d and then as %d, and "
-            "the last one wins. Declare it once.",
-            String(context_name),
-            int(write_policy),
-            int(p_write_policy)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {"The write policy", String(context_name)}
         );
     }
     write_policy = p_write_policy;
@@ -149,13 +147,10 @@ void NetwMemberConfig::set_write_policy(Policy p_write_policy) {
 
 void NetwMemberConfig::set_transfer_mode(TransferMode p_transfer_mode) {
     if (transfer_configured && transfer_mode != p_transfer_mode) {
-        NETW_WARN(
-            sys::SESSION,
-            "The transfer mode of '%s' was declared as %d and then as %d, "
-            "and the last one wins. Declare it once.",
-            String(context_name),
-            int(transfer_mode),
-            int(p_transfer_mode)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {"The transfer mode", String(context_name)}
         );
     }
     transfer_mode = p_transfer_mode;
@@ -164,20 +159,20 @@ void NetwMemberConfig::set_transfer_mode(TransferMode p_transfer_mode) {
 
 void NetwMemberConfig::set_is_call_local(bool p_is_call_local) {
     if (context_type == 1) {
-        NETW_WARN(
-            sys::SESSION,
-            "NetwMemberConfig.call_local and call_remote do nothing on the "
-            "property '%s', because a property always changes locally "
-            "first. Remove the call.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_CONFLICTING_SETTINGS,
+            {"{NetwMemberConfig.call_local}",
+             String(context_name),
+             "a property, which always changes locally first"}
         );
     }
     if (local_configured && is_call_local != p_is_call_local) {
-        NETW_WARN(
-            sys::SESSION,
-            "'%s' declares both NetwMemberConfig.call_local and "
-            "call_remote, and the last one wins. Keep one of them.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {"{NetwMemberConfig.call_local} or call_remote",
+             String(context_name)}
         );
     }
     is_call_local = p_is_call_local;
@@ -226,12 +221,10 @@ Ref<NetwMemberConfig> NetwMemberConfig::call_remote() {
 
 Ref<NetwMemberConfig> NetwMemberConfig::defer_until(const Signal &p_signal) {
     if (!defer_signal_name.is_empty()) {
-        NETW_WARN(
-            sys::SESSION,
-            "NetwMemberConfig.defer_until was called twice on '%s', and "
-            "'%s' is replaced. Call it once.",
-            String(context_name),
-            String(defer_signal_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {"{NetwMemberConfig.defer_until}", String(context_name)}
         );
     }
     defer_signal_name = p_signal.get_name();
@@ -245,21 +238,24 @@ Ref<NetwMemberConfig> NetwMemberConfig::timeout(double p_seconds) {
             context_name
         );
     if (context_type != 0 || spawn_config.ptr() == this) {
-        NETW_WARN(
-            sys::SESSION,
-            "NetwMemberConfig.timeout does nothing on '%s', because only a "
-            "requested method waits for a reply. Remove the call.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_CONFLICTING_SETTINGS,
+            {"{NetwMemberConfig.timeout}",
+             String(context_name),
+             "a member that waits for no reply"}
         );
         return Ref<NetwMemberConfig>(this);
     }
     if (p_seconds <= 0.0) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwMemberConfig.timeout got %s seconds for '%s'. Pass a number "
-            "of seconds above zero.",
-            String::num(p_seconds),
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwMemberConfig.timeout}"),
+             vformat("%s seconds for '%s'",
+                     String::num(p_seconds),
+                     String(context_name)),
+             String("a number of seconds above zero")}
         );
         return Ref<NetwMemberConfig>(this);
     }
@@ -269,11 +265,12 @@ Ref<NetwMemberConfig> NetwMemberConfig::timeout(double p_seconds) {
 
 Ref<NetwMemberConfig> NetwMemberConfig::quantize(const Array &p_quantizers) {
     if (p_quantizers.is_empty()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwMemberConfig.quantize got no quantizer for '%s'. Pass one "
-            "quantizer for each value.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwMemberConfig.quantize}"),
+             vformat("no quantizer for '%s'", String(context_name)),
+             String("one quantizer for each value")}
         );
         return Ref<NetwMemberConfig>(this);
     }
@@ -296,11 +293,10 @@ Ref<NetwMemberConfig> NetwMemberConfig::quantize(const Array &p_quantizers) {
     }
     if (!quantizers.is_empty()
         && !same_quantizer_layout(quantizers, p_quantizers)) {
-        NETW_WARN(
-            sys::SESSION,
-            "NetwMemberConfig.quantize changed the quantizers of '%s', and "
-            "the last call wins. Declare them once.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {"{NetwMemberConfig.quantize}", String(context_name)}
         );
     }
     quantizers = p_quantizers;
@@ -317,11 +313,12 @@ Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
     const Array &p_interpolators
 ) {
     if (p_interpolators.is_empty()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwMemberConfig.interpolate got no interpolator for '%s'. Pass "
-            "one interpolator for each value.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwMemberConfig.interpolate}"),
+             vformat("no interpolator for '%s'", String(context_name)),
+             String("one interpolator for each value")}
         );
         return Ref<NetwMemberConfig>(this);
     }
@@ -346,11 +343,10 @@ Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
         return Ref<NetwMemberConfig>(this);
     }
     if (!interpolators.is_empty()) {
-        NETW_WARN(
-            sys::SESSION,
-            "NetwMemberConfig.interpolate changed the interpolators of '%s', "
-            "and the last call wins. Declare them once.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_AGAIN,
+            {"{NetwMemberConfig.interpolate}", String(context_name)}
         );
     }
     interpolators = p_interpolators;

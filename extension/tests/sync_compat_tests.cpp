@@ -132,13 +132,7 @@ TEST_CASE(
     "properties, and a frame whose value count disagrees poisons it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] MultiplayerSynchronizer '*' on route * "
-        "stopped replicating, because an update carried the wrong "
-        "number of values. Give it the same replication config on "
-        "every peer.",
-        1
-    );
+    expected_faults.expect_error("*'Sync'*[NW1020]*", 1);
 
     Stand stand;
     stand.declare("name", SceneReplicationConfig::REPLICATION_MODE_ALWAYS);
@@ -200,12 +194,7 @@ TEST_CASE(
     "grammar this version does not have, so the frame drops loudly"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] MultiplayerSynchronizer '*' got an update "
-        "with unknown flags 1, so it was dropped. Run the same "
-        "Networked version on every peer.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     Stand stand;
     stand.declare("name", SceneReplicationConfig::REPLICATION_MODE_ALWAYS);
@@ -264,13 +253,7 @@ TEST_CASE(
     "it announces the change, because the engine's own editors never do"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] MultiplayerSynchronizer '*' on route * "
-        "stopped replicating, because an update carried the wrong "
-        "number of values. Give it the same replication config on "
-        "every peer.",
-        1
-    );
+    expected_faults.expect_error("*'Sync'*[NW1020]*", 1);
 
     Stand stand;
     stand.declare("first", SceneReplicationConfig::REPLICATION_MODE_ALWAYS);
@@ -305,12 +288,7 @@ TEST_CASE(
     "unrepresentable, so the row poisons at consumption"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] MultiplayerSynchronizer '*' on route * "
-        "stopped replicating, because it watches 65 properties and "
-        "the limit is 64. Split them across more synchronizers.",
-        1
-    );
+    expected_faults.expect_error("*[NW1020]*", 1);
 
     Stand fits;
     fits.declare("name", SceneReplicationConfig::REPLICATION_MODE_ALWAYS);

@@ -4,6 +4,7 @@
 #include "netw/api/property_config.hpp"
 #include "netw/api/schema_core.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/script/model.hpp"
@@ -43,33 +44,33 @@ void warn_set_conflict(
     const StringName &p_first,
     const StringName &p_second
 ) {
-    NETW_WARN(
-        sys::WIRE,
-        "'%s' and '%s' declare different %s values for the same %s "
-        "properties, and the last one wins. Declare it on one of them.",
-        String(p_first).utf8().get_data(),
-        String(p_second).utf8().get_data(),
-        p_axis,
-        String(record_kind_name(p_record)).utf8().get_data()
+    fault::raise(
+        nullptr,
+        NETW_FAULT_DECLARED_AGAIN,
+        {vformat(
+             "The %s of the %s properties",
+             String(p_axis),
+             record_kind_name(p_record)
+         ),
+         vformat("%s' and '%s", String(p_first), String(p_second))}
     );
 }
 
 void warn_broadcast_ignored(const char *p_axis, const StringName &p_property) {
-    NETW_WARN(
-        sys::WIRE,
-        "'%s' is a broadcast property, which ignores "
-        "NetwPropertyConfig.%s. Remove that call.",
-        String(p_property).utf8().get_data(),
-        p_axis
+    fault::raise(
+        nullptr,
+        NETW_FAULT_CONFLICTING_SETTINGS,
+        {vformat("{NetwPropertyConfig.%s}", String(p_axis)),
+         String(p_property),
+         "broadcast"}
     );
 }
 
 void warn_broadcast_exclusivity(const StringName &p_property) {
-    NETW_WARN(
-        sys::WIRE,
-        "'%s' is declared broadcast and also state or input, so broadcast "
-        "was ignored. Keep only one of them.",
-        String(p_property).utf8().get_data()
+    fault::raise(
+        nullptr,
+        NETW_FAULT_CONFLICTING_SETTINGS,
+        {"broadcast", String(p_property), "state or input"}
     );
 }
 
@@ -253,11 +254,12 @@ bool from_property_configs(
     }
 
     if (masked && window > 0) {
-        NETW_WARN(
-            sys::WIRE,
-            "The %s properties are both masked and windowed, so masked was "
-            "ignored. Remove NetwPropertyConfig.masked from them.",
-            String(record_kind_name(p_record)).utf8().get_data()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_CONFLICTING_SETTINGS,
+            {"{NetwPropertyConfig.masked}",
+             record_kind_name(p_record),
+             "{NetwPropertyConfig.windowed}"}
         );
         masked = false;
     }

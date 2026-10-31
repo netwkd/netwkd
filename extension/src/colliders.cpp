@@ -7,6 +7,7 @@
 #include "godot/physics_server.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/spatial_node.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/tree_hook.hpp"
 
@@ -177,11 +178,13 @@ Node *first_collider_under(Node *p_node) {
 void push(Node *p_node) {
     if (syncs_to_physics(p_node)
         && first_report(p_node, Fault::SYNC_TO_PHYSICS)) {
-        NETW_WARN(
-            sys::LAGCOMP,
-            "'%s' has sync_to_physics on, so a restore cannot move it. Turn "
-            "sync_to_physics off and move it in _network_tick.",
-            String(p_node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_REWIND_MISUSE,
+            {String(p_node->get_name()),
+             "sync_to_physics",
+             "sync_to_physics off and the node moved in _network_tick"},
+            gd::instance_id(p_node)
         );
     }
     force(p_node);
@@ -337,12 +340,13 @@ void report_unseen(Object *p_owner) {
         || !first_report(kinematic, Fault::UNSEEN_KINEMATIC)) {
         return;
     }
-    NETW_WARN(
-        sys::LAGCOMP,
-        "'%s' is a %s with no hitbox, so a query in a rewind sees it where it "
-        "is now. Add an Area3D hitbox, or use the Networked engine build.",
-        String(kinematic->get_name()),
-        kinematic->get_class()
+    fault::raise(
+        nullptr,
+        NETW_FAULT_ENGINE_LACKS,
+        {String(kinematic->get_name()),
+         String(),
+         vformat("to move its %s in a rewind", kinematic->get_class())},
+        gd::instance_id(kinematic)
     );
 }
 
@@ -363,12 +367,17 @@ void exclude_visual_root(Node *p_owner, Node *p_visual) {
     if (inside == nullptr || !first_report(inside, Fault::VISUAL_ROOT)) {
         return;
     }
-    NETW_WARN(
-        sys::LAGCOMP,
-        "'%s/%s' is under the visual root, so it moves with the drawn body. "
-        "Move it out of NetwDisplay.visual_root.",
-        String(p_owner->get_name()),
-        String(p_owner->get_path_to(inside))
+    fault::raise(
+        nullptr,
+        NETW_FAULT_REWIND_MISUSE,
+        {vformat(
+             "%s/%s",
+             String(p_owner->get_name()),
+             String(p_owner->get_path_to(inside))
+         ),
+         "a place under the visual root",
+         "a parent outside {NetwDisplay.visual_root}"},
+        gd::instance_id(inside)
     );
 }
 

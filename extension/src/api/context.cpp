@@ -13,6 +13,8 @@
 #include "netw/api/sync_pipeline.hpp"
 #include "netw/colors.hpp"
 #include "netw/connect/transport.hpp"
+#include "netw/decl_sites.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/scene_core.hpp"
@@ -44,12 +46,14 @@ Ref<Script> named_method_script(
     Object *target = p_callable.get_object();
     const Ref<Script> script = script_of(target);
     if (script.is_null() || method.is_empty() || !target->has_method(method)) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.%s got '%s', which is not a method of a node with a "
-            "script. Name a method the node's script declares.",
-            p_verb,
-            String(method)
+        Node *host = Object::cast_to<Node>(target);
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNKNOWN_NAME,
+            {vformat("{Netw.%s}", p_verb),
+             host != nullptr ? String(host->get_name()) : String("the node"),
+             String(method)},
+            host != nullptr ? uint64_t(gd::instance_id(host)) : 0
         );
         return Ref<Script>();
     }
@@ -61,47 +65,51 @@ Node *node_behind(const Variant &p_held) {
 }
 
 Node *handler_scope(const Callable &p_handler, const char *p_verb) {
-    NETW_ERR_COND_V(
-        !p_handler.is_valid(),
-        nullptr,
-        sys::SESSION,
-        "Netw.%s needs a valid handler. Pass a method of a node inside the "
-        "session's branch.",
-        p_verb
-    );
+    if (!p_handler.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("{Netw.%s}", p_verb),
+             String(),
+             String("a method of a node inside the session's branch")}
+        );
+        return nullptr;
+    }
     Node *scope = Object::cast_to<Node>(p_handler.get_object());
-    NETW_ERR_COND_V(
-        scope == nullptr,
-        nullptr,
-        sys::SESSION,
-        "Netw.%s needs a handler that is a method of a Node. Move the method "
-        "onto a node inside the session's branch.",
-        p_verb
-    );
+    if (scope == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("{Netw.%s}", p_verb),
+             String(),
+             String("a method of a Node inside the session's branch")}
+        );
+        return nullptr;
+    }
     return scope;
 }
 
 template <typename T>
 Ref<T> declare_config(Node *p_node, session_decl::Kind p_kind) {
     const char *verb = session_decl::verb_of(p_kind);
-    NETW_ERR_COND_V(
-        p_node == nullptr,
-        Ref<T>(),
-        sys::SESSION,
-        "Netw.%s needs a node, and it was null. Pass a node inside the "
-        "session's branch.",
-        verb
-    );
+    if (p_node == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {vformat("{Netw.%s}", verb), String(), String("node")}
+        );
+        return Ref<T>();
+    }
     const Ref<T> standing = session_decl::payload_on(p_node, p_kind);
-    NETW_ERR_COND_V(
-        standing.is_valid(),
-        Ref<T>(),
-        sys::SESSION,
-        "Netw.%s was called twice on '%s'. Keep the Resource the first call "
-        "returned and set its values there.",
-        verb,
-        String(p_node->get_name())
-    );
+    if (standing.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_TWICE,
+            {vformat("{Netw.%s}", verb), String(p_node->get_name())},
+            uint64_t(gd::instance_id(p_node))
+        );
+        return Ref<T>();
+    }
     Ref<T> draft;
     draft.instantiate();
     if (session_decl::declare(p_node, p_kind, Callable(), draft, verb) != OK) {
@@ -113,20 +121,22 @@ Ref<T> declare_config(Node *p_node, session_decl::Kind p_kind) {
 NetwMultiplayer *sole_session(const char *p_verb) {
     const TypedArray<MultiplayerAPI> live = NetwMultiplayer::session_get_all();
     if (live.is_empty()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.%s found no running session. Start one before calling it.",
-            p_verb
+        fault::raise(
+            nullptr,
+            NETW_FAULT_SESSION_NOT_FOUND,
+            {vformat("{Netw.%s}", p_verb), String(), String(), 0, 0}
         );
         return nullptr;
     }
     if (live.size() > 1) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.%s found %d running sessions and cannot choose one. Reach "
-            "the one you mean with Netw.of.",
-            p_verb,
-            int(live.size())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_SESSION_NOT_FOUND,
+            {vformat("{Netw.%s}", p_verb),
+             String(),
+             String(),
+             0,
+             int64_t(live.size())}
         );
         return nullptr;
     }
@@ -145,7 +155,11 @@ CallSession call_session(Node *p_node, const StringName &p_member) {
     if (p_node == nullptr) {
         out.code = ERR_INVALID_PARAMETER;
         out.detail = String("A Netw RPC needs a method of a Node.");
-        NETW_ERROR(sys::SESSION, "%s", out.detail);
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("A Netw RPC"), String(), String("a method of a Node")}
+        );
         return out;
     }
     out.api = NetwMultiplayer::of(p_node);
@@ -163,7 +177,13 @@ CallSession call_session(Node *p_node, const StringName &p_member) {
     const uint64_t node_id = uint64_t(gd::instance_id(p_node));
     if (!reported.has(node_id)) {
         reported.insert(node_id);
-        NETW_ERROR(sys::SESSION, "%s", out.detail);
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("The call to '") + String(p_member) + String("'"),
+             String(p_node->get_name())},
+            node_id
+        );
     }
     return out;
 }
@@ -225,11 +245,13 @@ void register_as_component(const Variant &p_node) {
     if (entity.is_valid()) {
         entity->register_component(node);
     } else {
-        NETW_WARN(
-            sys::ENTITY,
-            "'%s' has networked configuration but is not part of a "
-            "NetwEntity. Call Netw.configure_entity on its root.",
-            String(node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_ENTITY,
+            {String("Networked configuration"),
+             String(node->get_name()),
+             String()},
+            gd::instance_id(node)
         );
     }
     setup_defer_latches(node);
@@ -324,13 +346,11 @@ void lint_property_overlaps(const Variant &p_node) {
         }
         const NodePath real = entity->property_path(node, property, nullptr);
         if (!real.is_empty() && entity->governs_property(real, nullptr)) {
-            NETW_WARN(
-                sys::SESSION,
-                "'%s' on '%s' is already replicated by its entity, so "
-                "Netw.configure_property gives it a second writer. Declare "
-                "the property only once.",
-                String(property),
-                String(node->get_name())
+            fault::raise(
+                nullptr,
+                NETW_FAULT_DECLARED_AGAIN,
+                {String(property), String(node->get_name())},
+                gd::instance_id(node)
             );
         }
     }
@@ -389,18 +409,26 @@ Ref<NetwPromise> Netw::prepare_join(
     const Array &p_args
 ) {
     const Ref<NetwMultiplayer> api = NetwMultiplayer::core_of(p_node);
-    NETW_ERR_COND_V(
-        api.is_null(),
-        NetwPromise::resolved(ERR_UNCONFIGURED),
-        sys::SESSION,
-        "Netw.prepare_join got a node that is not inside a session. Call it "
-        "from a node in the scene tree under a MultiplayerViewport."
-    );
+    const uint64_t node_id
+        = p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0;
+    if (api.is_null()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.prepare_join}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            node_id
+        );
+        return NetwPromise::resolved(ERR_UNCONFIGURED);
+    }
     if (api->is_online()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.prepare_join was called after the session connected. Call "
-            "it before assigning multiplayer_peer."
+        fault::raise(
+            api.ptr(),
+            NETW_FAULT_DECLARED_ONLINE,
+            {String("{Netw.prepare_join}"),
+             String(),
+             String("the join arguments")},
+            node_id
         );
         return NetwPromise::resolved(ERR_ALREADY_IN_USE);
     }
@@ -421,6 +449,7 @@ Error Netw::configure_server_info(const Callable &p_provider) {
     if (scope == nullptr) {
         return ERR_INVALID_PARAMETER;
     }
+    decl_sites::record_handler(p_provider);
     return session_decl::declare(
         scope,
         session_decl::KIND_SERVER_INFO,
@@ -437,15 +466,20 @@ Ref<NetwJoinConfig> Netw::configure_join(const Callable &p_handler) {
     }
     const Ref<Script> declaring
         = netw::script::model::declaring_script(p_handler.get_object());
-    NETW_ERR_COND_V(
-        NetwMultiplayer::join_declared_arg_types(p_handler).is_empty()
-            && p_handler.get_argument_count() > 1,
-        Ref<NetwJoinConfig>(),
-        sys::SESSION,
-        "Netw.configure_join got a lambda that takes join arguments. Use a "
-        "named method with typed parameters, such as "
-        "'func spawn_at(who: NetwPlayer, at: Vector3) -> void'."
-    );
+    if (NetwMultiplayer::join_declared_arg_types(p_handler).is_empty()
+        && p_handler.get_argument_count() > 1) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{Netw.configure_join}"),
+             String(),
+             String("a named method with typed parameters for the join "
+                    "arguments")},
+            uint64_t(gd::instance_id(scope))
+        );
+        return Ref<NetwJoinConfig>();
+    }
+    decl_sites::record_handler(p_handler);
     Ref<NetwJoinConfig> config;
     config.instantiate();
     config->set_context_script(declaring);
@@ -468,6 +502,7 @@ Ref<NetwAdmissionConfig> Netw::configure_admission(const Callable &p_handler) {
     if (scope == nullptr) {
         return Ref<NetwAdmissionConfig>();
     }
+    decl_sites::record_handler(p_handler);
     Ref<NetwAdmissionConfig> config;
     config.instantiate();
     if (session_decl::declare(
@@ -488,6 +523,7 @@ Error Netw::configure_transfer(const Callable &p_keep) {
     if (scope == nullptr) {
         return ERR_INVALID_PARAMETER;
     }
+    decl_sites::record_handler(p_keep);
     return session_decl::declare(
         scope,
         session_decl::KIND_TRANSFER,
@@ -505,6 +541,7 @@ Ref<NetwSessionConfig> Netw::configure_session(Node *p_node) {
 }
 
 Ref<NetwClockConfig> Netw::configure_clock(Node *p_node) {
+    decl_sites::record(NETW_SITE_CLOCK, p_node);
     return declare_config<NetwClockConfig>(
         p_node,
         session_decl::KIND_CLOCK_CONFIG
@@ -525,55 +562,67 @@ Ref<NetwPropertyConfig> Netw::configure_property(
 ) {
     NETW_ZONE_NC("Netw configure property", colors::SESSION);
     if (p_node == nullptr) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_property needs a node, and it was null."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_property}"), String(), String("node")}
         );
         return Ref<NetwPropertyConfig>();
     }
+    const uint64_t node_id = uint64_t(gd::instance_id(p_node));
     if (p_node->is_inside_tree()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_property cannot declare '%s' on '%s' after it "
-            "entered the tree. Call it from _init.",
-            String(p_property),
-            String(p_node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_TOO_LATE,
+            {String("{Netw.configure_property}"),
+             String("'") + String(p_node->get_name()) + String("'"),
+             String("the node enters the tree")},
+            node_id
         );
         return Ref<NetwPropertyConfig>();
     }
     const gd::PropertyResolution resolved
         = gd::resolve_property(p_node, p_property, gd::property_list(p_node));
     if (!resolved.present) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_property got '%s', which the node does not have. "
-            "Check the property name.",
-            String(p_property)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{Netw.configure_property}"),
+             String(p_node->get_name()),
+             String(p_property)},
+            node_id
         );
         return Ref<NetwPropertyConfig>();
     }
     if (p_declared_type < -1 || p_declared_type >= Variant::VARIANT_MAX
         || (resolved.type >= 0 && p_declared_type >= 0
             && resolved.type != p_declared_type)) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_property got a declared type for '%s' that does "
-            "not match the property. Pass its Variant type, or -1.",
-            String(p_property)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{Netw.configure_property}"),
+             vformat("a declared type of %d for '%s'",
+                     p_declared_type,
+                     String(p_property)),
+             String("the Variant type of the property, or -1")},
+            node_id
         );
         return Ref<NetwPropertyConfig>();
     }
     const int declared_type
         = p_declared_type >= 0 ? int(p_declared_type) : resolved.type;
     if (declared_type < 0) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_property cannot find the type of '%s'. List it "
-            "in _get_property_list, or pass declared_type.",
-            String(p_property)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{Netw.configure_property}"),
+             String(p_node->get_name()),
+             String(p_property)},
+            node_id
         );
         return Ref<NetwPropertyConfig>();
     }
+    decl_sites::record(NETW_SITE_COLUMN, p_node, p_property);
     const Ref<Script> script = script_of(p_node);
     if (script.is_null()) {
         const Ref<NetwPropertyConfig> config
@@ -590,11 +639,13 @@ Ref<NetwPropertyConfig> Netw::configure_property(
         = netw::script::model::get_property_config(script, p_property);
     if (existing.is_valid()) {
         if (existing->get_declared_type() != declared_type) {
-            NETW_ERROR(
-                sys::SESSION,
-                "Netw.configure_property declared '%s' with two different "
-                "types. Give the property one type on every instance.",
-                String(p_property)
+            fault::raise(
+                nullptr,
+                NETW_FAULT_DECLARED_TWICE,
+                {String("{Netw.configure_property}"),
+                 String(p_node->get_name()),
+                 String(p_property)},
+                node_id
             );
             return Ref<NetwPropertyConfig>();
         }
@@ -620,17 +671,19 @@ Ref<NetwMemberConfig> Netw::configure_rpc(const Callable &p_callable) {
     Node *host = Object::cast_to<Node>(p_callable.get_object());
     if (host != nullptr) {
         if (host->is_inside_tree()) {
-            NETW_ERROR(
-                sys::SESSION,
-                "Netw.configure_rpc cannot declare '%s' on '%s' after it "
-                "entered the tree. Call it from _init.",
-                String(method),
-                String(host->get_name())
+            fault::raise(
+                nullptr,
+                NETW_FAULT_TOO_LATE,
+                {String("{Netw.configure_rpc}"),
+                 String("'") + String(host->get_name()) + String("'"),
+                 String("the node enters the tree")},
+                uint64_t(gd::instance_id(host))
             );
             return Ref<NetwMemberConfig>();
         }
         inject_component_registration(host);
     }
+    decl_sites::record(NETW_SITE_RPC, p_callable.get_object(), method);
     const Ref<NetwMemberConfig> existing
         = netw::script::model::get_rpc_options(script, method);
     if (existing.is_valid()) {
@@ -651,21 +704,23 @@ Ref<NetwMemberConfig> Netw::configure_rpc(const Callable &p_callable) {
 Ref<NetwMemberConfig> Netw::configure_signal(const Signal &p_signal) {
     Node *node = Object::cast_to<Node>(p_signal.get_object());
     if (node == nullptr) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_signal needs a signal of a Node."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_signal}"), String(), String("signal")}
         );
         return Ref<NetwMemberConfig>();
     }
     const StringName name = p_signal.get_name();
     const Ref<Script> script = script_of(node);
     if (script.is_null() || name.is_empty() || !node->has_signal(name)) {
-        NETW_ERROR(
-            sys::SESSION,
-            "Netw.configure_signal got '%s', which '%s' does not declare. "
-            "Name a signal the node's script declares.",
-            String(name),
-            String(node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{Netw.configure_signal}"),
+             String(node->get_name()),
+             String(name)},
+            uint64_t(gd::instance_id(node))
         );
         return Ref<NetwMemberConfig>();
     }
@@ -691,6 +746,7 @@ Ref<NetwMemberConfig> Netw::configure_spawn(const Callable &p_callable) {
         return Ref<NetwMemberConfig>();
     }
     const StringName method = p_callable.get_method();
+    decl_sites::record(NETW_SITE_HANDLER, nullptr, method);
     const Ref<NetwMemberConfig> existing
         = netw::script::model::get_spawn_config(script, method);
     if (existing.is_valid()) {
@@ -707,15 +763,17 @@ Ref<NetwMemberConfig> Netw::configure_spawn(const Callable &p_callable) {
 
 Ref<NetwEntity> Netw::configure_entity(Node *p_node) {
     NETW_ZONE_NC("Netw configure entity", colors::SESSION);
+    decl_sites::record(NETW_SITE_KIND, p_node);
     const Ref<NetwEntity> entity = NetwEntity::resolve(p_node);
     if (p_node != nullptr && p_node->is_inside_tree()
         && (entity.is_null() || entity->get_owner() != p_node)) {
-        NETW_ERROR(
-            sys::ENTITY,
-            "Netw.configure_entity ran after '%s' entered the tree, which is "
-            "too late. Call it before the node enters the tree, or use "
-            "NetwEntity.of to find an entity that already exists.",
-            String(p_node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_TOO_LATE,
+            {String("{Netw.configure_entity}"),
+             String("'") + String(p_node->get_name()) + String("'"),
+             String("the node enters the tree")},
+            uint64_t(gd::instance_id(p_node))
         );
         return Ref<NetwEntity>();
     }
@@ -725,9 +783,14 @@ Ref<NetwEntity> Netw::configure_entity(Node *p_node) {
 Ref<NetwDespawnConfig> Netw::configure_despawn(Node *p_node) {
     const Ref<Script> script = script_of(p_node);
     if (script.is_null()) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "Netw.configure_despawn needs a node that has a script."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_SCRIPT,
+            {String("{Netw.configure_despawn}"),
+             p_node != nullptr ? vformat("'%s'", String(p_node->get_name()))
+                               : String("no node"),
+             String("a node with a script")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return Ref<NetwDespawnConfig>();
     }
@@ -743,12 +806,14 @@ Ref<NetwDespawnConfig> Netw::configure_despawn(Node *p_node) {
 }
 
 Ref<NetwPersistenceConfig> Netw::configure_persistence(Node *p_node) {
-    NETW_ERR_COND_V(
-        p_node == nullptr,
-        Ref<NetwPersistenceConfig>(),
-        sys::TABLE,
-        "Netw.configure_persistence needs a node, and it was null."
-    );
+    if (p_node == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_persistence}"), String(), String("node")}
+        );
+        return Ref<NetwPersistenceConfig>();
+    }
     return netw::script::model::configure_node_persistence(p_node);
 }
 
@@ -788,7 +853,16 @@ Ref<NetwPromise> Netw::request_id(
             "Netw.request_id got peer id 0, which names no single peer. Use "
             "Netw.request_all to ask every peer."
         );
-        NETW_ERROR(sys::SESSION, "%s", detail);
+        Node *asker = Object::cast_to<Node>(p_callable.get_object());
+        fault::raise(
+            asker != nullptr ? NetwMultiplayer::of(asker) : nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("Netw.request_id"),
+             String("peer id 0"),
+             String("a single peer id, or {Netw.request_all} to ask every "
+                    "peer")},
+            asker != nullptr ? uint64_t(gd::instance_id(asker)) : 0
+        );
         return NetwPromise::refused(ERR_INVALID_PARAMETER, detail);
     }
     const CallSession session = call_session(p_callable);
@@ -864,18 +938,25 @@ Ref<NetwDatabaseConfig> Netw::configure_database(
     Node *p_node,
     const StringName &p_name
 ) {
-    NETW_ERR_COND_V(
-        p_node == nullptr,
-        Ref<NetwDatabaseConfig>(),
-        sys::TABLE,
-        "Netw.configure_database needs a node, and it was null."
-    );
-    NETW_ERR_COND_V(
-        String(p_name).is_empty(),
-        Ref<NetwDatabaseConfig>(),
-        sys::TABLE,
-        "Netw.configure_database needs a database name, and it was empty."
-    );
+    if (p_node == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_database}"), String(), String("node")}
+        );
+        return Ref<NetwDatabaseConfig>();
+    }
+    if (String(p_name).is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_database}"),
+             String(),
+             String("database name")},
+            uint64_t(gd::instance_id(p_node))
+        );
+        return Ref<NetwDatabaseConfig>();
+    }
     Ref<NetwDatabaseConfig> draft;
     draft.instantiate();
     if (session_decl::declare_database(p_node, p_name, draft) != OK) {
@@ -895,20 +976,20 @@ Node *Netw::spawn_player(
 ) {
     Node *host = Object::cast_to<Node>(p_fn.get_object());
     if (host == nullptr) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "Netw.spawn needs a spawn function that is a method of a Node."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{Netw.spawn}"), String(), String("a method of a Node")}
         );
         return nullptr;
     }
     NetwMultiplayer *api = NetwMultiplayer::of(host);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "Netw.spawn got a spawn function on '%s', which is not inside a "
-            "session. Move it to a node in the scene tree under a "
-            "MultiplayerViewport.",
-            String(host->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.spawn}"), String(host->get_name())},
+            uint64_t(gd::instance_id(host))
         );
         return nullptr;
     }
@@ -927,7 +1008,15 @@ Ref<NetwPromise> Netw::spawn_async(const Callable &p_fn, const Array &p_args) {
             "Netw.spawn_async needs a spawn function on a node inside a "
             "session. Pass a method of a node under a MultiplayerViewport."
         );
-        NETW_ERROR(sys::SPAWN, "%s", refusal);
+        fault::raise(
+            api,
+            NETW_FAULT_SPAWN_REFUSED,
+            {String("The spawn"),
+             String("a spawn function outside a session"),
+             String("a spawn function on a node under a {MultiplayerViewport}")
+            },
+            host != nullptr ? uint64_t(gd::instance_id(host)) : 0
+        );
         return NetwPromise::refused(ERR_UNCONFIGURED, refusal);
     }
     return plane->get_spawn_pipeline()
@@ -938,20 +1027,22 @@ Error Netw::despawn(Node *p_node, const Ref<NetwDespawnOpts> &p_opts) {
     const Ref<NetwEntity> entity
         = NetwEntity::of(NetwMultiplayer::scene_inner_of(p_node));
     if (entity.is_null()) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "Netw.despawn got '%s', which is not a NetwEntity. Despawn the "
-            "entity's root node.",
-            p_node != nullptr ? String(p_node->get_name()) : String("<null>")
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_ENTITY,
+            {String("{Netw.despawn}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return ERR_DOES_NOT_EXIST;
     }
     NetwMultiplayer *api = NetwEntity::session_core_for(p_node);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "Netw.despawn got '%s', which is not inside a session.",
-            String(p_node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.despawn}"), String(p_node->get_name())},
+            uint64_t(gd::instance_id(p_node))
         );
         return ERR_UNAVAILABLE;
     }
@@ -962,11 +1053,12 @@ Ref<NetwPromise> Netw::reparent(Node *p_node, Node *p_new_parent) {
     const Ref<NetwEntity> entity
         = NetwEntity::of(NetwMultiplayer::scene_inner_of(p_node));
     if (entity.is_null()) {
-        NETW_ERROR(
-            sys::SCENE,
-            "Netw.reparent got '%s', which is not a NetwEntity. Reparent the "
-            "entity's root node.",
-            p_node != nullptr ? String(p_node->get_name()) : String("<null>")
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_ENTITY,
+            {String("{Netw.reparent}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return NetwPromise::rejected(
             ERR_DOES_NOT_EXIST,
@@ -975,10 +1067,11 @@ Ref<NetwPromise> Netw::reparent(Node *p_node, Node *p_new_parent) {
     }
     NetwMultiplayer *api = NetwEntity::session_core_for(p_node);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::SCENE,
-            "Netw.reparent got '%s', which is not inside a session.",
-            String(p_node->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.reparent}"), String(p_node->get_name())},
+            uint64_t(gd::instance_id(p_node))
         );
         return NetwPromise::rejected(
             ERR_UNAVAILABLE,
@@ -991,21 +1084,20 @@ Ref<NetwPromise> Netw::reparent(Node *p_node, Node *p_new_parent) {
 Ref<NetwAction> Netw::action(const Callable &p_authority) {
     Node *host = Object::cast_to<Node>(p_authority.get_object());
     if (host == nullptr) {
-        NETW_ERROR(
-            sys::LAGCOMP,
-            "Netw.action needs an authority callback that is a method of a "
-            "Node."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{Netw.action}"), String(), String("a method of a Node")}
         );
         return Ref<NetwAction>();
     }
     NetwMultiplayer *api = NetwMultiplayer::of(host);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::LAGCOMP,
-            "Netw.action got a callback on '%s', which is not inside a "
-            "session. Move it to a node in the scene tree under a "
-            "MultiplayerViewport.",
-            String(host->get_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.action}"), String(host->get_name())},
+            uint64_t(gd::instance_id(host))
         );
         return Ref<NetwAction>();
     }
@@ -1017,17 +1109,22 @@ Ref<DictionaryRecord> Netw::sample(
     int64_t p_tick
 ) {
     if (p_entity.is_null()) {
-        NETW_ERROR(
-            sys::LAGCOMP,
-            "Netw.sample needs an entity, and it was null."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.sample}"), String(), String("entity")}
         );
         return Ref<DictionaryRecord>();
     }
     NetwMultiplayer *api = NetwEntity::session_core_for(p_entity->get_owner());
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::LAGCOMP,
-            "Netw.sample got an entity that is not inside a session."
+        Node *owner = p_entity->get_owner();
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.sample}"),
+             owner != nullptr ? String(owner->get_name()) : String("<null>")},
+            owner != nullptr ? uint64_t(gd::instance_id(owner)) : 0
         );
         return Ref<DictionaryRecord>();
     }
@@ -1040,10 +1137,10 @@ Variant Netw::rewind(
     const Callable &p_body
 ) {
     if (p_entities.is_empty()) {
-        NETW_ERROR(
-            sys::LAGCOMP,
-            "Netw.rewind got no entities, so nothing moved. Pass the entities "
-            "to move back, such as Netw.scene(self).entities."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.rewind}"), String(), String("entities")}
         );
         return Variant();
     }
@@ -1055,10 +1152,10 @@ Variant Netw::rewind(
         }
     }
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::LAGCOMP,
-            "Netw.rewind got entities that are not in a session, so nothing "
-            "moved. Pass entities whose nodes are in the scene tree."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.rewind}"), String("its entities")}
         );
         return Variant();
     }
@@ -1066,21 +1163,28 @@ Variant Netw::rewind(
 }
 
 Ref<NetwSceneConfig> Netw::configure_scene(Node *p_node) {
-    NETW_ERR_COND_V(
-        p_node == nullptr,
-        Ref<NetwSceneConfig>(),
-        sys::SCENE,
-        "Netw.configure_scene needs the scene's root node, and it was null."
-    );
+    if (p_node == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_scene}"),
+             String(),
+             String("root node of the scene")}
+        );
+        return Ref<NetwSceneConfig>();
+    }
     const Ref<Script> script = script_of(p_node);
-    NETW_ERR_COND_V(
-        script.is_null(),
-        Ref<NetwSceneConfig>(),
-        sys::SCENE,
-        "Netw.configure_scene needs '%s' to have a script. "
-        "Call it from the script on the scene's root.",
-        String(p_node->get_name())
-    );
+    if (script.is_null()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_SCRIPT,
+            {String("{Netw.configure_scene}"),
+             vformat("'%s'", String(p_node->get_name())),
+             String("the script on the root of the scene")},
+            uint64_t(gd::instance_id(p_node))
+        );
+        return Ref<NetwSceneConfig>();
+    }
 
     SceneDecl decl = netw::script::model::get_scene_decl(script);
     if (!decl.declared) {

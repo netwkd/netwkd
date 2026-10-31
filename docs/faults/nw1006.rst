@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1006:
+
+NW1006. A call got a script it cannot use
+=========================================
+
+Reported as an error when a call is given a node or script that does not
+have the shape the call needs, or no script at all.
+
+The call did nothing. The log line names the call, the script or node path,
+and what to use.
+
+.. code-block:: gdscript
+
+    Netw.configure_database(self, "main", Node.new())
+
+Use a script of the kind the log line names, such as a class that extends
+``RefCounted``.
+
+.. code-block:: gdscript
+
+    class MainDatabase extends RefCounted:
+        pass

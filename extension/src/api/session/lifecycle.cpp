@@ -8,6 +8,7 @@
 #include "netw/api/persistence_config.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/lifecycle/rule.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/engine.hpp"
@@ -58,6 +59,40 @@ Ref<NetwEntity> entity_holding(Node *p_node) {
 
 String root_name(Node *p_root) {
     return p_root != nullptr ? String(p_root->get_name()) : String("<null>");
+}
+
+uint64_t subject_of(Node *p_root) {
+    return p_root != nullptr ? uint64_t(gd::instance_id(p_root)) : 0;
+}
+
+FaultValues moved_values(Node *p_root, Error p_code, bool p_halted) {
+    if (p_code == ERR_INVALID_PARAMETER) {
+        return {
+            root_name(p_root),
+            String("a parent the session cannot follow"),
+            String("a parent inside the multiplayer root")
+        };
+    }
+    if (p_code == ERR_UNAVAILABLE && p_halted) {
+        return {
+            root_name(p_root),
+            String("a new parent while session authority moves to another "
+                   "peer"),
+            String("the move again once session authority has moved")
+        };
+    }
+    if (p_code == ERR_UNAVAILABLE) {
+        return {
+            root_name(p_root),
+            String("a new parent while it waits on session authority"),
+            String("the move again once session authority answers")
+        };
+    }
+    return {
+        root_name(p_root),
+        String("a new parent by a peer that may not move it"),
+        String("the move on the server")
+    };
 }
 
 } // namespace
@@ -173,9 +208,19 @@ lifecycle::Ruling NetwMultiplayer::lifecycle_judge_verb(
         return ruling;
     }
     if (ruling.code == ERR_BUSY) {
-        NETW_DEBUG(sys::ENTITY, "%s", r_text);
+        NETW_DEBUG(
+            sys::ENTITY,
+            "%s on '%s' ran during a prediction replay and was refused.",
+            p_verb,
+            root_name(p_root)
+        );
     } else {
-        NETW_ERROR(sys::ENTITY, "%s", r_text);
+        fault::raise(
+            this,
+            NETW_FAULT_ENTITY_MOVED,
+            moved_values(p_root, ruling.code, p_facts.minting_halted),
+            subject_of(p_root)
+        );
     }
     return ruling;
 }
@@ -253,7 +298,13 @@ void NetwMultiplayer::lifecycle_refuse_move_here(
     Error p_code,
     const String &p_text
 ) {
-    NETW_WARN(sys::ENTITY, "%s It is moved back.", p_text);
+    Node *owner = p_row.wrapper->get_owner();
+    fault::raise(
+        this,
+        NETW_FAULT_ENTITY_MOVED,
+        moved_values(owner, p_code, false),
+        subject_of(owner)
+    );
     if (p_row.promise.is_valid()) {
         p_row.promise->reject(p_code, p_text);
     }
@@ -777,48 +828,29 @@ void NetwMultiplayer::entity_settle_foreign_move(const EntityDeparture &p_row) {
     facts.destination = lifecycle_destination(owner, parent);
     lifecycle::Ruling ruling = lifecycle::rule(facts);
     if (ruling.admitted()) {
-        lifecycle_undo_ungranted_move(p_row, facts);
+        lifecycle_undo_ungranted_move(p_row);
         return;
     }
-    String text;
-    if (ruling.verdict == lifecycle::Verdict::STATIC) {
-        text = lifecycle::refusal_text(
-            String("Node.reparent"),
-            root_name(owner),
-            facts,
-            ruling
-        );
-    }
-    if (text.is_empty() || !p_row.wrapper->note_raw_move_warning()) {
+    if (ruling.verdict != lifecycle::Verdict::STATIC) {
         return;
     }
-    NETW_WARN(
-        sys::ENTITY,
-        "%s The move stays on this peer, and the session keeps its copy "
-        "where it was.",
-        text
+    fault::raise(
+        this,
+        NETW_FAULT_ENTITY_MOVED,
+        moved_values(owner, ruling.code, facts.minting_halted),
+        subject_of(owner)
     );
 }
 
 void NetwMultiplayer::lifecycle_undo_ungranted_move(
-    const EntityDeparture &p_row,
-    lifecycle::Facts p_facts
+    const EntityDeparture &p_row
 ) {
-    p_facts.peer_is_controller = false;
-    p_facts.peer_claim = lifecycle::Claim::REQUESTABLE;
-    lifecycle::Ruling refused;
-    refused.verdict = lifecycle::Verdict::STATIC;
-    refused.code = ERR_UNAUTHORIZED;
-    const String text = lifecycle::refusal_text(
-        String("Node.reparent"),
-        root_name(p_row.wrapper->get_owner()),
-        p_facts,
-        refused
-    );
-    NETW_WARN(
-        sys::ENTITY,
-        "%s It moved before the server allowed it, so it is moved back.",
-        text
+    Node *owner = p_row.wrapper->get_owner();
+    fault::raise(
+        this,
+        NETW_FAULT_ENTITY_MOVED,
+        moved_values(owner, ERR_UNAUTHORIZED, false),
+        subject_of(owner)
     );
     lifecycle_undo(
         p_row.wrapper.ptr(),

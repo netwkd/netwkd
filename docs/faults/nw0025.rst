@@ -1,0 +1,28 @@
+:github_url: hide
+
+.. _fault_nw0025:
+
+NW0025. Two peers are set up differently
+========================================
+
+Reported as a warning when a peer and this peer disagree on a setting the
+session needs to match.
+
+The thing in question was refused. The log line names the peer, the thing
+refused, and the setting that differs. The setting can be the app tag, the
+build identity, the auth callback, the tickrate, an entity's components, its
+synchronized properties or their names, or an action the server never
+created.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).ticks_per_second(30)
+
+If one peer runs 60 here, they cannot play together. Declare the setting the
+same way on every peer, and run the same build.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).ticks_per_second(60)

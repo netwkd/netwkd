@@ -89,12 +89,7 @@ TEST_CASE(
     "parent"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] '*' was moved outside the multiplayer root, "
-        "so other peers keep its old parent. Move it under a node "
-        "inside the root.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -252,11 +247,7 @@ TEST_CASE(
     "node"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     DeferredMove world;
     const PackedByteArray frame

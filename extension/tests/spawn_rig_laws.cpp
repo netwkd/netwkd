@@ -104,9 +104,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][spawn] Spawn constructor '*' has no argument "
-        "types, so route * was not sent. Pass arg_types to "
-        "NetwMultiplayer.spawn_register_constructor.",
+        "*no argument types*[NW0039]*",
         1
     );
 

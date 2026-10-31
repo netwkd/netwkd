@@ -99,7 +99,6 @@ struct Build {
     godot::StringName method;
     int64_t serial = 0;
     int64_t started_at = 0;
-    bool warned = false;
 };
 
 struct SpawnCall {
@@ -117,7 +116,6 @@ struct SpawnRefusal {
     godot::String detail;
 
     void refuse(godot::Error p_code, const godot::String &p_detail);
-    void refused_quietly(godot::Error p_code, const godot::String &p_detail);
     godot::Ref<NetwPromise> promise() const;
     void settle(const godot::Ref<NetwPromise> &p_promise) const;
 };
@@ -126,7 +124,6 @@ struct PendingSpawn {
     SpawnCall call;
     godot::Variant waiting;
     godot::Ref<NetwPromise> promise;
-    bool warned = false;
 };
 
 class Pipeline {
@@ -333,7 +330,7 @@ private:
         const godot::StringName &p_method,
         const godot::Array &p_args
     );
-    bool frame_read(bool p_healthy, int64_t p_route);
+    bool frame_read(bool p_healthy, int64_t p_route, int64_t p_sender);
     bool admits_frame(
         int64_t p_sender,
         int64_t p_channel,
@@ -350,6 +347,7 @@ private:
     );
     SpawnBuild::Outcome build_spawn(
         const godot::PackedByteArray &p_payload,
+        int64_t p_sender,
         SpawnBuild &r_built
     );
     void park_built(
@@ -389,7 +387,7 @@ private:
     void warn_slow_build(
         const godot::StringName &p_method,
         int64_t p_started_at,
-        bool &r_warned
+        uint64_t p_host
     ) const;
     void park_spawn(
         const godot::PackedByteArray &p_payload,

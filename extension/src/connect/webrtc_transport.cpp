@@ -10,6 +10,7 @@
 #include "netw/connect/creation.hpp"
 #include "netw/connect/tracker_client.hpp"
 #include "netw/connect/transports.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -447,11 +448,17 @@ void WebRTCTransport::pump_outcomes() {
             } break;
             case SessionOutcome::FAILED: {
                 connect_started_msec = 0;
-                NETW_WARN(
-                    sys::TRANSPORT,
-                    "The WebRTC connection to peer %d failed (%s).",
-                    reported[at].peer,
-                    reported[at].reason
+                fault::raise(
+                    nullptr,
+                    NETW_FAULT_LINK_FAILED,
+                    {String("the WebRTC connection"),
+                     String(),
+                     vformat(
+                         "peer %d (%s)",
+                         int(reported[at].peer),
+                         String(reported[at].reason)
+                     ),
+                     int64_t(reported[at].peer)}
                 );
             } break;
         }
@@ -487,10 +494,12 @@ void WebRTCTransport::pump_inbound() {
                 if (!hosting && session_core != nullptr
                     && !session_core->is_connected_to(1)) {
                     connect_started_msec = 0;
-                    NETW_WARN(
-                        sys::TRANSPORT,
-                        "WebRTC signaling was lost before the host answered, "
-                        "so the connection failed. Try joining again."
+                    fault::raise(
+                        nullptr,
+                        NETW_FAULT_LINK_FAILED,
+                        {String("the WebRTC connection"),
+                         String(),
+                         String("the host, because signaling was lost")}
                     );
                 }
             } break;
@@ -508,10 +517,12 @@ void WebRTCTransport::watch_signaling(int64_t p_now_msec) {
     const double elapsed = double(p_now_msec - connect_started_msec) / 1000.0;
     if (elapsed >= timeout_hint() - 0.1 && !signaling_ready) {
         connect_started_msec = 0;
-        NETW_WARN(
-            sys::TRANSPORT,
-            "WebRTC reached no signaling server before the connection timed "
-            "out. Check the network, or pass your own NetwWebRTCSignaler."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {String("the WebRTC connection"),
+             String(),
+             String("a signaling server")}
         );
     }
 }

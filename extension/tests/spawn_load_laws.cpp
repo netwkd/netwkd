@@ -268,7 +268,7 @@ TEST_CASE(
     rig.pump(PAST_THE_DEADLINE);
 
     NETW_CHECK_EQ(
-        watch.log->warning_count_containing("never appeared on this peer"),
+        watch.log->warning_count_containing("its MultiplayerSpawner does not exist on this peer"),
         int64_t(1)
     );
     NETW_CHECK_EQ(rig.spawn_plane(0)->get_park().size(), 0);

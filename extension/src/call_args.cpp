@@ -1,9 +1,11 @@
 #include "netw/call_args.hpp"
 
 #include <cstring>
+#include <utility>
 
 #include "godot/utility.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/wire/frame.hpp"
@@ -337,19 +339,25 @@ bool values_write(
     wire::WriteStream &p_stream,
     const Array &p_values,
     const Array &p_quantizers,
-    const Array &p_types
+    const Array &p_types,
+    NetwMultiplayer *p_session
 ) {
+    static bool unsessioned_reported = false;
     LocalVector<Slot> slots;
     slots.reserve(uint32_t(p_values.size()));
     for (int at = 0; at < p_values.size(); ++at) {
         const Variant value = p_values[at];
         if (value.get_type() == Variant::OBJECT) {
-            NETW_ERROR_ONCE(
-                sys::CODEC,
-                "Value %d is an Object, which a synced value cannot carry, so "
-                "null was sent. Sync the object's data or its node path.",
-                int(at)
-            );
+            if (p_session != nullptr
+                || !std::exchange(unsessioned_reported, true)) {
+                fault::raise(
+                    p_session,
+                    NETW_FAULT_UNSENDABLE_VALUE,
+                    {vformat("Value %d", at),
+                     String("an Object"),
+                     String("the object's data or its node path")}
+                );
+            }
             slots.push_back(of_value(Variant()));
             continue;
         }

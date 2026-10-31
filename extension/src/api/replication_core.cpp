@@ -6,6 +6,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/call_args.hpp"
 #include "netw/entity/control.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/liveness_core.hpp"
 #include "netw/log.hpp"
 #include "netw/session/frames.hpp"
@@ -1060,7 +1061,7 @@ Error ReplicationCore::admit_entity_frame(
     if (gate < 0) {
         return OK;
     }
-    return plane->finish_stage_verdict(gate, verdict, p_route);
+    return plane->finish_stage_verdict(gate, verdict, p_route, p_sender);
 }
 
 void ReplicationCore::send_property(
@@ -1231,7 +1232,8 @@ void ReplicationCore::handle_table_frame(
     if (plane->finish_stage_verdict(
             EventPlane::GATE_TABLE,
             Error(int64_t(verdict)),
-            0
+            0,
+            p_sender
         )
         != OK) {
         return;
@@ -1286,15 +1288,8 @@ void ReplicationCore::on_poll() {
     if (plane->clock_engine().get_configured()) {
         return;
     }
-    if (!warned_rows_without_clock && plane->is_online()
-        && sync_pipeline.owes_rows()) {
-        warned_rows_without_clock = true;
-        NETW_WARN(
-            sys::WIRE,
-            "This session declares replicated properties but has no clock, "
-            "so none of their rows is ever sent. Call Netw.configure_clock "
-            "on every peer."
-        );
+    if (plane->is_online() && sync_pipeline.owes_rows()) {
+        fault::raise(plane, NETW_FAULT_ROWS_WITHOUT_CLOCK, {});
     }
     sync_compat.pump();
     spawn_pipeline.retry_adopt_parked();
@@ -1308,7 +1303,6 @@ void ReplicationCore::clear_session() {
         plane->carrier_clear();
     }
     sync_model.clear();
-    warned_rows_without_clock = false;
     sync_pipeline.clear_session();
     spawn_pipeline.clear_session();
     sync_compat.clear_session();

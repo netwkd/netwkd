@@ -113,13 +113,7 @@ TEST_CASE(
     CHECK(differ(sealed_hash, 0));
 
     SUBCASE("a column cannot join after the seal") {
-        expected_faults.expect_error(
-            "[error][table] Condition \"record->get_sealed()\" is "
-            "true. Returning: nullptr. The property set is sealed, "
-            "so it cannot be changed. Change it before "
-            "NetwMultiplayer.property_set_seal.",
-            1
-        );
+        expected_faults.expect_error("*Changing a property set*[NW0036]*", 1);
 
         NETW_CHECK_EQ(world.session->property_set_add_column(set, 0), -1);
         NETW_CHECK_EQ(
@@ -129,13 +123,7 @@ TEST_CASE(
     }
 
     SUBCASE("a set parameter cannot move after the seal") {
-        expected_faults.expect_error(
-            "[error][table] Condition \"record->get_sealed()\" is "
-            "true. Returning: nullptr. The property set is sealed, "
-            "so it cannot be changed. Change it before "
-            "NetwMultiplayer.property_set_seal.",
-            1
-        );
+        expected_faults.expect_error("*Changing a property set*[NW0036]*", 1);
 
         world.session->property_set_set_param(
             set,

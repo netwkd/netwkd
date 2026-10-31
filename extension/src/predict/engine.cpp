@@ -20,6 +20,7 @@
 #include "godot/spatial_node.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/object_port.hpp"
@@ -42,38 +43,32 @@ using repl::PropertySet;
 namespace {
 
 const GameCall SIMULATION_STEP
-    = {sys::PREDICTION,
-       "NetwSimulation.step",
+    = {"NetwSimulation.step",
        "func(delta: float, tick: int, is_fresh: bool) -> void",
        3};
 
 const GameCall CARRY_STEP
-    = {sys::PREDICTION,
-       "NetwPropertyConfig.carry_step",
+    = {"NetwPropertyConfig.carry_step",
        "func(value: Variant, ctx: NetwPredictCarryContext) -> Variant",
        2};
 
 const GameCall PREDICT_INPUT_CALL
-    = {sys::PREDICTION,
-       "NetwPrediction.predict_input",
+    = {"NetwPrediction.predict_input",
        "func(entity: NetwEntity, tick: int) -> Dictionary",
        2};
 
 const GameCall WITNESS_CONTACTS_CALL
-    = {sys::PREDICTION,
-       "NetwPrediction.witness_contacts",
+    = {"NetwPrediction.witness_contacts",
        "func() -> Dictionary",
        0};
 
 const GameCall CORRECTION_PATH_CALL
-    = {sys::PREDICTION,
-       "NetwPrediction.correction_path_clear",
+    = {"NetwPrediction.correction_path_clear",
        "func(current: Dictionary, proposed: Dictionary) -> bool",
        2};
 
 const GameCall SENSOR_CALL
-    = {sys::PREDICTION,
-       "A NetwPrediction.sensors entry",
+    = {"A NetwPrediction.sensors entry",
        "func() -> Variant",
        0};
 
@@ -116,39 +111,22 @@ bool recovery_request_in_range(
     int p_attribution,
     double p_tick_delta
 ) {
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_policy < int(RecoveryPolicy::REBASE_REPLAY)
             || p_policy > int(RecoveryPolicy::OBSERVE),
-        false,
-        sys::PREDICTION,
-        "A correction was skipped because recovery policy %d is not a "
-        "NetwPrediction.RecoveryPolicy value.",
-        p_policy
+        false
     );
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_domain < int(predict::Domain::IN_DOMAIN)
             || p_domain > int(predict::Domain::OUT_OF_DOMAIN),
-        false,
-        sys::PREDICTION,
-        "A correction was skipped because domain %d is not a "
-        "NetwPrediction.Domain value.",
-        p_domain
+        false
     );
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_attribution < int(predict::Attribution::UNKNOWN)
             || p_attribution > int(predict::Attribution::CLOSURE),
-        false,
-        sys::PREDICTION,
-        "A correction was skipped because attribution %d is not a "
-        "NetwPrediction.Attribution value.",
-        p_attribution
+        false
     );
-    NETW_ERR_COND_V(
-        p_tick_delta <= 0.0,
-        false,
-        sys::PREDICTION,
-        "A correction was skipped because the tick length is not positive."
-    );
+    NETW_BUG_COND_V(p_tick_delta <= 0.0, false);
     return true;
 }
 
@@ -995,12 +973,10 @@ bool NetwPredictionEngine::roster_open(const char *p_verb) {
         return true;
     }
     mutations_refused += 1;
-    NETW_WARN_ONCE(
-        sys::PREDICTION,
-        "Prediction refused to %s an entity while a simulation step was "
-        "running. Add or remove predicted entities outside the simulate "
-        "callback.",
-        p_verb
+    fault::raise(
+        core(),
+        NETW_FAULT_BUSY_APPLYING,
+        {vformat("Prediction's %s of an entity", String(p_verb))}
     );
     return false;
 }
@@ -1728,20 +1704,14 @@ void NetwPredictionEngine::set_has_previous_witness(
     }
 }
 
-bool NetwPredictionEngine::invalid_witness_reported_of(int64_t p_slot) const {
-    const predict::Slot *row = row_of(p_slot);
-    return row == nullptr ? false : row->latches.invalid_witness_reported;
+namespace {
+
+uint64_t subject_of(const Ref<NetwEntity> &p_entity) {
+    return p_entity.is_valid() ? uint64_t(gd::instance_id(p_entity->get_owner()))
+                               : 0;
 }
 
-void NetwPredictionEngine::set_invalid_witness_reported(
-    int64_t p_slot,
-    bool p_value
-) {
-    predict::Slot *row = mutable_row_of(p_slot);
-    if (row != nullptr) {
-        row->latches.invalid_witness_reported = p_value;
-    }
-}
+} // namespace
 
 Dictionary NetwPredictionEngine::witness_sample(
     int64_t p_slot,
@@ -1805,16 +1775,16 @@ Dictionary NetwPredictionEngine::normalize_witness_sample(
             }
         }
     }
-    if (!invalid_witness_reported_of(p_slot)) {
-        set_invalid_witness_reported(p_slot, true);
-        NETW_ERROR(
-            sys::PREDICTION,
-            "NetwPrediction.witness_contacts returned an unusable value, "
-            "so it was ignored. Return a Dictionary with 'colliders' as an "
-            "Array of live nodes, 'sleeping' as a bool, and 'continuous' as a "
-            "Dictionary when present."
-        );
-    }
+    fault::raise(
+        core(),
+        NETW_FAULT_BAD_RETURN,
+        {String("{NetwPrediction.witness_contacts}"),
+         String("an unusable value"),
+         String("a Dictionary with 'colliders' as an Array of live nodes, "
+                "'sleeping' as a bool, and 'continuous' as a Dictionary "
+                "when present")},
+        subject_of(owner_entity(p_slot))
+    );
     NETW_TRACE(
         sys::PREDICTION,
         "Predicted entity %d declared contact sampling that cannot be used.",
@@ -1877,14 +1847,16 @@ bool NetwPredictionEngine::predict_command(
         }
         return seal_predicted_command(p_slot);
     }
-    if (called && !invalid_command_predictor_reported_of(p_slot)) {
-        set_invalid_command_predictor_reported(p_slot, true);
-        NETW_ERROR(
-            sys::PREDICTION,
-            "NetwPrediction.predict_input for '%s' did not return a "
-            "Dictionary, so a zeroed input was used. Return a Dictionary "
-            "of input property names to values.",
-            p_entity.is_valid() ? p_entity->get_name() : StringName()
+    if (called) {
+        fault::raise(
+            core(),
+            NETW_FAULT_BAD_RETURN,
+            {String("{NetwPrediction.predict_input}"),
+             String("something other than a Dictionary"),
+             String("a Dictionary of input property names to values")},
+            p_entity.is_valid()
+                ? uint64_t(gd::instance_id(p_entity->get_owner()))
+                : 0
         );
     }
     NETW_TRACE(
@@ -1909,24 +1881,6 @@ bool NetwPredictionEngine::seal_predicted_command(int64_t p_slot) {
     return true;
 }
 
-bool NetwPredictionEngine::invalid_command_predictor_reported_of(
-    int64_t p_slot
-) const {
-    const predict::Slot *row = row_of(p_slot);
-    return row == nullptr ? false
-                          : row->latches.invalid_command_predictor_reported;
-}
-
-void NetwPredictionEngine::set_invalid_command_predictor_reported(
-    int64_t p_slot,
-    bool p_value
-) {
-    predict::Slot *row = mutable_row_of(p_slot);
-    if (row != nullptr) {
-        row->latches.invalid_command_predictor_reported = p_value;
-    }
-}
-
 bool NetwPredictionEngine::joint_refusal_reported_of(int64_t p_slot) const {
     const predict::Slot *row = row_of(p_slot);
     return row == nullptr ? false : row->latches.joint_refusal_reported;
@@ -1939,21 +1893,6 @@ void NetwPredictionEngine::set_joint_refusal_reported(
     predict::Slot *row = mutable_row_of(p_slot);
     if (row != nullptr) {
         row->latches.joint_refusal_reported = p_value;
-    }
-}
-
-bool NetwPredictionEngine::island_gap_reported_of(int64_t p_slot) const {
-    const predict::Slot *row = row_of(p_slot);
-    return row == nullptr ? false : row->latches.island_gap_reported;
-}
-
-void NetwPredictionEngine::set_island_gap_reported(
-    int64_t p_slot,
-    bool p_value
-) {
-    predict::Slot *row = mutable_row_of(p_slot);
-    if (row != nullptr) {
-        row->latches.island_gap_reported = p_value;
     }
 }
 
@@ -3037,11 +2976,7 @@ void NetwPredictionEngine::close(int64_t p_slot) {
 
 int64_t NetwPredictionEngine::slot_register(const Ref<RefCounted> &p_entity) {
     if (p_entity.is_null()) {
-        NETW_ERR_V(
-            -1,
-            sys::PREDICTION,
-            "Prediction cannot register a null entity."
-        );
+        NETW_BUG_V(-1);
     }
     const int64_t standing = slot_of(p_entity);
     if (standing >= 0) {
@@ -3798,22 +3733,14 @@ predict::ConsumeInputPlan NetwPredictionEngine::plan_consume_input(
     bool p_has_last_input,
     int p_missing_policy
 ) const {
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_schedule != int(Schedule::TICK) && p_schedule != int(Schedule::FRAME),
-        predict::ConsumeInputPlan(),
-        sys::PREDICTION,
-        "Input for schedule %d was not read, because only SCHEDULE_TICK and "
-        "SCHEDULE_FRAME read input this way.",
-        p_schedule
+        predict::ConsumeInputPlan()
     );
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_missing_policy < int(MissingInput::STALL)
             || p_missing_policy > int(MissingInput::REPEAT_LAST),
-        predict::ConsumeInputPlan(),
-        sys::PREDICTION,
-        "Input was not read, because missing input policy %d is not a "
-        "NetwPrediction.MissingInput value.",
-        p_missing_policy
+        predict::ConsumeInputPlan()
     );
     return predict::plan_consume_input(
         Schedule(p_schedule),
@@ -4052,22 +3979,12 @@ bool NetwPredictionEngine::record_evidence(
     bool p_sleeping
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        false,
-        sys::PREDICTION,
-        "Prediction got physics results for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, false);
     const int count = p_contact_ids.size();
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         p_witness_classes.size() != count || p_realizations.size() != count
             || p_outside_boundary.size() != count,
-        false,
-        sys::PREDICTION,
-        "Prediction got contact lists of different lengths for one physics "
-        "step."
+        false
     );
     LocalVector<predict::WitnessContact> contacts;
     for (int at = 0; at < count; ++at) {
@@ -4078,14 +3995,29 @@ bool NetwPredictionEngine::record_evidence(
         contact.outside_boundary = p_outside_boundary[at] != 0;
         contacts.push_back(contact);
     }
-    return row->record_evidence(
+    int rejected_contact = -1;
+    const bool recorded = row->record_evidence(
         p_transition,
         p_environment_epoch,
         p_environment,
         p_topology,
         contacts,
-        p_sleeping
+        p_sleeping,
+        &rejected_contact
     );
+    if (rejected_contact >= 0) {
+        const Ref<NetwEntity> entity = owner_entity(p_slot);
+        fault::raise(
+            core(),
+            NETW_FAULT_BAD_RETURN,
+            {String("{NetwPrediction.witness_contacts}"),
+             String("a contact with no collider or an unknown class"),
+             String("a collider and a known class for every contact")},
+            entity.is_valid() ? uint64_t(gd::instance_id(entity->get_owner()))
+                              : 0
+        );
+    }
+    return recorded;
 }
 
 sim::Facts NetwPredictionEngine::resolution_facts(
@@ -4208,12 +4140,13 @@ int NetwPredictionEngine::settle_correction(int64_t p_slot, int p_declared) {
     const Ref<NetwEntity> seated = owner_entity(p_slot);
     const String named
         = seated.is_valid() ? String(seated->get_name()) : String();
-    NETW_WARN(
-        sys::PREDICTION,
-        "'%s' is a physics body on SCHEDULE_FRAME, which cannot replay, so "
-        "it uses NetwPrediction.RECOVERY_POLICY_REBASE_RECOVER. Use "
-        "SCHEDULE_STEPPED to get RECOVERY_POLICY_REBASE_REPLAY.",
-        named.is_empty() ? "an entity" : named.utf8().get_data()
+    fault::raise(
+        core(),
+        NETW_FAULT_PREDICTION_DOWNGRADED,
+        {named.is_empty() ? String("an entity") : named,
+         "a physics body on SCHEDULE_FRAME",
+         "SCHEDULE_STEPPED to get RECOVERY_POLICY_REBASE_REPLAY"},
+        subject_of(seated)
     );
     return correction;
 }
@@ -4498,14 +4431,7 @@ bool NetwPredictionEngine::transport_admissible(
     bool p_observing
 ) const {
     const predict::Slot *row = row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        false,
-        sys::PREDICTION,
-        "Prediction judged a correction for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, false);
     predict::TransportEvidence evidence;
     evidence.candidate = p_candidate;
     evidence.basis_witness_clean = p_basis_witness_clean;
@@ -4530,14 +4456,7 @@ bool NetwPredictionEngine::dissipate_admissible(
     int p_meter
 ) const {
     const predict::Slot *row = row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        false,
-        sys::PREDICTION,
-        "Prediction judged a correction for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, false);
     predict::DissipateEvidence evidence;
     evidence.momentum_active = p_momentum_active;
     evidence.other_active = p_other_active;
@@ -5601,14 +5520,18 @@ void NetwPredictionEngine::report_joint_refusal(int64_t p_slot) {
         return;
     }
     set_joint_refusal_reported(p_slot, true);
-    NETW_ERROR(
-        sys::PREDICTION,
-        "NetwPrediction.RECONCILE_JOINT needs every entity in the group of "
-        "%s to replay a tick, and %s cannot, so the group runs "
-        "NetwPrediction.RECONCILE_INDEPENDENT. Give each one a "
-        "NetwSimulation.step on SCHEDULE_TICK, or use SCHEDULE_STEPPED.",
-        quoted_entity(owner_entity(p_slot)),
-        String(", ").join(refusals)
+    const Ref<NetwEntity> seated = owner_entity(p_slot);
+    fault::raise(
+        core(),
+        NETW_FAULT_PREDICTION_DOWNGRADED,
+        {seated.is_valid() ? String(seated->get_name()) : String("an entity"),
+         vformat(
+             "{NetwPrediction.RECONCILE_JOINT} with %s, which cannot replay "
+             "a tick",
+             String(", ").join(refusals)
+         ),
+         "a {NetwSimulation.step} on SCHEDULE_TICK, or SCHEDULE_STEPPED"},
+        subject_of(seated)
     );
 }
 
@@ -5801,24 +5724,29 @@ void NetwPredictionEngine::report_stepper_absence(int64_t p_slot) {
             )) {
             return;
         }
-        NETW_WARN(
-            sys::PREDICTION,
-            "'%s' is a %s under SCHEDULE_STEPPED, and this Godot build cannot "
-            "restore it without moving it. It runs SCHEDULE_FRAME.",
-            String(kinematic->get_name()),
-            kinematic->get_class()
+        fault::raise(
+            core(),
+            NETW_FAULT_ENGINE_LACKS,
+            {String(kinematic->get_name()),
+             String(),
+             vformat(
+                 "to restore its %s under SCHEDULE_STEPPED without moving it",
+                 kinematic->get_class()
+             )},
+            gd::instance_id(kinematic)
         );
         return;
     }
     if (!colliders::first_report(owner, colliders::Fault::STEPPED_NO_STEP)) {
         return;
     }
-    NETW_WARN(
-        sys::PREDICTION,
-        "'%s' uses SCHEDULE_STEPPED, and this Godot build cannot step physics "
-        "on demand, so it runs SCHEDULE_FRAME. Install a NetwPhysicsStepper "
-        "with NetwSession.install_physics_stepper.",
-        String(owner->get_name())
+    fault::raise(
+        core(),
+        NETW_FAULT_ENGINE_LACKS,
+        {String(owner->get_name()),
+         String(),
+         "to step physics on demand under SCHEDULE_STEPPED"},
+        gd::instance_id(owner)
     );
 }
 
@@ -7767,29 +7695,10 @@ int NetwPredictionEngine::judge_carry(
     bool p_faithful
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        CARRY_DECLINED,
-        sys::PREDICTION,
-        "Prediction carried a value for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
-    NETW_ERR_COND_V(
-        row->carry_rules.is_empty(),
-        CARRY_DECLINED,
-        sys::PREDICTION,
-        "Prediction tried to carry a value on an entity with no "
-        "NetwPropertyConfig.carry_along or carry_step property."
-    );
+    NETW_BUG_COND_V(row == nullptr, CARRY_DECLINED);
+    NETW_BUG_COND_V(row->carry_rules.is_empty(), CARRY_DECLINED);
     const int field = row->wiring.fields.index_of(p_field);
-    NETW_ERR_COND_V(
-        field < 0,
-        CARRY_DECLINED,
-        sys::PREDICTION,
-        "Prediction tried to carry '%s', which is not a carried property.",
-        String(p_field).utf8().get_data()
-    );
+    NETW_BUG_COND_V(field < 0, CARRY_DECLINED);
     predict::CarryProbe probe;
     probe.same_type = p_same_type;
     probe.finite = p_finite;
@@ -7804,23 +7713,9 @@ int NetwPredictionEngine::decline_carry(
     const StringName &p_field
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        CARRY_DECLINED,
-        sys::PREDICTION,
-        "Prediction declined a carried value for an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, CARRY_DECLINED);
     const int field = row->wiring.fields.index_of(p_field);
-    NETW_ERR_COND_V(
-        field < 0,
-        CARRY_DECLINED,
-        sys::PREDICTION,
-        "Prediction declined to carry '%s', which is not a carried "
-        "property.",
-        String(p_field).utf8().get_data()
-    );
+    NETW_BUG_COND_V(field < 0, CARRY_DECLINED);
     return int(row->carry.decline(field, row->config.schedule));
 }
 
@@ -8259,13 +8154,9 @@ void NetwPredictionEngine::mark_domain(
     int64_t p_transition,
     int p_domain
 ) {
-    NETW_ERR_COND(
+    NETW_BUG_COND(
         p_domain < int(predict::Domain::IN_DOMAIN)
-            || p_domain > int(predict::Domain::OUT_OF_DOMAIN),
-        sys::PREDICTION,
-        "Prediction recorded a tick with domain %d, which is not a "
-        "NetwPrediction.Domain value.",
-        p_domain
+            || p_domain > int(predict::Domain::OUT_OF_DOMAIN)
     );
     predict::Slot *row = mutable_row_of(p_slot);
     if (row != nullptr) {
@@ -8278,13 +8169,7 @@ void NetwPredictionEngine::mark_chain_broken(
     int64_t p_transition
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction marked a gap in the history of an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->journal.mark_chain_broken(p_transition);
 }
 
@@ -8296,22 +8181,12 @@ void NetwPredictionEngine::mark_provenance(
     int p_operator,
     int64_t p_basis
 ) {
-    NETW_ERR_COND(
+    NETW_BUG_COND(
         p_operator < int(predict::Operator::NONE)
-            || p_operator > int(predict::Operator::JOINT_REBASE),
-        sys::PREDICTION,
-        "Prediction recorded a tick with operator %d, which is not a "
-        "NetwPrediction.Operator value.",
-        p_operator
+            || p_operator > int(predict::Operator::JOINT_REBASE)
     );
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction recorded where a tick came from for an entity it no "
-        "longer predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     const int index = row->journal.index_of(p_transition);
     const bool cleared_chain_break = index >= 0
         && (row->journal.flags_at(index) & predict::ROW_CHAIN_BROKEN) != 0;
@@ -8333,13 +8208,7 @@ void NetwPredictionEngine::mark_attribution(
     int p_attribution
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction blamed a misprediction on an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->journal.mark_attribution(
         p_transition,
         predict::Attribution(p_attribution)
@@ -8351,21 +8220,12 @@ void NetwPredictionEngine::mark_differing_family(
     int64_t p_transition,
     int p_family
 ) {
-    NETW_ERR_COND(
+    NETW_BUG_COND(
         p_family < int(predict::DifferingFamily::NONE)
-            || p_family > int(predict::DifferingFamily::CONTROLLER_LATCH),
-        sys::PREDICTION,
-        "Prediction recorded an unknown kind of differing state, %d.",
-        p_family
+            || p_family > int(predict::DifferingFamily::CONTROLLER_LATCH)
     );
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction recorded which state differed for an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->journal.mark_differing_family(
         p_transition,
         predict::DifferingFamily(p_family)
@@ -8381,13 +8241,7 @@ void NetwPredictionEngine::mark_solve(
     int p_witness_class_bits
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction got physics results for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->journal.mark_solve(
         p_transition,
         int32_t(p_topo_fp),
@@ -8436,13 +8290,7 @@ void NetwPredictionEngine::mark_witness_match(
     bool p_matched
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction checked the contacts of an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->journal.mark_witness_match(p_transition, p_matched);
 }
 
@@ -9329,15 +9177,14 @@ void NetwPredictionEngine::notify_contact(
         && live_participants(p_slot).is_empty()) {
         row->latches.island_gap_reported = true;
         const Ref<NetwEntity> seated = owner_entity(p_slot);
-        NETW_WARN(
-            sys::PREDICTION,
-            "'%s' touched a body while it selects no entities, so the contact "
-            "cannot be predicted. Put what it touches in one of its "
-            "NetwInterestLayer layers, or name it with "
-            "NetwSimulation.simulate.",
-            String(seated.is_valid() ? seated->get_name() : StringName())
-                .utf8()
-                .get_data()
+        fault::raise(
+            core(),
+            NETW_FAULT_PREDICTION_DOWNGRADED,
+            {seated.is_valid() ? String(seated->get_name()) : String(),
+             "a contact with a body while it selects no entities",
+             "what it touches in one of its {NetwInterestLayer} layers, or "
+             "named with {NetwSimulation.simulate}"},
+            subject_of(seated)
         );
     }
     if (!contact_is_equivalent(p_slot, p_has_witness)) {
@@ -9427,17 +9274,8 @@ void NetwPredictionEngine::joint_record(
         profile::SUBSYSTEM_PREDICTION
     );
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction recorded a group tick for an entity it no longer "
-        "predicts."
-    );
-    NETW_ERR_COND(
-        p_transition < 0,
-        sys::PREDICTION,
-        "Prediction recorded a group tick with a negative tick number."
-    );
+    NETW_BUG_COND(row == nullptr);
+    NETW_BUG_COND(p_transition < 0);
     if (p_state.any()) {
         row->record_state_row(p_transition + 1, p_state);
     }
@@ -9454,18 +9292,10 @@ void NetwPredictionEngine::joint_note_basis(
     int p_source
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr || row->config.island == ISLAND_NONE,
-        sys::PREDICTION,
-        "Prediction moved the oldest replay tick of an entity that is not in "
-        "a group."
-    );
-    NETW_ERR_COND(
+    NETW_BUG_COND(row == nullptr || row->config.island == ISLAND_NONE);
+    NETW_BUG_COND(
         p_basis < 0 || p_source < JOINT_FLOOR_ACK
-            || p_source > JOINT_FLOOR_EPOCH,
-        sys::PREDICTION,
-        "Prediction moved the oldest replay tick of a group to a negative "
-        "tick or from an unknown source."
+        || p_source > JOINT_FLOOR_EPOCH
     );
     predict::JointTrack &track = row->joint;
     predict::JointStats &stats = row->joint_stats;
@@ -9511,20 +9341,12 @@ predict::JointPassPlan NetwPredictionEngine::joint_pass(
     NETW_ZONE_NC("Predict joint group pass", colors::PREDICTION);
     predict::JointPassPlan plan;
     predict::Slot *owner = mutable_row_of(p_slot);
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         owner == nullptr || owner->config.island != ISLAND_JOINT
             || !rerunnable(owner->config.schedule),
-        plan,
-        sys::PREDICTION,
-        "Prediction tried a group replay for an entity that does not lead a "
-        "NetwPrediction.RECONCILE_JOINT group able to replay."
+        plan
     );
-    NETW_ERR_COND_V(
-        p_present < 0,
-        plan,
-        sys::PREDICTION,
-        "Prediction tried a group replay up to a negative tick."
-    );
+    NETW_BUG_COND_V(p_present < 0, plan);
 
     struct PassMember {
         predict::Slot *row = nullptr;
@@ -9661,11 +9483,7 @@ predict::JointPassPlan NetwPredictionEngine::joint_pass(
         plan.restores.push_back(restore);
         members[at].row->set_state(*state);
     }
-    NETW_ASSERT(
-        plan.restores.size() == members.size(),
-        sys::PREDICTION,
-        "A joint pass must restore every member."
-    );
+    NETW_ASSERT(plan.restores.size() == members.size());
 
     predict::JointStats &stats = owner->joint_stats;
     if (!decision.heal) {
@@ -10796,10 +10614,7 @@ bool NetwPredictionEngine::apply_plan_rows(
             sync_episode(p_slot);
         }
     } else {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Prediction could not start a correction it had planned."
-        );
+        NETW_BUG_REPORT();
     }
     row = mutable_row_of(p_slot);
     if (row != nullptr) {
@@ -10933,10 +10748,7 @@ int NetwPredictionEngine::open_recovery_rows(
         )) {
         sync_episode(p_slot);
     } else {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Prediction could not start a correction it had planned."
-        );
+        NETW_BUG_REPORT();
     }
     row = mutable_row_of(p_slot);
     if (row != nullptr) {
@@ -10993,11 +10805,11 @@ void NetwPredictionEngine::push_carry_rules(int64_t p_slot) {
             continue;
         }
         if (projection_of(p_slot, field_slot(p_slot, key)) >= 0) {
-            NETW_ERROR(
-                sys::PREDICTION,
-                "'%s' declares both NetwPropertyConfig.carry_along and "
-                "carry_step, so carry_step is ignored. Keep only one of them.",
-                String(key).utf8().get_data()
+            fault::raise(
+                core(),
+                NETW_FAULT_CONFLICTING_SETTINGS,
+                {"carry_step", String(key), "{NetwPropertyConfig.carry_along}"},
+                gd::instance_id(node)
             );
             continue;
         }
@@ -11018,13 +10830,17 @@ void NetwPredictionEngine::report_authority_model(int64_t p_slot) {
         for (const PropertyColumn &column : broadcast->columns) {
             keys.push_back(String(column.get_key()));
         }
-        NETW_WARN(
-            sys::PREDICTION,
-            "'%s' is predicted but declares NetwPropertyConfig.broadcast "
-            "properties [%s], which cannot be corrected. Declare them with "
-            "state, or turn off prediction for this entity.",
-            String(seated->get_name()).utf8().get_data(),
-            String(", ").join(keys).utf8().get_data()
+        fault::raise(
+            core(),
+            NETW_FAULT_PREDICTION_DOWNGRADED,
+            {String(seated->get_name()),
+             vformat(
+                 "{NetwPropertyConfig.broadcast} properties [%s], which "
+                 "cannot be corrected",
+                 String(", ").join(keys)
+             ),
+             "{NetwPropertyConfig.state} on those properties"},
+            subject_of(seated)
         );
     }
     const PropertyBindingPtr input = input_binding_of(p_slot);
@@ -11039,11 +10855,13 @@ void NetwPredictionEngine::report_authority_model(int64_t p_slot) {
             seated_schema != nullptr ? *seated_schema : unplannable,
             planned
         )) {
-        NETW_WARN(
-            sys::PREDICTION,
-            "'%s' has NetwPropertyConfig.input properties without a type, so "
-            "its input is not sent. Give each one a type, or quantize it.",
-            String(seated->get_name()).utf8().get_data()
+        fault::raise(
+            core(),
+            NETW_FAULT_PREDICTION_DOWNGRADED,
+            {String(seated->get_name()),
+             "{NetwPropertyConfig.input} properties without a type",
+             "a type on each one, or {NetwMemberConfig.quantize}"},
+            subject_of(seated)
         );
     }
 }
@@ -11719,11 +11537,16 @@ void NetwPredictionEngine::validate_declaration(
         if (column.get_lane() != PropertySet::RETAINED) {
             continue;
         }
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Predicted state property '%s' uses NetwPropertyConfig.retained, "
-            "which a predicted entity cannot use. Remove retained from it.",
-            String(column.get_key()).utf8().get_data()
+        const Ref<NetwEntity> entity = owner_entity(p_slot);
+        fault::raise(
+            core(),
+            NETW_FAULT_SETTING_REFUSED,
+            {String("{NetwPropertyConfig.retained} on '")
+                 + String(column.get_key()) + String("'"),
+             String("a predicted entity"),
+             String("the property without retained")},
+            entity.is_valid() ? uint64_t(gd::instance_id(entity->get_owner()))
+                              : 0
         );
     }
 
@@ -12287,25 +12110,13 @@ int64_t NetwPredictionEngine::journal_first_chain_break(int64_t p_slot) const {
 
 void NetwPredictionEngine::journal_clear(int64_t p_slot, int64_t p_epoch) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction reset the tick history of an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->journal.clear(p_epoch);
 }
 
 void NetwPredictionEngine::tape_reset(int64_t p_slot, int64_t p_epoch) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction reset the input history of an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->reset_tape(p_epoch);
 }
 
@@ -12316,14 +12127,7 @@ PackedByteArray NetwPredictionEngine::build_ack_frame(
     int64_t p_owner_ack_floor
 ) const {
     const predict::Slot *row = row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        PackedByteArray(),
-        sys::PREDICTION,
-        "Prediction acknowledged input for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, PackedByteArray());
     if (p_ack < 0) {
         return PackedByteArray();
     }
@@ -12416,13 +12220,7 @@ bool NetwPredictionEngine::tape_is_fresh(
 
 void NetwPredictionEngine::tape_prepare_tick(int64_t p_slot, int64_t p_tick) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction renumbered the input history of an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->prepare_tick_tape(p_tick);
 }
 
@@ -12432,25 +12230,13 @@ void NetwPredictionEngine::tape_author(
     bool p_fresh
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction recorded an input tick for an entity it no longer "
-        "predicts (slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->author_tape_entry(p_label, p_fresh);
 }
 
 void NetwPredictionEngine::open_lane(int64_t p_slot) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction read input for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->open_lane();
 }
 
@@ -12467,14 +12253,7 @@ bool NetwPredictionEngine::wire_role_timeline(
     bool p_fallback_latched
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        false,
-        sys::PREDICTION,
-        "Prediction set up the roles of an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, false);
     const Ref<NetwEntity> entity = owner_entity(p_slot);
     const bool speculates = p_role == NetwPrediction::ROLE_PREDICT
         || p_role == NetwPrediction::ROLE_SIMULATE
@@ -13171,24 +12950,24 @@ String carry_residual_text(const predict::CarryAttempt &p_attempt) {
 String carry_infidelity_reason(int p_count, const String &p_residual) {
     String measured;
     if (!p_residual.is_empty()) {
-        measured
-            = String(" The last replay was off by ") + p_residual + String(".");
+        measured = String(", and its last replay was off by ") + p_residual;
     }
-    return String("It did not reproduce ") + String::num_int64(p_count)
-        + String(" ticks already recorded.") + measured
-        + String(
-               " Use carry_step only on a value the physics engine does not "
-               "move, and read only the NetwPredictCarryContext in it."
-        );
+    return String("a rule that did not reproduce ") + String::num_int64(p_count)
+        + String(" ticks already recorded") + measured;
 }
 
-void warn_carry_retired(const StringName &p_field, const String &p_reason) {
-    NETW_WARN(
-        sys::PREDICTION,
-        "The NetwPropertyConfig.carry_step rule for '%s' was turned off, so "
-        "a correction restores the value as the server had it. %s",
-        String(p_field).utf8().get_data(),
-        p_reason.utf8().get_data()
+void warn_carry_retired(
+    NetwMultiplayer *p_session,
+    const StringName &p_field,
+    const String &p_reason,
+    const String &p_fix,
+    uint64_t p_subject
+) {
+    fault::raise(
+        p_session,
+        NETW_FAULT_PREDICTION_DOWNGRADED,
+        {String(p_field), p_reason, p_fix},
+        p_subject
     );
 }
 
@@ -13199,34 +12978,39 @@ void NetwPredictionEngine::report_carry_retirements(int64_t p_slot) {
     if (row == nullptr) {
         return;
     }
+    const uint64_t subject = subject_of(owner_entity(p_slot));
     for (uint32_t at = 0; at < row->carry_attempts.size(); ++at) {
         const predict::CarryAttempt &charged = row->carry_attempts[at];
         switch (charged.verdict) {
             case CARRY_RETIRED_INFIDELITY:
                 warn_carry_retired(
+                    core(),
                     charged.field,
                     carry_infidelity_reason(
                         int(carry_stats(p_slot, charged.field)[2]),
                         carry_residual_text(charged)
-                    )
+                    ),
+                    "carry_step only on a value the physics engine does not "
+                    "move, reading only the {NetwPredictCarryContext}",
+                    subject
                 );
                 break;
             case CARRY_RETIRED_SCHEDULE:
                 warn_carry_retired(
+                    core(),
                     charged.field,
-                    String(
-                        "It needs NetwSimulation.schedule set to "
-                        "SCHEDULE_FRAME."
-                    )
+                    "a carry_step rule on a schedule other than SCHEDULE_FRAME",
+                    "{NetwSimulation.schedule} set to SCHEDULE_FRAME",
+                    subject
                 );
                 break;
             case CARRY_RETIRED_IMPURE:
                 warn_carry_retired(
+                    core(),
                     charged.field,
-                    String(
-                        "It wrote to the body. A carry_step rule may read only "
-                        "its NetwPredictCarryContext and must write nothing."
-                    )
+                    "a carry_step rule that wrote to the body",
+                    "a rule that only reads the {NetwPredictCarryContext}",
+                    subject
                 );
                 break;
             default:
@@ -13264,8 +13048,6 @@ void NetwPredictionEngine::reset_for_rewire(
     set_open_topology(p_slot, Dictionary());
     set_previous_witness_sleeping(p_slot, false);
     set_has_previous_witness(p_slot, false);
-    set_invalid_witness_reported(p_slot, false);
-    set_invalid_command_predictor_reported(p_slot, false);
     set_joint_refusal_reported(p_slot, false);
     clear_authority_witness_classes(p_slot);
     drop_deferred_operator(p_slot);
@@ -13495,13 +13277,7 @@ bool NetwPredictionEngine::command_codes_agree(int64_t p_slot) const {
 
 void NetwPredictionEngine::trim_history(int64_t p_slot, int64_t p_ack) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND(
-        row == nullptr,
-        sys::PREDICTION,
-        "Prediction trimmed the history of an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND(row == nullptr);
     row->trim_history(p_ack);
 }
 
@@ -13513,14 +13289,7 @@ bool NetwPredictionEngine::command_admit(
     const predict::StateRow &p_command
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
-    NETW_ERR_COND_V(
-        row == nullptr,
-        false,
-        sys::PREDICTION,
-        "Prediction wrote input for an entity it no longer predicts "
-        "(slot %d).",
-        p_slot
-    );
+    NETW_BUG_COND_V(row == nullptr, false);
     return row->admit_command(p_transition, p_label, p_fresh, p_command);
 }
 

@@ -1,0 +1,29 @@
+:github_url: hide
+
+.. _fault_nw1016:
+
+NW1016. A property is not interpolated as declared
+==================================================
+
+Reported as a warning when an interpolation cannot run as declared, such as a
+second interpolation of the same property, or a node that simulates on this
+peer.
+
+The property is not interpolated the way it was declared. The log line names
+the node and property as a path, such as ``Car:position``, and the reason.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").interpolate(
+                NetwInterpolate.new().lerp().to(&"position"))
+        Netw.configure_property(self, &"position").interpolate(
+                NetwInterpolate.new().lerp().to(&"position"))
+
+Use one interpolation for each property.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").interpolate(
+                NetwInterpolate.new().lerp().to(&"position"))

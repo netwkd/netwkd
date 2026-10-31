@@ -51,7 +51,6 @@ private:
     sim::Declaration declared;
     sim::Choice choice;
     bool declared_here = false;
-    bool bodies_warned = false;
     Mode announced = MODE_NONE;
 
     NetwMultiplayer *core() const;

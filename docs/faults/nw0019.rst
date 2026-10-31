@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0019:
+
+NW0019. A declaration came after the session started
+====================================================
+
+Reported as an error when a ``configure_*`` call changes a setting that the
+running session has already fixed.
+
+The running value stays as it was. The log line names the call and the
+setting.
+
+.. code-block:: gdscript
+
+    func _on_start_pressed() -> void:
+        multiplayer.multiplayer_peer = peer
+        Netw.configure_clock(self).ticks_per_second(30)
+
+Make the call before the session starts, and finish the chain without
+``await``.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).ticks_per_second(30)

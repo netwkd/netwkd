@@ -39,11 +39,7 @@ TEST_CASE(
     "database's"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] Database '*' failed. Record '*' was not "
-        "saved (the memory store was told to fail).",
-        1
-    );
+    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
 
     schema_model::clear();
     netw::persist::forget_stores();
@@ -212,12 +208,7 @@ TEST_CASE(
     "reads saved properties by their saved names and survives its root"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] Condition \"read_only\" is true. Returning: "
-        "false. NetwPersistence.schema cannot be changed. Configure"
-        " saved properties with Netw.configure_property.",
-        2
-    );
+    expected_faults.expect_error("*NetwPersistence.schema*[NW1020]*", 2);
 
     schema_model::clear();
     netw::persist::forget_stores();

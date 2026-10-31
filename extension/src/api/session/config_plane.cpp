@@ -45,17 +45,7 @@ Error typed_draft(
     Ref<T> &r_draft
 ) {
     r_draft = p_offered.payload;
-    NETW_ERR_COND_V(
-        r_draft.is_null(),
-        ERR_INVALID_DATA,
-        sys::SESSION,
-        "The Netw.%s settings on '%s' cannot be read, so %s was refused. "
-        "Declare them only through Netw.%s.",
-        session_decl::verb_of(p_kind),
-        p_offered.scope,
-        p_by,
-        session_decl::verb_of(p_kind)
-    );
+    NETW_BUG_COND_V(r_draft.is_null(), ERR_INVALID_DATA);
     return OK;
 }
 
@@ -101,7 +91,7 @@ Error NetwMultiplayer::apply_pending_config(
         const session_decl::Availability state = selected.offered[slot].state;
         if (state == session_decl::UNAVAILABLE
             || state == session_decl::AMBIGUOUS) {
-            declaration_book().report_unresolved(this, kind, state, p_by);
+            declaration_book().report_unresolved(this, kind, state);
             return failure_of(state);
         }
     }
@@ -241,20 +231,26 @@ Error NetwMultiplayer::lagcomp_initialize(
     int64_t p_max_future_action_ticks,
     int64_t p_input_gate_deadline_ticks
 ) {
-    NETW_ERR_COND_V(
-        p_max_future_action_ticks < 0 || p_input_gate_deadline_ticks < 0,
-        ERR_INVALID_PARAMETER,
-        sys::PREDICTION,
-        "Lag compensation tick counts cannot be negative, so the settings did "
-        "not change."
-    );
+    if (p_max_future_action_ticks < 0 || p_input_gate_deadline_ticks < 0) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{Netw.configure_lagcomp}",
+             vformat(
+                 "%d and %d ticks",
+                 p_max_future_action_ticks,
+                 p_input_gate_deadline_ticks
+             ),
+             "tick counts of zero or more"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     const int slot = slot_of(session_decl::KIND_LAGCOMP_CONFIG);
     if (config_consumption[slot].consumed) {
-        NETW_WARN(
-            sys::PREDICTION,
-            "Netw.configure_lagcomp came after the session started, so lag "
-            "compensation did not change. Configure it before the session "
-            "starts, and finish the chain without await."
+        fault::raise(
+            this,
+            NETW_FAULT_DECLARED_ONLINE,
+            {"{Netw.configure_lagcomp}", String(), "lag compensation"}
         );
         return ERR_ALREADY_IN_USE;
     }

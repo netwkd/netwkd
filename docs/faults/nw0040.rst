@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0040:
+
+NW0040. A spawn function or constructor gave no usable node
+===========================================================
+
+Reported as an error when the function, constructor or ``MultiplayerSpawner``
+that builds a spawned node awaits, returns no node, returns a freed node, or
+fails with an error.
+
+The spawn was dropped. The log line names what built it and why it failed.
+
+.. code-block:: gdscript
+
+    func make_car() -> Node:
+        await get_tree().process_frame
+        return CarScene.instantiate()
+
+Use :ref:`Netw.spawn_async <class_Netw_method_spawn_async>` for a spawn
+function that awaits, and return the new node from a constructor.
+
+.. code-block:: gdscript
+
+    func make_car() -> Node:
+        return CarScene.instantiate()

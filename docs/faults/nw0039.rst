@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0039:
+
+NW0039. A node was not spawned
+==============================
+
+Reported as an error when a spawn is refused on the peer that makes it, for a
+reason such as a parent outside the multiplayer root or an unregistered spawn
+constructor.
+
+The node was not spawned. The log line names the node, or the route when
+there is no node, and the reason.
+
+.. code-block:: gdscript
+
+    var car := CarScene.instantiate()
+    outside_root.add_child(car)
+
+Use what the log line asks for. For a parent outside the multiplayer root,
+spawn under a parent inside it.
+
+.. code-block:: gdscript
+
+    var car := CarScene.instantiate()
+    cars_root.add_child(car)

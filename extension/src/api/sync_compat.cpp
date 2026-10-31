@@ -10,6 +10,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/liveness_core.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
@@ -423,10 +424,10 @@ void SyncCompat::refresh_row(Consumed *p_row) {
                 p_row,
                 0,
                 vformat(
-                    "it watches %d properties and the limit is 64. Split "
-                    "them across more synchronizers",
+                    "%d watched properties, over the limit of 64",
                     int(watch.size())
-                )
+                ),
+                "more synchronizers, each with fewer properties"
             );
         }
         watch.resize(WATCH_LIMIT);
@@ -462,17 +463,20 @@ int64_t SyncCompat::schema_fingerprint(const Consumed *p_row) {
 void SyncCompat::poison(
     Consumed *p_row,
     int64_t p_route,
-    const String &p_reason
+    const String &p_reason,
+    const String &p_fix
 ) {
     p_row->poisoned = true;
     MultiplayerSynchronizer *sync = p_row->sync_node();
-    NETW_ERROR(
-        sys::WIRE,
-        "MultiplayerSynchronizer '%s' on route %d stopped replicating, "
-        "because %s.",
-        sync != nullptr ? String(sync->get_name()) : String("<freed>"),
-        p_route,
-        p_reason
+    fault::raise(
+        core(),
+        NETW_FAULT_UNSUPPORTED,
+        {String("MultiplayerSynchronizer '")
+             + (sync != nullptr ? String(sync->get_name()) : String("<freed>"))
+             + String("' on route ") + String::num_int64(p_route),
+         p_reason,
+         p_fix},
+        uint64_t(gd::instance_id(sync))
     );
 }
 
@@ -496,11 +500,12 @@ void SyncCompat::validate_schema(Consumed *p_row, int64_t p_route) {
             p_row,
             p_route,
             vformat(
-                "its replication config (%08x) differs from the server's "
-                "(%08x). Give it the same config on every peer",
+                "a replication config (%08x) that differs from the server's "
+                "(%08x)",
                 p_row->schema_hash,
                 declared
-            )
+            ),
+            "the same replication config on every peer"
         );
     }
 }
@@ -1266,13 +1271,11 @@ void SyncCompat::handle_sync(
     const int64_t flags = int64_t(head.flags);
     if (flags != sync_kernel::RESERVED) {
         drops_sync_unknown_flag += 1;
-        NETW_WARN_ONCE(
-            sys::WIRE,
-            "MultiplayerSynchronizer '%s' got an update with unknown flags "
-            "%d, so it was dropped. Run the same Networked version on every "
-            "peer.",
-            sync->get_name(),
-            flags
+        fault::raise(
+            plane,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender},
+            gd::instance_id(sync)
         );
         return;
     }
@@ -1297,8 +1300,8 @@ void SyncCompat::handle_sync(
         poison(
             row,
             route,
-            "an update carried the wrong number of values. Give it the same "
-            "replication config on every peer"
+            "an update with the wrong number of values",
+            "the same replication config on every peer"
         );
         return;
     }
@@ -1373,8 +1376,8 @@ void SyncCompat::handle_sync_delta(
         poison(
             row,
             route,
-            "a delta update carried the wrong number of values. Give it the "
-            "same replication config on every peer"
+            "a delta update with the wrong number of values",
+            "the same replication config on every peer"
         );
         return;
     }

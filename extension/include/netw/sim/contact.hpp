@@ -26,7 +26,6 @@ struct Contact {
     bool eligible = false;
     bool monitored = false;
     bool reports = false;
-    bool warned = false;
 };
 
 void monitor_contacts(const Bodies &p_bodies);

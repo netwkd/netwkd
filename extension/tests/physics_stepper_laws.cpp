@@ -637,17 +637,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][prediction] Condition \"p_world.is_null()\" is true."
-        " Returning: ERR_INVALID_PARAMETER. "
-        "NetwSession.install_physics_stepper needs a World3D. Pass "
-        "get_world_3d() of a node in the scene.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][prediction] Condition \"!p_space.is_valid()\" is "
-        "true. Returning: ERR_INVALID_PARAMETER. A physics stepper "
-        "needs a physics space. Pass the space of a World2D or "
-        "World3D.",
+        "*install_physics_stepper*[NW0031]*",
         1
     );
 

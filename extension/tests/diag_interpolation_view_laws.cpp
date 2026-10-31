@@ -512,7 +512,7 @@ struct Chased {
         NETW_REQUIRE_EQ(runtime->get_pump_mode(), netw::display::PUMP_CHASE);
         client->diag_gather(view.sources);
         NETW_CHECK_EQ(
-            faults.warnings_containing("declares state and input properties"),
+            faults.warnings_containing("[NW1014]"),
             int64_t(1)
         );
     }

@@ -157,11 +157,7 @@ TEST_CASE(
     "server is refused and counted, whatever it names"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();

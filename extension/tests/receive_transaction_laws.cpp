@@ -192,12 +192,7 @@ TEST_CASE(
     "node does not carry lands nothing and notifies nobody"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] An update for route * names property '*', "
-        "which the node on this peer does not have, so it was "
-        "dropped. Give the node the same script on every peer.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0025]*", 1);
 
     netw_test::Books books;
     const uint64_t pose = pose_set(books.sets);

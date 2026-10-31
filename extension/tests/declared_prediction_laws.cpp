@@ -948,12 +948,7 @@ TEST_CASE(
     "horizon"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] Packet 130 is not tracked for delivery, "
-        "because packet 2 still waits for its ack. Too many packets"
-        " to one peer are in flight.",
-        1
-    );
+    expected_faults.expect_warning("*packet 130*[NW1018]*", 1);
 
     const Scenario scenario = deaf_frame_lane();
     LoopbackRig rig(scenario.clients);

@@ -1,0 +1,18 @@
+:github_url: hide
+
+.. _fault_nw1020:
+
+NW1020. A call is not supported for this case
+=============================================
+
+Reported as an error when a call is made for a case Networked does not
+support. The cases are a synchronizer that stopped, a node outside the
+spawnable scenes, an entity moved to another viewport, a scene change that
+freed the session, a read only schema, a scene's own interest layer, a config
+passed to ``object_configuration_add``, a directory with no friends list, and
+a transport that moves the server under link conditions.
+
+The call was ignored. The log line names the call and the case.
+
+Use what the log line asks for. To move an entity between scenes, use
+:ref:`Netw.scene <class_Netw_method_scene>` to change it.

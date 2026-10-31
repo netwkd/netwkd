@@ -34,6 +34,7 @@ struct WitnessSummary {
     uint8_t class_bits = 0;
     uint8_t realization_bits = 0;
     int contact_count = 0;
+    int rejected_contact = -1;
     bool breach = false;
     bool sleeping = false;
     bool valid = false;

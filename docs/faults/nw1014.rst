@@ -1,0 +1,25 @@
+:github_url: hide
+
+.. _fault_nw1014:
+
+NW1014. Prediction runs in a weaker mode than declared
+======================================================
+
+Reported as a warning when an entity declares a prediction mode that its
+setup cannot run, such as a physics body on ``SCHEDULE_FRAME``.
+
+The entity runs in a weaker mode. The log line gives the reason and the
+setting that fixes it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self).simulation = NetwSimulation.SCHEDULE_FRAME
+
+Use what the log line asks for. A physics body needs ``SCHEDULE_STEPPED`` to
+get ``RECOVERY_POLICY_REBASE_REPLAY``.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self).simulation = NetwSimulation.SCHEDULE_STEPPED

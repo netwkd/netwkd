@@ -163,9 +163,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "[warn][session] NetwMemberConfig.interpolate changed the "
-        "interpolators of '*', and the last call wins. Declare them"
-        " once.",
+        "*NetwMemberConfig.interpolate*[NW0035]*",
         1
     );
 
@@ -185,11 +183,7 @@ TEST_CASE(
     "silently unpack a member that was already declared"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] NetwMemberConfig.quantize got a int for "
-        "value 0 of '*'. Pass a NetwQuantize or null there.",
-        1
-    );
+    expected_faults.expect_error("*NetwMemberConfig.quantize*[NW0032]*", 1);
 
     const Ref<NetwMemberConfig> config = make_config();
     const Ref<NetwQuantize> packer = make_quantizer();
@@ -298,11 +292,7 @@ TEST_CASE(
     "or an unknown type, which is the one rule NetwJoinConfig also enforces"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] NetwQuantizeScalar cannot pack the String "
-        "value of '*' in '*'. Use a quantizer that supports String.",
-        1
-    );
+    expected_faults.expect_error("*NetwQuantizeScalar*[NW1019]*", 1);
 
     const Ref<NetwQuantize> packer = make_quantizer();
 
@@ -354,12 +344,7 @@ TEST_CASE(
     "list the quantizer rule reads"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] The interpolator for '*' in '*' cannot "
-        "blend its String value. Use an interpolator that supports "
-        "String.",
-        1
-    );
+    expected_faults.expect_warning("*cannot blend a String*[NW1016]*", 1);
 
     const Ref<NetwInterpolate> smoother = make_interpolator(0.1);
 
@@ -388,9 +373,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][session] NetwMemberConfig.quantize got 1 entries "
-        "for '*' in '*', which has 2 values. Pass one entry per "
-        "value, and null for a value to leave as it is.",
+        "*NetwMemberConfig.quantize*1 entries*[NW0032]*",
         1
     );
 
@@ -437,17 +420,8 @@ TEST_CASE(
     "refused whether the arity is readable or not"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] NetwMemberConfig.quantize got no "
-        "quantizer for '*'. Pass one quantizer for each value.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] NetwMemberConfig.interpolate got no "
-        "interpolator for '*'. Pass one interpolator for each "
-        "value.",
-        1
-    );
+    expected_faults.expect_error("*NetwMemberConfig.quantize*[NW0032]*", 1);
+    expected_faults.expect_error("*NetwMemberConfig.interpolate*[NW0032]*", 1);
 
     const Ref<NetwMemberConfig> config = make_config();
 

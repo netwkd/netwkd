@@ -542,8 +542,6 @@ public:
     void set_previous_witness_sleeping(int64_t p_slot, bool p_value);
     bool has_previous_witness_of(int64_t p_slot) const;
     void set_has_previous_witness(int64_t p_slot, bool p_value);
-    bool invalid_witness_reported_of(int64_t p_slot) const;
-    void set_invalid_witness_reported(int64_t p_slot, bool p_value);
     godot::Dictionary witness_sample(
         int64_t p_slot,
         const godot::Ref<NetwPrediction> &p_handle
@@ -558,15 +556,11 @@ public:
         int64_t p_tick
     );
     bool seal_predicted_command(int64_t p_slot);
-    bool invalid_command_predictor_reported_of(int64_t p_slot) const;
-    void set_invalid_command_predictor_reported(int64_t p_slot, bool p_value);
     bool joint_refusal_reported_of(int64_t p_slot) const;
     void set_joint_refusal_reported(int64_t p_slot, bool p_value);
     void report_joint_refusal(int64_t p_slot);
     int resolved_schedule(int64_t p_slot, int p_declared);
     void report_stepper_absence(int64_t p_slot);
-    bool island_gap_reported_of(int64_t p_slot) const;
-    void set_island_gap_reported(int64_t p_slot, bool p_value);
     bool island_roster_seeded_of(int64_t p_slot) const;
     void set_island_roster_seeded(int64_t p_slot, bool p_value);
     int64_t joint_basis_of(int64_t p_slot) const;

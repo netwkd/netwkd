@@ -1,0 +1,21 @@
+:github_url: hide
+
+.. _fault_nw1001:
+
+NW1001. Saving failed
+=====================
+
+Reported as a warning when a write to a database or to the packet capture
+file fails.
+
+What the save was part of did not happen. The log line names what was written
+to, what did not happen, and what to check.
+
+For a database, check its file or service and call the operation again. For
+the capture file, check the path that the ``NETW_CAPTURE`` environment
+variable names.
+
+.. code-block:: gdscript
+
+    func _on_leave_pressed() -> void:
+        session.leave()

@@ -295,11 +295,7 @@ TEST_CASE(
     "ready fired once, and never touches an observer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     DespawnStage stage;
     stage.spawn_crate();
@@ -442,11 +438,7 @@ TEST_CASE(
     "session holds it, keeping its world pose"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     DespawnStage stage;
     LoopbackRig &rig = stage.rig;
@@ -503,11 +495,7 @@ TEST_CASE(
     "and author"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     DespawnStage stage;
     LoopbackRig &rig = stage.rig;

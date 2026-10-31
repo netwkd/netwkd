@@ -403,20 +403,15 @@ PackedByteArray encode_command(
     const wire::WirePlan &p_input_plan
 ) {
     NETW_ZONE_NC("Predict wire command encode", colors::PREDICTION);
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         !valid_command_shape(p_frame, p_input_plan),
-        PackedByteArray(),
-        sys::PREDICTION,
-        "An input command does not match the input properties it was built "
-        "from, so it was not sent."
+        PackedByteArray()
     );
     CommandFrame staged = p_frame;
     WriteStream writer;
-    NETW_ERR_COND_V(
+    NETW_BUG_COND_V(
         !serialize_command(writer, staged, p_input_plan),
-        PackedByteArray(),
-        sys::PREDICTION,
-        "An input command did not fit its packet layout, so it was not sent."
+        PackedByteArray()
     );
     NETW_TRACE(
         sys::PREDICTION,
@@ -451,18 +446,8 @@ PackedByteArray encode_ack(const AckFrame &p_frame) {
     NETW_ZONE_NC("Predict wire ack encode", colors::PREDICTION);
     AckFrame staged = p_frame;
     WriteStream writer;
-    NETW_ERR_COND_V(
-        !serialize_ack(writer, staged),
-        PackedByteArray(),
-        sys::PREDICTION,
-        "An input acknowledgement did not fit its packet layout, so it was "
-        "not sent."
-    );
-    NETW_ASSERT(
-        writer.to_bytes().size() <= ACK_FRAME_BYTES_MAX,
-        sys::PREDICTION,
-        "Acknowledgement prefix exceeded its MTU budget."
-    );
+    NETW_BUG_COND_V(!serialize_ack(writer, staged), PackedByteArray());
+    NETW_ASSERT(writer.to_bytes().size() <= ACK_FRAME_BYTES_MAX);
     NETW_TRACE(
         sys::PREDICTION,
         "Built an input acknowledgement with %d records in %d bytes.",

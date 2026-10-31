@@ -9,6 +9,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/persistence_config.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/persist/binding.hpp"
 #include "netw/persist/database.hpp"
@@ -246,7 +247,7 @@ Ref<NetwPromise> NetwMultiplayer::database_open(
 Error NetwMultiplayer::database_backend_of(
     const RID &p_database,
     Ref<NetwDatabaseBackend> &r_backend
-) const {
+) {
     r_backend = Ref<NetwDatabaseBackend>();
     const StringName name = databases.name_of(p_database);
     const DatabaseDeclaration *latest = nullptr;
@@ -269,19 +270,13 @@ Error NetwMultiplayer::database_backend_of(
             const String first_scope = first != nullptr
                 ? String(first->get_path())
                 : String("the session");
-            const String second_scope = second != nullptr
-                ? String(second->get_path())
-                : String("the session");
-            NETW_ERR_V(
-                ERR_ALREADY_EXISTS,
-                sys::TABLE,
-                "Database '%s' is declared with two different backends on "
-                "'%s' and '%s', so it did not open. Declare it on one node, "
-                "or give both the same backend.",
-                String(name).utf8().get_data(),
-                first_scope.utf8().get_data(),
-                second_scope.utf8().get_data()
+            fault::raise(
+                this,
+                NETW_FAULT_DECLARED_TWICE,
+                {vformat("Database '%s'", String(name)), first_scope},
+                gd::instance_id(second)
             );
+            return ERR_ALREADY_EXISTS;
         }
     }
     const DatabaseDeclaration *used = chosen != nullptr ? chosen : latest;
@@ -469,7 +464,15 @@ Error NetwMultiplayer::database_batch_write(
     String detail;
     const Error checked = persist::validate_row(*schema, p_values, detail);
     if (checked != OK) {
-        NETW_ERR_V(checked, sys::TABLE, "%s", detail.utf8().get_data());
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {String("NetwMultiplayer.database_batch_write"),
+             String("a row where ") + detail,
+             String("a row with one value of the declared type for each "
+                    "column of its schema")}
+        );
+        return checked;
     }
     Dictionary operation;
     operation["kind"] = "replace";
@@ -632,11 +635,12 @@ void NetwMultiplayer::persist_notify_failed(
     Error p_error,
     const String &p_detail
 ) {
-    NETW_ERROR(
-        sys::TABLE,
-        "Database '%s' failed. %s",
-        String(databases.name_of(p_database)).utf8().get_data(),
-        p_detail.utf8().get_data()
+    fault::raise(
+        this,
+        NETW_FAULT_STORAGE_FAILED,
+        {vformat("database '%s'", String(databases.name_of(p_database))),
+         "the save",
+         p_detail}
     );
     const HashMap<RID, Ref<RefCounted>>::Iterator held
         = database_handles.find(p_database);

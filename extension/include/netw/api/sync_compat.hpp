@@ -162,7 +162,8 @@ private:
     void poison(
         Consumed *p_row,
         int64_t p_route,
-        const godot::String &p_reason
+        const godot::String &p_reason,
+        const godot::String &p_fix
     );
     void validate_schema(Consumed *p_row, int64_t p_route);
 

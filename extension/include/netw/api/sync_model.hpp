@@ -17,7 +17,6 @@ class NetwSyncModel {
     int64_t skips_no_recipients = 0;
     int64_t drops_bad_sender = 0;
     int64_t drops_schema = 0;
-    bool schema_drop_warned = false;
     int64_t rows_in = 0;
 
     repl::PropertyBinding *live(uint64_t p_binding) const;
@@ -115,7 +114,8 @@ public:
         int64_t p_route,
         int64_t p_ordinal,
         int64_t p_sender,
-        int64_t p_controller
+        int64_t p_controller,
+        bool *r_schema_dropped = nullptr
     );
 
     void note_row_applied();

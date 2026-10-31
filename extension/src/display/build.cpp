@@ -11,6 +11,7 @@
 #include "netw/display/roles.hpp"
 #include "netw/display/spec_row.hpp"
 #include "netw/display/tracks.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/subsystems.hpp"
@@ -55,14 +56,16 @@ StringName state_key_for(Node *p_node, const StringName &p_prop) {
 }
 
 static void warn_double_write(Channel *p_standing, Channel *p_fresh) {
-    NETW_WARN_COND(
-        p_standing->get_target_obj() == p_fresh->get_target_obj()
-            && p_standing->get_target_prop() == p_fresh->get_target_prop(),
-        sys::INTERPOLATION,
-        "Two interpolations write '%s' on the same node, so only the later "
-        "one shows. Interpolate each property once.",
-        String(p_fresh->get_target_prop())
-    );
+    if (p_standing->get_target_obj() == p_fresh->get_target_obj()
+        && p_standing->get_target_prop() == p_fresh->get_target_prop()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {String(p_fresh->get_target_prop()),
+             String("a second interpolation of it"),
+             String("one interpolation for each property")}
+        );
+    }
 }
 
 Channel *ensure_state(
@@ -97,34 +100,47 @@ Channel *ensure_state(
     Node *visual = nullptr;
     if (owner != nullptr && !config.visual_root.is_empty()) {
         visual = owner->get_node_or_null(config.visual_root);
-        NETW_ERR_COND_V(
-            has_source && visual == nullptr,
-            nullptr,
-            sys::INTERPOLATION,
-            "NetwDisplay.visual_root '%s' is not a node under '%s', so "
-            "'%s' is not interpolated, to keep it off the simulated node "
-            "'%s'. Point visual_root at a child node.",
-            String(config.visual_root),
-            String(owner->get_name()),
-            String(p_target_prop),
-            String(p_node->get_name())
-        );
+        if (has_source && visual == nullptr) {
+            fault::raise(
+                NetwEntity::session_core_for(owner),
+                NETW_FAULT_INTERPOLATION_IGNORED,
+                {vformat(
+                     "%s:%s",
+                     String(p_node->get_name()),
+                     String(p_target_prop)
+                 ),
+                 vformat(
+                     "a visual root '%s' that is not a node under '%s'",
+                     String(config.visual_root),
+                     String(owner->get_name())
+                 ),
+                 String("a child node as {NetwDisplay.visual_root}")},
+                gd::instance_id(p_node)
+            );
+            return nullptr;
+        }
         colliders::exclude_visual_root(owner, visual);
     }
     const bool split = has_source && visual != nullptr;
-    NETW_ERR_COND_V(
-        has_source && !split && p_target_prop != p_source_prop
-            && p_runtime->holds_body(p_node),
-        nullptr,
-        sys::INTERPOLATION,
-        "'%s' on '%s' is not interpolated, because it follows '%s' but "
-        "writes '%s' on the simulated body itself. Set "
-        "NetwDisplay.visual_root to draw it on a child node.",
-        String(p_target_prop),
-        String(p_node->get_name()),
-        String(p_source_prop),
-        String(p_target_prop)
-    );
+    if (has_source && !split && p_target_prop != p_source_prop
+        && p_runtime->holds_body(p_node)) {
+        fault::raise(
+            owner != nullptr ? NetwEntity::session_core_for(owner) : nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {vformat(
+                 "%s:%s",
+                 String(p_node->get_name()),
+                 String(p_target_prop)
+             ),
+             vformat(
+                 "a write to '%s' on the simulated body itself",
+                 String(p_target_prop)
+             ),
+             String("{NetwDisplay.visual_root} to draw it on a child node")},
+            gd::instance_id(p_node)
+        );
+        return nullptr;
+    }
     Node *target = split ? visual : p_node;
     state->set_target_obj(target);
 
@@ -143,15 +159,18 @@ Channel *ensure_state(
     port.declare(p_target_prop, p_source_prop, global_space);
     port.seat_authored(p_runtime->get_visual_offset());
 
-    NETW_WARN_COND(
-        visual != nullptr && target == visual && !port.get_global_space()
-            && !bool(visual->get("top_level")) && is_spatial(p_target_prop),
-        sys::INTERPOLATION,
-        "'%s' on the visual node is written in local space, so the body "
-        "drags it. Set top_level on the visual node, or interpolate position "
-        "and rotation.",
-        String(p_target_prop)
-    );
+    if (visual != nullptr && target == visual && !port.get_global_space()
+        && !bool(visual->get("top_level")) && is_spatial(p_target_prop)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {String(p_target_prop),
+             String("a write in local space, which the body drags"),
+             String("top_level on the visual node, or position and rotation "
+                    "interpolated")},
+            gd::instance_id(visual)
+        );
+    }
 
     state->set_self_feedback(
         has_source && target == p_node && p_target_prop == p_source_prop

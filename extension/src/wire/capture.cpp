@@ -4,6 +4,7 @@
 #include "godot/os.hpp"
 #include "godot/time.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 
@@ -71,11 +72,12 @@ bool CaptureWriter::open(const String &p_path, Dictionary p_header) {
     }
     file = FileAccess::open(p_path, FileAccess::WRITE);
     if (file.is_null()) {
-        NETW_WARN_ONCE(
-            sys::WIRE,
-            "The packet capture file %s could not be opened, so nothing is "
-            "captured. Point NETW_CAPTURE at a writable path.",
-            String(p_path).utf8().get_data()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_STORAGE_FAILED,
+            {vformat("the packet capture file '%s'", p_path),
+             "the capture",
+             "the path NETW_CAPTURE names"}
         );
         return false;
     }

@@ -1,0 +1,10 @@
+--- a/extension/src/fault_book.cpp
++++ b/extension/src/fault_book.cpp
+@@ -20,7 +20,6 @@
+ uint64_t key_of(const FaultKey &p_key) {
+     uint64_t hash = mixed(0, uint64_t(p_key.code));
+     hash = mixed(hash, p_key.subject);
+-    hash = mixed(hash, uint64_t(p_key.peer));
+     return mixed(hash, p_key.arg);
+ }
+

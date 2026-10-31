@@ -248,8 +248,6 @@ struct EngineLatches {
     bool fallback_latched = false;
     bool previous_witness_sleeping = false;
     bool has_previous_witness = false;
-    bool invalid_witness_reported = false;
-    bool invalid_command_predictor_reported = false;
     bool joint_refusal_reported = false;
     bool integration_refusal_reported = false;
     bool island_gap_reported = false;
@@ -432,7 +430,6 @@ struct Slot {
     bool witnessed_sleeping = false;
     bool witnessed_before = false;
     bool open = false;
-    bool quantum_declaration_warned = false;
     bool relay_subscribed = false;
     RelayWindow relay_window;
 
@@ -511,7 +508,8 @@ struct Slot {
         const godot::Dictionary &p_environment,
         const godot::Dictionary &p_topology,
         const godot::LocalVector<WitnessContact> &p_contacts,
-        bool p_sleeping
+        bool p_sleeping,
+        int *r_rejected_contact = nullptr
     );
     void close_drive(int64_t p_transition, const StateStamp &p_post);
 

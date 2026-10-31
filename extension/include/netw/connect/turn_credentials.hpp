@@ -4,7 +4,6 @@
 
 #include "godot/ref_counted.hpp"
 #include "godot/variant.hpp"
-#include "netw/log.hpp"
 
 namespace netw::connect {
 
@@ -21,7 +20,6 @@ public:
 
     struct Answer {
         godot::Array servers;
-        log::Level level = log::Level::ERROR;
         godot::String message;
     };
 
@@ -61,7 +59,7 @@ private:
     int64_t started_msec = 0;
 
     void settle(const godot::Array &p_servers);
-    void refuse(log::Level p_level, const godot::String &p_reason);
+    void refuse(const godot::String &p_reason);
     void unreachable();
     void read_body();
 };

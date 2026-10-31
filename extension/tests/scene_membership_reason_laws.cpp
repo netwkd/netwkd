@@ -258,12 +258,7 @@ TEST_CASE(
     "refusal to the id the root now spells"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] This layer belongs to a multiplayer "
-        "scene, so it cannot be changed directly. Change it through"
-        " Netw.scene.",
-        4
-    );
+    expected_faults.expect_error("*Changing an interest layer*[NW1020]*", 1);
 
     const Ref<NetwMultiplayer> core = peered_core();
     Node *root = memnew(Node);

@@ -1136,12 +1136,7 @@ TEST_CASE(
     "one forward model and the channel is the one in use"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] '*' declares both "
-        "NetwPropertyConfig.carry_along and carry_step, so "
-        "carry_step is ignored. Keep only one of them.",
-        1
-    );
+    expected_faults.expect_warning("*carry_step*[NW0038]*", 1);
 
     Node2D *owner = memnew(Node2D);
     owner->set_name("Carried");
@@ -1339,13 +1334,7 @@ TEST_CASE(
     "one"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] NetwPrediction.witness_contacts "
-        "returned an unusable value, so it was ignored. Return a "
-        "Dictionary with '*' as an Array of live nodes, '*' as a "
-        "bool, and '*' as a Dictionary when present.",
-        1
-    );
+    expected_faults.expect_error("*witness_contacts*[NW1007]*", 1);
 
     NetwPredictionEngine held_pool;
     NetwPredictionEngine *const pool = &held_pool;
@@ -1361,11 +1350,9 @@ TEST_CASE(
     const Dictionary accepted = pool->witness_sample(slot, handle);
     NETW_CHECK_EQ(accepted.size(), 3);
     NETW_CHECK_EQ(int(accepted[StringName("depth")]), 3);
-    NETW_CHECK_EQ(pool->invalid_witness_reported_of(slot), false);
 
     handle->set_witness_contacts(callable_mp_static(&witness_misshapen));
     NETW_CHECK_EQ(pool->witness_sample(slot, handle).size(), 0);
-    NETW_CHECK_EQ(pool->invalid_witness_reported_of(slot), true);
 }
 
 TEST_CASE(
@@ -1374,13 +1361,7 @@ TEST_CASE(
     "cannot tell which contact it stood for"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] NetwPrediction.witness_contacts "
-        "returned an unusable value, so it was ignored. Return a "
-        "Dictionary with '*' as an Array of live nodes, '*' as a "
-        "bool, and '*' as a Dictionary when present.",
-        1
-    );
+    expected_faults.expect_error("*witness_contacts*[NW1007]*", 1);
 
     NetwPredictionEngine held_pool;
     NetwPredictionEngine *const pool = &held_pool;
@@ -1392,7 +1373,6 @@ TEST_CASE(
     handle->set_witness_contacts(callable_mp_static(&witness_freed_collider));
 
     NETW_CHECK_EQ(pool->witness_sample(slot, handle).size(), 0);
-    NETW_CHECK_EQ(pool->invalid_witness_reported_of(slot), true);
 }
 
 Dictionary predictor_overlay(const Ref<NetwEntity> &, int64_t p_tick) {
@@ -1412,9 +1392,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][prediction] NetwPrediction.predict_input for '*' "
-        "did not return a Dictionary, so a zeroed input was used. "
-        "Return a Dictionary of input property names to values.",
+        "*predict_input*[NW1007]*",
         1
     );
 
@@ -1439,19 +1417,16 @@ TEST_CASE(
     const netw::predict::StateRow &command = *pool->command_of(slot);
     REQUIRE(command.has(0));
     NETW_CHECK_EQ(int(command.values[0]), 0);
-    NETW_CHECK_EQ(pool->invalid_command_predictor_reported_of(slot), false);
 
     const Ref<netw::NetwPrediction> member = seated->get_prediction();
     REQUIRE(member.is_valid());
     member->set_predict_input(callable_mp_static(&predictor_overlay));
     REQUIRE(pool->predict_command(slot, seated, 4));
     NETW_CHECK_EQ(int(pool->command_of(slot)->values[0]), 4);
-    NETW_CHECK_EQ(pool->invalid_command_predictor_reported_of(slot), false);
 
     member->set_predict_input(callable_mp_static(&predictor_broken));
     REQUIRE(pool->predict_command(slot, seated, 4));
     NETW_CHECK_EQ(int(pool->command_of(slot)->values[0]), 0);
-    NETW_CHECK_EQ(pool->invalid_command_predictor_reported_of(slot), true);
 }
 
 namespace {
@@ -1545,9 +1520,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][event] The override of _predict_evaluate returned "
-        "null, so the default ran instead. Return what its "
-        "documentation asks for.",
+        "*the override of _predict_evaluate*[NW1007]*",
         1
     );
 

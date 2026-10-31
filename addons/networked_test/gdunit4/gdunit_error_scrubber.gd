@@ -26,7 +26,7 @@ static func get_eraser() -> Callable:
 ## writing a pattern. A case that provokes a fault on purpose asserts the count,
 ## so the fault is checked rather than hidden.
 ## [codeblock]
-## assert_int(await erase_matching(["joined with no arguments"])).is_equal(1)
+## assert_int(await erase_matching(["[NW0027]"])).is_equal(1)
 ## [/codeblock]
 static func erase_matching(markers: Array) -> int:
 	var monitor := (

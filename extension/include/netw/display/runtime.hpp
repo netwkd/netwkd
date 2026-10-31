@@ -38,7 +38,6 @@ private:
     godot::Array chase_hooks;
     bool disabled = false;
     int64_t disable_until_tick = -1;
-    bool warned_self_feedback = false;
     double display_offset_limit = 0.0;
     godot::LocalVector<godot::ObjectID> bodies;
     godot::Variant visual_offset;
@@ -187,13 +186,6 @@ public:
     }
     int64_t get_disable_until_tick() const {
         return disable_until_tick;
-    }
-
-    void set_warned_self_feedback(bool p_warned) {
-        warned_self_feedback = p_warned;
-    }
-    bool get_warned_self_feedback() const {
-        return warned_self_feedback;
     }
 
     void set_display_offset_limit(double p_limit) {

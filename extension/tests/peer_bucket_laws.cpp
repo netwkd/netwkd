@@ -100,12 +100,7 @@ TEST_CASE(
     "creates one and no read may invent a peer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"!session_has_accepted(p_peer)\""
-        " is true. Returning: Variant(). NetwSession.bucket_of got "
-        "peer *, which has not joined this session.",
-        1
-    );
+    expected_faults.expect_error("*bucket_of*[NW0018]*", 1);
 
     Ref<NetwMultiplayer> session = make_session();
     const Ref<Script> kind = a_bucket_type("value");
@@ -162,13 +157,7 @@ TEST_CASE(
     "a null it stored"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"type == nullptr\" is true. "
-        "Returning: Variant(). NetwSession.bucket_of needs a script"
-        " to build the bucket from. Pass a script class that "
-        "extends RefCounted.",
-        1
-    );
+    expected_faults.expect_error("*bucket_of*[NW1006]*", 1);
 
     Ref<NetwMultiplayer> session = make_session();
     admit(session, 7);

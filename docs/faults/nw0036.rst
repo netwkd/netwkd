@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0036:
+
+NW0036. A declaration came too late
+===================================
+
+Reported as an error when a ``configure_*`` call runs after the moment it
+must come before, such as the node entering the tree or a batch being
+submitted.
+
+The call was ignored. The log line names the call, what it came too late for
+and the moment it had to precede.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        await get_tree().process_frame
+        Netw.configure_property(self, &"position").state()
+
+Call it before the node enters the tree.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state()

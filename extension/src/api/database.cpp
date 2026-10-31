@@ -4,6 +4,7 @@
 #include "godot/class_db.hpp"
 #include "netw/api/database_result.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/persist/envelope.hpp"
 
@@ -63,10 +64,12 @@ Ref<NetwDatabase> NetwDatabase::over(
 Ref<NetwDatabase> NetwDatabase::of(Node *p_node, const StringName &p_name) {
     NetwMultiplayer *api = NetwMultiplayer::of(p_node);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::TABLE,
-            "A database was requested from a node outside a session. Request "
-            "it from a node in the scene tree under a MultiplayerViewport."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{NetwDatabase.of}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return Ref<NetwDatabase>();
     }
@@ -79,11 +82,10 @@ Ref<NetwDatabase> NetwDatabase::named(
 ) {
     const RID found = p_session->database_lookup(p_name);
     if (!found.is_valid()) {
-        NETW_ERROR(
-            sys::TABLE,
-            "There is no database named '%s' in this session. Declare it with "
-            "Netw.configure_database first.",
-            String(p_name).utf8().get_data()
+        fault::raise(
+            p_session,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{NetwDatabase.of}"), String("this session"), p_name}
         );
         return Ref<NetwDatabase>();
     }
@@ -317,10 +319,12 @@ Error NetwWriteBatch::write(
         return ERR_UNAVAILABLE;
     }
     if (sealed) {
-        NETW_ERROR(
-            sys::TABLE,
-            "NetwWriteBatch.write ran after the batch was submitted. Start "
-            "a new batch for more writes."
+        fault::raise(
+            api,
+            NETW_FAULT_TOO_LATE,
+            {String("{NetwWriteBatch.write}"),
+             String("the submitted batch"),
+             String("the batch is submitted")}
         );
         first_fault = first_fault == OK ? ERR_LOCKED : first_fault;
         return ERR_LOCKED;
@@ -347,10 +351,12 @@ Error NetwWriteBatch::erase(
         return ERR_UNAVAILABLE;
     }
     if (sealed) {
-        NETW_ERROR(
-            sys::TABLE,
-            "NetwWriteBatch.erase ran after the batch was submitted. Start "
-            "a new batch for more changes."
+        fault::raise(
+            api,
+            NETW_FAULT_TOO_LATE,
+            {String("{NetwWriteBatch.erase}"),
+             String("the submitted batch"),
+             String("the batch is submitted")}
         );
         first_fault = first_fault == OK ? ERR_LOCKED : first_fault;
         return ERR_LOCKED;

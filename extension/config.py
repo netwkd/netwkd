@@ -16,7 +16,7 @@ def can_build(env, platform):
 
 def configure(env):
     """Put this module's headers and NETW_MODULE on the engine's environment."""
-    env.Append(CPPPATH=[str(ROOT), str(ROOT / "include")])
+    env.Append(CPPPATH=[str(ROOT), str(ROOT / "include"), str(ROOT.parent / "core")])
     env.Append(CPPDEFINES=[sources.MODULE])
     sources.write_hosted_manifest()
 

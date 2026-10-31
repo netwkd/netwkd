@@ -243,15 +243,7 @@ TEST_CASE(
     "so once, and keeps the declaration the game made"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] NetwPrediction.RECONCILE_JOINT needs "
-        "every entity in the group of '*' to replay a tick, and '*'"
-        " on SCHEDULE_STEPPED cannot, so the group runs "
-        "NetwPrediction.RECONCILE_INDEPENDENT. Give each one a "
-        "NetwSimulation.step on SCHEDULE_TICK, or use "
-        "SCHEDULE_STEPPED.",
-        1
-    );
+    expected_faults.expect_warning("*RECONCILE_JOINT*[NW1014]*", 1);
 
     const Scenario scenario = rerunnable_island_lane();
     LoopbackRig rig(scenario.clients);
@@ -293,7 +285,7 @@ TEST_CASE(
         3
     );
     NETW_CHECK_EQ(
-        watch.warnings_containing("cannot step physics on demand"),
+        watch.warnings_containing("[NW1017]"),
         int64_t(1)
     );
 }
@@ -344,7 +336,7 @@ TEST_CASE(
         int(netw::NetwSimulation::SCHEDULE_STEPPED)
     );
     NETW_CHECK_EQ(
-        watch.warnings_containing("cannot step physics on demand"),
+        watch.warnings_containing("[NW1017]"),
         int64_t(0)
     );
     unstep(owner);
@@ -367,7 +359,7 @@ TEST_CASE(
     const JointOwner owner = joint_owner(predictor);
     REQUIRE_MESSAGE(owner.slot >= 0, "the predictor seated no JOINT owner");
 
-    const char *refused = "RECONCILE_JOINT needs every entity";
+    const char *refused = "RECONCILE_JOINT";
     const FaultWatch watch;
     netw::gd::scene_root()->add_child(owner.entity->get_owner());
     owner.entity->get_simulation()->set_schedule(
@@ -380,7 +372,7 @@ TEST_CASE(
     for (int frame = 0; frame < 4; ++frame) {
         rig.step_frame(1);
     }
-    NETW_CHECK_EQ(watch.errors_containing(refused), int64_t(0));
+    NETW_CHECK_EQ(watch.warnings_containing(refused), int64_t(0));
 
     owner.entity->get_simulation()->set_schedule(
         netw::NetwSimulation::SCHEDULE_FRAME
@@ -388,7 +380,7 @@ TEST_CASE(
     for (int frame = 0; frame < 4; ++frame) {
         rig.step_frame(1);
     }
-    NETW_CHECK_EQ(watch.errors_containing(refused), int64_t(1));
+    NETW_CHECK_EQ(watch.warnings_containing(refused), int64_t(1));
     unstep(owner);
 }
 

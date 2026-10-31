@@ -27,16 +27,7 @@ int64_t validation_interval() {
 }
 
 void report_miss(const Miss &p_miss) {
-    NETW_WARN(
-        sys::WIRE,
-        "Store validation found a change the store did not record, route %d "
-        "slot %d column '%s' at tick %d through the %s path.",
-        int64_t(p_miss.route),
-        int64_t(p_miss.slot),
-        String(p_miss.column),
-        p_miss.tick,
-        String(p_miss.gate)
-    );
+    NETW_BUG_REPORT();
 #if defined(NETW_TESTS)
     validation_audit::Ledger &book = validation_audit::ledger();
     if (book.faults == 0) {

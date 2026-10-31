@@ -14,6 +14,7 @@
 #include "netw/api/server_info.hpp"
 #include "netw/api/session_config.hpp"
 #include "netw/api/table.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -260,13 +261,16 @@ Error NetwSession::install_physics_stepper(
     if (api == nullptr) {
         return ERR_UNCONFIGURED;
     }
-    NETW_ERR_COND_V(
-        p_world.is_null(),
-        ERR_INVALID_PARAMETER,
-        sys::PREDICTION,
-        "NetwSession.install_physics_stepper needs a World3D. Pass "
-        "get_world_3d() of a node in the scene."
-    );
+    if (p_world.is_null()) {
+        fault::raise(
+            api,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwSession.install_physics_stepper}",
+             String(),
+             "World3D from get_world_3d() of a node in the scene"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     return api->predict_stepper_install(p_world->get_space(), p_stepper);
 }
 
@@ -278,13 +282,16 @@ Error NetwSession::install_physics_stepper_2d(
     if (api == nullptr) {
         return ERR_UNCONFIGURED;
     }
-    NETW_ERR_COND_V(
-        p_world.is_null(),
-        ERR_INVALID_PARAMETER,
-        sys::PREDICTION,
-        "NetwSession.install_physics_stepper_2d needs a World2D. Pass "
-        "get_world_2d() of a node in the scene."
-    );
+    if (p_world.is_null()) {
+        fault::raise(
+            api,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwSession.install_physics_stepper_2d}",
+             String(),
+             "World2D from get_world_2d() of a node in the scene"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     return api->predict_stepper_install(p_world->get_space(), p_stepper);
 }
 

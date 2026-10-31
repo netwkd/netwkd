@@ -88,9 +88,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][spawn] '*' was added under a MultiplayerSpawner on"
-        " a client, and only the server spawns. Add it on the "
-        "server, or use Netw.spawn.",
+        "*under a MultiplayerSpawner*[NW0012]*",
         1
     );
 

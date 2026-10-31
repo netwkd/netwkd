@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <cmath>
 
+#include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "godot/math.hpp"
 #include "godot/physics_body.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_slot_engine.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
@@ -22,26 +24,22 @@ namespace netw {
 namespace {
 
 const GameCall PREDICT_INPUT_CALL
-    = {sys::PREDICTION,
-       "NetwPrediction.predict_input",
+    = {"NetwPrediction.predict_input",
        "func(entity: NetwEntity, tick: int) -> Dictionary",
        2};
 
 const GameCall WITNESS_CONTACTS_CALL
-    = {sys::PREDICTION,
-       "NetwPrediction.witness_contacts",
+    = {"NetwPrediction.witness_contacts",
        "func() -> Dictionary",
        0};
 
 const GameCall CORRECTION_PATH_CALL
-    = {sys::PREDICTION,
-       "NetwPrediction.correction_path_clear",
+    = {"NetwPrediction.correction_path_clear",
        "func(current: Dictionary, proposed: Dictionary) -> bool",
        2};
 
 const GameCall SENSOR_CALL
-    = {sys::PREDICTION,
-       "A NetwPrediction.sensors entry",
+    = {"A NetwPrediction.sensors entry",
        "func() -> Variant",
        0};
 
@@ -331,24 +329,36 @@ void NetwPrediction::set_epoch(int64_t p_value) {
 }
 
 void NetwPrediction::set_witness_contacts(const Callable &p_value) {
-    NETW_ERR_COND(
-        !p_value.is_null() && !p_value.is_valid(),
-        sys::PREDICTION,
-        "NetwPrediction.witness_contacts needs a valid Callable, so "
-        "the value was ignored. Pass a method of a live object."
-    );
+    if (!p_value.is_null() && !p_value.is_valid()) {
+        const Ref<NetwEntity> bound = get_entity();
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwPrediction.witness_contacts}"),
+             String(),
+             String("a method of a live object")},
+            bound.is_valid() ? uint64_t(gd::instance_id(bound->get_owner())) : 0
+        );
+        return;
+    }
     game_call_declared(p_value, WITNESS_CONTACTS_CALL);
     witness_sampler = p_value;
     rewire();
 }
 
 void NetwPrediction::set_correction_path_clear(const Callable &p_value) {
-    NETW_ERR_COND(
-        !p_value.is_null() && !p_value.is_valid(),
-        sys::PREDICTION,
-        "NetwPrediction.correction_path_clear needs a valid Callable, "
-        "so the value was ignored. Pass a method of a live object."
-    );
+    if (!p_value.is_null() && !p_value.is_valid()) {
+        const Ref<NetwEntity> bound = get_entity();
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwPrediction.correction_path_clear}"),
+             String(),
+             String("a method of a live object")},
+            bound.is_valid() ? uint64_t(gd::instance_id(bound->get_owner())) : 0
+        );
+        return;
+    }
     game_call_declared(p_value, CORRECTION_PATH_CALL);
     corridor_sweep = p_value;
 }

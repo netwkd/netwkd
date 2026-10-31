@@ -372,10 +372,12 @@ RID TransportRegistry::register_script(
     }
     const StringName named = peer_class_of_script(p_script);
     if (named == StringName()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "The transport could not be registered, because it names no "
-            "peer class. Override NetwTransport._peer_class."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_SCRIPT,
+            {"{NetwMultiplayer.transport_register}",
+             "a script that names no peer class",
+             "a script that overrides {NetwTransport._peer_class}"}
         );
         return RID();
     }
@@ -384,12 +386,11 @@ RID TransportRegistry::register_script(
         if (rows[at].script == p_script) {
             return rows[at].slot;
         }
-        NETW_ERROR(
-            sys::SESSION,
-            "A transport for peer class '%s' is already registered, so this "
-            "one was refused. Call NetwMultiplayer.transport_unregister "
-            "first.",
-            String(named)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_TWICE,
+            {vformat("A transport for peer class '%s'", String(named)),
+             "this session"}
         );
         return RID();
     }

@@ -216,19 +216,12 @@ TEST_CASE(
     const Placed pawn = place(core, root, false);
 
     const RID bodiless = core->get_liveness_core()->entity_create();
-    const String refused_move
-        = "[warn][scene] Entity %d could not move to scene %d, "
-          "because one of them is not in the tree.";
-    expected_faults.expect_warning(
-        vformat(
-            refused_move,
-            int(bodiless.get_id()),
-            int(arena.handle.get_id())
-        ),
+    expected_faults.expect_error(
+        vformat("*Entity %d'*[NW0041]*", int(bodiless.get_id())),
         1
     );
-    expected_faults.expect_warning(
-        vformat(refused_move, int(pawn.handle.get_id()), 0),
+    expected_faults.expect_error(
+        vformat("*Entity %d'*[NW0041]*", int(pawn.handle.get_id())),
         1
     );
     const Ref<NetwPromise> unheld
@@ -267,11 +260,7 @@ TEST_CASE(
     "session authority moves an entity"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][scene] scene_move: only the session authority "
-        "moves an entity between scenes",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();

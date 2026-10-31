@@ -1,0 +1,23 @@
+:github_url: hide
+
+.. _fault_nw0018:
+
+NW0018. A call named a peer that is not in the session
+======================================================
+
+Reported as an error when a call is given a peer id that is not connected to
+this session.
+
+The call did nothing. The log line names the call and the peer id.
+
+.. code-block:: gdscript
+
+    Netw.session(self).bucket_of(9999)
+
+Pass the id of a connected peer, such as one from
+:ref:`NetwSession.players <class_NetwSession_property_players>`.
+
+.. code-block:: gdscript
+
+    for player in session.players:
+        session.bucket_of(player.peer_id)

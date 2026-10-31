@@ -80,13 +80,8 @@ TEST_CASE(
 
 #if defined(NETW_TIER_HOSTED)
 
-const char *SERVERLESS_MESH_WARNING
-    = "This peer is linked to other peers but not to peer 1, so it is not "
-      "online. Link it to the endpoint created with id 1, which is the "
-      "server.";
-
 int serverless_mesh_warnings(const netw_test::FaultWatch &p_faults) {
-    return int(p_faults.warnings_containing(SERVERLESS_MESH_WARNING));
+    return int(p_faults.errors_containing("no link to peer 1"));
 }
 
 TEST_CASE(

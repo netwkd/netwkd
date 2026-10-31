@@ -138,11 +138,7 @@ TEST_CASE(
     "refuse open with one fault and retain both declarations"
 ) {
     netw_test::FaultWatch faults;
-    faults.expect_error(
-        "[error][table] Database '*' is declared with two different "
-        "backends*",
-        1
-    );
+    faults.expect_error("*Database 'saves'*[NW0034]*", 1);
     World world("DC3");
     Node *one = world.author(backend("dc3-one"));
     Node *two = world.author(backend("dc3-two"));

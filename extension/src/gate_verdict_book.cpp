@@ -57,20 +57,10 @@ int64_t GateVerdictBook::total(int64_t verdict) const {
     return row < 0 ? 0 : totals[row];
 }
 
-bool GateVerdictBook::claim_warning(int64_t verdict, int64_t route) {
-    const int64_t pair = (verdict << 32) | (route & 0xFFFFFFFF);
-    if (warned_routes.has(pair)) {
-        return false;
-    }
-    warned_routes.insert(pair);
-    return true;
-}
-
 void GateVerdictBook::clear() {
     for (int row = 0; row < ROWS; row++) {
         totals[row] = 0;
     }
-    warned_routes.clear();
 }
 
 } // namespace netw

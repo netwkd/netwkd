@@ -37,7 +37,8 @@ public:
     godot::Dictionary resolve(
         const godot::Array &p_layers,
         const Decl *p_decl,
-        const Engine &p_engine
+        const Engine &p_engine,
+        godot::StringName *r_freed_layer = nullptr
     ) const;
 };
 

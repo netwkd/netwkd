@@ -100,22 +100,10 @@ TEST_CASE(
     netw_test::flow_clocks(rig, TICKRATE);
     Node *crate = spawn_crate(rig, "authority_join_crate");
     SUBCASE("the server controls it") {
-        expected_faults.expect_warning(
-            "[warn][entity] /root/RigServer/Crate/Child had its "
-            "multiplayer authority set to 5 outside its entity, and"
-            " the entity sets it back to 1. Choose who holds it "
-            "with NetwEntity.authority.",
-            1
-        );
+        expected_faults.expect_error("*[NW1012]*", 4);
     }
     SUBCASE("a player controls it") {
-        expected_faults.expect_warning(
-            "[warn][entity] /root/RigServer/Crate/Child had its "
-            "multiplayer authority set to 5 outside its entity, and"
-            " the entity sets it back to 1. Choose who holds it "
-            "with NetwEntity.authority.",
-            1
-        );
+        expected_faults.expect_error("*[NW1012]*", 4);
 
         NetwEntity::of(crate)->set_controller(rig.peer_id(0));
         NETW_REQUIRE_EQ(
@@ -173,13 +161,7 @@ TEST_CASE(
     "authority with the server"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] /root/RigServer/Crate/Child/Late had its "
-        "multiplayer authority set to 5 outside its entity, and the"
-        " entity sets it back to 1. Choose who holds it with "
-        "NetwEntity.authority.",
-        1
-    );
+    expected_faults.expect_error("*'Late'*[NW1012]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();

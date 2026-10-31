@@ -65,7 +65,7 @@ jobs:
 
       - name: Build HTML with Sphinx
         working-directory: docs
-        run: python -m sphinx -T --keep-going -b html -d _build/doctrees . _build/html
+        run: python -m sphinx -T -W --keep-going -b html -d _build/doctrees . _build/html
 
       - name: Upload built docs
         if: always()

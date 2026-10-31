@@ -273,11 +273,7 @@ TEST_CASE(
     "a tick later is reported once, and one added in time is not"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] 'Late' was spawned but never entered the tree. Add "
-        "it before the next tick.",
-        1
-    );
+    expected_faults.expect_warning("*'Late'*[NW0022]*", 1);
     netw_test::LoopbackRig rig(0);
     rig.mount();
     NetwMultiplayer *server = rig.server();
@@ -320,10 +316,7 @@ TEST_CASE(
     "through"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with error *.",
-        1
-    );
+    expected_faults.expect_warning("*refused*[NW1000]*", 1);
     netw_test::LoopbackRig rig(0);
     rig.mount();
     NetwMultiplayer *server = rig.server();

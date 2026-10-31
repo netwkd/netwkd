@@ -1,6 +1,7 @@
 #include "netw/wire/stream_book.hpp"
 
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 
@@ -34,24 +35,28 @@ StreamTenure anchor_bar(uint64_t p_anchor, uint64_t p_author) {
 
 uint64_t next_stream_token() {
     if (token_counter == UINT64_MAX) {
-        NETW_ERR_V(
-            0,
-            sys::WIRE,
-            "This process has used every stream id and cannot open another "
-            "stream. Restart the process."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {godot::String("opening another stream"),
+             godot::String(),
+             godot::String("a process that has used every stream id")}
         );
+        return 0;
     }
     return ++token_counter;
 }
 
 uint64_t next_open_request() {
     if (request_counter == UINT64_MAX) {
-        NETW_ERR_V(
-            0,
-            sys::WIRE,
-            "This process has used every stream request id and cannot open "
-            "another stream. Restart the process."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {godot::String("opening another stream"),
+             godot::String(),
+             godot::String("a process that has used every stream request id")}
         );
+        return 0;
     }
     return ++request_counter;
 }

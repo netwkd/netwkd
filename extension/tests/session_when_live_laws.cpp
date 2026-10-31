@@ -67,7 +67,7 @@ TEST_CASE(
             named->liveness_poll(0);
         }
         NETW_CHECK_EQ(named->liveness_pending_live_count(), 0);
-        NETW_CHECK_EQ(faults.warnings_containing("never became live"), 1);
+        NETW_CHECK_EQ(faults.warnings_containing("[NW1021]"), 1);
     }
 }
 
@@ -91,7 +91,7 @@ TEST_CASE(
     session->clock_engine().force_step(tickrate);
     session->liveness_poll_now();
     NETW_CHECK_EQ(session->liveness_pending_live_count(), 0);
-    NETW_CHECK_EQ(faults.warnings_containing("never became live"), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW1021]"), 1);
 }
 
 TEST_CASE(
@@ -110,13 +110,7 @@ TEST_CASE(
     "authority's, and a client is answered a rejected promise"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "only the session authority moves it. Set "
-        "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its "
-        "root enters the tree to let its controller move it.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     Ref<NetwMultiplayer> client;
     client.instantiate();

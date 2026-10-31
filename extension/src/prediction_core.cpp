@@ -7,6 +7,7 @@
 #include "godot/class_db.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/predict_fold.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
 #include "netw/predict/compare.hpp"
@@ -327,14 +328,16 @@ Ref<NetwPredictFold> NetwPredictFold::of(
     NetwPrediction::DriveKind p_kind
 ) {
     const int kind = int(p_kind);
-    NETW_ERR_COND_V(
-        kind < int(DriveKind::NONE) || kind > int(DriveKind::SUBSTITUTED),
-        Ref<NetwPredictFold>(),
-        sys::PREDICTION,
-        "NetwPredictFold.of got kind %d, which is not a "
-        "NetwPrediction.DriveKind value. Pass one of its constants.",
-        kind
-    );
+    if (kind < int(DriveKind::NONE) || kind > int(DriveKind::SUBSTITUTED)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwPredictFold.of}"),
+             String::num_int64(kind),
+             String("a {NetwPrediction.DriveKind} value")}
+        );
+        return Ref<NetwPredictFold>();
+    }
     NETW_NOTE_RECORD_MINT();
     Ref<NetwPredictFold> out;
     out.instantiate();

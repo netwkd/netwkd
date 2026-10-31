@@ -73,13 +73,7 @@ void SessionCore::transition(State next) {
     if (state == next) {
         return;
     }
-    NETW_ERR_COND(
-        !edge_is_legal(state, next),
-        sys::SESSION,
-        "The session cannot move from state %d to state %d.",
-        int(state),
-        int(next)
-    );
+    NETW_BUG_COND(!edge_is_legal(state, next));
     const State previous = state;
     NETW_DEBUG(
         sys::SESSION,

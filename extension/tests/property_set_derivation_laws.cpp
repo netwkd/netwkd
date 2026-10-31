@@ -678,30 +678,17 @@ const DerivationLaw LAWS[] = {
 TEST_CASE("[Networked][Sync][Hosted] the property set derivation laws hold") {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "[warn][wire] '*' is a broadcast property, which ignores "
-        "NetwPropertyConfig.windowed. Remove that call.",
+        "*sets NetwPropertyConfig.windowed*[NW0038]*",
         1
     );
     expected_faults.expect_warning(
-        "[warn][wire] '*' is a broadcast property, which ignores "
-        "NetwPropertyConfig.audience. Remove that call.",
+        "*sets NetwPropertyConfig.audience*[NW0038]*",
         1
     );
+    expected_faults.expect_warning("*sets broadcast*[NW0038]*", 1);
+    expected_faults.expect_warning("*The window of*[NW0035]*", 1);
     expected_faults.expect_warning(
-        "[warn][wire] '*' is declared broadcast and also state or "
-        "input, so broadcast was ignored. Keep only one of them.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][wire] '*' and '*' declare different window values "
-        "for the same input properties, and the last one wins. "
-        "Declare it on one of them.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][wire] The input properties are both masked and "
-        "windowed, so masked was ignored. Remove "
-        "NetwPropertyConfig.masked from them.",
+        "*sets NetwPropertyConfig.masked*[NW0038]*",
         1
     );
 
@@ -754,12 +741,7 @@ TEST_CASE(
     "knobs"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] '*' and '*' declare different window values "
-        "for the same input properties, and the last one wins. "
-        "Declare it on one of them.",
-        1
-    );
+    expected_faults.expect_warning("*The window of*[NW0035]*", 1);
 
     const DerivationScenario scenario = two_members_naming_one_window();
     const DerivationRun run(scenario, PLANT_THE_LAST_KNOB_DECLARED_FIRST);

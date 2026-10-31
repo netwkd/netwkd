@@ -34,7 +34,7 @@ func lambda() -> Callable:
 )";
 
 const netw::GameCall PAIR_SITE
-    = {netw::sys::SESSION, "The test handler", "func(a, b)", 2};
+    = {"The test handler", "func(a, b)", 2};
 
 Ref<RefCounted> handlers() {
     const Ref<Script> shape
@@ -97,11 +97,7 @@ TEST_CASE(
     "reports one error for that handler however often it is called"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] The test handler could not be called with 1 "
-        "arguments, so it did not run. Declare it as func(a, b).",
-        1
-    );
+    expected_faults.expect_error("*The test handler*[NW1002]*", 1);
 
     const Ref<RefCounted> on = handlers();
     const Callable pair = method_of(on, "pair");
@@ -121,11 +117,7 @@ TEST_CASE(
     "reported again when it is called"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] The test handler takes the wrong arguments, so it "
-        "will not run. Declare it as func(a, b).",
-        1
-    );
+    expected_faults.expect_error("*The test handler*[NW1002]*", 1);
 
     const Ref<RefCounted> on = handlers();
     const Callable wrong = method_of(on, "any");
@@ -143,9 +135,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][session] The NetwPromise.catch_error callback could not be "
-        "called with 2 arguments, so it did not run. Declare it as "
-        "func(code: Error, detail: String).",
+        "*The NetwPromise.catch_error callback*[NW1002]*",
         1
     );
 
@@ -164,12 +154,7 @@ TEST_CASE(
     "reported when it is set, before any tick runs"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] NetwSimulation.step takes the wrong arguments, "
-        "so it will not run. Declare it as func(delta: float, tick: int, "
-        "is_fresh: bool) -> void.",
-        1
-    );
+    expected_faults.expect_error("*NetwSimulation.step*[NW1002]*", 1);
 
     const Ref<RefCounted> on = handlers();
     Ref<netw::NetwSimulation> simulation;

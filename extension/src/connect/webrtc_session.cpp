@@ -2,6 +2,7 @@
 
 #include "godot/local_vector.hpp"
 #include "netw/connect/webrtc_link.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -132,10 +133,12 @@ Error WebRTCSession::create_server(int64_t p_now_msec) {
     }
     const Error err = gd::webrtc_create_server(made);
     if (err != OK) {
-        NETW_ERROR(
-            sys::TRANSPORT,
-            "WebRTCMultiplayerPeer.create_server failed with error %d.",
-            int(err)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {String("the WebRTC server"),
+             String(),
+             vformat("its WebRTC peer (error %d)", int(err))}
         );
         return err;
     }
@@ -152,10 +155,12 @@ Error WebRTCSession::create_client(int64_t p_id, int64_t p_now_msec) {
     }
     const Error err = gd::webrtc_create_client(made, p_id);
     if (err != OK) {
-        NETW_ERROR(
-            sys::TRANSPORT,
-            "WebRTCMultiplayerPeer.create_client failed with error %d.",
-            int(err)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {String("the WebRTC client"),
+             String(),
+             vformat("its WebRTC peer (error %d)", int(err))}
         );
         return err;
     }

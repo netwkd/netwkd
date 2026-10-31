@@ -315,7 +315,7 @@ void lost_body_leaves_nothing_waiting(NetwSession::TransferMode p_mode) {
     }
     session.rig.release(successor);
     session.rig.step_ticks(TICKRATE * 3);
-    NETW_CHECK_EQ(faults.warnings_containing("never became live"), 0);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW1021]"), 0);
     for (int at = 0; at < CLIENTS; ++at) {
         NETW_FORMAT_INT(seat_text, at);
         CAPTURE(seat_text);

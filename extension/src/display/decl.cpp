@@ -1,5 +1,6 @@
 #include "netw/display/decl.hpp"
 
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -9,14 +10,16 @@ namespace netw::display {
 namespace {
 
 bool ordinal_names_one(int value, int limit, const char *what) {
-    NETW_ERR_COND_V(
-        value < 0 || value >= limit,
-        false,
-        sys::INTERPOLATION,
-        "Display setting %s got %d, which is not one of its values.",
-        what,
-        value
-    );
+    if (value < 0 || value >= limit) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("The display ") + String(what),
+             String::num_int64(value),
+             String("one of its values")}
+        );
+        return false;
+    }
     return true;
 }
 
@@ -54,14 +57,17 @@ Dirt Decl::set_param(int param, const Variant &value) {
         }
         case PARAM_VISUAL_ROOT: {
             const Variant::Type type = value.get_type();
-            NETW_ERR_COND_V(
-                type != Variant::NODE_PATH && type != Variant::STRING
-                    && type != Variant::STRING_NAME,
-                DIRT_NONE,
-                sys::INTERPOLATION,
-                "NetwDisplay.visual_root must be a NodePath, not a %s.",
-                Variant::get_type_name(type)
-            );
+            if (type != Variant::NODE_PATH && type != Variant::STRING
+                && type != Variant::STRING_NAME) {
+                fault::raise(
+                    nullptr,
+                    NETW_FAULT_BAD_VALUE,
+                    {String("{NetwDisplay.visual_root}"),
+                     String("a ") + Variant::get_type_name(type),
+                     String("a NodePath")}
+                );
+                return DIRT_NONE;
+            }
             visual_root = value.operator NodePath();
             return DIRT_RUNTIME;
         }
@@ -89,12 +95,14 @@ Dirt Decl::set_param(int param, const Variant &value) {
         default:
             break;
     }
-    NETW_ERR_V(
-        DIRT_NONE,
-        sys::INTERPOLATION,
-        "Display setting %d does not exist.",
-        param
+    fault::raise(
+        nullptr,
+        NETW_FAULT_BAD_VALUE,
+        {String("The display settings"),
+         String("the setting ") + String::num_int64(param),
+         String("a setting that exists")}
     );
+    return DIRT_NONE;
 }
 
 Variant Decl::get_param(int param) const {
@@ -124,12 +132,14 @@ Variant Decl::get_param(int param) const {
         default:
             break;
     }
-    NETW_ERR_V(
-        Variant(),
-        sys::INTERPOLATION,
-        "Display setting %d does not exist.",
-        param
+    fault::raise(
+        nullptr,
+        NETW_FAULT_BAD_VALUE,
+        {String("The display settings"),
+         String("the setting ") + String::num_int64(param),
+         String("a setting that exists")}
     );
+    return Variant();
 }
 
 bool pump_is_predicted(int pump) {

@@ -914,7 +914,7 @@ int64_t refused_joint(
         int(netw::NetwPrediction::RECONCILE_INDEPENDENT)
     );
     p_rig.pump();
-    return p_watch.errors_containing("RECONCILE_JOINT needs");
+    return p_watch.warnings_containing("RECONCILE_JOINT");
 }
 
 TEST_CASE(
@@ -955,7 +955,7 @@ TEST_CASE(
     const godot::String named = godot::String("'")
         + godot::String(predicted->get_owner()->get_name())
         + godot::String("'");
-    NETW_CHECK_EQ(watch.errors_containing(named), int64_t(1));
+    NETW_CHECK_EQ(watch.warnings_containing(named), int64_t(1));
 }
 
 TEST_CASE(
@@ -989,7 +989,7 @@ TEST_CASE(
         pool->admitted_reconcile_mode(slot),
         int(netw::NetwPrediction::RECONCILE_JOINT)
     );
-    NETW_CHECK_EQ(watch.errors_containing("RECONCILE_JOINT needs"), int64_t(0));
+    NETW_CHECK_EQ(watch.warnings_containing("RECONCILE_JOINT"), int64_t(0));
     CHECK_FALSE(pool->joint_refusal_reported_of(slot));
 }
 

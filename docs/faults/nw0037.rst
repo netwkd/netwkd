@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw0037:
+
+NW0037. A call needs a running session
+======================================
+
+Reported as an error when a call that works on the session's clock, sessions
+or services runs before the session starts or after it ends.
+
+The call did nothing. The log line names the call and what is not running.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        session.clock.tick
+
+Call it after the session starts, such as from a handler for the signal that
+announces it.
+
+.. code-block:: gdscript
+
+    func _on_session_started() -> void:
+        print(session.clock.tick)

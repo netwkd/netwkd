@@ -73,8 +73,7 @@ public:
     bool report_unresolved(
         NetwMultiplayer *p_api,
         Kind p_kind,
-        Availability p_state,
-        const char *p_action
+        Availability p_state
     );
     void install_from(NetwMultiplayer *p_api, godot::Node *p_scope);
     void withdraw(godot::ObjectID p_scope, Kind p_kind, uint64_t p_generation);

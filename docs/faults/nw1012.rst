@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1012:
+
+NW1012. A node changed its authority outside its entity
+=======================================================
+
+Reported as an error when a node that belongs to an entity has its
+multiplayer authority set to a different peer than the entity chose.
+
+The entity set the authority back. The log line gives both peers.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        set_multiplayer_authority(3)
+
+Choose who holds it with
+:ref:`NetwEntity.authority <class_NetwEntity_property_authority>`.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self).authority = NetwEntity.AUTHORITY_CONTROLLER

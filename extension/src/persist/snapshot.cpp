@@ -10,8 +10,7 @@ namespace netw::persist {
 namespace {
 
 const GameCall MIGRATION_STEP
-    = {sys::TABLE,
-       "The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
+    = {"The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
        "func(values: Dictionary) -> Dictionary",
        1};
 

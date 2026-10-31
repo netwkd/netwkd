@@ -155,11 +155,7 @@ TEST_CASE(
     "stay uncommitted rather than the write being lost"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Interest could not be updated, because "
-        "interest is not running on this peer.",
-        1
-    );
+    expected_faults.expect_error("*Updating interest*[NW0037]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();

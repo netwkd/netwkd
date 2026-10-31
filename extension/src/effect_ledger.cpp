@@ -13,20 +13,17 @@ namespace netw {
 namespace {
 
 const GameCall EFFECT_REVERT
-    = {sys::PREDICTION,
-       "The NetwMultiplayer.lagcomp_effect_arm revert",
+    = {"The NetwMultiplayer.lagcomp_effect_arm revert",
        "func() -> void",
        0};
 
 const GameCall EFFECT_CONFIRMED
-    = {sys::PREDICTION,
-       "The NetwMultiplayer.lagcomp_effect_watch confirmed callback",
+    = {"The NetwMultiplayer.lagcomp_effect_watch confirmed callback",
        "func() -> void",
        0};
 
 const GameCall EFFECT_DENIED
-    = {sys::PREDICTION,
-       "The NetwMultiplayer.lagcomp_effect_watch denied callback",
+    = {"The NetwMultiplayer.lagcomp_effect_watch denied callback",
        "func() -> void",
        0};
 

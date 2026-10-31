@@ -14,6 +14,8 @@
 
 namespace netw {
 
+class NetwMultiplayer;
+
 class EventPlane {
 public:
     enum Event : int64_t {
@@ -108,6 +110,7 @@ public:
     static int64_t value_at(int index);
 
     int64_t watch(
+        NetwMultiplayer *session,
         const godot::PackedInt64Array &events,
         const godot::Dictionary &target,
         const godot::Dictionary &predicate,

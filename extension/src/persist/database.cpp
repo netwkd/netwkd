@@ -1,5 +1,6 @@
 #include "netw/persist/database.hpp"
 
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/persist/envelope.hpp"
 #include "netw/schema_core.hpp"
@@ -676,11 +677,12 @@ Error Databases::stage_patch(
         detail
     );
     if (opened != OK) {
-        NETW_WARN(
-            sys::TABLE,
-            "NetwDatabase.patch left a record unchanged, because the stored "
-            "record could not be read (%s).",
-            detail.utf8().get_data()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_STORAGE_FAILED,
+            {String("the stored record"),
+             String("the patch"),
+             vformat("whether the stored record can be read (%s)", detail)}
         );
         return opened;
     }
@@ -694,12 +696,12 @@ Error Databases::stage_patch(
     }
     const Error checked = validate_row(*schema, held, detail);
     if (checked != OK) {
-        NETW_WARN(
-            sys::TABLE,
-            "NetwDatabase.patch left a record unchanged, because the merged "
-            "values do not fit the table (%s). Pass values whose types match "
-            "its columns.",
-            detail.utf8().get_data()
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwDatabase.patch}"),
+             vformat("merged values that do not fit the table (%s)", detail),
+             String("values whose types match its columns")}
         );
         return checked;
     }

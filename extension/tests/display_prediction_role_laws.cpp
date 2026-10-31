@@ -163,7 +163,7 @@ public:
         }
         rig.pump();
         NETW_CHECK_EQ(
-            faults.warnings_containing("declares state and input properties"),
+            faults.warnings_containing("[NW1014]"),
             int64_t(plant_is(PLANT_NOBODY_REGISTERED_THE_ENGINE) ? 1 : 0)
         );
         read.server_role = stat_of(server, on_server, "role");

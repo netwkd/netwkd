@@ -5,6 +5,7 @@
 #include "godot/object.hpp"
 #include "godot/scene_tree.hpp"
 #include "netw/api/context.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -28,17 +29,26 @@ MultiplayerViewport::MultiplayerViewport() {
 }
 
 void MultiplayerViewport::set_api(const Ref<NetwMultiplayer> &p_value) {
-    NETW_ERR_COND(
-        is_inside_tree(),
-        sys::SESSION,
-        "MultiplayerViewport.api cannot change once the tree is in the scene "
-        "tree. Set it before adding the MultiplayerViewport."
-    );
-    NETW_ERR_COND(
-        p_value.is_null(),
-        sys::SESSION,
-        "MultiplayerViewport.api cannot be null. Pass a NetwMultiplayer."
-    );
+    if (is_inside_tree()) {
+        fault::raise(
+            api.ptr(),
+            NETW_FAULT_TOO_LATE,
+            {"{MultiplayerViewport.api}",
+             vformat("'%s'", String(get_name())),
+             "the node enters the tree"},
+            gd::instance_id(this)
+        );
+        return;
+    }
+    if (p_value.is_null()) {
+        fault::raise(
+            api.ptr(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{MultiplayerViewport.api}", String(), "{NetwMultiplayer}"},
+            gd::instance_id(this)
+        );
+        return;
+    }
     if (api == p_value) {
         return;
     }
@@ -74,11 +84,7 @@ void MultiplayerViewport::register_path() {
     api->session_get_inner()->set_root_path(root_path);
     get_tree()->set_multiplayer(api, root_path);
     const Ref<MultiplayerAPI> mounted = get_tree()->get_multiplayer(root_path);
-    NETW_ASSERT(
-        mounted == api,
-        sys::SESSION,
-        "mounting is the only installation point on this branch"
-    );
+    NETW_ASSERT(mounted == api);
 }
 
 void MultiplayerViewport::unregister_path() {

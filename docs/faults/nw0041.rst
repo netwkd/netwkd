@@ -1,0 +1,23 @@
+:github_url: hide
+
+.. _fault_nw0041:
+
+NW0041. An entity was moved where the session does not follow
+=============================================================
+
+Reported as an error when an entity's node is moved to a parent outside the
+multiplayer root, or into a second session.
+
+The session does not follow the move. The log line names the entity and where
+it went.
+
+.. code-block:: gdscript
+
+    car.reparent(outside_root)
+
+Move it with :ref:`Netw.reparent <class_Netw_method_reparent>`, to a node
+that stays in the session.
+
+.. code-block:: gdscript
+
+    Netw.reparent(car, arena.get_node(^"Spawns"))

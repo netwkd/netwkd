@@ -195,7 +195,7 @@ TEST_CASE(
 
         netw_test::FaultWatch faults;
         if (row.code == ERR_INVALID_PARAMETER) {
-            faults.expect_error("*did not return a Node outside the tree*", 1);
+            faults.expect_error("*'make'*[NW0040]*", 1);
         }
         const Ref<NetwPromise> promise = stand.host->call(StringName("begin"));
         REQUIRE(promise.is_valid());
@@ -249,7 +249,7 @@ TEST_CASE(
     spawner_script = spawner.ptr();
     Stand stand;
     netw_test::FaultWatch faults;
-    faults.expect_error("*Netw.spawn_async runs on the server.*", 1);
+    faults.expect_error("*[NW0039]*", 1);
 
     const Ref<NetwPromise> promise
         = stand.client_host->call(StringName("begin"));
@@ -381,18 +381,20 @@ TEST_CASE(
 
 struct Failure {
     const char *outcome;
-    const char *warning;
+    const char *fault;
     const char *reported;
 };
 
 const Failure FAILURES[] = {
     {"null",
-     "*Spawn function 'make' did not return a Node*",
-     "*because 'make' returned no Node on their peer*"},
+     "*spawn function 'make'*no returned Node*[NW0040]*",
+     "*'make', which returned no Node on their peer*[NW0039]*"},
     {"promise fails",
-     "*Spawn function 'make' failed with 'slow'*",
-     "*because 'make' failed with 'slow' on their peer*"},
-    {"host freed", "*was freed before it returned*", nullptr},
+     "*spawn function 'make'*the error 'slow'*[NW0040]*",
+     "*'make', which failed with 'slow' on their peer*[NW0039]*"},
+    {"host freed",
+     "*spawn function 'make'*freed holder node*[NW0040]*",
+     nullptr},
 };
 
 TEST_CASE(
@@ -407,9 +409,9 @@ TEST_CASE(
         NetwMultiplayer *client = stand.sim.session(A);
         stand.client_host->set(StringName("outcome"), String(failure.outcome));
         netw_test::FaultWatch faults;
-        faults.expect_warning(failure.warning, 1);
+        faults.expect_error(failure.fault, 1);
         if (failure.reported != nullptr) {
-            faults.expect_warning(failure.reported, 1);
+            faults.expect_error(failure.reported, 1);
         }
 
         const int route = int(NetwEntity::of(spawn_made(stand))->get_route());
@@ -446,7 +448,7 @@ TEST_CASE(
         }
         netw_test::FaultWatch faults;
         faults.expect_warning(
-            "*Spawn function 'make' has not returned after 0.2 seconds.*",
+            "*'make'*[NW0023]*",
             1
         );
         Node *runner = stand.client_host;
@@ -480,7 +482,7 @@ TEST_CASE(
     Stand stand;
     netw_test::FaultWatch faults;
     faults.expect_error(
-        "*bind_result got 'Made', which Netw.spawn_async built.*",
+        "*'Made'*[NW0039]*",
         1
     );
 

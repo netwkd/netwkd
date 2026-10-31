@@ -13,6 +13,7 @@
 #include "netw/api/property_config.hpp"
 #include "netw/colors.hpp"
 #include "netw/entity/control.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/object_port.hpp"
 #include "netw/predict/tick_work.hpp"
@@ -428,10 +429,14 @@ void SyncPipeline::report_missing_prediction_component(
     if (authoring::declares_prediction(node)) {
         return;
     }
-    NETW_WARN(
-        sys::PREDICTION,
-        "%s",
-        missing_prediction_component_message(contract_subject_name(node))
+    fault::raise(
+        core(),
+        NETW_FAULT_PREDICTION_DOWNGRADED,
+        {contract_subject_name(node),
+         String("state and input properties with no prediction"),
+         String("a prediction block on its MultiplayerSynchronizer, or "
+                "{NetwMultiplayer.predict_declare}")},
+        gd::instance_id(node)
     );
 }
 
@@ -440,18 +445,6 @@ String SyncPipeline::contract_subject_name(Node *p_node) {
     const String entity_id
         = entity.is_valid() ? String(entity->get_name()) : String();
     return entity_id.is_empty() ? String(p_node->get_name()) : entity_id;
-}
-
-String SyncPipeline::missing_prediction_component_message(
-    const String &p_entity_name
-) {
-    return p_entity_name
-        + String(
-               " declares state and input properties but no prediction, so "
-               "its controller sends input without predicting. Fill the "
-               "prediction block on its MultiplayerSynchronizer, or call "
-               "NetwMultiplayer.predict_declare."
-        );
 }
 
 void SyncPipeline::register_state_timeline(Node *p_node) {
@@ -959,15 +952,7 @@ LocalVector<PropertyBindingPtr> SyncPipeline::entity_bindings_checked(
         same = scanned[at] == matched[at];
     }
     if (!same) {
-        NETW_ERROR(
-            sys::WIRE,
-            "The property index of '%s' holds %d entries and a full scan "
-            "finds %d.",
-            String(p_entity->get_name()),
-            int(matched.size()),
-            int(scanned.size())
-        );
-        return scanned;
+        NETW_BUG_V(scanned);
     }
     return matched;
 }
@@ -1078,9 +1063,20 @@ void SyncPipeline::commit_pending_masked(int64_t p_peer_id, int64_t p_seq) {
         return;
     }
     carrier_rows = nullptr;
-    if (row_sender_armed) {
-        row_sender
-            .commit(p_peer_id, p_seq, *rows, carrier_frames, carrier_bits);
+    if (row_sender_armed
+        && !row_sender
+                .commit(p_peer_id, p_seq, *rows, carrier_frames, carrier_bits)
+        && p_seq >= 0) {
+        fault::raise(
+            core(),
+            NETW_FAULT_LIMIT_EXCEEDED,
+            {String("Tracking packets for delivery"),
+             vformat("packet %d", int(p_seq)),
+             String("fewer packets in flight to one peer"),
+             p_peer_id,
+             wire::AckBook::MAX_IN_FLIGHT + 1,
+             wire::AckBook::MAX_IN_FLIGHT}
+        );
     }
 }
 
@@ -1193,12 +1189,13 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
         return;
     }
     if (!gd::has_property(p_node, p_property)) {
-        NETW_WARN(
-            sys::WIRE,
-            "Netw.sync_property got '%s', which '%s' does not have. Check "
-            "the property name.",
-            p_property,
-            p_node->get_name()
+        fault::raise(
+            plane,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{Netw.sync_property}"),
+             String(p_node->get_name()),
+             String(p_property)},
+            uint64_t(gd::instance_id(p_node))
         );
         return;
     }
@@ -1210,11 +1207,13 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
         const int64_t local_id = plane->get_unique_id();
         if (!plane->is_host()
             && local_id != p_node->get_multiplayer_authority()) {
-            NETW_WARN(
-                sys::WIRE,
-                "Only the authority can sync '%s', because it is not "
-                "declared. Declare it with Netw.configure_property.",
-                p_property
+            fault::raise(
+                plane,
+                NETW_FAULT_UNKNOWN_NAME,
+                {String("{Netw.sync_property}"),
+                 String(p_node->get_name()),
+                 String(p_property)},
+                uint64_t(gd::instance_id(p_node))
             );
             return;
         }
@@ -1250,7 +1249,7 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
     types.push_back(
         netw::script::model::get_node_property_type(p_node, p_property)
     );
-    if (!call_args::values_write(stream, values, quantizers, types)
+    if (!call_args::values_write(stream, values, quantizers, types, plane)
         || !stream.align_verify()) {
         return;
     }
@@ -1285,12 +1284,13 @@ void SyncPipeline::send_signal(
         return;
     }
     if (!p_node->has_signal(p_signal)) {
-        NETW_WARN(
-            sys::WIRE,
-            "Netw.emit_entity_signal got '%s', which '%s' does not have. "
-            "Check the signal name.",
-            p_signal,
-            p_node->get_name()
+        fault::raise(
+            plane,
+            NETW_FAULT_UNKNOWN_NAME,
+            {String("{Netw.emit_entity_signal}"),
+             String(p_node->get_name()),
+             String(p_signal)},
+            uint64_t(gd::instance_id(p_node))
         );
         return;
     }
@@ -1309,11 +1309,13 @@ void SyncPipeline::send_signal(
         const int64_t local_id = plane->get_unique_id();
         if (!plane->is_host()
             && local_id != p_node->get_multiplayer_authority()) {
-            NETW_WARN(
-                sys::WIRE,
-                "Only the authority can emit '%s', because it is not "
-                "declared. Declare it with Netw.configure_signal.",
-                p_signal
+            fault::raise(
+                plane,
+                NETW_FAULT_UNKNOWN_NAME,
+                {String("{Netw.emit_entity_signal}"),
+                 String(p_node->get_name()),
+                 String(p_signal)},
+                uint64_t(gd::instance_id(p_node))
             );
             return;
         }
@@ -1340,7 +1342,13 @@ void SyncPipeline::send_signal(
             stream,
             encode_signal_val(entity, p_node, p_signal)
         )
-        || !netw::call_args::values_write(stream, p_args, quantizers, types)
+        || !netw::call_args::values_write(
+            stream,
+            p_args,
+            quantizers,
+            types,
+            plane
+        )
         || !stream.align_verify()) {
         return;
     }
@@ -1569,10 +1577,30 @@ void SyncPipeline::apply_row(
         );
         return;
     }
-    const PropertyBindingPtr binding
-        = sync_model
-              ->admit_row(route, p_ordinal, p_sender, p_entity->steering());
+    bool schema_dropped = false;
+    const PropertyBindingPtr binding = sync_model->admit_row(
+        route,
+        p_ordinal,
+        p_sender,
+        p_entity->steering(),
+        &schema_dropped
+    );
     if (binding == nullptr) {
+        if (schema_dropped) {
+            Node *dropped = p_entity->get_owner();
+            fault::raise(
+                plane,
+                NETW_FAULT_PEER_MISMATCH,
+                {String("an update for '")
+                     + (dropped != nullptr ? String(dropped->get_name())
+                                           : String())
+                     + String("'"),
+                 String(),
+                 String("the properties it synchronizes"),
+                 p_sender},
+                uint64_t(gd::instance_id(dropped))
+            );
+        }
         plane->attribution_note_refusal(
             p_sender,
             p_channel,
@@ -1919,16 +1947,6 @@ void SyncPipeline::clear_route(int64_t p_route) {
 
 void SyncPipeline::clear_peer(int64_t p_peer_id) {
     progress.clear_peer(p_peer_id);
-    LocalVector<uint64_t> refused;
-    for (const KeyValue<uint64_t, int64_t> &row :
-         write_refusals_by_peer_member) {
-        if ((row.key >> 32) == uint64_t(uint32_t(p_peer_id))) {
-            refused.push_back(row.key);
-        }
-    }
-    for (const uint64_t key : refused) {
-        write_refusals_by_peer_member.erase(key);
-    }
     for (uint32_t at = 0; at < bindings.size(); ++at) {
         live(bindings[at])->clear_peer(p_peer_id);
     }
@@ -2070,20 +2088,11 @@ void SyncPipeline::handle_property_sync(
             p_entity->steering()
         )) {
         writes_refused += 1;
-        const uint64_t key = (uint64_t(uint32_t(p_sender)) << 32)
-            | uint64_t(uint32_t(prop.hash()));
-        if (write_refusals_by_peer_member.has(key)) {
-            write_refusals_by_peer_member[key] += 1;
-            return;
-        }
-        write_refusals_by_peer_member.insert(key, 1);
-        NETW_WARN(
-            sys::WIRE,
-            "'%s' was synced by peer %d, which may not write it, so it was "
-            "dropped. Set NetwMemberConfig.write_policy if that peer should "
-            "write it.",
-            prop,
-            p_sender
+        fault::raise(
+            plane,
+            NETW_FAULT_WRITE_REFUSED,
+            {String(prop), String(p_comp_node->get_name()), String(), p_sender},
+            gd::instance_id(p_comp_node)
         );
         return;
     }
@@ -2200,13 +2209,14 @@ void SyncPipeline::handle_signal(
             p_sender,
             p_entity->steering()
         )) {
-        NETW_WARN(
-            sys::WIRE,
-            "'%s' was emitted by peer %d, which may not emit it, so it was "
-            "dropped. Set NetwMemberConfig.write_policy if that peer should "
-            "emit it.",
-            signal_name,
-            p_sender
+        fault::raise(
+            plane,
+            NETW_FAULT_WRITE_REFUSED,
+            {String(signal_name),
+             String(p_comp_node->get_name()),
+             String(),
+             p_sender},
+            gd::instance_id(p_comp_node)
         );
         return;
     }

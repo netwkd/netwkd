@@ -111,7 +111,7 @@ TEST_CASE(
     "error while the client still joins"
 ) {
     netw_test::FaultWatch watch;
-    watch.expect_error(String("*joined without it*"), 1);
+    watch.expect_warning(String("*join_address*[NW1018]*"), 1);
     watch.expect_error(String("*got an address*"), 1);
     const String long_address = String("m").repeat(netw::wire::STRING_CAP + 1);
     Seated seated(long_address);

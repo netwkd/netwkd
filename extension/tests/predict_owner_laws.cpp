@@ -378,12 +378,7 @@ TEST_CASE(
     "a pass"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][prediction] Prediction refused to close an entity "
-        "while a simulation step was running. Add or remove "
-        "predicted entities outside the simulate callback.",
-        1
-    );
+    expected_faults.expect_error("*[NW1008]*", 2);
 
     NetwPredictionEngine held;
     NetwPredictionEngine *const engine = &held;

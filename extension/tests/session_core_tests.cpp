@@ -104,13 +104,6 @@ TEST_CASE(
     "[Networked][Session][Hosted] S2 a refused edge leaves the machine where "
     "it was and announces nothing"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"!edge_is_legal(state, next)\" "
-        "is true. The session cannot move from state 3 to state 0.",
-        1
-    );
-
     Ref<NetwMultiplayer> host;
     host.instantiate();
     SessionCore &core = host->session_plane();

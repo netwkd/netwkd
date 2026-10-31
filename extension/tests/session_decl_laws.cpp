@@ -67,8 +67,7 @@ bool reports_ambiguity(const Ref<NetwMultiplayer> &p_api) {
     return p_api->declaration_book().report_unresolved(
         p_api.ptr(),
         netw::session_decl::KIND_SERVER_INFO,
-        netw::session_decl::AMBIGUOUS,
-        "a probe"
+        netw::session_decl::AMBIGUOUS
     );
 }
 
@@ -179,15 +178,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][session] Netw.configure_server_info was called on "
-        "more than one node (/root/HD5/First, /root/HD5/Second), so"
-        " a probe was refused. Call it on one node per session.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] Netw.configure_server_info was called on "
-        "more than one node (/root/HD5/First), so a probe was "
-        "refused. Call it on one node per session.",
+        "*Netw.configure_server_info*/root/HD5/First*[NW0034]*",
         1
     );
 
@@ -220,13 +211,7 @@ TEST_CASE(
     "and re-entering the same session restores it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_server_info was called by "
-        "Session, which left the tree before the session applied "
-        "its settings, so a probe was refused. Keep that node in "
-        "the tree until the session starts.",
-        1
-    );
+    expected_faults.expect_error("*'Session'*[NW0041]*", 1);
 
     Branch branch("HD6");
     const CallLog log;
@@ -252,13 +237,7 @@ TEST_CASE(
     "branch it left"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_server_info was called by "
-        "/root/HD7Second/Session, which left the tree before the "
-        "session applied its settings, so a probe was refused. Keep"
-        " that node in the tree until the session starts.",
-        1
-    );
+    expected_faults.expect_error("*'/root/HD7Second/Session'*[NW0041]*", 1);
 
     Branch first("HD7First");
     Branch second("HD7Second");
@@ -282,13 +261,7 @@ TEST_CASE(
     "the replacement and the provider it replaced with it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_server_info was called by "
-        "Session, which left the tree before the session applied "
-        "its settings, so a probe was refused. Keep that node in "
-        "the tree until the session starts.",
-        1
-    );
+    expected_faults.expect_error("*'Session'*[NW0041]*", 1);
 
     Branch branch("HD8");
     const CallLog log;
@@ -317,9 +290,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][transport] A probe got no reply, because the "
-        "Netw.configure_server_info handler returned Nil. Edit the "
-        "NetwServerInfo it is given and return it.",
+        "*Netw.configure_server_info*[NW1007]*",
         1
     );
 
@@ -357,20 +328,7 @@ TEST_CASE(
     "survives the rejected edit"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"scope == nullptr\" is true. "
-        "Returning: nullptr. Netw.configure_server_info needs a "
-        "handler that is a method of a Node. Move the method onto a"
-        " node inside the session's branch.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] Condition \"!p_handler.is_valid()\" is "
-        "true. Returning: nullptr. Netw.configure_server_info needs"
-        " a valid handler. Pass a method of a node inside the "
-        "session's branch.",
-        1
-    );
+    expected_faults.expect_error("*Netw.configure_server_info*[NW1005]*", 2);
 
     Branch branch("HD11");
     const CallLog log;

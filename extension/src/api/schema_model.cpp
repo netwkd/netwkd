@@ -3,6 +3,7 @@
 #include "godot/class_db.hpp"
 #include "godot/object.hpp"
 #include "godot/templates.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/schema_core.hpp"
 #include "netw/schema_model.hpp"
@@ -39,13 +40,16 @@ Ref<NetwSchema> NetwSchema::from_record(const table::SchemaRecord &p_record) {
 }
 
 bool NetwSchema::can_edit() const {
-    NETW_ERR_COND_V(
-        read_only,
-        false,
-        sys::TABLE,
-        "NetwPersistence.schema cannot be changed. Configure saved "
-        "properties with Netw.configure_property."
-    );
+    if (read_only) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNSUPPORTED,
+            {String("Changing a schema"),
+             String("{NetwPersistence.schema}"),
+             String("{Netw.configure_property} for saved properties")}
+        );
+        return false;
+    }
     return true;
 }
 
@@ -70,13 +74,14 @@ int NetwSchema::column(
     }
     for (const ObjectID &adopter : adopters) {
         if (gd::object_of(adopter) != nullptr) {
-            NETW_ERR_V(
-                -1,
-                sys::TABLE,
-                "Schema '%s' is already in use by a live session. Declare "
-                "its columns before the session uses it.",
-                String(name).utf8().get_data()
+            fault::raise(
+                nullptr,
+                NETW_FAULT_TOO_LATE,
+                {String("Declaring columns"),
+                 vformat("schema '%s'", String(name)),
+                 String("a live session uses the schema")}
             );
+            return -1;
         }
     }
     Column fresh;
@@ -91,9 +96,10 @@ int NetwSchema::column(
 Ref<NetwSchema> NetwSchema::declare(const StringName &p_name) {
     const Ref<NetwSchema> declaration = schema_model::declare(p_name);
     if (declaration.is_null()) {
-        NETW_ERROR(
-            sys::TABLE,
-            "NetwSchema.declare needs a name, and it was empty."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwSchema.declare}"), String(), String("name")}
         );
     }
     return declaration;
@@ -270,12 +276,12 @@ Ref<NetwSchema> NetwSchema::storage_version(int p_version) {
         return Ref<NetwSchema>(this);
     }
     if (p_version < 1) {
-        NETW_ERROR(
-            sys::TABLE,
-            "NetwSchema.storage_version got %d for '%s'. Versions start at "
-            "1.",
-            p_version,
-            String(name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwSchema.storage_version}"),
+             vformat("version %d for '%s'", int(p_version), String(name)),
+             String("a version of 1 or more")}
         );
         return Ref<NetwSchema>(this);
     }
@@ -291,12 +297,12 @@ Ref<NetwSchema> NetwSchema::migrate(
         return Ref<NetwSchema>(this);
     }
     if (p_from_version < 1 || p_step.is_null()) {
-        NETW_ERROR(
-            sys::TABLE,
-            "NetwSchema.migrate on '%s' needs a version of 1 or more and a "
-            "valid step, and got version %d.",
-            String(name),
-            p_from_version
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("{NetwSchema.migrate} on '%s'", String(name)),
+             String(),
+             String("a version of 1 or more and a valid step")}
         );
         return Ref<NetwSchema>(this);
     }

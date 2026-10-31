@@ -15,7 +15,6 @@ namespace netw {
 class LobbyDirectory : public NetwService, public enums::LobbyDirectory {
     GDCLASS(LobbyDirectory, NetwService)
 
-    bool warned_friends = false;
     godot::ObjectID watcher;
 
     godot::String display_name_value = godot::String();

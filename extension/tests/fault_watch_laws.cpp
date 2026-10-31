@@ -24,8 +24,16 @@ TEST_CASE(
     FaultWatch outer;
     {
         FaultWatch inner;
-        NETW_WARN(netw::sys::TEST, "FW1 asserted by the inner watch");
-        NETW_WARN(netw::sys::TEST, "FW1 left to the outer watch");
+        netw::log::write(
+            netw::log::Level::WARN,
+            netw::sys::TEST,
+            "FW1 asserted by the inner watch"
+        );
+        netw::log::write(
+            netw::log::Level::WARN,
+            netw::sys::TEST,
+            "FW1 left to the outer watch"
+        );
         NETW_CHECK_EQ(
             inner.warnings_containing("FW1 asserted by the inner watch"),
             int64_t(1)

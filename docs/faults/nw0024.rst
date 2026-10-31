@@ -1,0 +1,19 @@
+:github_url: hide
+
+.. _fault_nw0024:
+
+NW0024. A peer asked for control the entity does not allow
+==========================================================
+
+Reported as a warning when a peer asks for control of an entity and its
+:ref:`NetwEntity.transfer <class_NetwEntity_property_transfer>` does not
+allow requests.
+
+The request was refused. The log line names the peer and the entity.
+
+Set ``transfer`` to ``NetwEntity.TRANSFER_REQUESTABLE`` to allow requests.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self).transfer = NetwEntity.TRANSFER_REQUESTABLE

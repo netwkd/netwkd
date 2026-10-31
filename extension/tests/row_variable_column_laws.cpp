@@ -227,24 +227,13 @@ TEST_CASE(
     "no clock warns once and sends none"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] This session declares replicated properties "
-        "but has no clock, so none of their rows is ever sent. Call"
-        " Netw.configure_clock on every peer.",
-        3
-    );
+    expected_faults.expect_error("*[NW0011]*", 3);
 
     Board unclocked(false);
     REQUIRE(unclocked.node(0) != nullptr);
     CHECK_FALSE(unclocked.rig.server()->clock_is_configured());
     unclocked.node(-1)->set("ink", stroke(3));
     unclocked.rig.pump(12);
-    CHECK(unclocked.rig.server()
-              ->get_replication_plane()
-              ->has_warned_rows_without_clock());
-    CHECK(unclocked.rig.client(0)
-              ->get_replication_plane()
-              ->has_warned_rows_without_clock());
     CHECK(PackedVector2Array(unclocked.node(0)->get("ink")).is_empty());
 
     Board clocked;
@@ -252,9 +241,6 @@ TEST_CASE(
     clocked.node(-1)->set("ink", stroke(3));
     clocked.rig.step_ticks(6);
     CHECK(clocked.every_peer_holds("ink", stroke(3)));
-    CHECK_FALSE(clocked.rig.server()
-                    ->get_replication_plane()
-                    ->has_warned_rows_without_clock());
 }
 
 } // namespace TestRowVariableColumn

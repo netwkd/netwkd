@@ -330,11 +330,7 @@ TEST_CASE(
     const RID adopted = core->schema_find_or_adopt("TimingSchema");
     REQUIRE(adopted.is_valid());
     netw_test::FaultWatch faults;
-    faults.expect_error(
-        "[error][table] Schema 'TimingSchema' is already in use by a "
-        "live session. Declare its columns before the session uses it.",
-        1
-    );
+    faults.expect_error("*'TimingSchema'*[NW0036]*", 1);
     NETW_CHECK_EQ(schema->i64("late", 1), -1);
     NETW_CHECK_EQ(int(schema->columns_of().size()), 1);
     NETW_CHECK_EQ(core->schema_get_column_count(adopted), 1);

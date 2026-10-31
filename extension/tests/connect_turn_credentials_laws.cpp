@@ -52,61 +52,50 @@ TEST_CASE(
         int code;
         const char *body;
         int servers;
-        netw::log::Level level;
         const char *message;
     };
-    using netw::log::Level;
     const Row rows[] = {
         {200,
          "{\"iceServers\":[{\"urls\":[\"turn:relay.example\"],"
          "\"username\":\"u\",\"credential\":\"c\"}]}",
          1,
-         Level::INFO,
          ""},
         {200,
          "[{\"urls\":[\"turn:relay.example\"]}]",
          0,
-         Level::ERROR,
          "The TURN credential server answered without iceServers. "
          "It must answer {\"iceServers\": [...]}."},
         {200,
          "{\"iceServers\":[]}",
          0,
-         Level::ERROR,
          "The TURN credential server answered without iceServers. "
          "It must answer {\"iceServers\": [...]}."},
         {200,
          "{\"iceServers\":[{},42]}",
          0,
-         Level::ERROR,
          "The TURN credential server answered without iceServers. "
          "It must answer {\"iceServers\": [...]}."},
         {404,
          "missing",
          0,
-         Level::ERROR,
          "The TURN credential URL answered 404. Check "
          "networked/webrtc/turn_credentials_url."},
         {403,
          "{\"error\":\"Add it to ALLOWED_ORIGINS.\"}",
          0,
-         Level::ERROR,
          "The TURN credential server refused this game. "
          "Add it to ALLOWED_ORIGINS."},
         {500,
          "{\"error\":\"TURN_KEY_ID is not set.\"}",
          0,
-         Level::WARN,
          "The TURN credential server answered 500. TURN_KEY_ID is not set."},
         {429,
          "{\"error\":\"Try again in a minute.\"}",
          0,
-         Level::WARN,
          "The TURN credential server answered 429. Try again in a minute."},
         {200,
          "not json",
          0,
-         Level::ERROR,
          "The TURN credential server answered without iceServers. "
          "It must answer {\"iceServers\": [...]}."},
     };
@@ -114,9 +103,7 @@ TEST_CASE(
         const TurnCredentials::Answer answer
             = TurnCredentials::read_answer(row.code, bytes_of(row.body));
         const bool count_matches = answer.servers.size() == row.servers;
-        const bool level_matches = answer.level == row.level;
         CHECK(count_matches);
-        CHECK(level_matches);
         const bool message_matches = answer.message == String(row.message);
         CHECK(message_matches);
         if (!answer.servers.is_empty()) {
@@ -343,7 +330,7 @@ struct CredentialState {
             faults = std::make_unique<netw_test::FaultWatch>();
             TurnCredentialProbe::expire(transport);
             evidence.timeout_warnings = int(
-                faults->warnings_containing("did not answer within 5 seconds")
+                faults->warnings_containing("[NW1000]")
             );
             faults.reset();
         } else if (answered && attempt == 3) {

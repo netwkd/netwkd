@@ -5,7 +5,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/interest_layer.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 
 using namespace godot;
 
@@ -117,10 +117,12 @@ void NetwInterest::layer_leave_live(const StringName &p_layer_id) {
 Ref<NetwInterest> NetwInterest::of(Node *p_node) {
     const Ref<NetwEntity> entity = NetwEntity::ensure(p_node);
     if (entity.is_null()) {
-        NETW_ERROR(
-            sys::INTEREST,
-            "NetwInterest.of got a node that is not an entity root. "
-            "Pass the entity's root node."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_ENTITY,
+            {String("{NetwInterest.of}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return Ref<NetwInterest>();
     }

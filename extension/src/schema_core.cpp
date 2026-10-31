@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 
@@ -414,15 +415,17 @@ Error SchemaCore::fix(SchemaRecord *record) {
         return ERR_DOES_NOT_EXIST;
     }
     if (record->column_count() > MAX_COLUMNS) {
-        NETW_ERR_V(
-            ERR_INVALID_DECLARATION,
-            sys::TABLE,
-            "Schema '%s' declares %d columns, and a schema holds at most %d. "
-            "Split it into smaller schemas.",
-            String(record->name).utf8().get_data(),
-            record->column_count(),
-            MAX_COLUMNS
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LIMIT_EXCEEDED,
+            {vformat("Schema '%s'", String(record->name)),
+             "the schema",
+             "smaller schemas",
+             0,
+             record->column_count(),
+             MAX_COLUMNS}
         );
+        return ERR_INVALID_DECLARATION;
     }
     if (record->sealed) {
         if (!record->redeclare_open) {

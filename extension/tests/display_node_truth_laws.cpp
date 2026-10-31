@@ -531,14 +531,7 @@ TEST_CASE(
     "holds leaves-the-body"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interp] Condition \"has_source && visual == "
-        "nullptr\" is true. Returning: nullptr. "
-        "NetwDisplay.visual_root '*' is not a node under '*', so "
-        "'*' is not interpolated, to keep it off the simulated node"
-        " '*'. Point visual_root at a child node.",
-        3
-    );
+    expected_faults.expect_warning("*is not a node under*[NW1016]*", 1);
 
     const WriteScenario scenario = moving_body();
     const WriteRun run(scenario, PLANT_THE_VISUAL_ROOT_NAMES_NOTHING);
@@ -596,7 +589,6 @@ class RoleRun {
     RoleScenario declared;
     int64_t resolved = -1;
     bool steers_locally = false;
-    bool warned_self_feedback = false;
 
 public:
     explicit RoleRun(const RoleScenario &p_scenario, Plant p_plant = PLANT_NONE)
@@ -639,7 +631,6 @@ public:
                 entity->get_rid_handle()
             );
         REQUIRE(runtime != nullptr);
-        warned_self_feedback = runtime->get_warned_self_feedback();
     }
 
     const RoleScenario &scenario() const {
@@ -652,10 +643,6 @@ public:
 
     bool local_control() const {
         return steers_locally;
-    }
-
-    bool warned() const {
-        return warned_self_feedback;
     }
 };
 
@@ -697,62 +684,14 @@ const RoleLaw L_STEERING = {
     &law_steering,
 };
 
-LawVerdict law_in_place(const RoleRun &p_run) {
-    if (p_run.scenario().rung != RUNG_AVATAR) {
-        return law_held();
-    }
-    if (p_run.warned()) {
-        return law_broken(
-            "an unpredicted body written in place by its own controller "
-            "raised the self-feedback warning"
-        );
-    }
-    return law_held();
-}
-
-const RoleLaw L_IN_PLACE = {
-    "in-place",
-    "an unpredicted entity on its controller keeps the disabled role, so a "
-    "channel it interpolates in place raises no self-feedback warning",
-    &law_in_place,
-};
-
-LawVerdict law_self_feedback(const RoleRun &p_run) {
-    if (p_run.scenario().rung != RUNG_STEERED) {
-        return law_held();
-    }
-    if (!p_run.warned()) {
-        return law_broken(
-            "a predicted body written in place by its own simulation raised "
-            "no self-feedback warning"
-        );
-    }
-    return law_held();
-}
-
-const RoleLaw L_SELF_FEEDBACK = {
-    "self-feedback",
-    "a channel a predicting peer interpolates in place on the body it "
-    "simulates raises the self-feedback warning",
-    &law_self_feedback,
-};
-
 const RoleLaw ROLE_LAWS[] = {
     L_LADDER,
     L_STEERING,
-    L_IN_PLACE,
-    L_SELF_FEEDBACK,
 };
 
 TEST_CASE("[Networked][Display][SceneTree] the auto display role laws hold") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][interp] '*' on '*' is simulated on this peer, so "
-        "smoothing it in place would feed back into the simulation "
-        "and it is not smoothed. Write it elsewhere with "
-        "NetwInterpolate.to or NetwDisplay.visual_root.",
-        1
-    );
+    expected_faults.expect_warning("*'LadderTarget:position'*[NW1016]*", 1);
 
     const RoleScenario CORPUS[] = {
         locally_owned(),

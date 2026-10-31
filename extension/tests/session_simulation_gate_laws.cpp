@@ -263,13 +263,7 @@ TEST_CASE(
     "and one that is not warns once"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][prediction] Physics runs at 60 steps per second and"
-        " the tickrate is 59, so a tick is 1.017 steps and peers "
-        "drift apart. Make physics_ticks_per_second a whole "
-        "multiple of the tickrate.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0014]*", 1);
 
     const godot::Engine *engine = godot::Engine::get_singleton();
     REQUIRE(engine != nullptr);
@@ -283,7 +277,6 @@ TEST_CASE(
     const RID aligned_entity = seated(aligned_session, 46, aligned_body);
 
     aligned_session->simulation_gate_set(aligned_entity, true);
-    CHECK_FALSE(aligned_session->predict_pacing_rate_warned);
     aligned_body->queue_free();
 
     const int mismatched_tickrate = physics_rate - 1;
@@ -296,11 +289,8 @@ TEST_CASE(
     netw::gd::scene_root()->add_child(second_body);
     const RID second_entity = seated(mismatched_session, 48, second_body);
 
-    CHECK_FALSE(mismatched_session->predict_pacing_rate_warned);
     mismatched_session->simulation_gate_set(first_entity, true);
-    CHECK(mismatched_session->predict_pacing_rate_warned);
     mismatched_session->simulation_gate_set(second_entity, true);
-    CHECK(mismatched_session->predict_pacing_rate_warned);
 
     first_body->queue_free();
     second_body->queue_free();

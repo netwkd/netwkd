@@ -13,8 +13,7 @@ using PerPeer = Leave::PerPeer;
 namespace {
 
 const GameCall LEAVE_POLICY_CUSTOM
-    = {sys::INTEREST,
-       "The NetwInterest.on_leave_policy custom_callback",
+    = {"The NetwInterest.on_leave_policy custom_callback",
        "func(peer_id: int, layer_id: StringName)",
        2};
 
@@ -112,7 +111,8 @@ Dictionary Leave::resolve(
     int64_t key,
     int64_t peer,
     const Decl *p_decl,
-    const Engine &p_engine
+    const Engine &p_engine,
+    StringName *r_freed_layer
 ) const {
     const Array layers = pending_layers(key, peer);
     if (layers.is_empty()) {
@@ -135,13 +135,9 @@ Dictionary Leave::resolve(
             ? p_decl->custom_leave_for(layer_id)
             : Callable();
         if (!callback.is_valid()) {
-            NETW_ERROR_ONCE(
-                sys::INTEREST,
-                "The CUSTOM leave callback of layer '%s' was freed, so the "
-                "copy is hidden. Keep the callback's object alive while the "
-                "layer uses it.",
-                godot::String(layer_id)
-            );
+            if (r_freed_layer != nullptr) {
+                *r_freed_layer = layer_id;
+            }
             return verdict(true, Array());
         }
         Array action;

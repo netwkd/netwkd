@@ -53,19 +53,8 @@ TEST_CASE(
     "authority's, so a client claims nothing rather than a private range"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][liveness] Condition \"!is_host()\" is true. "
-        "Returning: out. NetwMultiplayer.liveness_claim_routes runs"
-        " only on the server.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][liveness] Condition \"!is_host()\" is true. "
-        "Returning: ERR_UNCONFIGURED. "
-        "NetwMultiplayer.liveness_release_routes runs only on the "
-        "server.",
-        1
-    );
+    expected_faults.expect_error("*liveness_claim_routes*[NW0012]*", 1);
+    expected_faults.expect_error("*liveness_release_routes*[NW0012]*", 1);
 
     Ref<NetwMultiplayer> client;
     client.instantiate();
@@ -106,14 +95,7 @@ TEST_CASE(
     );
 
     SUBCASE("a client is refused before the entity is even looked up") {
-        expected_faults.expect_error(
-            "[error][entity] Netw.despawn on '*' was refused, "
-            "because only the session authority despawns it. Set "
-            "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before "
-            "its root enters the tree to let its controller despawn"
-            " it.",
-            1
-        );
+        expected_faults.expect_error("*[NW0041]*", 1);
 
         Ref<NetwMultiplayer> client;
         client.instantiate();
@@ -151,13 +133,7 @@ TEST_CASE(
     }
 
     SUBCASE("and a client's refused release queues nothing") {
-        expected_faults.expect_error(
-            "[error][liveness] Condition \"!is_host()\" is true. "
-            "Returning: ERR_UNCONFIGURED. "
-            "NetwMultiplayer.liveness_release_routes runs only on "
-            "the server.",
-            1
-        );
+        expected_faults.expect_error("*liveness_release_routes*[NW0012]*", 1);
 
         Ref<NetwMultiplayer> client;
         client.instantiate();

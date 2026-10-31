@@ -335,11 +335,7 @@ const IntakeLaw LAWS[] = {L_ADMITS, L_SENDER, L_COUNTED, L_BOTH_BOOKS};
 
 TEST_CASE("[Networked][Session][SceneTree] the carrier intake laws hold") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        2
-    );
+    expected_faults.expect_warning("*[NW0007]*", 2);
 
     const IntakeScenario CORPUS[] = {
         a_command_from_a_stranger(),

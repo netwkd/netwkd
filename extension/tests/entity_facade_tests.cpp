@@ -101,13 +101,7 @@ TEST_CASE(
     root->add_child(child);
     netw::gd::scene_root()->add_child(root);
     netw_test::FaultWatch faults;
-    faults.expect_error(
-        "[error][entity] Netw.configure_entity ran after 'Child' entered "
-        "the tree, which is too late. Call it before the node enters "
-        "the tree, or use NetwEntity.of to find an entity that already "
-        "exists.",
-        1
-    );
+    faults.expect_error("*'Child'*[NW0036]*", 1);
     CHECK(netw::Netw::configure_entity(child).is_null());
     CHECK(netw::Netw::configure_entity(root) == entity);
     CHECK(NetwEntity::of(child) == entity);

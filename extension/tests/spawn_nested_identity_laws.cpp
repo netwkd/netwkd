@@ -792,7 +792,7 @@ TEST_CASE(
     "kicked, with a reason naming the node"
 ) {
     netw_test::FaultWatch faults;
-    faults.expect_error("*'Crate'*Run the same build on both peers.*", 1);
+    faults.expect_warning("*'Crate'*[NW0025]*", 1);
     UnconnectedPair pair;
     pair.place(0);
     pair.pump(2);
@@ -818,11 +818,7 @@ TEST_CASE(
     "with add_child on the server is reported once and sent to no client"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][spawn] 'Crate' was added to the tree without Netw.spawn, so "
-        "no other peer has it. Spawn it with Netw.spawn.",
-        1
-    );
+    expected_faults.expect_error("*'Crate'*[NW0039]*", 1);
     LoopbackRig rig(1);
     rig.mount();
     flow_clocks(rig, 30);
@@ -957,11 +953,7 @@ TEST_CASE(
     "session root is refused on the server once and sent to no client"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][scene] 'IsolatedLevel' is isolated and was placed in the "
-        "editor. Spawn it with Netw.spawn, or turn isolation off.",
-        1
-    );
+    expected_faults.expect_error("*'IsolatedLevel'*[NW0039]*", 1);
     const netw_test::FaultWatch faults;
     UnconnectedPair peers;
     Node *hosted = peers.place_level(0, ISOLATED_LEVEL);

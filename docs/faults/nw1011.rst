@@ -1,0 +1,17 @@
+:github_url: hide
+
+.. _fault_nw1011:
+
+NW1011. A failed promise had no handler
+=======================================
+
+Reported as a warning when a :ref:`NetwPromise <class_NetwPromise>` fails
+and nothing handled the failure.
+
+The log line names the promise, the error code and the error.
+
+Attach ``catch_error`` or await ``wait``.
+
+.. code-block:: gdscript
+
+    promise.catch_error(func(error: int) -> void: push_error(str(error)))

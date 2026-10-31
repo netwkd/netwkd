@@ -68,7 +68,8 @@ PackedInt64Array Perception::armed_keys() const {
 Dictionary Perception::resolve(
     const Array &p_layers,
     const Decl *p_decl,
-    const Engine &p_engine
+    const Engine &p_engine,
+    StringName *r_freed_layer
 ) const {
     bool hide = false;
     Array custom;
@@ -89,13 +90,9 @@ Dictionary Perception::resolve(
             ? p_decl->custom_perception_for(layer_id)
             : Callable();
         if (!callback.is_valid()) {
-            NETW_ERROR_ONCE(
-                sys::INTEREST,
-                "The CUSTOM perception callback of layer '%s' was freed, so "
-                "what it covered is hidden. Keep the callback's object alive "
-                "while the layer uses it.",
-                godot::String(layer_id)
-            );
+            if (r_freed_layer != nullptr) {
+                *r_freed_layer = layer_id;
+            }
             hide = true;
             continue;
         }

@@ -1,8 +1,11 @@
 #include "netw/api/property_config.hpp"
 
+#include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "godot/node.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/script/model.hpp"
 
@@ -15,8 +18,7 @@ using repl::PropertySet;
 namespace {
 
 const GameCall CARRY_STEP
-    = {sys::PREDICTION,
-       "NetwPropertyConfig.carry_step",
+    = {"NetwPropertyConfig.carry_step",
        "func(value: Variant, ctx: NetwPredictCarryContext) -> Variant",
        2};
 
@@ -38,12 +40,10 @@ void NetwPropertyConfig::warn_double_set(
     if (!p_replaces) {
         return;
     }
-    NETW_WARN(
-        sys::SESSION,
-        "The %s of '%s' was declared twice with different values, and the "
-        "last one wins. Declare it once.",
-        String(p_axis),
-        String(get_context_name())
+    fault::raise(
+        nullptr,
+        NETW_FAULT_DECLARED_AGAIN,
+        {vformat("The %s", String(p_axis)), String(get_context_name())}
     );
 }
 
@@ -109,11 +109,14 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::carry_along(
 Ref<NetwPropertyConfig> NetwPropertyConfig::carry_step(const Callable &p_step) {
     Node *owner = Object::cast_to<Node>(p_step.get_object());
     if (!p_step.is_valid() || owner == nullptr) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwPropertyConfig.carry_step on '%s' needs a valid method of "
-            "the node it moves. Pass a method of that node.",
-            String(get_context_name())
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("{NetwPropertyConfig.carry_step} on '%s'",
+                     String(get_context_name())),
+             String(),
+             String("a method of the node it moves")},
+            owner != nullptr ? uint64_t(gd::instance_id(owner)) : 0
         );
         return Ref<NetwPropertyConfig>(this);
     }

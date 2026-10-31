@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1003:
+
+NW1003. A call got a node that is not in a session
+==================================================
+
+Reported as an error when a call that needs a session is given a node that is
+not in the scene tree under a session.
+
+The call did nothing. The log line names the call and the node.
+
+.. code-block:: gdscript
+
+    var orphan := Node.new()
+    Netw.configure_property(orphan, &"health")
+
+Call it from a node in the scene tree under a
+:ref:`MultiplayerViewport <class_MultiplayerViewport>`.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        Netw.scene(self)

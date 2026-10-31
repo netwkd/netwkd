@@ -84,13 +84,7 @@ TEST_CASE(
     "told otherwise, and a null config moves no gate"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] Condition \"p_max_future_action_ticks <"
-        " 0 || p_input_gate_deadline_ticks < 0\" is true. Returning:"
-        " ERR_INVALID_PARAMETER. Lag compensation tick counts "
-        "cannot be negative, so the settings did not change.",
-        1
-    );
+    expected_faults.expect_error("*Netw.configure_lagcomp*[NW0032]*", 1);
 
     Ref<NetwMultiplayer> session = hosting();
 

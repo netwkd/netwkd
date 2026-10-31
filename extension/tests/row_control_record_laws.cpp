@@ -306,10 +306,7 @@ TEST_CASE(
     "be written"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][wire] A packet field value is outside its range.",
-        2
-    );
+    expected_faults.expect_error("*outside*[NW0032]*", 2);
 
     const bool none = write_control_record(accept_of(0)).is_empty();
     CHECK(none);

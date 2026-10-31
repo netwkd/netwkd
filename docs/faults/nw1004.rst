@@ -1,0 +1,18 @@
+:github_url: hide
+
+.. _fault_nw1004:
+
+NW1004. A call needs exactly one running session
+================================================
+
+Reported as an error when a call that reaches the session without a node
+finds none, or more than one.
+
+The call did nothing. The log line gives the number of sessions it found.
+
+Start a session first, or reach the one you mean with
+:ref:`Netw.of <class_Netw_method_of>`.
+
+.. code-block:: gdscript
+
+    var session: NetwSession = Netw.session(self)

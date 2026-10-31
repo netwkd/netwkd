@@ -223,13 +223,7 @@ TEST_CASE(
     "names nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] Condition \"!same_scene(*this, subject,"
-        " p_entity)\" is true. Returning: ERR_INVALID_PARAMETER. "
-        "NetwSimulation.simulate refused '*', because it is in "
-        "another scene than '*'. Select entities in the same scene.",
-        1
-    );
+    expected_faults.expect_error("*NetwSimulation.simulate*[NW0032]*", 1);
 
     Scenario scenario;
     scenario.label = "two-scenes";

@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0022:
+
+NW0022. A spawned node never entered the tree
+=============================================
+
+Reported as a warning when a node built for a spawn is still outside the
+scene tree at the next tick.
+
+The log line names the node.
+
+.. code-block:: gdscript
+
+    func make_car() -> Node:
+        var car := CarScene.instantiate()
+        return car
+
+Add the node to the tree before the next tick.
+
+.. code-block:: gdscript
+
+    func make_car() -> Node:
+        var car := CarScene.instantiate()
+        cars_root.add_child(car)
+        return car

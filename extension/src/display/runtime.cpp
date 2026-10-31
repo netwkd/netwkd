@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "netw/display/history.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/subsystems.hpp"
 
@@ -68,13 +69,15 @@ Node *Runtime::owner() {
 }
 
 Channel *Runtime::channel_named(const StringName &p_name) const {
-    NETW_WARN_COND(
-        tracks.is_ambiguous(p_name),
-        sys::INTERPOLATION,
-        "More than one interpolation on this entity is named '%s', so the "
-        "first one declared is used. Give each a unique name.",
-        String(p_name)
-    );
+    if (tracks.is_ambiguous(p_name)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {String(p_name),
+             String("a second interpolation with the same name"),
+             String("a unique name for each interpolation")}
+        );
+    }
     const int at = tracks.by_name(p_name);
     if (at < 0 || at >= int(states.size())) {
         return nullptr;

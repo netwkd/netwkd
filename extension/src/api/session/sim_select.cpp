@@ -104,22 +104,27 @@ Error NetwMultiplayer::sim_simulate(
     const Ref<NetwEntity> &p_entity
 ) {
     const Ref<NetwEntity> subject = entity_get_view(p_subject);
-    NETW_ERR_COND_V(
-        subject.is_null() || p_entity.is_null(),
-        ERR_INVALID_PARAMETER,
-        sys::PREDICTION,
-        "NetwSimulation.simulate needs two live entities, and one of "
-        "them is gone."
-    );
-    NETW_ERR_COND_V(
-        !same_scene(*this, subject, p_entity),
-        ERR_INVALID_PARAMETER,
-        sys::PREDICTION,
-        "NetwSimulation.simulate refused '%s', because it is in another "
-        "scene than '%s'. Select entities in the same scene.",
-        String(p_entity->get_name()).utf8().get_data(),
-        String(subject->get_name()).utf8().get_data()
-    );
+    if (subject.is_null() || p_entity.is_null()) {
+        fault::raise(
+            this,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwSimulation.simulate}", String(), "live entities"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    if (!same_scene(*this, subject, p_entity)) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSimulation.simulate}",
+             vformat(
+                 "an entity in another scene than '%s'",
+                 String(subject->get_name())
+             ),
+             "entities in the same scene"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
     sim::choose(
         sim_rows.ensure(p_subject).choice,
         p_entity->get_rid_handle(),

@@ -730,29 +730,6 @@ TEST_CASE(
     NETW_CHECK_EQ(received.payloads.size(), 0);
 }
 
-TEST_CASE(
-    "[Networked][PredictWire][Hosted] a gapped transition run has no encoding"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] Condition "
-        "\"!valid_command_shape(p_frame, p_input_plan)\" is true. "
-        "Returning: PackedByteArray(). An input command does not "
-        "match the input properties it was built from, so it was "
-        "not sent.",
-        1
-    );
-
-    const WirePlan plan = input_plan();
-    CommandFrame gapped;
-    gapped.transitions.push_back(TransitionWire{4, 10, true});
-    gapped.transitions.push_back(TransitionWire{6, 12, true});
-    gapped.payloads.push_back(input_row(plan, 1));
-    gapped.payloads.push_back(input_row(plan, 2));
-
-    CHECK(netw::predict::encode_command(gapped, plan).is_empty());
-}
-
 TEST_CASE("[Networked][PredictWire][Hosted] the evidence section is optional") {
     const WirePlan plan = input_plan();
     CommandFrame bare;
@@ -770,44 +747,6 @@ TEST_CASE("[Networked][PredictWire][Hosted] the evidence section is optional") {
     );
     NETW_CHECK_EQ(received.evidence.size(), 0);
     NETW_CHECK_EQ(received.transitions.size(), 2);
-}
-
-TEST_CASE(
-    "[Networked][PredictWire][Hosted] a frame needs a planned input schema"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][prediction] Condition "
-        "\"!valid_command_shape(p_frame, p_input_plan)\" is true. "
-        "Returning: PackedByteArray(). An input command does not "
-        "match the input properties it was built from, so it was "
-        "not sent.",
-        1
-    );
-
-    SchemaRecord unsealed;
-    unsealed.name = "Unsealed";
-    SchemaCore::append_column(&unsealed, "motion", SchemaCore::VECTOR2, 1);
-    CHECK_FALSE(WirePlan::compile(unsealed).valid());
-
-    SchemaRecord self_describing;
-    self_describing.name = "SelfDescribing";
-    SchemaCore::append_column(
-        &self_describing,
-        "anything",
-        SchemaCore::VARIANT,
-        2
-    );
-    SchemaCore::fix(&self_describing);
-    CHECK_FALSE(WirePlan::compile(self_describing).valid());
-
-    CommandFrame frame;
-    frame.transitions.push_back(TransitionWire{0, 5, true});
-    frame.payloads.push_back(input_row(input_plan(), 3));
-    CHECK(
-        netw::predict::encode_command(frame, WirePlan::compile(self_describing))
-            .is_empty()
-    );
 }
 
 TEST_CASE(

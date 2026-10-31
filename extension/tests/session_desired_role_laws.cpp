@@ -111,12 +111,7 @@ TEST_CASE(
     "is ever handed a role it cannot switch on"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_session got * for 'desired_role', "
-        "which it does not accept, so the previous value stays. "
-        "Pass a value in the range its documentation gives.",
-        2
-    );
+    expected_faults.expect_error("*'desired_role'*[NW0032]*", 2);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -153,12 +148,7 @@ TEST_CASE(
     "a reconnect quietly reopening initialization"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_session ran after the "
-        "session started, so the running values are unchanged. Call"
-        " it before startup and finish the chain without awaiting.",
-        1
-    );
+    expected_faults.expect_error("*Netw.configure_session*[NW0019]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();

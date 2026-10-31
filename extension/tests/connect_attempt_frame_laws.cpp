@@ -342,7 +342,7 @@ public:
                 hosting.unref();
                 netw_test::FaultLog::detach(diagnostics);
                 evidence.tag_refusals = diagnostics->warning_count_containing(
-                    "Set the same tag on both"
+                    "differ in the app tag"
                 );
                 diagnostics.unref();
                 evidence.driven = true;

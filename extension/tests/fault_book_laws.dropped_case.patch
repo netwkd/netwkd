@@ -1,0 +1,10 @@
+--- a/extension/src/api/fault_text.cpp
++++ b/extension/src/api/fault_text.cpp
+@@ -501,7 +501,6 @@
+                 ),
+                 vformat("Use %s.", v.detail)
+             };
+-        case NETW_FAULT_LIVENESS_TIMEOUT:
+             return {
+                 vformat(
+                     "Route %d did not become live within its timeout, so its "

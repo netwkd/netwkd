@@ -153,13 +153,7 @@ TEST_CASE(
     "server admitted it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][scene] Condition \"!is_host() && "
-        "entity_get_route(p_entity) <= 0\" is true. Returning: "
-        "ERR_UNAUTHORIZED. A client cannot set the scene of an "
-        "entity that has not spawned yet.",
-        1
-    );
+    expected_faults.expect_error("*Setting the scene*[NW0012]*", 1);
 
     LoopbackRig rig(0);
     rig.declare_scene(StringName("Arena"));
@@ -478,12 +472,7 @@ TEST_CASE(
     NETW_CHECK_EQ(int(handler->get(StringName("seated"))), 1);
 
     SUBCASE("a handler that declared one refuses the join when none arrived") {
-        expected_faults.expect_warning(
-            "[warn][session] Peer * joined with no arguments, but "
-            "the Netw.configure_join handler needs 1. Pass the "
-            "arguments to Netw.prepare_join on the client.",
-            1
-        );
+        expected_faults.expect_warning("*[NW0027]*", 1);
 
         core->session_set_join_override(
             Callable(handler.ptr(), StringName("seat_with")),
@@ -543,12 +532,7 @@ TEST_CASE(
     "default join, and the client hears join_failed"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Peer * joined with no arguments, but the "
-        "Netw.configure_join handler needs 1. Pass the arguments to "
-        "Netw.prepare_join on the client.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0027]*", 1);
 
     const Ref<RefCounted> handler = shape_of(COUNTING_SEAT)->call("new");
     REQUIRE(handler.is_valid());
@@ -681,11 +665,7 @@ TEST_CASE(
     }
 
     SUBCASE("an online session refuses the join and sends nothing") {
-        expected_faults.expect_error(
-            "[error][session] Netw.prepare_join was called after the session "
-            "connected. Call it before assigning multiplayer_peer.",
-            1
-        );
+        expected_faults.expect_error("*Netw.prepare_join*[NW0019]*", 1);
         api->session_set_state(NetwMultiplayer::SESSION_STATE_ONLINE);
         const Ref<netw::NetwPromise> asked
             = netw::Netw::prepare_join(seat, StringName("ana"), Array());
@@ -696,11 +676,7 @@ TEST_CASE(
     }
 
     SUBCASE("an empty username prepares nothing") {
-        expected_faults.expect_error(
-            "[error][session] Netw.prepare_join needs a username, "
-            "and it was empty.",
-            1
-        );
+        expected_faults.expect_error("*Netw.prepare_join*[NW0031]*", 1);
 
         NETW_CHECK_EQ(
             int(netw::Netw::prepare_join(seat, StringName(), Array())
@@ -722,13 +698,7 @@ TEST_CASE(
     "chose"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_join was called by "
-        "@Node@*, which left the tree before the session applied"
-        " its settings, so a join was refused. Keep that node in "
-        "the tree until the session starts.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     const Ref<Script> shape = shape_of(
         "extends Node\n"
@@ -795,13 +765,7 @@ TEST_CASE(
     "restores the answer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Netw.configure_join was called on more "
-        "than one node (/root/JoinScopeRival/@Node@*, "
-        "/root/JoinScopeRival/@Node@*), so a join was refused. "
-        "Call it on one node per session.",
-        1
-    );
+    expected_faults.expect_error("*Netw.configure_join*[NW0034]*", 1);
 
     const Ref<Script> shape = shape_of(
         "extends Node\n"
@@ -890,15 +854,7 @@ TEST_CASE(
     "would be sent as an empty one and decoded as an empty one"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition "
-        "\"NetwMultiplayer::join_declared_arg_types(p_handler).is_empty()"
-        " && p_handler.get_argument_count() > 1\" is true. "
-        "Returning: Ref<NetwJoinConfig>(). Netw.configure_join got "
-        "a lambda that takes join arguments. Use a named method "
-        "with typed parameters, such as '*'.",
-        1
-    );
+    expected_faults.expect_error("*[NW1005]*", 1);
 
     const Ref<Script> shape = shape_of(
         "extends Node\n"
@@ -965,17 +921,8 @@ TEST_CASE(
     "dropped without being refused, so a seated peer keeps its seat"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Peer * was refused, because its wire "
-        "identity differs from this server's. Run the same build on"
-        " both peers.",
-        1
-    );
-    expected_faults.expect_warning(
-        "[warn][session] Peer * sent too many join requests, so the extra "
-        "ones were dropped.",
-        2
-    );
+    expected_faults.expect_warning("*wire identity*[NW0025]*", 1);
+    expected_faults.expect_warning("*[NW0028]*", 2);
 
     LoopbackRig rig(3);
     rig.pump(4);

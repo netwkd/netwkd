@@ -1,0 +1,19 @@
+:github_url: hide
+
+.. _fault_nw1010:
+
+NW1010. A call got a node that is not part of an entity
+=======================================================
+
+Reported as an error when a call that works on an entity is given a node
+that does not belong to one.
+
+The call did nothing. The log line names the call and the node.
+
+Pass the entity's root node, or call
+:ref:`Netw.configure_entity <class_Netw_method_configure_entity>` on it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self)

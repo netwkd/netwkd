@@ -236,17 +236,4 @@ godot::String refusal_text(
     );
 }
 
-godot::String lease_empty_text(
-    const godot::String &p_verb,
-    const godot::String &p_root
-) {
-    return godot::vformat(
-        "%s on '%s' was refused, because this peer used up the spawns the "
-        "session authority granted it. More are granted as its spawns are "
-        "admitted, so try again shortly.",
-        p_verb,
-        p_root
-    );
-}
-
 } // namespace netw::lifecycle

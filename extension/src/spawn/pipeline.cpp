@@ -14,6 +14,7 @@
 #include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/lifecycle/rule.hpp"
 #include "netw/log.hpp"
@@ -44,18 +45,15 @@ const double CLOCKLESS_TICKRATE = 30.0;
 constexpr int BLOB_CAP = 4095;
 
 const GameCall SPAWN_FUNCTION
-    = {sys::SPAWN,
-       "The Netw.configure_spawn function",
+    = {"The Netw.configure_spawn function",
        "func(...) -> Node",
        -1};
 const GameCall SPAWN_CONSTRUCTOR
-    = {sys::SPAWN,
-       "The NetwMultiplayer.spawn_register_constructor function",
+    = {"The NetwMultiplayer.spawn_register_constructor function",
        "func(...) -> Node, taking one argument per arg_types entry",
        -1};
 const GameCall DESPAWN_HOOK
-    = {sys::SPAWN,
-       "The NetwDespawnConfig.before_removal method",
+    = {"The NetwDespawnConfig.before_removal method",
        "func() -> void",
        0};
 
@@ -406,11 +404,11 @@ void Pipeline::report_unadded(int64_t p_ticks_run) {
             || !spawn_book.has_armed(row.key)) {
             continue;
         }
-        NETW_WARN(
-            sys::SPAWN,
-            "'%s' was spawned but never entered the tree. Add it before the "
-            "next tick.",
-            node->get_name()
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_NOT_PLACED,
+            {String(node->get_name())},
+            gd::instance_id(node)
         );
     }
     for (const int64_t route : settled) {
@@ -477,23 +475,21 @@ bool Pipeline::spawn_admitted(Node *p_node, const char *p_verb) {
     if (facts.peer_is_server || plane->liveness_lease_remaining() > 0) {
         return true;
     }
-    NETW_ERROR(
-        sys::SPAWN,
-        "%s",
-        lifecycle::lease_empty_text(
-            String(p_verb),
-            p_node != nullptr ? String(p_node->get_name()) : String("<null>")
-        )
+    fault::raise(
+        plane,
+        NETW_FAULT_SPAWN_REFUSED,
+        {p_node != nullptr ? String("'") + String(p_node->get_name())
+                    + String("'")
+                           : String("<null>"),
+         String("all the spawns the session authority granted this peer"),
+         String("it again once the session authority admits more of its "
+                "spawns")},
+        p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
     );
     return false;
 }
 
 void SpawnRefusal::refuse(Error p_code, const String &p_detail) {
-    NETW_ERROR(sys::SPAWN, "%s", p_detail);
-    refused_quietly(p_code, p_detail);
-}
-
-void SpawnRefusal::refused_quietly(Error p_code, const String &p_detail) {
     code = p_code;
     detail = p_detail;
 }
@@ -514,6 +510,13 @@ Node *Pipeline::spawn_host(
 ) {
     Node *host = Object::cast_to<Node>(p_fn.get_object());
     if (host == nullptr) {
+        fault::raise(
+            core(),
+            NETW_FAULT_BAD_CALLABLE,
+            {String(p_verb),
+             String(),
+             String("a method of a node that exists on every peer")}
+        );
         r_refusal.refuse(
             ERR_UNCONFIGURED,
             vformat(
@@ -527,6 +530,15 @@ Node *Pipeline::spawn_host(
     const Ref<Script> script = host->get_script();
     const StringName method = p_fn.get_method();
     if (netw::script::model::get_spawn_config(script, method).is_null()) {
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn function '") + String(method) + String("'"),
+             String("no registration"),
+             String("{Netw.configure_spawn} on it before calling ")
+                 + String(p_verb)},
+            gd::instance_id(host)
+        );
         r_refusal.refuse(
             ERR_UNCONFIGURED,
             vformat(
@@ -543,6 +555,14 @@ Node *Pipeline::spawn_host(
             method,
             p_args.size()
         )) {
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn function '") + String(method) + String("'"),
+             String("the wrong number of arguments"),
+             String("the arguments it declares")},
+            gd::instance_id(host)
+        );
         r_refusal.refuse(
             ERR_INVALID_PARAMETER,
             vformat(
@@ -564,6 +584,14 @@ Node *Pipeline::spawn_finish(
 ) {
     Node *node = Object::cast_to<Node>(gd::live_object(p_built));
     if (node == nullptr || node->is_inside_tree()) {
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn function '") + String(p_call.method) + String("'"),
+             String("no returned Node outside the tree"),
+             String("a function that returns the new node without adding it")},
+            p_call.host
+        );
         r_refusal.refuse(
             ERR_INVALID_PARAMETER,
             vformat(
@@ -576,6 +604,14 @@ Node *Pipeline::spawn_finish(
     }
     const Ref<NetwEntity> existing = NetwEntity::of(node);
     if (existing.is_valid() && existing->get_route() != 0) {
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn function '") + String(p_call.method) + String("'"),
+             String("a node that is already replicated"),
+             String("a function that returns a new node")},
+            p_call.host
+        );
         r_refusal.refuse(
             ERR_INVALID_PARAMETER,
             vformat(
@@ -594,7 +630,7 @@ Node *Pipeline::spawn_finish(
     }
     if (!admitted) {
         memdelete(node);
-        r_refusal.refused_quietly(
+        r_refusal.refuse(
             ERR_UNAUTHORIZED,
             vformat("The session refused spawn function '%s'.", p_call.method)
         );
@@ -615,7 +651,7 @@ Node *Pipeline::spawn_finish(
     }
     if (!armed) {
         memdelete(node);
-        r_refusal.refused_quietly(
+        r_refusal.refuse(
             ERR_UNAVAILABLE,
             vformat("Spawn function '%s' could not be armed.", p_call.method)
         );
@@ -652,13 +688,15 @@ Node *Pipeline::spawn(
     }
     if (NetwMultiplayer::is_waiting(built)) {
         NetwMultiplayer::free_when_returned(built);
-        NETW_ERR_V(
-            nullptr,
-            sys::SPAWN,
-            "Spawn function '%s' waited. Use Netw.spawn_async for a spawn "
-            "function that awaits.",
-            method
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn function '") + String(method) + String("'"),
+             String("an await"),
+             String("{Netw.spawn_async} for a spawn function that awaits")},
+            uint64_t(gd::instance_id(host))
         );
+        return nullptr;
     }
     const SpawnCall
         call{gd::instance_id(host), method, p_args, p_owner, "Netw.spawn", 0};
@@ -673,6 +711,13 @@ Ref<NetwPromise> Pipeline::spawn_async(
     NETW_STAGE(SPAWN, "Spawn construct async", colors::LIVENESS);
     SpawnRefusal refusal;
     if (!is_server_authority()) {
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_REFUSED,
+            {String("The spawn"),
+             String("a call from a client"),
+             String("{Netw.spawn} for a node the client spawns itself")}
+        );
         refusal.refuse(
             ERR_UNAUTHORIZED,
             String(
@@ -704,7 +749,7 @@ Ref<NetwPromise> Pipeline::spawn_async(
         built = game_call(p_fn, p_args, SPAWN_FUNCTION, &called);
     }
     if (!called) {
-        refusal.refused_quietly(
+        refusal.refuse(
             ERR_INVALID_PARAMETER,
             vformat("Spawn function '%s' could not be called.", call.method)
         );
@@ -817,7 +862,7 @@ void Pipeline::sweep_pending_spawns() {
         warn_slow_build(
             pending.call.method,
             pending.call.started_at,
-            pending.warned
+            uint64_t(pending.call.host)
         );
     }
     for (const int64_t serial : orphaned) {
@@ -904,13 +949,15 @@ Node *Pipeline::spawn_registered(
 ) {
     const Callable fn = constructor_of(p_id);
     if (!fn.is_valid()) {
-        NETW_ERR_V(
-            nullptr,
-            sys::SPAWN,
-            "Spawn constructor '%s' is not registered. Register it with "
-            "NetwMultiplayer.spawn_register_constructor.",
-            p_id
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_REFUSED,
+            {String("spawn constructor '") + String(p_id) + String("'"),
+             String("an unregistered spawn constructor"),
+             String("a spawn constructor registered with "
+                    "{NetwMultiplayer.spawn_register_constructor}")}
         );
+        return nullptr;
     }
     bool called = false;
     const Variant built = game_call(fn, p_args, SPAWN_CONSTRUCTOR, &called);
@@ -919,22 +966,26 @@ Node *Pipeline::spawn_registered(
     }
     if (NetwMultiplayer::is_waiting(built)) {
         NetwMultiplayer::free_when_returned(built);
-        NETW_ERR_V(
-            nullptr,
-            sys::SPAWN,
-            "Spawn constructor '%s' waited. Return the node without waiting.",
-            p_id
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn constructor '") + String(p_id) + String("'"),
+             String("an await"),
+             String("a constructor that returns the node without waiting")}
         );
+        return nullptr;
     }
     Node *node = Object::cast_to<Node>(gd::live_object(built));
     if (node == nullptr || node->is_inside_tree()) {
-        NETW_ERR_V(
-            nullptr,
-            sys::SPAWN,
-            "Spawn constructor '%s' did not return a Node outside the tree. "
-            "Return the new node without adding it.",
-            p_id
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_RETURN,
+            {String("spawn constructor '") + String(p_id) + String("'"),
+             String("no returned Node outside the tree"),
+             String("a constructor that returns the new node outside the "
+                    "tree")}
         );
+        return nullptr;
     }
     write_owner(node, p_owner);
     if (!spawn_admitted(node, "spawn_registered")) {
@@ -1212,19 +1263,23 @@ void Pipeline::publish_placed(Node *p_node, int64_t p_route) {
     }
     refused_placed.insert(id);
     if (owned) {
-        NETW_ERROR(
-            sys::SCENE,
-            "'%s' is isolated and was placed in the editor. Spawn it with "
-            "Netw.spawn, or turn isolation off.",
-            p_node->get_name()
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_REFUSED,
+            {String("'") + String(p_node->get_name()) + String("'"),
+             String("an isolated scene placed in the editor"),
+             String("{Netw.spawn} for it, or isolation turned off")},
+            uint64_t(gd::instance_id(p_node))
         );
         return;
     }
-    NETW_ERROR(
-        sys::SPAWN,
-        "'%s' was added to the tree without Netw.spawn, so no other peer has "
-        "it. Spawn it with Netw.spawn.",
-        p_node->get_name()
+    fault::raise(
+        core(),
+        NETW_FAULT_SPAWN_REFUSED,
+        {String("'") + String(p_node->get_name()) + String("'"),
+         String("a node added to the tree without {Netw.spawn}"),
+         String("{Netw.spawn} for it")},
+        uint64_t(gd::instance_id(p_node))
     );
 }
 
@@ -1563,13 +1618,7 @@ PackedByteArray Pipeline::encode_record_frame(
             installed.revision,
             installed.author
         )) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "The spawn of route %d could not be written to a packet, so it "
-            "was not sent.",
-            int(p_route)
-        );
-        return PackedByteArray();
+        NETW_BUG_V(PackedByteArray());
     }
 
     Node *outer = NetwMultiplayer::scene_outer_of(p_node);
@@ -1583,21 +1632,16 @@ PackedByteArray Pipeline::encode_record_frame(
     int64_t recipe_code = int64_t(recipe);
     if (!stream.int_range(recipe_code, 1, 4)
         || !stream.bool1(parent_is_spawn_target)) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "The spawn of route %d was not sent, because its way of building "
-            "the node, %d, is unknown.",
-            p_record->get_route(),
-            recipe
-        );
-        return PackedByteArray();
+        NETW_BUG_V(PackedByteArray());
     }
     if (!parent_is_spawn_target && !plane->anchor_encode(stream, parent)) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "'%s' was not spawned, because its parent is outside the "
-            "multiplayer root. Add it under a node inside the root.",
-            p_node->get_name()
+        fault::raise(
+            plane,
+            NETW_FAULT_SPAWN_REFUSED,
+            {String("'") + String(p_node->get_name()) + String("'"),
+             String("a parent outside the multiplayer root"),
+             String("a parent inside the multiplayer root")},
+            uint64_t(gd::instance_id(p_node))
         );
         return PackedByteArray();
     }
@@ -1613,11 +1657,14 @@ PackedByteArray Pipeline::encode_record_frame(
         }
     } else if (recipe == Book::RECIPE_SPAWNER) {
         if (spawner == nullptr || !plane->anchor_encode(stream, spawner)) {
-            NETW_ERROR(
-                sys::SPAWN,
-                "The spawn of route %d was not sent, because its "
-                "MultiplayerSpawner is gone or outside the multiplayer root.",
-                p_record->get_route()
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_REFUSED,
+                {String("route ") + String::num_int64(p_record->get_route()),
+                 String("a MultiplayerSpawner that is gone or outside the "
+                        "multiplayer root"),
+                 String("a MultiplayerSpawner inside the multiplayer root")},
+                uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
         }
@@ -1636,25 +1683,27 @@ PackedByteArray Pipeline::encode_record_frame(
         const StringName id = p_record->get_fn_registry_id();
         const Callable fn = constructor_of(id);
         if (!fn.is_valid()) {
-            NETW_ERROR(
-                sys::SPAWN,
-                "Spawn constructor '%s' is not registered, so route %d was not "
-                "sent. Register it with "
-                "NetwMultiplayer.spawn_register_constructor.",
-                id,
-                p_record->get_route()
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_REFUSED,
+                {String("route ") + String::num_int64(p_record->get_route()),
+                 String("an unregistered spawn constructor"),
+                 String("a spawn constructor registered with "
+                        "{NetwMultiplayer.spawn_register_constructor}")},
+                uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
         }
         const Variant schema = fn_registry_schema(id, fn);
         if (schema.get_type() == Variant::NIL) {
-            NETW_ERROR(
-                sys::SPAWN,
-                "Spawn constructor '%s' has no argument types, so route %d was "
-                "not sent. Pass arg_types to "
-                "NetwMultiplayer.spawn_register_constructor.",
-                id,
-                p_record->get_route()
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_REFUSED,
+                {String("route ") + String::num_int64(p_record->get_route()),
+                 String("a spawn constructor with no argument types"),
+                 String("{NetwMultiplayer.spawn_register_constructor} with "
+                        "arg_types")},
+                uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
         }
@@ -1667,24 +1716,30 @@ PackedByteArray Pipeline::encode_record_frame(
     } else if (recipe == Book::RECIPE_FN) {
         Node *host = p_record->fn_host();
         if (host == nullptr || !plane->anchor_encode(stream, host)) {
-            NETW_ERROR(
-                sys::SPAWN,
-                "The spawn of route %d was not sent, because the node holding "
-                "its spawn function is gone or outside the multiplayer root.",
-                p_record->get_route()
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_REFUSED,
+                {String("route ") + String::num_int64(p_record->get_route()),
+                 String("a node holding the spawn function that is gone or "
+                        "outside the multiplayer root"),
+                 String("a node inside the multiplayer root holding the "
+                        "spawn function")},
+                uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
         }
         const Variant schema
             = fn_script_schema(host->get_script(), p_record->get_fn_method());
         if (schema.get_type() == Variant::NIL) {
-            NETW_ERROR(
-                sys::SPAWN,
-                "Spawn function '%s' is not registered, so route %d was not "
-                "sent. Register it with Netw.configure_spawn before calling "
-                "Netw.spawn.",
-                p_record->get_fn_method(),
-                p_record->get_route()
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_REFUSED,
+                {String("route ") + String::num_int64(p_record->get_route()),
+                 String("the unregistered spawn function '")
+                     + String(p_record->get_fn_method()) + String("'"),
+                 String("{Netw.configure_spawn} on it before calling "
+                        "{Netw.spawn}")},
+                uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
         }
@@ -1730,7 +1785,13 @@ PackedByteArray Pipeline::encode_record_frame(
         Array values;
         values.push_back(port_get(source, prop));
         wire::WriteStream value_stream;
-        if (!call_args::values_write(value_stream, values, quantizers, types)
+        if (!call_args::values_write(
+                value_stream,
+                values,
+                quantizers,
+                types,
+                core()
+            )
             || !value_stream.align_verify()) {
             return PackedByteArray();
         }
@@ -1961,17 +2022,22 @@ bool decode_spawn_frame(
     return true;
 }
 
-bool Pipeline::frame_read(bool p_healthy, int64_t p_route) {
+bool Pipeline::frame_read(
+    bool p_healthy,
+    int64_t p_route,
+    int64_t p_sender
+) {
     if (p_healthy) {
         return true;
     }
     drops_spawn_truncated += 1;
     NetwMultiplayer *plane = core();
-    if (plane != nullptr && plane->warn_verdict(ERR_INVALID_DATA, p_route)) {
-        NETW_WARN(
-            sys::SPAWN,
-            "A spawn packet for route %d ended early, so it was dropped.",
-            p_route
+    if (plane != nullptr) {
+        plane->count_verdict(ERR_INVALID_DATA, p_route);
+        fault::raise(
+            plane,
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender}
         );
     }
     return false;
@@ -2051,7 +2117,7 @@ void Pipeline::admit_controller_spawn(
     }
     SpawnFrame named;
     if (!decode_spawn_frame(plane, p_payload, named)) {
-        frame_read(false, route);
+        frame_read(false, route, p_sender);
         refuse_controller_spawn(route, p_sender, ERR_INVALID_DATA, true);
         return;
     }
@@ -2062,7 +2128,8 @@ void Pipeline::admit_controller_spawn(
     }
     SpawnBuild built;
     built.strict = true;
-    const SpawnBuild::Outcome outcome = build_spawn(p_payload, built);
+    const SpawnBuild::Outcome outcome
+        = build_spawn(p_payload, p_sender, built);
     if (outcome != SpawnBuild::BUILT) {
         refuse_controller_spawn(route, p_sender, ERR_INVALID_PARAMETER, true);
         return;
@@ -2182,12 +2249,14 @@ void Pipeline::apply_parked(
     if (!admits_frame(p_sender, channel_spawn, p_payload)) {
         release_build(p_route);
         spawn_park_refused += 1;
-        NETW_WARN(
-            sys::SPAWN,
-            "A spawn for route %d was dropped, because peer %d lost its "
-            "authority while the spawn waited for its parent.",
-            int(p_route),
-            int(p_sender)
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_MISMATCH,
+            {String(),
+             String(),
+             String("the authority of peer ") + String::num_int64(p_sender),
+             p_sender,
+             p_route}
         );
         return;
     }
@@ -2199,7 +2268,7 @@ void Pipeline::try_apply_spawn(
     int64_t p_sender
 ) {
     SpawnBuild built;
-    switch (build_spawn(p_payload, built)) {
+    switch (build_spawn(p_payload, p_sender, built)) {
         case SpawnBuild::DROPPED:
             if (!built.scene.is_empty() || built.from_build) {
                 release_build(built.frame.route);
@@ -2256,6 +2325,7 @@ void Pipeline::park_built(
 
 SpawnBuild::Outcome Pipeline::build_spawn(
     const PackedByteArray &p_payload,
+    int64_t p_sender,
     SpawnBuild &r_built
 ) {
     NetwMultiplayer *plane = core();
@@ -2265,7 +2335,7 @@ SpawnBuild::Outcome Pipeline::build_spawn(
     }
     SpawnFrame &frame = r_built.frame;
     if (!decode_spawn_frame(plane, p_payload, frame)) {
-        frame_read(false, 0);
+        frame_read(false, 0, p_sender);
         return SpawnBuild::DROPPED;
     }
 
@@ -2363,12 +2433,15 @@ SpawnBuild::Outcome Pipeline::build_spawn(
                 recv_spawner->get_spawn_path()
             );
             if (elided_parent == nullptr) {
-                NETW_WARN(
-                    sys::SPAWN,
-                    "A spawn for route %d was dropped, because this peer's "
-                    "MultiplayerSpawner has no node at its spawn_path. Make "
-                    "spawn_path point to a node on every peer.",
-                    route
+                fault::raise(
+                    plane,
+                    NETW_FAULT_SPAWN_MISMATCH,
+                    {String(),
+                     String(),
+                     String("the node at its MultiplayerSpawner spawn_path"),
+                     p_sender,
+                     route},
+                    uint64_t(gd::instance_id(recv_spawner))
                 );
                 drops_spawn_unresolved += 1;
                 return SpawnBuild::DROPPED;
@@ -2379,11 +2452,12 @@ SpawnBuild::Outcome Pipeline::build_spawn(
                 .bind(recv_spawner, scene_index, r_built.data)
         );
         if (node == nullptr) {
-            NETW_WARN(
-                sys::SPAWN,
-                "A spawn for route %d was dropped, because its "
-                "MultiplayerSpawner did not build a node on this peer.",
-                route
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_RETURN,
+                {String("MultiplayerSpawner"),
+                 String("no returned Node"),
+                 String("a spawner that builds a node on every peer")}
             );
             drops_spawn_unresolved += 1;
             return SpawnBuild::DROPPED;
@@ -2392,26 +2466,29 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         const StringName id = StringName(frame.fn_id);
         const Callable fn = constructor_of(id);
         if (!fn.is_valid()) {
-            NETW_WARN(
-                sys::SPAWN,
-                "A spawn for route %d was dropped, because spawn constructor "
-                "'%s' is not registered on this peer. Register it with "
-                "NetwMultiplayer.spawn_register_constructor on every peer.",
-                route,
-                id
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_MISMATCH,
+                {String(),
+                 String(),
+                 String("spawn constructor '") + String(id) + String("'"),
+                 p_sender,
+                 route}
             );
             drops_spawn_unresolved += 1;
             return SpawnBuild::DROPPED;
         }
         const Variant schema = fn_registry_schema(id, fn);
         if (schema.get_type() == Variant::NIL) {
-            NETW_WARN(
-                sys::SPAWN,
-                "A spawn for route %d was dropped, because spawn constructor "
-                "'%s' has no argument types on this peer. Register it with the "
-                "same arg_types on every peer.",
-                route,
-                id
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_MISMATCH,
+                {String(),
+                 String(),
+                 String("the argument types of spawn constructor '")
+                     + String(id) + String("'"),
+                 p_sender,
+                 route}
             );
             drops_spawn_unresolved += 1;
             return SpawnBuild::DROPPED;
@@ -2431,19 +2508,21 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         );
         if (node == nullptr) {
             if (fn_waited) {
-                NETW_WARN(
-                    sys::SPAWN,
-                    "Spawn constructor '%s' waited, so the spawn was dropped. "
-                    "Return the node without waiting.",
-                    id
+                fault::raise(
+                    plane,
+                    NETW_FAULT_SPAWN_RETURN,
+                    {String("spawn constructor '") + String(id) + String("'"),
+                     String("an await"),
+                     String("a constructor that returns the node without "
+                            "waiting")}
                 );
             } else if (build_called) {
-                NETW_WARN(
-                    sys::SPAWN,
-                    "Spawn constructor '%s' did not return a Node, so the "
-                    "spawn "
-                    "was dropped.",
-                    id
+                fault::raise(
+                    plane,
+                    NETW_FAULT_SPAWN_RETURN,
+                    {String("spawn constructor '") + String(id) + String("'"),
+                     String("no returned Node"),
+                     String("a constructor that returns a Node")}
                 );
             }
             plane->spawn_report_failed(
@@ -2464,10 +2543,14 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         }
         Node *host = plane->anchor_resolve(host_anchor);
         if (host == nullptr) {
-            NETW_WARN(
-                sys::SPAWN,
-                "A spawn was dropped, because the node holding its spawn "
-                "function does not exist on this peer."
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_MISMATCH,
+                {String(),
+                 String(),
+                 String("the node holding its spawn function"),
+                 p_sender,
+                 route}
             );
             drops_spawn_unresolved += 1;
             return SpawnBuild::DROPPED;
@@ -2476,13 +2559,15 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         const StringName method = StringName(frame.method);
         const Variant schema = fn_script_schema(host->get_script(), method);
         if (schema.get_type() == Variant::NIL) {
-            NETW_WARN(
-                sys::SPAWN,
-                "A spawn was dropped, because spawn function '%s' is not "
-                "registered on '%s' on this peer. Call Netw.configure_spawn "
-                "for it on every peer.",
-                method,
-                host->get_name()
+            fault::raise(
+                plane,
+                NETW_FAULT_SPAWN_MISMATCH,
+                {String(),
+                 String(),
+                 String("spawn function '") + String(method) + String("'"),
+                 p_sender,
+                 route},
+                uint64_t(gd::instance_id(host))
             );
             drops_spawn_unresolved += 1;
             return SpawnBuild::DROPPED;
@@ -2517,18 +2602,21 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         }
         if (node == nullptr) {
             if (fn_waited) {
-                NETW_WARN(
-                    sys::SPAWN,
-                    "Spawn function '%s' waited, so the spawn was dropped. "
-                    "Use Netw.spawn_async for a spawn function that awaits.",
-                    method
+                fault::raise(
+                    plane,
+                    NETW_FAULT_SPAWN_RETURN,
+                    {String("spawn function '") + String(method) + String("'"),
+                     String("an await"),
+                     String("{Netw.spawn_async} for a spawn function that "
+                            "awaits")}
                 );
             } else if (build_called) {
-                NETW_WARN(
-                    sys::SPAWN,
-                    "Spawn function '%s' did not return a Node, so the spawn "
-                    "was dropped.",
-                    method
+                fault::raise(
+                    plane,
+                    NETW_FAULT_SPAWN_RETURN,
+                    {String("spawn function '") + String(method) + String("'"),
+                     String("no returned Node"),
+                     String("a function that returns a Node")}
                 );
             }
             plane->spawn_report_failed(
@@ -2544,12 +2632,15 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         ? elided_parent
         : plane->anchor_resolve(parent_anchor);
     if (parent == nullptr) {
-        NETW_WARN(
-            sys::SPAWN,
-            "A spawn for route %d was dropped, because its parent '%s' does "
-            "not exist on this peer.",
-            route,
-            String(parent_anchor[StringName("path")])
+        fault::raise(
+            plane,
+            NETW_FAULT_SPAWN_MISMATCH,
+            {String(),
+             String(),
+             String("its parent '")
+                 + String(parent_anchor[StringName("path")]) + String("'"),
+             p_sender,
+             route}
         );
         drops_spawn_unresolved += 1;
         if (!adopted && node != nullptr) {
@@ -2741,7 +2832,7 @@ void Pipeline::handle_despawn_frame(
     int64_t epoch = 0;
     if (!NetwMultiplayer::verb_head_read(reader, route, epoch)
         || !reader.align_verify() || reader.bits_remaining() != 0) {
-        frame_read(false, route);
+        frame_read(false, route, p_sender);
         return;
     }
     if (!plane->liveness_epoch_admits(route, epoch)) {
@@ -2831,7 +2922,7 @@ void Pipeline::handle_hide_frame(
     int64_t epoch = 0;
     if (!NetwMultiplayer::verb_head_read(reader, route, epoch)
         || !reader.align_verify() || reader.bits_remaining() != 0) {
-        frame_read(false, route);
+        frame_read(false, route, p_sender);
         return;
     }
     if (!plane->liveness_epoch_admits(route, epoch)) {
@@ -2905,7 +2996,7 @@ void Pipeline::handle_reparent_frame(
         || !plane->anchor_decode(reader, anchor) || !reader.varuint(revision, 5)
         || !reader.varuint(author, 5) || !reader.align_verify()
         || reader.bits_remaining() != 0) {
-        frame_read(false, route);
+        frame_read(false, route, p_sender);
         return;
     }
     if (!plane->liveness_epoch_admits(route, epoch)) {
@@ -2946,12 +3037,14 @@ void Pipeline::handle_reparent_frame(
         return;
     }
     if (parent == nullptr) {
-        NETW_WARN(
-            sys::SPAWN,
-            "Route %d could not be moved, because its new parent, route %d, "
-            "does not exist on this peer.",
-            int(route),
-            int(anchor_route)
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_MISMATCH,
+            {String(),
+             String(),
+             String("its new parent, route ") + String::num_int64(anchor_route),
+             p_sender,
+             route}
         );
         drops_spawn_unresolved += 1;
         return;
@@ -3020,18 +3113,16 @@ int64_t Pipeline::park_now() const {
 void Pipeline::warn_slow_build(
     const StringName &p_method,
     int64_t p_started_at,
-    bool &r_warned
+    uint64_t p_host
 ) const {
-    if (r_warned || park_now() - p_started_at < park_timeout_ticks()) {
+    if (park_now() - p_started_at < park_timeout_ticks()) {
         return;
     }
-    r_warned = true;
-    NETW_WARN(
-        sys::SPAWN,
-        "Spawn function '%s' has not returned after %s seconds. Check that "
-        "what it awaits can finish.",
-        p_method,
-        String::num(park_timeout_seconds)
+    fault::raise(
+        core(),
+        NETW_FAULT_SPAWN_STILL_WAITING,
+        {String(p_method), String(), String::num(park_timeout_seconds)},
+        p_host
     );
 }
 void Pipeline::park_spawn(
@@ -3114,10 +3205,10 @@ void Pipeline::expire_spawner_parked() {
             continue;
         }
         spawn_park_expired += 1;
-        NETW_WARN(
-            sys::SPAWN,
-            "A spawn was dropped, because its MultiplayerSpawner never "
-            "appeared on this peer."
+        fault::raise(
+            core(),
+            NETW_FAULT_SPAWN_MISMATCH,
+            {String(), String(), String("its MultiplayerSpawner")}
         );
     }
 }
@@ -3197,11 +3288,14 @@ void Pipeline::retry_adopt_parked() {
             cancel_parked(parked_route);
             spawn_park_expired += 1;
             drops_spawn_unresolved += 1;
-            NETW_WARN(
-                sys::SPAWN,
-                "%s exists on the server but not on this peer. Place it in the "
-                "same scene on every peer, or spawn it with Netw.spawn.",
-                missing
+            fault::raise(
+                core(),
+                NETW_FAULT_SPAWN_MISMATCH,
+                {String(),
+                 String(),
+                 String(missing),
+                 0,
+                 parked_route}
             );
             continue;
         }
@@ -3237,14 +3331,20 @@ void Pipeline::retry_build_parked() {
                 const StringName method = held->method;
                 cancel_parked(parked_route);
                 drops_spawn_unresolved += 1;
-                NETW_WARN(
-                    sys::SPAWN,
-                    "The node holding spawn function '%s' was freed before it "
-                    "returned, so the spawn was dropped.",
-                    method
+                fault::raise(
+                    core(),
+                    NETW_FAULT_SPAWN_RETURN,
+                    {String("spawn function '") + String(method) + String("'"),
+                     String("a freed holder node"),
+                     String("a node holding the spawn function that stays "
+                            "until it returns")}
                 );
             } else {
-                warn_slow_build(held->method, held->started_at, held->warned);
+                warn_slow_build(
+                    held->method,
+                    held->started_at,
+                    uint64_t(held->host)
+                );
             }
             continue;
         }
@@ -3369,10 +3469,12 @@ bool Pipeline::build_returned(
     }
     const StringName method = held->method;
     drop_build(p_route);
-    NETW_WARN(
-        sys::SPAWN,
-        "Spawn function '%s' did not return a Node, so the spawn was dropped.",
-        method
+    fault::raise(
+        core(),
+        NETW_FAULT_SPAWN_RETURN,
+        {String("spawn function '") + String(method) + String("'"),
+         String("no returned Node"),
+         String("a function that returns a Node")}
     );
     if (NetwMultiplayer *plane = core()) {
         plane->spawn_report_failed(p_route, String("returned no Node"));
@@ -3392,11 +3494,12 @@ void Pipeline::build_failed(
     }
     const StringName method = held->method;
     drop_build(p_route);
-    NETW_WARN(
-        sys::SPAWN,
-        "Spawn function '%s' failed with '%s', so the spawn was dropped.",
-        method,
-        p_detail
+    fault::raise(
+        core(),
+        NETW_FAULT_SPAWN_RETURN,
+        {String("spawn function '") + String(method) + String("'"),
+         String("the error '") + p_detail + String("'"),
+         String("a function that finishes without an error")}
     );
     if (NetwMultiplayer *plane = core()) {
         plane->spawn_report_failed(
@@ -3418,11 +3521,14 @@ SpawnBuild::Outcome Pipeline::drop_missing_scene(
     const String &p_path
 ) {
     release_build(p_route);
-    NETW_WARN(
-        sys::SPAWN,
-        "A spawn was dropped, because scene '%s' does not exist on this "
-        "peer. Export the same scenes on every peer.",
-        p_path
+    fault::raise(
+        core(),
+        NETW_FAULT_SPAWN_MISMATCH,
+        {String(),
+         String(),
+         String("scene '") + p_path + String("'"),
+         0,
+         p_route}
     );
     drops_spawn_unresolved += 1;
     return SpawnBuild::DROPPED;

@@ -159,14 +159,7 @@ int64_t SetModel::declare(
     NETW_ZONE_NC("Set declare", colors::WIRE);
     revision += 1;
     if (p_route <= 0 || String(p_key).is_empty()) {
-        NETW_WARN_ONCE(
-            sys::WIRE,
-            "Properties declared on route %d under key '%s' have no valid "
-            "address, so they will not sync.",
-            int(p_route),
-            String(p_key).utf8().get_data()
-        );
-        return -1;
+        NETW_BUG_V(-1);
     }
     LocalVector<SetRow> &rows = routes[p_route];
     SetRow *found = nullptr;

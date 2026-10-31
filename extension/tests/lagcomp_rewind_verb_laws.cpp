@@ -151,7 +151,7 @@ TEST_CASE(
     }
     NETW_CHECK_CLOSE(range.offset(), double(TICKS), 0.0001);
     NETW_CHECK_EQ(
-        faults.warnings_containing("changed inside a rewind"),
+        faults.warnings_containing("a change inside the rewind"),
         int64_t(1)
     );
 }
@@ -164,7 +164,7 @@ TEST_CASE(
     const netw_test::FaultWatch faults;
     range.shooter->call(StringName("look"), range.entities, range.past);
     NETW_CHECK_EQ(
-        faults.warnings_containing("changed inside a rewind"),
+        faults.warnings_containing("a change inside the rewind"),
         int64_t(0)
     );
 }
@@ -177,7 +177,7 @@ TEST_CASE(
     const netw_test::FaultWatch faults;
     range.shooter->call(StringName("await_inside"), range.entities, range.past);
     NETW_CHECK_EQ(
-        faults.warnings_containing("rewind body awaited"),
+        faults.warnings_containing("[NW1015]"),
         int64_t(1)
     );
     NETW_CHECK_CLOSE(range.offset(), double(TICKS), 0.0001);

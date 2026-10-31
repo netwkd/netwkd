@@ -44,12 +44,7 @@ TEST_CASE(
     "seats a viewer and a client session is refused"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][scene] Condition \"!is_host()\" is true. Returning: "
-        "ERR_UNAUTHORIZED. NetwMultiplayer.scene_watch runs only on"
-        " the server, and was called for peer * on a client.",
-        1
-    );
+    expected_faults.expect_error("*scene_watch*[NW0012]*", 1);
 
     Ref<NetwMultiplayer> owning = a_session_at(1);
     REQUIRE(owning->is_host());
@@ -78,12 +73,7 @@ TEST_CASE(
     "anything"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][scene] Condition \"!is_host()\" is true. Returning: "
-        "false. NetwMultiplayer.scene_unwatch runs only on the "
-        "server, and was called for peer * on a client.",
-        1
-    );
+    expected_faults.expect_error("*scene_unwatch*[NW0012]*", 1);
 
     Ref<NetwMultiplayer> owning = a_session_at(1);
     const DeclaredScene arena = declare_scene(owning, "Arena");

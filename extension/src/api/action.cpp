@@ -5,6 +5,7 @@
 #include "godot/vararg.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/spawn/pipeline.hpp"
@@ -30,13 +31,13 @@ Node *live_node(int64_t p_id) {
 }
 
 const GameCall ACTION_PREDICT
-    = {sys::PREDICTION, "NetwAction.predict", "func() -> Node", 0};
+    = {"NetwAction.predict", "func() -> Node", 0};
 
 const GameCall ACTION_REVERT
-    = {sys::PREDICTION, "NetwAction.revert", "func(node: Node) -> void", 1};
+    = {"NetwAction.revert", "func(node: Node) -> void", 1};
 
 const GameCall ACTION_CONFIRM
-    = {sys::PREDICTION, "NetwAction.confirm", "func(node: Node) -> void", 1};
+    = {"NetwAction.confirm", "func(node: Node) -> void", 1};
 
 } // namespace
 
@@ -78,11 +79,13 @@ bool built_async(Node *p_node) {
 
 void NetwActionContext::bind_result(Node *p_node) {
     if (p_node != nullptr && built_async(p_node)) {
-        NETW_ERROR(
-            sys::SPAWN,
-            "NetwActionContext.bind_result got '%s', which Netw.spawn_async "
-            "built. Spawn it with Netw.spawn inside the action.",
-            p_node->get_name()
+        fault::raise(
+            session(),
+            NETW_FAULT_SPAWN_REFUSED,
+            {vformat("'%s'", String(p_node->get_name())),
+             String("a node built by {Netw.spawn_async}"),
+             String("{Netw.spawn} inside the action")},
+            gd::instance_id(p_node)
         );
         return;
     }
@@ -239,12 +242,13 @@ void NetwAction::request(int64_t p_view_tick, const Array &p_args) {
     const Ref<NetwEntity> entity
         = Object::cast_to<NetwEntity>(gd::object_of(entity_id));
     if (entity.is_null()) {
-        NETW_WARN_ONCE(
-            sys::PREDICTION,
-            "Action '%s' was requested, but its node is not part of an "
-            "entity. Call Netw.action on a method of a node under a "
-            "NetwEntity.",
-            String(method)
+        Node *node = Object::cast_to<Node>(authority.get_object());
+        fault::raise(
+            session(),
+            NETW_FAULT_NOT_ENTITY,
+            {"NetwAction.request",
+             node != nullptr ? String(node->get_name()) : String(method)},
+            gd::instance_id(node)
         );
         return;
     }
@@ -260,23 +264,22 @@ void NetwAction::request(int64_t p_view_tick, const Array &p_args) {
         target_path = tree_relative_path(target);
     }
     if (target_path.is_empty()) {
-        NETW_WARN_ONCE(
-            sys::PREDICTION,
-            "Action '%s' was requested while its node is outside the scene "
-            "tree, so nothing was sent. Request it after the node enters the "
-            "tree.",
-            String(method)
+        fault::raise(
+            api,
+            NETW_FAULT_NOT_IN_SESSION,
+            {"NetwAction.request",
+             target != nullptr ? String(target->get_name()) : String(method)},
+            gd::instance_id(target)
         );
         return;
     }
     const Error ready = api->lagcomp_require("the action request");
     if (ready == ERR_BUSY) {
-        NETW_ERROR(
-            sys::PREDICTION,
-            "Action '%s' was requested while the session applied its "
-            "Netw.configure_* settings, so nothing was sent. Request it "
-            "outside the callbacks that react to those settings.",
-            String(method)
+        fault::raise(
+            api,
+            NETW_FAULT_BUSY_APPLYING,
+            {"NetwAction.request"},
+            gd::instance_id(target)
         );
         return;
     }

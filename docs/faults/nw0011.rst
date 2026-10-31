@@ -1,0 +1,23 @@
+:github_url: hide
+
+.. _fault_nw0011:
+
+NW0011. The session has properties to send and no clock
+=======================================================
+
+Reported as an error once the session is online, a property is waiting to be
+sent, and no clock is configured.
+
+No property value is sent until a clock exists.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        Netw.configure_property(self, &"health").broadcast()
+
+Declare the clock on every peer before the session starts.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self)

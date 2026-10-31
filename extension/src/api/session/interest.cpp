@@ -23,6 +23,7 @@
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
 #include "netw/api/sync_pipeline.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/entity/stage.hpp"
@@ -46,28 +47,23 @@ namespace netw {
 namespace {
 
 const GameCall PERCEPTION_CUSTOM
-    = {sys::INTEREST,
-       "The NetwInterest.on_perception_policy custom_callback",
+    = {"The NetwInterest.on_perception_policy custom_callback",
        "func(visible: bool, peer_id: int, layer_id: StringName)",
        3};
 const GameCall LAYER_DRIVER
-    = {sys::INTEREST,
-       "NetwInterestLayer.driver",
+    = {"NetwInterestLayer.driver",
        "func(layer: NetwInterestLayer) -> Array[NetwEntity]",
        1};
 const GameCall LAYER_DRIVER_RID
-    = {sys::INTEREST,
-       "The NetwMultiplayer.interest_layer_set_driver_callback callback",
+    = {"The NetwMultiplayer.interest_layer_set_driver_callback callback",
        "func(layer: RID) -> Array[RID]",
        1};
 const GameCall LAYER_MONITOR
-    = {sys::INTEREST,
-       "NetwInterestLayer.monitor",
+    = {"NetwInterestLayer.monitor",
        "func(entity: NetwEntity, peer_id: int, visible: bool)",
        3};
 const GameCall LAYER_MONITOR_RID
-    = {sys::INTEREST,
-       "The NetwMultiplayer.interest_layer_set_monitor_callback callback",
+    = {"The NetwMultiplayer.interest_layer_set_monitor_callback callback",
        "func(visible: bool, entity: RID, peer_id: int)",
        3};
 
@@ -152,12 +148,25 @@ Dictionary NetwMultiplayer::interest_leave_resolve(
         return Dictionary();
     }
     const RID handle = p_entity->get_rid_handle();
-    return interest_leave_engine.resolve(
+    StringName freed;
+    const Dictionary verdict = interest_leave_engine.resolve(
         handle.get_id(),
         p_peer_id,
         interest_decl_on(p_entity),
-        interest_engine
+        interest_engine,
+        &freed
     );
+    if (!String(freed).is_empty()) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("The CUSTOM leave policy of layer '%s'", freed),
+             String(),
+             String("a callback whose object stays alive while the layer "
+                    "uses it")}
+        );
+    }
+    return verdict;
 }
 
 void NetwMultiplayer::interest_leave_commit(
@@ -248,11 +257,23 @@ void NetwMultiplayer::interest_refresh_perception(
     if (layers.is_empty()) {
         layers = perception_layers_for(p_entity, peer_id);
     }
+    StringName freed;
     const Dictionary verdict = interest_perception.resolve(
         layers,
         interest_decl_on(p_entity),
-        interest_engine
+        interest_engine,
+        &freed
     );
+    if (!String(freed).is_empty()) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("The CUSTOM perception policy of layer '%s'", freed),
+             String(),
+             String("a callback whose object stays alive while the layer "
+                    "uses it")}
+        );
+    }
     if (bool(verdict[StringName("hide")])) {
         perception_hide(slot, p_entity->get_owner());
     }
@@ -1197,13 +1218,14 @@ Error NetwMultiplayer::interest_flush_tail() {
 }
 
 Error NetwMultiplayer::interest_flush_immediate() {
-    NETW_ERR_COND_V(
-        !interest_flush.is_valid(),
-        ERR_UNCONFIGURED,
-        sys::INTEREST,
-        "Interest could not be updated, because interest is not running on "
-        "this peer."
-    );
+    if (!interest_flush.is_valid()) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"Updating interest", String(), "interest"}
+        );
+        return ERR_UNCONFIGURED;
+    }
     interest_flush.call();
     return OK;
 }
@@ -1214,10 +1236,10 @@ StringName NetwMultiplayer::interest_flush_key() {
 
 void NetwMultiplayer::interest_request_flush() {
     if (!interest_flush.is_valid()) {
-        NETW_ERROR(
-            sys::INTEREST,
-            "Interest could not be updated, because interest is not running "
-            "on this peer."
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"Updating interest", String(), "interest"}
         );
         return;
     }
@@ -1235,16 +1257,8 @@ void NetwMultiplayer::interest_awareness_queue_layer(
     int p_kind
 ) {
     NETW_ZONE_NC("NetwMultiplayer awareness layer edge", colors::INTEREST);
-    NETW_ERR_COND(
-        p_peer_id == 0,
-        sys::INTEREST,
-        "An interest change was dropped, because it was addressed to peer 0."
-    );
-    NETW_ERR_COND(
-        p_route == 0,
-        sys::INTEREST,
-        "An interest change was dropped, because its entity has no route."
-    );
+    NETW_BUG_COND(p_peer_id == 0);
+    NETW_BUG_COND(p_route == 0);
     NETW_TRACE(
         sys::INTEREST,
         "Awareness layer edge for peer %d on route %d.",
@@ -1265,16 +1279,8 @@ void NetwMultiplayer::interest_awareness_queue_observer(
     int p_kind
 ) {
     NETW_ZONE_NC("NetwMultiplayer awareness observer edge", colors::INTEREST);
-    NETW_ERR_COND(
-        p_peer_id == 0,
-        sys::INTEREST,
-        "An interest change was dropped, because it was addressed to peer 0."
-    );
-    NETW_ERR_COND(
-        p_route == 0,
-        sys::INTEREST,
-        "An interest change was dropped, because its entity has no route."
-    );
+    NETW_BUG_COND(p_peer_id == 0);
+    NETW_BUG_COND(p_route == 0);
     NETW_TRACE(
         sys::INTEREST,
         "Awareness observer edge for peer %d naming observer %d.",
@@ -1319,12 +1325,14 @@ void NetwMultiplayer::interest_awareness_clear() {
 }
 
 RID NetwMultiplayer::layer_open(const StringName &p_name) {
-    NETW_ERR_COND_V(
-        p_name.is_empty(),
-        RID(),
-        sys::INTEREST,
-        "An interest layer needs a name. Pass a non-empty name."
-    );
+    if (p_name.is_empty()) {
+        fault::raise(
+            this,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwInterest.layer}", String(), "name"}
+        );
+        return RID();
+    }
     const RID *known = layer_by_name.getptr(p_name);
     if (known != nullptr) {
         return *known;
@@ -1434,10 +1442,11 @@ Error NetwMultiplayer::interest_layer_add_entity(
         return ERR_DOES_NOT_EXIST;
     }
     if (!is_host()) {
-        NETW_WARN(
-            sys::INTEREST,
-            "NetwMultiplayer.interest_layer_add_entity runs only on the "
-            "server."
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.interest_layer_add_entity}"},
+            gd::instance_id(wrapper->get_owner())
         );
         return ERR_UNAUTHORIZED;
     }
@@ -1456,10 +1465,11 @@ Error NetwMultiplayer::interest_layer_remove_entity(
         return ERR_DOES_NOT_EXIST;
     }
     if (!is_host()) {
-        NETW_WARN(
-            sys::INTEREST,
-            "NetwMultiplayer.interest_layer_remove_entity runs only on the "
-            "server."
+        fault::raise(
+            this,
+            NETW_FAULT_SERVER_ONLY,
+            {"{NetwMultiplayer.interest_layer_remove_entity}"},
+            gd::instance_id(wrapper->get_owner())
         );
         return ERR_UNAUTHORIZED;
     }
@@ -1489,10 +1499,12 @@ void NetwMultiplayer::interest_layer_set_param(
             );
             return;
         default:
-            NETW_ERR(
-                sys::INTEREST,
-                "Interest layer setting %d does not exist.",
-                p_param
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {"An interest layer setting",
+                 vformat("setting %d", int(p_param)),
+                 "an interest layer setting that exists"}
             );
     }
 }
@@ -1558,11 +1570,12 @@ Error NetwMultiplayer::layer_drive(const LayerDriverRow &p_row) {
     }
     const String layer_name = record->get_layer_id();
     if (answered.get_type() != Variant::ARRAY) {
-        NETW_WARN(
-            sys::INTEREST,
-            "The driver of layer '%s' did not return an Array, so the layer "
-            "was not changed. Return the entities that belong in it.",
-            layer_name
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_RETURN,
+            {vformat("The driver of layer '%s'", layer_name),
+             "something that is not an Array",
+             "an Array of the entities that belong in the layer"}
         );
         return ERR_INVALID_DATA;
     }
@@ -1582,12 +1595,12 @@ Error NetwMultiplayer::layer_drive(const LayerDriverRow &p_row) {
             entity = entity_get_view(wanted[at]);
         }
         if (entity.is_null()) {
-            NETW_WARN(
-                sys::INTEREST,
-                "The driver of layer '%s' returned something that is not an "
-                "entity of this session, so the layer was not changed. "
-                "Return only entities spawned in this session.",
-                layer_name
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_RETURN,
+                {vformat("The driver of layer '%s'", layer_name),
+                 "something that is not an entity of this session",
+                 "only entities spawned in this session"}
             );
             return ERR_DOES_NOT_EXIST;
         }
@@ -1676,10 +1689,12 @@ Ref<NetwInterestLayer> NetwMultiplayer::interest_layer_view(
     const RID &p_layer
 ) const {
     if (scene_owns_layer(layer_name_of(p_layer))) {
-        NETW_ERROR(
-            sys::INTEREST,
-            "This layer belongs to a multiplayer scene, so it cannot be "
-            "changed directly. Change it through Netw.scene."
+        fault::raise(
+            const_cast<NetwMultiplayer *>(this),
+            NETW_FAULT_UNSUPPORTED,
+            {"Changing an interest layer",
+             "a layer that belongs to a multiplayer scene",
+             "{Netw.scene} to change it"}
         );
         return Ref<NetwInterestLayer>();
     }

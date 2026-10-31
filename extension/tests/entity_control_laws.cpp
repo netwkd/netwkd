@@ -269,7 +269,7 @@ TEST_CASE(
                     : NetwEntity::TRANSFER_REQUESTABLE)
     );
     NETW_CHECK_EQ(
-        watch.log->error_count_containing("TRANSFER_IMMEDIATE"),
+        int(watch.warnings_containing("TRANSFER_IMMEDIATE")),
         follows ? 0 : 1
     );
 
@@ -290,10 +290,7 @@ TEST_CASE(
         int(follows ? NetwEntity::AUTHORITY_CONTROLLER
                     : NetwEntity::AUTHORITY_SERVER)
     );
-    NETW_CHECK_EQ(
-        watch.log->error_count_containing("after it entered the tree"),
-        1
-    );
+    NETW_CHECK_EQ(watch.log->error_count_containing("[NW0036]"), 1);
     watch.log->error_count_containing("TRANSFER_IMMEDIATE");
 
     memdelete(owner);
@@ -320,8 +317,8 @@ TEST_CASE(
     NETW_CHECK_EQ(owner->get_multiplayer_authority(), 1);
     NETW_CHECK_EQ(child->get_multiplayer_authority(), 1);
     NETW_CHECK_EQ(
-        watch.log->warning_count_containing("NetwEntity.authority"),
-        1
+        watch.log->error_count_containing("[NW1012]"),
+        2
     );
 
     memdelete(owner);

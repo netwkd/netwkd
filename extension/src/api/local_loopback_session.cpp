@@ -10,6 +10,7 @@
 #include "godot/project_settings.hpp"
 #include "godot/utility.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 
@@ -102,9 +103,10 @@ void LocalLoopbackSession::init_server_side() {
     server_peer.instantiate();
     server_peer->set_loopback_session(this);
     if (server_peer->create_server() != Error::OK) {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "LocalLoopbackSession could not create its server peer."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {"the loopback session", String(), "its server peer"}
         );
     }
     server_peer->term = transfer_term;
@@ -126,9 +128,10 @@ Ref<LocalMultiplayerPeer> LocalLoopbackSession::create_client_peer() {
         ? draw_fresh_id()
         : int(gd::randi_range(2, 2147483647));
     if (client->create_client(client_id) != Error::OK) {
-        NETW_WARN(
-            sys::TRANSPORT,
-            "LocalLoopbackSession could not create a client peer."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_LINK_FAILED,
+            {"the loopback session", String(), "a client peer"}
         );
         return client;
     }
@@ -224,11 +227,7 @@ void LocalLoopbackSession::poll_peers() {
 }
 
 void LocalLoopbackSession::poll_or_hold(LocalMultiplayerPeer *p_peer) {
-    NETW_ASSERT(
-        p_peer != nullptr,
-        sys::TRANSPORT,
-        "A loopback poll requires a peer."
-    );
+    NETW_ASSERT(p_peer != nullptr);
     LinkState *state = link_of(p_peer);
     if (state != nullptr && state->held) {
         capture_held_packets(p_peer);

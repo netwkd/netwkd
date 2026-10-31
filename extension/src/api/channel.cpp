@@ -4,6 +4,7 @@
 #include "godot/class_db.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 
@@ -14,8 +15,7 @@ namespace netw {
 namespace {
 
 const GameCall CHANNEL_HANDLER
-    = {sys::LIVENESS,
-       "The NetwChannel.register handler",
+    = {"The NetwChannel.register handler",
        "func(sender: int, payload: PackedByteArray) -> void",
        2};
 
@@ -30,13 +30,14 @@ ReplicationCore *NetwChannel::plane() const {
 Ref<NetwChannel> NetwChannel::over(int64_t p_id, NetwMultiplayer *p_session) {
     if (p_id < NetwMultiplayer::CHANNEL_USER_FIRST
         || p_id > NetwMultiplayer::CHANNEL_USER_LAST) {
-        NETW_ERROR(
-            sys::LIVENESS,
-            "Channel id %d is not available to a game. Use an id from %d "
-            "to %d.",
-            int(p_id),
-            int(NetwMultiplayer::CHANNEL_USER_FIRST),
-            int(NetwMultiplayer::CHANNEL_USER_LAST)
+        fault::raise(
+            p_session,
+            NETW_FAULT_BAD_VALUE,
+            {String("{Netw.channel}"),
+             vformat("channel id %d", int(p_id)),
+             vformat("an id from %d to %d",
+                     int(NetwMultiplayer::CHANNEL_USER_FIRST),
+                     int(NetwMultiplayer::CHANNEL_USER_LAST))}
         );
         return Ref<NetwChannel>();
     }
@@ -50,10 +51,12 @@ Ref<NetwChannel> NetwChannel::over(int64_t p_id, NetwMultiplayer *p_session) {
 Ref<NetwChannel> NetwChannel::of(Node *p_node, int64_t p_id) {
     NetwMultiplayer *api = NetwMultiplayer::of(p_node);
     if (api == nullptr) {
-        NETW_ERROR(
-            sys::LIVENESS,
-            "Netw.channel got a node that is not inside a session. Call it "
-            "from a node in the scene tree under a MultiplayerViewport."
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_IN_SESSION,
+            {String("{Netw.channel}"),
+             p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
+            p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
         return Ref<NetwChannel>();
     }

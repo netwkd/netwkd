@@ -5,6 +5,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/prediction.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/sim/body.hpp"
@@ -16,8 +17,7 @@ namespace netw {
 namespace {
 
 const GameCall SIMULATION_STEP
-    = {sys::PREDICTION,
-       "NetwSimulation.step",
+    = {"NetwSimulation.step",
        "func(delta: float, tick: int, is_fresh: bool) -> void",
        3};
 
@@ -123,14 +123,16 @@ void NetwSimulation::set_bodies(const TypedArray<NodePath> &p_value) {
     NetwMultiplayer *session = core();
     const sim::Row *row
         = session != nullptr ? session->sim_row_of(entity_rid()) : nullptr;
-    if (row != nullptr && row->bodies.recorded && !bodies_warned) {
-        bodies_warned = true;
-        NETW_WARN(
-            sys::PREDICTION,
-            "NetwSimulation.bodies on %s changed after the entity "
-            "spawned, so the change is ignored. Set it before the entity "
-            "enters the tree.",
-            entity_name(entity()).utf8().get_data()
+    if (row != nullptr && row->bodies.recorded) {
+        const Ref<NetwEntity> owner = entity();
+        fault::raise(
+            session,
+            NETW_FAULT_TOO_LATE,
+            {String("NetwSimulation.bodies"),
+             String("'") + entity_name(owner) + String("'"),
+             String("the entity enters the tree")},
+            owner.is_valid() ? uint64_t(gd::instance_id(owner->get_owner()))
+                             : 0
         );
     }
     declare();
@@ -246,13 +248,19 @@ TypedArray<NetwEntity> NetwSimulation::get_selected() const {
 }
 
 void NetwSimulation::simulate(const Ref<NetwEntity> &p_entity) {
-    NETW_ERR_COND(
-        p_entity.is_null(),
-        sys::PREDICTION,
-        "NetwSimulation.simulate on %s needs an entity, and it was "
-        "null.",
-        entity_name(entity()).utf8().get_data()
-    );
+    if (p_entity.is_null()) {
+        const Ref<NetwEntity> owner = entity();
+        fault::raise(
+            core(),
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwSimulation.simulate}"),
+             String(),
+             String("an entity")},
+            owner.is_valid() ? uint64_t(gd::instance_id(owner->get_owner()))
+                             : 0
+        );
+        return;
+    }
     if (live() && p_entity->get_owner() != nullptr
         && core()->sim_simulate(entity_rid(), p_entity) != OK) {
         return;

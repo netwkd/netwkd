@@ -92,41 +92,21 @@ struct Row {
     const char *name;
     int waiter;
     Wait wait;
-    bool error;
     const char *message;
 };
 
 constexpr const char *FN_FIX
-    = "Use Netw.spawn_async for a spawn function that awaits.";
-constexpr const char *REGISTRY_FIX = "Return the node without waiting.";
+    = "Netw.spawn_async for a spawn function that awaits";
+constexpr const char *REGISTRY_FIX
+    = "a constructor that returns the node without waiting";
 
 const Row ROWS[] = {
-    {"server coroutine",
-     SERVER,
-     COROUTINE,
-     true,
-     "Spawn function 'make' waited."},
-    {"client coroutine",
-     A,
-     COROUTINE,
-     false,
-     "Spawn function 'make' waited, so the spawn"},
-    {"server promise", SERVER, PROMISE, true, "Spawn function 'make' waited."},
-    {"client promise",
-     A,
-     PROMISE,
-     false,
-     "Spawn function 'make' waited, so the spawn"},
-    {"server registry",
-     SERVER,
-     REGISTRY,
-     true,
-     "Spawn constructor 'waiting' waited."},
-    {"client registry",
-     A,
-     REGISTRY,
-     false,
-     "Spawn constructor 'waiting' waited, so the spawn"},
+    {"server coroutine", SERVER, COROUTINE, "spawn function 'make'"},
+    {"client coroutine", A, COROUTINE, "spawn function 'make'"},
+    {"server promise", SERVER, PROMISE, "spawn function 'make'"},
+    {"client promise", A, PROMISE, "spawn function 'make'"},
+    {"server registry", SERVER, REGISTRY, "spawn constructor 'waiting'"},
+    {"client registry", A, REGISTRY, "spawn constructor 'waiting'"},
 };
 
 void register_waiting(NetwMultiplayer *p_api, Node *p_host) {
@@ -208,11 +188,7 @@ TEST_CASE(
         }
         const String fix = row.wait == REGISTRY ? REGISTRY_FIX : FN_FIX;
         for (const String message : {String(row.message), fix}) {
-            NETW_CHECK_EQ(
-                row.error ? faults.errors_containing(message)
-                          : faults.warnings_containing(message),
-                1
-            );
+            NETW_CHECK_EQ(faults.errors_containing(message), 1);
         }
 
         waiter->call(StringName("finish"));

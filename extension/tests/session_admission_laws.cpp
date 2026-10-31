@@ -376,12 +376,7 @@ TEST_CASE(
     "peer by"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] The host could not join its own session, so it has "
-        "no NetwPlayer. The server did not let this player join "
-        "(Unauthorized).",
-        1
-    );
+    expected_faults.expect_error("*Unauthorized*[NW0020]*", 1);
 
     Node *branch = mounted_branch("AdmitG5");
     const Ref<NetwMultiplayer> host = branch_session(branch);
@@ -404,8 +399,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][session] The admission handler returned String. "
-        "Return OK or an Error.",
+        "*the admission handler returned String*[NW1007]*",
         1
     );
 
@@ -430,17 +424,8 @@ TEST_CASE(
     "and the host's own join reports it once"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] The admission handler cannot take a "
-        "NetwJoinRequest, so the join was refused. Declare it as func "
-        "admit(request: NetwJoinRequest) -> Error.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] The host could not join its own session, so it has "
-        "no NetwPlayer. The admission handler cannot take a NetwJoinRequest*",
-        1
-    );
+    expected_faults.expect_error("*The admission handler*[NW1002]*", 1);
+    expected_faults.expect_error("*cannot take a NetwJoinRequest*[NW0020]*", 1);
 
     Node *branch = mounted_branch("AdmitG7");
     const Ref<NetwMultiplayer> host = branch_session(branch);

@@ -212,6 +212,7 @@ if use_mold and shutil.which("mold"):
     env.Append(LINKFLAGS=["-fuse-ld=mold"])
 env.Append(CXXFLAGS=["-std=c++17"])
 env.Append(CPPPATH=[str(ROOT), str(ROOT / "include")])
+env.Append(CPPPATH=[str(ROOT.parent / "core")])
 sources.hold_determinism_floor(
     env,
     lambda message: Exit("networked: " + message),
@@ -232,6 +233,9 @@ build_sources = sources.get_sources(
     env,
     env["target"] in ["editor", "template_debug"],
 )
+fault_text_env = env.Clone()
+fault_text_env.Append(CCFLAGS=sources.SWITCH_ERROR_FLAGS[sources.dialect(env)])
+build_sources.append(fault_text_env.SharedObject(str(sources.FAULT_TEXT)))
 
 if env["target"] in ["editor", "template_debug"]:
     doc_xml = Glob("doc_classes/*.xml")

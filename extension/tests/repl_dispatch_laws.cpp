@@ -74,11 +74,7 @@ TEST_CASE(
     "by the address clamp before anything is resolved through it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet named path '*', which leaves "
-        "entity '*', so it was dropped.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     Stand stand = a_stand();
     Node *outside = memnew(Node);

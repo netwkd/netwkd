@@ -1,0 +1,13 @@
+:github_url: hide
+
+.. _fault_nw0030:
+
+NW0030. A transport made a server move the session cannot follow
+================================================================
+
+Reported as a warning when a transport moves the server to a peer outside
+this session, or starts a second move during the last one.
+
+The session ended. The log line names the transport and the refused move.
+
+Give the transport a successor it links to, and have it move once at a time.

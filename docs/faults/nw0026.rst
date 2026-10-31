@@ -1,0 +1,26 @@
+:github_url: hide
+
+.. _fault_nw0026:
+
+NW0026. A spawn named something this peer does not have
+=======================================================
+
+Reported as a warning when the server sends a spawn that needs a scene, node,
+spawn function, spawn constructor or parent that does not exist on this peer.
+
+The spawn was dropped. The log line gives the route and the missing piece.
+
+A client that lacks the scene or the function cannot build the node.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        if multiplayer.is_server():
+            Netw.configure_spawn(self, make_car)
+
+Create it the same way on every peer.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_spawn(self, make_car)

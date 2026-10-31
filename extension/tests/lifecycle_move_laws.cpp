@@ -360,11 +360,7 @@ TEST_CASE(
     "session's anchor, and no row from the refused branch is seated anywhere"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     const netw_test::FaultWatch faults;
     MoveStage stage;
@@ -402,7 +398,7 @@ TEST_CASE(
     );
 
     NETW_CHECK_EQ(faults.errors(), 0);
-    NETW_CHECK_EQ(faults.warnings_containing("was refused with error 30"), 1);
+    NETW_CHECK_EQ(faults.warnings_containing("(error 30)"), 1);
     const Seats session = stage.seats_on(-1, GHOST, SHELF);
     const Seats observer = stage.seats_on(1, GHOST, SHELF);
     NETW_CHECK_EQ(session.from_the_branch, int64_t(0));
@@ -418,11 +414,7 @@ TEST_CASE(
     "session's anchor"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     MoveStage stage;
     REQUIRE(stage.cube_on(0) != nullptr);
@@ -459,13 +451,7 @@ TEST_CASE(
     "and never sent"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] Node.reparent: '*' already has 8 moves "
-        "waiting on the session authority, the most one entity may "
-        "have. Chain the next move on the promise of the last. It "
-        "is moved back.",
-        1
-    );
+    expected_faults.expect_error("*'Cube'*[NW0041]*", 1);
 
     MoveStage stage;
     REQUIRE(stage.cube_on(0) != nullptr);
@@ -537,11 +523,7 @@ TEST_CASE(
     "session before the controller's move does"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 4.",
-        1
-    );
+    expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
     MoveStage stage;
     REQUIRE(stage.cube_on(0) != nullptr);
@@ -647,12 +629,7 @@ TEST_CASE(
     "before the move settles, and no move reaches the session"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] Node.reparent on '*' was refused, because "
-        "this peer'*'s promise resolves. It moved before the server"
-        " allowed it, so it is moved back.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     MoveStage stage;
     REQUIRE(stage.cube_on(1) != nullptr);
@@ -710,11 +687,7 @@ TEST_CASE(
     const Ref<NetwEntity> claimant = NetwEntity::of(stage.cube_on(1));
 
     SUBCASE("refused") {
-        expected_faults.expect_warning(
-            "[warn][transport] A packet for route * was refused "
-            "with error 4.",
-            1
-        );
+        expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
 
         NetwEntity::of(stage.cube_on(-1))
             ->connect(

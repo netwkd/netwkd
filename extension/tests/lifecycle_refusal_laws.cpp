@@ -149,7 +149,6 @@ struct RefusalScenario {
     Standing standing = STANDING_NONE;
     Target target = TARGET_SHELF;
     Error code = ERR_UNAUTHORIZED;
-    const char *says = "";
 };
 
 struct RefusalEvidence {
@@ -170,8 +169,7 @@ RefusalScenario row(
     bool p_declared,
     Standing p_standing,
     Target p_target,
-    Error p_code,
-    const char *p_says
+    Error p_code
 ) {
     RefusalScenario scenario;
     scenario.label = p_label;
@@ -180,7 +178,6 @@ RefusalScenario row(
     scenario.standing = p_standing;
     scenario.target = p_target;
     scenario.code = p_code;
-    scenario.says = p_says;
     return scenario;
 }
 
@@ -398,12 +395,10 @@ LawVerdict law_names_the_setting(const RefusalRun &p_run) {
     if (seen.errors != 1) {
         return law_broken("%d errors were raised, not one", seen.errors);
     }
-    const String says = p_run.scenario().says;
-    if (!seen.first_error.contains(says)
+    if (!seen.first_error.contains("[NW0041]")
         || !seen.first_error.contains(seen.root)) {
         return law_broken(
-            "the error names neither '%s' nor the root, it reads '%s'",
-            says.utf8().get_data(),
+            "the error names neither the code nor the root, it reads '%s'",
             seen.first_error.utf8().get_data()
         );
     }
@@ -473,200 +468,93 @@ TEST_CASE(
     "its error names NetwEntity.lifecycle and the root"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "only the session authority moves it. Set "
-        "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its "
-        "root enters the tree to let its controller move it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "this peer is neither the session authority nor its "
-        "controller. Call it from the peer that controls it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "this peer'*'s promise resolves.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "it is predicted, so only the session authority moves it, "
-        "whatever NetwEntity.lifecycle says. Call it on the server.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "it is replicated through a MultiplayerSynchronizer or a "
-        "MultiplayerSpawner, so only the session authority moves "
-        "it, whatever NetwEntity.lifecycle says. Call it on the "
-        "server.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "it is an entity spawned for a player, so only the session authority "
-        "moves it, whatever NetwEntity.lifecycle says. Call it on the "
-        "server.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "the new parent is outside the session root. Pick a parent "
-        "under the session root.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "the new parent is inside the entity itself. Pick a parent "
-        "outside it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.despawn on '*' was refused, because "
-        "only the session authority despawns it. Set "
-        "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its "
-        "root enters the tree to let its controller despawn it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.despawn on '*' was refused, because "
-        "this peer is neither the session authority nor its "
-        "controller. Call it from the peer that controls it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] spawn_registered on '*' was refused, "
-        "because only the session authority spawns it. Set "
-        "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its "
-        "root enters the tree to let any peer spawn it.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.reparent on '*' was refused, because "
-        "session authority is moving to another peer. Call it again"
-        " once the move completes.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] Netw.despawn on '*' was refused, because "
-        "session authority is moving to another peer. Call it again"
-        " once the move completes.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][entity] spawn_registered on '*' was refused, "
-        "because session authority is moving to another peer. Call "
-        "it again once the move completes.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 14);
 
-    const char *UNDECLARED
-        = "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its root "
-          "enters the tree";
-    const char *NOT_HIS = "neither the session authority nor its controller";
-    const char *MOVING = "session authority is moving";
     const RefusalScenario CORPUS[] = {
         row("an-undeclared-move",
             VERB_REPARENT,
             false,
             STANDING_NONE,
             TARGET_SHELF,
-            ERR_UNAUTHORIZED,
-            UNDECLARED),
+            ERR_UNAUTHORIZED),
         row("a-move-by-a-peer-that-does-not-control-it",
             VERB_REPARENT,
             true,
             STANDING_NONE,
             TARGET_SHELF,
-            ERR_UNAUTHORIZED,
-            NOT_HIS),
+            ERR_UNAUTHORIZED),
         row("a-move-before-the-grant",
             VERB_REPARENT,
             true,
             STANDING_CLAIM_WAITING,
             TARGET_SHELF,
-            ERR_UNAUTHORIZED,
-            "not granted yet"),
+            ERR_UNAUTHORIZED),
         row("a-predicted-move",
             VERB_REPARENT,
             true,
             STANDING_PREDICTED,
             TARGET_SHELF,
-            ERR_UNAVAILABLE,
-            "is predicted"),
+            ERR_UNAVAILABLE),
         row("a-native-move",
             VERB_REPARENT,
             true,
             STANDING_NATIVE,
             TARGET_SHELF,
-            ERR_UNAVAILABLE,
-            "MultiplayerSynchronizer"),
+            ERR_UNAVAILABLE),
         row("a-player-entity-move",
             VERB_REPARENT,
             true,
             STANDING_PLAYER,
             TARGET_SHELF,
-            ERR_UNAVAILABLE,
-            "an entity spawned for a player"),
+            ERR_UNAVAILABLE),
         row("a-move-outside-the-session",
             VERB_REPARENT,
             true,
             STANDING_CONTROLLER,
             TARGET_OUTSIDE,
-            ERR_INVALID_PARAMETER,
-            "outside the session root"),
+            ERR_INVALID_PARAMETER),
         row("a-move-into-itself",
             VERB_REPARENT,
             true,
             STANDING_CONTROLLER,
             TARGET_POCKET,
-            ERR_INVALID_PARAMETER,
-            "inside the entity itself"),
+            ERR_INVALID_PARAMETER),
         row("an-undeclared-despawn",
             VERB_DESPAWN,
             false,
             STANDING_NONE,
             TARGET_SHELF,
-            ERR_UNAUTHORIZED,
-            UNDECLARED),
+            ERR_UNAUTHORIZED),
         row("a-despawn-by-a-peer-that-does-not-control-it",
             VERB_DESPAWN,
             true,
             STANDING_NONE,
             TARGET_SHELF,
-            ERR_UNAUTHORIZED,
-            NOT_HIS),
+            ERR_UNAUTHORIZED),
         row("an-undeclared-spawn",
             VERB_SPAWN,
             false,
             STANDING_NONE,
             TARGET_SHELF,
-            ERR_UNAUTHORIZED,
-            UNDECLARED),
+            ERR_UNAUTHORIZED),
         row("a-move-while-authority-moves",
             VERB_REPARENT,
             true,
             STANDING_HALTED,
             TARGET_SHELF,
-            ERR_UNAVAILABLE,
-            MOVING),
+            ERR_UNAVAILABLE),
         row("a-despawn-while-authority-moves",
             VERB_DESPAWN,
             true,
             STANDING_HALTED,
             TARGET_SHELF,
-            ERR_UNAVAILABLE,
-            MOVING),
+            ERR_UNAVAILABLE),
         row("a-spawn-while-authority-moves",
             VERB_SPAWN,
             true,
             STANDING_HALTED,
             TARGET_SHELF,
-            ERR_UNAVAILABLE,
-            MOVING),
+            ERR_UNAVAILABLE),
     };
     for (const RefusalScenario &scenario : CORPUS) {
         const RefusalRun run(scenario);
@@ -683,15 +571,7 @@ TEST_CASE(
     "session's copy where it was"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] Node.reparent on '*' was refused, because "
-        "only the session authority moves it. Set "
-        "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its "
-        "root enters the tree to let its controller move it. The "
-        "move stays on this peer, and the session keeps its copy "
-        "where it was.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();
@@ -725,21 +605,21 @@ TEST_CASE(
 
     int warnings = 0;
     int errors = 0;
-    String warned;
+    String errored;
     for (int at = 0; at < faults.size(); ++at) {
         const Dictionary fault = faults[at];
         const int type = int(fault[StringName("type")]);
         if (type == int(Logger::ERROR_TYPE_WARNING)) {
-            warned = String(fault[StringName("text")]);
             warnings += 1;
         } else if (type == int(Logger::ERROR_TYPE_ERROR)) {
+            errored = String(fault[StringName("text")]);
             errors += 1;
         }
     }
-    NETW_CHECK_EQ(warnings, 1);
-    NETW_CHECK_EQ(errors, 0);
-    CHECK(warned.contains("NetwEntity.lifecycle"));
-    CHECK(warned.contains("Crate"));
+    NETW_CHECK_EQ(warnings, 0);
+    NETW_CHECK_EQ(errors, 1);
+    CHECK(errored.contains("'Crate'"));
+    CHECK(errored.contains("[NW0041]"));
     const bool stays_local = body->get_parent() == shelf;
     const bool session_kept = held->get_parent() == arena;
     CHECK(stays_local);
@@ -763,13 +643,7 @@ TEST_CASE(
     "re-runs a verb its fresh tick already ran"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][entity] Netw.spawn on '*' was refused, because "
-        "only the session authority spawns it. Set "
-        "NetwEntity.lifecycle to LIFECYCLE_CONTROLLER before its "
-        "root enters the tree to let any peer spawn it.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();

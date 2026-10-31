@@ -200,7 +200,7 @@ TEST_CASE(
     NETW_CHECK_EQ(calls_at(seated.hub), 1);
     NETW_CHECK_EQ(int(seated.hub->get(StringName("last_tag"))), 7);
     NETW_CHECK_EQ(
-        faults.warnings_containing(String("may not call")),
+        faults.warnings_containing(String("[NW0021]")),
         int64_t(0)
     );
 
@@ -213,7 +213,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(calls_at(seated.hub), 1);
     NETW_CHECK_EQ(
-        faults.warnings_containing(String("may not call")),
+        faults.warnings_containing(String("[NW0021]")),
         int64_t(1)
     );
 
@@ -247,7 +247,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(calls_at(seated.hub), 0);
     NETW_CHECK_EQ(
-        faults.warnings_containing(String("may not call")),
+        faults.warnings_containing(String("[NW0021]")),
         int64_t(1)
     );
 
@@ -391,11 +391,7 @@ TEST_CASE(
     node->set_name("LateRpc");
     netw::gd::scene_root()->add_child(node);
     FaultWatch faults;
-    faults.expect_error(
-        "[error][session] Netw.configure_rpc cannot declare 'hit' on "
-        "'LateRpc' after it entered the tree. Call it from _init.",
-        1
-    );
+    faults.expect_error("*'LateRpc'*[NW0036]*", 1);
     CHECK(netw::Netw::configure_rpc(Callable(node, "hit")).is_null());
     CHECK(netw::script::model::get_rpc_options(script, "hit").is_null());
     node->get_parent()->remove_child(node);

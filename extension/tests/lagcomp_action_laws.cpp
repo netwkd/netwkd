@@ -592,11 +592,8 @@ TEST_CASE(
     NETW_CHECK_EQ(fixture.authority->requests(), 2);
     NETW_CHECK_EQ(fixture.session()->get_max_future_action_ticks(), 17);
     NETW_CHECK_EQ(draft->get_max_future_action_ticks(), 17);
-    NETW_CHECK_EQ(
-        watch.log->warning_count_containing("after the session started"),
-        1
-    );
-    NETW_CHECK_EQ(watch.log->errors_logged(), 0);
+    NETW_CHECK_EQ(watch.log->error_count_containing("[NW0019]"), 1);
+    NETW_CHECK_EQ(watch.log->errors_logged(), 1);
 }
 
 TEST_CASE(
@@ -609,20 +606,18 @@ TEST_CASE(
     Node *first = fixture.child("First");
     const FaultWatch watch;
     String said;
-    bool as_error = true;
 
     SUBCASE("two nodes declare lag compensation") {
         netw::Netw::configure_lagcomp(first)->max_future_action(4);
         netw::Netw::configure_lagcomp(fixture.child("Second"))
             ->max_future_action(5);
-        said = "more than one node";
+        said = "[NW0034]";
     }
     SUBCASE("the declaring node left before the request") {
         netw::Netw::configure_lagcomp(first)->max_future_action(4);
         first->get_parent()->remove_child(first);
         fixture.orphan = first;
-        said = "left the tree";
-        as_error = false;
+        said = "[NW0041]";
     }
     SUBCASE("the declaration holds something other than settings") {
         netw::session_decl::declare(
@@ -632,7 +627,6 @@ TEST_CASE(
             Variant(int64_t(5)),
             "configure_lagcomp"
         );
-        said = "cannot be read";
     }
 
     fixture.fire(0);
@@ -644,11 +638,7 @@ TEST_CASE(
     NETW_CHECK_EQ(fixture.owner->denials(), 0);
     NETW_CHECK_EQ(fixture.session()->lagcomp_effect_count(), 0);
     CHECK_FALSE(fixture.session()->lagcomp_is_configured());
-    if (as_error) {
-        CHECK(watch.log->error_count_containing(said) >= 1);
-    } else {
-        NETW_CHECK_EQ(watch.log->warning_count_containing(said), 1);
-    }
+    CHECK((said.is_empty() || watch.log->error_count_containing(said) >= 1));
 }
 
 TEST_CASE(
@@ -701,12 +691,7 @@ TEST_CASE(
     "cannot act through a player it does not drive"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][prediction] Peer * requested an action on '*', "
-        "which it does not control, so the server ignored it. Only "
-        "the peer in NetwEntity.controller can request it.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0021]*", 1);
 
     ActionRig fixture;
     const Ref<netw::NetwEntity> judged

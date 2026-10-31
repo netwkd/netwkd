@@ -259,10 +259,7 @@ TEST_CASE(
 
     SUBCASE("the binding never compiled") {
         expected_faults.expect_error(
-            "[error][table] Condition \"!gd::has_property(node, "
-            "property)\" is true. Returning: RID(). '*' saves column"
-            " '*' of table '*' from '*', but that node has no such "
-            "property. Fix the property name.",
+            "*[NW0033]*",
             1
         );
 
@@ -283,11 +280,7 @@ TEST_CASE(
     "binding go"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] Database '*' failed. Record '*' was not "
-        "saved (the memory store was told to fail).",
-        1
-    );
+    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
 
     World world("lc5");
     const RID binding = world.loaded();
@@ -485,17 +478,8 @@ TEST_CASE(
     "them goes on to close the peer"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] Database '*' failed. Record '*' was not "
-        "saved (the memory store was told to fail).",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][session] The session stayed online, because an "
-        "entity could not be saved. Call NetwSession.leave again to"
-        " retry, or close the peer to leave without saving.",
-        1
-    );
+    expected_faults.expect_warning("*Saving to database*[NW1001]*", 1);
+    expected_faults.expect_warning("*Saving to the database*[NW1001]*", 1);
 
     Leaving stand;
     REQUIRE(stand.binding.is_valid());

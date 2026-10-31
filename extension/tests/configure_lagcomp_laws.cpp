@@ -72,13 +72,7 @@ TEST_CASE(
     "draft standing, because a node declares each configuration once"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"standing.is_valid()\" is true. "
-        "Returning: Ref<T>(). Netw.configure_lagcomp was called "
-        "twice on '*'. Keep the Resource the first call returned "
-        "and set its values there.",
-        1
-    );
+    expected_faults.expect_error("*Netw.configure_lagcomp*[NW0034]*", 1);
 
     Branch branch("CG2");
     Node *scope = child_named(branch.node, "Session");
@@ -120,13 +114,7 @@ TEST_CASE(
     "the running values stand"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_lagcomp set '*' on '*' "
-        "after the session started, so the running value is "
-        "unchanged. Set it before startup and finish the chain "
-        "without awaiting.",
-        1
-    );
+    expected_faults.expect_error("*Netw.configure_lagcomp*[NW0019]*", 1);
 
     Branch branch("CG4");
     Node *scope = child_named(branch.node, "Session");
@@ -151,10 +139,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][session] Netw.configure_lagcomp was called on more"
-        " than one node (/root/CG5/One, /root/CG5/Two), so "
-        "configuration was refused. Call it on one node per "
-        "session.",
+        "*Netw.configure_lagcomp*/root/CG5/One*[NW0034]*",
         1
     );
 
@@ -178,13 +163,7 @@ TEST_CASE(
     "of reading as no declaration at all"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] Netw.configure_lagcomp was called by "
-        "Session, which left the tree before the session applied "
-        "its settings, so configuration was refused. Keep that node"
-        " in the tree until the session starts.",
-        1
-    );
+    expected_faults.expect_error("*'Session'*[NW0041]*", 1);
 
     Branch branch("CG6");
     Node *scope = child_named(branch.node, "Session");

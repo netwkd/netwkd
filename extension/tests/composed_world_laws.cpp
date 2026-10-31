@@ -488,11 +488,7 @@ TEST_CASE(
     "was never given arrives as nothing rather than as the server's own node"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][transport] An RPC argument is a node that is not "
-        "spawned on the network, so it was sent as null.",
-        1
-    );
+    expected_faults.expect_error("*An RPC argument*[NW1019]*", 1);
 
     ComposedWorld cw;
     const RID for_seven = cw.hide_behind("SevenOnly", OTHER);
@@ -741,11 +737,7 @@ TEST_CASE(
     "same frame naming a route 9 holds runs and resolves its argument"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] Peer * sent a call naming a node it cannot see,"
-        " so the call was dropped.",
-        1
-    );
+    expected_faults.expect_warning("*[NW0021]*", 1);
 
     ComposedWorld cw;
     const RID for_seven = cw.hide_behind("SevenOnly", OTHER);
@@ -866,10 +858,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][entity] Condition \"!is_on_server()\" is true. "
-        "Returning: ERR_UNAUTHORIZED. Only the server can give '*' "
-        "to another peer. A client asks for it with "
-        "NetwEntity.claim_control.",
+        "*NetwEntity.controller*[NW0012]*",
         1
     );
 

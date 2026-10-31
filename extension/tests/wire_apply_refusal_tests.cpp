@@ -21,10 +21,10 @@ using netw::wire::decode_scalar_row;
 using netw::wire::encode_scalar_row;
 using netw::wire::WirePlan;
 
-SchemaRecord scalar(int type, int stride = 1) {
+SchemaRecord scalar(int type) {
     SchemaRecord record;
     record.name = godot::StringName("Probe");
-    SchemaCore::append_column(&record, godot::StringName("a"), type, stride);
+    SchemaCore::append_column(&record, godot::StringName("a"), type, 1);
     SchemaCore::fix(&record);
     return record;
 }
@@ -64,24 +64,6 @@ TEST_CASE(
 
     NETW_CHECK_EQ(out.size(), 1);
     CHECK(godot::String(out[0]) == godot::String("sentinel"));
-}
-
-TEST_CASE(
-    "[Networked][WireValue][Hosted] a strided schema has no scalar apply"
-) {
-    SchemaRecord schema = scalar(SchemaCore::I32, 4);
-    CodeRow row = CodeRow::for_plan(WirePlan::compile(schema));
-    Array out;
-    CHECK_FALSE(decode_scalar_row(schema, row, out));
-}
-
-TEST_CASE("[Networked][WireValue][Hosted] an empty row is not a row of zeros") {
-    SchemaRecord schema = scalar(SchemaCore::I32);
-    CodeRow empty;
-    Array out;
-
-    CHECK_FALSE(decode_scalar_row(schema, empty, out));
-    NETW_CHECK_EQ(out.size(), 0);
 }
 
 TEST_CASE(

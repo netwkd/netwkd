@@ -133,11 +133,7 @@ TEST_CASE(
     "is refused"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] Properties declared on route * under key '*' "
-        "have no valid address, so they will not sync.",
-        1
-    );
+    expected_faults.expect_error("*set_model.cpp*", 1);
 
     SetModel model;
 
@@ -791,15 +787,8 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Repl][Hosted] a schema the spawn descriptor disagrees with "
-    "is refused after the sender is admitted, with one warning"
+    "is refused after the sender is admitted"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] An update for '*' from peer 7 was dropped, because its "
-        "synchronized properties are configured differently on that peer. "
-        "Configure them the same way on every peer.",
-        1
-    );
     netw_test::Books books;
     Node *node = memnew(Node);
     netw::NetwSyncModel model = model_with_binding(

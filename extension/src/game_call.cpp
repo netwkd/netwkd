@@ -2,7 +2,7 @@
 
 #include "godot/object.hpp"
 #include "godot/templates.hpp"
-#include "netw/log.hpp"
+#include "netw/fault_book.hpp"
 
 using namespace godot;
 
@@ -56,12 +56,10 @@ bool game_call_declared(const Callable &p_fn, const GameCall &p_site) {
         return true;
     }
     if (first_report(p_fn, p_site)) {
-        NETW_ERROR(
-            p_site.system,
-            "%s takes the wrong arguments, so it will not run. Declare it as "
-            "%s.",
-            String(p_site.what),
-            String(p_site.signature)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_HANDLER_UNCALLABLE,
+            {String(p_site.what), String(), String(p_site.signature)}
         );
     }
     return false;
@@ -79,13 +77,10 @@ Variant game_call(
         *r_called = called;
     }
     if (!called && p_fn.is_valid() && first_report(p_fn, p_site)) {
-        NETW_ERROR(
-            p_site.system,
-            "%s could not be called with %d arguments, so it did not run. "
-            "Declare it as %s.",
-            String(p_site.what),
-            int64_t(p_args.size()),
-            String(p_site.signature)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_HANDLER_UNCALLABLE,
+            {String(p_site.what), String(), String(p_site.signature)}
         );
     }
     return result;

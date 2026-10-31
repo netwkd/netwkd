@@ -247,25 +247,12 @@ struct Fault {
     int client;
     bool configured;
     Error code;
-    bool error;
     const char *text;
 };
 
 const Fault FAULTS[] = {
-    {"no-entity",
-     -1,
-     false,
-     ERR_UNCONFIGURED,
-     true,
-     "[error][session] '%s' is not part of a NetwEntity, so the call to '%s' "
-     "was dropped. Call Netw.configure_entity on its root."},
-    {"not-live",
-     0,
-     true,
-     ERR_UNAVAILABLE,
-     false,
-     "[warn][transport] '%s' is not spawned on the network yet, so the call "
-     "to '%s' was dropped. Call it from _ready or later."},
+    {"no-entity", -1, false, ERR_UNCONFIGURED, "[NW1010]"},
+    {"not-live", 0, true, ERR_UNAVAILABLE, "[NW0037]"},
 };
 
 struct Answer {
@@ -316,19 +303,13 @@ Cell knock(LoopbackRig &p_rig, const Fault &p_fault, const Door &p_door) {
     p_rig.branch(p_fault.client)->add_child(node);
     netw_test::CallLog heard;
     node->connect(StringName("rang"), heard.callable("rang"));
-    const String expected
-        = vformat(p_fault.text, node->get_name(), p_door.member);
+    const String expected = p_fault.text;
     {
         netw_test::FaultWatch faults;
-        if (p_fault.error) {
-            faults.expect_error(expected, 1);
-        } else {
-            faults.expect_warning(expected, 1);
-        }
+        faults.expect_error(String("*") + expected + String("*"), 1);
         cell.first = answer_of(p_door.call(node));
         cell.second = answer_of(p_door.call(node));
-        cell.reported = p_fault.error ? faults.errors_containing(expected)
-                                      : faults.warnings_containing(expected);
+        cell.reported = faults.errors_containing(expected);
     }
     cell.heard = heard.count("rang");
     node->get_parent()->remove_child(node);

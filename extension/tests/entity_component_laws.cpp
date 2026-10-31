@@ -142,12 +142,8 @@ TEST_CASE(
     "re-entry, because the digest a peer agreed to cannot change under it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][entity] Condition "
-        "\"record->get_comp_table().get_table_hash() != 0\" is true. "
-        "'*' was configured after its entity spawned, so the spawn "
-        "did not carry it. Configure networked properties before "
-        "the node enters the tree.",
+    expected_faults.expect_error(
+        "*'Gun'*[NW0036]*",
         1
     );
 

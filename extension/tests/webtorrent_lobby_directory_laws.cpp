@@ -64,10 +64,8 @@ TEST_CASE(
     "wss:// URL is kept in the export and skipped when browsing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][transport] WebTorrentLobbyDirectory.trackers has "
-        "'*', which is not a tracker URL, so it is skipped. Use a "
-        "ws:// or wss:// URL.",
+    expected_faults.expect_error(
+        "*WebTorrentLobbyDirectory.trackers*[NW0032]*",
         1
     );
 

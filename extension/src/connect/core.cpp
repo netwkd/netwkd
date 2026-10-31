@@ -853,20 +853,24 @@ RID ConnectCore::open_creation(
     const Dictionary &p_settings,
     const Callable &p_completed
 ) {
-    NETW_ERR_COND_V(
-        session == nullptr,
-        RID(),
-        sys::TRANSPORT,
-        "NetwMultiplayer.transport_create_peer ran on a session that is "
-        "already closed."
-    );
-    NETW_ERR_COND_V(
-        !p_completed.is_valid(),
-        RID(),
-        sys::TRANSPORT,
-        "NetwMultiplayer.transport_create_peer needs a valid completion "
-        "Callable."
-    );
+    if (session == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_NOT_RUNNING,
+            {"{NetwMultiplayer.transport_create_peer}", String(), "the session"}
+        );
+        return RID();
+    }
+    if (!p_completed.is_valid()) {
+        fault::raise(
+            session,
+            NETW_FAULT_BAD_CALLABLE,
+            {"{NetwMultiplayer.transport_create_peer}",
+             String(),
+             "a valid completion Callable"}
+        );
+        return RID();
+    }
     Creation seed;
     seed.session = gd::instance_id(session);
     seed.transport = p_transport;

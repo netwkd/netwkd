@@ -62,7 +62,7 @@ func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
 constexpr int SERVER = -1;
 constexpr int A = 0;
 constexpr const char *KINEMATIC_FAULT
-    = "cannot restore it without moving it. It runs SCHEDULE_FRAME.";
+    = "without moving it";
 
 Script *built_script = nullptr;
 
@@ -169,10 +169,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "[warn][prediction] '*' uses SCHEDULE_STEPPED, and this "
-        "Godot build cannot step physics on demand, so it runs "
-        "SCHEDULE_FRAME. Install a NetwPhysicsStepper with "
-        "NetwSession.install_physics_stepper.",
+        "*step physics on demand*[NW1017]*",
         netw::gd::can_step_space(3) ? 0 : 1
     );
 

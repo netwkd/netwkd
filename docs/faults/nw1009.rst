@@ -1,0 +1,27 @@
+:github_url: hide
+
+.. _fault_nw1009:
+
+NW1009. The session cannot use the assigned peer
+================================================
+
+Reported as an error when ``multiplayer_peer`` is assigned a
+:godot:`MultiplayerPeer` that the session cannot use. The reasons are a peer
+with no link to peer 1, a peer that belongs to another session, and a peer
+that is disconnected.
+
+The peer was not used. The log line gives the reason.
+
+.. code-block:: gdscript
+
+    var peer := ENetMultiplayerPeer.new()
+    multiplayer.multiplayer_peer = peer
+
+Assign the peer after ``create_server`` or ``create_client`` succeeds, and
+assign each peer to the session that created it.
+
+.. code-block:: gdscript
+
+    var peer := ENetMultiplayerPeer.new()
+    if peer.create_client(address, port) == OK:
+        multiplayer.multiplayer_peer = peer

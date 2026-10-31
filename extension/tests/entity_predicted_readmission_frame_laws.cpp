@@ -225,9 +225,8 @@ class ReadmissionScenario final : public netw_test::FrameScenario {
         const int archetype_server = spawn(ARCHETYPE_ID, "Ann");
         stand->pump(10);
         ReadmissionEvidence &evidence = readmission_evidence();
-        evidence.setup_warnings = setup_faults.warnings_containing(
-            "declares state and input properties but no prediction"
-        );
+        evidence.setup_warnings
+            = setup_faults.warnings_containing("[NW1014]");
         return seat(
                    ARCHETYPE_CLIENT,
                    A,

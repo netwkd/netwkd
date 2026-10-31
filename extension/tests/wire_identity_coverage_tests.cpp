@@ -251,11 +251,7 @@ TEST_CASE(
     "table, and a caller cannot redeclare it"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][wire] Channel id 41 belongs to a built-in channel, "
-        "so '*' cannot use it. Pick another id.",
-        1
-    );
+    expected_faults.expect_error("*'stolen'*[NW0032]*", 1);
 
     CHECK(WireRegistry::id_is_builtin(PROBE));
     CHECK(WireRegistry::id_is_builtin(0));

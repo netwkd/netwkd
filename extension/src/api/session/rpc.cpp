@@ -25,6 +25,7 @@
 #include "netw/api/sync_pipeline.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
@@ -93,18 +94,15 @@ PackedByteArray call_frame(
 }
 
 const GameCall CHANNEL_HANDLER
-    = {sys::TRANSPORT,
-       "The NetwMultiplayer.rpc_channel_register handler",
+    = {"The NetwMultiplayer.rpc_channel_register handler",
        "func(entity: RID, payload: PackedByteArray, sender: int)",
        3};
 const GameCall RPC_LOCAL
-    = {sys::TRANSPORT,
-       "The method Netw.rpc runs on this peer",
+    = {"The method Netw.rpc runs on this peer",
        "a function that takes the arguments given to Netw.rpc",
        -1};
 const GameCall RPC_CONTROLLER_LOCAL
-    = {sys::TRANSPORT,
-       "The method Netw.rpc_controller runs on this peer",
+    = {"The method Netw.rpc_controller runs on this peer",
        "a function that takes the arguments given to Netw.rpc_controller",
        -1};
 
@@ -200,6 +198,13 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
         return header;
     }
     if (header.kind == NetwCarrierFrame::MALFORMED) {
+        if (header.unreadable) {
+            fault::raise(
+                this,
+                NETW_FAULT_MALFORMED_DATAGRAM,
+                {String(), String(), String(), p_peer}
+            );
+        }
         if (plane.wants(EventPlane::DATAGRAM_MALFORMED, 0)) {
             EventPlane::Emission fact(
                 EventPlane::DATAGRAM_MALFORMED,
@@ -259,14 +264,14 @@ Callable NetwMultiplayer::relay_for(const StringName &p_signal, int p_arity) {
             return callable_mp(this, &NetwMultiplayer::relay_two)
                 .bind(p_signal);
     }
-    NETW_ERR_V(
-        Callable(),
-        sys::SESSION,
-        "Signal '%s' has %d arguments, and only signals with up to 2 can be "
-        "relayed.",
-        String(p_signal),
-        p_arity
+    fault::raise(
+        this,
+        NETW_FAULT_BAD_VALUE,
+        {vformat("Signal '%s'", String(p_signal)),
+         vformat("%d arguments", p_arity),
+         "a signal with up to 2 arguments"}
     );
+    return Callable();
 }
 
 void NetwMultiplayer::relay_from(
@@ -644,17 +649,6 @@ void NetwMultiplayer::rpc_note_dropped_not_live() {
     ++rpc_dropped_not_live;
 }
 
-bool NetwMultiplayer::call_fault_first(Node *p_node, Error p_code) {
-    const uint8_t bit = p_code == ERR_UNCONFIGURED ? 1 : 2;
-    const uint64_t node_id = uint64_t(gd::instance_id(p_node));
-    uint8_t &reported = call_faults_reported[node_id];
-    if ((reported & bit) != 0) {
-        return false;
-    }
-    reported |= bit;
-    return true;
-}
-
 NetwMultiplayer::CallTarget NetwMultiplayer::call_target(
     Node *p_node,
     const StringName &p_member
@@ -663,7 +657,11 @@ NetwMultiplayer::CallTarget NetwMultiplayer::call_target(
     if (p_node == nullptr) {
         out.code = ERR_INVALID_PARAMETER;
         out.detail = String("A Netw RPC needs a method of a Node.");
-        NETW_ERROR(sys::SESSION, "%s", out.detail);
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("A Netw RPC"), String(), String("a method of a Node")}
+        );
         return out;
     }
     out.entity = NetwEntity::of(p_node);
@@ -675,9 +673,13 @@ NetwMultiplayer::CallTarget NetwMultiplayer::call_target(
             String(p_node->get_name()),
             String(p_member)
         );
-        if (call_fault_first(p_node, out.code)) {
-            NETW_ERROR(sys::SESSION, "%s", out.detail);
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_ENTITY,
+            {String("The call to '") + String(p_member) + String("'"),
+             String(p_node->get_name())},
+            gd::instance_id(p_node)
+        );
         return out;
     }
     out.route = liveness_route_of(out.entity.ptr());
@@ -689,9 +691,14 @@ NetwMultiplayer::CallTarget NetwMultiplayer::call_target(
             String(p_node->get_name()),
             String(p_member)
         );
-        if (call_fault_first(p_node, out.code)) {
-            NETW_WARN(sys::TRANSPORT, "%s", out.detail);
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {String("The call to '") + String(p_member) + String("'"),
+             String(),
+             String("'") + String(p_node->get_name()) + String("'")},
+            gd::instance_id(p_node)
+        );
     }
     return out;
 }
@@ -713,7 +720,7 @@ Error NetwMultiplayer::rpc_declared(
     Node *p_node,
     const StringName &p_method,
     String &r_detail
-) const {
+) {
     const Ref<Script> script = p_node->get_script();
     if (netw::script::model::get_rpc_options(script, p_method).is_valid()
         || (script.is_valid()
@@ -726,7 +733,14 @@ Error NetwMultiplayer::rpc_declared(
         String(p_method),
         String(p_node->get_name())
     );
-    NETW_WARN(sys::TRANSPORT, "%s", r_detail);
+    fault::raise(
+        this,
+        NETW_FAULT_UNKNOWN_NAME,
+        {String("The call"),
+         String(p_node->get_name()),
+         String(p_method)},
+        gd::instance_id(p_node)
+    );
     return ERR_METHOD_NOT_FOUND;
 }
 
@@ -1049,7 +1063,7 @@ Variant NetwMultiplayer::rpc_method_token(
 
 LocalVector<call_args::Slot> NetwMultiplayer::rpc_encoded_args(
     const Array &p_args
-) const {
+) {
     LocalVector<call_args::Slot> out;
     out.reserve(uint32_t(p_args.size()));
     for (int at = 0; at < p_args.size(); ++at) {
@@ -1058,7 +1072,7 @@ LocalVector<call_args::Slot> NetwMultiplayer::rpc_encoded_args(
     return out;
 }
 
-call_args::Slot NetwMultiplayer::rpc_encoded_arg(const Variant &p_arg) const {
+call_args::Slot NetwMultiplayer::rpc_encoded_arg(const Variant &p_arg) {
     Ref<NetwEntity> entity;
     Node *node = nullptr;
     if (Object *held = p_arg.get_type() == Variant::OBJECT
@@ -1077,12 +1091,15 @@ call_args::Slot NetwMultiplayer::rpc_encoded_arg(const Variant &p_arg) const {
     }
     const int64_t route = liveness_route_of(entity.ptr());
     if (route <= 0) {
-        NETW_ERR_V(
-            call_args::of_value(Variant()),
-            sys::TRANSPORT,
-            "An RPC argument is a node that is not spawned on the network, so "
-            "it was sent as null."
+        fault::raise(
+            this,
+            NETW_FAULT_UNSENDABLE_VALUE,
+            {"An RPC argument",
+             "a node that is not spawned on the network",
+             "a node spawned with {Netw.spawn}"},
+            gd::instance_id(node)
         );
+        return call_args::of_value(Variant());
     }
     return call_args::of_node(
         route,
@@ -1131,11 +1148,13 @@ void NetwMultiplayer::rpc_call(
             game_call(p_callable, p_args, RPC_LOCAL);
             dispatching_sender = previous;
         } else if (p_peer == local_id) {
-            NETW_ERR(
-                sys::TRANSPORT,
-                "RPC '%s' is call_remote, so it cannot target this peer. Make "
-                "it call_local to call it here.",
-                String(method)
+            fault::raise(
+                this,
+                NETW_FAULT_BAD_VALUE,
+                {vformat("RPC '%s'", String(method)),
+                 "this peer, which call_remote cannot target",
+                 "call_local on it to call it here"},
+                0
             );
             return;
         }
@@ -1853,9 +1872,12 @@ void NetwMultiplayer::rpc_handle_call(
                   String(method),
                   String(p_comp_node->get_name())
               );
-        if (claim_verdict_warning(ERR_METHOD_NOT_FOUND, route)) {
-            NETW_WARN(sys::TRANSPORT, "%s", detail);
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_RPC_REFUSED,
+            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            gd::instance_id(p_comp_node)
+        );
         refuse(ERR_METHOD_NOT_FOUND, detail);
         return;
     }
@@ -1873,9 +1895,12 @@ void NetwMultiplayer::rpc_handle_call(
             "RPC with the same arguments on every peer.",
             String(method)
         );
-        if (claim_verdict_warning(ERR_INVALID_DATA, route)) {
-            NETW_WARN(sys::TRANSPORT, "%s", detail);
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_RPC_REFUSED,
+            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            gd::instance_id(p_comp_node)
+        );
         refuse(ERR_INVALID_DATA, detail);
         return;
     }
@@ -1894,9 +1919,12 @@ void NetwMultiplayer::rpc_handle_call(
             String(method),
             String(p_comp_node->get_name())
         );
-        if (claim_verdict_warning(ERR_UNAUTHORIZED, route)) {
-            NETW_WARN(sys::TRANSPORT, "%s", detail);
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_RPC_REFUSED,
+            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            gd::instance_id(p_comp_node)
+        );
         refuse(ERR_UNAUTHORIZED, detail);
         return;
     }
@@ -1912,9 +1940,12 @@ void NetwMultiplayer::rpc_handle_call(
             String(method),
             String(p_comp_node->get_name())
         );
-        if (claim_verdict_warning(ERR_INVALID_DATA, route)) {
-            NETW_WARN(sys::TRANSPORT, "%s", detail);
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_RPC_REFUSED,
+            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            gd::instance_id(p_comp_node)
+        );
         refuse(ERR_INVALID_DATA, detail);
         return;
     }
@@ -1951,9 +1982,16 @@ void NetwMultiplayer::rpc_handle_call(
                 "call was dropped.",
                 p_sender
             );
-            if (warn_verdict(ERR_UNAUTHORIZED, slot.node.route)) {
-                NETW_WARN(sys::TRANSPORT, "%s", detail);
-            }
+            count_verdict(ERR_UNAUTHORIZED, slot.node.route);
+            fault::raise(
+                this,
+                NETW_FAULT_RPC_REFUSED,
+                {String(method),
+                 String(p_comp_node->get_name()),
+                 String(),
+                 p_sender},
+                gd::instance_id(p_comp_node)
+            );
             refuse(ERR_UNAUTHORIZED, detail);
             return;
         }
@@ -1975,16 +2013,12 @@ void NetwMultiplayer::rpc_handle_call(
     );
 
     if (target_type != CALL_TARGET_EVERYONE && target_peer != get_unique_id()) {
-        if (claim_verdict_warning(ERR_INVALID_PARAMETER, route)) {
-            NETW_WARN(
-                sys::TRANSPORT,
-                "A call for '%s' was meant for peer %d and reached peer %d, so "
-                "it was dropped.",
-                String(method),
-                int(target_peer),
-                int(get_unique_id())
-            );
-        }
+        fault::raise(
+            this,
+            NETW_FAULT_RPC_REFUSED,
+            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            gd::instance_id(p_comp_node)
+        );
         return;
     }
 
@@ -2123,15 +2157,7 @@ Error NetwMultiplayer::send_frame(
         static_cast<long long>(p_route),
         static_cast<long long>(p_peer)
     );
-    NETW_ERR_COND_V(
-        p_route < 0,
-        ERR_INVALID_PARAMETER,
-        sys::TRANSPORT,
-        "Channel %d cannot send to peer %d for an entity with a negative "
-        "route.",
-        int(p_channel),
-        int(p_peer)
-    );
+    NETW_BUG_COND_V(p_route < 0, ERR_INVALID_PARAMETER);
 
     const int64_t subject_route
         = p_route != 0 ? p_route : attribution_subject_route;
@@ -2141,14 +2167,16 @@ Error NetwMultiplayer::send_frame(
         = inner.is_valid() && inner->get_multiplayer_peer().is_valid();
     if (connected && p_peer == get_unique_id()) {
         ReplicationCore *plane = get_replication_plane();
-        NETW_ERR_COND_V(
-            plane == nullptr,
-            ERR_UNCONFIGURED,
-            sys::TRANSPORT,
-            "Channel %d could not deliver to this peer, because replication is "
-            "not running.",
-            int(p_channel)
-        );
+        if (plane == nullptr) {
+            fault::raise(
+                this,
+                NETW_FAULT_NOT_RUNNING,
+                {vformat("Sending on channel %d", int(p_channel)),
+                 String(),
+                 "replication"}
+            );
+            return ERR_UNCONFIGURED;
+        }
         NETW_TRACE(
             sys::TRANSPORT,
             "Delivered locally for route %d on channel %d.",
@@ -2634,7 +2662,7 @@ void NetwMultiplayer::session_on_inner_packet(
     int64_t p_sender,
     const PackedByteArray &p_packet
 ) {
-    sink_verdict(session_receive_inner_packet(p_sender, p_packet), 0);
+    sink_verdict(session_receive_inner_packet(p_sender, p_packet), 0, p_sender);
 }
 
 void NetwMultiplayer::note_ack(int64_t p_peer, int64_t p_sequence) {

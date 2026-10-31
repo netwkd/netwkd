@@ -44,12 +44,7 @@ WitnessSummary summarize_witness(
         const WitnessContact &contact = p_contacts[at];
         if (contact.identity.is_empty() || !valid_class(contact.witness_class)
             || contact.realization < 0 || contact.realization > 5) {
-            NETW_ERROR(
-                sys::PREDICTION,
-                "Prediction ignored the contacts of one physics step, because "
-                "contact %d has no collider or an unknown class.",
-                int(at)
-            );
+            out.rejected_contact = int(at);
             return out;
         }
         ordered.push_back(contact);

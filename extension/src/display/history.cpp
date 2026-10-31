@@ -6,6 +6,7 @@
 #include "godot/math.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/project.hpp"
@@ -279,24 +280,23 @@ void History::record(int64_t tick, const Variant &value, bool authoring_tick) {
     if (tick_domain == -1) {
         tick_domain = domain;
     } else {
-        NETW_ERR_COND(
-            tick_domain != domain,
-            sys::INTERPOLATION,
-            "An interpolated value was dropped, because it mixed ticks from "
-            "this peer with ticks from the server."
-        );
+        NETW_BUG_COND(tick_domain != domain);
     }
 
     const int type = value.get_type();
     if (value_type == Variant::NIL) {
         value_type = type;
     } else {
-        NETW_ERR_COND(
-            value_type != type,
-            sys::INTERPOLATION,
-            "An interpolated property changed its type, so the value was "
-            "dropped. Give the property a static type."
-        );
+        if (value_type != type) {
+            fault::raise(
+                nullptr,
+                NETW_FAULT_INTERPOLATION_IGNORED,
+                {String("An interpolated property"),
+                 String("a change of its type"),
+                 String("a static type on the property")}
+            );
+            return;
+        }
     }
 
     if (has_recorded && value == last_recorded) {

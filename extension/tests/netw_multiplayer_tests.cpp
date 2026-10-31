@@ -156,14 +156,6 @@ TEST_CASE(
     "[Networked][Multiplayer][Hosted] an awareness edge addressed to peer 0 is "
     "refused rather than queued under an id no drain can send to"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][interest] Condition \"p_peer_id == 0\" is true. An "
-        "interest change was dropped, because it was addressed to "
-        "peer *.",
-        2
-    );
-
     Ref<NetwMultiplayer> core;
     core.instantiate();
 
@@ -284,12 +276,7 @@ TEST_CASE(
 
 TEST_CASE("[Networked][Multiplayer][Hosted] an offline session admits") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][liveness] Condition \"!is_host()\" is true. "
-        "Returning: out. NetwMultiplayer.liveness_claim_routes runs"
-        " only on the server.",
-        1
-    );
+    expected_faults.expect_error("*liveness_claim_routes*[NW0012]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -309,13 +296,7 @@ TEST_CASE(
     "rides its transport, and so does an rpc on a node no entity claims"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] NetwSessionConfig cannot be passed to "
-        "MultiplayerAPI.object_configuration_add or "
-        "object_configuration_remove. Declare it with "
-        "Netw.configure_session before the session starts.",
-        1
-    );
+    expected_faults.expect_error("*A NetwSessionConfig*[NW1020]*", 1);
     expected_faults.expect_error(
         "Condition \"!node || !node->is_inside_tree()\" is true. "
         "Returning: ERR_INVALID_PARAMETER The object must be a "
@@ -534,8 +515,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "[warn][transport] A packet for route * was refused with "
-        "error 44.",
+        "*(error 44)*[NW1000]*",
         1
     );
 
@@ -548,23 +528,6 @@ TEST_CASE(
 
     NETW_CHECK_EQ(core->stats_get_verdict_count(ERR_SKIP), 1);
     NETW_CHECK_EQ(core->stats_get_verdict_count(ERR_BUSY), 1);
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_BUSY, 4), false);
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_SKIP, 4), true);
-}
-
-TEST_CASE("[Networked][Multiplayer][Hosted] a route warns once per verdict") {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_BUSY, 12), true);
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_BUSY, 12), false);
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_BUSY, 13), true);
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_INVALID_DATA, 12), true);
-
-    core->clear_verdicts();
-
-    NETW_CHECK_EQ(core->claim_verdict_warning(ERR_BUSY, 12), true);
-    NETW_CHECK_EQ(core->stats_get_verdict_count(ERR_BUSY), 0);
 }
 
 TEST_CASE(
@@ -732,13 +695,7 @@ TEST_CASE("[Networked][Multiplayer][Hosted] a zero wait takes the default") {
 
 TEST_CASE("[Networked][Multiplayer][Hosted] watching an unarmed key refuses") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][prediction] Condition \"!watching\" is true. Effect "
-        "'*' is not armed, so there is nothing to watch. Call "
-        "NetwMultiplayer.lagcomp_effect_arm before "
-        "lagcomp_effect_watch.",
-        2
-    );
+    expected_faults.expect_warning("*[NW1015]*", 2);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -1429,13 +1386,6 @@ TEST_CASE(
     "[Networked][Multiplayer][Hosted] a transition the machine refuses, "
     "OFFLINE straight to ONLINE with no connect between, publishes nothing"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"!edge_is_legal(state, next)\" "
-        "is true. The session cannot move from state 0 to state 3.",
-        1
-    );
-
     Ref<NetwMultiplayer> core;
     core.instantiate();
     Recorder session(core.ptr(), session_edges());
@@ -1455,13 +1405,7 @@ TEST_CASE(
     "and publish nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][session] Condition \"!is_session_core_state(p_state)\" is "
-        "true. State 1 cannot be set on a session. STATE_CREATING only "
-        "reports a peer being built, so pass STATE_OFFLINE, STATE_CONNECTING, "
-        "STATE_ONLINE or STATE_DISCONNECTING.",
-        2
-    );
+    expected_faults.expect_error("*state 1*[NW0032]*", 2);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -2253,12 +2197,7 @@ TEST_CASE(
     "service and announce the wrong one gone"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][session] A service of type ():<Resource#-*> was "
-        "already registered, and the new one replaces it. Call "
-        "NetwSession.unregister_service first.",
-        1
-    );
+    expected_faults.expect_warning("*The service*[NW0035]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -2967,12 +2906,7 @@ TEST_CASE(
     "whole of what a move can refuse"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][entity] Condition \"owner == nullptr || parent == "
-        "nullptr\" is true. An entity move needs both a node and a "
-        "new parent, and one was null.",
-        1
-    );
+    expected_faults.expect_error("*Netw.reparent*[NW0031]*", 1);
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -3073,13 +3007,7 @@ TEST_CASE(
         "an empty id identifies nothing, so the node keeps its name and the "
         "wrapper keeps its blank identity"
     ) {
-        expected_faults.expect_error(
-            "[error][entity] Condition "
-            "\"String(p_entity_id).is_empty()\" is true. Returning: "
-            "p_node. '*' was given an empty entity id, so it was "
-            "not renamed. Pass a non-empty id.",
-            1
-        );
+        expected_faults.expect_error("*[NW0031]*", 1);
 
         Ref<netw::NetwEntity> untouched;
         untouched.instantiate();

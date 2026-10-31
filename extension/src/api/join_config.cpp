@@ -3,6 +3,7 @@
 #include "godot/class_db.hpp"
 #include "godot/vararg.hpp"
 #include "netw/api/quantize.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/member_packing.hpp"
 #include "netw/script/model.hpp"
@@ -32,11 +33,12 @@ void NetwJoinConfig::set_arg_types_reader(const Callable &p_reader) {
 
 Ref<NetwJoinConfig> NetwJoinConfig::quantize(const Array &p_quantizers) {
     if (p_quantizers.is_empty()) {
-        NETW_ERROR(
-            sys::SESSION,
-            "NetwJoinConfig.quantize got no quantizer for '%s'. Pass one "
-            "quantizer for each join argument.",
-            String(context_name)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwJoinConfig.quantize}",
+             vformat("no quantizer for '%s'", String(context_name)),
+             "one quantizer for each join argument"}
         );
         return Ref<NetwJoinConfig>(this);
     }

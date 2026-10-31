@@ -4,6 +4,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
@@ -17,7 +18,7 @@ namespace {
 constexpr SubsystemName MODULE = sys::LAGCOMP;
 
 const GameCall REWIND_BODY
-    = {MODULE, "The Netw.rewind body", "func() -> Variant", 0};
+    = {"The Netw.rewind body", "func() -> Variant", 0};
 
 bool is_suspended_call(const Variant &p_answered) {
     if (p_answered.get_type() != Variant::OBJECT) {
@@ -55,12 +56,13 @@ void report_write_inside(Object *p_owner, const Dictionary &p_wrote) {
             )) {
             return;
         }
-        NETW_WARN(
-            MODULE,
-            "'%s.%s' changed inside a rewind, and the rewind put it back. "
-            "Change it after rewind returns.",
-            String(node->get_name()),
-            String(key)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_REWIND_MISUSE,
+            {vformat("%s.%s", String(node->get_name()), String(key)),
+             "a change inside the rewind",
+             "a change after the rewind returns"},
+            gd::instance_id(node)
         );
         return;
     }
@@ -158,11 +160,7 @@ int64_t NetwLagCompCore::timeline_register(
 ) {
     const uint64_t key = entity_key(p_entity);
     if (key == 0) {
-        NETW_ERR_V(
-            -1,
-            MODULE,
-            "Lag compensation was asked to track a null entity."
-        );
+        NETW_BUG_V(-1);
     }
     HashMap<uint64_t, int64_t>::ConstIterator seated = slot_by_entity.find(key);
     if (seated != slot_by_entity.end()) {
@@ -459,7 +457,8 @@ Variant NetwLagCompCore::rewind(
     const PackedInt64Array &p_slots,
     int64_t p_tick,
     const Callable &p_body,
-    int *r_moved
+    int *r_moved,
+    bool *r_awaited
 ) {
     NETW_ZONE_NC("NetwLagComp rewind", colors::PREDICTION);
     LocalVector<int64_t> moved;
@@ -511,12 +510,8 @@ Variant NetwLagCompCore::rewind(
     const Variant answered = p_body.is_valid()
         ? game_call(p_body, Array(), REWIND_BODY)
         : Variant();
-    if (is_suspended_call(answered)) {
-        NETW_WARN_ONCE(
-            MODULE,
-            "The rewind body awaited, so the rest of it ran after the rewind "
-            "ended. Remove the await from it."
-        );
+    if (r_awaited != nullptr) {
+        *r_awaited = is_suspended_call(answered);
     }
 
     for (uint32_t at = 0; at < moved.size(); ++at) {

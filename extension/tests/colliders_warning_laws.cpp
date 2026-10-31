@@ -86,7 +86,7 @@ TEST_CASE(
         );
     }
     NETW_CHECK_EQ(
-        faults.warnings_containing("is under the visual root"),
+        faults.warnings_containing("a place under the visual root"),
         int64_t(1 + pair.mirrors.size())
     );
 }
@@ -105,12 +105,12 @@ TEST_CASE(
     platform->add_child(hitbox);
     rewind_once(platform);
     CHECK(platform->get_position() == Vector3());
-    NETW_CHECK_EQ(faults.warnings_containing("changed inside a rewind"), 0);
-    NETW_CHECK_EQ(faults.warnings_containing("with no hitbox"), 0);
+    NETW_CHECK_EQ(faults.warnings_containing("a change inside the rewind"), 0);
+    NETW_CHECK_EQ(faults.warnings_containing("[NW1017]"), 0);
     netw::gd::scene_root()->remove_child(arena);
     memdelete(arena);
     NETW_CHECK_EQ(
-        faults.warnings_containing("has sync_to_physics on"),
+        faults.warnings_containing("because of sync_to_physics"),
         int64_t(1)
     );
 }
@@ -128,7 +128,7 @@ TEST_CASE(
     netw::gd::scene_root()->remove_child(arena);
     memdelete(arena);
     NETW_CHECK_EQ(
-        faults.warnings_containing("with no hitbox"),
+        faults.warnings_containing("[NW1017]"),
         int64_t(netw::gd::can_flush_kinematic() ? 0 : 1)
     );
 }

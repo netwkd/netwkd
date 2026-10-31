@@ -4,6 +4,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/call_args.hpp"
 #include "netw/colors.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/object_port.hpp"
 #include "netw/profile.hpp"
@@ -428,13 +429,17 @@ bool PropertyBinding::admits_arrival(
         if (property_present(held, key)) {
             continue;
         }
-        NETW_WARN_ONCE(
-            sys::WIRE,
-            "An update for route %d names property '%s', which the node on "
-            "this peer does not have, so it was dropped. Give the node the "
-            "same script on every peer.",
-            int(route),
-            String(key).utf8().get_data()
+        fault::raise(
+            core(),
+            NETW_FAULT_PEER_MISMATCH,
+            {vformat("an update for route %d", route),
+             String(),
+             vformat(
+                 "the properties of the node's script, such as '%s'",
+                 String(key)
+             ),
+             held->get_multiplayer_authority()},
+            gd::instance_id(held)
         );
         reset_stream();
         return false;
@@ -511,7 +516,8 @@ PackedByteArray PropertyBinding::write_image(const Array &p_values) {
             stream,
             values,
             quantizers_of(),
-            types_of(held)
+            types_of(held),
+            core()
         )
         || !stream.align_verify()) {
         return PackedByteArray();

@@ -280,12 +280,7 @@ TEST_CASE(
     "membership and the destination claims nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] '*' was moved outside the multiplayer root, "
-        "so other peers keep its old parent. Move it under a node "
-        "inside the root.",
-        1
-    );
+    expected_faults.expect_error("*[NW0041]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();

@@ -68,10 +68,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error(
-        "[error][prediction] Prediction on "
-        "/root/pull_declared/declared is off, because no property "
-        "is declared as state. Call NetwPropertyConfig.state on the"
-        " properties it restores.",
+        "*'/root/pull_declared/declared'*[NW1013]*",
         1
     );
 

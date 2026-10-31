@@ -312,11 +312,7 @@ TEST_CASE(
     "seal, so an author learns at authoring time and not at send time"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][table] Schema '*' declares 65 columns, and a "
-        "schema holds at most 64. Split it into smaller schemas.",
-        1
-    );
+    expected_faults.expect_warning("*Schema*[NW1018]*", 1);
 
     SchemaRecord record = record_of("TooWide");
     for (int index = 0; index <= SchemaCore::MAX_COLUMNS; ++index) {

@@ -45,7 +45,6 @@ private:
     godot::Ref<godot::RefCounted> host_socket;
     godot::Ref<NetwServerInfo> listed;
     double listed_check = 0.0;
-    bool warned_ports = false;
 
     godot::Ref<godot::RefCounted> browse_socket;
     godot::String query_address = "255.255.255.255";

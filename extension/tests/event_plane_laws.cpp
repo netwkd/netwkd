@@ -162,6 +162,7 @@ class EventRun {
             PackedInt64Array unknown_event;
             unknown_event.push_back(9);
             refusals.push_back(plane.watch(
+                nullptr,
                 plant_is(PLANT_KNOWN_KEYS_ONLY) ? legal_events()
                                                 : unknown_event,
                 Dictionary(),
@@ -172,6 +173,7 @@ class EventRun {
             Dictionary bad_predicate;
             bad_predicate["verdict_is"] = 1;
             refusals.push_back(plane.watch(
+                nullptr,
                 legal_events(),
                 Dictionary(),
                 plant_is(PLANT_KNOWN_KEYS_ONLY) ? Dictionary() : bad_predicate,
@@ -181,6 +183,7 @@ class EventRun {
             Dictionary bad_target;
             bad_target["entity"] = "P";
             refusals.push_back(plane.watch(
+                nullptr,
                 legal_events(),
                 plant_is(PLANT_KNOWN_KEYS_ONLY) ? Dictionary() : bad_target,
                 Dictionary(),
@@ -200,6 +203,7 @@ class EventRun {
             opts["dedupe"] = false;
         }
         installs.push_back(plane.watch(
+            nullptr,
             legal_events(),
             target,
             Dictionary(),
@@ -624,23 +628,9 @@ constexpr int LAWS_SIZE = int(sizeof(LAWS) / sizeof(LAWS[0]));
 
 TEST_CASE("[Networked][Event][Hosted] the event plane's laws hold") {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "[error][event] NetwMultiplayer.event_watch got event 9, "
-        "which does not exist. Use a NetwMultiplayer.Event value.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][event] NetwMultiplayer.event_watch got the "
-        "predicate key '*', which it does not read. Use a key its "
-        "documentation lists.",
-        1
-    );
-    expected_faults.expect_error(
-        "[error][event] NetwMultiplayer.event_watch got the target "
-        "key '*', which it does not read. Use a key its "
-        "documentation lists.",
-        1
-    );
+    expected_faults.expect_error("*event 9*[NW0032]*", 1);
+    expected_faults.expect_error("*predicate key*[NW0032]*", 1);
+    expected_faults.expect_error("*target key*[NW0032]*", 1);
 
     const EventScenario CORPUS[] = {
         watched_gate(),

@@ -2,6 +2,7 @@
 
 #include "netw/api/interpolate.hpp"
 #include "netw/api/quantize.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -34,14 +35,17 @@ bool declared_slots_are(
         if (slot.get_type() == Variant::NIL || Ref<T>(slot).is_valid()) {
             continue;
         }
-        NETW_ERROR(
-            sys::SESSION,
-            "%s got a %s for value %d of '%s'. Pass a %s or null there.",
-            p_verb,
-            type_label(int(slot.get_type())),
-            index,
-            String(p_member),
-            p_expected
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {p_verb,
+             vformat(
+                 "a %s for value %d of '%s'",
+                 type_label(int(slot.get_type())),
+                 index,
+                 String(p_member)
+             ),
+             vformat("a %s or null there", p_expected)}
         );
         return false;
     }
@@ -60,15 +64,18 @@ bool declared_count_fits_arity(
     if (p_types.is_empty() || p_declared_count == p_types.size()) {
         return true;
     }
-    NETW_ERROR(
-        sys::SESSION,
-        "%s got %d entries for '%s' in '%s', which has %d values. Pass one "
-        "entry per value, and null for a value to leave as it is.",
-        p_verb,
-        p_declared_count,
-        String(p_member),
-        script_file(p_script),
-        p_types.size()
+    fault::raise(
+        nullptr,
+        NETW_FAULT_BAD_VALUE,
+        {p_verb,
+         vformat(
+             "%d entries for '%s' in '%s', which has %d values",
+             p_declared_count,
+             String(p_member),
+             script_file(p_script),
+             p_types.size()
+         ),
+         "one entry per value, and null for a value to leave as it is"}
     );
     return false;
 }
@@ -115,15 +122,17 @@ bool quantizers_fit_types(
             || packer->supports_type(static_cast<Variant::Type>(type))) {
             continue;
         }
-        NETW_WARN(
-            sys::SESSION,
-            "%s cannot pack the %s value of '%s' in '%s'. Use a quantizer "
-            "that supports %s.",
-            packer->get_class(),
-            type_label(type),
-            String(p_member),
-            script_file(p_script),
-            type_label(type)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNSENDABLE_VALUE,
+            {packer->get_class(),
+             vformat(
+                 "a %s value of '%s' in '%s'",
+                 type_label(type),
+                 String(p_member),
+                 script_file(p_script)
+             ),
+             vformat("a quantizer that supports %s", type_label(type))}
         );
         return false;
     }
@@ -145,14 +154,12 @@ bool interpolators_fit_types(
         if (type == int(Variant::NIL) || smoother->supports_type(type)) {
             continue;
         }
-        NETW_WARN(
-            sys::SESSION,
-            "The interpolator for '%s' in '%s' cannot blend its %s value. Use "
-            "an interpolator that supports %s.",
-            String(p_member),
-            script_file(p_script),
-            type_label(type),
-            type_label(type)
+        fault::raise(
+            nullptr,
+            NETW_FAULT_INTERPOLATION_IGNORED,
+            {vformat("%s:%s", script_file(p_script), String(p_member)),
+             vformat("an interpolator that cannot blend a %s", type_label(type)),
+             vformat("an interpolator that supports %s", type_label(type))}
         );
         return false;
     }

@@ -90,12 +90,7 @@ TEST_CASE(
     "registration it belongs to, and a second registration has none"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] '*' was not spawned, because its scene is "
-        "not in the MultiplayerSpawner's spawnable scenes. Add the "
-        "scene there, or spawn it with MultiplayerSpawner.spawn.",
-        1
-    );
+    expected_faults.expect_error("*[NW1020]*", 1);
 
     Stand stand;
     stand.arm_seams(false);
@@ -143,12 +138,7 @@ TEST_CASE(
     "reconstructing through the original captures nothing"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] '*' was not spawned, because its scene is "
-        "not in the MultiplayerSpawner's spawnable scenes. Add the "
-        "scene there, or spawn it with MultiplayerSpawner.spawn.",
-        1
-    );
+    expected_faults.expect_error("*[NW1020]*", 1);
 
     Stand stand;
     stand.arm_seams(false);
@@ -219,12 +209,7 @@ TEST_CASE(
     "this peer produced through that spawner"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "[warn][spawn] MultiplayerSpawner '*' reached its "
-        "spawn_limit, so a spawn was dropped. Raise spawn_limit or "
-        "free spawned nodes.",
-        1
-    );
+    expected_faults.expect_warning("*MultiplayerSpawner*[NW1018]*", 1);
 
     Stand stand;
     stand.spawner->set_spawn_limit(1);

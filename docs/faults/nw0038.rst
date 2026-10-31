@@ -1,0 +1,25 @@
+:github_url: hide
+
+.. _fault_nw0038:
+
+NW0038. A setting has no effect with another setting
+====================================================
+
+Reported as a warning when a node declares a setting that does nothing with
+the other settings it was given.
+
+The session runs with the setting ignored. The log line names the node, the
+setting and the one it conflicts with.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun).timeout(2.0)
+
+A timeout has no effect on a method that waits for no reply. Remove the
+setting, or change the one it conflicts with.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(self.apply_stun)

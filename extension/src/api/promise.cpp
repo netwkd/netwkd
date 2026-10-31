@@ -4,6 +4,7 @@
 #include "godot/object.hpp"
 #include "godot/utility.hpp"
 #include "netw/game_call.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -16,14 +17,13 @@ const char *SIG_SETTLED = "settled";
 const char *SIG_ANSWERED = "answered";
 
 const GameCall PROMISE_THEN
-    = {sys::SESSION, "The NetwPromise.then callback", "func(result)", 1};
+    = {"The NetwPromise.then callback", "func(result)", 1};
 const GameCall PROMISE_CATCH
-    = {sys::SESSION,
-       "The NetwPromise.catch_error callback",
+    = {"The NetwPromise.catch_error callback",
        "func(code: Error, detail: String)",
        2};
 const GameCall PROMISE_SETTLED
-    = {sys::SESSION, "The NetwPromise.when_settled callback", "func()", 0};
+    = {"The NetwPromise.when_settled callback", "func()", 0};
 
 void answer_waiter(const Ref<RefCounted> &p_waiter, const Variant &p_answer) {
     p_waiter->emit_signal(StringName(SIG_ANSWERED), p_answer);
@@ -138,12 +138,11 @@ void NetwPromise::_notification(int p_what) {
         || code == ERR_SKIP) {
         return;
     }
-    NETW_WARN(
-        sys::SESSION,
-        "A NetwPromise failed with error %d (%s) and nothing handled it. "
-        "Attach NetwPromise.catch_error or await NetwPromise.wait.",
-        code,
-        detail
+    fault::raise(
+        nullptr,
+        NETW_FAULT_UNHANDLED_PROMISE,
+        {"{NetwPromise}", String(), detail, 0, int64_t(code), 0},
+        get_instance_id()
     );
 }
 
