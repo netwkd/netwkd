@@ -2915,7 +2915,11 @@ void NetwMultiplayer::spawn_receive_failed_frame(
         return;
     }
     const Ref<NetwPlayer> player = player_of(p_sender);
-    const String method = String(record->get_fn_method());
+    const String method = String(
+        record->get_recipe() == spawn::Book::RECIPE_FN_REGISTRY
+            ? record->get_fn_registry_id()
+            : record->get_fn_method()
+    );
     NETW_WARN(
         sys::SPAWN,
         "Player '%s' could not spawn a node, because '%s' %s on their "

@@ -122,6 +122,10 @@ Node *build_host(const Variant &p_name) {
     return made;
 }
 
+Node *build_nothing(const Variant &) {
+    return nullptr;
+}
+
 void collect_despawned(Node *p_node, LocalVector<ObjectID> &r_out) {
     for (int at = 0; at < p_node->get_child_count(); ++at) {
         Node *child = p_node->get_child(at);
@@ -796,6 +800,48 @@ TEST_CASE(
         1
     );
     NETW_CHECK_EQ(int(faults.warnings_containing("does not exist")), 0);
+}
+
+TEST_CASE(
+    "[Networked][Scene][SceneTree] SF4 a client whose registered spawn "
+    "constructor returns no Node reports it, and the server warns once naming "
+    "the player and the constructor"
+) {
+    netw_test::FaultWatch faults;
+    Stand stand(2);
+    const int route = stand.rig.spawn_registered(
+        StringName("sr_crate"),
+        callable_mp_static(&build_host),
+        Array::make(String("Crate")),
+        Array::make(int(Variant::STRING)),
+        nullptr,
+        Variant(),
+        false
+    );
+    stand.rig.register_constructor(
+        stand.rig.client(0),
+        StringName("sr_crate"),
+        callable_mp_static(&build_nothing),
+        Array::make(int(Variant::STRING))
+    );
+    stand.rig.pump(8);
+
+    CHECK(stand.rig.route_node(route, 1) != nullptr);
+    CHECK(stand.rig.route_node(route, 0) == nullptr);
+    NETW_CHECK_EQ(
+        int(faults.warnings_containing(
+            "Spawn constructor 'sr_crate' did not return a Node"
+        )),
+        1
+    );
+    NETW_CHECK_EQ(
+        int(faults.warnings_containing(
+            "Player 'ada' could not spawn a node, because 'sr_crate' returned "
+            "no Node on their peer. Make 'sr_crate' return a Node on every "
+            "peer."
+        )),
+        1
+    );
 }
 
 TEST_CASE(

@@ -2406,6 +2406,10 @@ SpawnBuild::Outcome Pipeline::build_spawn(
                     id
                 );
             }
+            plane->spawn_report_failed(
+                route,
+                fn_waited ? String("awaited") : String("returned no Node")
+            );
             drops_spawn_unresolved += 1;
             return SpawnBuild::DROPPED;
         }
