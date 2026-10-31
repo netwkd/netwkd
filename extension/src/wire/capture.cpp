@@ -50,8 +50,23 @@ String CaptureWriter::claim_armed_path() {
     return path;
 }
 
+String CaptureWriter::stamp_header(Dictionary p_header) {
+    started_msec = Time::get_singleton()->get_ticks_msec();
+    p_header[StringName("started")] = started_msec;
+    return JSON::stringify(p_header);
+}
+
+bool CaptureWriter::open_memory(Dictionary p_header) {
+    if (is_open()) {
+        return false;
+    }
+    holding = true;
+    held = (stamp_header(p_header) + String("\n")).to_utf8_buffer();
+    return true;
+}
+
 bool CaptureWriter::open(const String &p_path, Dictionary p_header) {
-    if (file.is_valid() || p_path.is_empty()) {
+    if (is_open() || p_path.is_empty()) {
         return false;
     }
     file = FileAccess::open(p_path, FileAccess::WRITE);
@@ -64,9 +79,7 @@ bool CaptureWriter::open(const String &p_path, Dictionary p_header) {
         );
         return false;
     }
-    started_msec = Time::get_singleton()->get_ticks_msec();
-    p_header[StringName("started")] = started_msec;
-    file->store_line(JSON::stringify(p_header));
+    file->store_line(stamp_header(p_header));
     return true;
 }
 
@@ -77,7 +90,7 @@ void CaptureWriter::note(
     const PackedByteArray &p_datagram
 ) {
     NETW_ZONE_NC("wire capture note", colors::WIRE);
-    if (file.is_null() || p_datagram.is_empty()) {
+    if (!is_open() || p_datagram.is_empty()) {
         return;
     }
     if (p_datagram.size() > CAPTURE_BYTES_CAP) {
@@ -96,11 +109,16 @@ void CaptureWriter::note(
     if (packed.is_empty()) {
         return;
     }
-    file->store_buffer(packed);
+    if (holding) {
+        held.append_array(packed);
+    } else {
+        file->store_buffer(packed);
+    }
     records += 1;
 }
 
 void CaptureWriter::close() {
+    holding = false;
     if (file.is_null()) {
         return;
     }

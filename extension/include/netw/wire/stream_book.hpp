@@ -12,6 +12,10 @@ namespace netw::wire {
 uint64_t next_stream_token();
 uint64_t next_open_request();
 
+#if defined(NETW_TESTS)
+void reset_stream_counters();
+#endif
+
 constexpr uint64_t STREAM_BINDING_SPAN = 256;
 constexpr uint32_t DORMANT_LANE_CAP = 1024;
 

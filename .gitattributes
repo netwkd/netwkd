@@ -2,6 +2,7 @@
 
 *.cmd text eol=crlf
 *.bat text eol=crlf
+*.netwcap binary
 
 addons/gdUnit4/** linguist-vendored
 addons/com.heroiclabs.nakama/** linguist-vendored

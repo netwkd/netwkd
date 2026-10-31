@@ -133,6 +133,9 @@ Ref<LocalMultiplayerPeer> LocalLoopbackSession::create_client_peer() {
         return client;
     }
     used_ids.insert(client_id);
+#if defined(NETW_TESTS)
+    client_ordinals.insert(peer_key(client.ptr()), client_ordinals.size() + 1);
+#endif
     client->term = transfer_term;
     client->label = client_id;
     client->relays = !transfer_enabled;
@@ -572,6 +575,11 @@ void LocalLoopbackSession::reset() {
     used_ids.clear();
     transfer_term = 0;
     transfer_enabled = false;
+#if defined(NETW_TESTS)
+    client_ordinals.clear();
+    datagrams_by_leg.clear();
+    scripted.clear();
+#endif
 }
 
 LocalLoopbackSession::LinkState &LocalLoopbackSession::ensure_link(
@@ -605,6 +613,11 @@ bool LocalLoopbackSession::capture_incoming(
     const LocalMultiplayerPeer::Packet &p_packet
 ) {
     NETW_ZONE_NC("LocalLoopbackSession capture", colors::TRANSPORT);
+#if defined(NETW_TESTS)
+    if (run_script(p_peer, p_packet)) {
+        return true;
+    }
+#endif
     LinkState *state = link_of(p_peer);
     if (state != nullptr && state->held) {
         enqueue(*state, p_packet, NEVER_DUE);
@@ -772,6 +785,84 @@ Ref<NetwLinkConditions> LocalLoopbackSession::conditions_for(
         = p_state.conditions_by_sender.getptr(0);
     return for_everyone == nullptr ? Ref<NetwLinkConditions>() : *for_everyone;
 }
+
+#if defined(NETW_TESTS)
+int LocalLoopbackSession::leg_of(
+    const LocalMultiplayerPeer *p_peer,
+    const LocalMultiplayerPeer::Packet &p_packet
+) const {
+    if (p_peer == server_peer.ptr()) {
+        for (const Ref<LocalMultiplayerPeer> &client : client_peers) {
+            if (client.is_valid() && client->unique_id == p_packet.peer) {
+                const int *ordinal
+                    = client_ordinals.getptr(peer_key(client.ptr()));
+                return ordinal == nullptr ? 0 : *ordinal * 2 + 1;
+            }
+        }
+        return 0;
+    }
+    const int *ordinal = client_ordinals.getptr(peer_key(p_peer));
+    if (ordinal == nullptr || server_peer.is_null()
+        || p_packet.peer != server_peer->unique_id) {
+        return 0;
+    }
+    return *ordinal * 2;
+}
+
+bool LocalLoopbackSession::run_script(
+    const LocalMultiplayerPeer *p_peer,
+    const LocalMultiplayerPeer::Packet &p_packet
+) {
+    const int leg = leg_of(p_peer, p_packet);
+    if (leg == 0) {
+        return false;
+    }
+    const uint64_t index = datagrams_on(leg / 2, leg % 2 == 1);
+    datagrams_by_leg[leg] = index + 1;
+    for (const ScriptedDatagram &row : scripted) {
+        if (row.leg != leg || row.index != index) {
+            continue;
+        }
+        if (!row.dropped) {
+            enqueue(ensure_link(p_peer), p_packet, clock_ms + row.delay_ms);
+        }
+        return true;
+    }
+    return false;
+}
+
+void LocalLoopbackSession::script_drop(
+    int p_client,
+    bool p_to_server,
+    uint64_t p_index
+) {
+    ScriptedDatagram row;
+    row.leg = p_client * 2 + int(p_to_server);
+    row.index = p_index;
+    row.dropped = true;
+    scripted.push_back(row);
+}
+
+void LocalLoopbackSession::script_delay(
+    int p_client,
+    bool p_to_server,
+    uint64_t p_index,
+    double p_delay_ms
+) {
+    ScriptedDatagram row;
+    row.leg = p_client * 2 + int(p_to_server);
+    row.index = p_index;
+    row.delay_ms = p_delay_ms;
+    scripted.push_back(row);
+}
+
+uint64_t LocalLoopbackSession::datagrams_on(int p_client, bool p_to_server)
+    const {
+    const uint64_t *sent
+        = datagrams_by_leg.getptr(p_client * 2 + int(p_to_server));
+    return sent == nullptr ? 0 : *sent;
+}
+#endif
 
 void LocalLoopbackSession::_bind_methods() {
     ClassDB::bind_static_method(

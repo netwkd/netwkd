@@ -1,0 +1,14 @@
+label replication_writes
+clients 2
+ticks 26
+seed 7
+laws R1 R4 R5 R6
+1 spawn kart scene:kart parent:World name:Kart
+1 drop c1>s index:15
+1 drop s>c1 index:21
+14 set kart position:1,0,0
+15 set kart position:2,0,0
+16 set kart position:3,0,0
+17 set kart position:4,0,0
+18 set kart position:5,0,0
+20 join c3 name:cy

@@ -1457,6 +1457,41 @@ void Pipeline::disarm_spawn_state() {
     armed_spawn_state.clear();
     spawn_state_is_armed = false;
 }
+
+void Pipeline::delay_placement(int64_t p_route, int64_t p_ticks) {
+    placement_delays[p_route] = p_ticks;
+}
+
+bool Pipeline::hold_placement(const SpawnBuild &p_built) {
+    const int64_t route = p_built.frame.route;
+    const int64_t *ticks = placement_delays.getptr(route);
+    if (ticks == nullptr) {
+        return false;
+    }
+    HeldPlacement held;
+    held.built = p_built;
+    held.release_tick = park_now() + *ticks;
+    held_placements.push_back(held);
+    placement_delays.erase(route);
+    return true;
+}
+
+void Pipeline::place_held() {
+    const int64_t now = park_now();
+    uint32_t at = 0;
+    while (at < held_placements.size()) {
+        if (held_placements[at].release_tick > now) {
+            at += 1;
+            continue;
+        }
+        const SpawnBuild built = held_placements[at].built;
+        held_placements.remove_at(at);
+        const Ref<NetwLivenessCore> liveness = core()->get_liveness_core();
+        liveness->defer_flushes();
+        place_received(built);
+        liveness->resume_flushes();
+    }
+}
 #endif
 
 TypedArray<Dictionary> Pipeline::collect_spawn_state(Node *p_root) {
@@ -2176,6 +2211,11 @@ void Pipeline::try_apply_spawn(
         case SpawnBuild::BUILT:
             break;
     }
+#ifdef NETW_TESTS
+    if (hold_placement(built)) {
+        return;
+    }
+#endif
     const Ref<NetwLivenessCore> liveness = core()->get_liveness_core();
     liveness->defer_flushes();
     place_received(built);

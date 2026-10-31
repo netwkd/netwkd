@@ -371,8 +371,8 @@ TEST_CASE(
     "and stamped one tick after its last change, and none while it moves"
 ) {
     constexpr int64_t STOP = 6;
-    constexpr int64_t EDGE_BYTES = 6;
-    constexpr int64_t EDGE_FRAMED = 10;
+    constexpr int64_t EDGE_BYTES = 5;
+    constexpr int64_t EDGE_FRAMED = 9;
     SessionSend session;
     netw_test::seat_streams(session, watched(1, 1));
     HashMap<int, uint64_t> last_sent;

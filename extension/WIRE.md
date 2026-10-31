@@ -985,11 +985,12 @@ client before it closes the leaving one, and `reason` is a
 `NetwPlayer.LeaveReason`. A client that never receives it reads
 `LEAVE_DROPPED`.
 
-A client whose spawn function returns no Node, fails or awaits sends
-SESSION_SPAWN_FAILED once for that route. The server reads it only from a peer
-it sent the route to, and from then until the route is despawned it sends that
-peer nothing more of the route or its children, and drops the peer from the
-viewers of a level the route roots.
+A client whose spawn function or registered constructor returns no Node, fails
+or awaits sends SESSION_SPAWN_FAILED once for that route. The server reads it
+only from a peer it sent the route to, and from then until the route is
+despawned it sends that peer no rows, child spawns or reparents of the route,
+and drops the peer from the viewers of a level the route roots. The route's
+DESPAWN still reaches that peer.
 
 ```text
 SESSION_SCENE_RELEASED  [route varuint 5]

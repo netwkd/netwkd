@@ -878,10 +878,16 @@ def capture(path, verbose):
     per_channel = {0: {}, 1: {}}
     per_direction = {0: 0, 1: 0}
     datagram_bytes = {0: 0, 1: 0}
+    raw = 0
     for index, row in enumerate(rows):
         direction = row["dir"]
         per_direction[direction] = per_direction.get(direction, 0) + 1
         datagram_bytes[direction] = datagram_bytes.get(direction, 0) + len(row["bytes"])
+        if row["bytes"] and row["bytes"][0] not in magics:
+            raw += 1
+            if verbose:
+                print("  raw record %d: bytes=%d" % (index, len(row["bytes"])))
+            continue
         try:
             head, walked = walk_datagram(records, channels, row["bytes"], magics)
         except Poisoned as stopped:
@@ -942,6 +948,8 @@ def capture(path, verbose):
         for key in sorted(lane, key=lambda k: -lane[k]):
             print("      %-28s %9d" % (key, lane[key]))
     print("CAPTURE %d records %d frames %d errors" % (len(rows), frames, errors))
+    if raw:
+        print("CAPTURE %d raw records that are not Networked datagrams" % raw)
     return 1 if errors else 0
 
 

@@ -19,6 +19,7 @@
 
 #include "loopback_rig.h"
 #include "netw_recorder.h"
+#include "scenario_verbs.h"
 #endif
 
 namespace netw_test {
@@ -371,6 +372,13 @@ inline godot::Vector2 ScenarioRun::motion_of(const godot::Variant &p_command) {
     if (p_command.get_type() == godot::Variant::VECTOR2) {
         return godot::Vector2(p_command);
     }
+    if (p_command.get_type() == godot::Variant::STRING) {
+        const godot::PackedFloat64Array parts
+            = godot::String(p_command).split_floats(",");
+        return parts.size() == 2
+            ? godot::Vector2(godot::real_t(parts[0]), godot::real_t(parts[1]))
+            : godot::Vector2();
+    }
     if (p_command.get_type() != godot::Variant::DICTIONARY) {
         return godot::Vector2();
     }
@@ -627,7 +635,9 @@ inline ScenarioRun ScenarioRun::session(
 ) {
     ScenarioRun run;
     run.ran = p_scenario;
-    run.seed_tracks(p_scenario);
+    if (p_scenario.world.entity_count() > 0) {
+        run.seed_tracks(p_scenario);
+    }
     p_rig.declare_world(p_scenario.world);
     for (int at = 0; at < p_scenario.world.entity_count(); ++at) {
         const EntityDecl &decl = p_scenario.world.entity_at(at);
@@ -695,6 +705,7 @@ inline ScenarioRun ScenarioRun::session(
         recorders.push_back(std::make_unique<Recorder>(handle, signals));
     }
 
+    ScenarioVerbs verbs(p_rig, p_scenario);
     for (int tick = 1; tick <= p_scenario.run_ticks; ++tick) {
         Track *tick_tracks = run.tracks.ptrw();
         for (int at = 0; at < run.tracks.size(); ++at) {
@@ -709,7 +720,7 @@ inline ScenarioRun ScenarioRun::session(
             }
         }
         for (const Scenario::Step &step : p_scenario.steps) {
-            if (step.tick != tick) {
+            if (step.tick != tick || scenario_verbs::run(verbs, step)) {
                 continue;
             }
             int track_index = -1;
@@ -751,7 +762,7 @@ inline ScenarioRun ScenarioRun::session(
                     "a perturbation needs a body"
                 );
                 owner->set_position(
-                    owner->get_position() + godot::Vector2(step.value)
+                    owner->get_position() + motion_of(step.value)
                 );
             }
         }

@@ -1,0 +1,8 @@
+label wire_raw
+clients 0
+ticks 14
+seed 7
+laws
+2 join c1 name:ada
+8 send_bytes server to:c1 bytes:07ff
+9 send_bytes c1 to:server bytes:98000100

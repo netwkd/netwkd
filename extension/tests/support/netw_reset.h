@@ -11,6 +11,7 @@
 #include "godot/project_settings.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/wire/stream_book.hpp"
 
 namespace netw_test {
 
@@ -40,6 +41,7 @@ inline void smooth_when_headless(bool p_smooth) {
 
 inline void reset_for_case() {
     netw::gd::seed(NETW_TEST_SEED);
+    netw::wire::reset_stream_counters();
     smooth_when_headless(true);
     for (ResetHook hook : reset_hooks()) {
         hook();

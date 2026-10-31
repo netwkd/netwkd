@@ -1,0 +1,13 @@
+label spawn_late_join
+clients 2
+ticks 30
+seed 7
+laws S5 S7 S11 S12 S22 S29
+1 spawn car scene:car parent:World name:Car
+1 spawn wheel scene:wheel parent:car name:Wheel
+16 delay s>c1 index:24 ticks:4
+16 set car position:4,0,2
+16 reparent wheel parent:World
+17 reparent wheel parent:Garage
+18 join c3 name:cy
+22 despawn car

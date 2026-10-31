@@ -662,6 +662,7 @@ private:
 #endif
     wire::CaptureWriter capture;
     bool capture_decided = false;
+    bool capture_in_memory = false;
     int64_t attribution_subject_route = 0;
     NetwChannelBook channel_book;
     wire::WireRegistry channels = wire::WireRegistry::create_default();
@@ -3173,6 +3174,11 @@ public:
     const wire::CaptureWriter &capture_writer() const {
         return capture;
     }
+#if defined(NETW_TESTS)
+    void capture_to_memory() {
+        capture_in_memory = true;
+    }
+#endif
     godot::Dictionary capture_header();
 
 #if defined(DEBUG_ENABLED)

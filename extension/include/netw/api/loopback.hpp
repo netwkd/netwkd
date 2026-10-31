@@ -233,6 +233,28 @@ class LocalLoopbackSession : public godot::Resource {
         const LocalMultiplayerPeer::Packet &p_packet
     ) const;
 
+#if defined(NETW_TESTS)
+    struct ScriptedDatagram {
+        int leg = 0;
+        uint64_t index = 0;
+        bool dropped = false;
+        double delay_ms = 0.0;
+    };
+
+    godot::HashMap<uint64_t, int> client_ordinals;
+    godot::HashMap<int, uint64_t> datagrams_by_leg;
+    godot::Vector<ScriptedDatagram> scripted;
+
+    int leg_of(
+        const LocalMultiplayerPeer *p_peer,
+        const LocalMultiplayerPeer::Packet &p_packet
+    ) const;
+    bool run_script(
+        const LocalMultiplayerPeer *p_peer,
+        const LocalMultiplayerPeer::Packet &p_packet
+    );
+#endif
+
 protected:
     static void _bind_methods();
 
@@ -279,6 +301,17 @@ public:
 
     int in_flight_count(const LocalMultiplayerPeer *p_peer) const;
     bool is_holding_inbound(const LocalMultiplayerPeer *p_peer) const;
+
+#if defined(NETW_TESTS)
+    void script_drop(int p_client, bool p_to_server, uint64_t p_index);
+    void script_delay(
+        int p_client,
+        bool p_to_server,
+        uint64_t p_index,
+        double p_delay_ms
+    );
+    uint64_t datagrams_on(int p_client, bool p_to_server) const;
+#endif
 
     void enable_server_transfer();
     godot::Error transfer_server(int p_successor, bool p_keep_former);

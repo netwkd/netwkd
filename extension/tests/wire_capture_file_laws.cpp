@@ -6,10 +6,15 @@
 #include "godot/file_system.hpp"
 #include "netw/wire/capture.hpp"
 #include "netw/wire/spec.hpp"
+#include "support/scenario_capture.h"
 
 namespace TestWireCaptureFile {
 
 using namespace godot;
+using netw_test::adopt_into_memory;
+using netw_test::LoopbackRig;
+using netw_test::MemoryCapture;
+using netw_test::read_memory;
 using netw::wire::CaptureDirection;
 using netw::wire::CaptureRecord;
 using netw::wire::CaptureWriter;
@@ -91,6 +96,79 @@ TEST_CASE(
     NETW_CHECK_EQ(int64_t(in.dir), int64_t(CaptureDirection::IN));
     NETW_CHECK_EQ(int64_t(in.tick), int64_t(9));
     NETW_CHECK_EQ(read.bits_remaining(), int64_t(0));
+}
+
+LocalVector<PackedByteArray> datagrams(
+    const MemoryCapture &p_capture,
+    CaptureDirection p_dir,
+    int64_t p_peer
+) {
+    LocalVector<PackedByteArray> out;
+    for (const CaptureRecord &record : p_capture.records) {
+        if (record.dir == uint64_t(p_dir) && record.peer == uint64_t(p_peer)) {
+            out.push_back(record.bytes);
+        }
+    }
+    return out;
+}
+
+bool same_datagrams(
+    const LocalVector<PackedByteArray> &p_left,
+    const LocalVector<PackedByteArray> &p_right
+) {
+    if (p_left.size() != p_right.size()) {
+        return false;
+    }
+    for (uint32_t at = 0; at < p_left.size(); ++at) {
+        if (p_left[at] != p_right[at]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+TEST_CASE(
+    "[Networked][Wire][Capture] C7 two worlds in one process each capture "
+    "into memory exactly the datagrams they sent and received"
+) {
+    LoopbackRig rig(0, false, adopt_into_memory);
+    rig.arrive(StringName("ada"));
+    rig.arrive(StringName("bo"));
+    rig.step_ticks(10);
+
+    const MemoryCapture server
+        = read_memory(rig.server()->capture_writer().memory());
+    NETW_CHECK_EQ(int64_t(server.header.get("peer", -1)), int64_t(1));
+    NETW_CHECK_EQ(server.trailing_bits < 8, true);
+    NETW_CHECK_EQ(
+        int64_t(server.records.size()),
+        rig.server()->capture_writer().record_count()
+    );
+
+    for (int index = 0; index < rig.count(); ++index) {
+        const int64_t id = rig.peer_id(index);
+        const MemoryCapture client
+            = read_memory(rig.client(index)->capture_writer().memory());
+        NETW_CHECK_EQ(int64_t(client.header.get("peer", -1)), id);
+        NETW_CHECK_EQ(client.trailing_bits < 8, true);
+
+        const LocalVector<PackedByteArray> sent
+            = datagrams(server, CaptureDirection::OUT, id);
+        const LocalVector<PackedByteArray> received
+            = datagrams(client, CaptureDirection::IN, 1);
+        const LocalVector<PackedByteArray> answered
+            = datagrams(client, CaptureDirection::OUT, 1);
+        REQUIRE(sent.size() > 0);
+        CHECK(same_datagrams(sent, received));
+        CHECK(same_datagrams(
+            answered,
+            datagrams(server, CaptureDirection::IN, id)
+        ));
+        NETW_CHECK_EQ(
+            int64_t(received.size() + answered.size()),
+            int64_t(client.records.size())
+        );
+    }
 }
 
 } // namespace TestWireCaptureFile

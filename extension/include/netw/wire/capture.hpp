@@ -39,14 +39,19 @@ godot::Dictionary capture_spec_records();
 
 class CaptureWriter {
     godot::Ref<godot::FileAccess> file;
+    godot::PackedByteArray held;
+    bool holding = false;
     int64_t started_msec = 0;
     int64_t records = 0;
     int64_t oversized = 0;
+
+    godot::String stamp_header(godot::Dictionary p_header);
 
 public:
     static godot::String claim_armed_path();
 
     bool open(const godot::String &p_path, godot::Dictionary p_header);
+    bool open_memory(godot::Dictionary p_header);
     void note(
         CaptureDirection p_dir,
         int64_t p_peer,
@@ -56,7 +61,11 @@ public:
     void close();
 
     bool is_open() const {
-        return file.is_valid();
+        return file.is_valid() || holding;
+    }
+
+    const godot::PackedByteArray &memory() const {
+        return held;
     }
 
     int64_t record_count() const {

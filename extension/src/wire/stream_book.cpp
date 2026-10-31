@@ -56,6 +56,13 @@ uint64_t next_open_request() {
     return ++request_counter;
 }
 
+#if defined(NETW_TESTS)
+void reset_stream_counters() {
+    token_counter = 0;
+    request_counter = 0;
+}
+#endif
+
 bool binding_follows(
     const StreamTenure &p_origin,
     const StreamTenure &p_bound

@@ -1121,6 +1121,9 @@ void ReplicationCore::on_clock_tick(int64_t p_tick) {
     sync_pipeline.pump(p_tick);
     send_claim_images(p_tick);
     sync_compat.pump();
+#if defined(NETW_TESTS)
+    spawn_pipeline.place_held();
+#endif
     spawn_pipeline.retry_adopt_parked();
     {
         NETW_ZONE_NC("Table pump", colors::TABLE);

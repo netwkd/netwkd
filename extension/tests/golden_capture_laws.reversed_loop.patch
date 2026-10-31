@@ -1,0 +1,12 @@
+diff --git a/extension/src/repl/session_send.cpp b/extension/src/repl/session_send.cpp
+--- a/extension/src/repl/session_send.cpp
++++ b/extension/src/repl/session_send.cpp
+@@ -950,7 +950,7 @@ const SessionResult &SessionSend::run(
+         return out;
+     }
+     record_windows(p_base_tick);
+-    for (uint32_t peer = 0; peer < world->peer_capacity(); ++peer) {
++    for (uint32_t peer = world->peer_capacity(); peer-- > 0;) {
+         if (world->peer_joined(peer)) {
+             pass_peer(p_registry, peer, p_max_bits, p_base_tick, p_now_ms, out);
+         }

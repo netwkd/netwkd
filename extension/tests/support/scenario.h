@@ -21,6 +21,8 @@ struct Scenario {
     int clients = 1;
     int warmup_ticks = 0;
     int run_ticks = 0;
+    int64_t seed = 0;
+    godot::Vector<godot::StringName> laws;
     double epsilon = 0.0;
     godot::Ref<netw::NetwLinkConditions> link_conditions;
     godot::Ref<netw::NetwLinkConditions> inbound_conditions;

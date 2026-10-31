@@ -171,6 +171,7 @@
 #include "rpc_admission_laws.cpp"
 #include "rpc_call_laws.cpp"
 #include "rpc_frame_wire_laws.cpp"
+#include "scenario_text_laws.cpp"
 #include "scene_admission_laws.cpp"
 #include "scene_boundary_read_laws.cpp"
 #include "scene_core_tests.cpp"

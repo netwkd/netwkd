@@ -1,0 +1,8 @@
+label predict_correction
+clients 1
+ticks 60
+seed 7
+laws
+14 hold_input Runner 1,0
+30 perturb Runner 6,0
+40 release_input Runner

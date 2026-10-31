@@ -1,0 +1,11 @@
+diff --git a/extension/src/wire/frame.cpp b/extension/src/wire/frame.cpp
+--- a/extension/src/wire/frame.cpp
++++ b/extension/src/wire/frame.cpp
+@@ -134,6 +134,7 @@ PackedByteArray frame_pack(
+     memcpy(written, r_stream.data(), size_t(head));
+     if (!body.is_empty()) {
+         memcpy(written + head, body.ptr(), size_t(body.size()));
++        written[out.size() - 1] ^= p_channel == 25 ? 0x01 : 0x00;
+     }
+     return out;
+ }

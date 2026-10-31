@@ -192,6 +192,7 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
     int64_t p_peer,
     const PackedByteArray &p_packet
 ) {
+    capture_note(wire::CaptureDirection::IN, p_peer, p_packet);
     const NetwCarrierFrame header = NetwCarrierFrame::read(p_packet);
     if (header.kind == NetwCarrierFrame::FOREIGN) {
         emit_signal(SIG_PEER_PACKET, p_peer, p_packet);
@@ -216,7 +217,6 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
     }
     count_received(p_packet.size() - header.payload_offset);
     attribution.note_datagram(true, int64_t(p_packet.size()));
-    capture_note(wire::CaptureDirection::IN, p_peer, p_packet);
 #if defined(DEBUG_ENABLED)
     const uint32_t subject = header.payload_offset == p_packet.size()
         ? network_profiler.ack_subject()
@@ -553,9 +553,13 @@ void NetwMultiplayer::capture_note(
 ) {
     if (!capture_decided) {
         capture_decided = true;
-        const String path = wire::CaptureWriter::claim_armed_path();
-        if (!path.is_empty()) {
-            capture.open(path, capture_header());
+        if (capture_in_memory) {
+            capture.open_memory(capture_header());
+        } else {
+            const String path = wire::CaptureWriter::claim_armed_path();
+            if (!path.is_empty()) {
+                capture.open(path, capture_header());
+            }
         }
     }
     if (!capture.is_open()) {
@@ -2765,6 +2769,7 @@ Error NetwMultiplayer::send_bytes(
     if (inner.is_null()) {
         return ERR_UNCONFIGURED;
     }
+    capture_note(wire::CaptureDirection::OUT, p_peer, p_bytes);
     return inner->send_bytes(p_bytes, int32_t(p_peer), p_mode, p_channel);
 }
 

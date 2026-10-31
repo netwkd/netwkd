@@ -191,6 +191,15 @@ private:
     godot::TypedArray<godot::Dictionary> armed_spawn_state;
     bool spawn_state_is_armed = false;
     int spawn_state_asked = 0;
+
+    struct HeldPlacement {
+        SpawnBuild built;
+        int64_t release_tick = 0;
+    };
+    godot::HashMap<int64_t, int64_t> placement_delays;
+    godot::LocalVector<HeldPlacement> held_placements;
+
+    bool hold_placement(const SpawnBuild &p_built);
 #endif
 
     friend class netw::NetwMultiplayer;
@@ -565,6 +574,8 @@ public:
     int spawn_state_asks() const {
         return spawn_state_asked;
     }
+    void delay_placement(int64_t p_route, int64_t p_ticks);
+    void place_held();
 #endif
 
     godot::PackedByteArray encode_spawn_frame(

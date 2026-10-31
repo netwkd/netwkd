@@ -1,0 +1,9 @@
+label replication_calls
+clients 2
+ticks 24
+seed 7
+laws R13 R14 R23
+1 spawn kart scene:kart parent:World name:Kart
+14 table mob rows:2 hp:90
+15 rpc server entity:kart method:honk arg:3
+16 request c1 entity:kart method:ask arg:2

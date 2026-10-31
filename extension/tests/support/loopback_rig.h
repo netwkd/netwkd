@@ -11,6 +11,7 @@
 #include "godot/scene_tree.hpp"
 #include "godot/spatial_node.hpp"
 #include "godot/templates.hpp"
+#include "godot/utility.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/entity.hpp"
@@ -407,6 +408,11 @@ public:
             add_client();
         }
         pump(4);
+    }
+
+    static LoopbackRig seeded(int64_t p_seed, int p_clients) {
+        netw::gd::seed(p_seed);
+        return LoopbackRig(p_clients);
     }
 
     ~LoopbackRig() {
@@ -1199,6 +1205,10 @@ public:
 
     netw::LocalLoopbackSession *session() const {
         return link.ptr();
+    }
+
+    double tick_ms() const {
+        return tick_period_ms;
     }
 
     void step_ticks(int p_ticks) {
