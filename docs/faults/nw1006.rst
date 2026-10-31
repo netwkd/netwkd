@@ -13,12 +13,11 @@ and what to use.
 
 .. code-block:: gdscript
 
-    Netw.configure_database(self, "main", Node.new())
+    Netw.configure_despawn(Node.new())
 
-Use a script of the kind the log line names, such as a class that extends
-``RefCounted``.
+Use a node with a script, or a script of the kind the log line names.
 
 .. code-block:: gdscript
 
-    class MainDatabase extends RefCounted:
-        pass
+    func _init() -> void:
+        Netw.configure_despawn(self)

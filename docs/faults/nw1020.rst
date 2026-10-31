@@ -14,5 +14,7 @@ a transport that moves the server under link conditions.
 
 The call was ignored. The log line names the call and the case.
 
-Use what the log line asks for. To move an entity between scenes, use
-:ref:`Netw.scene <class_Netw_method_scene>` to change it.
+Use what the log line asks for. To change an interest layer that belongs to a
+multiplayer scene, change it through the
+:ref:`NetwScene <class_NetwScene>` that :ref:`Netw.scene <class_Netw_method_scene>`
+returns.

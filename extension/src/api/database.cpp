@@ -67,7 +67,7 @@ Ref<NetwDatabase> NetwDatabase::of(Node *p_node, const StringName &p_name) {
         fault::raise(
             nullptr,
             NETW_FAULT_NOT_IN_SESSION,
-            {String("{NetwDatabase.of}"),
+            {String("{NetwSession.database}"),
              p_node != nullptr ? String(p_node->get_name()) : String("<null>")},
             p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );

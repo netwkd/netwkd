@@ -2560,14 +2560,17 @@ PropertySet *NetwMultiplayer::property_set_of(const RID &p_set) const {
     return set_book.get(property_set_id_of(p_set));
 }
 
-PropertySet *NetwMultiplayer::mutable_property_set(const RID &p_set) {
+PropertySet *NetwMultiplayer::mutable_property_set(
+    const RID &p_set,
+    const char *p_verb
+) {
     PropertySet *record = property_set_of(p_set);
     NETW_BUG_COND_V(record == nullptr, nullptr);
     if (record->get_sealed()) {
         fault::raise(
             this,
             NETW_FAULT_TOO_LATE,
-            {"Changing a property set",
+            {String(p_verb),
              "a sealed property set",
              "{NetwMultiplayer.property_set_seal}"}
         );
@@ -2601,7 +2604,10 @@ RID NetwMultiplayer::property_set_create(
 }
 
 int NetwMultiplayer::property_set_add_column(const RID &p_set, int p_column) {
-    PropertySet *record = mutable_property_set(p_set);
+    PropertySet *record = mutable_property_set(
+        p_set,
+        "{NetwMultiplayer.property_set_add_column}"
+    );
     if (record == nullptr) {
         return -1;
     }
@@ -2623,7 +2629,8 @@ void NetwMultiplayer::property_set_set_column_param(
     int p_param,
     const Variant &p_value
 ) {
-    PropertySet *record = mutable_property_set(p_set);
+    PropertySet *record
+        = mutable_property_set(p_set, "Changing a property set column");
     if (record == nullptr) {
         return;
     }
@@ -2674,7 +2681,8 @@ void NetwMultiplayer::property_set_set_param(
     int p_param,
     const Variant &p_value
 ) {
-    PropertySet *record = mutable_property_set(p_set);
+    PropertySet *record
+        = mutable_property_set(p_set, "Changing a property set");
     if (record == nullptr) {
         return;
     }
@@ -2769,7 +2777,7 @@ RID NetwMultiplayer::script_schema(const Ref<Script> &p_script, Node *p_node) {
         fault::raise(
             this,
             NETW_FAULT_DECLARED_TWICE,
-            {"The replicated properties", String(name)},
+            {"The list of replicated properties", String(name)},
             gd::instance_id(p_node)
         );
     }

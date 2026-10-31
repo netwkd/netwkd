@@ -737,7 +737,7 @@ TEST_CASE(
     "same frame naming a route 9 holds runs and resolves its argument"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*[NW0021]*", 1);
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     ComposedWorld cw;
     const RID for_seven = cw.hide_behind("SevenOnly", OTHER);

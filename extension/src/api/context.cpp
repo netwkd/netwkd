@@ -614,10 +614,11 @@ Ref<NetwPropertyConfig> Netw::configure_property(
     if (declared_type < 0) {
         fault::raise(
             nullptr,
-            NETW_FAULT_UNKNOWN_NAME,
+            NETW_FAULT_BAD_VALUE,
             {String("{Netw.configure_property}"),
-             String(p_node->get_name()),
-             String(p_property)},
+             vformat("no declared type for '%s'", String(p_property)),
+             String("a declared_type, because the property has no fixed "
+                    "type")},
             node_id
         );
         return Ref<NetwPropertyConfig>();
@@ -1011,7 +1012,7 @@ Ref<NetwPromise> Netw::spawn_async(const Callable &p_fn, const Array &p_args) {
         fault::raise(
             api,
             NETW_FAULT_SPAWN_REFUSED,
-            {String("The spawn"),
+            {String("The node"),
              String("a spawn function outside a session"),
              String("a spawn function on a node under a {MultiplayerViewport}")
             },

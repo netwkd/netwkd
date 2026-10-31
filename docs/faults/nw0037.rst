@@ -5,20 +5,22 @@
 NW0037. A call needs a running session
 ======================================
 
-Reported as an error when a call that works on the session's clock, sessions
-or services runs before the session starts or after it ends.
+Reported as an error when a call that needs a running part of the session,
+such as replication, interest updates or the clock, runs before that part has
+started or after it has ended.
 
 The call did nothing. The log line names the call and what is not running.
 
 .. code-block:: gdscript
 
     func _ready() -> void:
-        session.clock.tick
+        session.transfer_server(2)
 
-Call it after the session starts, such as from a handler for the signal that
-announces it.
+Call it after the session starts, such as from a handler for
+:ref:`NetwSession.state_changed <class_NetwSession_signal_state_changed>`.
 
 .. code-block:: gdscript
 
-    func _on_session_started() -> void:
-        print(session.clock.tick)
+    func _on_state_changed(state: int) -> void:
+        if state == NetwSession.STATE_ONLINE:
+            session.transfer_server(2)

@@ -802,7 +802,8 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error("*transfer_server*[NW0012]*", 1);
-    expected_faults.expect_error("*transfer_server*[NW0018]*", 2);
+    expected_faults.expect_error("*transfer_server*[NW0018]*", 1);
+    expected_faults.expect_error("*transfer_server*[NW0032]*", 1);
 
     Ref<MultiplayerPeer> enet;
     for (int port = ENET_PORT; port < ENET_PORT + ENET_PORTS; ++port) {

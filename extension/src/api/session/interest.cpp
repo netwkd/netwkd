@@ -1329,7 +1329,7 @@ RID NetwMultiplayer::layer_open(const StringName &p_name) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwInterest.layer}", String(), "name"}
+            {"{NetwSession.interest_layer}", String(), "name"}
         );
         return RID();
     }

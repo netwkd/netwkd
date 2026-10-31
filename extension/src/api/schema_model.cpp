@@ -77,7 +77,7 @@ int NetwSchema::column(
             fault::raise(
                 nullptr,
                 NETW_FAULT_TOO_LATE,
-                {String("Declaring columns"),
+                {String("{NetwSchema.column}"),
                  vformat("schema '%s'", String(name)),
                  String("a live session uses the schema")}
             );
@@ -296,13 +296,23 @@ Ref<NetwSchema> NetwSchema::migrate(
     if (!can_edit()) {
         return Ref<NetwSchema>(this);
     }
-    if (p_from_version < 1 || p_step.is_null()) {
+    if (p_from_version < 1) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {vformat("{NetwSchema.migrate} on '%s'", String(name)),
+             vformat("version %d", p_from_version),
+             String("a version of 1 or more")}
+        );
+        return Ref<NetwSchema>(this);
+    }
+    if (p_step.is_null()) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_CALLABLE,
             {vformat("{NetwSchema.migrate} on '%s'", String(name)),
              String(),
-             String("a version of 1 or more and a valid step")}
+             String("a valid step")}
         );
         return Ref<NetwSchema>(this);
     }

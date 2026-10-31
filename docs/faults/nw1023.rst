@@ -1,0 +1,13 @@
+:github_url: hide
+
+.. _fault_nw1023:
+
+NW1023. This Godot build has no cryptography support
+====================================================
+
+Reported as a warning when the session needs random bytes for an admission
+challenge and the engine in use cannot make them.
+
+The join did not go through. The log line names what needed the bytes.
+
+Use a Godot build with cryptography support.

@@ -2,20 +2,21 @@
 
 .. _fault_nw1005:
 
-NW1005. A call got a Callable it cannot call
-============================================
+NW1005. A call got a Callable it cannot use
+===========================================
 
-Reported as an error when a call is given a Callable that is invalid, freed
-or bound to an object that no longer exists.
+Reported as an error when a call is given a Callable that is invalid, freed,
+bound to an object that no longer exists, or of a kind the call does not
+accept.
 
 The Callable was ignored. The log line names the call and what to pass.
 
 .. code-block:: gdscript
 
-    Netw.configure_rpc(Callable())
+    Netw.configure_join(Callable())
 
 Pass a Callable of a method that exists on a live node.
 
 .. code-block:: gdscript
 
-    Netw.configure_rpc(self.apply_stun)
+    Netw.configure_join(join_handler)

@@ -1183,7 +1183,7 @@ Ref<NetwPromise> NetwMultiplayer::scene_move_entity(
             NETW_FAULT_ENTITY_MOVED,
             {vformat("Entity %d", int(p_entity.get_id())),
              vformat(
-                 "scene %d, which is not in the tree",
+                 "scene %d while it or the entity is not in the tree",
                  int(p_destination.get_id())
              ),
              "an entity and a scene that are both in the tree"}

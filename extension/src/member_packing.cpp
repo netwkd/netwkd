@@ -69,11 +69,11 @@ bool declared_count_fits_arity(
         NETW_FAULT_BAD_VALUE,
         {p_verb,
          vformat(
-             "%d entries for '%s' in '%s', which has %d values",
+             "%d entries for the %d values of '%s' in '%s'",
              p_declared_count,
+             p_types.size(),
              String(p_member),
-             script_file(p_script),
-             p_types.size()
+             script_file(p_script)
          ),
          "one entry per value, and null for a value to leave as it is"}
     );

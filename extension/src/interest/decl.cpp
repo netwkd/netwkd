@@ -57,7 +57,7 @@ bool guard_pair(
         fault::raise(
             nullptr,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {name, String(), String("a layer name")}
+            {name, String(), String("layer name")}
         );
         return false;
     }
@@ -97,7 +97,7 @@ bool Decl::join(const StringName &layer_id) {
         fault::raise(
             nullptr,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {String("{NetwInterest.join}"), String(), String("a layer name")}
+            {String("{NetwInterest.join}"), String(), String("layer name")}
         );
         return false;
     }

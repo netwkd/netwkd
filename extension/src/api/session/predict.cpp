@@ -1195,9 +1195,9 @@ void NetwMultiplayer::action_receive_carrier(
         fault::raise(
             this,
             NETW_FAULT_RPC_REFUSED,
-            {"Netw.action",
+            {"{NetwAction.request}",
              String(p_entity->get_owner()->get_name()),
-             String(),
+             "the server or the controller of the entity",
              p_sender},
             gd::instance_id(p_entity->get_owner())
         );

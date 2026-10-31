@@ -169,10 +169,8 @@ String NetwMultiplayer::session_mint_challenge() {
     if (bytes.size() != auth::CHALLENGE_BYTES) {
         fault::raise(
             this,
-            NETW_FAULT_LINK_FAILED,
-            {"the admission challenge",
-             String(),
-             "a peer, because Godot's cryptography support is missing"}
+            NETW_FAULT_NO_CRYPTO,
+            {"The admission challenge"}
         );
         return String();
     }

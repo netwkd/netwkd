@@ -2405,7 +2405,15 @@ int64_t NetwMultiplayer::connection_max_players() const {
 }
 
 Error NetwMultiplayer::connection_set_join_address(const String &p_address) {
-    if (!has_server_role() || !is_online()) {
+    if (!is_online()) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"{NetwConnection.join_address}", String(), "the session"}
+        );
+        return ERR_UNAVAILABLE;
+    }
+    if (!has_server_role()) {
         fault::raise(
             this,
             NETW_FAULT_SERVER_ONLY,
@@ -2766,7 +2774,7 @@ void NetwMultiplayer::peer_mark_unreachable(int64_t p_peer) {
             NETW_FAULT_LINK_FAILED,
             {String("sending to it"),
              String(),
-             vformat("peer %d, which refused a packet", int(p_peer)),
+             vformat("peer %d (it refused a packet)", int(p_peer)),
              p_peer}
         );
     }

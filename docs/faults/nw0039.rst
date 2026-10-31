@@ -14,13 +14,11 @@ there is no node, and the reason.
 
 .. code-block:: gdscript
 
-    var car := CarScene.instantiate()
-    outside_root.add_child(car)
+    outside_root.add_child(Netw.spawn(make_car))
 
 Use what the log line asks for. For a parent outside the multiplayer root,
 spawn under a parent inside it.
 
 .. code-block:: gdscript
 
-    var car := CarScene.instantiate()
-    cars_root.add_child(car)
+    cars_root.add_child(Netw.spawn(make_car))

@@ -13,7 +13,7 @@ The call did nothing. The log line names the call and the node.
 .. code-block:: gdscript
 
     var orphan := Node.new()
-    Netw.configure_property(orphan, &"health")
+    Netw.channel(orphan, 1)
 
 Call it from a node in the scene tree under a
 :ref:`MultiplayerViewport <class_MultiplayerViewport>`.
@@ -21,4 +21,4 @@ Call it from a node in the scene tree under a
 .. code-block:: gdscript
 
     func _ready() -> void:
-        Netw.scene(self)
+        Netw.channel(self, 1)

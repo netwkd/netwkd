@@ -26,7 +26,7 @@ bool named_layer(
     fault::raise(
         host,
         NETW_FAULT_EMPTY_ARGUMENT,
-        {String(verb), String(), String("a layer name")}
+        {String(verb), String(), String("layer name")}
     );
     return false;
 }

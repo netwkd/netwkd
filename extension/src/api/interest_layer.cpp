@@ -280,7 +280,7 @@ bool NetwInterestLayer::add_entity(const Ref<NetwEntity> &p_entity) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{NetwInterestLayer.add_entity}"),
              String(),
-             String("an entity")},
+             String("entity")},
             uint64_t(get_instance_id())
         );
         return false;
@@ -303,7 +303,7 @@ bool NetwInterestLayer::remove_entity(const Ref<NetwEntity> &p_entity) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{NetwInterestLayer.remove_entity}"),
              String(),
-             String("an entity")},
+             String("entity")},
             uint64_t(get_instance_id())
         );
         return false;
@@ -330,7 +330,7 @@ void NetwInterestLayer::client_admit(const Ref<NetwEntity> &p_entity) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{NetwInterestLayer.client_admit}"),
              String(),
-             String("an entity")},
+             String("entity")},
             uint64_t(get_instance_id())
         );
         return;
@@ -352,7 +352,7 @@ void NetwInterestLayer::client_revoke(const Ref<NetwEntity> &p_entity) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{NetwInterestLayer.client_revoke}"),
              String(),
-             String("an entity")},
+             String("entity")},
             uint64_t(get_instance_id())
         );
         return;
@@ -372,7 +372,7 @@ void NetwInterestLayer::client_untrack_entity(const Ref<NetwEntity> &p_entity) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{NetwInterestLayer.client_untrack_entity}"),
              String(),
-             String("an entity")},
+             String("entity")},
             uint64_t(get_instance_id())
         );
         return;

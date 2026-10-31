@@ -206,7 +206,7 @@ TEST_CASE(
     "disclosure and a peer may not name what it cannot see"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*[NW0021]*", 1);
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     LoopbackRig rig(0);
     rig.mount();

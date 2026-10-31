@@ -14,8 +14,8 @@ what the call asks for.
 
 .. code-block:: text
 
-    Netw.configure_join got 0, which it does not accept, so it was ignored.
-    Pass a count from 1 to 64. [NW0032]
+    LANLobbyDirectory.port_count got 0, which it does not accept, so it was
+    ignored. Pass a count from 1 to 64. [NW0032]
 
 Pass a value the log line asks for. The class reference lists the accepted
 values of each call.

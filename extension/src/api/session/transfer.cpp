@@ -1006,7 +1006,15 @@ void NetwMultiplayer::transfer_raise_reported() {
 }
 
 Error NetwMultiplayer::session_transfer_server(int64_t p_peer) {
-    if (!is_online() || !session_core.is_server_role()) {
+    if (!is_online()) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_RUNNING,
+            {"{NetwSession.transfer_server}", String(), "the session"}
+        );
+        return ERR_UNAUTHORIZED;
+    }
+    if (!session_core.is_server_role()) {
         fault::raise(
             this,
             NETW_FAULT_SERVER_ONLY,
@@ -1019,8 +1027,17 @@ Error NetwMultiplayer::session_transfer_server(int64_t p_peer) {
         || !transport->has_method(StringName(VERB_TRANSFER_SERVER))) {
         return ERR_UNAVAILABLE;
     }
-    if (p_peer == SERVER_PEER
-        || !gd::api_peer_ids(inner).has(int32_t(p_peer))) {
+    if (p_peer == SERVER_PEER) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSession.transfer_server}",
+             "the server's own peer id",
+             "the peer id of a client"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    if (!gd::api_peer_ids(inner).has(int32_t(p_peer))) {
         fault::raise(
             this,
             NETW_FAULT_UNKNOWN_PEER,

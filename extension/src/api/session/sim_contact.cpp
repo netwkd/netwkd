@@ -109,7 +109,7 @@ void NetwMultiplayer::sim_contact_arm(sim::Row &r_row) {
             this,
             NETW_FAULT_CONFLICTING_SETTINGS,
             {String("claim_on_contact or release_on_rest"),
-             String("'") + String(r_row.view->get_name()) + String("'"),
+             String(r_row.view->get_name()),
              String("a NetwEntity.transfer other than TRANSFER_IMMEDIATE, or "
                     "an entity with prediction or state properties")},
             uint64_t(gd::instance_id(r_row.view->get_owner()))

@@ -178,7 +178,7 @@ TEST_CASE(
     "a packet that reaches the wrong session leaves no effect behind"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*[NW0021]*", 1);
+    expected_faults.expect_warning("*[NW0007]*", 1);
 
     LoopbackRig rig(0);
     rig.mount();
@@ -490,7 +490,7 @@ const Refusal REFUSALS[] = {
      "echo",
      ERR_METHOD_NOT_FOUND,
      nullptr,
-     "*'Sink'*[NW0021]*"},
+     "*'Sink'*[NW0025]*"},
     {"RR3 a method whose promise rejects",
      ANSWERING_SINK,
      ANSWERING_SINK,
@@ -506,7 +506,7 @@ const Refusal REFUSALS[] = {
      "echo",
      ERR_METHOD_NOT_FOUND,
      nullptr,
-     "*'Sink'*[NW0021]*"},
+     "*'Sink'*[NW0025]*"},
 };
 
 Node *sink_of(const char *p_source) {

@@ -11,8 +11,8 @@ session needs to match.
 The thing in question was refused. The log line names the peer, the thing
 refused, and the setting that differs. The setting can be the app tag, the
 build identity, the auth callback, the tickrate, an entity's components, its
-synchronized properties or their names, or an action the server never
-created.
+synchronized properties or their names, the RPCs declared on a node or the
+arguments of one, or an action the server never created.
 
 .. code-block:: gdscript
 

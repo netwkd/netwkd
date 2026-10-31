@@ -40,7 +40,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_MALFORMED_DATAGRAM:
             return {
                 vformat(
-                    "Peer %d sent a packet this peer could not read, so it "
+                    "Peer %d sent a packet this peer could not use, so it "
                     "was dropped.",
                     v.peer
                 ),
@@ -154,13 +154,15 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.name,
                     v.owner
                 ),
-                vformat(
-                    "Call {NetwMemberConfig.any_peer} or "
-                    "{NetwMemberConfig.controller} on '%s' if peer %d should "
-                    "call it.",
-                    v.name,
-                    v.peer
-                )
+                v.detail.is_empty()
+                    ? vformat(
+                          "Call {NetwMemberConfig.any_peer} or "
+                          "{NetwMemberConfig.controller} on '%s' if peer %d "
+                          "should call it.",
+                          v.name,
+                          v.peer
+                      )
+                    : vformat("Call it from %s.", v.detail)
             };
         case NETW_FAULT_SPAWN_NOT_PLACED:
             return {
@@ -273,8 +275,8 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_DECLARED_TWICE:
             return {
                 vformat(
-                    "%s was declared twice on '%s' with different values, so "
-                    "the second was refused.",
+                    "%s was declared twice on '%s', so the second was "
+                    "refused.",
                     v.name,
                     v.owner
                 ),
@@ -403,7 +405,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_BAD_CALLABLE:
             return {
                 vformat(
-                    "%s got a Callable it cannot call, so it was ignored.",
+                    "%s got a Callable it cannot use, so it was ignored.",
                     v.name
                 ),
                 vformat("Pass %s.", v.detail)
@@ -411,7 +413,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_BAD_SCRIPT:
             return {
                 vformat(
-                    "%s got %s, whose script it cannot use.",
+                    "%s got %s, which it cannot use.",
                     v.name,
                     v.owner
                 ),
@@ -429,11 +431,12 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_BUSY_APPLYING:
             return {
                 vformat(
-                    "%s ran while the session applied its {Netw} settings, so "
-                    "it did nothing.",
+                    "%s ran while the session applied its {Netw} settings or "
+                    "ran a simulation step, so it did nothing.",
                     v.name
                 ),
-                "Call it outside the callbacks that react to those settings."
+                "Call it outside the callbacks that react to those settings "
+                "and outside the simulation step."
             };
         case NETW_FAULT_PEER_REFUSED:
             return {
@@ -577,6 +580,15 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 ),
                 "Set {LANLobbyDirectory.port} or "
                 "{LANLobbyDirectory.port_count} to a free range."
+            };
+        case NETW_FAULT_NO_CRYPTO:
+            return {
+                vformat(
+                    "%s needs Godot's cryptography support, which this Godot "
+                    "build lacks, so it did nothing.",
+                    v.name
+                ),
+                "Use a Godot build with cryptography support."
             };
     }
     return {};

@@ -47,7 +47,7 @@ Ref<NetwSceneConfig> NetwSceneConfig::labeled(const StringName &p_stem) {
         fault::raise(
             nullptr,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwSceneConfig.labeled}", String(), "a label"},
+            {"{NetwSceneConfig.labeled}", String(), "label"},
             uint64_t(node_id)
         );
         return Ref<NetwSceneConfig>(this);

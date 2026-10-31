@@ -14,7 +14,8 @@ setting that fixes it.
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_entity(self).simulation = NetwSimulation.SCHEDULE_FRAME
+        Netw.configure_entity(self).simulation.schedule = (
+                NetwSimulation.SCHEDULE_FRAME)
 
 Use what the log line asks for. A physics body needs ``SCHEDULE_STEPPED`` to
 get ``RECOVERY_POLICY_REBASE_REPLAY``.
@@ -22,4 +23,5 @@ get ``RECOVERY_POLICY_REBASE_REPLAY``.
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_entity(self).simulation = NetwSimulation.SCHEDULE_STEPPED
+        Netw.configure_entity(self).simulation.schedule = (
+                NetwSimulation.SCHEDULE_STEPPED)

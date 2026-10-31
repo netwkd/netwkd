@@ -2,25 +2,26 @@
 
 .. _fault_nw0034:
 
-NW0034. Something was declared twice with different values
-==========================================================
+NW0034. Something was declared twice
+====================================
 
 Reported as an error when a ``configure_*`` call declares a thing that is
-already declared on the same node with different values.
+already declared on the same node, or a database, schema, transport or saved
+column is declared a second time.
 
 The second declaration was refused. The log line names the declaration and
-the node.
+where it was declared.
 
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_property(self, &"health").state()
-        Netw.configure_property(self, &"health").broadcast()
+        Netw.configure_session(self)
+        Netw.configure_session(self)
 
 Declare it once, and keep what the first call returned.
 
 .. code-block:: gdscript
 
     func _init() -> void:
-        var health := Netw.configure_property(self, &"health")
-        health.state()
+        var config := Netw.configure_session(self)
+        config.bandwidth_kbps = 512

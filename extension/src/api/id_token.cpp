@@ -388,14 +388,22 @@ void NetwIdToken::hold(
 }
 
 void NetwIdToken::provide(const String &p_issuer, const Callable &p_fetch) {
-    if (p_issuer.is_empty() || (!p_fetch.is_null() && !p_fetch.is_valid())) {
+    if (p_issuer.is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwIdToken.provide}", String(), "issuer"}
+        );
+        return;
+    }
+    if (!p_fetch.is_null() && !p_fetch.is_valid()) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_CALLABLE,
             {"{NetwIdToken.provide}",
              String(),
-             "an issuer and a Callable that takes a nonce and returns a "
-             "{NetwPromise} of a token"}
+             "a Callable that takes a nonce and returns a {NetwPromise} of "
+             "a token"}
         );
         return;
     }

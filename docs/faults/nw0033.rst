@@ -13,16 +13,16 @@ owner.
 
 .. code-block:: gdscript
 
+    var health := 100
+
     func _init() -> void:
-        Netw.configure_rpc(self.aply_stun)
+        Netw.configure_property(self, &"helth")
 
 Check the name, or declare it on the owner first.
 
 .. code-block:: gdscript
 
-    func _init() -> void:
-        Netw.configure_rpc(self.apply_stun)
+    var health := 100
 
-    @rpc("authority", "reliable")
-    func apply_stun() -> void:
-        pass
+    func _init() -> void:
+        Netw.configure_property(self, &"health")

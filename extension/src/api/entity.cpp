@@ -699,7 +699,7 @@ void NetwEntity::project_control(Object *p_announcer) {
             api,
             NETW_FAULT_CONFLICTING_SETTINGS,
             {String("NetwEntity.controller"),
-             String("'") + String(get_name()) + String("'"),
+             String(get_name()),
              String("NetwEntity.authority at AUTHORITY_SERVER")},
             uint64_t(gd::instance_id(get_owner()))
         );
@@ -1979,7 +1979,8 @@ void NetwEntity::hydrate_components() {
         fault::raise(
             session_core(),
             NETW_FAULT_PEER_MISMATCH,
-            {String("the components of '") + String(get_name()) + String("'"),
+            {String("the component list of '") + String(get_name())
+                 + String("'"),
              String(),
              String("the networked components of '") + String(get_name())
                  + String("'"),

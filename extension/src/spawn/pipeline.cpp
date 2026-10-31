@@ -481,7 +481,8 @@ bool Pipeline::spawn_admitted(Node *p_node, const char *p_verb) {
         {p_node != nullptr ? String("'") + String(p_node->get_name())
                     + String("'")
                            : String("<null>"),
-         String("all the spawns the session authority granted this peer"),
+         String("using up all the spawns the session authority granted this "
+                "peer"),
          String("it again once the session authority admits more of its "
                 "spawns")},
         p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
@@ -714,7 +715,7 @@ Ref<NetwPromise> Pipeline::spawn_async(
         fault::raise(
             core(),
             NETW_FAULT_SPAWN_REFUSED,
-            {String("The spawn"),
+            {String("The node"),
              String("a call from a client"),
              String("{Netw.spawn} for a node the client spawns itself")}
         );
@@ -952,7 +953,8 @@ Node *Pipeline::spawn_registered(
         fault::raise(
             core(),
             NETW_FAULT_SPAWN_REFUSED,
-            {String("spawn constructor '") + String(p_id) + String("'"),
+            {String("A node from spawn constructor '") + String(p_id)
+                 + String("'"),
              String("an unregistered spawn constructor"),
              String("a spawn constructor registered with "
                     "{NetwMultiplayer.spawn_register_constructor}")}
@@ -2251,12 +2253,8 @@ void Pipeline::apply_parked(
         spawn_park_refused += 1;
         fault::raise(
             core(),
-            NETW_FAULT_SPAWN_MISMATCH,
-            {String(),
-             String(),
-             String("the authority of peer ") + String::num_int64(p_sender),
-             p_sender,
-             p_route}
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender}
         );
         return;
     }
@@ -3208,7 +3206,11 @@ void Pipeline::expire_spawner_parked() {
         fault::raise(
             core(),
             NETW_FAULT_SPAWN_MISMATCH,
-            {String(), String(), String("its MultiplayerSpawner")}
+            {String(),
+             String(),
+             String("its MultiplayerSpawner"),
+             0,
+             parked_route}
         );
     }
 }

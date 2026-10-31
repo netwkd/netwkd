@@ -1152,8 +1152,9 @@ void NetwMultiplayer::rpc_call(
                 this,
                 NETW_FAULT_BAD_VALUE,
                 {vformat("RPC '%s'", String(method)),
-                 "this peer, which call_remote cannot target",
-                 "call_local on it to call it here"},
+                 "this peer as the target",
+                 "another peer, or call {NetwMemberConfig.call_local} on it "
+                 "to run it here"},
                 0
             );
             return;
@@ -1874,8 +1875,11 @@ void NetwMultiplayer::rpc_handle_call(
               );
         fault::raise(
             this,
-            NETW_FAULT_RPC_REFUSED,
-            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            NETW_FAULT_PEER_MISMATCH,
+            {vformat("the call to '%s'", String(method)),
+             String(),
+             vformat("the RPCs declared on '%s'", p_comp_node->get_name()),
+             p_sender},
             gd::instance_id(p_comp_node)
         );
         refuse(ERR_METHOD_NOT_FOUND, detail);
@@ -1897,8 +1901,15 @@ void NetwMultiplayer::rpc_handle_call(
         );
         fault::raise(
             this,
-            NETW_FAULT_RPC_REFUSED,
-            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            NETW_FAULT_PEER_MISMATCH,
+            {vformat("the call to '%s'", String(method)),
+             String(),
+             vformat(
+                 "the arguments of '%s' on '%s'",
+                 String(method),
+                 p_comp_node->get_name()
+             ),
+             p_sender},
             gd::instance_id(p_comp_node)
         );
         refuse(ERR_INVALID_DATA, detail);
@@ -1942,8 +1953,15 @@ void NetwMultiplayer::rpc_handle_call(
         );
         fault::raise(
             this,
-            NETW_FAULT_RPC_REFUSED,
-            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            NETW_FAULT_PEER_MISMATCH,
+            {vformat("the call to '%s'", String(method)),
+             String(),
+             vformat(
+                 "the number of arguments of '%s' on '%s'",
+                 String(method),
+                 p_comp_node->get_name()
+             ),
+             p_sender},
             gd::instance_id(p_comp_node)
         );
         refuse(ERR_INVALID_DATA, detail);
@@ -1985,11 +2003,8 @@ void NetwMultiplayer::rpc_handle_call(
             count_verdict(ERR_UNAUTHORIZED, slot.node.route);
             fault::raise(
                 this,
-                NETW_FAULT_RPC_REFUSED,
-                {String(method),
-                 String(p_comp_node->get_name()),
-                 String(),
-                 p_sender},
+                NETW_FAULT_MALFORMED_DATAGRAM,
+                {String(), String(), String(), p_sender},
                 gd::instance_id(p_comp_node)
             );
             refuse(ERR_UNAUTHORIZED, detail);
@@ -2016,8 +2031,8 @@ void NetwMultiplayer::rpc_handle_call(
     if (target_type != CALL_TARGET_EVERYONE && target_peer != get_unique_id()) {
         fault::raise(
             this,
-            NETW_FAULT_RPC_REFUSED,
-            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            NETW_FAULT_MALFORMED_DATAGRAM,
+            {String(), String(), String(), p_sender},
             gd::instance_id(p_comp_node)
         );
         return;

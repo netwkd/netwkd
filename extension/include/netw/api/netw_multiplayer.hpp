@@ -3102,7 +3102,10 @@ public:
     godot::RID property_set_get_schema(const godot::RID &p_set) const;
     uint64_t property_set_id_of(const godot::RID &p_set) const;
     repl::PropertySet *property_set_of(const godot::RID &p_set) const;
-    repl::PropertySet *mutable_property_set(const godot::RID &p_set);
+    repl::PropertySet *mutable_property_set(
+        const godot::RID &p_set,
+        const char *p_verb
+    );
     repl::SetBook &property_set_book() {
         return set_book;
     }

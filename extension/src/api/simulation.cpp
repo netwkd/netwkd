@@ -255,7 +255,7 @@ void NetwSimulation::simulate(const Ref<NetwEntity> &p_entity) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{NetwSimulation.simulate}"),
              String(),
-             String("an entity")},
+             String("entity")},
             owner.is_valid() ? uint64_t(gd::instance_id(owner->get_owner()))
                              : 0
         );

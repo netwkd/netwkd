@@ -191,7 +191,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
-    expected_faults.expect_warning("*[NW0026]*", 1);
+    expected_faults.expect_warning("*[NW0007]*", 2);
 
     ParkedRelease stale;
     stale.pipeline->park_spawn_for_scene(stale.frame(), 9101, 7);
@@ -217,7 +217,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
-    expected_faults.expect_warning("*[NW0026]*", 1);
+    expected_faults.expect_warning("*[NW0007]*", 2);
 
     ParkedRelease stale;
     stale.pipeline->park_spawn_for_adopt(stale.frame(), 9102, 7);
@@ -243,7 +243,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning("*(error 4)*[NW1000]*", 1);
-    expected_faults.expect_warning("*[NW0026]*", 1);
+    expected_faults.expect_warning("*[NW0007]*", 2);
 
     ParkedRelease stale;
     stale.pipeline->get_park()
