@@ -881,7 +881,8 @@ bool NetwMultiplayer::interest_wire_admits(
     int64_t p_peer_id,
     const Ref<NetwEntity> &p_entity
 ) {
-    if (p_peer_id == SERVER_PEER) {
+    if (p_peer_id == SERVER_PEER
+        || (p_entity.is_valid() && p_entity->steering() == p_peer_id)) {
         return true;
     }
     return interest_player_sees(p_peer_id, p_entity);

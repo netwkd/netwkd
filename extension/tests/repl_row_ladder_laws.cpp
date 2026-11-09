@@ -358,6 +358,50 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "[Networked][Repl][Hosted] LD10 a 64 bit code steps across zero and past "
+    "the signed ceiling, and reads back as the sender held it"
+) {
+    SchemaRecord record;
+    record.name = StringName("Wide");
+    SchemaCore::append_column(&record, StringName("n"), SchemaCore::I64, 1);
+    record.at(0)->delta = DeltaMode::LADDER;
+    SchemaCore::fix(&record);
+    const WirePlan plan = WirePlan::compile(record);
+    NETW_REQUIRE_EQ(plan.valid(), true);
+
+    const uint64_t rows[][2] = {
+        {0, UINT64_MAX},
+        {UINT64_MAX, UINT64_MAX - 3},
+        {UINT64_MAX, 0},
+    };
+    for (const auto &row : rows) {
+        CAPTURE(row[0]);
+        CAPTURE(row[1]);
+        CodeRow base = CodeRow::for_plan(plan);
+        base.write(plan.column(0), 0, row[0]);
+        CodeRow moved = CodeRow::for_plan(plan);
+        moved.write(plan.column(0), 0, row[1]);
+
+        const PackedByteArray stepped = write_snapshot_row(
+            stepping(2, plan.full_mask()),
+            BASE_TICK,
+            plan,
+            moved,
+            &base
+        );
+        NETW_REQUIRE_EQ(stepped.size() > 0, true);
+
+        SnapshotHeader got;
+        CodeRow into;
+        NETW_REQUIRE_EQ(
+            read_snapshot_row(stepped, BASE_TICK, plan, got, into, &base, nullptr),
+            true
+        );
+        CHECK(into.equals(moved));
+    }
+}
+
+TEST_CASE(
     "[Networked][Repl][Hosted] LD9 a window steps each sample from the one "
     "before it and writes the oldest whole"
 ) {

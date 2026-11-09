@@ -78,13 +78,11 @@ bool read_element(
     if (int(selector) != bucket_of(body, p_slot.width)) {
         return false;
     }
-    const int64_t code = int64_t(p_base_code) + unzigzag(body);
-    const int64_t ceiling
-        = p_slot.width >= 63 ? INT64_MAX : int64_t(uint64_t(1) << p_slot.width);
-    if (code < 0 || code >= ceiling) {
+    const uint64_t code = p_base_code + uint64_t(unzigzag(body));
+    if (p_slot.width < 64 && code >= (uint64_t(1) << p_slot.width)) {
         return false;
     }
-    r_code = uint64_t(code);
+    r_code = code;
     return true;
 }
 

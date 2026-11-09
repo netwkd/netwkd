@@ -376,6 +376,11 @@ bool NetwMultiplayer::store_source_row(
         table.set_offer(row, store::Table::OFFER_NONE);
         return true;
     }
+    if (entity_left_tree(entity.ptr())) {
+        store_world.set_source(p_at, store::Source::NONE);
+        table.set_offer(row, store::Table::OFFER_NONE);
+        return true;
+    }
     if (binding->route <= 0 && p_bind.is_valid()) {
         p_bind.call(int64_t(binding->id));
     }
@@ -508,7 +513,9 @@ void NetwMultiplayer::store_resource_entity(NetwEntity *p_entity) {
         return;
     }
     const int64_t live = liveness_route_of(p_entity);
-    store_resource_route(live > 0 ? live : p_entity->get_route());
+    const int64_t route = live > 0 ? live : p_entity->get_route();
+    store_world.stale_route(route);
+    store_resource_route(route);
 }
 
 bool NetwMultiplayer::store_mark(
@@ -706,8 +713,7 @@ void NetwMultiplayer::store_evaluate_slot(
         }
         const int64_t id = int64_t(store_world.peer_id(peer));
         const bool visible = p_entity.is_valid()
-            && (id == SERVER_PEER || !filtered
-                || interest_player_sees(id, p_entity));
+            && (!filtered || interest_wire_admits(id, p_entity));
         store_world.see(p_slot, peer, visible);
         store_world.hold(
             p_slot,

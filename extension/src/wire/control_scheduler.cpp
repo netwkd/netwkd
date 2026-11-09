@@ -90,7 +90,7 @@ void ControlScheduler::queue(int p_peer, const ControlRecord &p_record) {
     held.lifecycle.push_back(p_record);
 }
 
-void ControlScheduler::drop_token(int p_peer, uint64_t p_token) {
+void ControlScheduler::drop_reader_token(int p_peer, uint64_t p_token) {
     Peer *held = peers.getptr(p_peer);
     if (held == nullptr) {
         return;
@@ -102,8 +102,23 @@ void ControlScheduler::drop_token(int p_peer, uint64_t p_token) {
         }
     }
     for (uint32_t at = held->lifecycle.size(); at > 0; --at) {
-        if (held->lifecycle[at - 1].token == p_token
-            && held->lifecycle[at - 1].tag != ControlTag::OPEN) {
+        const ControlRecord &record = held->lifecycle[at - 1];
+        if (record.token == p_token
+            && (record.tag == ControlTag::READY
+                || record.tag == ControlTag::RESET)) {
+            held->lifecycle.remove_at(at - 1);
+        }
+    }
+}
+
+void ControlScheduler::drop_writer_token(int p_peer, uint64_t p_token) {
+    Peer *held = peers.getptr(p_peer);
+    if (held == nullptr) {
+        return;
+    }
+    for (uint32_t at = held->lifecycle.size(); at > 0; --at) {
+        const ControlRecord &record = held->lifecycle[at - 1];
+        if (record.token == p_token && record.tag == ControlTag::CLOSE) {
             held->lifecycle.remove_at(at - 1);
         }
     }

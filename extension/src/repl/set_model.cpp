@@ -290,6 +290,19 @@ bool SetModel::admits_schema(int64_t p_route, int64_t p_ordinal) const {
     return found != nullptr && found->schema_hash == declared->value;
 }
 
+void SetModel::renote_replaced(
+    int64_t p_route,
+    int64_t p_kind,
+    const StringName &p_key,
+    int64_t p_record
+) {
+    HashMap<int64_t, int64_t> *noted = descriptors.getptr(p_route);
+    const SetRow *found = row_for(p_route, p_kind, p_key, p_record);
+    if (noted != nullptr && found != nullptr && noted->has(found->ordinal)) {
+        (*noted)[found->ordinal] = found->schema_hash;
+    }
+}
+
 void SetModel::clear_route(int64_t p_route) {
     revision += 1;
     routes.erase(p_route);

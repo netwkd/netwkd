@@ -4,9 +4,9 @@
 #include "godot/utility.hpp"
 #include "netw/colors.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/fault_catalog.hpp"
 #include "netw/profile.hpp"
 #include "netw/subsystems.hpp"
-#include "netw_faults.h"
 
 using namespace godot;
 

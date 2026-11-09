@@ -40,7 +40,8 @@ struct ExitRig {
                     .placed_at(Vector2())
                     .predicted(0.01)
                     .scheduled(netw::Schedule::TICK)
-                    .mounted(),
+                    .mounted()
+                    .spawned(),
                 CLIENT
             )
         );
@@ -73,6 +74,31 @@ struct ExitRig {
             = int64_t(session->sync_pipeline()
                           ->counters()[StringName("derived_sets_active")]);
         return sizes;
+    }
+
+    int64_t sync_counter(int p_side, const char *p_name) const {
+        return int64_t(
+            api(p_side)->sync_pipeline()->counters()[StringName(p_name)]
+        );
+    }
+
+    int64_t rows_sent(int p_side) const {
+        return sync_counter(p_side, "row_frames_out")
+            + sync_counter(p_side, "retained_frames_out")
+            + sync_counter(p_side, "window_frames_out");
+    }
+
+    Ref<netw::NetwPrediction> inputs(int p_side) const {
+        return Ref<netw::NetwPrediction>(rig.prediction_handle("P", p_side));
+    }
+
+    static int64_t commands_received(
+        const Ref<netw::NetwPrediction> &p_inputs
+    ) {
+        return int64_t(p_inputs->get_stats()->to_dictionary().get(
+            StringName("command_frames_received"),
+            0
+        ));
     }
 
     void drive(int p_ticks, const Vector2 &p_motion) {
@@ -121,13 +147,27 @@ void left_out_of_the_tree_releases_its_slot(int p_side) {
     ExitRig stand;
     const int other = p_side == SERVER ? CLIENT : SERVER;
     Node *owner = stand.owner(p_side);
+    const RID copy = stand.rig.entity_of("P", other);
+    const Ref<netw::NetwPrediction> server_inputs = stand.inputs(SERVER);
     const FaultWatch faults;
+    const int64_t rows_out = stand.rows_sent(p_side);
+    const int64_t rows_in = stand.sync_counter(other, "derived_frames_in");
+    const int64_t commands_in = ExitRig::commands_received(server_inputs);
     owner->get_parent()->remove_child(owner);
 
     stand.drive(5, Vector2(0.0, 1.0));
+    const bool copy_despawned = stand.api(other)->entity_get_state(copy)
+        == netw::NetwMultiplayer::ENTITY_STATE_DEAD;
     NETW_CHECK_EQ(faults.errors(), int64_t(0));
     NETW_CHECK_EQ(stand.books(p_side).slots_open, int64_t(0));
-    NETW_CHECK_EQ(stand.books(other).slots_open, int64_t(1));
+    NETW_CHECK_EQ(copy_despawned, p_side == SERVER);
+    NETW_CHECK_EQ(
+        stand.books(other).slots_open,
+        int64_t(p_side == SERVER ? 0 : 1)
+    );
+    NETW_CHECK_EQ(stand.rows_sent(p_side), rows_out);
+    NETW_CHECK_EQ(stand.sync_counter(other, "derived_frames_in"), rows_in);
+    NETW_CHECK_EQ(ExitRig::commands_received(server_inputs), commands_in);
 
     stand.api(p_side)->clear_session_state();
     stand.rig.step_ticks(1);
@@ -146,7 +186,10 @@ void freed_off_the_tree_releases_every_book(int p_side) {
     stand.drive(5, Vector2(0.0, 1.0));
     NETW_CHECK_EQ(faults.errors(), int64_t(0));
     check_empty(stand.books(p_side));
-    NETW_CHECK_EQ(stand.books(other).slots_open, int64_t(1));
+    NETW_CHECK_EQ(
+        stand.books(other).slots_open,
+        int64_t(p_side == SERVER ? 0 : 1)
+    );
 }
 
 TEST_CASE(
@@ -165,8 +208,8 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Predict][TreeExit] a server's predicted owner left out of "
-    "the tree releases its slot without an error, and a session clear "
-    "releases the rest"
+    "the tree releases its slot and despawns the client's copy without an "
+    "error, and a session clear releases the rest"
 ) {
     left_out_of_the_tree_releases_its_slot(SERVER);
 }

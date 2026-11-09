@@ -35,7 +35,7 @@ bool stream_is(
 } // namespace
 
 void SessionSend::queue_close(int p_peer, uint64_t p_token) {
-    control.drop_token(p_peer, p_token);
+    control.drop_writer_token(p_peer, p_token);
     wire::ControlRecord closing;
     closing.tag = wire::ControlTag::CLOSE;
     closing.token = p_token;
@@ -1127,7 +1127,7 @@ void SessionSend::hide(int p_peer, const wire::StreamLane &p_lane) {
     }
     const uint64_t token = world->token_of(p_peer, p_lane);
     if (world->stream_hide(p_peer, p_lane) && token != 0) {
-        control.drop_token(p_peer, token);
+        control.drop_writer_token(p_peer, token);
     }
 }
 

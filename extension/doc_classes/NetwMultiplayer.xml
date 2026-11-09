@@ -1429,7 +1429,7 @@
 			<param index="0" name="peer_id" type="int" />
 			<param index="1" name="entity" type="NetwEntity" />
 			<description>
-				Returns [code]true[/code] when updates for [param entity] are sent to [param peer_id]. Always [code]true[/code] for the server, and [method interest_player_sees] for everyone else.
+				Returns [code]true[/code] when updates for [param entity] are sent to [param peer_id]. Always [code]true[/code] for the server and for the controller of [param entity], and [method interest_player_sees] for everyone else.
 			</description>
 		</method>
 		<method name="lagcomp_deny_action">

@@ -31,7 +31,9 @@ public:
 
     void queue(int p_peer, const ControlRecord &p_record);
 
-    void drop_token(int p_peer, uint64_t p_token);
+    void drop_reader_token(int p_peer, uint64_t p_token);
+
+    void drop_writer_token(int p_peer, uint64_t p_token);
 
     bool due(int p_peer, int64_t p_now_ms) const;
 

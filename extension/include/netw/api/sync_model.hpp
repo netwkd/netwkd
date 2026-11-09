@@ -89,6 +89,12 @@ public:
     void note_descriptors(int64_t p_route, const godot::Dictionary &p_noted);
 
     bool admits_schema(int64_t p_route, int64_t p_ordinal) const;
+    void renote_replaced(
+        int64_t p_route,
+        int64_t p_kind,
+        const godot::StringName &p_key,
+        int64_t p_record
+    );
 
     void attach(
         int64_t p_route,

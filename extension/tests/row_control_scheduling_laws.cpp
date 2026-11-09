@@ -186,8 +186,9 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a torn down token takes its unsent receipt "
-    "with it"
+    "[Networked][Wire][Hosted] a torn down reader token takes its unsent "
+    "receipt with it, and a CLOSE this peer writes on the same number still "
+    "goes out"
 ) {
     ControlScheduler scheduler;
     scheduler.accept(PEER, 7, 4);
@@ -197,17 +198,42 @@ TEST_CASE(
     closing.token = 7;
     scheduler.queue(PEER, closing);
 
-    scheduler.drop_token(PEER, 7);
+    scheduler.drop_reader_token(PEER, 7);
     NETW_CHECK_EQ(scheduler.pending_receipts(PEER), 1);
-    NETW_CHECK_EQ(scheduler.pending_lifecycle(PEER), 0);
+    NETW_CHECK_EQ(scheduler.pending_lifecycle(PEER), 1);
 
     const godot::LocalVector<ControlRecord> out
         = scheduler.flush(PEER, 0, CONTROL_TICK_RESERVATION_BYTES);
-    NETW_CHECK_EQ(out.size(), 1);
-    const bool one_record = out.size() == 1;
-    NETW_CHECK_EQ(one_record ? out[0].receipts.size() : 0, 1);
-    const bool one_receipt = one_record && out[0].receipts.size() == 1;
-    NETW_CHECK_EQ(one_receipt ? out[0].receipts[0].token : 0, 8);
+    bool closed = false;
+    int64_t receipts = 0;
+    uint64_t receipt_token = 0;
+    for (const ControlRecord &record : out) {
+        closed = closed
+            || (record.tag == ControlTag::CLOSE && record.token == 7);
+        for (const auto &receipt : record.receipts) {
+            receipts += 1;
+            receipt_token = receipt.token;
+        }
+    }
+    CHECK(closed);
+    NETW_CHECK_EQ(receipts, int64_t(1));
+    NETW_CHECK_EQ(receipt_token, uint64_t(8));
+}
+
+TEST_CASE(
+    "[Networked][Wire][Hosted] a torn down writer token takes its unsent "
+    "CLOSE and leaves the receipts this peer owes as a reader"
+) {
+    ControlScheduler scheduler;
+    scheduler.accept(PEER, 7, 4);
+    ControlRecord closing;
+    closing.tag = ControlTag::CLOSE;
+    closing.token = 7;
+    scheduler.queue(PEER, closing);
+
+    scheduler.drop_writer_token(PEER, 7);
+    NETW_CHECK_EQ(scheduler.pending_receipts(PEER), 1);
+    NETW_CHECK_EQ(scheduler.pending_lifecycle(PEER), 0);
 }
 
 TEST_CASE(

@@ -454,6 +454,7 @@ TEST_CASE(
         int64_t(NetwLivenessCore::STATE_LIVE)
     );
     CHECK(rig.route_node(route, 0) != nullptr);
+    CHECK(rig.server()->rpc_get_recipients(driven).has(rig.peer_id(0)));
 }
 
 } // namespace TestSpawnFlapLaws

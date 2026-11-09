@@ -4,7 +4,7 @@
 #include "godot/object.hpp"
 #include "godot/script_backtrace.hpp"
 #include "godot/variant.hpp"
-#include "netw_faults.h"
+#include "netw/fault_catalog.hpp"
 
 namespace netw::decl_sites {
 

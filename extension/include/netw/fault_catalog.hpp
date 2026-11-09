@@ -1,5 +1,4 @@
-#ifndef NETW_FAULTS_H
-#define NETW_FAULTS_H
+#pragma once
 
 #include <stdint.h>
 
@@ -128,5 +127,3 @@ typedef struct netw_fault_row {
     uint8_t site;
     uint8_t forward;
 } netw_fault_row;
-
-#endif

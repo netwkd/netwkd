@@ -1609,6 +1609,20 @@ void NetwMultiplayer::entity_capture_exit(Object *p_wrapper) {
     );
 }
 
+bool NetwMultiplayer::entity_left_tree(NetwEntity *p_entity) const {
+    if (p_entity == nullptr) {
+        return false;
+    }
+    const Node *owner = p_entity->get_owner();
+    if (owner != nullptr && owner->is_inside_tree()) {
+        return false;
+    }
+    const int64_t state = liveness_state_of(p_entity);
+    return entity_departures.has(uint64_t(p_entity->get_instance_id()))
+        || state == int64_t(NetwLivenessCore::STATE_DEAD)
+        || state == int64_t(NetwLivenessCore::STATE_ABSENT);
+}
+
 void NetwMultiplayer::entity_capture_residency(
     EntityDeparture &r_row,
     NetwEntity *p_entity

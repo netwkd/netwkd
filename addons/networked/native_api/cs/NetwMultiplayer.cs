@@ -2701,7 +2701,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Returns <c>true</c> when updates for <paramref name="entity"/> are sent
-    /// to <paramref name="peerId"/>. Always <c>true</c> for the server, and
+    /// to <paramref name="peerId"/>. Always <c>true</c> for the server and for
+    /// the controller of <paramref name="entity"/>, and
     /// <see cref="NetwMultiplayer.InterestPlayerSees"/> for everyone else.
     /// </summary>
     public bool InterestWireAdmits(long peerId, NetwEntity entity)

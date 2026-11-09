@@ -160,15 +160,9 @@ struct FindingWords {
 };
 
 const FindingWords FINDING_WORDS[] = {
-    {"unquantized",
-     "causal state properties with no quantizer",
-     "a quantizer on each of them"},
     {"uncompared",
      "an epsilon on non-causal state properties",
      "causal on them, or no epsilon"},
-    {"transport_without_epsilon",
-     "a transport reading causal non-pose properties with no epsilon",
-     "an epsilon on each of them"},
     {"unobserved",
      "reconcile_only properties with no epsilon",
      "an epsilon on each, or no reconcile_only"},
@@ -1057,11 +1051,6 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
     }
     set_correction_column(resolve_correction());
     pool->seed_recovery_ledger(slot);
-    pool->validate_declaration(
-        slot,
-        state->get_set(),
-        callable_mp(handle.ptr(), &NetwPrediction::seat_reachability_findings)
-    );
     if (session != nullptr) {
         const int resolved = pool->adopt_declaration(
             entity,
@@ -1081,6 +1070,16 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
         pool->tape_reset(slot, pool->tape_epoch_of(slot));
         pool->push_carry_rules(slot);
         reconfigure();
+    }
+    if (session != nullptr && p_declaration.controlled_locally) {
+        pool->validate_declaration(
+            slot,
+            state->get_set(),
+            callable_mp(
+                handle.ptr(),
+                &NetwPrediction::seat_reachability_findings
+            )
+        );
     }
     const predict::Feed feed
         = pool->role_feed(resolved_role, fallback_latched());

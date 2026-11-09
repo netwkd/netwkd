@@ -212,7 +212,6 @@ if use_mold and shutil.which("mold"):
     env.Append(LINKFLAGS=["-fuse-ld=mold"])
 env.Append(CXXFLAGS=["-std=c++17"])
 env.Append(CPPPATH=[str(ROOT), str(ROOT / "include")])
-env.Append(CPPPATH=[str(ROOT.parent / "core")])
 sources.hold_determinism_floor(
     env,
     lambda message: Exit("networked: " + message),

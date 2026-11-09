@@ -358,6 +358,14 @@ Error SyncPipeline::register_property_set(Node *p_node, uint64_t p_set) {
         capture_declaration_key(replacement);
         replace_binding(binding_position(held), replacement);
         bind_declaration(replacement);
+        if (sync_model != nullptr && replacement->route > 0) {
+            sync_model->renote_replaced(
+                replacement->route,
+                NetwSyncModel::KIND_DERIVED,
+                replacement->order_key,
+                declared->get_record()
+            );
+        }
         core()->predict_rebind_replaced(replaced);
         return OK;
     }
@@ -1430,7 +1438,7 @@ void SyncPipeline::reset_stream_of(int p_peer, uint64_t p_token) {
     if (!book.invalidate(p_peer, named, answer.request, answer.token)) {
         return;
     }
-    row_send()->control_scheduler().drop_token(p_peer, p_token);
+    row_send()->control_scheduler().drop_reader_token(p_peer, p_token);
     row_send()->control_scheduler().queue(p_peer, answer);
 }
 

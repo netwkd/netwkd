@@ -64,6 +64,59 @@ class LoopbackRig {
         netw::NetwMultiplayer *,
         const godot::Ref<netw::LocalMultiplayerPeer> &
     ) = nullptr;
+    bool constructs = false;
+
+    static constexpr const char *DECLARED_SPAWN = "netw_rig_declared";
+    static constexpr int SERVER_SEAT = -1;
+
+    struct DeclaredSpawn {
+        EntityDecl decl;
+        Carrier *server_owner = nullptr;
+    };
+
+    godot::Vector<DeclaredSpawn> declared_spawns;
+
+    static godot::Node *build_declared(
+        const godot::Variant &p_index,
+        int p_seat,
+        int64_t p_rig
+    ) {
+        LoopbackRig *rig = reinterpret_cast<LoopbackRig *>(intptr_t(p_rig));
+        const int64_t index = int64_t(p_index);
+        if (index < 0 || index >= rig->declared_spawns.size()) {
+            return nullptr;
+        }
+        DeclaredSpawn &row = rig->declared_spawns.ptrw()[index];
+        if (p_seat == SERVER_SEAT) {
+            Carrier *owner = row.server_owner;
+            row.server_owner = nullptr;
+            return owner;
+        }
+        return rig->mint_owner(row.decl);
+    }
+
+    void register_declared(netw::NetwMultiplayer *p_api, int p_seat) {
+        godot::Array types;
+        types.push_back(int(godot::Variant::INT));
+        register_constructor(
+            p_api,
+            godot::StringName(DECLARED_SPAWN),
+            callable_mp_static(&LoopbackRig::build_declared)
+                .bind(p_seat, int64_t(intptr_t(this))),
+            types
+        );
+    }
+
+    void construct_declared() {
+        if (constructs) {
+            return;
+        }
+        constructs = true;
+        register_declared(server(), SERVER_SEAT);
+        for (int index = 0; index < count(); ++index) {
+            register_declared(client(index), index);
+        }
+    }
 
     godot::Ref<netw::NetwMultiplayer> make_api(
         const godot::Ref<netw::LocalMultiplayerPeer> &p_peer,
@@ -736,7 +789,11 @@ public:
         client_apis.push_back(make_api(peer, p_username, p_args));
         client_declared.push_back({});
         client_state_sets.push_back({});
-        return client_apis.size() - 1;
+        const int made = client_apis.size() - 1;
+        if (constructs) {
+            register_declared(client(made), made);
+        }
+        return made;
     }
 
     int arrive(
@@ -815,7 +872,52 @@ public:
         link->set_link_conditions(peer(p_client), p_conditions, p_from);
     }
 
+    godot::RID spawn_declared(const EntityDecl &p_decl) {
+        mount();
+        construct_declared();
+        const int64_t index = declared_spawns.size();
+        Carrier *owner = mint_owner(p_decl);
+        declared_spawns.push_back({p_decl, owner});
+        godot::Array args;
+        args.push_back(index);
+        const godot::RID entity = server()->spawn_registered(
+            godot::StringName(DECLARED_SPAWN),
+            args,
+            nullptr
+        );
+        REQUIRE_MESSAGE(entity.is_valid(), "the declared spawn made no entity");
+        branch(-1)->add_child(owner);
+        if (p_decl.controller() != 0) {
+            server()->entity_grant_control(entity, p_decl.controller());
+        }
+        const godot::RID state = attach_state(server(), entity, owner, p_decl);
+        attach_input(server(), entity, owner, p_decl);
+        configure_prediction(shell(), entity, owner, p_decl);
+        if (!p_decl.name().is_empty()) {
+            declared[p_decl.name()] = entity;
+            if (state.is_valid()) {
+                declared_state_sets[p_decl.name()] = state;
+            }
+        }
+        const int route = int(server()->entity_get_route(entity));
+        for (int round = 0; round < 8; ++round) {
+            pump();
+            bool reached = true;
+            for (int at = 0; at < count(); ++at) {
+                reached = reached
+                    && client(at)->entity_from_route(route).is_valid();
+            }
+            if (reached) {
+                break;
+            }
+        }
+        return entity;
+    }
+
     godot::RID declare_entity(const EntityDecl &p_decl) {
+        if (p_decl.is_spawned()) {
+            return spawn_declared(p_decl);
+        }
         godot::Node *owner = nullptr;
         if (p_decl.wants_owner()) {
             owner = mint_owner(p_decl);
@@ -867,12 +969,19 @@ public:
 
     godot::RID declare_mirror(int p_client, const EntityDecl &p_decl) {
         REQUIRE_MESSAGE(p_decl.route() > 0, "a mirror needs an admitted route");
-        Carrier *owner = mint_owner(p_decl);
-        if (p_decl.is_mounted()) {
-            branch(p_client)->add_child(owner);
+        const godot::RID spawned
+            = client(p_client)->entity_from_route(p_decl.route());
+        Carrier *owner = godot::Object::cast_to<Carrier>(
+            client(p_client)->entity_get_node(spawned)
+        );
+        godot::RID entity = spawned;
+        if (owner == nullptr) {
+            owner = mint_owner(p_decl);
+            if (p_decl.is_mounted()) {
+                branch(p_client)->add_child(owner);
+            }
+            entity = stand_up(client(p_client), p_decl, owner, false);
         }
-        const godot::RID entity
-            = stand_up(client(p_client), p_decl, owner, false);
         const godot::RID state
             = attach_state(client(p_client), entity, owner, p_decl);
         attach_input(client(p_client), entity, owner, p_decl);

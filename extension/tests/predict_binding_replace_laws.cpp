@@ -75,26 +75,37 @@ int64_t frames_sent(const LoopbackRig &p_rig) {
 
 TEST_CASE(
     "[Networked][Predict] a state set replaced on a predicted entity is what "
-    "its reachability answers from"
+    "its reachability answers from, and replacing it on both peers of a "
+    "spawned entity keeps the client in the session"
 ) {
     const netw_test::FaultWatch faults;
     LoopbackRig rig(1);
-    open_world(rig);
+    rig.declare_world(
+        WorldDecl().clocked(30, 3).lag_compensated().player(
+            leaning_player().spawned(),
+            0
+        )
+    );
     drive(rig, SETTLE_TICKS, Vector2(1.0, 0.0));
     const Dictionary before
         = rig.prediction_handle(StringName("P"), 0)->reachability();
     REQUIRE(Dictionary(before["fields"]).has(StringName("lean")));
 
-    const Error added = replace(
-        rig.client(0),
-        rig.entity_of("P", 0),
-        "RebindPositionOnly",
-        "position",
-        NetwMultiplayer::COLUMN_VECTOR2,
-        NetwMultiplayer::RECORD_KIND_STATE
-    );
-    REQUIRE(int(added) == int(OK));
+    for (int client = -1; client < 1; ++client) {
+        NetwMultiplayer *api = client < 0 ? rig.server() : rig.client(0);
+        const Error added = replace(
+            api,
+            rig.entity_of("P", client),
+            "RebindPositionOnly",
+            "position",
+            NetwMultiplayer::COLUMN_VECTOR2,
+            NetwMultiplayer::RECORD_KIND_STATE
+        );
+        REQUIRE(int(added) == int(OK));
+    }
     drive(rig, SETTLE_TICKS, Vector2(0.0, 1.0));
+    NETW_CHECK_EQ(faults.errors_containing("NW0025"), int64_t(0));
+    NETW_CHECK_EQ(faults.warnings_containing("NW0025"), int64_t(0));
 
     const Dictionary fields
         = rig.prediction_handle(StringName("P"), 0)->reachability()["fields"];
@@ -104,7 +115,6 @@ TEST_CASE(
         int64_t(rig.client(0)->property_binding_book().retired_count()),
         int64_t(0)
     );
-    NETW_CHECK_EQ(faults.warnings_containing("causal state properties"), 1);
 }
 
 TEST_CASE(

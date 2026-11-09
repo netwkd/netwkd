@@ -25,6 +25,7 @@ class EntityDecl {
     int decl_input_window = -1;
     int decl_consume_lag = 0;
     bool decl_mounted = false;
+    bool decl_spawned = false;
     bool decl_carries = false;
     double decl_carry_gain = 1.0;
     double decl_teleport_at = 0.0;
@@ -127,6 +128,15 @@ public:
 
     bool is_mounted() const {
         return decl_mounted;
+    }
+
+    EntityDecl &spawned() {
+        decl_spawned = true;
+        return *this;
+    }
+
+    bool is_spawned() const {
+        return decl_spawned;
     }
 
     EntityDecl &carried(double p_gain, double p_teleport_at) {

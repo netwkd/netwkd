@@ -126,6 +126,12 @@ public:
     );
 
     bool admits_schema(int64_t p_route, int64_t p_ordinal) const;
+    void renote_replaced(
+        int64_t p_route,
+        int64_t p_kind,
+        const godot::StringName &p_key,
+        int64_t p_record
+    );
 
     void clear_route(int64_t p_route);
     void clear();

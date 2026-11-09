@@ -4,7 +4,7 @@
 
 #include "godot/hash_map.hpp"
 #include "godot/variant.hpp"
-#include "netw_faults.h"
+#include "netw/fault_catalog.hpp"
 
 namespace netw {
 

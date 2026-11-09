@@ -118,7 +118,6 @@ TEST_CASE(
     "does not replay costs one correction, and the client then equals the "
     "server"
 ) {
-    const netw_test::FaultWatch faults;
     for (const bool ruled : {false, true}) {
         for (const double latency : {0.0, 100.0}) {
             const Disturbed run = nudged_once(latency, ruled);
@@ -127,19 +126,39 @@ TEST_CASE(
             NETW_CHECK_CLOSE(run.client_y, run.server_y, CLOSE);
         }
     }
-    NETW_CHECK_EQ(faults.warnings_containing("causal state properties"), 2);
 }
 
 TEST_CASE(
     "[Networked][Predict] PR2 a row recorded before a correction's write is "
     "not judged against it, so the difference lands once"
 ) {
-    const netw_test::FaultWatch faults;
     for (const double latency : {0.0, 100.0}) {
         const Disturbed run = nudged_once(latency);
         NETW_CHECK_CLOSE(run.overshoot, 0.0, CLOSE);
     }
-    NETW_CHECK_EQ(faults.warnings_containing("causal state properties"), 1);
+}
+
+TEST_CASE(
+    "[Networked][Predict] PR3 a spawned predicted entity reports a finding "
+    "of its declaration once, on the peer that drives it"
+) {
+    netw_test::FaultWatch faults;
+    faults.expect_warning("*'P'*carry_step under the tick schedule*", 1);
+    LoopbackRig rig(1);
+    rig.declare_world(
+        WorldDecl().clocked(30, 3).lag_compensated().player(
+            EntityDecl()
+                .named("P")
+                .on_schema("TickCarriedPose")
+                .synced("position")
+                .placed_at(Vector2())
+                .predicted(0.01)
+                .carried(1.0, 200.0)
+                .spawned(),
+            0
+        )
+    );
+    rig.step_ticks(4);
 }
 
 Ref<netw::NetwQuantizeScalar> half_step() {

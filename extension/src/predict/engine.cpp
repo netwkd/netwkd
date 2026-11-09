@@ -1711,6 +1711,12 @@ uint64_t subject_of(const Ref<NetwEntity> &p_entity) {
                                : 0;
 }
 
+String subject_name(const Ref<NetwEntity> &p_entity) {
+    Node *node = p_entity.is_valid() ? p_entity->get_owner() : nullptr;
+    return node != nullptr ? String(node->get_name())
+                           : String("an entity with no node");
+}
+
 } // namespace
 
 Dictionary NetwPredictionEngine::witness_sample(
@@ -4138,12 +4144,10 @@ int NetwPredictionEngine::settle_correction(int64_t p_slot, int p_declared) {
     }
     row->latches.integration_refusal_reported = true;
     const Ref<NetwEntity> seated = owner_entity(p_slot);
-    const String named
-        = seated.is_valid() ? String(seated->get_name()) : String();
     fault::raise(
         core(),
         NETW_FAULT_PREDICTION_DOWNGRADED,
-        {named.is_empty() ? String("an entity") : named,
+        {subject_name(seated),
          "a physics body on SCHEDULE_FRAME",
          "SCHEDULE_STEPPED to get RECOVERY_POLICY_REBASE_REPLAY"},
         subject_of(seated)
@@ -4894,7 +4898,8 @@ PackedInt64Array NetwPredictionEngine::ack_frontier(
 int64_t NetwPredictionEngine::lane_route(int64_t p_slot) const {
     NetwMultiplayer *host = core();
     const Ref<NetwEntity> seated = owner_entity(p_slot);
-    if (host == nullptr || seated.is_null()) {
+    if (host == nullptr || seated.is_null()
+        || host->entity_left_tree(seated.ptr())) {
         return -1;
     }
     return host->liveness_route_of(seated.ptr());
@@ -5372,11 +5377,7 @@ String schedule_label(NetwSimulation::Schedule p_schedule) {
 }
 
 String quoted_entity(const Ref<NetwEntity> &p_member) {
-    Node *owner = p_member.is_valid() ? p_member->get_owner() : nullptr;
-    const String named = owner != nullptr
-        ? SyncPipeline::contract_subject_name(owner)
-        : String("an entity with no node");
-    return String("'") + named + String("'");
+    return String("'") + subject_name(p_member) + String("'");
 }
 
 String refusal_row(
@@ -5524,7 +5525,7 @@ void NetwPredictionEngine::report_joint_refusal(int64_t p_slot) {
     fault::raise(
         core(),
         NETW_FAULT_PREDICTION_DOWNGRADED,
-        {seated.is_valid() ? String(seated->get_name()) : String("an entity"),
+        {subject_name(seated),
          vformat(
              "{NetwPrediction.RECONCILE_JOINT} with %s, which cannot replay "
              "a tick",
@@ -9180,7 +9181,7 @@ void NetwPredictionEngine::notify_contact(
         fault::raise(
             core(),
             NETW_FAULT_PREDICTION_DOWNGRADED,
-            {seated.is_valid() ? String(seated->get_name()) : String(),
+            {subject_name(seated),
              "a contact with a body while it selects no entities",
              "what it touches in one of its {NetwInterestLayer} layers, or "
              "named with {NetwSimulation.simulate}"},
@@ -10833,7 +10834,7 @@ void NetwPredictionEngine::report_authority_model(int64_t p_slot) {
         fault::raise(
             core(),
             NETW_FAULT_PREDICTION_DOWNGRADED,
-            {String(seated->get_name()),
+            {subject_name(seated),
              vformat(
                  "{NetwPropertyConfig.broadcast} properties [%s], which "
                  "cannot be corrected",
@@ -10858,7 +10859,7 @@ void NetwPredictionEngine::report_authority_model(int64_t p_slot) {
         fault::raise(
             core(),
             NETW_FAULT_PREDICTION_DOWNGRADED,
-            {String(seated->get_name()),
+            {subject_name(seated),
              "{NetwPropertyConfig.input} properties without a type",
              "a type on each one, or {NetwMemberConfig.quantize}"},
             subject_of(seated)

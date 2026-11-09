@@ -43,14 +43,17 @@ EntityDecl census_player(const char *p_name) {
         .scheduled(netw::Schedule::TICK);
 }
 
-Scenario two_predicted_lanes() {
+Scenario two_predicted_lanes(bool p_spawned = false) {
+    EntityDecl p = census_player("P");
+    EntityDecl q = census_player("Q");
+    if (p_spawned) {
+        p.spawned();
+        q.spawned();
+    }
     Scenario scenario;
     scenario.label = "predict-census";
     scenario.epsilon = 0.01;
-    scenario.world.clocked(30, 3)
-        .lag_compensated()
-        .player(census_player("P"), 0)
-        .player(census_player("Q"), 1);
+    scenario.world.clocked(30, 3).lag_compensated().player(p, 0).player(q, 1);
     scenario.clients = 2;
     scenario.conditions(netw_test::polls(4));
     scenario.hold_input(1, "P", Vector2(1.0, 0.0));
@@ -920,42 +923,59 @@ int64_t refused_joint(
 TEST_CASE(
     "[Networked][Predict][Census] PC16 a refused JOINT island is reported "
     "once on the peer that predicts its owner and nowhere else, because only "
-    "that peer reconciles the group"
+    "that peer reconciles the group, naming its node whether placed or "
+    "spawned"
 ) {
-    const Scenario scenario = two_predicted_lanes();
-    LoopbackRig rig(scenario.clients);
-    const ScenarioRun run = ScenarioRun::session(rig, scenario);
-    REQUIRE(run.regime_reached());
+    for (const bool spawned : {false, true}) {
+        CAPTURE(spawned);
+        const Scenario scenario = two_predicted_lanes(spawned);
+        LoopbackRig rig(scenario.clients);
+        const ScenarioRun run = ScenarioRun::session(rig, scenario);
+        REQUIRE(run.regime_reached());
 
-    NetwMultiplayer *server = rig.server();
-    NetwMultiplayer *predictor = rig.client(0);
-    REQUIRE(server != nullptr);
-    REQUIRE(predictor != nullptr);
-    netw::NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+        NetwMultiplayer *server = rig.server();
+        NetwMultiplayer *predictor = rig.client(0);
+        REQUIRE(server != nullptr);
+        REQUIRE(predictor != nullptr);
+        netw::NetwPredictionEngine *const pool
+            = predictor->get_prediction_engine();
 
-    Ref<NetwEntity> predicted;
-    const TypedArray<NetwEntity> held = predictor->predict_stepped_entities();
-    for (int at = 0; at < held.size(); ++at) {
-        const Ref<NetwEntity> wrapper = held[at];
-        if (pool->role_of(pool->slot_of(wrapper)) == int(netw::Role::PREDICT)) {
-            predicted = wrapper;
+        Ref<NetwEntity> predicted;
+        const TypedArray<NetwEntity> held
+            = predictor->predict_stepped_entities();
+        for (int at = 0; at < held.size(); ++at) {
+            const Ref<NetwEntity> wrapper = held[at];
+            if (pool->role_of(pool->slot_of(wrapper))
+                == int(netw::Role::PREDICT)) {
+                predicted = wrapper;
+            }
         }
+        REQUIRE(predicted.is_valid());
+
+        const FaultWatch watch;
+        const TypedArray<NetwEntity> consumed
+            = server->predict_stepped_entities();
+        REQUIRE(consumed.size() == 2);
+        NETW_CHECK_EQ(
+            refused_joint(rig, server, consumed[0], watch),
+            int64_t(0)
+        );
+        NETW_CHECK_EQ(
+            refused_joint(rig, server, consumed[1], watch),
+            int64_t(0)
+        );
+        NETW_CHECK_EQ(
+            refused_joint(rig, predictor, predicted, watch),
+            int64_t(1)
+        );
+        CHECK(pool->joint_refusal_reported_of(pool->slot_of(predicted)));
+
+        REQUIRE(predicted->get_owner() != nullptr);
+        const godot::String named = godot::String("'")
+            + godot::String(predicted->get_owner()->get_name())
+            + godot::String("'");
+        NETW_CHECK_EQ(watch.warnings_containing(named), int64_t(1));
     }
-    REQUIRE(predicted.is_valid());
-
-    const FaultWatch watch;
-    const TypedArray<NetwEntity> consumed = server->predict_stepped_entities();
-    REQUIRE(consumed.size() == 2);
-    NETW_CHECK_EQ(refused_joint(rig, server, consumed[0], watch), int64_t(0));
-    NETW_CHECK_EQ(refused_joint(rig, server, consumed[1], watch), int64_t(0));
-    NETW_CHECK_EQ(refused_joint(rig, predictor, predicted, watch), int64_t(1));
-    CHECK(pool->joint_refusal_reported_of(pool->slot_of(predicted)));
-
-    REQUIRE(predicted->get_owner() != nullptr);
-    const godot::String named = godot::String("'")
-        + godot::String(predicted->get_owner()->get_name())
-        + godot::String("'");
-    NETW_CHECK_EQ(watch.warnings_containing(named), int64_t(1));
 }
 
 TEST_CASE(

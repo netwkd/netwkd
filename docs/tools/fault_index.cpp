@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "../netw_faults.h"
+#include "netw/fault_catalog.hpp"
 
 #define NETW_FAULT_ROW(m_name, m_id, m_class, m_aud, m_subj, m_site, m_fwd) \
     printf("- :doc:`nw%04d`, %s\n", m_id, #m_class);

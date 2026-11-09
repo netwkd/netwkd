@@ -139,6 +139,15 @@ bool NetwSyncModel::admits_schema(int64_t p_route, int64_t p_ordinal) const {
     return impl.admits_schema(p_route, p_ordinal);
 }
 
+void NetwSyncModel::renote_replaced(
+    int64_t p_route,
+    int64_t p_kind,
+    const StringName &p_key,
+    int64_t p_record
+) {
+    impl.renote_replaced(p_route, p_kind, p_key, p_record);
+}
+
 void NetwSyncModel::attach(
     int64_t p_route,
     int64_t p_kind,

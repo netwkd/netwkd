@@ -5358,6 +5358,7 @@ public:
         return faults;
     }
     void entity_capture_exit(godot::Object *p_wrapper);
+    bool entity_left_tree(NetwEntity *p_entity) const;
     void entity_settle_departure(int64_t p_instance);
     void liveness_owner_despawning(
         const godot::StringName &p_reason,
