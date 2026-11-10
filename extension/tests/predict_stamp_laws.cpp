@@ -45,12 +45,7 @@ netw::predict::AckEvidenceWire ack_record(
     record.topo_fp = p_topo_fp;
     record.witness_fp = p_witness_fp;
     record.raw_fp = p_raw_fp;
-    record.pre_pose_fp = p_family_base;
-    record.pre_momentum_fp = p_family_base == 0 ? 0 : p_family_base + 1;
-    record.pre_controller_fp = p_family_base == 0 ? 0 : p_family_base + 2;
-    record.post_pose_fp = record.pre_pose_fp;
-    record.post_momentum_fp = record.pre_momentum_fp;
-    record.post_controller_fp = record.pre_controller_fp;
+    (void)p_family_base;
     return record;
 }
 

@@ -970,7 +970,7 @@ void NetwMultiplayer::predict_relay_command_frame(
             false,
             0,
             String(),
-            false
+            true
         );
     }
 }

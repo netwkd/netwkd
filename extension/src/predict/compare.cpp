@@ -79,22 +79,6 @@ ExactVerdict exact_of(uint8_t p_flags) {
                                         : ExactVerdict::UNEQUAL;
 }
 
-DifferingFamily differing_family(
-    const FamilyFingerprints &p_local,
-    const FamilyFingerprints &p_peer
-) {
-    if (p_local.pose != p_peer.pose) {
-        return DifferingFamily::POSE;
-    }
-    if (p_local.momentum != p_peer.momentum) {
-        return DifferingFamily::MOMENTUM;
-    }
-    if (p_local.controller != p_peer.controller) {
-        return DifferingFamily::CONTROLLER_LATCH;
-    }
-    return DifferingFamily::NONE;
-}
-
 constexpr double DOT_PRODUCT_ROUNDINGS = 4.0;
 
 double rotation_of_dot(double p_dot) {
@@ -489,14 +473,6 @@ AckVerdict admit_ack(
         p_peer.complete
     );
     p_journal.mark_attribution(p_transition, out.attribution);
-    if (out.attribution == Attribution::PRE_STATE) {
-        out.differing_family
-            = differing_family(local.pre_families, p_peer.pre_families);
-    } else if (out.attribution == Attribution::CLOSURE) {
-        out.differing_family
-            = differing_family(local.post_families, p_peer.post_families);
-    }
-    p_journal.mark_differing_family(p_transition, out.differing_family);
     return out;
 }
 

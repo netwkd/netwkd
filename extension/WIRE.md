@@ -190,7 +190,9 @@ ROW_CONTROL declares 5 for the frame of records, the stepped ids, the omitted
 OPEN fields and the RESET that names only a token of section 10, and for the
 parked lanes and binding floors of section 7, LIFECYCLE_DECISION declares 2
 for the author of the revision it names and the denial string a refusal
-carries, and every other revision is 0.
+carries, PREDICT_COMMAND and PREDICT_RELAY declare 1 for the repeated row bit
+and PREDICT_ACK declares 1 for the compact record of section 20, and every
+other revision is 0.
 
 Ids 0, 1 and 7 were claimed by formats older than v8 and stay reserved, so an
 ancient frame is refused instead of decoding as a modern channel.
@@ -389,8 +391,10 @@ a window against the other windows of its own stream and buys nothing else.
 ## 10. ROW_CONTROL, channel 43
 
 A frame carries one or more complete records back to back until its payload
-ends, each tagged by its first byte. A peer sends at most one ROW_CONTROL
-frame per peer per flush.
+ends, each tagged by its first byte. A peer sends at most two ROW_CONTROL
+frames per peer per flush. OPEN, READY, RESET and CLOSE ride one reliable
+frame. ACCEPT rides a frame of its own in the unreliable datagram, beside
+whatever else the tick sends.
 
 ```text
 [tag bits 8]
@@ -507,8 +511,12 @@ splitting at whichever limit it reaches first. At most 256 control payload
 bytes per peer per physics tick are reserved inside the governor's budget, and
 unused reservation returns to state traffic.
 
-Reliable head-of-line delay can age a confirmed revision past the 32 the
-distance field allows, and the sender then writes a full row.
+A receipt names the latest revision, so a lost one is replaced by the next. A
+stream that went quiet behind a lost receipt is repaired by the writer, which
+sends the row again and is answered again.
+
+A late receipt can age a confirmed revision past the 32 the distance field
+allows, and the sender then writes a full row.
 
 ---
 
@@ -1199,7 +1207,10 @@ header       svarint ack_of_acks   the owner's highest seen acknowledgement
              u8      count         transitions in the run, at most 255
 per transition
              varuint tagged        zigzag(label - previous) << 1 | fresh
-payloads     one WirePlan row per FRESH transition, in run order, then align
+payloads     one WirePlan row per FRESH transition, in run order, then align.
+             Where the plan has no variable column, every row after the
+             first opens with one bit, set when the row repeats the row
+             before it, and a repeated row carries nothing else
 evidence     u8 count, at most the transition count, then per record:
              u8 mask, then pre, post, environment, topology and witness as
              32 bits each, three pre families, three post families, and a
@@ -1210,14 +1221,29 @@ A fresh transition and its row are inseparable, so a frame that lost one is
 refused whole. The payload plan is the input set's `VOLATILE` columns as a
 sealed `SchemaRecord`.
 
+The evidence count is 0 unless the owner runs with
+`NETW_PREDICT_OWNER_EVIDENCE` set. Evidence feeds only the server's judgement
+of the owner's claim, which is a diagnostic.
+
 ```text
 PREDICT_ACK (36, U, server -> owner)
 header       u8 epoch, varuint base, u8 count
-per record   u8 mask, then pre, command, environment, post, topology and
-             witness as 32 bits each, three pre families, three post
-             families, a raw fingerprint where the mask claims one, and u8
-             flags, whose bits 2..4 carry authority's witness class
+per record   u8 flags, whose bit 5 marks a compact record and whose bits
+             2..4 carry authority's witness class, then post as 32 bits.
+             A record that is not compact continues with u8 mask, then
+             pre, command, environment, topology and witness as 32 bits
+             each, and a raw fingerprint where the mask claims one.
+             Once the frame holds a record that is not compact, each later
+             one opens with u8 same and omits what a set bit names:
+             bit 0  pre equals the post of the record before it
+             bit 1  command      bit 2  environment   bit 3  topology
+             bit 4  witness      bit 5  mask          bit 6  raw
+             bits 1 to 6 compare with the last record that was not compact
 ```
+
+A record rides whole on its first two sends and compact after that, so the
+range still in flight costs 5 bytes a record. An owner that sees only a
+compact record judges the match and leaves the attribution unknown.
 
 At most 21 records ride, so a worst-case raw frame stays under the 1150 byte
 unreliable budget. Later records ride the next send once `ack_of_acks`

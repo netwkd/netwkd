@@ -1845,12 +1845,6 @@ TEST_CASE(
         record.post_fp = at;
         record.topo_fp = at;
         record.witness_fp = at;
-        record.pre_pose_fp = 1;
-        record.pre_momentum_fp = 2;
-        record.pre_controller_fp = 3;
-        record.post_pose_fp = 1;
-        record.post_momentum_fp = 2;
-        record.post_controller_fp = 3;
         record.raw_fp = at + 1;
         record.evidence_mask
             = uint8_t(at % 2 == 0 ? int(netw::predict::EVIDENCE_RAW) : 0);
@@ -1876,12 +1870,6 @@ TEST_CASE(
         NETW_CHECK_EQ(got.post_fp, sent.post_fp);
         NETW_CHECK_EQ(got.topo_fp, sent.topo_fp);
         NETW_CHECK_EQ(got.witness_fp, sent.witness_fp);
-        NETW_CHECK_EQ(got.pre_pose_fp, sent.pre_pose_fp);
-        NETW_CHECK_EQ(got.pre_momentum_fp, sent.pre_momentum_fp);
-        NETW_CHECK_EQ(got.pre_controller_fp, sent.pre_controller_fp);
-        NETW_CHECK_EQ(got.post_pose_fp, sent.post_pose_fp);
-        NETW_CHECK_EQ(got.post_momentum_fp, sent.post_momentum_fp);
-        NETW_CHECK_EQ(got.post_controller_fp, sent.post_controller_fp);
         const bool carries_raw
             = (sent.evidence_mask & int(netw::predict::EVIDENCE_RAW)) != 0;
         NETW_CHECK_EQ(got.raw_fp, carries_raw ? sent.raw_fp : 0);

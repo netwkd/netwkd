@@ -43,7 +43,8 @@ public:
         int p_peer,
         int64_t p_now_ms,
         int64_t p_budget_bytes,
-        godot::PackedByteArray *r_frame = nullptr
+        godot::PackedByteArray *r_frame = nullptr,
+        godot::PackedByteArray *r_receipts = nullptr
     );
 
     bool read(

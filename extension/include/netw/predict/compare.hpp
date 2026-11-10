@@ -55,7 +55,6 @@ struct AckVerdict {
     int64_t transition = -1;
     ExactVerdict exact = ExactVerdict::UNJUDGED;
     Attribution attribution = Attribution::UNKNOWN;
-    DifferingFamily differing_family = DifferingFamily::NONE;
     bool compared = false;
     bool evidence_complete = false;
 };

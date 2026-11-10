@@ -97,7 +97,15 @@ constexpr auto command_evidence_prefix = netw::wire::describe(
     )
 );
 
-constexpr auto ack_evidence_prefix = netw::wire::describe(
+constexpr auto ack_verdict = netw::wire::describe(
+    netw::wire::field<&AckEvidenceWire::flags>("flags", netw::wire::bits(8)),
+    netw::wire::field<&AckEvidenceWire::post_fp>(
+        "post_fp",
+        netw::wire::bits(32)
+    )
+);
+
+constexpr auto ack_detail = netw::wire::describe(
     netw::wire::field<&AckEvidenceWire::evidence_mask>(
         "evidence_mask",
         netw::wire::bits(8)
@@ -108,40 +116,12 @@ constexpr auto ack_evidence_prefix = netw::wire::describe(
         "e_digest",
         netw::wire::bits(32)
     ),
-    netw::wire::field<&AckEvidenceWire::post_fp>(
-        "post_fp",
-        netw::wire::bits(32)
-    ),
     netw::wire::field<&AckEvidenceWire::topo_fp>(
         "topo_fp",
         netw::wire::bits(32)
     ),
     netw::wire::field<&AckEvidenceWire::witness_fp>(
         "witness_fp",
-        netw::wire::bits(32)
-    ),
-    netw::wire::field<&AckEvidenceWire::pre_pose_fp>(
-        "pre_pose_fp",
-        netw::wire::bits(32)
-    ),
-    netw::wire::field<&AckEvidenceWire::pre_momentum_fp>(
-        "pre_momentum_fp",
-        netw::wire::bits(32)
-    ),
-    netw::wire::field<&AckEvidenceWire::pre_controller_fp>(
-        "pre_controller_fp",
-        netw::wire::bits(32)
-    ),
-    netw::wire::field<&AckEvidenceWire::post_pose_fp>(
-        "post_pose_fp",
-        netw::wire::bits(32)
-    ),
-    netw::wire::field<&AckEvidenceWire::post_momentum_fp>(
-        "post_momentum_fp",
-        netw::wire::bits(32)
-    ),
-    netw::wire::field<&AckEvidenceWire::post_controller_fp>(
-        "post_controller_fp",
         netw::wire::bits(32)
     )
 );
@@ -155,10 +135,6 @@ constexpr auto command_raw = netw::wire::describe(
 
 constexpr auto ack_raw = netw::wire::describe(
     netw::wire::field<&AckEvidenceWire::raw_fp>("raw_fp", netw::wire::bits(32))
-);
-
-constexpr auto ack_suffix = netw::wire::describe(
-    netw::wire::field<&AckEvidenceWire::flags>("flags", netw::wire::bits(8))
 );
 
 uint64_t zigzag(int64_t p_value) {
@@ -224,16 +200,139 @@ bool serialize_command_evidence(
     return true;
 }
 
+constexpr uint64_t ACK_SAME_PRE = 1U << 0;
+constexpr uint64_t ACK_SAME_COMMAND = 1U << 1;
+constexpr uint64_t ACK_SAME_ENVIRONMENT = 1U << 2;
+constexpr uint64_t ACK_SAME_TOPOLOGY = 1U << 3;
+constexpr uint64_t ACK_SAME_WITNESS = 1U << 4;
+constexpr uint64_t ACK_SAME_MASK = 1U << 5;
+constexpr uint64_t ACK_SAME_RAW = 1U << 6;
+
 template <class Stream>
-bool serialize_ack_evidence(Stream &p_stream, AckEvidenceWire &p_record) {
-    if (!ack_evidence_prefix.run(p_stream, p_record)) {
+bool carry_fingerprint(
+    Stream &p_stream,
+    int32_t &p_field,
+    bool p_same,
+    int32_t p_basis
+) {
+    if (p_same) {
+        p_field = p_basis;
+        return true;
+    }
+    uint64_t code = uint32_t(p_field);
+    if (!p_stream.bits(code, 32)) {
         return false;
     }
-    if ((p_record.evidence_mask & EVIDENCE_RAW) != 0
-        && !ack_raw.run(p_stream, p_record)) {
+    p_field = int32_t(uint32_t(code));
+    return true;
+}
+
+template <class Stream>
+bool serialize_ack_evidence(
+    Stream &p_stream,
+    AckEvidenceWire &p_record,
+    const AckEvidenceWire *p_previous,
+    const AckEvidenceWire *p_detailed
+) {
+    if (!ack_verdict.run(p_stream, p_record)) {
         return false;
     }
-    return ack_suffix.run(p_stream, p_record);
+    if ((p_record.flags & ACK_COMPACT) != 0) {
+        return true;
+    }
+    if (p_previous == nullptr || p_detailed == nullptr) {
+        if (!ack_detail.run(p_stream, p_record)) {
+            return false;
+        }
+        return (p_record.evidence_mask & EVIDENCE_RAW) == 0
+            || ack_raw.run(p_stream, p_record);
+    }
+    uint64_t same = 0;
+    if constexpr (!Stream::is_reading) {
+        same |= p_record.pre_fp == p_previous->post_fp ? ACK_SAME_PRE : 0;
+        same |= p_record.c_hash == p_detailed->c_hash ? ACK_SAME_COMMAND : 0;
+        same |= p_record.e_digest == p_detailed->e_digest
+            ? ACK_SAME_ENVIRONMENT
+            : 0;
+        same |= p_record.topo_fp == p_detailed->topo_fp ? ACK_SAME_TOPOLOGY : 0;
+        same |= p_record.witness_fp == p_detailed->witness_fp
+            ? ACK_SAME_WITNESS
+            : 0;
+        same |= p_record.evidence_mask == p_detailed->evidence_mask
+            ? ACK_SAME_MASK
+            : 0;
+        same |= p_record.raw_fp == p_detailed->raw_fp ? ACK_SAME_RAW : 0;
+    }
+    if (!p_stream.bits(same, 8)) {
+        return false;
+    }
+    uint64_t mask = p_record.evidence_mask;
+    if ((same & ACK_SAME_MASK) != 0) {
+        mask = p_detailed->evidence_mask;
+    } else if (!p_stream.bits(mask, 8)) {
+        return false;
+    }
+    p_record.evidence_mask = uint8_t(mask);
+    if (!carry_fingerprint(
+            p_stream,
+            p_record.pre_fp,
+            (same & ACK_SAME_PRE) != 0,
+            p_previous->post_fp
+        )
+        || !carry_fingerprint(
+            p_stream,
+            p_record.c_hash,
+            (same & ACK_SAME_COMMAND) != 0,
+            p_detailed->c_hash
+        )
+        || !carry_fingerprint(
+            p_stream,
+            p_record.e_digest,
+            (same & ACK_SAME_ENVIRONMENT) != 0,
+            p_detailed->e_digest
+        )
+        || !carry_fingerprint(
+            p_stream,
+            p_record.topo_fp,
+            (same & ACK_SAME_TOPOLOGY) != 0,
+            p_detailed->topo_fp
+        )
+        || !carry_fingerprint(
+            p_stream,
+            p_record.witness_fp,
+            (same & ACK_SAME_WITNESS) != 0,
+            p_detailed->witness_fp
+        )) {
+        return false;
+    }
+    return (p_record.evidence_mask & EVIDENCE_RAW) == 0
+        || carry_fingerprint(
+            p_stream,
+            p_record.raw_fp,
+            (same & ACK_SAME_RAW) != 0,
+            p_detailed->raw_fp
+        );
+}
+
+bool rows_compare_by_code(const wire::WirePlan &p_plan) {
+    for (uint32_t column = 0; column < p_plan.column_count(); ++column) {
+        if (p_plan.column(column).variable) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool same_codes(const wire::CodeRow &p_a, const wire::CodeRow &p_b) {
+    if (p_a.word_count() != p_b.word_count()) {
+        return false;
+    }
+    for (uint32_t at = 0; at < p_a.word_count(); ++at) {
+        if (p_a.word_data()[at] != p_b.word_data()[at]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool valid_command_shape(
@@ -308,6 +407,7 @@ bool serialize_command(
         previous_label = transition.label;
     }
 
+    const bool repeatable = rows_compare_by_code(p_plan);
     uint32_t payload_at = 0;
     for (uint32_t at = 0; at < header.count; ++at) {
         const TransitionWire &transition = p_frame.transitions[at];
@@ -316,7 +416,20 @@ bool serialize_command(
         }
         wire::CodeRow row = Stream::is_reading ? wire::CodeRow::for_plan(p_plan)
                                                : p_frame.payloads[payload_at];
-        if (!serialize_row(p_stream, p_plan, row)) {
+        bool repeats = false;
+        if (repeatable && payload_at > 0) {
+            if constexpr (!Stream::is_reading) {
+                repeats = same_codes(row, p_frame.payloads[payload_at - 1]);
+            }
+            if (!p_stream.bool1(repeats)) {
+                return false;
+            }
+        }
+        if (repeats) {
+            if constexpr (Stream::is_reading) {
+                row.copy_from(p_frame.payloads[payload_at - 1]);
+            }
+        } else if (!serialize_row(p_stream, p_plan, row)) {
             return false;
         }
         if constexpr (Stream::is_reading) {
@@ -368,16 +481,28 @@ bool serialize_ack(Stream &p_stream, AckFrame &p_frame) {
         p_frame.epoch = header.epoch;
         p_frame.base = header.base;
     }
+    if constexpr (Stream::is_reading) {
+        p_frame.records.reserve(header.count);
+    }
+    int detailed = -1;
     for (uint32_t at = 0; at < header.count; ++at) {
         AckEvidenceWire record;
         if constexpr (!Stream::is_reading) {
             record = p_frame.records[at];
         }
-        if (!serialize_ack_evidence(p_stream, record)) {
+        if (!serialize_ack_evidence(
+                p_stream,
+                record,
+                at > 0 ? &p_frame.records[at - 1] : nullptr,
+                detailed >= 0 ? &p_frame.records[uint32_t(detailed)] : nullptr
+            )) {
             return false;
         }
         if constexpr (Stream::is_reading) {
             p_frame.records.push_back(record);
+        }
+        if ((record.flags & ACK_COMPACT) == 0) {
+            detailed = int(at);
         }
     }
     return p_stream.align_verify();
@@ -394,7 +519,8 @@ Dictionary spec_records() {
     out["CommandHeader"] = CommandHeader::wire.spec_dump();
     out["AckHeader"] = AckHeader::wire.spec_dump();
     out["CommandEvidence"] = command_evidence_prefix.spec_dump();
-    out["AckEvidence"] = ack_evidence_prefix.spec_dump();
+    out["AckVerdict"] = ack_verdict.spec_dump();
+    out["AckDetail"] = ack_detail.spec_dump();
     return out;
 }
 

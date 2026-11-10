@@ -1199,6 +1199,7 @@ TEST_CASE(
 ) {
     NetwPredictionEngine held_pool;
     NetwPredictionEngine *const pool = &held_pool;
+    pool->set_owner_evidence(true);
     const int64_t slot = driving_slot(pool);
     pool->open_lane(slot);
 

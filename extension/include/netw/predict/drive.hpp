@@ -28,6 +28,8 @@ constexpr int TAPE_HISTORY_LIMIT = 256;
 
 constexpr int ACK_AGE_MAX = 64;
 
+constexpr int ACK_DETAILED_SENDS = 2;
+
 static_assert((ACK_AGE_MAX & (ACK_AGE_MAX - 1)) == 0);
 static_assert(TransitionBook::DEPTH == uint32_t(TAPE_HISTORY_LIMIT));
 
@@ -180,6 +182,7 @@ struct LaneCursor {
     int64_t ack_of_acks = -1;
     bool ack_domain_confirmed = true;
     int64_t owner_ack_floor = -1;
+    int64_t ack_detailed[ACK_DETAILED_SENDS] = {-1, -1};
     int64_t command_epoch = -1;
     int64_t relayed_epoch = -1;
     int64_t newest_matrix_transition = -1;

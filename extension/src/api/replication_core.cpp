@@ -1039,8 +1039,12 @@ void ReplicationCore::on_clock_tick(int64_t p_tick) {
         NETW_ZONE_NC("Table pump", colors::TABLE);
         pump_tables(p_tick);
     }
-    flush_all_buffers();
     NetwMultiplayer *plane = core();
+    if (plane != nullptr && plane->lagcomp_is_configured()
+        && plane->clock_engine().is_closing_tick()) {
+        return;
+    }
+    flush_all_buffers();
     if (plane != nullptr) {
         plane->flush_standalone_acks();
     }
@@ -1185,6 +1189,10 @@ void ReplicationCore::replay_tables(int64_t p_peer_id) {
 
 void ReplicationCore::on_frame_end() {
     flush_all_buffers();
+    NetwMultiplayer *plane = core();
+    if (plane != nullptr && plane->clock_engine().closed_a_tick()) {
+        plane->flush_standalone_acks();
+    }
 }
 
 void ReplicationCore::on_poll() {

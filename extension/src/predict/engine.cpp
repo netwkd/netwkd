@@ -17,6 +17,7 @@
 #include "godot/class_db.hpp"
 #include "godot/engine.hpp"
 #include "godot/object.hpp"
+#include "godot/os.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
@@ -2165,6 +2166,11 @@ void NetwPredictionEngine::set_owner_ack_floor(
     predict::Slot *row = mutable_row_of(p_slot);
     if (row != nullptr) {
         row->lane_cursor.owner_ack_floor = p_value;
+        if (p_value < 0) {
+            for (int64_t &sent : row->lane_cursor.ack_detailed) {
+                sent = -1;
+            }
+        }
     }
 }
 
@@ -2342,6 +2348,16 @@ void NetwPredictionEngine::set_last_recorded_input_tick(
 bool NetwPredictionEngine::raw_fingerprints_of(int64_t p_slot) const {
     const predict::Slot *row = row_of(p_slot);
     return row == nullptr ? false : row->cursor.raw_fingerprints;
+}
+
+bool NetwPredictionEngine::owner_evidence_from_environment() {
+    return !OS::get_singleton()
+                ->get_environment("NETW_PREDICT_OWNER_EVIDENCE")
+                .is_empty();
+}
+
+void NetwPredictionEngine::set_owner_evidence(bool p_value) {
+    owner_evidence = p_value;
 }
 
 void NetwPredictionEngine::set_raw_fingerprints(int64_t p_slot, bool p_value) {
@@ -4979,12 +4995,27 @@ PackedByteArray NetwPredictionEngine::publish_ack_frame(int64_t p_slot) {
     if (frontier[1] < 0) {
         return PackedByteArray();
     }
-    return build_ack_frame(
+    predict::Slot *row = mutable_row_of(p_slot);
+    if (row == nullptr) {
+        return PackedByteArray();
+    }
+    int64_t *detailed = row->lane_cursor.ack_detailed;
+    int64_t sent_through = -1;
+    const PackedByteArray frame = build_ack_frame(
         p_slot,
         int(command_epoch_of(p_slot)),
         ack_of(p_slot),
-        owner_ack_floor_of(p_slot)
+        owner_ack_floor_of(p_slot),
+        detailed[predict::ACK_DETAILED_SENDS - 1],
+        &sent_through
     );
+    if (!frame.is_empty()) {
+        for (int at = predict::ACK_DETAILED_SENDS - 1; at > 0; --at) {
+            detailed[at] = detailed[at - 1];
+        }
+        detailed[0] = std::max(detailed[0], sent_through);
+    }
+    return frame;
 }
 
 void NetwPredictionEngine::send_command_frame(int64_t p_slot) {
@@ -5879,7 +5910,8 @@ PackedByteArray NetwPredictionEngine::build_command_frame(
     if (rows.is_empty()) {
         return PackedByteArray();
     }
-    const int64_t closed = journal_last_closed(p_slot);
+    const int64_t closed
+        = owner_evidence ? journal_last_closed(p_slot) : int64_t(-1);
     for (int at = 0; at < rows.size(); ++at) {
         const int64_t index = rows[at];
         if (index > closed) {
@@ -8230,8 +8262,9 @@ PackedInt64Array NetwPredictionEngine::admit_ack_run(
         if (!judged.present || (judged.flags & predict::ROW_ACKED) != 0) {
             continue;
         }
+        const bool detailed = (record.flags & predict::ACK_COMPACT) == 0;
         const predict::AckVerdict verdict
-            = admit_ack_row(p_slot, p_frame, transition, at, true, false);
+            = admit_ack_row(p_slot, p_frame, transition, at, detailed, false);
         const bool matched = judged.post_fp == record.post_fp;
         counts[ACK_RUN_VERIFIED] += 1;
         if (matched) {
@@ -8247,7 +8280,7 @@ PackedInt64Array NetwPredictionEngine::admit_ack_run(
                 p_frame,
                 transition,
                 at,
-                true,
+                detailed,
                 int(verdict.attribution)
             );
             if (p_retry_operator.is_valid()) {
@@ -8315,12 +8348,12 @@ predict::AckVerdict NetwPredictionEngine::admit_ack_row(
         p_complete ? record.c_hash : 0,
         p_complete ? record.e_digest : 0,
         record.post_fp,
-        p_complete ? record.pre_pose_fp : 0,
-        p_complete ? record.pre_momentum_fp : 0,
-        p_complete ? record.pre_controller_fp : 0,
-        p_complete ? record.post_pose_fp : 0,
-        p_complete ? record.post_momentum_fp : 0,
-        p_complete ? record.post_controller_fp : 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         p_complete ? record.topo_fp : 0,
         p_complete ? record.witness_fp : 0,
         p_complete ? record.raw_fp : 0,
@@ -11847,7 +11880,9 @@ PackedByteArray NetwPredictionEngine::build_ack_frame(
     int64_t p_slot,
     int p_epoch,
     int64_t p_ack,
-    int64_t p_owner_ack_floor
+    int64_t p_owner_ack_floor,
+    int64_t p_detailed_through,
+    int64_t *r_sent_through
 ) const {
     const predict::Slot *row = row_of(p_slot);
     NETW_BUG_COND_V(row == nullptr, PackedByteArray());
@@ -11878,23 +11913,19 @@ PackedByteArray NetwPredictionEngine::build_ack_frame(
         if (transition > frontier) {
             break;
         }
-        const predict::FamilyFingerprints pre = journal.pre_families_at(at);
-        const predict::FamilyFingerprints post = journal.post_families_at(at);
         predict::AckEvidenceWire evidence;
-        evidence.evidence_mask = journal.evidence_mask_at(at);
-        evidence.pre_fp = journal.pre_fp_at(at);
-        evidence.c_hash = journal.c_hash_at(at);
-        evidence.e_digest = journal.e_digest_at(at);
         evidence.post_fp = journal.post_fp_at(at);
-        evidence.topo_fp = journal.topo_fp_at(at);
-        evidence.witness_fp = journal.witness_fp_at(at);
-        evidence.pre_pose_fp = pre.pose;
-        evidence.pre_momentum_fp = pre.momentum;
-        evidence.pre_controller_fp = pre.controller;
-        evidence.post_pose_fp = post.pose;
-        evidence.post_momentum_fp = post.momentum;
-        evidence.post_controller_fp = post.controller;
-        evidence.raw_fp = journal.raw_fp_at(at);
+        if (transition <= p_detailed_through) {
+            evidence.flags |= predict::ACK_COMPACT;
+        } else {
+            evidence.evidence_mask = journal.evidence_mask_at(at);
+            evidence.pre_fp = journal.pre_fp_at(at);
+            evidence.c_hash = journal.c_hash_at(at);
+            evidence.e_digest = journal.e_digest_at(at);
+            evidence.topo_fp = journal.topo_fp_at(at);
+            evidence.witness_fp = journal.witness_fp_at(at);
+            evidence.raw_fp = journal.raw_fp_at(at);
+        }
         if ((journal.flags_at(at) & predict::ROW_SUBSTITUTED) != 0) {
             evidence.flags |= predict::ACK_SUBSTITUTED;
         }
@@ -11906,6 +11937,13 @@ PackedByteArray NetwPredictionEngine::build_ack_frame(
     }
     if (frame.records.is_empty()) {
         return PackedByteArray();
+    }
+    if (r_sent_through != nullptr) {
+        *r_sent_through = base - 1
+            + std::min(
+                int64_t(frame.records.size()),
+                int64_t(predict::ACK_RECORD_MAX)
+            );
     }
     return predict::encode_ack(frame);
 }

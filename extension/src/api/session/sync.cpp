@@ -950,6 +950,7 @@ void NetwMultiplayer::row_control_flush(
     const LocalVector<int> ready = scheduler.ready_peers(now);
     for (uint32_t at = 0; at < ready.size(); ++at) {
         PackedByteArray frame;
+        PackedByteArray receipts;
         scheduler.flush(
             ready[at],
             now,
@@ -957,21 +958,33 @@ void NetwMultiplayer::row_control_flush(
                 ready[at],
                 wire::CONTROL_TICK_RESERVATION_BYTES
             ),
-            &frame
+            &frame,
+            &receipts
         );
-        if (frame.is_empty()) {
-            continue;
+        if (!frame.is_empty()) {
+            send_to(
+                int64_t(ready[at]),
+                0,
+                p_channel,
+                frame,
+                true,
+                0,
+                String(),
+                true
+            );
         }
-        send_to(
-            int64_t(ready[at]),
-            0,
-            p_channel,
-            frame,
-            true,
-            0,
-            String(),
-            true
-        );
+        if (!receipts.is_empty()) {
+            send_to(
+                int64_t(ready[at]),
+                0,
+                p_channel,
+                receipts,
+                false,
+                0,
+                String(),
+                true
+            );
+        }
     }
 }
 

@@ -206,7 +206,6 @@ TEST_CASE(
     peer.c_hash = 20;
     peer.post_fp = 100;
     peer.evidence_mask = EVIDENCE_WITNESS;
-    peer.pre_families.pose = 9;
     const AckVerdict verdict = admit_ack(journal, 4, peer, false);
 
     CHECK(verdict.compared);
@@ -215,7 +214,6 @@ TEST_CASE(
         int(verdict.attribution),
         int(netw::predict::Attribution::PRE_STATE)
     );
-    NETW_CHECK_EQ(int(verdict.differing_family), int(DifferingFamily::POSE));
     NETW_CHECK_EQ(
         int(journal.attribution_of(4)),
         int(netw::predict::Attribution::PRE_STATE)

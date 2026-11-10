@@ -465,7 +465,8 @@ WireRegistry WireRegistry::create_default() {
         Freshness::FRESHEST_WINS,
         Delivery::FITTED,
         Direction::OWNER_TO_SERVER,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
     reg_c(
         36,
@@ -475,7 +476,8 @@ WireRegistry WireRegistry::create_default() {
         Freshness::FRESHEST_WINS,
         Delivery::FITTED,
         Direction::SERVER_TO_OWNER,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
     reg_c(
         37,
@@ -485,7 +487,8 @@ WireRegistry WireRegistry::create_default() {
         Freshness::FRESHEST_WINS,
         Delivery::FITTED,
         Direction::SERVER_TO_CLIENT,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
     reg_c(
         38,

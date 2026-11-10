@@ -316,6 +316,9 @@ void ClockEngine::physics_step(double delta) {
     const double step = ticktime();
     while (accumulator >= step && ticks_this_frame < ceiling) {
         accumulator -= step;
+        if (accumulator < step || ticks_this_frame + 1 >= ceiling) {
+            closing_tick = tick;
+        }
         emit_tick();
         ticks_this_frame += 1;
     }
@@ -323,6 +326,19 @@ void ClockEngine::physics_step(double delta) {
     resolve_simulation_gate(ticks_this_frame);
 
     end_tick_loop();
+    closing_tick = NO_CLOSING_TICK;
+}
+
+bool ClockEngine::is_closing_tick() const {
+    return closing_tick == tick;
+}
+
+bool ClockEngine::closed_a_tick() const {
+    return closing_tick != NO_CLOSING_TICK;
+}
+
+int32_t ClockEngine::get_send_tick() const {
+    return closing_tick != NO_CLOSING_TICK ? closing_tick : tick;
 }
 
 void ClockEngine::set_manual_tick(bool value) {
@@ -488,7 +504,11 @@ void ClockEngine::nudge_toward_estimate() {
 
 bool ClockEngine::consume_ping_due(double delta) {
     ping_timer += delta;
-    if (ping_timer >= ping_interval) {
+    const bool settled = int(stats.samples.size()) >= jitter_window
+        && stats.is_stable && stats.jitter < ticktime() * 0.5;
+    const double due
+        = settled ? ping_interval * SETTLED_PING_STRETCH : ping_interval;
+    if (ping_timer >= due) {
         ping_timer = 0.0;
         return true;
     }

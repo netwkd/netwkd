@@ -49,7 +49,11 @@ private:
     bool manual_tick = false;
     bool enable_drift_logging = false;
 
+    static constexpr int32_t NO_CLOSING_TICK = INT32_MIN;
+    static constexpr double SETTLED_PING_STRETCH = 5.0;
+
     int32_t tick = 0;
+    int32_t closing_tick = NO_CLOSING_TICK;
     bool is_synchronized = false;
     bool simulating = true;
     bool held = false;
@@ -146,6 +150,9 @@ public:
     void set_tick(int value);
     int get_tick() const;
     int64_t get_ticks_run() const;
+    bool is_closing_tick() const;
+    bool closed_a_tick() const;
+    int32_t get_send_tick() const;
     void set_synchronized(bool value);
     bool get_synchronized() const;
 

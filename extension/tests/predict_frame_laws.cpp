@@ -76,12 +76,6 @@ AckEvidenceWire ack_evidence(int32_t seed, bool raw) {
     row.post_fp = seed + 4;
     row.topo_fp = seed + 5;
     row.witness_fp = seed + 6;
-    row.pre_pose_fp = seed + 7;
-    row.pre_momentum_fp = seed + 8;
-    row.pre_controller_fp = seed + 9;
-    row.post_pose_fp = seed + 10;
-    row.post_momentum_fp = seed + 11;
-    row.post_controller_fp = seed + 12;
     row.raw_fp = seed + 13;
     row.flags = uint8_t(
         netw::predict::ACK_SUBSTITUTED | (5 << netw::predict::ACK_WITNESS_SHIFT)
@@ -101,7 +95,9 @@ TEST_CASE(
     sent.transitions.push_back(TransitionWire{4, 100, true});
     sent.transitions.push_back(TransitionWire{5, 100, false});
     sent.transitions.push_back(TransitionWire{6, 102, true});
+    sent.transitions.push_back(TransitionWire{7, 103, true});
     sent.payloads.push_back(input_row(plan, 0x2a));
+    sent.payloads.push_back(input_row(plan, 0x7f));
     sent.payloads.push_back(input_row(plan, 0x7f));
     sent.evidence.push_back(command_evidence(-20, false));
     sent.evidence.push_back(command_evidence(100, true));
@@ -111,20 +107,23 @@ TEST_CASE(
     NETW_CHECK_EQ(bytes[0], 1);
     NETW_CHECK_EQ(bytes[1], 7);
     NETW_CHECK_EQ(bytes[2], 4);
-    NETW_CHECK_EQ(bytes[3], 3);
+    NETW_CHECK_EQ(bytes[3], 4);
     NETW_CHECK_EQ(bytes[4], 0x91);
     NETW_CHECK_EQ(bytes[5], 0x03);
     NETW_CHECK_EQ(bytes[6], 0);
     NETW_CHECK_EQ(bytes[7], 9);
-    NETW_CHECK_EQ(bytes[8], 0x2a);
-    NETW_CHECK_EQ(bytes[9], 0x7f);
+    NETW_CHECK_EQ(bytes[8], 5);
+    NETW_CHECK_EQ(bytes[9], 0x2a);
+    NETW_CHECK_EQ(bytes[10], 0xfe);
+    NETW_CHECK_EQ(bytes[11], 0x02);
 
     CommandFrame received;
     REQUIRE(netw::predict::decode_command(bytes, plan, received));
     NETW_CHECK_EQ(received.epoch, 7);
     NETW_CHECK_EQ(received.ack_of_acks, -1);
-    NETW_CHECK_EQ(received.transitions.size(), 3);
-    NETW_CHECK_EQ(received.payloads.size(), 2);
+    NETW_CHECK_EQ(received.transitions.size(), 4);
+    NETW_CHECK_EQ(received.payloads.size(), 3);
+    NETW_CHECK_EQ(received.payloads[2].read(plan.column(0), 0), 0x7f);
     NETW_CHECK_EQ(received.evidence.size(), 2);
     NETW_CHECK_EQ(received.transitions[2].index, 6);
     NETW_CHECK_EQ(received.transitions[2].label, 102);
@@ -322,7 +321,7 @@ TEST_CASE(
     NETW_CHECK_EQ(received.records[0].c_hash, 101);
     NETW_CHECK_EQ(received.records[0].pre_fp, 201);
     NETW_CHECK_EQ(received.records[0].post_fp, 301);
-    NETW_CHECK_EQ(received.records[1].post_controller_fp, 332);
+    NETW_CHECK_EQ(received.records[1].post_fp, 302);
 
     pool->mark_attribution(slot, 1, int(netw::predict::Attribution::PRE_STATE));
     const netw::predict::JournalRow row = pool->journal_row(slot, 1);

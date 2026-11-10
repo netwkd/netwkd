@@ -150,7 +150,8 @@ LocalVector<ControlRecord> ControlScheduler::flush(
     int p_peer,
     int64_t p_now_ms,
     int64_t p_budget_bytes,
-    PackedByteArray *r_frame
+    PackedByteArray *r_frame,
+    PackedByteArray *r_receipts
 ) {
     NETW_ZONE_NC("Control flush", colors::WIRE);
     LocalVector<ControlRecord> out;
@@ -187,6 +188,9 @@ LocalVector<ControlRecord> ControlScheduler::flush(
     if (receipts_due) {
         held.receipts.sort_custom<ByToken>();
     }
+    ControlBasis stateless;
+    ControlFrameWriter apart(stateless);
+    ControlFrameWriter &receipt_frame = r_receipts != nullptr ? apart : frame;
     uint32_t taken = 0;
     while (receipts_due && taken < held.receipts.size()) {
         ControlRecord record;
@@ -209,7 +213,7 @@ LocalVector<ControlRecord> ControlScheduler::flush(
             reaching += 1;
         }
         if (record.receipts.is_empty() || int64_t(span) > left
-            || !frame.append(record)) {
+            || !receipt_frame.append(record)) {
             break;
         }
         left -= int64_t(span);
@@ -221,6 +225,9 @@ LocalVector<ControlRecord> ControlScheduler::flush(
     }
     if (r_frame != nullptr) {
         *r_frame = frame.bytes();
+    }
+    if (r_receipts != nullptr) {
+        *r_receipts = apart.bytes();
     }
     return out;
 }

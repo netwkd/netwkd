@@ -65,7 +65,7 @@
 			Ticks of difference from the server past which the clock snaps, even with [constant NetwClock.SYNC_MODE_STRETCH].
 		</member>
 		<member name="ping_interval" type="float" setter="set_ping_interval" getter="get_ping_interval">
-			Seconds between pings to the server.
+			Seconds between pings to the server. The clock pings five times slower once the round trip varies by less than half a tick.
 		</member>
 		<member name="stall_threshold" type="float" setter="set_stall_threshold" getter="get_stall_threshold">
 			Seconds. A longer frame is treated as a hitch and skipped.

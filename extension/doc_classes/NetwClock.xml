@@ -58,7 +58,7 @@
 			Physics frames per tick. Multiply a per-frame value by it to get a per-tick value.
 		</member>
 		<member name="ping_interval" type="float" setter="set_ping_interval" getter="get_ping_interval">
-			Seconds between pings. Shorter follows the connection more closely and sends more packets.
+			Seconds between pings. Shorter follows the connection more closely and sends more packets. The clock pings five times slower once [constant CLOCK_MONITOR_RTT_JITTER] is under half a tick.
 		</member>
 		<member name="recommended_display_offset" type="int" setter="" getter="get_recommended_display_offset">
 			The [member display_offset] the current connection needs, in ticks.

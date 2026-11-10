@@ -2607,7 +2607,7 @@ NetwCarrierDatagram NetwMultiplayer::frame_datagram(
 }
 
 int64_t NetwMultiplayer::datagram_base_tick() const {
-    return int64_t(clock_engine().get_tick());
+    return int64_t(clock_engine().get_send_tick());
 }
 
 int64_t NetwMultiplayer::session_elapsed_ms() const {

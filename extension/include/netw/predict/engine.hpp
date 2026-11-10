@@ -185,6 +185,7 @@ class NetwPredictionEngine {
     godot::HashMap<int64_t, godot::Ref<godot::RefCounted>> entity_by_slot;
     godot::ObjectID core_id;
     bool journal_readers = false;
+    bool owner_evidence = owner_evidence_from_environment();
     SlotIds ids;
     int depth = 0;
     int replay_steps = 0;
@@ -300,6 +301,7 @@ class NetwPredictionEngine {
         const predict::StateRow &p_values
     );
     void read_parts(const predict::Slot &p_row, predict::StateRow &r_row) const;
+    static bool owner_evidence_from_environment();
 
 public:
     NetwPredictionEngine() = default;
@@ -616,6 +618,7 @@ public:
     void set_last_recorded_input_tick(int64_t p_slot, int64_t p_value);
     bool raw_fingerprints_of(int64_t p_slot) const;
     void set_raw_fingerprints(int64_t p_slot, bool p_value);
+    void set_owner_evidence(bool p_value);
 
     void seed_recovery_ledger(int64_t p_slot);
     godot::TypedArray<godot::Dictionary> tape_transitions(int64_t p_slot) const;
@@ -2056,7 +2059,9 @@ public:
         int64_t p_slot,
         int p_epoch,
         int64_t p_ack,
-        int64_t p_owner_ack_floor
+        int64_t p_owner_ack_floor,
+        int64_t p_detailed_through = -1,
+        int64_t *r_sent_through = nullptr
     ) const;
 
     int tape_size(int64_t p_slot) const;
