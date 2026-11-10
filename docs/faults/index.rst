@@ -66,6 +66,11 @@ Fault index
 - :doc:`nw1021`, PRACTICE
 - :doc:`nw1022`, ENVIRONMENT
 - :doc:`nw1023`, ENVIRONMENT
+- :doc:`nw1024`, PRACTICE
+- :doc:`nw1025`, MISUSE
+- :doc:`nw1026`, MISUSE
+- :doc:`nw1027`, PRACTICE
+- :doc:`nw1028`, MISUSE
 
 .. toctree::
    :hidden:
@@ -135,3 +140,8 @@ Fault index
    nw1021
    nw1022
    nw1023
+   nw1024
+   nw1025
+   nw1026
+   nw1027
+   nw1028

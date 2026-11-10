@@ -1,0 +1,34 @@
+:github_url: hide
+
+.. _fault_nw1024:
+
+NW1024. A node joined an entity that had already started
+========================================================
+
+Reported as a warning when a node that a scene places under an entity calls
+:ref:`Netw.configure_entity <class_Netw_method_configure_entity>`, and that
+entity had already entered the tree when the node arrived. Such a node is
+part of the entity above it only when it arrives before that entity starts.
+
+The node is its own entity. The log line names the node and the entity it
+sits in.
+
+``Turret`` is a plain child in ``turret_mount.tscn``, whose root declares
+nothing, and the mount is added under ``Tank`` after ``Tank`` is in the tree.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self)
+
+    # elsewhere
+    tank.add_child(preload("res://turret_mount.tscn").instantiate())
+
+Add the mount before ``Tank`` enters the tree, or save ``Turret`` as its
+own scene so it is a separate entity.
+
+.. code-block:: gdscript
+
+    var tank: Node = preload("res://tank.tscn").instantiate()
+    tank.add_child(preload("res://turret_mount.tscn").instantiate())
+    add_child(tank)

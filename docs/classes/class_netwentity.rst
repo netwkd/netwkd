@@ -36,7 +36,7 @@ One networked entity is one root node holding one **NetwEntity**. Nodes under th
 
 \ **Declaring an entity**\ 
 
-A root declares itself in ``_init``. A child marks its own spawn properties in its ``_init`` and connects to the entity in :godot:`Node._ready() <Node#class_Node_private_method__ready>`, once it has a parent to walk up to.
+A root declares itself in ``_init``. :ref:`Netw.spawn()<class_Netw_method_spawn>` makes the root it returns an entity whether or not it declares one, so a spawned root declares only to set options. A child marks its own spawn properties in its ``_init``, and may call :ref:`Netw.configure_entity()<class_Netw_method_configure_entity>` there to set the options of the entity it is part of. It reads that entity with :ref:`of()<class_NetwEntity_method_of>` from :godot:`Node._enter_tree() <Node#class_Node_private_method__enter_tree>` on.
 
 ::
 
@@ -47,6 +47,7 @@ A root declares itself in ``_init``. A child marks its own spawn properties in i
 
     # on a child
     func _init() -> void:
+        Netw.configure_entity(self).lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
         Netw.configure_property(self, &"health").on_spawn()
 
     func _ready() -> void:

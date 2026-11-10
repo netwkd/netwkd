@@ -3,6 +3,7 @@
 #include "godot/class_db.hpp"
 #include "godot/multiplayer.hpp"
 #include "godot/object.hpp"
+#include "godot/script.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/display.hpp"
 #include "netw/api/interest.hpp"
@@ -76,6 +77,157 @@ NetwMultiplayer *session_on_branch(Node *p_node) {
     return Object::cast_to<NetwMultiplayer>(api.ptr());
 }
 
+LocalVector<ObjectID> &pending_parts() {
+    static LocalVector<ObjectID> held;
+    return held;
+}
+
+Ref<NetwEntity> entity_above(Node *p_node) {
+    for (Node *above = p_node->get_parent(); above != nullptr;
+         above = above->get_parent()) {
+        if (tree::entity_object_at(above) != nullptr) {
+            return NetwEntity::of(above);
+        }
+    }
+    return Ref<NetwEntity>();
+}
+
+Ref<NetwEntity> part_target(Node *p_node) {
+    if (p_node->get_owner() == nullptr
+        || !p_node->get_scene_file_path().is_empty()) {
+        return Ref<NetwEntity>();
+    }
+    const Ref<NetwEntity> target = entity_above(p_node);
+    if (target.is_null() || target->get_declares_scene()) {
+        return Ref<NetwEntity>();
+    }
+    return target;
+}
+
+String owner_name(const Ref<NetwEntity> &p_entity) {
+    Node *node = p_entity->get_owner();
+    return node != nullptr ? String(node->get_name()) : String();
+}
+
+void raise_part_fault(
+    netw_fault_code p_code,
+    Node *p_part,
+    const Ref<NetwEntity> &p_target,
+    const String &p_option
+) {
+    const Ref<Script> script = p_part->get_script();
+    fault::raise(
+        NetwEntity::session_core_for(p_target->get_owner()),
+        p_code,
+        {p_option, String(p_part->get_name()), owner_name(p_target)},
+        uint64_t(gd::instance_id(
+            script.is_valid() ? static_cast<Object *>(script.ptr()) : p_part
+        ))
+    );
+}
+
+bool part_only(const StringName &p_option) {
+    return p_option == StringName("name")
+        || p_option == StringName("on_parent_despawn");
+}
+
+void copy_changed(
+    Object *p_from,
+    Object *p_fresh,
+    Object *p_into,
+    Node *p_part,
+    const Ref<NetwEntity> &p_target
+) {
+    const StringName klass = p_from->get_class();
+    const Array infos = gd::property_list(p_from);
+    for (int at = 0; at < infos.size(); ++at) {
+        const Dictionary info = infos[at];
+        const StringName option = info["name"];
+        if (gd::property_setter(klass, option) == StringName()) {
+            continue;
+        }
+        const Variant given = p_from->get(option);
+        const Variant initial = p_fresh->get(option);
+        if (given == initial) {
+            continue;
+        }
+        const String spelled = String("{") + String(klass) + String(".")
+            + String(option) + String("}");
+        if (part_only(option)) {
+            raise_part_fault(NETW_FAULT_PART_ONLY, p_part, p_target, spelled);
+            continue;
+        }
+        const Variant held = p_into->get(option);
+        if (held != initial && held != given) {
+            raise_part_fault(
+                NETW_FAULT_PART_CONFLICT,
+                p_part,
+                p_target,
+                spelled
+            );
+            continue;
+        }
+        p_into->set(option, given);
+    }
+}
+
+void fold_part(
+    Node *p_part,
+    const Ref<NetwEntity> &p_stand_in,
+    const Ref<NetwEntity> &p_target
+) {
+    Ref<NetwEntity> fresh;
+    fresh.instantiate();
+    copy_changed(
+        p_stand_in.ptr(),
+        fresh.ptr(),
+        p_target.ptr(),
+        p_part,
+        p_target
+    );
+    if (p_stand_in->held_interest().is_valid()) {
+        raise_part_fault(
+            NETW_FAULT_PART_ONLY,
+            p_part,
+            p_target,
+            String("{NetwEntity.interest}")
+        );
+    }
+    const NetwEntityRecord::Part parts[] = {
+        NetwEntityRecord::PART_PREDICTION,
+        NetwEntityRecord::PART_SIMULATION,
+        NetwEntityRecord::PART_DISPLAY,
+    };
+    for (const NetwEntityRecord::Part part : parts) {
+        Object *given = gd::live_object(
+            p_stand_in->get_record()->minted_part(part)
+        );
+        if (given == nullptr) {
+            continue;
+        }
+        Object *initial
+            = gd::live_object(fresh->get_record()->part(part, fresh.ptr()));
+        Object *into = gd::live_object(
+            p_target->get_record()->part(part, p_target.ptr())
+        );
+        if (initial != nullptr && into != nullptr) {
+            copy_changed(given, initial, into, p_part, p_target);
+        }
+    }
+    p_part->remove_meta(NetwMultiplayer::wrapper_meta());
+    tree::unmark(uint64_t(gd::instance_id(p_part)), tree::MARK_ENTITY);
+    p_stand_in->set_owner(nullptr);
+}
+
+int depth_of(Node *p_node) {
+    int depth = 0;
+    for (Node *above = p_node->get_parent(); above != nullptr;
+         above = above->get_parent()) {
+        depth += 1;
+    }
+    return depth;
+}
+
 Ref<NetwEntity> as_entity(const Ref<RefCounted> &p_wrapper) {
     return Ref<NetwEntity>(Object::cast_to<NetwEntity>(p_wrapper.ptr()));
 }
@@ -140,6 +292,86 @@ Ref<NetwEntity> NetwEntity::ensure(Node *p_root) {
 
 Ref<NetwEntity> NetwEntity::resolve(Node *p_node) {
     return as_entity(NetwMultiplayer::wrapper_resolve(p_node));
+}
+
+Ref<NetwEntity> NetwEntity::declare(Node *p_node) {
+    if (p_node == nullptr || p_node->is_inside_tree()) {
+        return resolve(p_node);
+    }
+    if (Object *own = tree::entity_object_at(p_node)) {
+        return Ref<NetwEntity>(Object::cast_to<NetwEntity>(own));
+    }
+    if (p_node->get_parent() == nullptr) {
+        const Ref<NetwEntity> stand_in = ensure(p_node);
+        pending_parts().push_back(gd::instance_id(p_node));
+        return stand_in;
+    }
+    const Ref<NetwEntity> above = entity_above(p_node);
+    if (above.is_null()) {
+        return resolve(p_node);
+    }
+    if (above->get_declares_scene()
+        || !p_node->get_scene_file_path().is_empty()) {
+        return ensure(p_node);
+    }
+    return above;
+}
+
+void NetwEntity::settle_parts(Node *p_root, bool p_spawned) {
+    LocalVector<ObjectID> &pending = pending_parts();
+    if (p_root == nullptr || pending.is_empty()) {
+        return;
+    }
+    LocalVector<Node *> under;
+    for (uint32_t at = 0; at < pending.size();) {
+        Node *node = Object::cast_to<Node>(gd::object_of(pending[at]));
+        if (node != nullptr && node != p_root
+            && !p_root->is_ancestor_of(node)) {
+            at += 1;
+            continue;
+        }
+        pending.remove_at_unordered(at);
+        if (node == nullptr) {
+            continue;
+        }
+        if (node != p_root) {
+            under.push_back(node);
+            continue;
+        }
+        const Ref<NetwEntity> target = p_spawned ? Ref<NetwEntity>()
+                                                 : part_target(node);
+        if (target.is_valid()) {
+            raise_part_fault(
+                NETW_FAULT_PART_TOO_LATE,
+                node,
+                target,
+                String()
+            );
+        }
+    }
+    for (uint32_t at = 1; at < under.size(); ++at) {
+        Node *held = under[at];
+        const int depth = depth_of(held);
+        uint32_t into = at;
+        while (into > 0 && depth_of(under[into - 1]) > depth) {
+            under[into] = under[into - 1];
+            into -= 1;
+        }
+        under[into] = held;
+    }
+    for (Node *node : under) {
+        const Ref<NetwEntity> stand_in = of(node);
+        const Ref<NetwEntity> target = part_target(node);
+        if (stand_in.is_null() || stand_in->get_owner() != node
+            || target.is_null()) {
+            continue;
+        }
+        if (target->get_stage() != STAGE_UNBOUND) {
+            raise_part_fault(NETW_FAULT_PART_TOO_LATE, node, target, String());
+            continue;
+        }
+        fold_part(node, stand_in, target);
+    }
 }
 
 void NetwEntity::attach_to(Node *p_root) {
@@ -1866,6 +2098,7 @@ void NetwEntity::transition(int64_t p_stage) {
 void NetwEntity::arm(const Ref<NetwMultiplayer> &p_api) {
     const Ref<NetwEntity> keep(this);
     NETW_BUG_COND(get_stage() != int64_t(entity::Stage::UNBOUND));
+    settle_parts(get_owner(), false);
     written_player.unref();
     stamp_multiplayer(p_api);
     Node *claimed = get_owner();

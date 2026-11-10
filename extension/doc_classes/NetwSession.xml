@@ -250,7 +250,7 @@
 			The [NetwConnection] of this session, to find servers and create peers.
 		</member>
 		<member name="is_local_client" type="bool" setter="" getter="get_is_local_client">
-			[code]true[/code] when this peer has its own player, at [constant ROLE_CLIENT] and [constant ROLE_LISTEN_SERVER].
+			[code]true[/code] when this peer has its own player, at [constant ROLE_CLIENT] and [constant ROLE_LISTEN_SERVER]. It reads the same for every entity, so ask [member NetwEntity.is_controlled_locally] whether an entity is this player's.
 		</member>
 		<member name="is_online" type="bool" setter="" getter="get_is_online">
 			[code]true[/code] while [member state] is [constant STATE_ONLINE]. It is still [code]true[/code] while [signal exiting] runs and the session's scenes are freed, and turns [code]false[/code] at [constant STATE_DISCONNECTING], before [signal exited].

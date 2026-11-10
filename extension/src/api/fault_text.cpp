@@ -590,6 +590,75 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 ),
                 "Use a Godot build with cryptography support."
             };
+        case NETW_FAULT_PART_TOO_LATE:
+            return {
+                vformat(
+                    "'%s' was declared inside '%s' after '%s' started, so it "
+                    "is its own entity.",
+                    v.owner,
+                    v.detail,
+                    v.detail
+                ),
+                vformat(
+                    "Declare it before '%s' enters the tree, or save it as "
+                    "its own scene.",
+                    v.detail
+                )
+            };
+        case NETW_FAULT_PART_CONFLICT:
+            return {
+                vformat(
+                    "'%s' and '%s' set %s to different values, so '%s' keeps "
+                    "its own.",
+                    v.owner,
+                    v.detail,
+                    v.name,
+                    v.detail
+                ),
+                vformat("Set %s on one of them.", v.name)
+            };
+        case NETW_FAULT_PART_ONLY:
+            return {
+                vformat(
+                    "'%s' is part of '%s', so the %s it set was ignored.",
+                    v.owner,
+                    v.detail,
+                    v.name
+                ),
+                vformat(
+                    "Set it on '%s', or save '%s' as its own scene.",
+                    v.detail,
+                    v.owner
+                )
+            };
+        case NETW_FAULT_RESOURCE_MISSING:
+            return {
+                vformat(
+                    "'%s' syncs '%s', but '%s' holds no resource, so the "
+                    "value was skipped.",
+                    v.owner,
+                    v.name,
+                    v.detail
+                ),
+                vformat(
+                    "Assign a resource to '%s' before '%s' enters the tree, "
+                    "and keep one there.",
+                    v.detail,
+                    v.owner
+                )
+            };
+        case NETW_FAULT_RESOURCE_SHARED:
+            return {
+                vformat(
+                    "'%s' and '%s' sync '%s' from the same resource, so each "
+                    "overwrites the other.",
+                    v.owner,
+                    v.detail,
+                    v.name
+                ),
+                "Turn on {Resource.resource_local_to_scene} for that "
+                "resource, so each entity gets its own copy."
+            };
     }
     return {};
 }

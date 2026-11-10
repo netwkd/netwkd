@@ -693,7 +693,10 @@ public sealed class NetwPrediction : NetwRefCounted
             971215631UL);
 
     /// <summary>
-    /// How this entity is corrected.
+    /// How this entity is corrected. Defaults to
+    /// <see cref="NetwPrediction.RecoveryPolicyEnum.Auto"/>, and
+    /// <see cref="NetwPrediction.ArchetypeEnum.Scripted"/> sets
+    /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseReplay"/>.
     /// <see cref="NetwPrediction.ResolvedRecoveryPolicy"/> returns the policy
     /// in use.
     /// </summary>

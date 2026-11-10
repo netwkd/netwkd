@@ -128,7 +128,7 @@ enum **DisplayRole**: :ref:`🔗<enum_NetwDisplay_DisplayRole>`
 
 :ref:`DisplayRole<enum_NetwDisplay_DisplayRole>` **DISPLAY_ROLE_AUTO** = ``0``
 
-Picked from :ref:`NetwSimulation.mode<class_NetwSimulation_property_mode>`. The default. Predicted entities use :ref:`DISPLAY_ROLE_PREDICTED<class_NetwDisplay_constant_DISPLAY_ROLE_PREDICTED>`, received ones :ref:`DISPLAY_ROLE_REMOTE<class_NetwDisplay_constant_DISPLAY_ROLE_REMOTE>`, ones this peer controls without prediction :ref:`DISPLAY_ROLE_DISABLED<class_NetwDisplay_constant_DISPLAY_ROLE_DISABLED>`, and the server uses :ref:`DISPLAY_ROLE_AUTHORITY<class_NetwDisplay_constant_DISPLAY_ROLE_AUTHORITY>`.
+Picked from :ref:`NetwSimulation.mode<class_NetwSimulation_property_mode>`. The default. Predicted entities use :ref:`DISPLAY_ROLE_PREDICTED<class_NetwDisplay_constant_DISPLAY_ROLE_PREDICTED>` and received ones :ref:`DISPLAY_ROLE_REMOTE<class_NetwDisplay_constant_DISPLAY_ROLE_REMOTE>`. Without prediction, the controlling peer uses :ref:`DISPLAY_ROLE_DISABLED<class_NetwDisplay_constant_DISPLAY_ROLE_DISABLED>` when it also holds the multiplayer authority. Any other peer that sends the entity's properties, such as the server, uses :ref:`DISPLAY_ROLE_AUTHORITY<class_NetwDisplay_constant_DISPLAY_ROLE_AUTHORITY>` and draws the entity one tick behind.
 
 .. _class_NetwDisplay_constant_DISPLAY_ROLE_REMOTE:
 
@@ -489,6 +489,8 @@ Frames between interpolation trace logs. ``0`` disables them.
 The child node that receives the smoothed values. Position and rotation are written in global space, and other properties are written as they are. A visual with :godot:`CanvasItem.top_level <CanvasItem#class_CanvasItem_property_top_level>` set receives every property in global space.
 
 The written values replace the visual's own position and rotation, so point this at a plain node and put a model that needs one under it.
+
+Only a child of the entity root is supported. A path that resolves to another node, such as a sibling, raises no fault. When the entity holds a :godot:`RigidBody3D`, that node's own transform is then read as its offset from the entity root, so it is drawn displaced.
 
 .. rst-class:: classref-section-separator
 

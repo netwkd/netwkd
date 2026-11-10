@@ -8,6 +8,7 @@
 #include "godot/object.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/script.hpp"
+#include "netw/api/context.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_record.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -444,6 +445,73 @@ TEST_CASE(
                 row.represents ? int64_t(rig.peer_id(0)) : int64_t(0)
             );
             NETW_CHECK_EQ(entity->get_controller(), int64_t(1));
+        }
+    }
+}
+
+bool part_declares = false;
+
+Node *build_pawn_with_part(const Variant &) {
+    Node *pawn = memnew(Node);
+    pawn->set_name("Pawn");
+    netw::Netw::configure_entity(pawn);
+    Node *physics = memnew(Node);
+    physics->set_name("Physics");
+    if (part_declares) {
+        netw::Netw::configure_entity(physics);
+    }
+    pawn->add_child(physics);
+    physics->set_owner(pawn);
+    return pawn;
+}
+
+TEST_CASE(
+    "[Networked][Spawn][SceneTree] SM9 a plain child of a spawned player "
+    "scene reads that player's entity on every peer, whether or not it "
+    "declares one in _init"
+) {
+    struct Row {
+        const char *label;
+        bool declares;
+    };
+    const Row rows[] = {
+        {"the child declares", true},
+        {"the child does not declare", false},
+    };
+    for (const Row &row : rows) {
+        INFO(row.label);
+        netw_test::LoopbackRig rig(1);
+        rig.mount();
+        const Ref<NetwPlayer> player = rig.player(0);
+        REQUIRE(player.is_valid());
+        part_declares = row.declares;
+        Array arg_types;
+        arg_types.push_back(int64_t(Variant::STRING));
+        Array args;
+        args.push_back(String("pawn"));
+
+        const int route = rig.spawn_registered(
+            StringName("pawn_with_part"),
+            callable_mp_static(&build_pawn_with_part),
+            args,
+            arg_types,
+            nullptr,
+            Variant(player)
+        );
+        part_declares = false;
+
+        for (int peer = -1; peer < rig.count(); ++peer) {
+            CAPTURE(peer);
+            Node *pawn = rig.route_node(route, peer);
+            REQUIRE(pawn != nullptr);
+            const Ref<NetwEntity> entity
+                = NetwEntity::of(pawn->get_node_or_null(NodePath("Physics")));
+            REQUIRE(entity.is_valid());
+            CHECK(entity == NetwEntity::of(pawn));
+            const Ref<NetwPlayer> seen = entity->get_player();
+            REQUIRE(seen.is_valid());
+            NETW_CHECK_EQ(seen->get_peer_id(), int64_t(rig.peer_id(0)));
+            CHECK(entity->get_is_controlled_locally() == (peer == 0));
         }
     }
 }

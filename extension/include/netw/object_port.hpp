@@ -18,6 +18,19 @@ struct ObjectPort {
     godot::Object *resolve(SubsystemName p_module);
 };
 
+bool named_held(godot::Object *p_owner, const godot::StringName &p_key);
+
+godot::Variant named_get(
+    godot::Object *p_owner,
+    const godot::StringName &p_key
+);
+
+void named_set(
+    godot::Object *p_owner,
+    const godot::StringName &p_key,
+    const godot::Variant &p_value
+);
+
 godot::Variant port_get(godot::Object *p_owner, const godot::StringName &p_key);
 
 bool port_rests(godot::Object *p_owner, const godot::StringName &p_key);

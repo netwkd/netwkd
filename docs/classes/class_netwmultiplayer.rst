@@ -3696,7 +3696,7 @@ The :godot:`SceneMultiplayer` this session wraps. It owns the :godot:`Multiplaye
 
 - :godot:`bool` **get_is_local_client**\ (\ )
 
-``true`` when this peer has its own player, which is at :ref:`NetwSession.ROLE_CLIENT<class_NetwSession_constant_ROLE_CLIENT>` and :ref:`NetwSession.ROLE_LISTEN_SERVER<class_NetwSession_constant_ROLE_LISTEN_SERVER>`.
+``true`` when this peer has its own player, which is at :ref:`NetwSession.ROLE_CLIENT<class_NetwSession_constant_ROLE_CLIENT>` and :ref:`NetwSession.ROLE_LISTEN_SERVER<class_NetwSession_constant_ROLE_LISTEN_SERVER>`. It reads the same for every entity, so ask :ref:`NetwEntity.is_controlled_locally<class_NetwEntity_property_is_controlled_locally>` whether an entity is this player's.
 
 .. rst-class:: classref-item-separator
 

@@ -574,7 +574,7 @@ The :ref:`NetwConnection<class_NetwConnection>` of this session, to find servers
 
 - :godot:`bool` **get_is_local_client**\ (\ )
 
-``true`` when this peer has its own player, at :ref:`ROLE_CLIENT<class_NetwSession_constant_ROLE_CLIENT>` and :ref:`ROLE_LISTEN_SERVER<class_NetwSession_constant_ROLE_LISTEN_SERVER>`.
+``true`` when this peer has its own player, at :ref:`ROLE_CLIENT<class_NetwSession_constant_ROLE_CLIENT>` and :ref:`ROLE_LISTEN_SERVER<class_NetwSession_constant_ROLE_LISTEN_SERVER>`. It reads the same for every entity, so ask :ref:`NetwEntity.is_controlled_locally<class_NetwEntity_property_is_controlled_locally>` whether an entity is this player's.
 
 .. rst-class:: classref-item-separator
 

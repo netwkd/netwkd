@@ -3216,7 +3216,7 @@
 			[code]true[/code] on a server, and when not connected at all, as with [method MultiplayerAPI.is_server]. [code]false[/code] on a client, even before it connects. Use [member is_online] to also require a connection.
 		</member>
 		<member name="is_local_client" type="bool" setter="" getter="get_is_local_client" default="false">
-			[code]true[/code] when this peer has its own player, which is at [constant NetwSession.ROLE_CLIENT] and [constant NetwSession.ROLE_LISTEN_SERVER].
+			[code]true[/code] when this peer has its own player, which is at [constant NetwSession.ROLE_CLIENT] and [constant NetwSession.ROLE_LISTEN_SERVER]. It reads the same for every entity, so ask [member NetwEntity.is_controlled_locally] whether an entity is this player's.
 		</member>
 		<member name="is_online" type="bool" setter="" getter="get_is_online" default="false">
 			[code]true[/code] when [member state] is [constant NetwSession.STATE_ONLINE].

@@ -39,6 +39,38 @@ func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
 	beat += motion
 )";
 
+const char *INPUTS_SOURCE = R"(extends Resource
+
+var move := 0
+)";
+
+const char *STEERER_SOURCE = R"(extends Node2D
+
+var beat := 0
+var assigns := 0
+var fresh := {}
+var replayed := {}
+var inputs: Resource:
+	set(value):
+		assigns += 1
+		inputs = value
+
+
+func _init() -> void:
+	var e := Netw.configure_entity(self)
+	e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+	Netw.configure_property(self, &"beat").state()
+	Netw.configure_property(self, &"inputs:move").input()
+
+
+func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+	if is_fresh:
+		fresh[tick] = inputs.move
+	else:
+		replayed[tick] = inputs.move
+	beat += inputs.move
+)";
+
 Node *build_walker(const Variant &p_name, const Variant &p_script) {
     const Ref<Script> script = p_script;
     Node *made
@@ -47,13 +79,31 @@ Node *build_walker(const Variant &p_name, const Variant &p_script) {
     return made;
 }
 
+Node *build_steerer(
+    const Variant &p_name,
+    const Variant &p_script,
+    const Variant &p_inputs
+) {
+    Node *made = build_walker(p_name, p_script);
+    const Ref<Script> inputs = p_inputs;
+    made->set(StringName("inputs"), inputs->call("new"));
+    return made;
+}
+
 struct Walk {
     LoopbackRig rig;
     Ref<Script> script;
+    Ref<Script> inputs;
     int route = 0;
 
-    explicit Walk(int p_lobby_ticks = 0) : rig(1) {
-        script = netw_test::minted_script(WALKER_SOURCE);
+    explicit Walk(int p_lobby_ticks = 0, bool p_steers = false) : rig(1) {
+        script = netw_test::minted_script(
+            p_steers ? STEERER_SOURCE : WALKER_SOURCE
+        );
+        inputs = netw_test::minted_script(INPUTS_SOURCE);
+        const Callable build = p_steers
+            ? callable_mp_static(&build_steerer).bind(script, inputs)
+            : callable_mp_static(&build_walker).bind(script);
         rig.mount();
         Node *arena = rig.mirror_child("Arena");
         Array types;
@@ -62,7 +112,7 @@ struct Walk {
             rig.register_constructor(
                 seat(at),
                 StringName("walker"),
-                callable_mp_static(&build_walker).bind(script),
+                build,
                 types
             );
         }
@@ -240,6 +290,51 @@ TEST_CASE(
     walk.walk();
     walk.hold_server(false);
     NETW_CHECK_EQ(walk.beat(-1), before + 2);
+}
+
+TEST_CASE(
+    "[Networked][Predict][SceneTree] PCU5 an input inside a resource reaches "
+    "the server's resource on its own tick, and a replay restores it into "
+    "the controller's resource"
+) {
+    Walk walk(0, true);
+    Node *client = walk.walker(0);
+    Node *server = walk.walker(-1);
+    Object *held = netw::gd::live_object(client->get(StringName("inputs")));
+    REQUIRE(held != nullptr);
+    for (int tick = 0; tick < WARM_TICKS + SETTLE_TICKS; ++tick) {
+        if (tick == WARM_TICKS) {
+            server->set(StringName("beat"), walk.beat(-1) + 100);
+        }
+        held->set(StringName("move"), tick % 3 + 1);
+        walk.rig.step_ticks(1);
+    }
+
+    const Dictionary sent = client->get(StringName("fresh"));
+    const Dictionary landed = server->get(StringName("fresh"));
+    const Dictionary replayed = client->get(StringName("replayed"));
+    REQUIRE(!replayed.is_empty());
+    int matched = 0;
+    const Array ticks = landed.keys();
+    for (int at = 0; at < ticks.size(); ++at) {
+        if (sent.has(ticks[at])) {
+            NETW_CHECK_EQ(int64_t(landed[ticks[at]]), int64_t(sent[ticks[at]]));
+            matched += 1;
+        }
+    }
+    NETW_CHECK_GT(matched, WARM_TICKS);
+    const Array again = replayed.keys();
+    for (int at = 0; at < again.size(); ++at) {
+        if (sent.has(again[at])) {
+            NETW_CHECK_EQ(
+                int64_t(replayed[again[at]]),
+                int64_t(sent[again[at]])
+            );
+        }
+    }
+    CHECK(netw::gd::live_object(client->get(StringName("inputs"))) == held);
+    NETW_CHECK_EQ(int64_t(client->get(StringName("assigns"))), int64_t(1));
+    NETW_CHECK_EQ(int64_t(server->get(StringName("assigns"))), int64_t(1));
 }
 
 } // namespace TestPredictCatchUpLaws

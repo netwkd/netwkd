@@ -16,7 +16,7 @@
 		    eliminate(entity.peer_id)
 		[/codeblock]
 		[b]Declaring an entity[/b]
-		A root declares itself in [code]_init[/code]. A child marks its own spawn properties in its [code]_init[/code] and connects to the entity in [method Node._ready], once it has a parent to walk up to.
+		A root declares itself in [code]_init[/code]. [method Netw.spawn] makes the root it returns an entity whether or not it declares one, so a spawned root declares only to set options. A child marks its own spawn properties in its [code]_init[/code], and may call [method Netw.configure_entity] there to set the options of the entity it is part of. It reads that entity with [method of] from [method Node._enter_tree] on.
 		[codeblock]
 		# on the root
 		func _init() -&gt; void:
@@ -25,6 +25,7 @@
 
 		# on a child
 		func _init() -&gt; void:
+		    Netw.configure_entity(self).lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
 		    Netw.configure_property(self, &amp;"health").on_spawn()
 
 		func _ready() -&gt; void:

@@ -290,6 +290,7 @@ void SyncPipeline::register_derived(Node *p_node) {
     if (registered != nullptr && !registered->is_empty()) {
         return;
     }
+    hold_resources(p_node, script);
     Object *shell = api();
     const uint64_t state = property_set_builder::from_script(
         script,
@@ -579,7 +580,88 @@ void SyncPipeline::unseat_record(
     record->set_record_binding(set->get_record(), 0);
 }
 
+void SyncPipeline::hold_resources(Node *p_node, const Ref<Script> &p_script) {
+    if (gd::indexed_paths().is_empty()) {
+        return;
+    }
+    const Dictionary configs
+        = netw::script::model::get_property_configs(p_script);
+    const Array names = configs.keys();
+    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
+    Node *named = entity.is_valid() && entity->get_owner() != nullptr
+        ? entity->get_owner()
+        : p_node;
+    const uint64_t node = uint64_t(gd::instance_id(p_node));
+    const uint64_t holder = uint64_t(gd::instance_id(named));
+    for (int at = 0; at < names.size(); ++at) {
+        const StringName path = names[at];
+        const gd::IndexedPath *indexed = gd::indexed_path(path);
+        if (indexed == nullptr) {
+            continue;
+        }
+        const Variant head = p_node->get(indexed->head);
+        if (gd::holds_nothing(head)) {
+            const Ref<NetwPropertyConfig> config = configs[path];
+            if (config.is_valid() && config->get_declared_type() < 0) {
+                fault::raise(
+                    core(),
+                    NETW_FAULT_RESOURCE_MISSING,
+                    {String(path),
+                     String(p_node->get_name()),
+                     String(indexed->head)},
+                    node
+                );
+            }
+            continue;
+        }
+        if (head.get_type() != Variant::OBJECT) {
+            continue;
+        }
+        const uint64_t resource
+            = uint64_t(gd::instance_id(gd::live_object(head)));
+        LocalVector<ResourceHolder> &holders = resource_holders[resource];
+        for (const ResourceHolder &held : holders) {
+            if (held.path == path && held.entity != holder) {
+                fault::raise(
+                    core(),
+                    NETW_FAULT_RESOURCE_SHARED,
+                    {String(path), held.name, String(named->get_name())},
+                    node
+                );
+                break;
+            }
+        }
+        holders.push_back({path, holder, node, String(named->get_name())});
+        node_resources[node].push_back(resource);
+    }
+}
+
+void SyncPipeline::release_resources(const Node *p_node) {
+    const uint64_t node = uint64_t(gd::instance_id(p_node));
+    const LocalVector<uint64_t> *held = node_resources.getptr(node);
+    if (held == nullptr) {
+        return;
+    }
+    for (const uint64_t resource : *held) {
+        LocalVector<ResourceHolder> *holders
+            = resource_holders.getptr(resource);
+        if (holders == nullptr) {
+            continue;
+        }
+        for (uint32_t at = holders->size(); at > 0; --at) {
+            if ((*holders)[at - 1].node == node) {
+                holders->remove_at_unordered(at - 1);
+            }
+        }
+        if (holders->is_empty()) {
+            resource_holders.erase(resource);
+        }
+    }
+    node_resources.erase(node);
+}
+
 void SyncPipeline::unregister_derived(Node *p_node) {
+    release_resources(p_node);
     bool dropped_state = false;
     for (uint32_t at = bindings.size(); at > 0; --at) {
         PropertyBinding *const held = live(bindings[at - 1]);
@@ -1181,7 +1263,7 @@ void SyncPipeline::send_entity_event(
 Array SyncPipeline::gather_stage() {
     Array values;
     if (stage_node != nullptr) {
-        values.push_back(stage_node->get(stage_property));
+        values.push_back(named_get(stage_node, stage_property));
     }
     return values;
 }
@@ -2292,7 +2374,7 @@ Error SyncPipeline::apply_one_value(const Array &p_values) {
     if (p_values.size() != 1 || stage_node == nullptr) {
         return ERR_INVALID_DATA;
     }
-    stage_node->set(stage_property, p_values[0]);
+    named_set(stage_node, stage_property, p_values[0]);
     return OK;
 }
 

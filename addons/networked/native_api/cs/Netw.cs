@@ -407,7 +407,13 @@ public sealed class Netw : NetwRefCounted
 
     /// <summary>
     /// For a property supplied by <c>Object._get</c>, provide its type through
-    /// <c>Object._get_property_list</c> or <paramref name="declaredType"/>.
+    /// <c>Object._get_property_list</c> or <paramref name="declaredType"/>. A
+    /// name like <c>stats:health</c> syncs <c>health</c> of the
+    /// <see cref="Resource"/> held in <c>stats</c>, and only that value is
+    /// sent.
+    /// <code>
+    /// Netw.configure_property(self, &amp;"stats:health").state()
+    /// </code>
     /// </summary>
     public static NetwPropertyConfig ConfigureProperty(
         Node node,
@@ -579,8 +585,10 @@ public sealed class Netw : NetwRefCounted
         NetwApi.MethodBind("Netw", "configure_entity", 1743742259UL);
 
     /// <summary>
-    /// Declares <paramref name="node"/> as a root before it enters the tree.
-    /// <see cref="NetwEntity.Of"/> finds an existing <see cref="NetwEntity"/>.
+    /// Declares <paramref name="node"/> as a <see cref="NetwEntity"/> before it
+    /// enters the tree. A node that a scene places inside another entity needs
+    /// its own scene to be a separate entity, and declaring it without one
+    /// raises a warning.
     /// </summary>
     public static NetwEntity ConfigureEntity(Node node)
     {

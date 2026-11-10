@@ -10039,7 +10039,24 @@ StringName part_key(const String &p_path, const StringName &p_key) {
     return StringName(p_path + String(":") + String(p_key));
 }
 
+bool owner_declares(
+    const LocalVector<predict::FieldDecl> &p_declared,
+    uint32_t p_owned,
+    const StringName &p_key
+) {
+    if (gd::indexed_path(p_key) == nullptr) {
+        return false;
+    }
+    for (uint32_t at = 0; at < p_owned; ++at) {
+        if (p_declared[at].key == p_key) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void declare_parts(
+    NetwMultiplayer *p_session,
     NetwEntity *p_entity,
     const PropertyBindingPtr &p_state,
     repl::BindingBook *p_book,
@@ -10052,6 +10069,7 @@ void declare_parts(
     if (record == nullptr || root == nullptr || p_book == nullptr) {
         return;
     }
+    const uint32_t owned = r_declared.size();
     for (const NetwEntityRecord::HeldBinding &held :
          record->get_held_bindings()) {
         repl::PropertyBinding *child = p_book->live(held.binding);
@@ -10070,6 +10088,16 @@ void declare_parts(
         part.first = r_declared.size();
         for (predict::FieldDecl decl : field_declaration(child)) {
             decl.key = part_key(part.path, decl.key);
+            if (owner_declares(r_declared, owned, decl.key)) {
+                fault::raise(
+                    p_session,
+                    NETW_FAULT_DECLARED_TWICE,
+                    {vformat("'%s'", String(decl.key)),
+                     String(root->get_name())},
+                    uint64_t(gd::instance_id(child->node()))
+                );
+                continue;
+            }
             if (decl.carry_channel != StringName()) {
                 decl.carry_channel = part_key(part.path, decl.carry_channel);
             }
@@ -10122,7 +10150,14 @@ int NetwPredictionEngine::adopt_declaration(
         return -1;
     }
     LocalVector<predict::StatePart> parts;
-    declare_parts(p_entity.ptr(), p_state, binding_book, declared, parts);
+    declare_parts(
+        core(),
+        p_entity.ptr(),
+        p_state,
+        binding_book,
+        declared,
+        parts
+    );
     rewire(slot, declared, field_declaration(p_input));
     set_parts(slot, parts);
 

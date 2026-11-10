@@ -1377,7 +1377,7 @@ Whether this entity is corrected alone or together with the entities its :ref:`N
 - |void| **set_recovery_policy**\ (\ value\: :ref:`RecoveryPolicy<enum_NetwPrediction_RecoveryPolicy>`\ )
 - :ref:`RecoveryPolicy<enum_NetwPrediction_RecoveryPolicy>` **get_recovery_policy**\ (\ )
 
-How this entity is corrected. :ref:`resolved_recovery_policy()<class_NetwPrediction_method_resolved_recovery_policy>` returns the policy in use.
+How this entity is corrected. Defaults to :ref:`RECOVERY_POLICY_AUTO<class_NetwPrediction_constant_RECOVERY_POLICY_AUTO>`, and :ref:`ARCHETYPE_SCRIPTED<class_NetwPrediction_constant_ARCHETYPE_SCRIPTED>` sets :ref:`RECOVERY_POLICY_REBASE_REPLAY<class_NetwPrediction_constant_RECOVERY_POLICY_REBASE_REPLAY>`. :ref:`resolved_recovery_policy()<class_NetwPrediction_method_resolved_recovery_policy>` returns the policy in use.
 
 .. rst-class:: classref-item-separator
 

@@ -322,6 +322,16 @@ Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
         );
         return Ref<NetwMemberConfig>(this);
     }
+    if (context_type == 1 && gd::indexed_path(context_name) != nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNSUPPORTED,
+            {String("{NetwMemberConfig.interpolate}"),
+             vformat("'%s', a value inside a resource", String(context_name)),
+             String("it on a property of the node")}
+        );
+        return Ref<NetwMemberConfig>(this);
+    }
     if (!declared_are_interpolators(
             p_interpolators,
             "NetwMemberConfig.interpolate",

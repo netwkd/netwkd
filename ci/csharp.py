@@ -136,6 +136,11 @@ RESERVED = {
 GLOBAL_ENUMS = {"Error"}
 
 VARARG_PARAMETER = "rest"
+VARARG_TYPES = {
+    ("NetwMemberConfig", "interpolate"): "NetwInterpolate",
+    ("NetwMemberConfig", "quantize"): "NetwQuantize",
+    ("NetwJoinConfig", "quantize"): "NetwQuantize",
+}
 NAMED_MEMBER_METHODS = {
     "configure_rpc",
     "configure_spawn",
@@ -1058,7 +1063,7 @@ class Emitter:
         arguments: list[tuple[str, Boxed]],
         answered: Boxed,
         indent: str,
-        varargs: str | None = None,
+        varargs: Boxed | None = None,
     ) -> list[str]:
         fixed = len(arguments)
         if varargs is not None or fixed > CALL_MAX_ARITY:
@@ -1091,7 +1096,7 @@ class Emitter:
         arguments: list[tuple[str, Boxed]],
         answered: Boxed,
         indent: str,
-        varargs: str | None,
+        varargs: Boxed | None,
     ) -> list[str]:
         """The unbounded tail, and any arity past the fixed thunks, carried in
         a pack the extension owns. It costs one allocation, which is why every
@@ -1099,8 +1104,9 @@ class Emitter:
         self.thunks.pack()
         fixed = len(arguments)
         body = []
+        rest = VARARG_PARAMETER
         if varargs is not None:
-            body.append(indent + "int total = %d + (%s == null ? 0 : %s.Length);" % (fixed, varargs, varargs))
+            body.append(indent + "int total = %d + (%s == null ? 0 : %s.Length);" % (fixed, rest, rest))
             total = "total"
         else:
             total = str(fixed)
@@ -1118,7 +1124,9 @@ class Emitter:
                 [
                     indent + "for (int index = %d; index < total; index++)" % fixed,
                     indent + "{",
-                    indent + "    godot_variant carried = %s[index - %d]" ".CopyNativeVariant();" % (varargs, fixed),
+                    indent
+                    + "    godot_variant carried = %s;"
+                    % varargs.to_variant.format(name="%s[index - %d]" % (rest, fixed)),
                     indent + "    NetwThunks.ArgsSet(pack, index, in carried);",
                     indent + "    carried.Dispose();",
                     indent + "}",
@@ -1219,9 +1227,10 @@ class Emitter:
         signature, filled = self.declared_arguments(arguments, names, boxed)
         varargs = None
         if method.get("is_vararg"):
-            varargs = VARARG_PARAMETER
-            tail = "params Variant[] %s" % VARARG_PARAMETER
-            signature = "%s, %s" % (signature, tail) if signature else tail
+            element = VARARG_TYPES.get((class_name, method["name"]), "Variant")
+            varargs = self.surface.box({"type": element})
+            tail = "params %s[] %s" % (varargs.declared, VARARG_PARAMETER)
+            signature ="%s, %s" % (signature, tail) if signature else tail
         body = (
             preflight
             + filled

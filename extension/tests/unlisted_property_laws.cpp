@@ -11,6 +11,7 @@
 #include "godot/scene_tree.hpp"
 #include "godot/script.hpp"
 #include "godot/variant.hpp"
+#include "netw/api/clock_config.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/property_config.hpp"
@@ -273,6 +274,193 @@ TEST_CASE(
     );
     node->get_parent()->remove_child(node);
     memdelete(node);
+}
+
+constexpr const char *HOLDER_ID = "resource_holder";
+
+constexpr const char *STATS_SOURCE = R"(extends Resource
+
+var health := 0
+var armor := 0
+)";
+
+constexpr const char *HOLDER_SOURCE = R"(extends Node2D
+
+var stats: Resource
+
+func _init() -> void:
+	Netw.configure_entity(self)
+	Netw.configure_property(self, &"stats:health").state()
+	Netw.configure_property(self, &"stats:armor").on_spawn()
+)";
+
+Script *holder_script = nullptr;
+Script *stats_script = nullptr;
+Ref<RefCounted> shared_stats;
+int64_t first_armor = 0;
+
+Variant made_stats(int64_t p_armor) {
+    const Variant stats = stats_script->call("new");
+    netw::gd::live_object(stats)->set("armor", p_armor);
+    return stats;
+}
+
+Node *build_holder(const Variant &p_name) {
+    Node *made = Object::cast_to<Node>(holder_script->call("new"));
+    made->set_name(String(p_name));
+    made->set(
+        "stats",
+        shared_stats.is_valid() ? Variant(shared_stats)
+                                : made_stats(first_armor)
+    );
+    first_armor = 0;
+    return made;
+}
+
+Array holder_types() {
+    Array types;
+    types.push_back(int(Variant::STRING));
+    return types;
+}
+
+Array holder_named(const char *p_name) {
+    Array args;
+    args.push_back(String(p_name));
+    return args;
+}
+
+struct HolderStand {
+    LoopbackRig rig;
+    Ref<Script> holder;
+    Ref<Script> stats;
+    Node *arena = nullptr;
+
+    HolderStand() : rig(1) {
+        holder = minted_script(HOLDER_SOURCE);
+        stats = minted_script(STATS_SOURCE);
+        holder_script = holder.ptr();
+        stats_script = stats.ptr();
+        rig.mount();
+        flow_clocks(rig, TICKRATE);
+        arena = rig.mirror_child("Arena");
+    }
+
+    ~HolderStand() {
+        holder_script = nullptr;
+        stats_script = nullptr;
+        shared_stats.unref();
+        first_armor = 0;
+    }
+
+    int spawn(const char *p_name, bool p_pump = true) {
+        return rig.spawn_registered(
+            StringName(HOLDER_ID),
+            callable_mp_static(&build_holder),
+            holder_named(p_name),
+            holder_types(),
+            arena,
+            Variant(),
+            p_pump
+        );
+    }
+};
+
+Object *stats_of(Node *p_node) {
+    return p_node != nullptr ? netw::gd::live_object(p_node->get("stats"))
+                             : nullptr;
+}
+
+int64_t stat(Node *p_node, const char *p_name) {
+    Object *stats = stats_of(p_node);
+    return stats != nullptr ? int64_t(stats->get(StringName(p_name))) : -1;
+}
+
+TEST_CASE(
+    "[Networked][Repl][Hosted] UP4 a property inside a resource replicates "
+    "into the client's own resource, and an on_spawn one reaches a late "
+    "joiner"
+) {
+    HolderStand stand;
+    first_armor = 5;
+    const int route = stand.spawn("Hero");
+    Node *server = stand.rig.route_node(route, -1);
+    Node *client = stand.rig.route_node(route, 0);
+    REQUIRE(server != nullptr);
+    REQUIRE(client != nullptr);
+    Object *client_stats = stats_of(client);
+    REQUIRE(client_stats != nullptr);
+    NETW_CHECK_EQ(stat(client, "armor"), int64_t(5));
+
+    stats_of(server)->set("health", 12);
+    stats_of(server)->set("armor", 9);
+    stand.rig.step_ticks(4);
+    NETW_CHECK_EQ(stat(client, "health"), int64_t(12));
+    NETW_CHECK_EQ(stat(client, "armor"), int64_t(5));
+    CHECK(stats_of(client) == client_stats);
+
+    const int late = stand.rig.add_client();
+    Ref<netw::NetwClockConfig> clock;
+    clock.instantiate();
+    clock->set_tickrate(TICKRATE);
+    NETW_REQUIRE_EQ(stand.rig.client(late)->clock_initialize(clock), OK);
+    stand.rig.client(late)->clock_engine().set_manual_tick(true);
+    stand.rig.register_constructor(
+        stand.rig.client(late),
+        StringName(HOLDER_ID),
+        callable_mp_static(&build_holder),
+        holder_types()
+    );
+    stand.rig.hold(late);
+    stand.rig.mount_late(late);
+    stand.rig.mirror_late(late, "Arena");
+    stand.rig.release(late);
+    stand.rig.step_ticks(24);
+    Node *joined = stand.rig.route_node(route, late);
+    REQUIRE(joined != nullptr);
+    NETW_CHECK_EQ(stat(joined, "armor"), int64_t(9));
+    NETW_CHECK_EQ(stat(joined, "health"), int64_t(12));
+}
+
+TEST_CASE(
+    "[Networked][Repl][Hosted] UP5 two entities syncing one shared resource "
+    "are reported once, naming both"
+) {
+    HolderStand stand;
+    FaultWatch faults;
+    faults.expect_error("*'HeroA'*'HeroB'*'stats:health'*[NW1026]*", 1);
+    faults.expect_error("*'HeroA'*'HeroB'*'stats:armor'*[NW1026]*", 1);
+    shared_stats = Ref<RefCounted>(made_stats(0));
+    stand.spawn("HeroA", false);
+    stand.spawn("HeroB", false);
+    shared_stats.unref();
+    stand.rig.step_ticks(8);
+}
+
+TEST_CASE(
+    "[Networked][Repl][Hosted] UP6 a resource taken away is reported once "
+    "and sends nothing, and the one put back is read on the next tick"
+) {
+    HolderStand stand;
+    const int route = stand.spawn("Hero");
+    Node *server = stand.rig.route_node(route, -1);
+    Node *client = stand.rig.route_node(route, 0);
+    REQUIRE(server != nullptr);
+    REQUIRE(client != nullptr);
+    stats_of(server)->set("health", 4);
+    stand.rig.step_ticks(4);
+    NETW_REQUIRE_EQ(stat(client, "health"), int64_t(4));
+    {
+        FaultWatch faults;
+        faults.expect_error("*'Hero'*'stats:health'*[NW1025]*", 1);
+        server->set("stats", Variant());
+        stand.rig.step_ticks(8);
+        NETW_CHECK_EQ(stat(client, "health"), int64_t(4));
+    }
+    const Variant swapped = made_stats(0);
+    netw::gd::live_object(swapped)->set("health", 6);
+    server->set("stats", swapped);
+    stand.rig.step_ticks(4);
+    NETW_CHECK_EQ(stat(client, "health"), int64_t(6));
 }
 
 } // namespace TestUnlistedProperty

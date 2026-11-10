@@ -581,6 +581,7 @@ Ref<NetwPropertyConfig> Netw::configure_property(
         );
         return Ref<NetwPropertyConfig>();
     }
+    const bool indexed = gd::declare_indexed_path(p_property) != nullptr;
     const gd::PropertyResolution resolved
         = gd::resolve_property(p_node, p_property, gd::property_list(p_node));
     if (!resolved.present) {
@@ -609,9 +610,10 @@ Ref<NetwPropertyConfig> Netw::configure_property(
         );
         return Ref<NetwPropertyConfig>();
     }
-    const int declared_type
-        = p_declared_type >= 0 ? int(p_declared_type) : resolved.type;
-    if (declared_type < 0) {
+    const int declared_type = p_declared_type >= 0 ? int(p_declared_type)
+        : indexed                                  ? -1
+                                                   : resolved.type;
+    if (declared_type < 0 && !indexed) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_VALUE,
@@ -765,7 +767,7 @@ Ref<NetwMemberConfig> Netw::configure_spawn(const Callable &p_callable) {
 Ref<NetwEntity> Netw::configure_entity(Node *p_node) {
     NETW_ZONE_NC("Netw configure entity", colors::SESSION);
     decl_sites::record(NETW_SITE_KIND, p_node);
-    const Ref<NetwEntity> entity = NetwEntity::resolve(p_node);
+    const Ref<NetwEntity> entity = NetwEntity::declare(p_node);
     if (p_node != nullptr && p_node->is_inside_tree()
         && (entity.is_null() || entity->get_owner() != p_node)) {
         fault::raise(

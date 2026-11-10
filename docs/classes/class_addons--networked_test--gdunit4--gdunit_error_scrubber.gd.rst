@@ -66,7 +66,7 @@ Erases every recorded error or warning whose message contains all of ``markers``
 
 ::
 
-    assert_int(await erase_matching(["joined with no arguments"])).is_equal(1)
+    assert_int(await erase_matching(["[NW0027]"])).is_equal(1)
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

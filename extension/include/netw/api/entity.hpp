@@ -218,6 +218,8 @@ public:
     static godot::Ref<NetwEntity> of(godot::Node *p_node);
     static godot::Ref<NetwEntity> ensure(godot::Node *p_root);
     static godot::Ref<NetwEntity> resolve(godot::Node *p_node);
+    static godot::Ref<NetwEntity> declare(godot::Node *p_node);
+    static void settle_parts(godot::Node *p_root, bool p_spawned);
 
     void attach_to(godot::Node *p_root);
 

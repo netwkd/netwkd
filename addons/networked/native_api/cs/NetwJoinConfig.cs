@@ -46,13 +46,15 @@ public sealed class NetwJoinConfig : NetwRefCounted
     /// order. <c>null</c> sends an argument as is. The number of quantizers
     /// must match the number of arguments.
     /// </summary>
-    public NetwJoinConfig Quantize(params Variant[] rest)
+    public NetwJoinConfig Quantize(params NetwQuantize[] rest)
     {
         int total = 0 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
         for (int index = 0; index < total; index++)
         {
-            godot_variant carried = rest[index - 0].CopyNativeVariant();
+            godot_variant carried =
+                VariantUtils.CreateFromGodotObjectPtr(
+                    rest[index - 0]?.Native ?? IntPtr.Zero);
             NetwThunks.ArgsSet(pack, index, in carried);
             carried.Dispose();
         }

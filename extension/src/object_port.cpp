@@ -6,6 +6,8 @@
 #include "godot/physics_server.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/api/entity_record.hpp"
+#include "netw/api/netw_multiplayer.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/tree_hook.hpp"
 
 using namespace godot;
@@ -277,7 +279,77 @@ bool write_2d(RigidBody2D *p_body, BodyKey p_key, const Variant &p_value) {
     return true;
 }
 
+void report_missing_resource(
+    Object *p_owner,
+    const StringName &p_key,
+    const gd::IndexedPath &p_indexed
+) {
+    Node *node = Object::cast_to<Node>(p_owner);
+    fault::raise(
+        NetwMultiplayer::of(node),
+        NETW_FAULT_RESOURCE_MISSING,
+        {String(p_key),
+         node != nullptr ? String(node->get_name()) : String(),
+         String(p_indexed.head)},
+        uint64_t(gd::instance_id(p_owner))
+    );
+}
+
 } // namespace
+
+bool named_held(Object *p_owner, const StringName &p_key) {
+    const gd::IndexedPath *indexed = gd::indexed_path(p_key);
+    if (p_owner == nullptr || indexed == nullptr
+        || !gd::holds_nothing(p_owner->get(indexed->head))) {
+        return true;
+    }
+    report_missing_resource(p_owner, p_key, *indexed);
+    return false;
+}
+
+Variant named_get(Object *p_owner, const StringName &p_key) {
+    if (p_owner == nullptr) {
+        return Variant();
+    }
+    const gd::IndexedPath *indexed = gd::indexed_path(p_key);
+    if (indexed == nullptr) {
+        return p_owner->get(p_key);
+    }
+    const Variant head = p_owner->get(indexed->head);
+    if (gd::holds_nothing(head)) {
+        report_missing_resource(p_owner, p_key, *indexed);
+        return Variant();
+    }
+    if (head.get_type() == Variant::OBJECT) {
+        return gd::get_indexed(gd::live_object(head), indexed->rest);
+    }
+    return gd::get_indexed(p_owner, indexed->path);
+}
+
+void named_set(
+    Object *p_owner,
+    const StringName &p_key,
+    const Variant &p_value
+) {
+    if (p_owner == nullptr) {
+        return;
+    }
+    const gd::IndexedPath *indexed = gd::indexed_path(p_key);
+    if (indexed == nullptr) {
+        p_owner->set(p_key, p_value);
+        return;
+    }
+    const Variant head = p_owner->get(indexed->head);
+    if (gd::holds_nothing(head)) {
+        report_missing_resource(p_owner, p_key, *indexed);
+        return;
+    }
+    if (head.get_type() == Variant::OBJECT) {
+        gd::set_indexed(gd::live_object(head), indexed->rest, p_value);
+        return;
+    }
+    gd::set_indexed(p_owner, indexed->path, p_value);
+}
 
 Variant port_get(Object *p_owner, const StringName &p_key) {
     if (p_owner == nullptr) {
@@ -295,7 +367,7 @@ Variant port_get(Object *p_owner, const StringName &p_key) {
             }
         }
     }
-    return p_owner->get(p_key);
+    return named_get(p_owner, p_key);
 }
 
 bool port_rests(Object *p_owner, const StringName &p_key) {
@@ -342,7 +414,7 @@ void port_set(
             }
         }
     }
-    p_owner->set(p_key, p_value);
+    named_set(p_owner, p_key, p_value);
 }
 
 Dictionary port_capture(

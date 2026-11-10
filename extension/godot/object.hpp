@@ -1,5 +1,6 @@
 #pragma once
 
+#include "godot/hash_map.hpp"
 #include "godot/ref_counted.hpp"
 #include "godot/variant.hpp"
 
@@ -142,6 +143,47 @@ struct PropertyResolution {
     int type = -1;
 };
 
+struct IndexedPath {
+    godot::StringName head;
+    godot::NodePath path;
+    godot::NodePath rest;
+};
+
+inline godot::HashMap<godot::StringName, IndexedPath> &indexed_paths() {
+    static godot::HashMap<godot::StringName, IndexedPath> paths;
+    return paths;
+}
+
+inline const IndexedPath *indexed_path(const godot::StringName &p_name) {
+    const godot::HashMap<godot::StringName, IndexedPath> &paths
+        = indexed_paths();
+    return paths.is_empty() ? nullptr : paths.getptr(p_name);
+}
+
+inline const IndexedPath *declare_indexed_path(
+    const godot::StringName &p_name
+) {
+    if (const IndexedPath *known = indexed_path(p_name)) {
+        return known;
+    }
+    const godot::String text(p_name);
+    const int split = text.find(":");
+    if (split <= 0 || split == text.length() - 1) {
+        return nullptr;
+    }
+    IndexedPath made;
+    made.head = godot::StringName(text.substr(0, split));
+    made.path = godot::NodePath(godot::String(":") + text);
+    made.rest = godot::NodePath(text.substr(split));
+    return &indexed_paths().insert(p_name, made)->value;
+}
+
+inline bool holds_nothing(const godot::Variant &p_value) {
+    return p_value.get_type() == godot::Variant::NIL
+        || (p_value.get_type() == godot::Variant::OBJECT
+            && live_object(p_value) == nullptr);
+}
+
 inline PropertyResolution listed_property(
     const godot::Array &p_infos,
     const godot::StringName &p_name
@@ -163,6 +205,16 @@ inline PropertyResolution resolve_property(
 ) {
     if (p_object == nullptr) {
         return {};
+    }
+    if (const IndexedPath *indexed = indexed_path(p_name)) {
+        if (!resolve_property(p_object, indexed->head, p_infos).present) {
+            return {};
+        }
+        const godot::Variant leaf = get_indexed(p_object, indexed->path);
+        return {
+            true,
+            leaf.get_type() == godot::Variant::NIL ? -1 : int(leaf.get_type())
+        };
     }
     const PropertyResolution listed = listed_property(p_infos, p_name);
     if (listed.present) {
@@ -205,12 +257,29 @@ inline int class_property_type(
 #endif
 }
 
+inline godot::StringName property_setter(
+    const godot::StringName &p_class,
+    const godot::StringName &p_name
+) {
+#if defined(NETW_MODULE)
+    return ::ClassDB::get_property_setter(p_class, p_name);
+#else
+    return godot::ClassDBSingleton::get_singleton()->class_get_property_setter(
+        p_class,
+        p_name
+    );
+#endif
+}
+
 inline bool has_property(
     const godot::Object *object,
     const godot::StringName &name
 ) {
     if (object == nullptr) {
         return false;
+    }
+    if (indexed_path(name) != nullptr) {
+        return resolve_property(object, name, godot::Array()).present;
     }
 #if defined(NETW_MODULE)
     bool valid = false;

@@ -1,0 +1,32 @@
+:github_url: hide
+
+.. _fault_nw1028:
+
+NW1028. A part set what only a separate entity has
+==================================================
+
+Reported as an error when a node that a scene places under an entity sets
+:ref:`NetwEntity.name <class_NetwEntity_property_name>`,
+:ref:`NetwEntity.on_parent_despawn <class_NetwEntity_property_on_parent_despawn>`
+or :ref:`NetwEntity.interest <class_NetwEntity_property_interest>` through
+:ref:`Netw.configure_entity <class_Netw_method_configure_entity>`. The node
+is part of the entity above it, and these belong to a separate entity.
+
+The setting is ignored. The log line names the node, the entity it is part
+of and the setting.
+
+``Turret`` is a plain child in ``tank.tscn``, under ``Tank``.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self).name = &"turret"
+
+Set it on ``Tank``, or save ``Turret`` as its own scene and instance it in
+``tank.tscn`` so it is a separate entity.
+
+.. code-block:: gdscript
+
+    # tank.gd
+    func _init() -> void:
+        Netw.configure_entity(self).name = &"tank"

@@ -269,7 +269,7 @@
 			Whether this entity is corrected alone or together with the entities its [member NetwEntity.simulation] selects.
 		</member>
 		<member name="recovery_policy" type="int" setter="set_recovery_policy" getter="get_recovery_policy" enum="NetwPrediction.RecoveryPolicy">
-			How this entity is corrected. [method resolved_recovery_policy] returns the policy in use.
+			How this entity is corrected. Defaults to [constant RECOVERY_POLICY_AUTO], and [constant ARCHETYPE_SCRIPTED] sets [constant RECOVERY_POLICY_REBASE_REPLAY]. [method resolved_recovery_policy] returns the policy in use.
 		</member>
 		<member name="replay_buffer_depth" type="int" setter="set_replay_buffer_depth" getter="get_replay_buffer_depth">
 			How many inputs the server keeps queued before running them, for an entity at [constant NetwSimulation.SCHEDULE_FRAME]. Each one adds a tick of latency, so leave it at [code]0[/code] unless you need it.

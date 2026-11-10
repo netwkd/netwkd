@@ -130,6 +130,21 @@ private:
     godot::Node *stage_node = nullptr;
     godot::StringName stage_property;
 
+    struct ResourceHolder {
+        godot::StringName path;
+        uint64_t entity = 0;
+        uint64_t node = 0;
+        godot::String name;
+    };
+    godot::HashMap<uint64_t, godot::LocalVector<ResourceHolder>>
+        resource_holders;
+    godot::HashMap<uint64_t, godot::LocalVector<uint64_t>> node_resources;
+    void hold_resources(
+        godot::Node *p_node,
+        const godot::Ref<godot::Script> &p_script
+    );
+    void release_resources(const godot::Node *p_node);
+
     NetwMultiplayer *core() const;
     godot::Object *api() const;
     ReplicationSend *row_send();

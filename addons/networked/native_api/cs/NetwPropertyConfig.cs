@@ -29,13 +29,16 @@ namespace Networked;
 /// <see cref="NetwPropertyConfig.Windowed"/>,
 /// <see cref="NetwPropertyConfig.Audience"/> and
 /// <see cref="NetwPropertyConfig.Masked"/> apply to every property of the same
-/// kind on the script. Give them consistent values. <b>Rigid bodies</b> When
-/// the <see cref="NetwEntity"/> root is a <see cref="RigidBody3D"/> or a
-/// <see cref="RigidBody2D"/>, <c>position</c>, <c>quaternion</c>
-/// (<c>rotation</c> in 2D), <c>linear_velocity</c>, <c>angular_velocity</c> and
-/// <c>sleeping</c> read and write the body's physics state. <c>position</c>
-/// stays relative to the parent. While <c>RigidBody3D.freeze</c> is on,
-/// position and rotation use the node transform.
+/// kind on the script. Give them consistent values.
+/// <see cref="NetwMemberConfig.Interpolate"/> smooths received values. It
+/// returns a <see cref="NetwMemberConfig"/>, so chain it after the methods of
+/// this class. <b>Rigid bodies</b> When the <see cref="NetwEntity"/> root is a
+/// <see cref="RigidBody3D"/> or a <see cref="RigidBody2D"/>, <c>position</c>,
+/// <c>quaternion</c> (<c>rotation</c> in 2D), <c>linear_velocity</c>,
+/// <c>angular_velocity</c> and <c>sleeping</c> read and write the body's
+/// physics state. <c>position</c> stays relative to the parent. While
+/// <c>RigidBody3D.freeze</c> is on, position and rotation use the node
+/// transform.
 /// <code>
 /// func _init() -&gt; void:
 ///     Netw.configure_property(self, &amp;"position").state()

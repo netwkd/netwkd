@@ -115,6 +115,8 @@ const char *port_name(Port p_port) {
             return "custom";
         case Port::ARRAY:
             return "array";
+        case Port::INDEXED:
+            return "indexed";
     }
     return "engine";
 }
@@ -192,6 +194,8 @@ void resolve_columns(
         r_columns[at].body = body;
         if (body != BodyKey::NONE) {
             r_columns[at].port = Port::BODY;
+        } else if (gd::indexed_path(key) != nullptr) {
+            r_columns[at].port = Port::INDEXED;
         } else if (script.is_valid() && script_declares(script, key)) {
             r_columns[at].port = Port::SCRIPT;
         } else {
@@ -215,6 +219,7 @@ void Table::resolve_ports(Object *p_node) {
         columns[at].port = resolved[at].port;
         columns[at].body = resolved[at].body;
         body_columns += resolved[at].port == Port::BODY ? 1 : 0;
+        indexed_columns += resolved[at].port == Port::INDEXED ? 1 : 0;
     }
 }
 

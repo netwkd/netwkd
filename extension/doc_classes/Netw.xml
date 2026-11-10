@@ -119,7 +119,7 @@
 			<return type="NetwEntity" />
 			<param index="0" name="node" type="Node" />
 			<description>
-				Declares [param node] as a root before it enters the tree. [method NetwEntity.of] finds an existing [NetwEntity].
+				Configures the [NetwEntity] that [method NetwEntity.of] answers for [param node] once it enters the tree. A node that a scene places under another entity is part of that entity and sets its options, unless the node is the root of an instanced scene or the nearest entity above it is a [method configure_scene] root.
 			</description>
 		</method>
 		<method name="configure_join" qualifiers="static">
@@ -170,6 +170,10 @@
 			<param index="2" name="declared_type" type="int" default="-1" />
 			<description>
 				For a property supplied by [method Object._get], provide its type through [method Object._get_property_list] or [param declared_type].
+				A name like [code]stats:health[/code] syncs [code]health[/code] of the [Resource] held in [code]stats[/code], and only that value is sent.
+				[codeblock]
+				Netw.configure_property(self, &amp;"stats:health").state()
+				[/codeblock]
 			</description>
 		</method>
 		<method name="configure_rpc" qualifiers="static">

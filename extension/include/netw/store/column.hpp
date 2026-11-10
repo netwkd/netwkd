@@ -6,7 +6,7 @@
 
 namespace netw::store {
 
-enum class Port : uint8_t { BODY, ENGINE, SCRIPT, CUSTOM, ARRAY };
+enum class Port : uint8_t { BODY, ENGINE, SCRIPT, CUSTOM, ARRAY, INDEXED };
 
 enum class Family : uint8_t { VOLATILE, RETAINED, WINDOW };
 

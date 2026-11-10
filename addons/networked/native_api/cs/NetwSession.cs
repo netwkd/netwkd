@@ -535,7 +535,9 @@ public sealed class NetwSession : NetwRefCounted
     /// <summary>
     /// <c>true</c> when this peer has its own player, at
     /// <see cref="NetwSession.RoleEnum.Client"/> and
-    /// <see cref="NetwSession.RoleEnum.ListenServer"/>.
+    /// <see cref="NetwSession.RoleEnum.ListenServer"/>. It reads the same for
+    /// every entity, so ask <see cref="NetwEntity.IsControlledLocally"/>
+    /// whether an entity is this player's.
     /// </summary>
     public bool IsLocalClient
     {

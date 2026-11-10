@@ -94,11 +94,12 @@
 		<member name="visual_root" type="NodePath" setter="set_visual_root" getter="get_visual_root">
 			The child node that receives the smoothed values. Position and rotation are written in global space, and other properties are written as they are. A visual with [member CanvasItem.top_level] set receives every property in global space.
 			The written values replace the visual's own position and rotation, so point this at a plain node and put a model that needs one under it.
+			Only a child of the entity root is supported. A path that resolves to another node, such as a sibling, raises no fault. When the entity holds a [RigidBody3D], that node's own transform is then read as its offset from the entity root, so it is drawn displaced.
 		</member>
 	</members>
 	<constants>
 		<constant name="DISPLAY_ROLE_AUTO" value="0" enum="DisplayRole">
-			Picked from [member NetwSimulation.mode]. The default. Predicted entities use [constant DISPLAY_ROLE_PREDICTED], received ones [constant DISPLAY_ROLE_REMOTE], ones this peer controls without prediction [constant DISPLAY_ROLE_DISABLED], and the server uses [constant DISPLAY_ROLE_AUTHORITY].
+			Picked from [member NetwSimulation.mode]. The default. Predicted entities use [constant DISPLAY_ROLE_PREDICTED] and received ones [constant DISPLAY_ROLE_REMOTE]. Without prediction, the controlling peer uses [constant DISPLAY_ROLE_DISABLED] when it also holds the multiplayer authority. Any other peer that sends the entity's properties, such as the server, uses [constant DISPLAY_ROLE_AUTHORITY] and draws the entity one tick behind.
 		</constant>
 		<constant name="DISPLAY_ROLE_REMOTE" value="1" enum="DisplayRole">
 			Interpolate between received states. Used for other players' entities.

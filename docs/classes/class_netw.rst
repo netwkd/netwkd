@@ -275,7 +275,7 @@ Declares what the other peers do with ``node`` when :ref:`despawn()<class_Netw_m
 
 :ref:`NetwEntity<class_NetwEntity>` **configure_entity**\ (\ node\: :godot:`Node`\ ) |static| :ref:`🔗<class_Netw_method_configure_entity>`
 
-Declares ``node`` as a root before it enters the tree. :ref:`NetwEntity.of()<class_NetwEntity_method_of>` finds an existing :ref:`NetwEntity<class_NetwEntity>`.
+Configures the :ref:`NetwEntity<class_NetwEntity>` that :ref:`NetwEntity.of()<class_NetwEntity_method_of>` answers for ``node`` once it enters the tree. A node that a scene places under another entity is part of that entity and sets its options, unless the node is the root of an instanced scene or the nearest entity above it is a :ref:`configure_scene()<class_Netw_method_configure_scene>` root.
 
 .. rst-class:: classref-item-separator
 
@@ -350,6 +350,12 @@ Declares what the server does with each peer that joins.
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **configure_property**\ (\ node\: :godot:`Node`, property\: :godot:`StringName`, declared_type\: :godot:`int` = -1\ ) |static| :ref:`🔗<class_Netw_method_configure_property>`
 
 For a property supplied by :godot:`Object._get() <Object#class_Object_private_method__get>`, provide its type through :godot:`Object._get_property_list() <Object#class_Object_private_method__get_property_list>` or ``declared_type``.
+
+A name like ``stats:health`` syncs ``health`` of the :godot:`Resource` held in ``stats``, and only that value is sent.
+
+::
+
+    Netw.configure_property(self, &"stats:health").state()
 
 .. rst-class:: classref-item-separator
 

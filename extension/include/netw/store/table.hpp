@@ -67,6 +67,7 @@ public:
     bool ports_resolved = false;
     bool scalar = false;
     uint32_t body_columns = 0;
+    uint32_t indexed_columns = 0;
     uint32_t words = 0;
     uint32_t carried = 0;
     int64_t pulled_tick = -1;

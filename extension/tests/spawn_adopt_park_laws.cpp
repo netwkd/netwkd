@@ -127,6 +127,7 @@ Node *placed_level(LoopbackRig &p_rig, int p_client, bool p_with_crate) {
     props->set_owner(level);
     if (p_with_crate) {
         Node *crate = netw_test::scripted_root(PLACED_ENTITY, "Crate");
+        crate->set_scene_file_path("res://crate.tscn");
         props->add_child(crate);
         crate->set_owner(level);
     }

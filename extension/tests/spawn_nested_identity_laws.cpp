@@ -41,10 +41,12 @@ Node *build_nested_arena(const Variant &) {
     Node2D *arena = memnew(Node2D);
     arena->set_name("Arena");
     Node2D *ball = rooted(arena, BALL, arena);
+    ball->set_scene_file_path("res://ball.tscn");
     netw::script::model::configure_node_property(ball, StringName("position"))
         ->on_spawn();
     NetwEntity::ensure(ball)->set_name(StringName(BALL));
     Node2D *spin = rooted(ball, SPIN, arena);
+    spin->set_scene_file_path("res://spin.tscn");
     NetwEntity::ensure(spin)->set_name(StringName(SPIN));
     return arena;
 }

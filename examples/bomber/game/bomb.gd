@@ -4,12 +4,8 @@ var in_area: Array = []
 var from_player: int = 0
 
 
-func _notification(what: int) -> void:
-	if what != NOTIFICATION_PARENTED:
-		return
-	var entity := Netw.configure_entity(self)
-	if not entity:
-		return
+func _init() -> void:
+	Netw.configure_entity(self)
 	Netw.configure_property(self, &"position").on_spawn()
 	Netw.configure_property(self, &"from_player").on_spawn()
 

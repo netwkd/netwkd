@@ -30,6 +30,8 @@ Description
 
 \ :ref:`volatile()<class_NetwPropertyConfig_method_volatile>`, :ref:`retained()<class_NetwPropertyConfig_method_retained>`, :ref:`epsilon()<class_NetwPropertyConfig_method_epsilon>` and :ref:`persisted()<class_NetwPropertyConfig_method_persisted>` apply to one property. :ref:`on_change()<class_NetwPropertyConfig_method_on_change>`, :ref:`heartbeat()<class_NetwPropertyConfig_method_heartbeat>`, :ref:`windowed()<class_NetwPropertyConfig_method_windowed>`, :ref:`audience()<class_NetwPropertyConfig_method_audience>` and :ref:`masked()<class_NetwPropertyConfig_method_masked>` apply to every property of the same kind on the script. Give them consistent values.
 
+\ :ref:`NetwMemberConfig.interpolate()<class_NetwMemberConfig_method_interpolate>` smooths received values. It returns a :ref:`NetwMemberConfig<class_NetwMemberConfig>`, so chain it after the methods of this class.
+
 \ **Rigid bodies**\ 
 
 When the :ref:`NetwEntity<class_NetwEntity>` root is a :godot:`RigidBody3D` or a :godot:`RigidBody2D`, ``position``, ``quaternion`` (``rotation`` in 2D), ``linear_velocity``, ``angular_velocity`` and ``sleeping`` read and write the body's physics state. ``position`` stays relative to the parent. While :godot:`RigidBody3D.freeze <RigidBody3D#class_RigidBody3D_property_freeze>` is on, position and rotation use the node transform.

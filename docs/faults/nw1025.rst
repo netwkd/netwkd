@@ -1,0 +1,35 @@
+:github_url: hide
+
+.. _fault_nw1025:
+
+NW1025. A synced resource property has no resource
+==================================================
+
+Reported as an error when a property declared with
+:ref:`Netw.configure_property <class_Netw_method_configure_property>` names a
+value inside a resource, and the property that holds the resource is null.
+It is checked when the node enters the tree, unless the declaration passed a
+``declared_type``, and again each time the value is read or written.
+
+The value is not read and not written while the resource is missing. It is
+reported once for each node and property.
+
+``stats`` is exported and left empty in the inspector.
+
+.. code-block:: gdscript
+
+    @export var stats: Stats
+
+    func _init() -> void:
+        Netw.configure_property(self, &"stats:health").state()
+
+Assign the resource before the node enters the tree, and keep one there.
+
+.. code-block:: gdscript
+
+    @export var stats: Stats = preload("res://hero_stats.tres")
+
+    func _init() -> void:
+        Netw.configure_property(self, &"stats:health").state()
+
+A resource that is swapped for another is read on the next tick.

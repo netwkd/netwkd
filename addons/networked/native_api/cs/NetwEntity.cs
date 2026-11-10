@@ -29,7 +29,9 @@ namespace Networked;
 /// </code>
 /// </para>
 /// <para>
-/// <b>Declaring an entity</b> A root declares itself in <c>_init</c>. A child
+/// <b>Declaring an entity</b> A root declares itself in <c>_init</c>.
+/// <see cref="Netw.Spawn"/> makes the root it returns an entity whether or not
+/// it declares one, so a spawned root declares only to set options. A child
 /// marks its own spawn properties in its <c>_init</c> and connects to the
 /// entity in <c>Node._ready</c>, once it has a parent to walk up to.
 /// <code>

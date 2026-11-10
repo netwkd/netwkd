@@ -12,6 +12,7 @@
 		    Netw.configure_property(self, &amp;"aim_dir").broadcast()
 		[/codeblock]
 		[method volatile], [method retained], [method epsilon] and [method persisted] apply to one property. [method on_change], [method heartbeat], [method windowed], [method audience] and [method masked] apply to every property of the same kind on the script. Give them consistent values.
+		[method NetwMemberConfig.interpolate] smooths received values. It returns a [NetwMemberConfig], so chain it after the methods of this class.
 		[b]Rigid bodies[/b]
 		When the [NetwEntity] root is a [RigidBody3D] or a [RigidBody2D], [code]position[/code], [code]quaternion[/code] ([code]rotation[/code] in 2D), [code]linear_velocity[/code], [code]angular_velocity[/code] and [code]sleeping[/code] read and write the body's physics state. [code]position[/code] stays relative to the parent. While [member RigidBody3D.freeze] is on, position and rotation use the node transform.
 		[codeblock]

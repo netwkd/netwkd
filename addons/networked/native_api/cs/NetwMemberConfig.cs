@@ -617,13 +617,15 @@ public class NetwMemberConfig : NetwRefCounted
     /// Netw.configure_rpc(self.fire).quantize(dir_q, null, power_q)
     /// </code>
     /// </summary>
-    public NetwMemberConfig Quantize(params Variant[] rest)
+    public NetwMemberConfig Quantize(params NetwQuantize[] rest)
     {
         int total = 0 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
         for (int index = 0; index < total; index++)
         {
-            godot_variant carried = rest[index - 0].CopyNativeVariant();
+            godot_variant carried =
+                VariantUtils.CreateFromGodotObjectPtr(
+                    rest[index - 0]?.Native ?? IntPtr.Zero);
             NetwThunks.ArgsSet(pack, index, in carried);
             carried.Dispose();
         }
@@ -649,13 +651,15 @@ public class NetwMemberConfig : NetwRefCounted
     /// Netw.configure_signal(self.aimed).interpolate(null, dir_slerp)
     /// </code>
     /// </summary>
-    public NetwMemberConfig Interpolate(params Variant[] rest)
+    public NetwMemberConfig Interpolate(params NetwInterpolate[] rest)
     {
         int total = 0 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
         for (int index = 0; index < total; index++)
         {
-            godot_variant carried = rest[index - 0].CopyNativeVariant();
+            godot_variant carried =
+                VariantUtils.CreateFromGodotObjectPtr(
+                    rest[index - 0]?.Native ?? IntPtr.Zero);
             NetwThunks.ArgsSet(pack, index, in carried);
             carried.Dispose();
         }

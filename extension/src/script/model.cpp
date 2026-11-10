@@ -543,6 +543,11 @@ int64_t get_node_property_type(Node *p_node, const StringName &p_property) {
     if (declared >= 0) {
         return declared;
     }
+    if (gd::indexed_path(p_property) != nullptr) {
+        const gd::PropertyResolution leaf
+            = gd::resolve_property(p_node, p_property, Array());
+        return leaf.type >= 0 ? leaf.type : int64_t(Variant::NIL);
+    }
     script::Cache *cache = cache_for(script_of(p_node));
     if (cache != nullptr) {
         return int64_t(cache->prop_type(p_node, p_property));

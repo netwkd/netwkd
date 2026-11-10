@@ -626,6 +626,7 @@ Node *Pipeline::spawn_finish(
     bool admitted = false;
     {
         NETW_ZONE_NC("Spawn admit", colors::LIVENESS);
+        NetwEntity::settle_parts(node, true);
         write_owner(node, p_call.owner);
         admitted = spawn_admitted(node, p_call.verb);
     }
@@ -989,6 +990,7 @@ Node *Pipeline::spawn_registered(
         );
         return nullptr;
     }
+    NetwEntity::settle_parts(node, true);
     write_owner(node, p_owner);
     if (!spawn_admitted(node, "spawn_registered")) {
         memdelete(node);
@@ -1045,6 +1047,7 @@ Ref<NetwEntity> Pipeline::arm_consumed_spawn(
     int p_scene_index,
     const Variant &p_data
 ) {
+    NetwEntity::settle_parts(p_node, true);
     Record record;
     record.set_recipe(Book::RECIPE_SPAWNER);
     record.bind_spawner(Object::cast_to<MultiplayerSpawner>(p_spawner));
@@ -2647,6 +2650,9 @@ SpawnBuild::Outcome Pipeline::build_spawn(
         return SpawnBuild::DROPPED;
     }
 
+    if (!adopted) {
+        NetwEntity::settle_parts(node, true);
+    }
     const Ref<NetwEntity> entity = Record::stamp_header(node, header, shell);
     if (action_spawn_tick >= 0) {
         ensure_action_gate_connection();

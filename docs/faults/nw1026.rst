@@ -1,0 +1,35 @@
+:github_url: hide
+
+.. _fault_nw1026:
+
+NW1026. Two entities sync one shared resource
+=============================================
+
+Reported as an error when two entities sync the same value inside the same
+:ref:`Resource <class_Resource>` with
+:ref:`Netw.configure_property <class_Netw_method_configure_property>`. It is
+checked when the second entity's node enters the tree.
+
+Both entities keep syncing, and each overwrites the other's value. Nodes of
+one entity may share a resource.
+
+``hero.tscn`` assigns ``hero_stats.tres`` to ``stats``, and the level places
+two heroes.
+
+.. code-block:: gdscript
+
+    @export var stats: Stats
+
+    func _init() -> void:
+        Netw.configure_property(self, &"stats:health").state()
+
+Turn on
+:ref:`Resource.resource_local_to_scene <class_Resource_property_resource_local_to_scene>`
+for ``hero_stats.tres``, so each instance of ``hero.tscn`` gets its own copy.
+
+.. code-block:: text
+
+    [resource]
+    resource_local_to_scene = true
+    script = ExtResource("1_stats")
+    health = 100

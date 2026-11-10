@@ -71,11 +71,14 @@ public sealed class NetwDisplay : NetwRefCounted
         /// <summary>
         /// Picked from <see cref="NetwSimulation.Mode"/>. The default.
         /// Predicted entities use
-        /// <see cref="NetwDisplay.DisplayRoleEnum.Predicted"/>, received ones
-        /// <see cref="NetwDisplay.DisplayRoleEnum.Remote"/>, ones this peer
-        /// controls without prediction
-        /// <see cref="NetwDisplay.DisplayRoleEnum.Disabled"/>, and the server
-        /// uses <see cref="NetwDisplay.DisplayRoleEnum.Authority"/>.
+        /// <see cref="NetwDisplay.DisplayRoleEnum.Predicted"/> and received
+        /// ones <see cref="NetwDisplay.DisplayRoleEnum.Remote"/>. Without
+        /// prediction, the controlling peer uses
+        /// <see cref="NetwDisplay.DisplayRoleEnum.Disabled"/> when it also
+        /// holds the multiplayer authority. Any other peer that sends the
+        /// entity's properties, such as the server, uses
+        /// <see cref="NetwDisplay.DisplayRoleEnum.Authority"/> and draws the
+        /// entity one tick behind.
         /// </summary>
         Auto = 0,
         /// <summary>
@@ -170,7 +173,11 @@ public sealed class NetwDisplay : NetwRefCounted
     /// are. A visual with <see cref="CanvasItem.TopLevel"/> set receives every
     /// property in global space. The written values replace the visual's own
     /// position and rotation, so point this at a plain node and put a model
-    /// that needs one under it.
+    /// that needs one under it. Only a child of the entity root is supported. A
+    /// path that resolves to another node, such as a sibling, raises no fault.
+    /// When the entity holds a <see cref="RigidBody3D"/>, that node's own
+    /// transform is then read as its offset from the entity root, so it is
+    /// drawn displaced.
     /// </summary>
     public NodePath VisualRoot
     {

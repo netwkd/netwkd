@@ -2,6 +2,7 @@
 #include "godot/object.hpp"
 #include "godot/script.hpp"
 #include "netw/colors.hpp"
+#include "netw/object_port.hpp"
 #include "netw/profile.hpp"
 #include "netw/store/world.hpp"
 #include "netw/wire/value_row.hpp"
@@ -30,6 +31,16 @@ uint32_t row_named(const Table &p_table, uint32_t p_order, int64_t p_route) {
     return Table::NO_SLOT;
 }
 
+bool resources_held(const Table &p_table, Object *p_node) {
+    for (uint32_t at = 0; at < p_table.columns.size(); ++at) {
+        if (p_table.columns[at].port == Port::INDEXED
+            && !named_held(p_node, p_table.schema.at(int(at))->key)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 const NodeCell &World::resident(Table &p_table, uint32_t p_row) {
@@ -41,16 +52,15 @@ const NodeCell &World::resident(Table &p_table, uint32_t p_row) {
 }
 
 bool World::readable(Table &p_table, uint32_t p_row, Object *p_node) {
-    if ((p_table.flags[p_row] & Table::READABLE) != 0) {
-        return true;
-    }
-    for (int at = 0; at < p_table.schema.column_count(); ++at) {
-        if (!gd::has_property(p_node, p_table.schema.at(at)->key)) {
-            return false;
+    if ((p_table.flags[p_row] & Table::READABLE) == 0) {
+        for (int at = 0; at < p_table.schema.column_count(); ++at) {
+            if (!gd::has_property(p_node, p_table.schema.at(at)->key)) {
+                return false;
+            }
         }
+        p_table.flags[p_row] |= Table::READABLE;
     }
-    p_table.flags[p_row] |= Table::READABLE;
-    return true;
+    return p_table.indexed_columns == 0 || resources_held(p_table, p_node);
 }
 
 bool World::read_row(

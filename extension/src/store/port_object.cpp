@@ -1,11 +1,13 @@
 #include "netw/store/port.hpp"
 
+#include "netw/object_port.hpp"
+
 using namespace godot;
 
 namespace netw::store {
 
 Variant object_value(Object *p_node, const StringName &p_name) {
-    return p_node != nullptr ? p_node->get(p_name) : Variant();
+    return named_get(p_node, p_name);
 }
 
 int push_rank(const Column &p_column) {
