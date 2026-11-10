@@ -82,10 +82,6 @@ TEST_CASE(
     const int route = a_body_the_client_holds(rig, arena);
 
     NetwMultiplayer *held = rig.client(0);
-    CallLog log;
-    held->observe(NetwMultiplayer::ENTITY_HIDDEN, log.callable("hidden"));
-    held->observe(NetwMultiplayer::ENTITY_DEAD, log.callable("dead"));
-
     const RID entity = held->entity_from_route(route);
     REQUIRE(entity.is_valid());
     CHECK(held->liveness_hide(route));
@@ -94,9 +90,6 @@ TEST_CASE(
         int64_t(held->liveness_route_state(route)),
         int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
     );
-    NETW_CHECK_EQ(log.count("hidden"), 1);
-    NETW_CHECK_EQ(log.count("dead"), 0);
-    NETW_CHECK_EQ(int64_t(log.args("hidden")[0]), int64_t(route));
 
     SUBCASE("the route still names the entity it named while it was here") {
         CHECK(held->entity_from_route(route) == entity);
@@ -116,7 +109,7 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Liveness] HV2 a hide that names no held route is "
-    "refused and tells nobody"
+    "refused and leaves the held route as it was"
 ) {
     LoopbackRig rig(1);
     rig.mount();
@@ -124,18 +117,22 @@ TEST_CASE(
     const int route = a_body_the_client_holds(rig, arena);
 
     NetwMultiplayer *held = rig.client(0);
-    CallLog log;
-    held->observe(NetwMultiplayer::ENTITY_HIDDEN, log.callable("hidden"));
 
     SUBCASE("a route this peer never heard of") {
         CHECK_FALSE(held->liveness_hide(route + 1000));
-        NETW_CHECK_EQ(log.count("hidden"), 0);
+        NETW_CHECK_EQ(
+            int64_t(held->liveness_route_state(route)),
+            int64_t(NetwMultiplayer::ENTITY_STATE_LIVE)
+        );
     }
 
     SUBCASE("a route already absent") {
         CHECK(held->liveness_hide(route));
         CHECK_FALSE(held->liveness_hide(route));
-        NETW_CHECK_EQ(log.count("hidden"), 1);
+        NETW_CHECK_EQ(
+            int64_t(held->liveness_route_state(route)),
+            int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
+        );
     }
 }
 

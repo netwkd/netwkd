@@ -24,7 +24,6 @@
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
 #include "netw/api/sync_pipeline.hpp"
-#include "netw/carrier_frame.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/log.hpp"
@@ -69,20 +68,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::interest_player_sees
     );
     ClassDB::bind_method(
-        D_METHOD("sync_apply_rows_default", "table", "routes", "columns"),
-        &NetwMultiplayer::sync_apply_rows_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("sync_gather_rows_default", "table", "routes"),
-        &NetwMultiplayer::sync_gather_rows_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("store_describe"),
-        &NetwMultiplayer::store_describe
-    );
-    GDVIRTUAL_BIND(_sync_gather_rows, "table", "routes");
-    GDVIRTUAL_BIND(_sync_apply_rows, "table", "routes", "columns");
-    ClassDB::bind_method(
         D_METHOD("interest_resolved_layer_ids", "entity"),
         &NetwMultiplayer::interest_resolved_layer_ids
     );
@@ -100,28 +85,12 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::interest_wire_admits
     );
     ClassDB::bind_method(
-        D_METHOD("interest_entity_has_filter", "entity"),
-        &NetwMultiplayer::interest_entity_has_filter
-    );
-    ClassDB::bind_method(
         D_METHOD("rpc_get_recipients", "entity"),
         &NetwMultiplayer::rpc_get_recipients
     );
     ClassDB::bind_method(
-        D_METHOD("clock_set_mismatch_action", "action"),
-        &NetwMultiplayer::clock_set_mismatch_action
-    );
-    ClassDB::bind_method(
         D_METHOD("clock_auto_configure_offset"),
         &NetwMultiplayer::clock_auto_configure_offset
-    );
-    ClassDB::bind_method(
-        D_METHOD("clock_request_handshake"),
-        &NetwMultiplayer::clock_request_handshake
-    );
-    ClassDB::bind_method(
-        D_METHOD("clock_send_ping"),
-        &NetwMultiplayer::clock_send_ping
     );
     ClassDB::bind_method(
         D_METHOD("rpc_get_relay_sender"),
@@ -158,10 +127,6 @@ void NetwMultiplayer::_bind_methods() {
         DEFVAL(0.0)
     );
     ClassDB::bind_method(
-        D_METHOD("rpc_send_reply", "peer", "route", "txn", "value"),
-        &NetwMultiplayer::rpc_send_reply
-    );
-    ClassDB::bind_method(
         D_METHOD("lagcomp_metrics"),
         &NetwMultiplayer::lagcomp_metrics
     );
@@ -172,18 +137,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("stats_get", "stat"),
         &NetwMultiplayer::stats_get
-    );
-    ClassDB::bind_method(
-        D_METHOD("attribution_set_armed", "armed"),
-        &NetwMultiplayer::attribution_set_armed
-    );
-    ClassDB::bind_method(
-        D_METHOD("attribution_is_armed"),
-        &NetwMultiplayer::attribution_is_armed
-    );
-    ClassDB::bind_method(
-        D_METHOD("attribution_snapshot"),
-        &NetwMultiplayer::attribution_snapshot
     );
     ClassDB::bind_method(
         D_METHOD("scene_observe", "scene", "event", "callback"),
@@ -221,7 +174,6 @@ void NetwMultiplayer::_bind_methods() {
         D_METHOD("get_is_online"),
         &NetwMultiplayer::is_online
     );
-    ClassDB::bind_method(D_METHOD("get_is_host"), &NetwMultiplayer::is_host);
     ClassDB::bind_method(
         D_METHOD("get_is_local_client"),
         &NetwMultiplayer::is_local_client
@@ -415,18 +367,6 @@ void NetwMultiplayer::_bind_methods() {
         DEFVAL(false)
     );
     ClassDB::bind_method(
-        D_METHOD("sync_note_sent_default", "peer", "sequence"),
-        &NetwMultiplayer::sync_note_sent_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("sync_note_ack_default", "peer", "sequence"),
-        &NetwMultiplayer::sync_note_ack_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("persist_tick_default", "delta"),
-        &NetwMultiplayer::persist_tick_default
-    );
-    ClassDB::bind_method(
         D_METHOD("database_find", "name"),
         &NetwMultiplayer::database_find
     );
@@ -518,10 +458,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::table_load
     );
     ClassDB::bind_method(
-        D_METHOD("sync_explain", "route", "comp", "peer"),
-        &NetwMultiplayer::sync_explain
-    );
-    ClassDB::bind_method(
         D_METHOD("peer_link_stats", "peer"),
         &NetwMultiplayer::peer_link_stats
     );
@@ -532,10 +468,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("peer_ack", "peer"),
         &NetwMultiplayer::peer_ack
-    );
-    ClassDB::bind_method(
-        D_METHOD("stats_get_verdict_count", "verdict"),
-        &NetwMultiplayer::stats_get_verdict_count
     );
     ClassDB::bind_method(
         D_METHOD("session_defer", "fn", "key"),
@@ -584,11 +516,6 @@ void NetwMultiplayer::_bind_methods() {
         D_METHOD("schema_get_name", "schema"),
         &NetwMultiplayer::schema_get_name
     );
-    ClassDB::bind_static_method(
-        "NetwMultiplayer",
-        D_METHOD("schema_get_element_type", "type"),
-        &NetwMultiplayer::schema_get_element_type
-    );
     ClassDB::bind_method(
         D_METHOD("schema_get_hash", "schema"),
         &NetwMultiplayer::schema_get_hash
@@ -631,35 +558,12 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::lagcomp_effect_pending
     );
     ClassDB::bind_method(
-        D_METHOD(
-            "event_watch",
-            "events",
-            "target",
-            "predicate",
-            "sink",
-            "opts"
-        ),
-        &NetwMultiplayer::event_watch,
-        DEFVAL(Dictionary()),
-        DEFVAL(Dictionary()),
-        DEFVAL(Callable()),
-        DEFVAL(Dictionary())
-    );
-    ClassDB::bind_method(
-        D_METHOD("event_unwatch", "id"),
-        &NetwMultiplayer::event_unwatch
-    );
-    ClassDB::bind_method(
-        D_METHOD("event_watches"),
-        &NetwMultiplayer::event_watches
-    );
-    ClassDB::bind_method(
-        D_METHOD("event_ring", "route"),
-        &NetwMultiplayer::event_ring
-    );
-    ClassDB::bind_method(
-        D_METHOD("event_arm", "enabled"),
+        D_METHOD("event_arm", "groups"),
         &NetwMultiplayer::event_arm
+    );
+    ClassDB::bind_method(
+        D_METHOD("event_drain"),
+        &NetwMultiplayer::event_drain
     );
     for (int index = 0; index < EventPlane::taxonomy_size(); index++) {
         const int64_t value = EventPlane::value_at(index);
@@ -670,35 +574,19 @@ void NetwMultiplayer::_bind_methods() {
             value
         );
     }
-    ClassDB::bind_integer_constant(
-        get_class_static(),
-        StringName("Phase"),
-        StringName("EVENT_PHASE_BEFORE"),
-        EventPlane::BEFORE
-    );
-    ClassDB::bind_integer_constant(
-        get_class_static(),
-        StringName("Phase"),
-        StringName("EVENT_PHASE_AFTER"),
-        EventPlane::AFTER
-    );
+    BIND_BITFIELD_FLAG(EVENT_GROUP_LIFECYCLE);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_INTEREST);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_PREDICTION);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_GATE);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_STAGE);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_VERDICT);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_SESSION);
+    BIND_BITFIELD_FLAG(EVENT_GROUP_CARRIER);
     ClassDB::bind_integer_constant(
         get_class_static(),
         StringName(),
-        StringName("CARRIER_MAGIC_RELIABLE"),
-        NetwCarrierFrame::MAGIC_RELIABLE
-    );
-    ClassDB::bind_integer_constant(
-        get_class_static(),
-        StringName(),
-        StringName("CARRIER_MAGIC_UNRELIABLE"),
-        NetwCarrierFrame::MAGIC_UNRELIABLE
-    );
-    ClassDB::bind_integer_constant(
-        get_class_static(),
-        StringName(),
-        StringName("CARRIER_MAGIC_UNRELIABLE_ACKED"),
-        NetwCarrierFrame::MAGIC_UNRELIABLE_ACKED
+        StringName("EVENT_ROW_WIDTH"),
+        EVENT_ROW_WIDTH
     );
     ClassDB::bind_method(
         D_METHOD("table_create", "schema"),
@@ -764,7 +652,6 @@ void NetwMultiplayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "state"), "", "session_get_state");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "role"), "", "session_get_role");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_online"), "", "get_is_online");
-    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_host"), "", "get_is_host");
     ADD_PROPERTY(
         PropertyInfo(Variant::BOOL, "is_local_client"),
         "",
@@ -783,10 +670,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("service_get", "type"),
         &NetwMultiplayer::service_held
-    );
-    ClassDB::bind_method(
-        D_METHOD("service_get_named", "class_name"),
-        &NetwMultiplayer::service_held_named
     );
     ClassDB::bind_method(
         D_METHOD("service_get_all", "base"),
@@ -880,8 +763,6 @@ void NetwMultiplayer::_bind_methods() {
         D_METHOD("player_get_entities", "peer"),
         &NetwMultiplayer::player_get_entities
     );
-    BIND_ENUM_CONSTANT(SCENE_MOVE_REFUSED);
-    BIND_ENUM_CONSTANT(SCENE_MOVE_ALREADY_THERE);
     BIND_ENUM_CONSTANT(RECORD_KIND_STATE);
     BIND_ENUM_CONSTANT(RECORD_KIND_INPUT);
     BIND_ENUM_CONSTANT(RECORD_KIND_BROADCAST);
@@ -930,7 +811,6 @@ void NetwMultiplayer::_bind_methods() {
     BIND_ENUM_CONSTANT(CLOCK_PARAM_JITTER_WINDOW);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_JITTER_STABILITY_THRESHOLD);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_USE_PHYSICS_INTERPOLATION);
-    BIND_ENUM_CONSTANT(CLOCK_PARAM_ENABLE_DRIFT_LOGGING);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_MANUAL_TICK);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_TICK_FACTOR_OVERRIDE);
     BIND_ENUM_CONSTANT(DISPLAY_PARAM_ROLE);
@@ -989,73 +869,12 @@ void NetwMultiplayer::_bind_methods() {
 #define NETW_SESSION_STAT_BIND(m_name, m_key) BIND_ENUM_CONSTANT(STAT_##m_name);
     NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_BIND)
 #undef NETW_SESSION_STAT_BIND
-    BIND_ENUM_CONSTANT(ENDPOINT_ADDED);
-    BIND_ENUM_CONSTANT(ENDPOINT_REMOVED);
-    BIND_ENUM_CONSTANT(ENDPOINT_UPDATED);
-    BIND_ENUM_CONSTANT(CLOCK_BEFORE_TICK);
-    BIND_ENUM_CONSTANT(CLOCK_ON_TICK);
-    BIND_ENUM_CONSTANT(CLOCK_AFTER_TICK);
-    BIND_ENUM_CONSTANT(PREDICT_OWNER_DIVERGENCE);
-    BIND_ENUM_CONSTANT(LAGCOMP_ACTION_GATE_FALLBACK);
-    BIND_ENUM_CONSTANT(SCENE_SPAWNED);
-    BIND_ENUM_CONSTANT(SCENE_DESPAWNED);
-    BIND_ENUM_CONSTANT(SCENE_ENTITY_MOVED);
-    BIND_ENUM_CONSTANT(SCENE_STARTUP_SPAWNED);
-    BIND_ENUM_CONSTANT(CLOCK_BEFORE_TICK_LOOP);
-    BIND_ENUM_CONSTANT(CLOCK_AFTER_TICK_LOOP);
-    BIND_ENUM_CONSTANT(CLOCK_SYNCHRONIZED);
-    BIND_ENUM_CONSTANT(CLOCK_CONFIGURED);
-    BIND_ENUM_CONSTANT(CLOCK_TICKRATE_MISMATCH);
-    BIND_ENUM_CONSTANT(CLOCK_PONG_RECEIVED);
-    BIND_ENUM_CONSTANT(CLOCK_STABILITY_CHANGED);
-    BIND_ENUM_CONSTANT(SESSION_STATE_CHANGED);
-    BIND_ENUM_CONSTANT(SESSION_JOIN_SUBMITTED);
-    BIND_ENUM_CONSTANT(SESSION_ENTERED);
-    BIND_ENUM_CONSTANT(SESSION_JOIN_FAILED);
-    BIND_ENUM_CONSTANT(SESSION_ENDED);
-    BIND_ENUM_CONSTANT(SESSION_RECLAIMED);
-    BIND_ENUM_CONSTANT(PEER_AUTHENTICATING);
-    BIND_ENUM_CONSTANT(PEER_AUTHENTICATION_FAILED);
-    BIND_ENUM_CONSTANT(SESSION_POLL_STARTED);
-    BIND_ENUM_CONSTANT(TABLE_RECEIVED);
-    BIND_ENUM_CONSTANT(DATABASE_FAILED);
-    BIND_ENUM_CONSTANT(PERSIST_LOADED);
-    BIND_ENUM_CONSTANT(PERSIST_SAVED);
-    BIND_ENUM_CONSTANT(PEER_PACKET);
-    BIND_ENUM_CONSTANT(PEER_KICKED);
-    BIND_ENUM_CONSTANT(SESSION_SERVER_DISCONNECTING);
-    BIND_ENUM_CONSTANT(PEER_KICK_REQUESTED);
-    BIND_ENUM_CONSTANT(SESSION_DISCONNECT_REQUESTED);
-    BIND_ENUM_CONSTANT(SESSION_TREE_PAUSED);
-    BIND_ENUM_CONSTANT(SESSION_TREE_UNPAUSED);
-    BIND_ENUM_CONSTANT(SERVICE_REGISTERED);
-    BIND_ENUM_CONSTANT(SERVICE_UNREGISTERED);
-    BIND_ENUM_CONSTANT(ENTITY_LIVE);
-    BIND_ENUM_CONSTANT(ENTITY_LINGERING);
-    BIND_ENUM_CONSTANT(ENTITY_DEAD);
-    BIND_ENUM_CONSTANT(ENTITY_HIDDEN);
-    BIND_ENUM_CONSTANT(PLAYER_JOINED);
-    BIND_ENUM_CONSTANT(PLAYER_LOCAL_JOINED);
-    BIND_ENUM_CONSTANT(PLAYER_LEFT);
-    BIND_ENUM_CONSTANT(SCENE_LIVE);
-    BIND_ENUM_CONSTANT(CONNECTION_PROGRESSED);
-    BIND_ENUM_CONSTANT(CONNECTION_FAILED);
-    BIND_ENUM_CONSTANT(CONNECTION_JOIN_ADDRESS_CHANGED);
-    BIND_ENUM_CONSTANT(CONNECTION_INVITED);
-    ClassDB::bind_method(
-        D_METHOD("observe", "event", "callback"),
-        &NetwMultiplayer::observe
-    );
-    ClassDB::bind_method(
-        D_METHOD("unobserve", "event", "callback"),
-        &NetwMultiplayer::unobserve
-    );
     ADD_SIGNAL(
-        MethodInfo("peer_authenticating", PropertyInfo(Variant::INT, "peer_id"))
+        MethodInfo("peer_authenticating", PropertyInfo(Variant::INT, "id"))
     );
     ADD_SIGNAL(MethodInfo(
         "peer_authentication_failed",
-        PropertyInfo(Variant::INT, "peer_id")
+        PropertyInfo(Variant::INT, "id")
     ));
     ADD_SIGNAL(MethodInfo(
         "peer_packet",
@@ -1092,33 +911,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::liveness_route_state
     );
     ClassDB::bind_method(
-        D_METHOD(
-            "sync_admit_frame_default",
-            "sender",
-            "route",
-            "comp",
-            "channel",
-            "flags",
-            "tick",
-            "payload"
-        ),
-        &NetwMultiplayer::sync_admit_frame_default
-    );
-    ClassDB::bind_method(
-        D_METHOD(
-            "predict_admit_frame_default",
-            "sender",
-            "route",
-            "channel",
-            "payload"
-        ),
-        &NetwMultiplayer::predict_admit_frame_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("entity_describe", "route"),
-        &NetwMultiplayer::entity_describe
-    );
-    ClassDB::bind_method(
         D_METHOD("entity_of", "node"),
         &NetwMultiplayer::entity_of
     );
@@ -1137,21 +929,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("scene_is_declared", "entity"),
         &NetwMultiplayer::scene_is_declared
-    );
-    ClassDB::bind_method(
-        D_METHOD(
-            "display_write_rows_default",
-            "table",
-            "column",
-            "routes",
-            "values"
-        ),
-        &NetwMultiplayer::display_write_rows_default
-    );
-    GDVIRTUAL_BIND(_display_write_rows, "table", "column", "routes", "values");
-    ClassDB::bind_method(
-        D_METHOD("liveness_node_of", "route"),
-        &NetwMultiplayer::liveness_node_of
     );
     ClassDB::bind_method(
         D_METHOD("liveness_get_entities"),
@@ -1212,107 +989,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::interest_layer_set_driver_callback
     );
     ClassDB::bind_method(
-        D_METHOD("predict_consume", "depth", "buffer"),
-        &NetwMultiplayer::predict_consume
-    );
-    ClassDB::bind_method(
-        D_METHOD(
-            "predict_drive_default",
-            "latest_input_tick",
-            "last_driven_input_tick",
-            "frame_tick"
-        ),
-        &NetwMultiplayer::predict_drive_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("predict_consume_default", "depth", "buffer"),
-        &NetwMultiplayer::predict_consume_default
-    );
-    ClassDB::bind_method(
-        D_METHOD(
-            "predict_evaluate_default",
-            "domain",
-            "verdict",
-            "predicted",
-            "payload",
-            "wiring",
-            "field_sink"
-        ),
-        &NetwMultiplayer::predict_evaluate_default
-    );
-    ClassDB::bind_method(
-        D_METHOD(
-            "predict_recover_default",
-            "payload",
-            "predicted",
-            "policy",
-            "restore",
-            "projection",
-            "current",
-            "pose_errors",
-            "wiring",
-            "verdict",
-            "tick_delta"
-        ),
-        &NetwMultiplayer::predict_recover_default
-    );
-    GDVIRTUAL_BIND(
-        _predict_drive,
-        "latest_input_tick",
-        "last_driven_input_tick",
-        "frame_tick"
-    );
-    GDVIRTUAL_BIND(_predict_consume, "depth", "buffer");
-    GDVIRTUAL_BIND(
-        _predict_evaluate,
-        "domain",
-        "verdict",
-        "predicted",
-        "payload",
-        "wiring",
-        "field_sink"
-    );
-    GDVIRTUAL_BIND(
-        _predict_recover,
-        "payload",
-        "predicted",
-        "policy",
-        "restore",
-        "projection",
-        "current",
-        "pose_errors",
-        "wiring",
-        "verdict",
-        "tick_delta"
-    );
-    GDVIRTUAL_BIND(_sync_encode, "peer", "tick");
-    GDVIRTUAL_BIND(_sync_decode, "entity", "comp", "flags", "tick", "payload");
-    GDVIRTUAL_BIND(_spawn_admit_frame, "sender", "route", "channel", "payload");
-    GDVIRTUAL_BIND(_table_admit_frame, "sender", "channel", "payload");
-    GDVIRTUAL_BIND(_persist_tick, "delta");
-    GDVIRTUAL_BIND(_sync_note_ack, "peer", "sequence");
-    GDVIRTUAL_BIND(_sync_note_sent, "peer", "sequence");
-    GDVIRTUAL_BIND(_spawn_declare, "entity", "recipe");
-    GDVIRTUAL_BIND(_spawn_undeclare, "entity");
-    GDVIRTUAL_BIND(_spawn_construct, "entity");
-    GDVIRTUAL_BIND(
-        _sync_admit_frame,
-        "sender",
-        "route",
-        "comp",
-        "channel",
-        "flags",
-        "tick",
-        "payload"
-    );
-    GDVIRTUAL_BIND(
-        _predict_admit_frame,
-        "sender",
-        "route",
-        "channel",
-        "payload"
-    );
-    ClassDB::bind_method(
         D_METHOD("interest_flush_now"),
         &NetwMultiplayer::interest_flush_now
     );
@@ -1323,10 +999,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("interest_leave", "entity", "layer_id"),
         &NetwMultiplayer::interest_leave
-    );
-    ClassDB::bind_method(
-        D_METHOD("interest_layer_ids", "entity"),
-        &NetwMultiplayer::interest_layer_ids
     );
     ClassDB::bind_method(
         D_METHOD("interest_on_enter", "entity", "layer_id", "callback"),
@@ -1372,10 +1044,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::interest_get_row
     );
     ClassDB::bind_method(
-        D_METHOD("interest_explain", "entity", "peer"),
-        &NetwMultiplayer::interest_explain
-    );
-    ClassDB::bind_method(
         D_METHOD("interest_get_membership", "entity"),
         &NetwMultiplayer::interest_get_membership
     );
@@ -1414,7 +1082,12 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::set_auth_timeout
     );
     ADD_PROPERTY(
-        PropertyInfo(Variant::FLOAT, "auth_timeout"),
+        PropertyInfo(
+            Variant::FLOAT,
+            "auth_timeout",
+            PROPERTY_HINT_RANGE,
+            "0,30,0.1,or_greater,suffix:s"
+        ),
         "set_auth_timeout",
         "get_auth_timeout"
     );
@@ -1533,10 +1206,6 @@ void NetwMultiplayer::_bind_methods() {
         DEFVAL(0)
     );
     ClassDB::bind_method(
-        D_METHOD("clear_roster"),
-        &NetwMultiplayer::clear_roster
-    );
-    ClassDB::bind_method(
         D_METHOD("predict_declare", "entity"),
         &NetwMultiplayer::predict_declare
     );
@@ -1649,14 +1318,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::clock_get_tick
     );
     ClassDB::bind_method(
-        D_METHOD("clock_get_display_tick"),
-        &NetwMultiplayer::clock_get_display_tick
-    );
-    ClassDB::bind_method(
-        D_METHOD("clock_get_physics_steps_per_tick"),
-        &NetwMultiplayer::clock_get_physics_steps_per_tick
-    );
-    ClassDB::bind_method(
         D_METHOD("clock_get_simulation_behind_count"),
         &NetwMultiplayer::clock_get_simulation_behind_count
     );
@@ -1671,10 +1332,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("clock_is_simulating"),
         &NetwMultiplayer::clock_is_simulating
-    );
-    ClassDB::bind_method(
-        D_METHOD("clock_is_stable"),
-        &NetwMultiplayer::clock_is_stable
     );
     ClassDB::bind_method(
         D_METHOD("clock_is_gated"),
@@ -1907,10 +1564,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::get_authenticating_peers
     );
     ClassDB::bind_method(
-        D_METHOD("auth_set_app_tag", "tag"),
-        &NetwMultiplayer::auth_set_app_tag
-    );
-    ClassDB::bind_method(
         D_METHOD("set_auth_callback", "callback"),
         &NetwMultiplayer::set_auth_callback
     );
@@ -1924,10 +1577,6 @@ void NetwMultiplayer::_bind_methods() {
         "get_auth_callback"
     );
     ClassDB::bind_method(
-        D_METHOD("session_answer_probe", "peer"),
-        &NetwMultiplayer::session_answer_probe
-    );
-    ClassDB::bind_method(
         D_METHOD("disconnect_peer", "id"),
         &NetwMultiplayer::disconnect_peer
     );
@@ -1938,11 +1587,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("peer_has_bucket", "peer", "bucket_type"),
         &NetwMultiplayer::peer_has_bucket
-    );
-    ClassDB::bind_static_method(
-        "NetwMultiplayer",
-        D_METHOD("session_role_name", "role"),
-        &NetwMultiplayer::session_role_name
     );
     ClassDB::bind_method(
         D_METHOD("session_set_state", "state"),
@@ -1957,16 +1601,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::session_transition
     );
     ClassDB::bind_method(
-        D_METHOD("session_notify_shutdown", "reason"),
-        &NetwMultiplayer::session_notify_shutdown,
-        DEFVAL(String())
-    );
-    ClassDB::bind_method(
-        D_METHOD("session_request_leave", "reason"),
-        &NetwMultiplayer::session_request_leave,
-        DEFVAL(String())
-    );
-    ClassDB::bind_method(
         D_METHOD("peer_kick", "peer_id", "reason"),
         &NetwMultiplayer::peer_kick,
         DEFVAL(String())
@@ -1975,28 +1609,6 @@ void NetwMultiplayer::_bind_methods() {
         D_METHOD("peer_request_kick", "peer_id", "reason"),
         &NetwMultiplayer::peer_request_kick,
         DEFVAL(String())
-    );
-    ClassDB::bind_method(
-        D_METHOD(
-            "spawn_admit_frame_default",
-            "sender",
-            "route",
-            "channel",
-            "payload"
-        ),
-        &NetwMultiplayer::spawn_admit_frame_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("table_admit_frame_default", "sender", "channel", "payload"),
-        &NetwMultiplayer::table_admit_frame_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("spawn_declare_default", "entity", "recipe"),
-        &NetwMultiplayer::spawn_declare_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("spawn_construct_default", "entity"),
-        &NetwMultiplayer::spawn_construct_default
     );
 }
 

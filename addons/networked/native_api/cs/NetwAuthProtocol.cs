@@ -171,8 +171,8 @@ public sealed class NetwAuthProtocol : NetwRefCounted
 
     /// <summary>
     /// Writes a join packet header with the build tag
-    /// <paramref name="appTag"/>. See
-    /// <see cref="NetwMultiplayer.AuthSetAppTag"/>.
+    /// <paramref name="appTag"/>. A session makes its build tag from
+    /// <see cref="NetwSessionConfig.AppId"/>.
     /// </summary>
     public static byte[] EncodeClientHello(long appTag = 0, int flags = 0)
     {

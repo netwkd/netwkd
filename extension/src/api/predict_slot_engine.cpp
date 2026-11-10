@@ -48,26 +48,6 @@ const String &env_raw_fingerprints() {
     return name;
 }
 
-const StringName &seam_predict_drive() {
-    static const StringName name("_predict_drive");
-    return name;
-}
-
-const StringName &seam_predict_consume() {
-    static const StringName name("_predict_consume");
-    return name;
-}
-
-const StringName &seam_predict_evaluate() {
-    static const StringName name("_predict_evaluate");
-    return name;
-}
-
-const StringName &seam_predict_recover() {
-    static const StringName name("_predict_recover");
-    return name;
-}
-
 const Dictionary &no_sample() {
     static const Dictionary empty;
     return empty;
@@ -135,11 +115,6 @@ const StringName &key_breach() {
 
 const StringName &key_witness_fp() {
     static const StringName name("witness_fp");
-    return name;
-}
-
-const StringName &key_demoted() {
-    static const StringName name("demoted");
     return name;
 }
 
@@ -213,11 +188,6 @@ NetwPredictSlotEngine *NetwPredictSlotEngine::sibling(
         return nullptr;
     }
     return seated->predict_engine_for(p_member->get_rid_handle());
-}
-
-bool NetwPredictSlotEngine::overrides_seam(const StringName &p_seam) const {
-    NetwMultiplayer *seated = core_seated();
-    return seated != nullptr && seated->overrides_seam(p_seam);
 }
 
 NetwPredictSlotEngine::Declaration NetwPredictSlotEngine::declaration_of(
@@ -693,9 +663,7 @@ void NetwPredictSlotEngine::enter_fallback(
         );
     }
     sync_episode();
-    Dictionary extra;
-    extra[key_demoted()] = p_demoted;
-    pool->announce_episode(slot, EventPlane::EPISODE_FALLBACK, extra);
+    pool->announce_episode(slot, EventPlane::EPISODE_FALLBACK);
     rewire_on(resolved_declaration());
 }
 
@@ -1231,19 +1199,14 @@ void NetwPredictSlotEngine::predict_frame_step(
         );
         return;
     }
-    const bool overridden = overrides_seam(seam_predict_drive());
-    Fold fold;
-    if (overridden) {
-        fold = drive_fold(p_timing.get_tick());
-    }
     const DriveOutcome drove = pool->record_drive_hashed(
         slot,
         pool->next_tape_entry_index_of(slot),
-        overridden ? fold.label : -1,
-        overridden ? int(fold.kind) : int(NetwPrediction::DRIVE_KIND_NONE),
+        -1,
+        int(NetwPrediction::DRIVE_KIND_NONE),
         0,
         p_timing.get_tick(),
-        overridden,
+        false,
         true
     );
     if (!drove.ran) {
@@ -1270,22 +1233,6 @@ void NetwPredictSlotEngine::predict_frame_step(
 
 Fold NetwPredictSlotEngine::drive_fold(int64_t p_frame_tick) {
     const int64_t slot = native_slot();
-    if (overrides_seam(seam_predict_drive())) {
-        NetwMultiplayer *seated = core_seated();
-        const Ref<NetwPredictFold> answered = seated->predict_drive(
-            pool->latest_input_tick_of(slot),
-            pool->last_driven_input_tick_of(slot),
-            p_frame_tick
-        );
-        if (answered.is_valid()) {
-            Fold out;
-            out.label = answered->label();
-            out.fresh = answered->fresh();
-            out.kind = DriveKind(answered->kind());
-            return out;
-        }
-        seated->seam_refused(seam_predict_drive(), route(), String("null"));
-    }
     return prediction_core::fold(
         pool->latest_input_tick_of(slot),
         pool->last_driven_input_tick_of(slot),
@@ -1294,9 +1241,6 @@ Fold NetwPredictSlotEngine::drive_fold(int64_t p_frame_tick) {
 }
 
 int NetwPredictSlotEngine::consume_action(int p_depth, int p_buffer) {
-    if (overrides_seam(seam_predict_consume())) {
-        return core_seated()->predict_consume(p_depth, p_buffer);
-    }
     return prediction_core::consume_action(p_depth, p_buffer);
 }
 
@@ -1528,10 +1472,7 @@ void NetwPredictSlotEngine::on_state(
             domain,
             opened.row_flags,
             pool->compared_row(slot),
-            pool->received_row(slot),
-            overrides_seam(seam_predict_evaluate())
-                ? callable_mp(handle.ptr(), &NetwPrediction::seat_evaluate_seam)
-                : Callable()
+            pool->received_row(slot)
         );
         divergence = judged.divergence;
         corrected = judged.corrected;
@@ -1636,10 +1577,7 @@ void NetwPredictSlotEngine::recover(
             replays ? witness_sample() : no_sample(),
             replays ? island_participant_ids() : no_participants(),
             replays ? callable_mp(handle.ptr(), &NetwPrediction::seat_breach)
-                    : Callable(),
-            overrides_seam(seam_predict_recover())
-                ? callable_mp(handle.ptr(), &NetwPrediction::seat_recover_seam)
-                : Callable()
+                    : Callable()
         )) {
         return;
     }
@@ -1671,56 +1609,6 @@ void NetwPredictSlotEngine::run_held_recovery() {
         held_recovery.meter,
         held_recovery.domain,
         held_recovery.attribution
-    );
-}
-
-Ref<NetwPredictRecovery> NetwPredictSlotEngine::recover_through_seam(
-    const Dictionary &p_carried,
-    const Dictionary &p_predicted,
-    NetwPrediction::RecoveryPolicy p_policy,
-    NetwSimulation::Restore p_snap_restore,
-    const Dictionary &p_projection,
-    const Dictionary &p_before,
-    const Dictionary &p_tier_errors,
-    const Dictionary &p_context,
-    double p_tick_delta
-) {
-    NetwMultiplayer *seated = core_seated();
-    if (seated == nullptr) {
-        return Ref<NetwPredictRecovery>();
-    }
-    return seated->predict_recover(
-        p_carried,
-        p_predicted,
-        p_policy,
-        p_snap_restore,
-        p_projection,
-        p_before,
-        p_tier_errors,
-        pool->wiring_snapshot(native_slot()),
-        p_context,
-        p_tick_delta
-    );
-}
-
-Ref<NetwPredictJudgement> NetwPredictSlotEngine::evaluate_through_seam(
-    NetwPrediction::Domain p_domain,
-    NetwPrediction::ExactVerdict p_exact_verdict,
-    const Dictionary &p_predicted,
-    const Dictionary &p_payload,
-    const Dictionary &p_field_sink
-) {
-    NetwMultiplayer *seated = core_seated();
-    if (seated == nullptr) {
-        return Ref<NetwPredictJudgement>();
-    }
-    return seated->predict_evaluate(
-        p_domain,
-        p_exact_verdict,
-        p_predicted,
-        p_payload,
-        pool->wiring_snapshot(native_slot()),
-        p_field_sink
     );
 }
 
@@ -2159,16 +2047,14 @@ void NetwPredictSlotEngine::consume_step(
         const int depth = int(queued_span());
         const int buffer = std::max(0, handle->get_consume_buffer_ticks());
         int action = consume_action(depth, buffer);
-        if (!overrides_seam(seam_predict_consume())) {
-            if (action == NetwPrediction::CONSUME_ACTION_REPLAY) {
-                consume_primed = true;
-            } else if (action == NetwPrediction::CONSUME_ACTION_STARVED) {
-                consume_primed = false;
-            } else if (consume_primed) {
-                action = NetwPrediction::CONSUME_ACTION_REPLAY;
-            }
+        if (action == NetwPrediction::CONSUME_ACTION_REPLAY) {
+            consume_primed = true;
+        } else if (action == NetwPrediction::CONSUME_ACTION_STARVED) {
+            consume_primed = false;
+        } else if (consume_primed) {
+            action = NetwPrediction::CONSUME_ACTION_REPLAY;
         }
-        pool->report_consume(slot, depth, buffer, action);
+        pool->report_consume(slot, depth, buffer);
         switch (action) {
             case NetwPrediction::CONSUME_ACTION_REPLAY:
                 consume_one(p_delta);
@@ -2247,7 +2133,7 @@ void NetwPredictSlotEngine::consume_frame_step(
         = stats->get_int_fact(NetwPredictStats::FACT_DRIVE_SEQ);
     record_consume_cadence(depth);
     const int action = consume_action(depth, buffer);
-    pool->report_consume(slot, depth, buffer, action);
+    pool->report_consume(slot, depth, buffer);
     switch (action) {
         case NetwPrediction::CONSUME_ACTION_REPLAY:
             resync_tape_if_stranded(depth, buffer);

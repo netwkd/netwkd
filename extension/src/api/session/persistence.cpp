@@ -618,7 +618,6 @@ void NetwMultiplayer::persist_notify_loaded(
     if (handle.is_valid()) {
         handle->announce_loaded(entity, p_found);
     }
-    notify(PERSIST_LOADED, entity, p_found);
 }
 
 void NetwMultiplayer::persist_notify_saved(const RID &p_binding) {
@@ -627,7 +626,6 @@ void NetwMultiplayer::persist_notify_saved(const RID &p_binding) {
     if (handle.is_valid()) {
         handle->announce_saved(entity);
     }
-    notify(PERSIST_SAVED, entity);
 }
 
 void NetwMultiplayer::persist_notify_failed(
@@ -641,7 +639,6 @@ void NetwMultiplayer::persist_notify_failed(
         Object::cast_to<NetwDatabase>(held->value.ptr())
             ->announce_failed(p_database, int(p_error), p_detail);
     }
-    notify(DATABASE_FAILED, p_database, int(p_error), p_detail);
 }
 
 void NetwMultiplayer::persist_bind_spawned(Node *p_root) {
@@ -1256,13 +1253,6 @@ void NetwMultiplayer::persist_write(const LocalVector<RID> &p_bindings) {
 }
 
 void NetwMultiplayer::persist_pump(double p_delta) {
-    if (GDVIRTUAL_CALL(_persist_tick, p_delta)) {
-        return;
-    }
-    persist_tick_default(p_delta);
-}
-
-void NetwMultiplayer::persist_tick_default(double p_delta) {
     if (!bindings_bound || !is_host()) {
         return;
     }

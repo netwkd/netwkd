@@ -19,11 +19,17 @@
 		The client pings the server every [member ping_interval] seconds. The server answers with its tick, and the client aims ahead of it by half the round trip plus [constant NetwMultiplayer.CLOCK_PARAM_LEAD_TICKS]. The first answer sets the tick directly. After that, [member sync_mode] decides.
 		[constant SYNC_MODE_SNAP] sets the tick directly every time, which can move it backwards. [constant SYNC_MODE_STRETCH], the default, runs the clock slightly faster or slower each frame by [constant NetwMultiplayer.CLOCK_PARAM_STRETCH_NUDGE_FACTOR] of the difference, so the tick never jumps. A difference larger than [constant NetwMultiplayer.CLOCK_PARAM_PANIC_SNAP_THRESHOLD] ticks is snapped.
 		[b]Showing remote state[/b]
-		State from other peers arrives late, so remote entities are shown [member display_offset] ticks in the past. [member recommended_display_offset] is the offset the current connection needs, the one-way latency plus the jitter times [constant NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER], in ticks. It is not applied automatically. [method NetwMultiplayer.clock_auto_configure_offset] applies it.
+		State from other peers arrives late, so remote entities are shown [member display_offset] ticks in the past. [member recommended_display_offset] is the offset the current connection needs, the one-way latency plus the jitter times [constant NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER], in ticks. It is not applied automatically. [method auto_configure_offset] applies it.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="auto_configure_offset">
+			<return type="void" />
+			<description>
+				Measures the connection for five seconds, then sets [member display_offset] to the largest [member recommended_display_offset] it saw. Does nothing on the server.
+			</description>
+		</method>
 		<method name="monitor" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="monitor" type="int" enum="NetwClock.ClockMonitor" />
@@ -46,7 +52,7 @@
 			[code]true[/code] once the settings from [method Netw.configure_clock] are applied. [member tick] does not move before that.
 		</member>
 		<member name="is_synchronized" type="bool" setter="" getter="get_is_synchronized">
-			[code]true[/code] once the tick follows the server. Always [code]true[/code] on the server and on a peer with no connection, as [member NetwMultiplayer.is_host] is.
+			[code]true[/code] once the tick follows the server. Always [code]true[/code] on the server and on a peer with no connection, as [method MultiplayerAPI.is_server] is.
 		</member>
 		<member name="physics_factor" type="float" setter="" getter="get_physics_factor">
 			Physics frames per tick. Multiply a per-frame value by it to get a per-tick value.
@@ -93,6 +99,12 @@
 				Emitted after every entity ran [code]_network_tick[/code] for [param tick]. Read results here.
 			</description>
 		</signal>
+		<signal name="tickrate_mismatch">
+			<param index="0" name="server_tickrate" type="int" />
+			<description>
+				Emitted on a client whose [member tickrate] differs from [param server_tickrate] when [member NetwClockConfig.tickrate_mismatch_action] is [constant MISMATCH_ACTION_SIGNAL].
+			</description>
+		</signal>
 	</signals>
 	<constants>
 		<constant name="SYNC_MODE_SNAP" value="0" enum="SyncMode">
@@ -108,7 +120,7 @@
 			Disconnect the peer.
 		</constant>
 		<constant name="MISMATCH_ACTION_SIGNAL" value="2" enum="MismatchAction">
-			Notify [constant NetwMultiplayer.CLOCK_TICKRATE_MISMATCH] and let the game decide.
+			Emit [signal tickrate_mismatch] and let the game decide.
 		</constant>
 		<constant name="CLOCK_MONITOR_RTT" value="0" enum="ClockMonitor">
 			The most recent round-trip time, in seconds.

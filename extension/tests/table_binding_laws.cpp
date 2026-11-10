@@ -1,7 +1,5 @@
 #include "support/netw_test.h"
 
-#include "support/netw_recorder.h"
-
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/schema_core.hpp"
 
@@ -10,7 +8,6 @@ namespace TestTableBinding {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::SchemaCore;
-using netw_test::Recorder;
 
 Ref<NetwMultiplayer> session() {
     Ref<NetwMultiplayer> core;
@@ -134,14 +131,10 @@ TEST_CASE(
     "signal and carries no node, which is what cohorts exist to buy"
 ) {
     const Ref<NetwMultiplayer> core = session();
-    Vector<StringName> watched;
-    watched.push_back(StringName("entity_live"));
-    const Recorder recorder(core.ptr(), watched);
 
     const PackedInt64Array routes = core->liveness_claim_routes(50);
 
     NETW_CHECK_EQ(routes.size(), 50);
-    NETW_CHECK_EQ(recorder.count(StringName("entity_live")), 0);
     if (routes.size() != 50) {
         return;
     }

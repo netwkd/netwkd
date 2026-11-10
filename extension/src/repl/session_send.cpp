@@ -145,23 +145,6 @@ LocalVector<wire::ParkedOpen> SessionSend::expire_parks(int64_t p_now_ms) {
     return out;
 }
 
-PackedByteArray SessionSend::price(
-    const RowSend &p_send,
-    int64_t p_base_tick
-) const {
-    if (!stage_wanted || !stage.is_valid()) {
-        return p_send.bytes;
-    }
-    return stage.call(
-        int64_t(p_send.peer),
-        p_base_tick,
-        p_send.route,
-        int64_t(p_send.comp),
-        int64_t(p_send.mask),
-        p_send.bytes
-    );
-}
-
 bool SessionSend::stream_seated(
     uint32_t p_peer,
     uint32_t p_table,
@@ -431,11 +414,6 @@ bool SessionSend::encode(
             header.absolute() ? nullptr : &baseline
         );
     }
-    if (r_send.bytes.is_empty()) {
-        r_out.staged_out += 1;
-        return false;
-    }
-    r_send.bytes = price(r_send, p_base_tick);
     if (r_send.bytes.is_empty()) {
         r_out.staged_out += 1;
         return false;

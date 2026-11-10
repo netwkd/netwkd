@@ -317,7 +317,7 @@ func _join_address() -> String:
 
 func _local_member_name() -> String:
 	if _account == null:
-		return LobbyDirectory.local_member_name_default()
+		return ""
 	return _account.display_name
 
 
@@ -326,7 +326,7 @@ func _member_name(peer_id: int) -> String:
 	if _bridge != null:
 		presence = _bridge.get_user_presence_for_peer(peer_id)
 	if presence == null:
-		return LobbyDirectory.member_name_default(peer_id)
+		return ""
 	return _names.get(presence.user_id, presence.username)
 
 

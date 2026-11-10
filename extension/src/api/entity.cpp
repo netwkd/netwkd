@@ -898,17 +898,14 @@ void NetwEntity::announce_control(int64_t p_was, int64_t p_peer) {
     if (core == nullptr) {
         return;
     }
-    Dictionary detail;
-    detail["from"] = was;
-    detail["to"] = peer;
-    core->event_emit(
+    core->event_record(
         EventPlane::CONTROL_CHANGED,
+        get_rid_handle(),
         get_route(),
-        detail,
-        get_name(),
         peer,
         OK,
-        Dictionary()
+        was,
+        peer
     );
 }
 
@@ -1751,19 +1748,15 @@ entity::Control::Outcome NetwEntity::decide_request(
     }
     NetwMultiplayer *core = session_core();
     if (core != nullptr) {
-        Dictionary detail;
-        detail["requester"] = p_requester;
-        detail["hold"] = p_hold;
-        core->event_emit(
+        const Error ruled = outcome == Outcome::GRANTED ? OK
+            : outcome == Outcome::UNAVAILABLE           ? ERR_UNAVAILABLE
+                                                        : ERR_UNAUTHORIZED;
+        core->event_record(
             EventPlane::CONTROL_REQUESTED,
+            get_rid_handle(),
             get_route(),
-            detail,
-            get_name(),
             p_requester,
-            outcome == Outcome::GRANTED           ? OK
-                : outcome == Outcome::UNAVAILABLE ? ERR_UNAVAILABLE
-                                                  : ERR_UNAUTHORIZED,
-            Dictionary()
+            ruled
         );
     }
     if (outcome == Outcome::GRANTED) {

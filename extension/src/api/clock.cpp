@@ -14,6 +14,7 @@ namespace {
 const char *SIG_BEFORE_TICK = "before_tick";
 const char *SIG_TICKED = "ticked";
 const char *SIG_SYNCHRONIZED = "synchronized";
+const char *SIG_TICKRATE_MISMATCH = "tickrate_mismatch";
 
 } // namespace
 
@@ -38,6 +39,10 @@ void NetwClock::announce_ticked(double p_delta, int64_t p_tick) {
 
 void NetwClock::announce_synchronized() {
     emit_signal(StringName(SIG_SYNCHRONIZED));
+}
+
+void NetwClock::announce_tickrate_mismatch(int64_t p_server_tickrate) {
+    emit_signal(StringName(SIG_TICKRATE_MISMATCH), p_server_tickrate);
 }
 
 int64_t NetwClock::get_tick() const {
@@ -146,6 +151,14 @@ void NetwClock::set_ping_interval(double p_seconds) {
         return;
     }
     api->clock_set_param(NetwMultiplayer::CLOCK_PARAM_PING_INTERVAL, p_seconds);
+}
+
+void NetwClock::auto_configure_offset() {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return;
+    }
+    api->clock_auto_configure_offset();
 }
 
 double NetwClock::monitor(NetwClock::ClockMonitor p_monitor) const {
@@ -282,6 +295,10 @@ void NetwClock::_bind_methods() {
     );
 
     ClassDB::bind_method(D_METHOD("monitor", "monitor"), &NetwClock::monitor);
+    ClassDB::bind_method(
+        D_METHOD("auto_configure_offset"),
+        &NetwClock::auto_configure_offset
+    );
 
     ADD_SIGNAL(MethodInfo(
         SIG_BEFORE_TICK,
@@ -294,6 +311,10 @@ void NetwClock::_bind_methods() {
         PropertyInfo(Variant::INT, "tick")
     ));
     ADD_SIGNAL(MethodInfo(SIG_SYNCHRONIZED));
+    ADD_SIGNAL(MethodInfo(
+        SIG_TICKRATE_MISMATCH,
+        PropertyInfo(Variant::INT, "server_tickrate")
+    ));
 }
 
 } // namespace netw

@@ -6,8 +6,8 @@
 #include "godot/callable.hpp"
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/session.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 
@@ -70,18 +70,6 @@ Ref<NetwEntity> entity_at(LoopbackRig &p_rig, int p_route, int p_client) {
     return node == nullptr ? Ref<NetwEntity>() : NetwEntity::of(node);
 }
 
-Array rows_of(const Array &p_drained, int64_t p_event) {
-    Array kept;
-    for (int at = 0; at < p_drained.size(); ++at) {
-        const Dictionary row = p_drained[at];
-        if (!row.is_empty()
-            && int64_t(row[netw::event_key::event()]) == p_event) {
-            kept.push_back(row);
-        }
-    }
-    return kept;
-}
-
 TEST_CASE(
     "[Networked][Session][SceneTree] L1 a server that leaves takes a "
     "client's session down"
@@ -93,10 +81,10 @@ TEST_CASE(
         == NetwMultiplayer::SESSION_STATE_ONLINE
     );
 
-    Recorder seen(rig.client(0), {"session_ended"});
+    Recorder seen(rig.client(0)->get_session().ptr(), {"exiting"});
     rig.client(0)->session_relay_peer_disconnected(1);
 
-    NETW_CHECK_EQ(seen.count("session_ended"), 1);
+    NETW_CHECK_EQ(seen.count("exiting"), 1);
     CHECK(
         rig.client(0)->session_get_state()
         == NetwMultiplayer::SESSION_STATE_OFFLINE
@@ -120,16 +108,12 @@ TEST_CASE(
     rig.pump(8);
     NETW_CHECK_EQ(host->get_controller(), controller);
 
-    rig.server()->event_arm(true);
-    rig.server()->event_ring(route);
+    Recorder reverted(host.ptr(), {"control_changed"});
     rig.drop_client(1);
     rig.pump(8);
 
-    const Array settled = rig.server()->event_ring(route);
-    const Array reverted = rows_of(settled, netw::EventPlane::CONTROL_CHANGED);
-    NETW_CHECK_EQ(reverted.size(), 1);
+    NETW_CHECK_EQ(reverted.count("control_changed"), 1);
     NETW_CHECK_EQ(host->get_controller(), int64_t(1));
-    rig.server()->event_arm(false);
 }
 
 TEST_CASE(
@@ -141,12 +125,12 @@ TEST_CASE(
     LoopbackRig rig(1);
     rig.mount();
 
-    Recorder seen(rig.client(0), {"session_ended"});
+    Recorder seen(rig.client(0)->get_session().ptr(), {"exiting"});
     rig.client(0)->session_relay_peer_disconnected(1);
     rig.client(0)->session_relay_peer_disconnected(1);
     rig.client(0)->peer_mark_unreachable(1);
 
-    NETW_CHECK_EQ(seen.count("session_ended"), 1);
+    NETW_CHECK_EQ(seen.count("exiting"), 1);
     CHECK(
         rig.client(0)->session_get_state()
         == NetwMultiplayer::SESSION_STATE_OFFLINE

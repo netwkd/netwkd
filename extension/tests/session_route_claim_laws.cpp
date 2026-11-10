@@ -144,11 +144,4 @@ TEST_CASE(
     }
 }
 
-TEST_CASE(
-    "[Networked][Session][Hosted] L5 a script that does not descend from "
-    "NetwMultiplayer is not an extension script, and null is not either"
-) {
-    CHECK_FALSE(NetwMultiplayer::is_extension_script(Ref<Script>()));
-}
-
 } // namespace TestNetwSessionRouteClaim

@@ -612,49 +612,4 @@ public class LobbyDirectory : NetwService
             ref answered);
         return answered != 0;
     }
-
-    private static readonly IntPtr _bindMemberNameDefault =
-        NetwApi.MethodBind(
-            "LobbyDirectory",
-            "member_name_default",
-            990163283UL);
-
-    /// <summary>
-    /// The default <c>_member_name</c>, <c>"Player &lt;peer_id&gt;"</c>.
-    /// </summary>
-    public static string MemberNameDefault(long peerId)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindMemberNameDefault,
-            IntPtr.Zero,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindLocalMemberNameDefault =
-        NetwApi.MethodBind(
-            "LobbyDirectory",
-            "local_member_name_default",
-            2841200299UL);
-
-    /// <summary>
-    /// The default <c>_local_member_name</c>.
-    /// </summary>
-    public static string LocalMemberNameDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(
-            _bindLocalMemberNameDefault,
-            IntPtr.Zero,
-            ref answered);
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
 }

@@ -12,7 +12,6 @@
 #include "netw/session/frames.hpp"
 #include "netw/spawn/record.hpp"
 #include "netw/store/array.hpp"
-#include "netw/sync_kernel.hpp"
 #include "netw/wire/frame.hpp"
 
 using namespace godot;
@@ -85,14 +84,6 @@ Object *ReplicationCore::api() const {
     return gd::instance_from_id(api_id);
 }
 
-Object *ReplicationCore::gate_seam(const StringName &p_seam) const {
-    Object *seam = api();
-    if (seam == nullptr || seam == core() || !seam->has_method(p_seam)) {
-        return nullptr;
-    }
-    return seam;
-}
-
 void ReplicationCore::install(Object *p_api) {
     api_id = gd::instance_id(p_api);
     if (p_api == nullptr) {
@@ -115,10 +106,6 @@ void ReplicationCore::install(Object *p_api) {
         ids.row_control,
         ids.property_sync,
         ids.signal
-    );
-    sync_pipeline.set_stage_seams(
-        callable_mp(plane, &NetwMultiplayer::run_sync_encode_stage),
-        callable_mp(plane, &NetwMultiplayer::run_sync_decode_stage)
     );
 
     spawn_pipeline.set_core(plane);
@@ -148,10 +135,6 @@ void ReplicationCore::install(Object *p_api) {
     sync_compat.set_core(plane);
     sync_compat.set_sync_model(&sync_model);
     sync_compat.set_spawn_book(spawn_pipeline.get_spawn_book());
-    sync_compat.set_stage_seams(
-        callable_mp(plane, &NetwMultiplayer::run_sync_encode_stage),
-        callable_mp(plane, &NetwMultiplayer::run_sync_decode_stage)
-    );
     sync_compat.set_spawn_seams(
         callable_mp(plane, &NetwMultiplayer::replication_adopt_in_place),
         callable_mp(plane, &NetwMultiplayer::spawn_schedule_visibility_sweep)
@@ -543,11 +526,6 @@ void ReplicationCore::flush_all_buffers() {
 }
 
 void ReplicationCore::note_staged(int64_t p_peer_id, int64_t p_seq) {
-    Object *seam = gate_seam(StringName("_sync_note_sent"));
-    if (seam != nullptr) {
-        seam->call("_sync_note_sent", p_peer_id, p_seq);
-        return;
-    }
     NetwMultiplayer *plane = core();
     if (plane != nullptr) {
         plane->note_sent(p_peer_id, p_seq);
@@ -623,17 +601,14 @@ Error ReplicationCore::finish_receive_pass(
 ) {
     sync_pipeline.close_datagram();
     NetwMultiplayer *plane = core();
-    if (plane != nullptr && plane->event_wants(EventPlane::APPLY, 0)) {
-        Dictionary detail;
-        detail[StringName("frames")] = p_frames;
-        plane->event_emit(
+    if (plane != nullptr) {
+        plane->event_record(
             EventPlane::APPLY,
+            RID(),
             0,
-            detail,
-            StringName(),
             p_sender,
             p_verdict,
-            Dictionary()
+            p_frames
         );
     }
     return p_verdict;
@@ -664,13 +639,8 @@ Error ReplicationCore::dispatch(
         );
     }
     if (p_route != 0) {
-        const Error admission = admit_entity_frame(
-            p_sender,
-            p_route,
-            p_comp,
-            p_channel,
-            p_payload
-        );
+        const Error admission
+            = admit_entity_frame(p_sender, p_route, p_channel, p_payload);
         if (admission != OK) {
             plane->repl_note_gate_verdict(admission);
             plane->attribution_note_refusal(
@@ -970,7 +940,6 @@ bool ReplicationCore::defers_unknown_route(
 Error ReplicationCore::admit_entity_frame(
     int64_t p_sender,
     int64_t p_route,
-    int64_t p_comp,
     int64_t p_channel,
     const PackedByteArray &p_payload
 ) {
@@ -978,85 +947,25 @@ Error ReplicationCore::admit_entity_frame(
     if (plane == nullptr) {
         return ERR_UNAVAILABLE;
     }
-    Object *seam = gate_seam(StringName("_sync_admit_frame"));
     int64_t gate = -1;
     Error verdict = OK;
-    if (p_channel == ids.sync) {
+    if (p_channel == ids.sync || p_channel == ids.sync_row
+        || p_channel == ids.sync_row_delta || p_channel == ids.sync_row_window
+        || p_channel == ids.sync_delta) {
         gate = EventPlane::GATE_SYNC;
-        wire::ReadStream reader(p_payload);
-        sync_kernel::VolatileHead head;
-        const int64_t flags = sync_kernel::VolatileHead::wire.run(reader, head)
-            ? int64_t(head.flags)
-            : int64_t(-1);
-        verdict = seam != nullptr ? Error(
-                                        int(seam->call(
-                                            "_sync_admit_frame",
-                                            p_sender,
-                                            p_route,
-                                            p_comp,
-                                            p_channel,
-                                            flags,
-                                            -1,
-                                            p_payload
-                                        ))
-                                    )
-                                  : plane->sync_admit_frame(
-                                        p_sender,
-                                        p_route,
-                                        p_comp,
-                                        p_channel,
-                                        flags,
-                                        -1,
-                                        p_payload
-                                    );
-    } else if (
-        p_channel == ids.sync_row || p_channel == ids.sync_row_delta
-        || p_channel == ids.sync_row_window || p_channel == ids.sync_delta
-    ) {
-        gate = EventPlane::GATE_SYNC;
-        verdict = seam != nullptr ? Error(
-                                        int(seam->call(
-                                            "_sync_admit_frame",
-                                            p_sender,
-                                            p_route,
-                                            p_comp,
-                                            p_channel,
-                                            0,
-                                            -1,
-                                            p_payload
-                                        ))
-                                    )
-                                  : plane->sync_admit_frame(
-                                        p_sender,
-                                        p_route,
-                                        p_comp,
-                                        p_channel,
-                                        0,
-                                        -1,
-                                        p_payload
-                                    );
+        verdict = plane->sync_admit_frame(p_route, p_channel, p_payload);
     } else if (
         p_channel == ids.predict_command || p_channel == ids.predict_ack
         || p_channel == ids.predict_relay
         || p_channel == ids.predict_relay_request
     ) {
         gate = EventPlane::GATE_PREDICT;
-        Object *lane = gate_seam(StringName("_predict_admit_frame"));
-        verdict = lane != nullptr ? Error(
-                                        int(lane->call(
-                                            "_predict_admit_frame",
-                                            p_sender,
-                                            p_route,
-                                            p_channel,
-                                            p_payload
-                                        ))
-                                    )
-                                  : plane->predict_admit_frame(
-                                        p_sender,
-                                        p_route,
-                                        p_channel,
-                                        p_payload
-                                    );
+        verdict = plane->predict_admit_frame(
+            p_sender,
+            p_route,
+            p_channel,
+            p_payload
+        );
     }
     if (gate < 0) {
         return OK;
@@ -1225,13 +1134,11 @@ void ReplicationCore::handle_table_frame(
     if (plane == nullptr) {
         return;
     }
-    Object *seam = gate_seam(StringName("_table_admit_frame"));
-    const Variant verdict = seam != nullptr
-        ? seam->call("_table_admit_frame", p_sender, ids.table, p_payload)
-        : Variant(plane->table_admit_frame(p_sender, ids.table, p_payload));
+    const Error verdict
+        = plane->table_admit_frame(p_sender, ids.table, p_payload);
     if (plane->finish_stage_verdict(
             EventPlane::GATE_TABLE,
-            Error(int64_t(verdict)),
+            verdict,
             0,
             p_sender
         )

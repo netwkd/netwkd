@@ -111,7 +111,7 @@ func test_a_guest_signs_in_with_no_username() -> void:
 	assert_str(account.session.username) \
 			.override_failure_message(
 				"The guest was created with the player's name as its username.",
-			).is_not_equal(LobbyDirectory.local_member_name_default())
+			).is_not_equal("Player")
 	assert_str(account.display_name).is_equal(account.session.username)
 
 

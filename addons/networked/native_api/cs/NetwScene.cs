@@ -82,6 +82,38 @@ public sealed class NetwScene : NetwRefCounted
     }
 
     /// <summary>
+    /// Emitted after <c>entity</c> enters the tree inside this scene.
+    /// </summary>
+    public event Action<NetwEntity> EntityEntered
+    {
+        add => ConnectBridge(
+            "entity_entered",
+            value,
+            Callable.From(
+                (Variant a0) =>
+                    value(Wrapped(a0, NetwEntity.From))
+            )
+        );
+        remove => DisconnectBridge("entity_entered", value);
+    }
+
+    /// <summary>
+    /// Emitted after <c>entity</c> leaves the tree inside this scene.
+    /// </summary>
+    public event Action<NetwEntity> EntityExited
+    {
+        add => ConnectBridge(
+            "entity_exited",
+            value,
+            Callable.From(
+                (Variant a0) =>
+                    value(Wrapped(a0, NetwEntity.From))
+            )
+        );
+        remove => DisconnectBridge("entity_exited", value);
+    }
+
+    /// <summary>
     /// Emitted when <c>entity</c> joins <see cref="NetwScene.PlayerEntities"/>.
     /// </summary>
     public event Action<NetwEntity> PlayerEntityEntered

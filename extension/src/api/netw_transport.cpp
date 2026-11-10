@@ -50,134 +50,66 @@ void NetwTransport::probe_authentication_failed(int64_t p_peer_id) {
 void NetwTransport::_bind_methods() {
     ClassDB::bind_method(D_METHOD("peer_class"), &NetwTransport::peer_class);
     ClassDB::bind_method(
-        D_METHOD("peer_class_default"),
-        &NetwTransport::peer_class_default
-    );
-    ClassDB::bind_method(
         D_METHOD("recognizes_peer", "peer"),
         &NetwTransport::recognizes_peer
-    );
-    ClassDB::bind_method(
-        D_METHOD("recognizes_peer_default", "peer"),
-        &NetwTransport::recognizes_peer_default
     );
     ClassDB::bind_method(
         D_METHOD("display_name"),
         &NetwTransport::display_name
     );
     ClassDB::bind_method(
-        D_METHOD("display_name_default"),
-        &NetwTransport::display_name_default
-    );
-    ClassDB::bind_method(
         D_METHOD("is_available"),
         &NetwTransport::is_available
-    );
-    ClassDB::bind_method(
-        D_METHOD("is_available_default"),
-        &NetwTransport::is_available_default
     );
     ClassDB::bind_method(
         D_METHOD("can_host_here"),
         &NetwTransport::can_host_here
     );
-    ClassDB::bind_method(
-        D_METHOD("can_host_here_default"),
-        &NetwTransport::can_host_here_default
-    );
     ClassDB::bind_method(D_METHOD("can_probe"), &NetwTransport::can_probe);
-    ClassDB::bind_method(
-        D_METHOD("can_probe_default"),
-        &NetwTransport::can_probe_default
-    );
     ClassDB::bind_method(
         D_METHOD("address_label"),
         &NetwTransport::address_label
-    );
-    ClassDB::bind_method(
-        D_METHOD("address_label_default"),
-        &NetwTransport::address_label_default
     );
     ClassDB::bind_method(
         D_METHOD("address_placeholder"),
         &NetwTransport::address_placeholder
     );
     ClassDB::bind_method(
-        D_METHOD("address_placeholder_default"),
-        &NetwTransport::address_placeholder_default
-    );
-    ClassDB::bind_method(
         D_METHOD("address_help"),
         &NetwTransport::address_help
-    );
-    ClassDB::bind_method(
-        D_METHOD("address_help_default"),
-        &NetwTransport::address_help_default
     );
     ClassDB::bind_method(
         D_METHOD("accepts_empty_address"),
         &NetwTransport::accepts_empty_address
     );
     ClassDB::bind_method(
-        D_METHOD("accepts_empty_address_default"),
-        &NetwTransport::accepts_empty_address_default
-    );
-    ClassDB::bind_method(
         D_METHOD("host_settings"),
         &NetwTransport::host_settings
-    );
-    ClassDB::bind_method(
-        D_METHOD("host_settings_default"),
-        &NetwTransport::host_settings_default
     );
     ClassDB::bind_method(
         D_METHOD("client_settings"),
         &NetwTransport::client_settings
     );
     ClassDB::bind_method(
-        D_METHOD("client_settings_default"),
-        &NetwTransport::client_settings_default
-    );
-    ClassDB::bind_method(
         D_METHOD("make_probe_peer", "address"),
         &NetwTransport::make_probe_peer
-    );
-    ClassDB::bind_method(
-        D_METHOD("make_probe_peer_default", "address"),
-        &NetwTransport::make_probe_peer_default
     );
     ClassDB::bind_method(
         D_METHOD("join_address"),
         &NetwTransport::join_address
     );
     ClassDB::bind_method(
-        D_METHOD("join_address_default"),
-        &NetwTransport::join_address_default
-    );
-    ClassDB::bind_method(
         D_METHOD("diagnostics", "peer_id"),
         &NetwTransport::diagnostics
-    );
-    ClassDB::bind_method(
-        D_METHOD("diagnostics_default", "peer_id"),
-        &NetwTransport::diagnostics_default
     );
     ClassDB::bind_method(
         D_METHOD("timeout_hint"),
         &NetwTransport::timeout_hint
     );
-    ClassDB::bind_method(
-        D_METHOD("timeout_hint_default"),
-        &NetwTransport::timeout_hint_default
-    );
 
     ClassDB::bind_method(
         D_METHOD("report", "ticket", "step", "message", "ratio"),
         &NetwTransport::report
-    );
-    ClassDB::bind_method(
-        D_METHOD("probe_default", "ticket", "address"),
-        &NetwTransport::probe_default
     );
     ClassDB::bind_method(
         D_METHOD("deliver", "ticket", "peer"),
@@ -190,10 +122,6 @@ void NetwTransport::_bind_methods() {
         DEFVAL(Array())
     );
     ClassDB::bind_method(D_METHOD("can_browse"), &NetwTransport::can_browse);
-    ClassDB::bind_method(
-        D_METHOD("can_browse_default"),
-        &NetwTransport::can_browse_default
-    );
     ClassDB::bind_method(
         D_METHOD("deliver_probe", "ticket", "info"),
         &NetwTransport::deliver_probe
@@ -323,7 +251,7 @@ void NetwTransport::fail(
     }
 }
 
-void NetwTransport::probe_default(
+void NetwTransport::probe_by_connecting(
     const RID &p_ticket,
     const String &p_address
 ) {
@@ -354,10 +282,6 @@ StringName NetwTransport::peer_class() {
     if (GDVIRTUAL_CALL(_peer_class, answered)) {
         return answered;
     }
-    return peer_class_default();
-}
-
-StringName NetwTransport::peer_class_default() {
     return StringName();
 }
 
@@ -366,12 +290,6 @@ bool NetwTransport::recognizes_peer(const Ref<MultiplayerPeer> &p_peer) {
     if (GDVIRTUAL_CALL(_recognizes_peer, p_peer, answered)) {
         return answered;
     }
-    return recognizes_peer_default(p_peer);
-}
-
-bool NetwTransport::recognizes_peer_default(
-    const Ref<MultiplayerPeer> &p_peer
-) {
     return peer_class_of(p_peer) == peer_class();
 }
 
@@ -380,10 +298,6 @@ String NetwTransport::display_name() {
     if (GDVIRTUAL_CALL(_display_name, answered)) {
         return answered;
     }
-    return display_name_default();
-}
-
-String NetwTransport::display_name_default() {
     return String("Generic");
 }
 
@@ -392,10 +306,6 @@ bool NetwTransport::is_available() {
     if (GDVIRTUAL_CALL(_is_available, answered)) {
         return answered;
     }
-    return is_available_default();
-}
-
-bool NetwTransport::is_available_default() {
     return true;
 }
 
@@ -404,10 +314,6 @@ bool NetwTransport::can_host_here() {
     if (GDVIRTUAL_CALL(_can_host_here, answered)) {
         return answered;
     }
-    return can_host_here_default();
-}
-
-bool NetwTransport::can_host_here_default() {
     return true;
 }
 
@@ -416,10 +322,6 @@ bool NetwTransport::can_probe() {
     if (GDVIRTUAL_CALL(_can_probe, answered)) {
         return answered;
     }
-    return can_probe_default();
-}
-
-bool NetwTransport::can_probe_default() {
     return false;
 }
 
@@ -428,10 +330,6 @@ String NetwTransport::address_label() {
     if (GDVIRTUAL_CALL(_address_label, answered)) {
         return answered;
     }
-    return address_label_default();
-}
-
-String NetwTransport::address_label_default() {
     return String("Address");
 }
 
@@ -440,10 +338,6 @@ String NetwTransport::address_placeholder() {
     if (GDVIRTUAL_CALL(_address_placeholder, answered)) {
         return answered;
     }
-    return address_placeholder_default();
-}
-
-String NetwTransport::address_placeholder_default() {
     return String();
 }
 
@@ -452,10 +346,6 @@ String NetwTransport::address_help() {
     if (GDVIRTUAL_CALL(_address_help, answered)) {
         return answered;
     }
-    return address_help_default();
-}
-
-String NetwTransport::address_help_default() {
     return String();
 }
 
@@ -464,10 +354,6 @@ bool NetwTransport::accepts_empty_address() {
     if (GDVIRTUAL_CALL(_accepts_empty_address, answered)) {
         return answered;
     }
-    return accepts_empty_address_default();
-}
-
-bool NetwTransport::accepts_empty_address_default() {
     return false;
 }
 
@@ -476,10 +362,6 @@ Dictionary NetwTransport::host_settings() {
     if (GDVIRTUAL_CALL(_host_settings, answered)) {
         return answered;
     }
-    return host_settings_default();
-}
-
-Dictionary NetwTransport::host_settings_default() {
     return Dictionary();
 }
 
@@ -488,10 +370,6 @@ Dictionary NetwTransport::client_settings() {
     if (GDVIRTUAL_CALL(_client_settings, answered)) {
         return answered;
     }
-    return client_settings_default();
-}
-
-Dictionary NetwTransport::client_settings_default() {
     return Dictionary();
 }
 
@@ -516,10 +394,6 @@ bool NetwTransport::can_browse() {
     if (GDVIRTUAL_CALL(_can_browse, answered)) {
         return answered;
     }
-    return can_browse_default();
-}
-
-bool NetwTransport::can_browse_default() {
     return false;
 }
 
@@ -543,7 +417,7 @@ void NetwTransport::probe(const RID &p_ticket, const String &p_address) {
     if (GDVIRTUAL_CALL(_probe, p_ticket, p_address)) {
         return;
     }
-    probe_default(p_ticket, p_address);
+    probe_by_connecting(p_ticket, p_address);
 }
 
 Ref<MultiplayerPeer> NetwTransport::make_probe_peer(const String &p_address) {
@@ -551,10 +425,6 @@ Ref<MultiplayerPeer> NetwTransport::make_probe_peer(const String &p_address) {
     if (GDVIRTUAL_CALL(_make_probe_peer, p_address, answered)) {
         return answered;
     }
-    return make_probe_peer_default(p_address);
-}
-
-Ref<MultiplayerPeer> NetwTransport::make_probe_peer_default(const String &) {
     return Ref<MultiplayerPeer>();
 }
 
@@ -575,10 +445,6 @@ String NetwTransport::join_address() {
     if (GDVIRTUAL_CALL(_join_address, answered)) {
         return answered;
     }
-    return join_address_default();
-}
-
-String NetwTransport::join_address_default() {
     return String();
 }
 
@@ -587,10 +453,6 @@ Dictionary NetwTransport::diagnostics(int64_t p_peer_id) {
     if (GDVIRTUAL_CALL(_diagnostics, p_peer_id, answered)) {
         return answered;
     }
-    return diagnostics_default(p_peer_id);
-}
-
-Dictionary NetwTransport::diagnostics_default(int64_t) {
     return Dictionary();
 }
 
@@ -599,10 +461,6 @@ double NetwTransport::timeout_hint() {
     if (GDVIRTUAL_CALL(_timeout_hint, answered)) {
         return answered;
     }
-    return timeout_hint_default();
-}
-
-double NetwTransport::timeout_hint_default() {
     return 5.0;
 }
 

@@ -56,6 +56,12 @@ public:
         int64_t p_successor_was,
         int64_t p_former_now
     );
+    void announce_kick_requested(
+        const godot::Ref<NetwPlayer> &p_requester,
+        const godot::Ref<NetwPlayer> &p_target,
+        const godot::String &p_reason
+    );
+    void announce_scene_removed(const godot::Ref<NetwScene> &p_scene);
 
     godot::TypedArray<NetwPlayer> get_players() const;
     godot::Ref<NetwPlayer> get_local_player() const;
@@ -76,8 +82,9 @@ public:
 
     godot::Ref<NetwSessionConfig> get_config() const;
     void set_server_info(const godot::Ref<NetwServerInfo> &p_info);
-    godot::Dictionary get_stats() const;
+    int64_t stat(enums::NetwMultiplayer::Stat p_stat) const;
     void set_peer_bandwidth(int64_t p_peer, int64_t p_kbps);
+    godot::Dictionary link_stats(int64_t p_peer) const;
 
     godot::Ref<NetwPromise> leave();
     godot::Ref<NetwPromise> step_away();
@@ -86,6 +93,10 @@ public:
     godot::Ref<NetwPromise> save_entities();
     godot::Error kick(
         const godot::Ref<NetwPlayer> &p_who,
+        const godot::String &p_reason
+    );
+    void request_kick(
+        const godot::Ref<NetwPlayer> &p_player,
         const godot::String &p_reason
     );
     godot::Error transfer_server(int64_t p_peer);

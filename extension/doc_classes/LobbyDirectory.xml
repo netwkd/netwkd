@@ -105,14 +105,14 @@
 		<method name="_local_member_name" qualifiers="virtual">
 			<return type="String" />
 			<description>
-				Return the local player's display name. [method local_member_name_default] by default.
+				Return the local player's display name. An empty answer gives [code]"Player"[/code], as not overriding does.
 			</description>
 		</method>
 		<method name="_member_name" qualifiers="virtual">
 			<return type="String" />
 			<param index="0" name="peer_id" type="int" />
 			<description>
-				Return the display name of [param peer_id]. [method member_name_default] by default.
+				Return the display name of [param peer_id]. An empty answer gives [code]"Player &lt;peer_id&gt;"[/code], as not overriding does.
 			</description>
 		</method>
 		<method name="_peer_class" qualifiers="virtual">
@@ -148,19 +148,6 @@
 			<param index="1" name="from_name" type="String" />
 			<description>
 				Calls [method NetwConnection.invite] for this directory's [MultiplayerPeer] class and emits [signal NetwConnection.invited].
-			</description>
-		</method>
-		<method name="local_member_name_default" qualifiers="static">
-			<return type="String" />
-			<description>
-				The default [method _local_member_name].
-			</description>
-		</method>
-		<method name="member_name_default" qualifiers="static">
-			<return type="String" />
-			<param index="0" name="peer_id" type="int" />
-			<description>
-				The default [method _member_name], [code]"Player &lt;peer_id&gt;"[/code].
 			</description>
 		</method>
 		<method name="publish_lobbies">

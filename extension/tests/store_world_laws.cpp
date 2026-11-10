@@ -196,7 +196,7 @@ TEST_CASE(
         = world.add_row(table, 10, 0, uint64_t(src->get_instance_id()), 0);
     world.place(at, 5, 1);
     held.sources[at.row] = uint8_t(Source::LOCAL);
-    world.pull(table, 1, false);
+    world.pull(table, 1);
 
     CHECK(bool((held.flags[at.row] & Table::UNGATHERED) != 0));
     CHECK(bool((held.flags[at.row] & Table::PULLED) == 0));
@@ -260,7 +260,7 @@ TEST_CASE(
 
     const Vector3 first(1.001, -2.002, 0.5003);
     src->set_position(first);
-    world.pull(table, 1, false);
+    world.pull(table, 1);
     NETW_CHECK_EQ(held.history_count(at.row), 1u);
     const Vector3 canonical = decoded_position(held, at.row);
     CHECK(first.distance_to(canonical) > 1e-4);
@@ -269,7 +269,7 @@ TEST_CASE(
 
     const Vector3 nudged = canonical + Vector3(0.0003, -0.0003, 0.0003);
     src->set_position(nudged);
-    world.pull(table, 2, false);
+    world.pull(table, 2);
     NETW_CHECK_EQ(held.history_count(at.row), 1u);
     NETW_CHECK_EQ(held.history_tick(at.row, 0), int64_t(1));
     check_close(Vector3(held.read_value(at.row, 0)), nudged, 1e-12);

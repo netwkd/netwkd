@@ -11,6 +11,7 @@
 namespace godot {
 using ::Array;
 using ::Basis;
+using ::BitField;
 using ::Color;
 using ::Dictionary;
 using ::ERR_ALREADY_EXISTS;

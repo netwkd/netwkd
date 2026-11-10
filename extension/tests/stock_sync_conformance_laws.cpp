@@ -1071,63 +1071,6 @@ TEST_CASE(
     NETW_CHECK_EQ(frames_out(rig.server()), settled);
 }
 
-constexpr const char *DECODING_SESSION = R"(extends NetwMultiplayer
-
-var decoded := 0
-
-func _sync_decode(_entity: RID, _comp: int, _flags: int, _tick: int,
-		_payload: PackedByteArray) -> Error:
-	decoded += 1
-	return ERR_INVALID_DATA
-)";
-
-TEST_CASE(
-    "[Networked][Sync][SceneTree] a consumed synchronizer runs the encode "
-    "and decode seams only on a session whose script overrides them"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error("*'Sync'*[NW1020]*", 1);
-
-    LoopbackRig rig(1);
-    rig.mount();
-    netw_test::flow_clocks(rig, TICKRATE);
-    const Ref<PackedScene> scene = probe_scene();
-    PackedStringArray scenes;
-    scenes.push_back(scene->get_path());
-    StockWorld world = netw_test::mount_stock_world(rig, scenes);
-
-    Node *node = scene->instantiate();
-    node->set_name("SeamProbe");
-    world.arena(-1)->add_child(node, true);
-    Node *mirror
-        = netw_test::pump_until_child(rig, world.arena(0), "SeamProbe");
-    REQUIRE(mirror != nullptr);
-    for (int value = 1; value <= 3; ++value) {
-        node->set(StringName("synced_value"), value);
-        node->set(StringName("watched_value"), value);
-        netw_test::pump_until_value(
-            rig,
-            mirror,
-            StringName("watched_value"),
-            value
-        );
-    }
-    NETW_CHECK_EQ(compat_of(rig.server())->get_stage_calls(), int64_t(0));
-    NETW_CHECK_EQ(compat_of(rig.client(0))->get_stage_calls(), int64_t(0));
-
-    const Ref<Script> decoding = netw_test::minted_script(DECODING_SESSION);
-    REQUIRE(decoding.is_valid());
-    rig.client(0)->set_script(decoding);
-    node->set(StringName("synced_value"), 9);
-    rig.step_ticks(6);
-    NETW_CHECK_GT(compat_of(rig.client(0))->get_stage_calls(), int64_t(0));
-    NETW_CHECK_GT(
-        int64_t(rig.client(0)->get(StringName("decoded"))),
-        int64_t(0)
-    );
-    NETW_CHECK_EQ(compat_of(rig.server())->get_stage_calls(), int64_t(0));
-}
-
 TEST_CASE(
     "[Networked][Sync][SceneTree] a received row whose properties declare no "
     "interpolator asks for one once, not on every frame"

@@ -24,11 +24,6 @@ using repl::PropertySet;
 
 namespace {
 
-const StringName &gather_rows_seam() {
-    static const StringName name("_sync_gather_rows");
-    return name;
-}
-
 struct RowChannels {
     uint8_t row = 0;
     uint8_t delta = 0;
@@ -128,31 +123,6 @@ const char *source_drift(const SourceImage &p_was, const SourceImage &p_now) {
 
 } // namespace
 
-Array NetwMultiplayer::sync_gather_rows_default(
-    const RID &p_table,
-    const PackedInt64Array &p_routes
-) {
-    return store_world.gather_rows(store_world.table_of(p_table), p_routes);
-}
-
-Array NetwMultiplayer::run_gather_rows(
-    const RID &p_table,
-    const PackedInt64Array &p_routes
-) {
-    NETW_ZONE_NC("session gather rows seam", colors::WIRE);
-    ReplicationCore *plane = get_replication_plane();
-    Object *seam
-        = plane != nullptr ? plane->gate_seam(gather_rows_seam()) : nullptr;
-    if (seam != nullptr) {
-        return seam->call(gather_rows_seam(), p_table, p_routes);
-    }
-    Array answered;
-    if (GDVIRTUAL_CALL(_sync_gather_rows, p_table, p_routes, answered)) {
-        return answered;
-    }
-    return sync_gather_rows_default(p_table, p_routes);
-}
-
 void NetwMultiplayer::store_admit(const PropertyBindingPtr &p_binding) {
     Node *node = p_binding != nullptr ? p_binding->node() : nullptr;
     PropertySet *set = node != nullptr ? p_binding->get_set() : nullptr;
@@ -238,14 +208,6 @@ void NetwMultiplayer::store_bind_entity(const Ref<NetwEntity> &p_entity) {
             lagcomp_core.bind_store(rewound, held);
         }
     }
-}
-
-bool NetwMultiplayer::store_gathers_by_seam() {
-    ReplicationCore *plane = get_replication_plane();
-    if (plane != nullptr && plane->gate_seam(gather_rows_seam()) != nullptr) {
-        return true;
-    }
-    return overrides_seam(gather_rows_seam());
 }
 
 void NetwMultiplayer::store_sources(
@@ -807,47 +769,6 @@ PackedInt32Array NetwMultiplayer::store_reach(uint32_t p_slot) const {
             out.push_back(store_roster[at]);
         }
     }
-    return out;
-}
-
-Dictionary NetwMultiplayer::store_describe() const {
-    Array tables;
-    for (uint32_t at = 0; at < store_world.table_count(); ++at) {
-        const store::Table &table = store_world.table(at);
-        Array columns;
-        for (uint32_t column = 0; column < table.columns.size(); ++column) {
-            Dictionary described;
-            described[StringName("name")] = table.schema.at(int(column))->key;
-            described[StringName("type")]
-                = int64_t(table.schema.at(int(column))->type);
-            described[StringName("port")]
-                = String(store::port_name(table.columns[column].port));
-            columns.push_back(described);
-        }
-        Dictionary described;
-        described[StringName("table")] = table.rid;
-        described[StringName("family")]
-            = String(store::family_name(table.family));
-        described[StringName("columns")] = columns;
-        described[StringName("rows")] = int64_t(table.row_count());
-        described[StringName("dirty")] = int64_t(table.dirty_count());
-        int64_t owed = 0;
-        for (uint32_t peer = 0; peer < table.peers.size(); ++peer) {
-            owed += store_world.peer_joined(peer)
-                ? int64_t(table.peers[peer].owed.population())
-                : 0;
-        }
-        described[StringName("owed")] = owed;
-        described[StringName("bytes")] = table.byte_count();
-        described[StringName("retention")]
-            = int64_t(store::Table::HISTORY_DEPTH);
-        tables.push_back(described);
-    }
-    Dictionary out;
-    out[StringName("tables")] = tables;
-    out[StringName("slots")] = int64_t(store_world.live_slot_count());
-    out[StringName("misses")] = store_world.miss_count;
-    out[StringName("validate_every")] = store_world.validate_every;
     return out;
 }
 

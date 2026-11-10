@@ -94,7 +94,7 @@ void NetwMultiplayer::session_arm_deadline(
         r_awaited.deadline = link->deadline;
         return;
     }
-    const double timeout = get_auth_timeout();
+    const double timeout = auth_link_seconds();
     r_awaited.deadline
         = timeout > 0.0 ? now_msec() + int64_t(timeout * 1000.0) : 0;
 }

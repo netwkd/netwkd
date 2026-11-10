@@ -157,32 +157,18 @@ PackedByteArray pong_payload(uint64_t p_origin, uint64_t p_tick) {
     return netw::session::frame_write(pong);
 }
 
-int &pong_accepted_count() {
-    static int count = 0;
-    return count;
-}
-
-void count_pong_accepted(const Dictionary &) {
-    pong_accepted_count() += 1;
-}
-
 TEST_CASE(
     "[Networked][Session][Hosted] L5 the clock's pong evidence answers the "
     "server, so a pong from any other peer is refused while the same pong "
     "from peer 1 settles"
 ) {
     Ref<NetwMultiplayer> session = a_session();
-    pong_accepted_count() = 0;
-    session->observe(
-        NetwMultiplayer::CLOCK_PONG_RECEIVED,
-        callable_mp_static(&count_pong_accepted)
-    );
 
     session->clock_receive_pong(pong_payload(0, 10), 7);
-    NETW_CHECK_EQ(pong_accepted_count(), 0);
+    CHECK_FALSE(session->clock_is_synchronized());
 
     session->clock_receive_pong(pong_payload(0, 10), 1);
-    NETW_CHECK_EQ(pong_accepted_count(), 1);
+    CHECK(session->clock_is_synchronized());
 }
 
 TEST_CASE(

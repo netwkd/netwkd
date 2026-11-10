@@ -123,8 +123,6 @@ class SessionSend {
     int64_t tickrate = 60;
     int64_t row_budget_bits = 0;
     int64_t pass_tick = -1;
-    godot::Callable stage;
-    bool stage_wanted = true;
     bool tables_published = true;
     store::World *world = nullptr;
     godot::LocalVector<Candidate> candidates;
@@ -224,11 +222,6 @@ class SessionSend {
 
     PeerAccount &refill(int p_peer, int64_t p_max_bits, int64_t p_tick);
 
-    godot::PackedByteArray price(
-        const RowSend &p_send,
-        int64_t p_base_tick
-    ) const;
-
 public:
     static constexpr uint32_t MISSES_PER_TICK = 4;
     static constexpr double BANKED_TICKS = 2.0;
@@ -268,20 +261,8 @@ public:
     int64_t rows_touched = 0;
 #endif
 
-    void set_encode_stage(const godot::Callable &p_stage) {
-        stage = p_stage;
-    }
-
-    void want_encode_stage(bool p_wanted) {
-        stage_wanted = p_wanted;
-    }
-
     void publish_tables(bool p_publishes) {
         tables_published = p_publishes;
-    }
-
-    bool has_encode_stage() const {
-        return stage.is_valid();
     }
 
     void watch_store(store::World *p_world) {

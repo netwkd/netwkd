@@ -161,19 +161,15 @@ public:
         }
 
         answered = declared.gate == GATE_A_SPAWN_FRAME
-            ? session->spawn_admit_frame_default(
+            ? session->spawn_admit_frame(
                   sender,
                   0,
                   netw::wire::builtin_channel("SPAWN"),
                   payload
               )
-            : session->sync_admit_frame_default(
-                  sender,
+            : session->sync_admit_frame(
                   route,
-                  0,
                   netw::wire::builtin_channel("SYNC"),
-                  0,
-                  -1,
                   payload
               );
 

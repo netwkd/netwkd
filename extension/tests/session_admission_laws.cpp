@@ -521,6 +521,28 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "[Networked][Session][SceneTree] the server's own join is given the "
+    "admission timeout, so a proof that outlives auth_timeout still seats it"
+) {
+    Node *branch = mounted_branch("OwnJoinTimeout");
+    const Ref<NetwMultiplayer> host = branch_session(branch);
+    Node *gate = gate_on(branch, ASYNC_GATE);
+    const Ref<TestAccount> held = account_row("held", "held:host");
+    held->hold_prove = true;
+    admit_through(gate)->accept(as_provider(held))->timeout(60.0);
+
+    host->session_submit_join(StringName("host"), Array());
+    host->session_poll_admissions(
+        int64_t(Time::get_singleton()->get_ticks_msec())
+        + int64_t(host->get_auth_timeout() * 1000.0) + 10000
+    );
+    held->release_prove();
+
+    CHECK(host->player_local().is_valid());
+    release_branch(host, branch);
+}
+
+TEST_CASE(
     "[Networked][Session][SceneTree] a required proof is separate from join "
     "arguments, a join without one is refused before the handler, and a "
     "local host awaits its own challenge"

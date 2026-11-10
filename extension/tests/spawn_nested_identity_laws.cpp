@@ -611,7 +611,7 @@ struct UnconnectedPair {
         Node *scene = netw::gd::scene_root();
         SceneTree *tree = netw::gd::scene_tree();
         for (int at = 0; at < count; ++at) {
-            apis[at] = netw::NetwMultiplayer::create(Ref<Script>());
+            apis[at] = netw::NetwMultiplayer::create();
             apis[at]->session_get_inner()->set_root_path(NodePath("/"));
             Ref<netw::NetwClockConfig> clock;
             clock.instantiate();

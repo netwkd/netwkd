@@ -233,35 +233,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Hosted][Law] the escalation tracker follows the "
-    "recovery a seam answered, not the one the pool planned"
-) {
-    Slot slot;
-    slot.open = true;
-    slot.rewire(recovery_wiring());
-    slot.config = snap_config();
-    RecoveryRequest declined = recovery_request();
-    declined.answered = true;
-    declined.answered_skip = true;
-
-    for (int at = 0; at < 4; ++at) {
-        CHECK_FALSE(slot.recover(declined).skip);
-    }
-    CHECK_FALSE(slot.recovery.escalate_next);
-    NETW_CHECK_EQ(slot.recovery.nonshrink_streak, 0);
-
-    RecoveryRequest teleported = recovery_request();
-    slot.recover(teleported);
-    NETW_CHECK_EQ(slot.recovery.nonshrink_streak, 1);
-    teleported.answered = true;
-    teleported.answered_skip = false;
-    teleported.answered_teleport = true;
-    CHECK_FALSE(slot.recover(teleported).teleport);
-    NETW_CHECK_EQ(slot.recovery.nonshrink_streak, 0);
-    NETW_CHECK_EQ(slot.recovery.last_field, -1);
-}
-
-TEST_CASE(
     "[Networked][Predict][Hosted][Recovery] the engine publishes its effect"
 ) {
     Slot slot;

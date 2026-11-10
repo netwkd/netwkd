@@ -10,6 +10,8 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/participant.hpp"
 #include "netw/api/promise.hpp"
+#include "netw/api/scene.hpp"
+#include "netw/api/session.hpp"
 #include "netw/scene_core.hpp"
 #include "support/netw_call_log.h"
 #include "support/netw_recorder.h"
@@ -198,70 +200,49 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT14 forgetting a container announces "
-    "scene_despawned for it after the record plane has dropped it, a null "
-    "container is not a departure, and a node the session never held still "
-    "departs"
+    "[Networked][Scene][Hosted] SNT14 forgetting a container emits "
+    "scene_removed with its scene at the next poll, and a null container or "
+    "a node the session never held emits nothing"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    Recorder departures(
-        core.ptr(),
-        Vector<StringName>{StringName("scene_despawned")}
-    );
-
-    core->scene_forget(nullptr);
-    NETW_CHECK_EQ(departures.count(StringName("scene_despawned")), 0);
-
-    core->scene_forget(arena.root);
-    NETW_CHECK_EQ(departures.count(StringName("scene_despawned")), 1);
-    const Array departed = departures.args(StringName("scene_despawned"), 0);
-    NETW_CHECK_EQ(departed.size(), 1);
-    NETW_CHECK_EQ(
-        departed.is_empty() ? nullptr : Object::cast_to<Node>(departed[0]),
+    REQUIRE(core->liveness_bind(
+        arena.scene,
+        core->get_liveness_core()->reserve_route(),
+        arena.entity,
+        arena.entity->get_record(),
         arena.root
+    ));
+    const Ref<netw::NetwSession> session = core->get_session();
+    const Ref<netw::NetwScene> scene = core->scene_handle_of(arena.scene);
+    REQUIRE(scene.is_valid());
+    Recorder removals(
+        session.ptr(),
+        Vector<StringName>{StringName("scene_removed")}
     );
-    NETW_CHECK_EQ(named_scene_node(core, StringName("Arena")), nullptr);
-
     Node *stranger = memnew(Node);
     root->add_child(stranger);
+
+    core->scene_forget(nullptr);
     core->scene_forget(stranger);
-    NETW_CHECK_EQ(departures.count(StringName("scene_despawned")), 2);
+    core->scene_forget(arena.root);
+    core->NETW_API_VIRTUAL(poll)();
+
+    NETW_CHECK_EQ(removals.count(StringName("scene_removed")), 1);
+    const Array removed = removals.args(StringName("scene_removed"), 0);
+    REQUIRE(removed.size() == 1);
+    CHECK(bool(Object::cast_to<netw::NetwScene>(removed[0]) == scene.ptr()));
+    NETW_CHECK_EQ(session->get_scenes().size(), 0);
 
     memdelete(root);
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT15 server authority entering the session "
-    "queues the startup announcement instead of raising it inline, so a "
-    "listener installed by the same entry still hears it, and the "
-    "announcement reports that startup finished rather than that anything "
-    "spawned"
-) {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    REQUIRE(core->is_server());
-    Recorder passes(
-        core.ptr(),
-        Vector<StringName>{StringName("scene_startup_spawned")}
-    );
-
-    core->scene_on_session_entered();
-    NETW_CHECK_EQ(passes.count(StringName("scene_startup_spawned")), 0);
-
-    core->scene_announce_startup();
-    NETW_CHECK_EQ(passes.count(StringName("scene_startup_spawned")), 1);
-
-    core->scene_announce_startup();
-    NETW_CHECK_EQ(passes.count(StringName("scene_startup_spawned")), 2);
-}
-
-TEST_CASE(
     "[Networked][Scene][Hosted] SNT16 remembering a scene root enters it "
-    "under its own name and announces scene_spawned, and a node the session "
-    "seated no entity on is refused rather than entered"
+    "under its own name, and a node the session seated no entity on is "
+    "refused rather than entered"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -281,42 +262,25 @@ TEST_CASE(
     bare->set_name(StringName("Bare"));
     root->add_child(bare);
 
-    Recorder entries(
-        core.ptr(),
-        Vector<StringName>{StringName("scene_spawned")}
-    );
-
     CHECK_FALSE(core->scene_remember(nullptr));
     CHECK_FALSE(core->scene_remember(bare));
-    NETW_CHECK_EQ(entries.count(StringName("scene_spawned")), 0);
+    NETW_CHECK_EQ(named_scene_node(core, StringName("Bare")), nullptr);
 
     CHECK(core->scene_remember(arena));
     NETW_CHECK_EQ(named_scene_node(core, StringName("Arena")), arena);
-    NETW_CHECK_EQ(entries.count(StringName("scene_spawned")), 1);
-    const Array entered = entries.args(StringName("scene_spawned"), 0);
-    NETW_CHECK_EQ(entered.size(), 1);
-    NETW_CHECK_EQ(
-        entered.is_empty() ? nullptr : Object::cast_to<Node>(entered[0]),
-        arena
-    );
 
     memdelete(root);
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT17 an arriving move announces "
-    "scene_entity_moved with the mover and both ends, resolves the waiting "
-    "promise with OK, and still arrives for a mover nobody is awaiting"
+    "[Networked][Scene][Hosted] SNT17 an arriving move resolves the waiting "
+    "promise with OK"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
     const Mounted annex = mount_plain(core, root, StringName("Annex"));
-    Recorder moves(
-        core.ptr(),
-        Vector<StringName>{StringName("scene_entity_moved")}
-    );
 
     Node *body = memnew(Node);
     arena.root->add_child(body);
@@ -328,24 +292,8 @@ TEST_CASE(
     settled.instantiate();
     core->scene_arrive(mover, arena.root, annex.root, settled);
 
-    NETW_CHECK_EQ(moves.count(StringName("scene_entity_moved")), 1);
-    const Array moved = moves.args(StringName("scene_entity_moved"), 0);
-    NETW_CHECK_EQ(moved.size(), 3);
-    if (moved.size() == 3) {
-        NETW_CHECK_EQ(Object::cast_to<netw::NetwEntity>(moved[0]), mover.ptr());
-        NETW_CHECK_EQ(Object::cast_to<Node>(moved[1]), arena.root);
-        NETW_CHECK_EQ(Object::cast_to<Node>(moved[2]), annex.root);
-    }
     CHECK(settled->get_is_settled());
     NETW_CHECK_EQ(settled->get_code(), int(OK));
-
-    Node *prop = memnew(Node);
-    annex.root->add_child(prop);
-    Ref<netw::NetwEntity> stranger;
-    stranger.instantiate();
-    stranger->attach_to(prop);
-    core->scene_arrive(stranger, annex.root, arena.root, nullptr);
-    NETW_CHECK_EQ(moves.count(StringName("scene_entity_moved")), 2);
 
     memdelete(root);
 }

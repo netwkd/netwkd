@@ -48,8 +48,8 @@ namespace Networked;
 /// past. <see cref="NetwClock.RecommendedDisplayOffset"/> is the offset the
 /// current connection needs, the one-way latency plus the jitter times
 /// <see cref="NetwMultiplayer.ClockParam.JitterMultiplier"/>, in ticks. It is
-/// not applied automatically.
-/// <see cref="NetwMultiplayer.ClockAutoConfigureOffset"/> applies it.
+/// not applied automatically. <see cref="NetwClock.AutoConfigureOffset"/>
+/// applies it.
 /// </para>
 /// </remarks>
 public sealed class NetwClock : NetwRefCounted
@@ -92,9 +92,8 @@ public sealed class NetwClock : NetwRefCounted
         /// </summary>
         Disconnect = 1,
         /// <summary>
-        /// Notify
-        /// <see cref="NetwMultiplayer.Notification.ClockTickrateMismatch"/> and
-        /// let the game decide.
+        /// Emit <see cref="NetwClock.TickrateMismatch"/> and let the game
+        /// decide.
         /// </summary>
         Signal = 2,
     }
@@ -200,6 +199,25 @@ public sealed class NetwClock : NetwRefCounted
         remove => DisconnectBridge("synchronized", value);
     }
 
+    /// <summary>
+    /// Emitted on a client whose <see cref="NetwClock.Tickrate"/> differs from
+    /// <c>server_tickrate</c> when
+    /// <see cref="NetwClockConfig.TickrateMismatchAction"/> is
+    /// <see cref="NetwClock.MismatchAction.Signal"/>.
+    /// </summary>
+    public event Action<long> TickrateMismatch
+    {
+        add => ConnectBridge(
+            "tickrate_mismatch",
+            value,
+            Callable.From(
+                (long a0) =>
+                    value(a0)
+            )
+        );
+        remove => DisconnectBridge("tickrate_mismatch", value);
+    }
+
     private static readonly IntPtr _bindGetTick =
         NetwApi.MethodBind("NetwClock", "get_tick", 3905245786UL);
 
@@ -222,7 +240,7 @@ public sealed class NetwClock : NetwRefCounted
     /// <summary>
     /// <c>true</c> once the tick follows the server. Always <c>true</c> on the
     /// server and on a peer with no connection, as
-    /// <see cref="NetwMultiplayer.IsHost"/> is.
+    /// <c>MultiplayerAPI.is_server</c> is.
     /// </summary>
     public bool IsSynchronized
     {
@@ -494,5 +512,23 @@ public sealed class NetwClock : NetwRefCounted
             in slot0,
             ref answered);
         return answered;
+    }
+
+    private static readonly IntPtr _bindAutoConfigureOffset =
+        NetwApi.MethodBind("NetwClock", "auto_configure_offset", 3218959716UL);
+
+    /// <summary>
+    /// Measures the connection for five seconds, then sets
+    /// <see cref="NetwClock.DisplayOffset"/> to the largest
+    /// <see cref="NetwClock.RecommendedDisplayOffset"/> it saw. Does nothing on
+    /// the server.
+    /// </summary>
+    public void AutoConfigureOffset()
+    {
+        long discarded = default;
+        NetwThunks.Ptrcall0_Long(
+            _bindAutoConfigureOffset,
+            Checked,
+            ref discarded);
     }
 }

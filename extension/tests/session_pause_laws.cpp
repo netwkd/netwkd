@@ -4,6 +4,7 @@
 #include "godot/scene_tree.hpp"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/session.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/wire/registry.hpp"
 #include "support/loopback_rig.h"
@@ -66,8 +67,8 @@ TEST_CASE(
     rig.join(-1, StringName("host"));
 
     const CallLog seen;
-    rig.client(0)->observe(
-        NetwMultiplayer::SESSION_TREE_PAUSED,
+    rig.client(0)->get_session()->connect(
+        StringName("paused_changed"),
         seen.callable("early")
     );
 
@@ -76,8 +77,8 @@ TEST_CASE(
     rig.pump(4);
 
     const int late = rig.add_client();
-    rig.client(late)->observe(
-        NetwMultiplayer::SESSION_TREE_PAUSED,
+    rig.client(late)->get_session()->connect(
+        StringName("paused_changed"),
         seen.callable("late")
     );
     rig.pump(8);
@@ -85,12 +86,10 @@ TEST_CASE(
     NETW_CHECK_EQ(int(rig.client(late)->session_is_paused()), 1);
     NETW_CHECK_EQ(seen.count("late"), 1);
     NETW_CHECK_EQ(seen.count("early"), 1);
-    const Array reason = seen.args("late");
-    NETW_CHECK_EQ(reason.size(), 1);
-    if (reason.size() != 1) {
-        return;
-    }
-    NETW_CHECK_EQ(int(String(reason[0]) == String("menu")), 1);
+    const Array late_heard = seen.args("late");
+    REQUIRE(late_heard.size() == 2);
+    CHECK(bool(late_heard[0]));
+    CHECK(String(late_heard[1]) == String("menu"));
 }
 
 TEST_CASE(
@@ -103,8 +102,8 @@ TEST_CASE(
     rig.join(-1, StringName("host"));
 
     const CallLog seen;
-    rig.client(0)->observe(
-        NetwMultiplayer::SESSION_TREE_UNPAUSED,
+    rig.client(0)->get_session()->connect(
+        StringName("paused_changed"),
         seen.callable("client")
     );
 
@@ -118,7 +117,8 @@ TEST_CASE(
 
     NETW_CHECK_EQ(int(rig.client(0)->session_is_paused()), 0);
     NETW_CHECK_EQ(int(rig.server()->session_is_paused()), 0);
-    NETW_CHECK_EQ(seen.count("client"), 1);
+    NETW_CHECK_EQ(seen.count("client"), 2);
+    CHECK_FALSE(bool(seen.args("client", 1)[0]));
     NETW_CHECK_EQ(int(tree_paused()), 0);
 }
 

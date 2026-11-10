@@ -2,6 +2,7 @@
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/table.hpp"
 #include "netw/schema_core.hpp"
 #include "netw/store/array.hpp"
 
@@ -238,11 +239,15 @@ TEST_CASE(
     "per touched table and reopens the wave behind itself"
 ) {
     Stand stand;
-    Vector<StringName> watched;
-    watched.push_back(StringName("table_received"));
-    const Recorder recorder(stand.core.ptr(), watched);
+    const Recorder recorder(
+        stand.core->get_table_handle(stand.table).ptr(),
+        {"received"}
+    );
 
     NETW_CHECK_EQ(stand.publish(int64s({1}), points(1), int32s({4})), OK);
+    stand.core->table_announce_intake();
+    NETW_CHECK_EQ(recorder.count(StringName("received")), 0);
+
     Arrays &plane = stand.core->store_arrays();
     const TypedArray<PackedByteArray> frames
         = plane.encode_owed(stand.table, 7, 1200);
@@ -258,10 +263,10 @@ TEST_CASE(
     }
 
     stand.core->table_announce_intake();
-    NETW_CHECK_EQ(recorder.count(StringName("table_received")), 1);
+    NETW_CHECK_EQ(recorder.count(StringName("received")), 1);
 
     stand.core->table_announce_intake();
-    NETW_CHECK_EQ(recorder.count(StringName("table_received")), 1);
+    NETW_CHECK_EQ(recorder.count(StringName("received")), 1);
 }
 
 TEST_CASE(

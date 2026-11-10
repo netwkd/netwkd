@@ -199,7 +199,7 @@ func run() -> void:
 	if api and api.clock_is_configured():
 		_cadence_baseline = _cadence()
 	if api:
-		api.attribution_set_armed(true)
+		ClassDB.class_call_static(&"NetwNativeTests", &"attribution_arm", api)
 	_sample_cadence_loop.call_deferred()
 	await gestures[gesture].call(seconds)
 	_snapshot_entities()
@@ -317,7 +317,11 @@ func _write_summary(exit_kind: String) -> void:
 		"condition": _condition_report(),
 		"clock": _clock_report(),
 		"entities": _entity_snapshots,
-		"attribution": api.attribution_snapshot() if api else { },
+		"attribution": ClassDB.class_call_static(
+			&"NetwNativeTests",
+			&"attribution_snapshot",
+			api,
+		) if api else { },
 		"stats": api.stats_snapshot() if api else { },
 		"instrument_cost": { "tap": api.predict_get_tap_cost() },
 	}

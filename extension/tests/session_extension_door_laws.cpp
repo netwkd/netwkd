@@ -13,8 +13,6 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/wire/registry.hpp"
-#include "support/declared_seams.h"
-#include "support/minted_script.h"
 
 namespace TestNetwSessionExtensionDoorLaws {
 
@@ -26,25 +24,21 @@ using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
 
-const char *CALLTHROUGH = netw_test::gdsrc::GATE_THAT_CALLS_THROUGH;
-const char *FLIPPING = netw_test::gdsrc::GATE_THAT_REFUSES_WHAT_STOCK_ADMITS;
 constexpr int64_t ROUTE = 7;
 constexpr int64_t ABSENT_ROUTE = 99;
 constexpr int64_t CLIENT_PEER = 2;
 
 enum Plant {
     PLANT_NONE,
-    PLANT_A_STOCK_SESSION_WEARING_THE_SCRIPT,
     PLANT_AN_INNER_NOBODY_ADOPTED,
 };
 
 struct DoorScenario {
     String label;
-    const char *implementation = nullptr;
+    const char *channel = "SYNC";
     bool binds_the_route = false;
     Error answers = OK;
     NetwMultiplayer::Stat lands_on = NetwMultiplayer::STAT_VERDICT_SKIP;
-    int64_t gate_calls = 0;
 };
 
 DoorScenario no_implementation_at_all() {
@@ -55,34 +49,13 @@ DoorScenario no_implementation_at_all() {
     return scenario;
 }
 
-DoorScenario a_gate_that_calls_through() {
+DoorScenario a_command_for_an_entity_it_does_not_steer() {
     DoorScenario scenario;
-    scenario.label = "a-gate-that-calls-through";
-    scenario.implementation = CALLTHROUGH;
-    scenario.answers = ERR_DOES_NOT_EXIST;
-    scenario.lands_on = NetwMultiplayer::STAT_VERDICT_DOES_NOT_EXIST;
-    scenario.gate_calls = 1;
-    return scenario;
-}
-
-DoorScenario a_gate_that_refuses_what_stock_admits() {
-    DoorScenario scenario;
-    scenario.label = "a-gate-that-refuses-what-stock-admits";
-    scenario.implementation = FLIPPING;
+    scenario.label = "a-command-for-an-entity-it-does-not-steer";
+    scenario.channel = "PREDICT_COMMAND";
     scenario.binds_the_route = true;
     scenario.answers = ERR_UNAUTHORIZED;
     scenario.lands_on = NetwMultiplayer::STAT_VERDICT_UNAUTHORIZED;
-    scenario.gate_calls = 1;
-    return scenario;
-}
-
-DoorScenario a_call_through_on_a_bound_route() {
-    DoorScenario scenario;
-    scenario.label = "a-call-through-on-a-bound-route";
-    scenario.implementation = CALLTHROUGH;
-    scenario.binds_the_route = true;
-    scenario.answers = OK;
-    scenario.gate_calls = 1;
     return scenario;
 }
 
@@ -98,9 +71,7 @@ const NetwMultiplayer::Stat VERDICT_STATS[] = {
 class DoorRun {
     DoorScenario declared;
     Plant planted = PLANT_NONE;
-    bool script_is_the_one_named = false;
     bool inner_is_the_one_adopted = false;
-    int64_t calls = 0;
     Error answered = OK;
     int64_t stats[6] = {0, 0, 0, 0, 0, 0};
     int entity_state = -1;
@@ -108,27 +79,9 @@ class DoorRun {
 public:
     DoorRun(const DoorScenario &p_scenario, Plant p_plant = PLANT_NONE)
         : declared(p_scenario), planted(p_plant) {
-        Ref<Script> implementation;
-        if (declared.implementation != nullptr) {
-            implementation = netw_test::script_from(declared.implementation);
-            REQUIRE(implementation.is_valid());
-        }
-        if (planted == PLANT_A_STOCK_SESSION_WEARING_THE_SCRIPT) {
-            implementation = netw_test::script_from(CALLTHROUGH);
-        }
-
-        const bool constructs_with_a_script = declared.implementation != nullptr
-            || planted == PLANT_A_STOCK_SESSION_WEARING_THE_SCRIPT;
-        Ref<NetwMultiplayer> session = NetwMultiplayer::create(
-            constructs_with_a_script ? implementation : Ref<Script>()
-        );
+        Ref<NetwMultiplayer> session = NetwMultiplayer::create();
         REQUIRE(session.is_valid());
         session->session_set_role(NetwMultiplayer::ROLE_LISTEN_SERVER);
-
-        const Ref<Script> worn = session->get_script();
-        script_is_the_one_named = declared.implementation == nullptr
-            ? worn.is_null()
-            : worn == implementation;
 
         Node3D *body = memnew(Node3D);
         netw::gd::scene_root()->add_child(body);
@@ -145,7 +98,7 @@ public:
             netw::NetwMultiplayer::frame_pack(
                 declared.binds_the_route ? ROUTE : ABSENT_ROUTE,
                 0,
-                netw::wire::builtin_channel("SYNC"),
+                netw::wire::builtin_channel(declared.channel),
                 payload,
                 String()
             ),
@@ -154,9 +107,6 @@ public:
             -1,
             -1
         );
-        if (implementation.is_valid()) {
-            calls = int64_t(session->get(StringName("sync_calls")));
-        }
         for (int index = 0; index < 6; index++) {
             stats[index] = session->stats_get(VERDICT_STATS[index]);
         }
@@ -177,16 +127,8 @@ public:
         return declared;
     }
 
-    bool wears_what_was_named() const {
-        return script_is_the_one_named;
-    }
-
     bool holds_what_was_adopted() const {
         return inner_is_the_one_adopted;
-    }
-
-    int64_t gate_calls() const {
-        return calls;
     }
 
     Error verdict() const {
@@ -204,23 +146,7 @@ public:
 
 typedef LawRowFor<DoorRun> DoorLaw;
 
-LawVerdict law_owned(const DoorRun &p_run) {
-    if (!p_run.wears_what_was_named()) {
-        return law_broken(
-            "the session runs a script the caller did not name, or none"
-        );
-    }
-    return law_held();
-}
-
-LawVerdict law_consulted(const DoorRun &p_run) {
-    if (p_run.gate_calls() != p_run.scenario().gate_calls) {
-        return law_broken(
-            "the installed gate answered %d frames against %d",
-            int(p_run.gate_calls()),
-            int(p_run.scenario().gate_calls)
-        );
-    }
+LawVerdict law_counted(const DoorRun &p_run) {
     if (p_run.verdict() != p_run.scenario().answers) {
         return law_broken(
             "the carrier answered %d where the door names %d",
@@ -228,10 +154,6 @@ LawVerdict law_consulted(const DoorRun &p_run) {
             int(p_run.scenario().answers)
         );
     }
-    return law_held();
-}
-
-LawVerdict law_counted(const DoorRun &p_run) {
     for (int index = 0; index < 6; index++) {
         const int64_t expected = p_run.scenario().answers != OK
                 && VERDICT_STATS[index] == p_run.scenario().lands_on
@@ -269,27 +191,15 @@ LawVerdict law_reseated(const DoorRun &p_run) {
     return law_held();
 }
 
-const DoorLaw L_OWNED = {
-    "owned",
-    "the session runs the implementation it was constructed with and no other",
-    &law_owned,
-};
-
-const DoorLaw L_CONSULTED = {
-    "consulted",
-    "an installed gate is the one that answers, and its answer is the verdict",
-    &law_consulted,
-};
-
 const DoorLaw L_COUNTED = {
     "counted",
-    "a gate's own refusal is counted the way the stock gate's would be",
+    "a refused frame answers its verdict and is counted under it once",
     &law_counted,
 };
 
 const DoorLaw L_UNMUTATED = {
     "unmutated",
-    "a gate that refuses stops the frame before anything it names changes",
+    "a refused frame stops before anything it names changes",
     &law_unmutated,
 };
 
@@ -299,8 +209,7 @@ const DoorLaw L_RESEATED = {
     &law_reseated,
 };
 
-const DoorLaw LAWS[]
-    = {L_OWNED, L_CONSULTED, L_COUNTED, L_UNMUTATED, L_RESEATED};
+const DoorLaw LAWS[] = {L_COUNTED, L_UNMUTATED, L_RESEATED};
 
 TEST_CASE("[Networked][Session] the extension door laws hold") {
     netw_test::FaultWatch expected_faults;
@@ -308,9 +217,7 @@ TEST_CASE("[Networked][Session] the extension door laws hold") {
 
     const DoorScenario CORPUS[] = {
         no_implementation_at_all(),
-        a_gate_that_calls_through(),
-        a_gate_that_refuses_what_stock_admits(),
-        a_call_through_on_a_bound_route(),
+        a_command_for_an_entity_it_does_not_steer(),
     };
     for (const DoorScenario &scenario : CORPUS) {
         const DoorRun run(scenario);
@@ -321,15 +228,8 @@ TEST_CASE("[Networked][Session] the extension door laws hold") {
     }
 }
 
-TEST_CASE("[Networked][Session] a stock session wearing a script reds owned") {
-    const DoorScenario scenario = no_implementation_at_all();
-    const DoorRun run(scenario, PLANT_A_STOCK_SESSION_WEARING_THE_SCRIPT);
-    NETW_CELL(L_OWNED, scenario);
-    NETW_LAW_BREAKS(L_OWNED, run);
-}
-
 TEST_CASE("[Networked][Session] a transport nobody adopted reds reseated") {
-    const DoorScenario scenario = a_gate_that_calls_through();
+    const DoorScenario scenario = no_implementation_at_all();
     const DoorRun run(scenario, PLANT_AN_INNER_NOBODY_ADOPTED);
     NETW_CELL(L_RESEATED, scenario);
     NETW_LAW_BREAKS(L_RESEATED, run);

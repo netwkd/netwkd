@@ -29,7 +29,6 @@
 #include "netw/api/member_config.hpp"
 #include "netw/api/participant.hpp"
 #include "netw/api/physics_stepper.hpp"
-#include "netw/api/predict_fold.hpp"
 #include "netw/api/predict_runner.hpp"
 #include "netw/api/predict_slot_engine.hpp"
 #include "netw/api/prediction.hpp"
@@ -268,9 +267,20 @@ public:
         RECORD_KIND_BROADCAST = repl::PropertySet::RECORD_BROADCAST,
     };
 
+    enum EventGroup : int64_t {
+        EVENT_GROUP_LIFECYCLE = int64_t(1) << (EventPlane::SPAWNING >> 4),
+        EVENT_GROUP_INTEREST = int64_t(1) << (EventPlane::INTEREST_ENTER >> 4),
+        EVENT_GROUP_PREDICTION = int64_t(1) << (EventPlane::EPISODE_OPEN >> 4),
+        EVENT_GROUP_GATE = int64_t(1) << (EventPlane::GATE_SYNC >> 4),
+        EVENT_GROUP_STAGE = int64_t(1) << (EventPlane::SYNC_ENCODE >> 4),
+        EVENT_GROUP_VERDICT = int64_t(1) << (EventPlane::VERDICT >> 4),
+        EVENT_GROUP_SESSION = int64_t(1) << (EventPlane::PEER_JOINED >> 4),
+        EVENT_GROUP_CARRIER = int64_t(1) << (EventPlane::DATAGRAM_SENT >> 4),
+    };
+    static constexpr int64_t EVENT_ROW_WIDTH = EventPlane::ROW_WIDTH;
+
     static constexpr int64_t CHANNEL_USER_FIRST = 100;
     static constexpr int64_t CHANNEL_USER_LAST = 254;
-    static constexpr const char *LAW_EXTENSION_ENV = "NETW_LAW_EXTENSION";
     static constexpr const char *INSTALL_AS_DEFAULT_SETTING
         = "networked/install_as_default";
     static constexpr const char *SMOOTH_WHEN_HEADLESS_SETTING
@@ -358,9 +368,6 @@ private:
     godot::HashMap<uint64_t, godot::RID> directory_slots;
     mutable ClockEngine clock;
     int64_t rpc_calls_deferred = 0;
-    godot::PackedByteArray sync_encode_stock;
-    bool sync_encode_armed = false;
-    godot::Callable sync_decoder;
     godot::Ref<NetwSceneCore> scene_core;
     godot::HashMap<godot::RID, godot::Ref<NetwInterestLayer>>
         scene_admission_layers;
@@ -731,7 +738,35 @@ private:
     NetwHandleLedger tables;
     NetwEffectLedger effects;
     EventPlane plane;
-    godot::LocalVector<godot::Callable> observers[NOTIFICATION_COUNT];
+
+    enum class AnnouncementKind : uint8_t {
+        KICK_REQUESTED,
+        TICKRATE_MISMATCH,
+        ENTITY_ENTERED,
+        ENTITY_EXITED,
+        SCENE_REMOVED,
+    };
+    struct Announcement {
+        AnnouncementKind kind = AnnouncementKind::KICK_REQUESTED;
+        godot::Ref<NetwEntity> entity;
+        bool entity_is_player = false;
+        int64_t requester = 0;
+        int64_t target = 0;
+        int64_t server_tickrate = 0;
+        godot::String reason;
+        godot::Ref<NetwScene> scene;
+    };
+    godot::LocalVector<Announcement> announcements;
+    godot::HashMap<uint64_t, uint64_t> announced_scene_of_entity;
+    int step_depth = 0;
+    void announce_entity_edge(
+        const godot::RID &p_scene,
+        const godot::RID &p_entity,
+        bool p_present,
+        bool p_is_player
+    );
+    void announce_flush();
+
     bool clock_sweeps_effects = false;
     bool clock_handshakes_on_enter = false;
     bool host_join_waits_startup = false;
@@ -744,13 +779,6 @@ private:
     godot::String session_pause_reason;
     void session_announce_exited(int p_reason, const godot::String &p_detail);
     bool scene_admits_on_join = false;
-    bool is_observing(
-        Notification p_event,
-        const godot::Callable &p_callback
-    ) const;
-    godot::HashSet<godot::StringName> misused_seams;
-    godot::HashMap<godot::StringName, bool> seam_overrides;
-    godot::ObjectID seam_script;
     godot::ObjectID scene_player_display_id;
     bool scene_player_display_pending = false;
     godot::RID scene_presentation;
@@ -828,7 +856,6 @@ private:
 
     ReplicationCore *replication_owner = nullptr;
     store::World store_world;
-    godot::ObjectID session_api_id;
     godot::Callable interest_flush;
     godot::Callable interest_compat_refresh;
     godot::Callable interest_awareness_send;
@@ -881,7 +908,6 @@ private:
     godot::HashMap<int64_t, AreaHush> area_hushes;
     godot::HashMap<uint64_t, HushedArea> hushed_areas;
     int64_t area_hush_next = 0;
-    godot::Callable spawn_constructor;
     EmbedPhase embed_phase_value = EMBED_PHASE_DECLARING;
     bool embed_disposing = false;
     void embed_set_phase(EmbedPhase p_phase);
@@ -1154,9 +1180,6 @@ private:
         const godot::RID &p_entity,
         const godot::StringName &p_layer_id
     );
-    godot::TypedArray<godot::StringName> interest_layer_ids(
-        const godot::RID &p_entity
-    );
     void interest_on_enter(
         const godot::RID &p_entity,
         const godot::StringName &p_layer_id,
@@ -1263,128 +1286,6 @@ public:
     void physics_frame_advance();
     NetwPredictTiming frame_timing() const;
     NetwPredictTiming tick_timing(int64_t p_tick, double p_delta) const;
-
-    godot::Ref<NetwPredictFold> predict_drive(
-        int64_t p_latest_input_tick,
-        int64_t p_last_driven_input_tick,
-        int64_t p_frame_tick
-    );
-    NetwPrediction::ConsumeAction predict_consume(int p_depth, int p_buffer);
-    godot::Ref<NetwPredictFold> predict_drive_default(
-        int64_t p_latest_input_tick,
-        int64_t p_last_driven_input_tick,
-        int64_t p_frame_tick
-    );
-    NetwPrediction::ConsumeAction predict_consume_default(
-        int p_depth,
-        int p_buffer
-    );
-    godot::Ref<NetwPredictJudgement> predict_evaluate(
-        NetwPrediction::Domain p_domain,
-        NetwPrediction::ExactVerdict p_verdict,
-        const godot::Dictionary &p_predicted,
-        const godot::Dictionary &p_payload,
-        const godot::Dictionary &p_wiring,
-        const godot::Dictionary &p_field_sink
-    );
-    godot::Ref<NetwPredictRecovery> predict_recover(
-        const godot::Dictionary &p_payload,
-        const godot::Dictionary &p_predicted,
-        NetwPrediction::RecoveryPolicy p_policy,
-        NetwSimulation::Restore p_snap_restore,
-        const godot::Dictionary &p_projection,
-        const godot::Dictionary &p_current,
-        const godot::Dictionary &p_pose_errors,
-        const godot::Dictionary &p_wiring,
-        const godot::Dictionary &p_verdict,
-        double p_tick_delta
-    );
-    godot::Ref<NetwPredictJudgement> predict_evaluate_default(
-        NetwPrediction::Domain p_domain,
-        NetwPrediction::ExactVerdict p_verdict,
-        const godot::Dictionary &p_predicted,
-        const godot::Dictionary &p_payload,
-        const godot::Dictionary &p_wiring,
-        const godot::Dictionary &p_field_sink
-    );
-    godot::Ref<NetwPredictRecovery> predict_recover_default(
-        const godot::Dictionary &p_payload,
-        const godot::Dictionary &p_predicted,
-        NetwPrediction::RecoveryPolicy p_policy,
-        NetwSimulation::Restore p_snap_restore,
-        const godot::Dictionary &p_projection,
-        const godot::Dictionary &p_current,
-        const godot::Dictionary &p_pose_errors,
-        const godot::Dictionary &p_wiring,
-        const godot::Dictionary &p_verdict,
-        double p_tick_delta
-    );
-
-    GDVIRTUAL3R(
-        godot::Ref<NetwPredictFold>,
-        _predict_drive,
-        int64_t,
-        int64_t,
-        int64_t
-    )
-    GDVIRTUAL2R(NetwPrediction::ConsumeAction, _predict_consume, int, int)
-    GDVIRTUAL6R(
-        godot::Ref<NetwPredictJudgement>,
-        _predict_evaluate,
-        NetwPrediction::Domain,
-        NetwPrediction::ExactVerdict,
-        godot::Dictionary,
-        godot::Dictionary,
-        godot::Dictionary,
-        godot::Dictionary
-    )
-    GDVIRTUAL10R(
-        godot::Ref<NetwPredictRecovery>,
-        _predict_recover,
-        godot::Dictionary,
-        godot::Dictionary,
-        NetwPrediction::RecoveryPolicy,
-        NetwSimulation::Restore,
-        godot::Dictionary,
-        godot::Dictionary,
-        godot::Dictionary,
-        godot::Dictionary,
-        godot::Dictionary,
-        double
-    )
-
-    godot::PackedByteArray sync_encode(int64_t p_peer, int64_t p_tick);
-    godot::Error sync_decode(
-        const godot::RID &p_entity,
-        int64_t p_comp,
-        int64_t p_flags,
-        int64_t p_tick,
-        const godot::PackedByteArray &p_payload
-    );
-    godot::PackedByteArray run_sync_encode_stage(
-        int64_t p_peer,
-        const godot::PackedByteArray &p_stock,
-        int64_t p_tick
-    );
-    godot::Error run_sync_decode_stage(
-        const godot::RID &p_entity,
-        int64_t p_comp,
-        int64_t p_flags,
-        int64_t p_tick,
-        const godot::PackedByteArray &p_payload,
-        const godot::Callable &p_decoder
-    );
-
-    GDVIRTUAL2R(godot::PackedByteArray, _sync_encode, int64_t, int64_t)
-    GDVIRTUAL5R(
-        godot::Error,
-        _sync_decode,
-        godot::RID,
-        int64_t,
-        int64_t,
-        int64_t,
-        godot::PackedByteArray
-    )
 
     godot::Error finish_stage_verdict(
         int64_t p_stage,
@@ -1497,17 +1398,6 @@ public:
     void interest_commit();
     godot::Error interest_flush_tail();
     godot::Error interest_flush_immediate();
-    godot::Error sync_apply_rows_default(
-        const godot::RID &p_table,
-        const godot::PackedInt64Array &p_routes,
-        const godot::Array &p_columns
-    );
-    godot::Error run_apply_rows(
-        const godot::RID &p_table,
-        const godot::PackedInt64Array &p_routes,
-        const godot::Array &p_columns
-    );
-    bool store_applies_by_seam();
     void store_received(
         repl::PropertyBinding *p_binding,
         const store::RowAddress &p_at,
@@ -1550,15 +1440,6 @@ public:
         uint64_t p_tenure,
         int p_age
     );
-    godot::Array sync_gather_rows_default(
-        const godot::RID &p_table,
-        const godot::PackedInt64Array &p_routes
-    );
-    godot::Array run_gather_rows(
-        const godot::RID &p_table,
-        const godot::PackedInt64Array &p_routes
-    );
-    bool store_gathers_by_seam();
     void store_admit(const repl::PropertyBindingPtr &p_binding);
     void store_place(const repl::PropertyBindingPtr &p_binding);
     void store_sources(
@@ -1633,7 +1514,6 @@ public:
     void store_clear_row(const store::RowAddress &p_at);
     godot::PackedInt32Array store_reach(uint32_t p_slot) const;
     godot::PackedInt32Array store_roster_ids() const;
-    godot::Dictionary store_describe() const;
     void scene_watch_entity(const godot::Ref<NetwEntity> &p_entity);
     void scene_on_entity_live(
         int64_t p_route,
@@ -1693,7 +1573,6 @@ public:
         int64_t p_route,
         const godot::PackedInt32Array &p_connected,
         int64_t p_channel,
-        const godot::Callable &p_undeclare,
         godot::Node *p_within = nullptr
     );
     void spawn_detach_before_despawn(NetwEntity *p_dying);
@@ -1771,11 +1650,6 @@ public:
         uint64_t p_mask
     );
     godot::Dictionary sync_flush_stats() const;
-    godot::Dictionary sync_explain(
-        int64_t p_route,
-        int64_t p_comp,
-        int64_t p_peer
-    ) const;
     godot::Dictionary peer_link_stats(int64_t p_peer) const;
     godot::PackedInt64Array spawn_replay_to(
         spawn::Book *p_book,
@@ -1980,56 +1854,11 @@ public:
     void display_default_chase_hook(const godot::RID &p_entity, bool p_bind);
     void interest_send_awareness(int64_t p_peer, const godot::Array &p_wire);
     void interest_refresh_compat_intents();
-    godot::Error display_write(
-        const godot::RID &p_entity,
-        const godot::StringName &p_track,
-        const godot::Variant &p_value
-    );
     godot::Error display_write_track(
         const godot::RID &p_entity,
         const godot::StringName &p_track,
         const godot::Variant &p_value
     );
-    bool display_row_of(
-        const godot::RID &p_entity,
-        const godot::StringName &p_track,
-        godot::RID &r_table,
-        int64_t &r_column,
-        int64_t &r_route
-    );
-    godot::Error run_display_write_rows(
-        const godot::RID &p_table,
-        int64_t p_column,
-        const godot::PackedInt64Array &p_routes,
-        const godot::Array &p_values
-    );
-    godot::Error display_write_rows_default(
-        const godot::RID &p_table,
-        int64_t p_column,
-        const godot::PackedInt64Array &p_routes,
-        const godot::Array &p_values
-    );
-    GDVIRTUAL4R(
-        godot::Error,
-        _display_write_rows,
-        godot::RID,
-        int64_t,
-        godot::PackedInt64Array,
-        godot::Array
-    )
-    GDVIRTUAL2R(
-        godot::Array,
-        _sync_gather_rows,
-        godot::RID,
-        godot::PackedInt64Array
-    )
-    GDVIRTUAL3R(
-        godot::Error,
-        _sync_apply_rows,
-        godot::RID,
-        godot::PackedInt64Array,
-        godot::Array
-    )
     godot::Error display_lane(
         const godot::RID &p_entity,
         const godot::StringName &p_track,
@@ -2109,7 +1938,6 @@ public:
     );
     bool display_record_followed(
         int64_t p_route,
-        const godot::StringName &p_target_property,
         int64_t p_tick,
         bool p_authoring_tick,
         uint64_t p_owner,
@@ -2120,7 +1948,6 @@ public:
         display::Runtime *p_runtime,
         display::Channel *p_state,
         int64_t p_route,
-        const godot::StringName &p_target_property,
         const godot::Variant &p_value,
         int64_t p_tick,
         bool p_authoring_tick,
@@ -2324,7 +2151,6 @@ public:
         int64_t drowsy = 0;
         int64_t sources = 0;
         int64_t sourced = 0;
-        int64_t staged = 0;
         int64_t sends = 0;
         int64_t sent_rows = 0;
         int64_t pump_allocations = 0;
@@ -2336,7 +2162,6 @@ public:
         int64_t pumped = 0;
         int64_t recorders = 0;
         int64_t received_rows = 0;
-        int64_t decode_stages = 0;
         int64_t receive_allocations = 0;
         int64_t role_resolves = 0;
     };
@@ -2733,15 +2558,6 @@ public:
         int64_t p_route,
         const godot::Ref<NetwEntity> &p_entity
     );
-    godot::PackedByteArray sync_pipeline_stage_row_frame(
-        int64_t p_peer,
-        int64_t p_frame_tick,
-        int64_t p_route,
-        int64_t p_comp,
-        int64_t p_mask,
-        const godot::PackedByteArray &p_bytes
-    );
-    godot::Error sync_pipeline_decode_stage_body();
     void sync_pipeline_bind_declaration(int64_t p_binding);
     void sync_note_node_removed(godot::Node *p_node);
     void entity_watch_authority_joins();
@@ -2794,7 +2610,6 @@ public:
     void sync_compat_visibility_changed(int64_t p_peer, godot::Node *p_root);
     void sync_compat_config_changed();
     void sync_compat_node_removed(godot::Node *p_node);
-    godot::Error sync_compat_decode_stage_body();
 
     spawn::SpawnerCompat *spawner_adapter() const;
     void spawner_session_entered();
@@ -2873,7 +2688,6 @@ public:
     godot::Error predict_declare(const godot::RID &p_entity);
     void predict_undeclare(const godot::RID &p_entity);
     int64_t register_rewind(const godot::Ref<NetwEntity> &p_entity);
-    static bool is_extension_script(const godot::Ref<godot::Script> &p_script);
 
     godot::Ref<NetwPrediction> prediction_handle(
         const godot::RID &p_entity
@@ -3040,11 +2854,7 @@ public:
         const godot::RID &p_entity,
         int64_t p_comp
     );
-    static bool law_extension_named();
-    static godot::Ref<godot::Script> law_extension_script();
-    static godot::Ref<NetwMultiplayer> create(
-        const godot::Ref<godot::Script> &p_implementation
-    );
+    static godot::Ref<NetwMultiplayer> create();
     static void install_default_interface();
     static void restore_default_interface();
     static NetwMultiplayer *of(godot::Node *p_node);
@@ -3248,13 +3058,10 @@ public:
     int64_t clock_get_recommended_display_offset() const;
 
     int64_t clock_get_tick() const;
-    int64_t clock_get_display_tick() const;
-    int64_t clock_get_physics_steps_per_tick() const;
     int64_t clock_get_simulation_behind_count() const;
     bool clock_is_configured() const;
     bool clock_is_synchronized() const;
     bool clock_is_simulating() const;
-    bool clock_is_stable() const;
     bool clock_is_gated() const;
 
     void clock_step(int64_t p_count);
@@ -3652,6 +3459,8 @@ public:
     godot::Dictionary relay_stats_snapshot();
     godot::Dictionary lagcomp_metrics() const;
     godot::Dictionary stats_snapshot();
+    void stats_fill_predict(godot::Dictionary &r_out) const;
+    void stats_fill_display(godot::Dictionary &r_out) const;
     int64_t stats_get(Stat p_stat);
     void rpc_settle_open(int64_t p_txn, const RpcSettle &p_settle);
     RpcSettle rpc_settle_of(int64_t p_txn) const;
@@ -3715,13 +3524,8 @@ public:
     int64_t session_elapsed_ms() const;
     bool note_inbound_seq(int64_t p_peer, int64_t p_seq);
     bool note_peer_ack(int64_t p_peer, int64_t p_ack, uint32_t p_history);
-    void sync_note_sent_default(int64_t p_peer, int64_t p_sequence);
-    void sync_note_ack_default(int64_t p_peer, int64_t p_sequence);
     void note_sent(int64_t p_peer, int64_t p_sequence);
     void note_ack(int64_t p_peer, int64_t p_sequence);
-    GDVIRTUAL2(_sync_note_sent, int64_t, int64_t)
-    GDVIRTUAL2(_sync_note_ack, int64_t, int64_t)
-    godot::Object *session_seam(const godot::StringName &p_seam) const;
     void session_note_state_ack(
         int64_t p_peer,
         int64_t p_ack,
@@ -3903,8 +3707,6 @@ public:
     void persist_capture_exit(godot::Node *p_owner);
     void persist_settle_departure(godot::ObjectID p_owner, bool p_terminal);
     void persist_pump(double p_delta);
-    void persist_tick_default(double p_delta);
-    GDVIRTUAL1(_persist_tick, double)
 
     static godot::Error configuration_door_refuses_config(
         NetwMultiplayer *p_session,
@@ -3930,7 +3732,6 @@ public:
     godot::RID schema_find_or_adopt(const godot::StringName &p_name);
     godot::RID table_find_or_adopt(const godot::StringName &p_name);
     godot::StringName schema_get_name(const godot::RID &p_schema) const;
-    static godot::Variant::Type schema_get_element_type(ColumnType p_type);
     int schema_get_hash(const godot::RID &p_schema) const;
     int schema_get_column_count(const godot::RID &p_schema) const;
     godot::StringName schema_get_column_key(
@@ -4144,15 +3945,6 @@ public:
         int64_t p_channel
     );
 
-    void report_event(
-        int64_t p_event,
-        int64_t p_route,
-        const godot::Dictionary &p_detail,
-        int64_t p_peer,
-        const godot::StringName &p_entity_id,
-        const godot::Dictionary &p_model,
-        int64_t p_verdict
-    );
     godot::Error entity_bind_node(
         const godot::RID &p_entity,
         godot::Node *p_node
@@ -4342,6 +4134,11 @@ public:
         int64_t p_destination
     ) const;
     godot::PackedByteArray session_roster_bytes(int64_t p_destination) const;
+    std::optional<JoinRequest> session_take_submitted_join_under_test() {
+        const std::optional<JoinRequest> taken = submitted_join;
+        submitted_join.reset();
+        return taken;
+    }
 #endif
     void session_forget_peer(int64_t p_peer);
     void session_clear_roster();
@@ -4357,7 +4154,6 @@ public:
     void peer_mark_reachable(int64_t p_peer);
     void session_refuse(int64_t p_peer, const godot::String &p_reason);
     godot::String session_refusal(int64_t p_peer) const;
-    static godot::String session_role_name(Role p_role);
 
     void session_set_state(SessionState p_state);
     void session_set_role(Role p_role);
@@ -4548,7 +4344,6 @@ public:
     void session_unpause();
     bool session_is_paused() const;
     void session_notify_shutdown(const godot::String &p_reason);
-    void session_request_leave(const godot::String &p_reason);
 
     void peer_kick(int64_t p_peer_id, const godot::String &p_reason);
     void peer_request_kick(int64_t p_peer_id, const godot::String &p_reason);
@@ -4599,57 +4394,20 @@ public:
         const godot::Variant &p_a,
         const godot::Variant &p_b
     );
-    godot::Error observe(
-        Notification p_event,
-        const godot::Callable &p_callback
-    );
-    void unobserve(Notification p_event, const godot::Callable &p_callback);
-    template <typename... Args>
-    void notify(Notification p_event, const Args &...p_args) {
-        if (observers[p_event].is_empty()) {
-            return;
-        }
-        godot::LocalVector<godot::Callable> snapshot;
-        snapshot.reserve(observers[p_event].size());
-        for (const godot::Callable &held : observers[p_event]) {
-            snapshot.push_back(held);
-        }
-        for (const godot::Callable &held : snapshot) {
-            if (held.is_valid() && is_observing(p_event, held)) {
-                held.call(godot::Variant(p_args)...);
-            }
-        }
+
+    void event_arm(godot::BitField<EventGroup> p_groups);
+    godot::PackedInt64Array event_drain();
+    bool event_records(int64_t p_kind) const {
+        return plane.records(p_kind);
     }
-
-    int64_t event_watch(
-        const godot::PackedInt64Array &p_events,
-        const godot::Dictionary &p_target,
-        const godot::Dictionary &p_predicate,
-        const godot::Callable &p_sink,
-        const godot::Dictionary &p_opts
-    );
-    bool event_unwatch(int64_t p_id);
-    godot::TypedArray<godot::Dictionary> event_watches() const;
-    godot::TypedArray<godot::Dictionary> event_ring(int64_t p_route);
-    void event_ring_clear(int64_t p_route);
-    void event_arm(bool p_enabled);
-    bool event_wants(int64_t p_event, int64_t p_route) const;
-
-    void event_emit(
-        int64_t p_event,
+    void event_record(
+        int64_t p_kind,
+        const godot::RID &p_entity,
         int64_t p_route,
-        const godot::Dictionary &p_detail,
-        const godot::StringName &p_entity_id,
         int64_t p_peer,
-        int64_t p_verdict,
-        const godot::Dictionary &p_model
-    );
-
-    godot::Error spawn_admit_frame_default(
-        int64_t p_sender,
-        int64_t p_route,
-        int64_t p_channel,
-        const godot::PackedByteArray &p_payload
+        int64_t p_verdict = 0,
+        int64_t p_a = 0,
+        int64_t p_b = 0
     );
 
     godot::Error spawn_admit_frame(
@@ -4658,51 +4416,12 @@ public:
         int64_t p_channel,
         const godot::PackedByteArray &p_payload
     );
-
-    GDVIRTUAL4R(
-        godot::Error,
-        _spawn_admit_frame,
-        int64_t,
-        int64_t,
-        int64_t,
-        godot::PackedByteArray
-    )
-
-    godot::Error table_admit_frame_default(
-        int64_t p_sender,
-        int64_t p_channel,
-        const godot::PackedByteArray &p_payload
-    );
-
     godot::Error table_admit_frame(
         int64_t p_sender,
         int64_t p_channel,
         const godot::PackedByteArray &p_payload
     );
-
-    GDVIRTUAL3R(
-        godot::Error,
-        _table_admit_frame,
-        int64_t,
-        int64_t,
-        godot::PackedByteArray
-    )
-
-    godot::Error spawn_declare_default(
-        const godot::RID &p_entity,
-        const godot::Variant &p_recipe
-    );
-    godot::Error spawn_declare(
-        const godot::RID &p_entity,
-        const godot::Variant &p_recipe
-    );
-    void spawn_undeclare(const godot::RID &p_entity);
-    void spawn_construct_arm(const godot::Callable &p_constructor);
-    godot::Node *spawn_construct_default(const godot::RID &p_entity);
-    godot::Node *spawn_construct(const godot::RID &p_entity);
-    GDVIRTUAL2R(godot::Error, _spawn_declare, godot::RID, godot::Variant)
-    GDVIRTUAL1(_spawn_undeclare, godot::RID)
-    GDVIRTUAL1R(godot::Node *, _spawn_construct, godot::RID)
+    godot::Error spawn_declare(const godot::RID &p_entity);
 
     void service_register(godot::Object *p_service, godot::Object *p_type);
 
@@ -4711,7 +4430,6 @@ public:
     godot::Object *get_service(godot::Object *p_type) const;
     godot::Object *get_service_named(const godot::StringName &p_class) const;
     godot::Variant service_held(godot::Object *p_type) const;
-    godot::Variant service_held_named(const godot::StringName &p_class) const;
 
     godot::TypedArray<godot::Node> service_get_all(godot::Object *p_base) const;
 
@@ -4752,24 +4470,20 @@ public:
         bool p_present,
         bool p_is_player
     );
+    bool is_inside_step() const {
+        return step_depth > 0;
+    }
 
     godot::Ref<NetwScene> entity_scene_facet(
         NetwEntityRecord *p_record,
         NetwEntity *p_wrapper
     );
 
-    void scene_publish_live(
-        int64_t p_route,
-        const godot::RID &p_container,
-        const godot::String &p_name
-    );
+    void scene_publish_live(int64_t p_route, const godot::RID &p_container);
 
     static void entity_move(godot::Node *p_owner, godot::Node *p_new_parent);
 
     SyncPipeline *sync_pipeline() const;
-    void set_session_api(godot::Object *p_api);
-    godot::Object *session_api() const;
-    godot::Ref<godot::MultiplayerAPI> get_session_api() const;
 
     bool session_is_active() const;
 
@@ -5168,60 +4882,17 @@ public:
     void liveness_raise_epoch_to_wire(int64_t p_route);
     int64_t liveness_route_wire_life(int64_t p_route) const;
     godot::Error entity_frame_verdict(int64_t p_route) const;
-    godot::Error sync_admit_frame_default(
-        int64_t p_sender,
-        int64_t p_route,
-        int64_t p_comp,
-        int64_t p_channel,
-        int64_t p_flags,
-        int64_t p_tick,
-        const godot::PackedByteArray &p_payload
-    ) const;
-
     godot::Error sync_admit_frame(
-        int64_t p_sender,
         int64_t p_route,
-        int64_t p_comp,
         int64_t p_channel,
-        int64_t p_flags,
-        int64_t p_tick,
         const godot::PackedByteArray &p_payload
     ) const;
-
-    GDVIRTUAL7RC(
-        godot::Error,
-        _sync_admit_frame,
-        int64_t,
-        int64_t,
-        int64_t,
-        int64_t,
-        int64_t,
-        int64_t,
-        godot::PackedByteArray
-    )
-
-    godot::Error predict_admit_frame_default(
-        int64_t p_sender,
-        int64_t p_route,
-        int64_t p_channel,
-        const godot::PackedByteArray &p_payload
-    );
-
     godot::Error predict_admit_frame(
         int64_t p_sender,
         int64_t p_route,
         int64_t p_channel,
         const godot::PackedByteArray &p_payload
     );
-
-    GDVIRTUAL4R(
-        godot::Error,
-        _predict_admit_frame,
-        int64_t,
-        int64_t,
-        int64_t,
-        godot::PackedByteArray
-    )
 
     godot::RID liveness_adopt(NetwEntity *p_wrapper);
     godot::RID entity_of(godot::Object *p_node);
@@ -5360,10 +5031,7 @@ public:
     void entity_capture_exit(godot::Object *p_wrapper);
     bool entity_left_tree(NetwEntity *p_entity) const;
     void entity_settle_departure(int64_t p_instance);
-    void liveness_owner_despawning(
-        const godot::StringName &p_reason,
-        godot::Object *p_wrapper
-    );
+    void liveness_owner_despawning(godot::Object *p_wrapper);
 
 public:
     static bool is_coroutine(const godot::Variant &p_value);
@@ -5406,35 +5074,9 @@ public:
         int64_t p_route,
         int64_t p_serial
     );
-
-    bool script_overrides_seam(
-        const godot::Ref<godot::Script> &p_script,
-        const godot::StringName &p_base_name,
-        const godot::StringName &p_seam
-    );
-    bool overrides_seam(const godot::StringName &p_seam);
-    void forget_seam_overrides();
-
-    void seam_entered(
-        const godot::StringName &p_seam,
-        int64_t p_event,
-        int64_t p_route,
-        const godot::Dictionary &p_detail
-    );
-    godot::Variant seam_settled(
-        const godot::StringName &p_seam,
-        int64_t p_event,
-        int64_t p_route,
-        const godot::Variant &p_result,
-        const godot::Variant &p_fallback
-    );
-    void seam_refused(
-        const godot::StringName &p_seam,
-        int64_t p_route,
-        const godot::String &p_reason
-    );
 };
 
 } // namespace netw
 
 VARIANT_ENUM_CAST(netw::NetwMultiplayer::RecordKind);
+VARIANT_BITFIELD_CAST(netw::NetwMultiplayer::EventGroup);

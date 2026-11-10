@@ -2,6 +2,8 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "support/event_ring.h"
+
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/event_plane.hpp"
@@ -40,22 +42,6 @@ int64_t state_of(LoopbackRig &p_rig, int p_client, int p_route) {
     NetwMultiplayer *api
         = p_client < 0 ? p_rig.server() : p_rig.client(p_client);
     return int64_t(api->entity_get_state(api->entity_from_route(p_route)));
-}
-
-int64_t stage_rows(NetwMultiplayer *p_api, int p_route, int64_t p_event) {
-    if (p_api == nullptr) {
-        return 0;
-    }
-    const Array ring = p_api->event_ring(p_route);
-    int64_t seen = 0;
-    for (int at = 0; at < ring.size(); ++at) {
-        const Dictionary row = ring[at];
-        if (!row.is_empty()
-            && int64_t(row[netw::event_key::event()]) == p_event) {
-            seen += 1;
-        }
-    }
-    return seen;
 }
 
 TEST_CASE(
@@ -144,8 +130,8 @@ TEST_CASE(
     rig.mount();
     Node *arena = rig.mirror_child("Arena");
 
-    rig.server()->event_arm(true);
-    rig.client(0)->event_arm(true);
+    rig.server()->event_arm(NetwMultiplayer::EVENT_GROUP_STAGE);
+    rig.client(0)->event_arm(NetwMultiplayer::EVENT_GROUP_STAGE);
 
     const int route = rig.spawn_registered(
         StringName("body"),
@@ -172,19 +158,13 @@ TEST_CASE(
     const bool arrived = rig.route_node(route, 0) != nullptr;
     CHECK(arrived);
 
-    const int64_t host_declared
-        = stage_rows(rig.server(), route, EventPlane::SPAWN_DECLARE);
-    const int64_t host_reconciled
-        = stage_rows(rig.server(), 0, EventPlane::SPAWN_RECONCILE);
-    const int64_t seat_built
-        = stage_rows(rig.client(0), 0, EventPlane::SPAWN_CONSTRUCT);
-    const int64_t seat_declared
-        = stage_rows(rig.client(0), route, EventPlane::SPAWN_DECLARE);
+    const EventRing host(rig.server()->event_drain());
+    const EventRing seat(rig.client(0)->event_drain());
 
-    NETW_CHECK_GT(host_declared, int64_t(0));
-    NETW_CHECK_GT(host_reconciled, int64_t(0));
-    NETW_CHECK_GT(seat_built, int64_t(0));
-    NETW_CHECK_EQ(seat_declared, int64_t(0));
+    NETW_CHECK_GT(host.count_of(EventPlane::SPAWN_DECLARE, route), 0);
+    NETW_CHECK_GT(host.count_of(EventPlane::SPAWN_RECONCILE, 0), 0);
+    NETW_CHECK_GT(seat.count_of(EventPlane::SPAWN_CONSTRUCT, 0), 0);
+    NETW_CHECK_EQ(seat.count_of(EventPlane::SPAWN_DECLARE, route), 0);
 }
 
 TEST_CASE(

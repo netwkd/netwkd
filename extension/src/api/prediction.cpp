@@ -196,48 +196,6 @@ void NetwPrediction::seat_command_frame() {
     }
 }
 
-Ref<NetwPredictRecovery> NetwPrediction::seat_recover_seam(
-    const Dictionary &p_carried,
-    const Dictionary &p_predicted,
-    NetwPrediction::RecoveryPolicy p_policy,
-    NetwSimulation::Restore p_snap_restore,
-    const Dictionary &p_projection,
-    const Dictionary &p_before,
-    const Dictionary &p_tier_errors,
-    const Dictionary &p_context,
-    double p_tick_delta
-) {
-    return engine_seat == nullptr ? Ref<NetwPredictRecovery>()
-                                  : engine_seat->recover_through_seam(
-                                        p_carried,
-                                        p_predicted,
-                                        p_policy,
-                                        p_snap_restore,
-                                        p_projection,
-                                        p_before,
-                                        p_tier_errors,
-                                        p_context,
-                                        p_tick_delta
-                                    );
-}
-
-Ref<NetwPredictJudgement> NetwPrediction::seat_evaluate_seam(
-    NetwPrediction::Domain p_domain,
-    NetwPrediction::ExactVerdict p_exact_verdict,
-    const Dictionary &p_predicted,
-    const Dictionary &p_payload,
-    const Dictionary &p_field_sink
-) {
-    return engine_seat == nullptr ? Ref<NetwPredictJudgement>()
-                                  : engine_seat->evaluate_through_seam(
-                                        p_domain,
-                                        p_exact_verdict,
-                                        p_predicted,
-                                        p_payload,
-                                        p_field_sink
-                                    );
-}
-
 Ref<NetwEntity> NetwPrediction::get_entity() const {
     return Ref<NetwEntity>(
         Object::cast_to<NetwEntity>(ObjectDB::get_instance(entity_id))

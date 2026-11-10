@@ -131,25 +131,12 @@ void NetwMultiplayer::sync_compat_node_removed(Node *p_node) {
     }
 }
 
-Error NetwMultiplayer::sync_compat_decode_stage_body() {
-    SyncCompat *adapter = sync_adapter();
-    return adapter != nullptr ? adapter->decode_stage_body() : ERR_UNCONFIGURED;
-}
-
 void SyncCompat::set_sync_model(NetwSyncModel *p_model) {
     sync_model = p_model;
 }
 
 void SyncCompat::set_spawn_book(spawn::Book *p_book) {
     spawn_book = p_book;
-}
-
-void SyncCompat::set_stage_seams(
-    const Callable &p_encode,
-    const Callable &p_decode
-) {
-    encode_stage = p_encode;
-    decode_stage = p_decode;
 }
 
 void SyncCompat::set_spawn_seams(
@@ -890,8 +877,6 @@ void SyncCompat::pump() {
     pump_server = plane->has_server_role();
     pump_peers = pump_server ? PackedInt32Array()
                              : gd::api_peer_ids(plane->session_get_inner());
-    static const StringName encode_seam("_sync_encode");
-    pump_encodes = plane->overrides_seam(encode_seam);
 
     LocalVector<Consumed *> &pass = pump_pass;
     pass.clear();
@@ -968,16 +953,12 @@ void SyncCompat::pump() {
                     )
                 );
                 for (int peer = 0; peer < recipients.size(); ++peer) {
-                    const PackedByteArray payload
-                        = run_encode_stage(recipients[peer], stock);
-                    if (payload.is_empty()) {
-                        continue;
-                    }
+                    note_encoded(recipients[peer], route, stock.size());
                     plane->send_to(
                         recipients[peer],
                         route,
                         channel_sync,
-                        payload,
+                        stock,
                         false,
                         0,
                         String(),
@@ -1054,12 +1035,12 @@ void SyncCompat::send_deltas(
         if (mask == 0) {
             continue;
         }
-        const PackedByteArray stock
+        const PackedByteArray bytes
             = sync_kernel::encode_retained(ordinal, int64_t(mask), values);
-        const PackedByteArray bytes = run_encode_stage(peer_id, stock);
         if (bytes.is_empty()) {
             continue;
         }
+        note_encoded(peer_id, p_route, bytes.size());
         plane->send_to(
             peer_id,
             p_route,
@@ -1074,91 +1055,34 @@ void SyncCompat::send_deltas(
     }
 }
 
-PackedByteArray SyncCompat::run_encode_stage(
-    int64_t p_peer,
-    const PackedByteArray &p_stock
-) {
-    PackedByteArray bytes = p_stock;
-    if (encode_stage.is_valid() && pump_encodes) {
-        stage_calls += 1;
-        bytes = encode_stage.call(p_peer, p_stock, int64_t(-1));
-    }
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr && plane->event_wants(EventPlane::SYNC_ENCODE, 0)) {
-        Dictionary detail;
-        detail[StringName("bytes")] = bytes.size();
-        plane->event_emit(
-            EventPlane::SYNC_ENCODE,
-            0,
-            detail,
-            StringName(),
-            p_peer,
-            OK,
-            Dictionary()
-        );
-    }
-    return bytes;
+void SyncCompat::note_encoded(int64_t p_peer, int64_t p_route, int64_t p_bytes) {
+    core()->event_record(
+        EventPlane::SYNC_ENCODE,
+        RID(),
+        p_route,
+        p_peer,
+        OK,
+        p_bytes
+    );
 }
 
-Error SyncCompat::decode_stage_body() {
-    stage_valid = stage_retained ? sync_kernel::decode_retained(
-                                       stage_payload,
-                                       stage_columns,
-                                       stage_decoded
-                                   )
-                                 : sync_kernel::decode_volatile(
-                                       stage_payload,
-                                       stage_columns,
-                                       stage_decoded
-                                   );
-    return stage_valid ? OK : ERR_INVALID_DATA;
-}
-
-Error SyncCompat::run_decode_stage(
+bool SyncCompat::decode_row(
     const RID &p_entity,
-    int64_t p_comp,
-    int64_t p_flags,
-    const PackedByteArray &p_payload
+    const PackedByteArray &p_payload,
+    int64_t p_columns,
+    bool p_retained,
+    Array &r_values
 ) {
+    sync_kernel::DecodedRow decoded;
+    const bool valid = p_retained
+        ? sync_kernel::decode_retained(p_payload, p_columns, decoded)
+        : sync_kernel::decode_volatile(p_payload, p_columns, decoded);
+    r_values = decoded.values;
+    const Error verdict = valid ? OK : ERR_INVALID_DATA;
     NetwMultiplayer *plane = core();
-    Error verdict = OK;
-    static const StringName decode_seam("_sync_decode");
-    if (!decode_stage.is_valid() || plane == nullptr
-        || !plane->overrides_seam(decode_seam)) {
-        verdict = decode_stage_body();
-    } else {
-        stage_calls += 1;
-        verdict = Error(
-            int(decode_stage.call(
-                p_entity,
-                p_comp,
-                p_flags,
-                -1,
-                p_payload,
-                callable_mp(
-                    plane,
-                    &NetwMultiplayer::sync_compat_decode_stage_body
-                )
-            ))
-        );
-    }
-    if (plane != nullptr) {
-        const int64_t route = plane->get_liveness_core()->route_of(p_entity);
-        if (plane->event_wants(EventPlane::SYNC_DECODE, route)) {
-            Dictionary detail;
-            detail[StringName("comp")] = p_comp;
-            plane->event_emit(
-                EventPlane::SYNC_DECODE,
-                route,
-                detail,
-                StringName(),
-                0,
-                verdict,
-                Dictionary()
-            );
-        }
-    }
-    return verdict;
+    const int64_t route = plane->get_liveness_core()->route_of(p_entity);
+    plane->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
+    return valid;
 }
 
 const SyncCompat::Field *SyncCompat::field_of(const NodePath &p_path) {
@@ -1280,22 +1204,15 @@ void SyncCompat::handle_sync(
         return;
     }
 
-    stage_columns = int64_t(row->sync_paths.size());
-    stage_payload = p_payload;
-    stage_retained = false;
-    stage_valid = false;
-    const Error verdict = run_decode_stage(
+    Array values;
+    const bool valid = decode_row(
         p_entity->get_rid_handle(),
-        row->comp,
-        flags,
-        p_payload
+        p_payload,
+        int64_t(row->sync_paths.size()),
+        false,
+        values
     );
-    const bool valid = stage_valid;
-    const Array values = stage_decoded.values;
-    stage_decoded = sync_kernel::DecodedRow();
-    stage_valid = false;
-    if (verdict != OK || !valid
-        || values.size() != int(row->sync_paths.size())) {
+    if (!valid || values.size() != int(row->sync_paths.size())) {
         drops_sync_poisoned += 1;
         poison(
             row,
@@ -1361,17 +1278,15 @@ void SyncCompat::handle_sync_delta(
         }
     }
 
-    stage_columns = int64_t(row->watch_paths.size());
-    stage_payload = p_payload;
-    stage_retained = true;
-    stage_valid = false;
-    const Error verdict
-        = run_decode_stage(p_entity->get_rid_handle(), row->comp, 0, p_payload);
-    const bool valid = stage_valid;
-    const Array values = stage_decoded.values;
-    stage_decoded = sync_kernel::DecodedRow();
-    stage_valid = false;
-    if (verdict != OK || !valid || values.size() != int(selected.size())) {
+    Array values;
+    const bool valid = decode_row(
+        p_entity->get_rid_handle(),
+        p_payload,
+        int64_t(row->watch_paths.size()),
+        true,
+        values
+    );
+    if (!valid || values.size() != int(selected.size())) {
         drops_sync_poisoned += 1;
         poison(
             row,

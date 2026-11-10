@@ -594,6 +594,16 @@ void NetwNativeTests::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "NetwNativeTests",
+        D_METHOD("attribution_arm", "session"),
+        &NetwNativeTests::attribution_arm
+    );
+    ClassDB::bind_static_method(
+        "NetwNativeTests",
+        D_METHOD("attribution_snapshot", "session"),
+        &NetwNativeTests::attribution_snapshot
+    );
+    ClassDB::bind_static_method(
+        "NetwNativeTests",
         D_METHOD("property_set_keys_of_script", "script", "record"),
         &NetwNativeTests::property_set_keys_of_script
     );
@@ -815,6 +825,17 @@ Dictionary NetwNativeTests::prediction_stats(Object *p_handle) {
         return Dictionary();
     }
     return handle->get_stats()->to_dictionary();
+}
+
+void NetwNativeTests::attribution_arm(NetwMultiplayer *p_session) {
+    if (p_session != nullptr) {
+        p_session->attribution_set_armed(true);
+    }
+}
+
+Dictionary NetwNativeTests::attribution_snapshot(NetwMultiplayer *p_session) {
+    return p_session != nullptr ? p_session->attribution_snapshot()
+                                : Dictionary();
 }
 
 TypedArray<StringName> NetwNativeTests::property_set_keys_of_script(

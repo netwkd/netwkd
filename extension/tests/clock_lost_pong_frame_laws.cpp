@@ -26,7 +26,6 @@ struct LostPongEvidence {
     bool driven = false;
     bool client_seated = false;
     bool synchronized_under_loss = false;
-    int pongs_under_loss = 0;
     bool synchronized_after_loss = false;
     int frames_to_synchronize = -1;
 };
@@ -34,15 +33,6 @@ struct LostPongEvidence {
 LostPongEvidence &lost_pong_evidence() {
     static LostPongEvidence evidence;
     return evidence;
-}
-
-int &client_pongs() {
-    static int count = 0;
-    return count;
-}
-
-void count_client_pong(const Dictionary &) {
-    client_pongs() += 1;
 }
 
 class ClockLostPongScenario final : public netw_test::FrameScenario {
@@ -91,10 +81,6 @@ class ClockLostPongScenario final : public netw_test::FrameScenario {
 
         client.instantiate();
         client_branch = mount("LostPongClient", client);
-        client->observe(
-            netw::NetwMultiplayer::CLOCK_PONG_RECEIVED,
-            callable_mp_static(&count_client_pong)
-        );
         client->session_prepare_join(StringName("joiner"), Array());
         client->NETW_API_VIRTUAL(set_multiplayer_peer)(client_peer);
     }
@@ -151,7 +137,6 @@ public:
                 }
                 evidence.synchronized_under_loss
                     = client->clock_is_synchronized();
-                evidence.pongs_under_loss = client_pongs();
                 link->clear_link_conditions(client_peer.ptr(), 1);
                 enter(3);
                 return true;
@@ -192,7 +177,6 @@ TEST_CASE(
     REQUIRE(evidence.driven);
     CHECK(evidence.client_seated);
     CHECK_FALSE(evidence.synchronized_under_loss);
-    NETW_CHECK_EQ(evidence.pongs_under_loss, 0);
     CHECK(evidence.synchronized_after_loss);
     NETW_CHECK_EQ(int(evidence.frames_to_synchronize <= 30), 1);
 }

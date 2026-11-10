@@ -182,9 +182,6 @@ void initialize_networked_module(ModuleInitializationLevel level) {
     GDREGISTER_CLASS(netw::NetwQuantizeQuaternion);
     GDREGISTER_CLASS(netw::NetwQuantizeTransform2D);
     GDREGISTER_CLASS(netw::NetwQuantizeTransform3D);
-    GDREGISTER_CLASS(netw::NetwPredictFold);
-    GDREGISTER_CLASS(netw::NetwPredictJudgement);
-    GDREGISTER_CLASS(netw::NetwPredictRecovery);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwSimulation);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwPrediction);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwPredictCarryContext);

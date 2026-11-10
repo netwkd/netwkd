@@ -175,7 +175,7 @@ func _join_address() -> String:
 
 func _member_name(peer_id: int) -> String:
 	if peer == null:
-		return LobbyDirectory.member_name_default(peer_id)
+		return ""
 
 	var steam_id := peer.get_steam_id_for_peer_id(peer_id)
 	return Steam.getFriendPersonaName(steam_id)

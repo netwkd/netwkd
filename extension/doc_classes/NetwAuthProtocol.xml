@@ -72,7 +72,7 @@
 			<param index="0" name="app_tag" type="int" default="0" />
 			<param index="1" name="flags" type="int" default="0" />
 			<description>
-				Writes a join packet header with the build tag [param app_tag]. See [method NetwMultiplayer.auth_set_app_tag].
+				Writes a join packet header with the build tag [param app_tag]. A session makes its build tag from [member NetwSessionConfig.app_id].
 			</description>
 		</method>
 		<method name="encode_probe_reply" qualifiers="static">

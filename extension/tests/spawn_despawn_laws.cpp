@@ -8,7 +8,6 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/spawn/book.hpp"
 #include "netw/spawn/record.hpp"
-#include "support/netw_call_log.h"
 
 namespace TestNetwSpawnDespawn {
 
@@ -17,7 +16,6 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::spawn::Book;
 using netw::spawn::Record;
-using netw_test::CallLog;
 
 const int64_t DESPAWN_CHANNEL = 15;
 
@@ -41,7 +39,6 @@ TEST_CASE(
     Ref<NetwMultiplayer> core;
     core.instantiate();
     Book book;
-    CallLog log;
     Node *node = memnew(Node);
     tracked(&book, 1, 0, node);
 
@@ -49,18 +46,15 @@ TEST_CASE(
         &book,
         9,
         PackedInt32Array(),
-        DESPAWN_CHANNEL,
-        log.callable("undeclare")
+        DESPAWN_CHANNEL
     ));
-    NETW_CHECK_EQ(log.count("undeclare"), 0);
     CHECK(book.has_spawned(1));
 
     CHECK_FALSE(core->spawn_despawn_route(
         nullptr,
         1,
         PackedInt32Array(),
-        DESPAWN_CHANNEL,
-        log.callable("undeclare")
+        DESPAWN_CHANNEL
     ));
     CHECK(book.has_spawned(1));
 
@@ -68,13 +62,12 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SD2 a despawn cascades children before the "
-    "ancestor that contains them, and empties the book of the whole subtree"
+    "[Networked][Spawn][Hosted] SD2 a despawn empties the book of the whole "
+    "subtree"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
     Book book;
-    CallLog log;
     Node *parent = memnew(Node);
     Node *child = memnew(Node);
     Node *grandchild = memnew(Node);
@@ -89,30 +82,13 @@ TEST_CASE(
         &book,
         1,
         PackedInt32Array(),
-        DESPAWN_CHANNEL,
-        log.callable("undeclare")
+        DESPAWN_CHANNEL
     ));
 
-    NETW_CHECK_EQ(log.count("undeclare"), 3);
     CHECK_FALSE(book.has_spawned(1));
     CHECK_FALSE(book.has_spawned(2));
     CHECK_FALSE(book.has_spawned(3));
     NETW_CHECK_EQ(book.spawned_count(), 0);
-
-    const Array first = log.args("undeclare", 0);
-    const Array last = log.args("undeclare", 2);
-    NETW_CHECK_EQ(int64_t(first.size()), int64_t(1));
-    NETW_CHECK_EQ(int64_t(last.size()), int64_t(1));
-    if (first.size() == 1 && last.size() == 1) {
-        NETW_CHECK_EQ(
-            uint64_t(RID(first[0]).get_id()),
-            uint64_t(NetwEntity::of(grandchild)->get_rid_handle().get_id())
-        );
-        NETW_CHECK_EQ(
-            uint64_t(RID(last[0]).get_id()),
-            uint64_t(NetwEntity::of(parent)->get_rid_handle().get_id())
-        );
-    }
 
     memdelete(grandchild);
     memdelete(child);
@@ -126,7 +102,6 @@ TEST_CASE(
     Ref<NetwMultiplayer> core;
     core.instantiate();
     Book book;
-    CallLog log;
     Node *bare = memnew(Node);
     Node *carrying = memnew(Node);
     NetwEntity::ensure(carrying);
@@ -137,38 +112,13 @@ TEST_CASE(
         &book,
         1,
         PackedInt32Array(),
-        DESPAWN_CHANNEL,
-        log.callable("undeclare")
+        DESPAWN_CHANNEL
     ));
 
-    NETW_CHECK_EQ(log.count("undeclare"), 1);
     NETW_CHECK_EQ(book.spawned_count(), 0);
 
     memdelete(carrying);
     memdelete(bare);
-}
-
-TEST_CASE(
-    "[Networked][Spawn][Hosted] SD4 a caller that declares nothing needs no "
-    "undeclare, so an absent one is not a refusal"
-) {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    Book book;
-    Node *node = memnew(Node);
-    NetwEntity::ensure(node);
-    tracked(&book, 1, 0, node);
-
-    CHECK(core->spawn_despawn_route(
-        &book,
-        1,
-        PackedInt32Array(),
-        DESPAWN_CHANNEL,
-        Callable()
-    ));
-    NETW_CHECK_EQ(book.spawned_count(), 0);
-
-    memdelete(node);
 }
 
 } // namespace TestNetwSpawnDespawn

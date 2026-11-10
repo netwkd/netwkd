@@ -19,12 +19,6 @@ struct NetwMultiplayer {
         TABLE_PARAM_RELIABLE = 0,
     };
 
-    enum SceneMove {
-        SCENE_MOVE_REFUSED = NetwSceneCore::MOVE_REFUSED,
-        SCENE_MOVE_ALREADY_THERE = NetwSceneCore::MOVE_ALREADY_THERE,
-        SCENE_MOVE_CARRY = NetwSceneCore::MOVE_CARRY,
-    };
-
     enum EntityState {
         ENTITY_STATE_UNKNOWN = NetwLivenessCore::STATE_UNKNOWN,
         ENTITY_STATE_LIVE = NetwLivenessCore::STATE_LIVE,
@@ -47,7 +41,6 @@ struct NetwMultiplayer {
         CLOCK_PARAM_JITTER_WINDOW = 10,
         CLOCK_PARAM_JITTER_STABILITY_THRESHOLD = 11,
         CLOCK_PARAM_USE_PHYSICS_INTERPOLATION = 12,
-        CLOCK_PARAM_ENABLE_DRIFT_LOGGING = 13,
         CLOCK_PARAM_MANUAL_TICK = 14,
         CLOCK_PARAM_TICK_FACTOR_OVERRIDE = 15,
     };
@@ -206,63 +199,6 @@ struct NetwMultiplayer {
         NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_ENUM)
 #undef NETW_SESSION_STAT_ENUM
             STAT_COUNT,
-    };
-
-    enum Notification {
-        ENDPOINT_ADDED,
-        ENDPOINT_REMOVED,
-        ENDPOINT_UPDATED,
-        CLOCK_BEFORE_TICK,
-        CLOCK_ON_TICK,
-        CLOCK_AFTER_TICK,
-        PREDICT_OWNER_DIVERGENCE,
-        LAGCOMP_ACTION_GATE_FALLBACK,
-        SCENE_SPAWNED,
-        SCENE_DESPAWNED,
-        SCENE_ENTITY_MOVED,
-        SCENE_STARTUP_SPAWNED,
-        CLOCK_BEFORE_TICK_LOOP,
-        CLOCK_AFTER_TICK_LOOP,
-        CLOCK_SYNCHRONIZED,
-        CLOCK_CONFIGURED,
-        CLOCK_TICKRATE_MISMATCH,
-        CLOCK_PONG_RECEIVED,
-        CLOCK_STABILITY_CHANGED,
-        SESSION_STATE_CHANGED,
-        SESSION_JOIN_SUBMITTED,
-        SESSION_ENTERED,
-        SESSION_JOIN_FAILED,
-        SESSION_ENDED,
-        SESSION_RECLAIMED,
-        PEER_AUTHENTICATING,
-        PEER_AUTHENTICATION_FAILED,
-        SESSION_POLL_STARTED,
-        TABLE_RECEIVED,
-        DATABASE_FAILED,
-        PERSIST_LOADED,
-        PERSIST_SAVED,
-        PEER_PACKET,
-        PEER_KICKED,
-        SESSION_SERVER_DISCONNECTING,
-        PEER_KICK_REQUESTED,
-        SESSION_DISCONNECT_REQUESTED,
-        SESSION_TREE_PAUSED,
-        SESSION_TREE_UNPAUSED,
-        SERVICE_REGISTERED,
-        SERVICE_UNREGISTERED,
-        ENTITY_LIVE,
-        ENTITY_LINGERING,
-        ENTITY_DEAD,
-        ENTITY_HIDDEN,
-        PLAYER_JOINED,
-        PLAYER_LOCAL_JOINED,
-        PLAYER_LEFT,
-        SCENE_LIVE,
-        CONNECTION_PROGRESSED,
-        CONNECTION_FAILED,
-        CONNECTION_JOIN_ADDRESS_CHANGED,
-        CONNECTION_INVITED,
-        NOTIFICATION_COUNT,
     };
 };
 
@@ -452,7 +388,6 @@ VARIANT_ENUM_CAST(netw::enums::NetwInterestLayer::LeavePolicy);
 VARIANT_ENUM_CAST(netw::enums::NetwInterestLayer::PerceptionPolicy);
 VARIANT_ENUM_CAST(netw::enums::LobbyDirectory::Capability);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::TableParam);
-VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SceneMove);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::EntityState);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ClockParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::LayerParam);
@@ -470,4 +405,3 @@ VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::PropertySetParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ColumnType);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::DatabaseState);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::Stat);
-VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::Notification);

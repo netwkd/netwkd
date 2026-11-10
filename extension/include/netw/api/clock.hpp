@@ -27,6 +27,7 @@ public:
     void announce_before_tick(double p_delta, int64_t p_tick);
     void announce_ticked(double p_delta, int64_t p_tick);
     void announce_synchronized();
+    void announce_tickrate_mismatch(int64_t p_server_tickrate);
 
     int64_t get_tick() const;
     bool get_is_synchronized() const;
@@ -45,6 +46,7 @@ public:
     void set_sync_mode(enums::NetwClock::SyncMode p_mode);
     double get_ping_interval() const;
     void set_ping_interval(double p_seconds);
+    void auto_configure_offset();
 
     double monitor(enums::NetwClock::ClockMonitor p_monitor) const;
 };

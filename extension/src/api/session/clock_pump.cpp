@@ -30,11 +30,7 @@ bool authoring_in_editor() {
 } // namespace
 
 Error NetwMultiplayer::clock_initialize(const Ref<NetwClockConfig> &p_from) {
-    const Error committed = clock_commit(p_from);
-    if (committed == OK) {
-        notify(CLOCK_CONFIGURED);
-    }
-    return committed;
+    return clock_commit(p_from);
 }
 
 Error NetwMultiplayer::clock_commit(const Ref<NetwClockConfig> &p_from) {
@@ -149,6 +145,7 @@ void NetwMultiplayer::clock_on_physics_frame() {
     }
     const double delta = root->get_physics_process_delta_time();
     const bool hosting = is_host();
+    ++step_depth;
     if (delta > clock_engine().get_stall_threshold() && !hosting) {
         clock_request_handshake();
     }
@@ -157,6 +154,8 @@ void NetwMultiplayer::clock_on_physics_frame() {
     if (!hosting && clock_consume_ping_due(delta)) {
         clock_send_ping();
     }
+    --step_depth;
+    announce_flush();
 }
 
 void NetwMultiplayer::clock_start_handshake() {

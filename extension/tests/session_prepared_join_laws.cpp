@@ -1,21 +1,33 @@
 #include "support/fault_log.h"
-#include "support/netw_call_log.h"
 #include "support/netw_test.h"
+
+#include <optional>
 
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/participant.hpp"
 
 namespace TestNetwSessionPreparedJoin {
 
 using namespace godot;
 using netw::LocalMultiplayerPeer;
 using netw::NetwMultiplayer;
-using netw_test::CallLog;
+
+constexpr const char *NOTHING = "(nothing submitted)";
 
 Ref<NetwMultiplayer> a_session() {
     Ref<NetwMultiplayer> session;
     session.instantiate();
     return session;
+}
+
+String submitted(const Ref<NetwMultiplayer> &p_session) {
+    const std::optional<netw::JoinRequest> taken
+        = p_session->session_take_submitted_join_under_test();
+    if (!taken.has_value()) {
+        return NOTHING;
+    }
+    return String(taken->username);
 }
 
 TEST_CASE(
@@ -33,22 +45,14 @@ TEST_CASE(
     REQUIRE(session->session_prepared_join().has_value());
     CHECK(session->session_prepared_join()->username == StringName("ana"));
 
-    CallLog log;
-    session->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
-
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
     session->session_announce_entered();
 
-    NETW_CHECK_EQ(log.count("submitted"), 1);
-    CHECK(StringName(log.args("submitted", 0)[0]) == StringName("ana"));
+    CHECK(submitted(session) == String("ana"));
     CHECK_FALSE(session->session_prepared_join().has_value());
 
     session->session_announce_entered();
-    NETW_CHECK_EQ(log.count("submitted"), 2);
-    CHECK(String(log.args("submitted", 1)[0]).is_empty());
+    CHECK(submitted(session) == String());
 
     session->embed_dispose();
 }
@@ -61,26 +65,23 @@ TEST_CASE(
     const Ref<NetwMultiplayer> session = a_session();
     session->session_prepare_join(StringName("ana"), Array());
 
-    CallLog log;
-    session->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
-
     session->session_set_role(NetwMultiplayer::ROLE_LISTEN_SERVER);
     session->session_announce_entered();
 
-    NETW_CHECK_EQ(log.count("submitted"), 0);
+    CHECK(submitted(session) == NOTHING);
+    CHECK(session->player_local().is_null());
     REQUIRE(session->session_prepared_join().has_value());
     CHECK(session->session_prepared_join()->username == StringName("ana"));
 
     session->scene_announce_startup();
 
-    NETW_CHECK_EQ(log.count("submitted"), 1);
+    const Ref<netw::NetwPlayer> seated = session->player_local();
+    REQUIRE(seated.is_valid());
+    CHECK(seated->get_username() == StringName("ana"));
     CHECK_FALSE(session->session_prepared_join().has_value());
 
     session->scene_announce_startup();
-    NETW_CHECK_EQ(log.count("submitted"), 1);
+    CHECK(session->player_local() == seated);
 
     session->embed_dispose();
 }
@@ -90,17 +91,12 @@ TEST_CASE(
     "join submits none, because it is not a player"
 ) {
     const Ref<NetwMultiplayer> session = a_session();
-    CallLog log;
-    session->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
 
     session->session_set_role(NetwMultiplayer::ROLE_DEDICATED_SERVER);
     session->session_announce_entered();
     session->scene_announce_startup();
 
-    NETW_CHECK_EQ(log.count("submitted"), 0);
+    CHECK(submitted(session) == NOTHING);
     CHECK(session->player_local().is_null());
 
     session->embed_dispose();
@@ -120,15 +116,9 @@ TEST_CASE(
 
     CHECK_FALSE(session->session_prepared_join().has_value());
 
-    CallLog log;
-    session->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
     session->session_announce_entered();
-    NETW_CHECK_EQ(log.count("submitted"), 1);
-    CHECK(String(log.args("submitted", 0)[0]).is_empty());
+    CHECK(submitted(session) == String());
 
     session->embed_dispose();
 }
@@ -171,22 +161,17 @@ TEST_CASE(
     session->session_prepare_join(StringName("ana"), Array());
     REQUIRE(session->session_prepared_join().has_value());
 
-    CallLog log;
-    session->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
     session->session_announce_entered();
-    NETW_CHECK_EQ(log.count("submitted"), 1);
+    CHECK(submitted(session) == String("ana"));
 
     session->emit_signal(StringName("peer_connected"), int64_t(7));
-    NETW_CHECK_EQ(log.count("submitted"), 1);
+    CHECK(submitted(session) == NOTHING);
 
     session->emit_signal(StringName("peer_connected"), int64_t(1));
-    NETW_CHECK_EQ(log.count("submitted"), 2);
+    CHECK(submitted(session) == String("ana"));
 
     session->emit_signal(StringName("peer_connected"), int64_t(1));
-    NETW_CHECK_EQ(log.count("submitted"), 2);
+    CHECK(submitted(session) == NOTHING);
 
     session->embed_dispose();
 }
@@ -199,24 +184,19 @@ TEST_CASE(
     const Ref<NetwMultiplayer> session = a_client(9);
     session->session_prepare_join(StringName("ana"), Array());
 
-    CallLog log;
-    session->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
     session->session_announce_entered();
-    NETW_CHECK_EQ(log.count("submitted"), 1);
+    CHECK(submitted(session) == String("ana"));
 
     session->session_prepare_join(StringName("bo"), Array());
     session->emit_signal(StringName("peer_connected"), int64_t(1));
-    NETW_CHECK_EQ(log.count("submitted"), 1);
+    CHECK(submitted(session) == NOTHING);
 
     session->session_announce_entered();
-    NETW_CHECK_EQ(log.count("submitted"), 2);
+    CHECK(submitted(session) == String("bo"));
 
     session->session_clear_prepared_join();
     session->emit_signal(StringName("peer_connected"), int64_t(1));
-    NETW_CHECK_EQ(log.count("submitted"), 2);
+    CHECK(submitted(session) == NOTHING);
 
     session->embed_dispose();
 }

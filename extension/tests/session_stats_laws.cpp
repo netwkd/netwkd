@@ -123,9 +123,7 @@ public:
             const int read = plant_is(PLANT_A_STAT_READ_FROM_THE_WRONG_KEY)
                 ? wrong
                 : index;
-            reads.push_back(int64_t(
-                first.get(StringName(ENUM_TABLE[read].key), int64_t(-1))
-            ));
+            reads.push_back(core->stats_get(NetwMultiplayer::Stat(read)));
         }
 
         if (plant_is(PLANT_A_SNAPSHOT_THAT_COUNTS_AS_AN_ACT)) {

@@ -38,8 +38,7 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Session][SceneTree] L2 a node in the tree resolves "
-    "to the session its branch installed, through whatever object "
-    "publishes it"
+    "to the session its branch installed"
 ) {
     Node *mounted = memnew(Node);
     netw::gd::scene_root()->add_child(mounted);
@@ -48,7 +47,7 @@ TEST_CASE(
     const Ref<MultiplayerAPI> installed = mounted->get_multiplayer();
     NetwMultiplayer *resolved = NetwMultiplayer::of(mounted);
     CHECK(resolved != nullptr);
-    CHECK(resolved->session_api() == installed.ptr());
+    CHECK(installed.ptr() == resolved);
     CHECK(resolved->session_is_active());
     CHECK(NetwMultiplayer::session_of(mounted) == installed);
 
@@ -56,14 +55,6 @@ TEST_CASE(
 }
 
 #endif
-
-TEST_CASE(
-    "[Networked][Session][Hosted] L3 with no law extension named, the "
-    "environment resolves to no script rather than to a broken one"
-) {
-    CHECK_FALSE(NetwMultiplayer::law_extension_named());
-    CHECK(NetwMultiplayer::law_extension_script().is_null());
-}
 
 Ref<NetwMultiplayer> session_rooted_at(Node *p_node) {
     Ref<SceneMultiplayer> inner;
@@ -255,8 +246,7 @@ TEST_CASE(
     SceneTree *loop = netw::gd::scene_tree();
     const Ref<MultiplayerAPI> original = loop->get_multiplayer();
 
-    const Ref<NetwMultiplayer> installed
-        = NetwMultiplayer::create(Ref<Script>());
+    const Ref<NetwMultiplayer> installed = NetwMultiplayer::create();
     NETW_CHECK_EQ(int(installed.is_valid()), 1);
     if (installed.is_null()) {
         return;

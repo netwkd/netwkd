@@ -155,17 +155,11 @@ class World {
         bool p_body_columns,
         int64_t p_tick
     );
-    void pull_rows(
-        Table &p_table,
-        int64_t p_tick,
-        bool p_custom,
-        bool p_validating
-    );
+    void pull_rows(Table &p_table, int64_t p_tick, bool p_validating);
     void pull_row(
         Table &p_table,
         uint32_t p_row,
         int64_t p_tick,
-        bool p_custom,
         bool p_validating,
         bool p_gated
     );
@@ -225,7 +219,6 @@ public:
         int64_t body = 0;
         int64_t engine = 0;
         int64_t script = 0;
-        int64_t custom = 0;
         int64_t validated = 0;
         int64_t changed = 0;
         int64_t coded = 0;
@@ -286,19 +279,12 @@ public:
 
     void forget_sender(int p_id);
 
-    void pull(uint32_t p_table, int64_t p_tick, bool p_custom);
+    void pull(uint32_t p_table, int64_t p_tick);
 
     bool read_live(
         const RowAddress &p_at,
         godot::LocalVector<godot::Variant> &r_values
     );
-
-    godot::Array gather_rows(
-        uint32_t p_table,
-        const godot::PackedInt64Array &p_routes
-    );
-
-    void absorb(uint32_t p_table, const godot::Array &p_rows, int64_t p_tick);
 
     World() {
         arrays.seat(this);

@@ -351,7 +351,6 @@ void NetwMultiplayer::display_record(
         runtime,
         state,
         route,
-        p_target_property,
         p_value,
         p_tick,
         p_authoring_tick,
@@ -363,7 +362,6 @@ void NetwMultiplayer::display_record(
 
 bool NetwMultiplayer::display_record_followed(
     int64_t p_route,
-    const StringName &p_target_property,
     int64_t p_tick,
     bool p_authoring_tick,
     uint64_t p_owner,
@@ -387,7 +385,6 @@ bool NetwMultiplayer::display_record_followed(
         runtime,
         state,
         p_route,
-        p_target_property,
         Variant(),
         p_tick,
         p_authoring_tick,
@@ -402,7 +399,6 @@ void NetwMultiplayer::display_land(
     display::Runtime *p_runtime,
     display::Channel *p_state,
     int64_t p_route,
-    const StringName &p_target_property,
     const Variant &p_value,
     int64_t p_tick,
     bool p_authoring_tick,
@@ -420,19 +416,7 @@ void NetwMultiplayer::display_land(
     history.record(p_tick, p_value, p_authoring_tick);
     display_book->wake(p_runtime);
 
-    if (plane.wants(EventPlane::DISPLAY_RECORD, p_route)) {
-        EventPlane::Emission fact(
-            EventPlane::DISPLAY_RECORD,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        fact.route = p_route;
-        Dictionary detail;
-        detail["track"] = p_target_property;
-        detail["tick"] = p_tick;
-        fact.detail = detail;
-        plane.emit(fact);
-    }
+    event_record(EventPlane::DISPLAY_RECORD, RID(), p_route, 0, OK, p_tick);
 }
 
 bool NetwMultiplayer::display_table_of(
@@ -673,22 +657,16 @@ bool NetwMultiplayer::display_pump_listed(
     if (entity.is_null()) {
         return false;
     }
-    bool busy
+    const bool busy
         = display::pump_runtime(p_runtime, p_timing, p_stats, display_hooks);
-    const int64_t route = p_runtime->get_route();
-    if (plane.wants(EventPlane::DISPLAY_PUMP, route)) {
-        busy = true;
-        EventPlane::Emission fact(
-            EventPlane::DISPLAY_PUMP,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        fact.route = route;
-        Dictionary detail;
-        detail["tick"] = p_timing.display_tick;
-        fact.detail = detail;
-        plane.emit(fact);
-    }
+    event_record(
+        EventPlane::DISPLAY_PUMP,
+        entity->get_rid_handle(),
+        p_runtime->get_route(),
+        0,
+        OK,
+        p_timing.display_tick
+    );
     return busy;
 }
 

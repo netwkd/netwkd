@@ -3,7 +3,6 @@
 #include "support/event_ring.h"
 #include "support/netw_cells.h"
 
-#include "godot/callable.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -31,7 +30,6 @@ constexpr int64_t COMMIT_TICK = 41;
 enum Plant {
     PLANT_NONE,
     PLANT_COMMIT_BEHIND_THE_SESSION,
-    PLANT_SINK_REACHES_BEHAVIOR,
     PLANT_GATE_BEHIND_THE_SESSION,
     PLANT_MALFORMED_READS_AS_FOREIGN,
 };
@@ -110,65 +108,7 @@ struct Evidence {
     int64_t commit_rows = 0;
     int64_t commit_tick = 0;
     int64_t acks_advanced = 0;
-    Array ring;
-};
-
-// A sink that writes to everything it is handed and answers garbage, which is
-// the worst an observer can do to a session that lets it.
-class HostileSink final : public CallableCustom {
-    ObjectID anchor;
-
-    static bool same(const CallableCustom *a, const CallableCustom *b) {
-        return a == b;
-    }
-
-    static bool before(const CallableCustom *a, const CallableCustom *b) {
-        return a < b;
-    }
-
-public:
-    explicit HostileSink(const Object *p_anchor)
-        : anchor(netw::gd::instance_id(p_anchor)) {
-    }
-
-    uint32_t hash() const override {
-        return uint32_t(uintptr_t(this));
-    }
-
-    String get_as_text() const override {
-        return String("HostileSink");
-    }
-
-    CompareEqualFunc get_compare_equal_func() const override {
-        return &HostileSink::same;
-    }
-
-    CompareLessFunc get_compare_less_func() const override {
-        return &HostileSink::before;
-    }
-
-    ObjectID get_object() const override {
-        return anchor;
-    }
-
-    void call(
-        const Variant **p_arguments,
-        int p_count,
-        Variant &r_return_value,
-        netw::gd::CallError &r_call_error
-    ) const override {
-        if (p_count > 0) {
-            const Dictionary record = *p_arguments[0];
-            if (!record.is_empty()) {
-                Dictionary detail = record[netw::event_key::detail()];
-                detail.clear();
-                Dictionary model = record[netw::event_key::model()];
-                model.clear();
-            }
-        }
-        r_return_value = Variant("garbage");
-        netw::gd::call_ok(r_call_error);
-    }
+    PackedInt64Array ring;
 };
 
 class SessionRun {
@@ -185,19 +125,12 @@ class SessionRun {
         Ref<NetwMultiplayer> core;
         core.instantiate();
         core->clock_engine().set_tick(COMMIT_TICK);
-        Variant answer;
         if (p_armed) {
-            core->event_arm(true);
-            PackedInt64Array events;
-            for (int index = 0; index < EventPlane::taxonomy_size(); index++) {
-                events.push_back(EventPlane::value_at(index));
-            }
-            core->event_watch(
-                events,
-                Dictionary(),
-                Dictionary(),
-                Callable(memnew(HostileSink(core.ptr()))),
-                Dictionary()
+            core->event_arm(
+                NetwMultiplayer::EVENT_GROUP_GATE
+                | NetwMultiplayer::EVENT_GROUP_STAGE
+                | NetwMultiplayer::EVENT_GROUP_VERDICT
+                | NetwMultiplayer::EVENT_GROUP_CARRIER
             );
         }
 
@@ -274,18 +207,7 @@ class SessionRun {
             r_evidence.commit_tick = core->table_get_tick(table);
         }
 
-        if (plant_is(PLANT_SINK_REACHES_BEHAVIOR) && p_armed) {
-            const Array rows = core->event_watches();
-            for (int index = 0; index < rows.size(); index++) {
-                const Dictionary row = rows[index];
-                r_evidence.verdict_total += int64_t(row.get("hit_count", 0));
-            }
-        }
-        r_evidence.ring = core->event_ring(0);
-        const Array on_route = core->event_ring(GATE_ROUTE);
-        for (int index = 0; index < on_route.size(); index++) {
-            r_evidence.ring.push_back(on_route[index]);
-        }
+        r_evidence.ring = core->event_drain();
     }
 
 public:
@@ -383,7 +305,7 @@ LawVerdict law_neutral(const SessionRun &p_run) {
     if (!quiet.ring.is_empty()) {
         return law_broken(
             "an unarmed session recorded %d rows",
-            int(quiet.ring.size())
+            EventRing(quiet.ring).size()
         );
     }
     return law_held();
@@ -403,10 +325,7 @@ LawVerdict law_complete(const SessionRun &p_run) {
     for (const int64_t event : families) {
         const int64_t expected = p_run.expected(event);
         total += expected;
-        int64_t seen = 0;
-        for (int index = 0; index < ring.size(); index++) {
-            seen += ring.event_at(index) == event ? 1 : 0;
-        }
+        const int64_t seen = ring.count_of(event);
         if (seen != expected) {
             return law_broken(
                 "%d rows of %s, %d acts",
@@ -424,23 +343,13 @@ LawVerdict law_complete(const SessionRun &p_run) {
         );
     }
     for (int index = 0; index < ring.size(); index++) {
-        const Dictionary row = ring.at(index);
-        if (row.is_empty()) {
-            return law_broken("row %d is not a record", index);
-        }
-        const int64_t tick = int64_t(row[netw::event_key::tick()]);
-        if (tick != COMMIT_TICK) {
+        if (ring.tick_at(index) != COMMIT_TICK) {
             return law_broken(
                 "row %d is stamped %d, not the session's %d",
                 index,
-                int(tick),
+                int(ring.tick_at(index)),
                 int(COMMIT_TICK)
             );
-        }
-        const int64_t event = int64_t(row[netw::event_key::event()]);
-        const Dictionary detail = row[netw::event_key::detail()];
-        if (event == EventPlane::VERDICT && !detail.has(StringName("stage"))) {
-            return law_broken("a verdict row carries no stage");
         }
     }
     return law_held();
@@ -510,13 +419,107 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] a plane that reads its sink reds "
-    "neutral"
+    "[Networked][Event][Hosted] EV1 event_drain answers the newest 4096 "
+    "rows oldest first, and a second drain answers nothing"
 ) {
-    const SessionScenario scenario = mixed_session();
-    const SessionRun run(scenario, PLANT_SINK_REACHES_BEHAVIOR);
-    NETW_CELL(L_NEUTRAL, scenario);
-    NETW_LAW_BREAKS(L_NEUTRAL, run);
+    Ref<NetwMultiplayer> core;
+    core.instantiate();
+    core->event_arm(NetwMultiplayer::EVENT_GROUP_VERDICT);
+    const int overflow = 5;
+    const int recorded = int(EventPlane::ROW_CAPACITY) + overflow;
+    for (int tick = 0; tick < recorded; tick++) {
+        core->clock_engine().set_tick(tick);
+        core->count_verdict(ERR_INVALID_DATA, GATE_ROUTE);
+    }
+
+    const EventRing ring(core->event_drain());
+    NETW_REQUIRE_EQ(ring.size(), int(EventPlane::ROW_CAPACITY));
+    int out_of_order = 0;
+    for (int index = 0; index < ring.size(); index++) {
+        out_of_order += ring.tick_at(index) != index + overflow ? 1 : 0;
+    }
+    NETW_CHECK_EQ(out_of_order, 0);
+    NETW_CHECK_EQ(int(core->event_drain().size()), 0);
+}
+
+TEST_CASE(
+    "[Networked][Event][Hosted] EV2 a session records only the groups it "
+    "was armed with, and nothing at all unarmed"
+) {
+    struct Row {
+        const char *label;
+        int64_t groups;
+        bool disarm;
+        int verdicts;
+        int gates;
+    };
+    const Row rows[] = {
+        {"unarmed", 0, false, 0, 0},
+        {"another group", NetwMultiplayer::EVENT_GROUP_CARRIER, false, 0, 0},
+        {"verdicts", NetwMultiplayer::EVENT_GROUP_VERDICT, false, 3, 0},
+        {"verdicts and gates",
+         NetwMultiplayer::EVENT_GROUP_VERDICT
+             | NetwMultiplayer::EVENT_GROUP_GATE,
+         false,
+         3,
+         2},
+        {"disarmed", NetwMultiplayer::EVENT_GROUP_VERDICT, true, 0, 0},
+    };
+    for (const Row &row : rows) {
+        INFO(row.label);
+        Ref<NetwMultiplayer> core;
+        core.instantiate();
+        core->event_arm(row.groups);
+        if (row.disarm) {
+            core->event_arm(0);
+        }
+        for (int index = 0; index < 3; index++) {
+            core->count_verdict(ERR_INVALID_DATA, GATE_ROUTE);
+        }
+        for (int index = 0; index < 2; index++) {
+            core->finish_stage_verdict(EventPlane::GATE_SYNC, OK, GATE_ROUTE);
+        }
+
+        const EventRing ring(core->event_drain());
+        NETW_CHECK_EQ(ring.count_of(EventPlane::VERDICT), row.verdicts);
+        NETW_CHECK_EQ(ring.count_of(EventPlane::GATE_SYNC), row.gates);
+        NETW_CHECK_EQ(ring.size(), row.verdicts + row.gates);
+    }
+}
+
+TEST_CASE(
+    "[Networked][Event][Hosted] EV3 a row carries its act's tick, route, "
+    "peer, verdict and the two values its kind names"
+) {
+    Ref<NetwMultiplayer> core;
+    core.instantiate();
+    core->clock_engine().set_tick(COMMIT_TICK);
+    core->event_arm(
+        NetwMultiplayer::EVENT_GROUP_GATE | NetwMultiplayer::EVENT_GROUP_CARRIER
+    );
+    PackedByteArray payload;
+    payload.push_back(9);
+    core->receive_header(
+        INTAKE_PEER,
+        NetwCarrierFrame::build(payload, false, 3, -1, 0, -1)
+    );
+    core->note_peer_ack(ACK_PEER, 1, 0);
+    core->finish_stage_verdict(EventPlane::GATE_SYNC, ERR_SKIP, GATE_ROUTE);
+
+    const EventRing ring(core->event_drain());
+    NETW_REQUIRE_EQ(ring.size(), 3);
+    NETW_CHECK_EQ(ring.event_at(0), int64_t(EventPlane::DATAGRAM_RECEIVED));
+    NETW_CHECK_EQ(ring.tick_at(0), COMMIT_TICK);
+    NETW_CHECK_EQ(ring.peer_at(0), INTAKE_PEER);
+    NETW_CHECK_EQ(ring.a_at(0), int64_t(payload.size()));
+    NETW_CHECK_EQ(ring.b_at(0), int64_t(3));
+    NETW_CHECK_EQ(ring.event_at(1), int64_t(EventPlane::ACK_ADVANCED));
+    NETW_CHECK_EQ(ring.peer_at(1), ACK_PEER);
+    NETW_CHECK_EQ(ring.a_at(1), int64_t(1));
+    NETW_CHECK_EQ(ring.event_at(2), int64_t(EventPlane::GATE_SYNC));
+    NETW_CHECK_EQ(ring.route_at(2), GATE_ROUTE);
+    NETW_CHECK_EQ(ring.verdict_at(2), int64_t(ERR_SKIP));
+    NETW_CHECK_EQ(ring.entity_at(2), int64_t(0));
 }
 
 } // namespace TestNetwEventSessionLaws

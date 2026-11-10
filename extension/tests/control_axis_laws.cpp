@@ -14,6 +14,7 @@
 #include "netw/entity/control.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/wire/registry.hpp"
+#include "support/event_ring.h"
 #include "support/netw_call_log.h"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -113,18 +114,6 @@ Ref<NetwEntity> entity_at(LoopbackRig &p_rig, int p_route, int p_client) {
     return node == nullptr ? Ref<NetwEntity>() : NetwEntity::of(node);
 }
 
-Array rows_of(const Array &p_drained, int64_t p_event) {
-    Array kept;
-    for (int at = 0; at < p_drained.size(); ++at) {
-        const Dictionary row = p_drained[at];
-        if (!row.is_empty()
-            && int64_t(row[netw::event_key::event()]) == p_event) {
-            kept.push_back(row);
-        }
-    }
-    return kept;
-}
-
 TEST_CASE(
     "[Networked][Entity] CA1 a granted request moves the controller on BOTH "
     "peers, and moves the node authority with it exactly when the entity "
@@ -212,85 +201,6 @@ TEST_CASE(
     NETW_CHECK_EQ(fixed->get_code(), ERR_UNAVAILABLE);
     NETW_CHECK_EQ(entity_at(rig, route, 1)->get_controller(), represented);
     NETW_CHECK_EQ(rig.route_node(route, 1)->get_multiplayer_authority(), 1);
-}
-
-TEST_CASE(
-    "[Networked][Entity] CA3 a watched session names both halves of a "
-    "transfer, and a refused request still rides a row of its own carrying "
-    "the refusal rather than steering nothing silently"
-) {
-    LoopbackRig rig(2);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-
-    rig.server()->event_arm(true);
-    const int route = seat_player(rig, arena, "Watched");
-    const Ref<NetwEntity> host = entity_at(rig, route, -1);
-    REQUIRE(host.is_valid());
-    host->set_transfer(NetwEntity::TRANSFER_REQUESTABLE);
-
-    const int64_t asker = rig.peer_id(1);
-    const int64_t represented = rig.peer_id(0);
-
-    rig.server()->event_ring(route);
-    entity_at(rig, route, 1)->claim_control();
-    rig.pump(10);
-
-    const Array after_grant = rig.server()->event_ring(route);
-    const Array granted
-        = rows_of(after_grant, netw::EventPlane::CONTROL_REQUESTED);
-    REQUIRE(granted.size() == 1);
-    const Dictionary asked = granted[0];
-    NETW_CHECK_EQ(int64_t(asked[netw::event_key::verdict()]), int64_t(OK));
-    const Dictionary asked_detail = asked[netw::event_key::detail()];
-    NETW_CHECK_EQ(
-        int64_t(asked_detail.get(StringName("requester"), -1)),
-        asker
-    );
-
-    const Array moved = rows_of(after_grant, netw::EventPlane::CONTROL_CHANGED);
-    REQUIRE(moved.size() == 1);
-    const Dictionary change = moved[0];
-    const Dictionary change_detail = change[netw::event_key::detail()];
-    NETW_CHECK_EQ(
-        int64_t(change_detail.get(StringName("from"), -1)),
-        represented
-    );
-    NETW_CHECK_EQ(int64_t(change_detail.get(StringName("to"), -1)), asker);
-
-    host->set_controller(asker);
-    rig.pump(10);
-    rig.server()->event_ring(route);
-
-    host->connect(
-        StringName("control_requested"),
-        callable_mp_static(&deny_every_request)
-    );
-    const Ref<NetwPromise> denied = entity_at(rig, route, 0)->claim_control();
-    rig.pump(10);
-
-    CHECK(denied->get_is_failed());
-    NETW_CHECK_EQ(denied->get_code(), ERR_UNAUTHORIZED);
-    const Array after_denial = rig.server()->event_ring(route);
-    const Array refused
-        = rows_of(after_denial, netw::EventPlane::CONTROL_REQUESTED);
-    NETW_REQUIRE_EQ(int64_t(refused.size()), int64_t(1));
-    const Dictionary denial = refused[0];
-    NETW_CHECK_EQ(
-        int64_t(denial[netw::event_key::verdict()]),
-        int64_t(ERR_UNAUTHORIZED)
-    );
-    NETW_CHECK_EQ(
-        rows_of(after_denial, netw::EventPlane::CONTROL_CHANGED).size(),
-        0
-    );
-    NETW_CHECK_EQ(host->get_controller(), asker);
-
-    host->disconnect(
-        StringName("control_requested"),
-        callable_mp_static(&deny_every_request)
-    );
-    rig.server()->event_arm(false);
 }
 
 TEST_CASE(
@@ -413,7 +323,7 @@ TEST_CASE(
     rig.mount();
     Node *arena = rig.mirror_child("Arena");
     teach_every_session(rig);
-    rig.server()->event_arm(true);
+    rig.server()->event_arm(NetwMultiplayer::EVENT_GROUP_LIFECYCLE);
     const int route = seat_free(rig, arena, "Held");
 
     const Ref<NetwPromise> first = entity_at(rig, route, 0)->claim_control();
@@ -422,20 +332,19 @@ TEST_CASE(
     NETW_CHECK_EQ(entity_at(rig, route, 1)->get_controller(), rig.peer_id(0));
     NETW_CHECK_EQ(hold_at(rig, route, 1), int(Control::HOLD_EXCLUSIVE));
 
-    rig.server()->event_ring(route);
+    rig.server()->event_drain();
     const Ref<NetwPromise> refused = entity_at(rig, route, 1)->claim_control();
     CHECK(refused->get_is_failed());
     NETW_CHECK_EQ(int(refused->get_code()), int(ERR_UNAUTHORIZED));
     CHECK_FALSE(entity_at(rig, route, 1)->get_is_control_pending());
     rig.pump(10);
 
-    const Array heard = rows_of(
-        rig.server()->event_ring(route),
-        netw::EventPlane::CONTROL_REQUESTED
+    const EventRing heard(rig.server()->event_drain());
+    NETW_CHECK_EQ(
+        heard.count_of(netw::EventPlane::CONTROL_REQUESTED, route),
+        0
     );
-    NETW_CHECK_EQ(int64_t(heard.size()), int64_t(0));
     NETW_CHECK_EQ(entity_at(rig, route, -1)->get_controller(), rig.peer_id(0));
-    rig.server()->event_arm(false);
 }
 
 TEST_CASE(
@@ -760,7 +669,7 @@ TEST_CASE(
     rig.hold(late);
     rig.mount_late(late);
     rig.mirror_late(late, "Arena");
-    rig.client(late)->event_arm(true);
+    rig.client(late)->event_arm(NetwMultiplayer::EVENT_GROUP_LIFECYCLE);
 
     netw::session::ControlApply stale;
     stale.controller = 0;
@@ -784,16 +693,13 @@ TEST_CASE(
     NETW_CHECK_EQ(int64_t(joined->get_control_tenure()), int64_t(1));
     NETW_CHECK_EQ(int(joined->get_hold()), int(Control::HOLD_SOFT));
 
-    const Array moved = rows_of(
-        rig.client(late)->event_ring(route),
-        netw::EventPlane::CONTROL_CHANGED
-    );
+    const EventRing moved(rig.client(late)->event_drain());
     for (int at = 0; at < moved.size(); ++at) {
-        const Dictionary row = moved[at];
-        const Dictionary detail = row[netw::event_key::detail()];
-        NETW_CHECK_GT(int64_t(detail.get(StringName("to"), -1)), int64_t(0));
+        if (moved.event_at(at) == netw::EventPlane::CONTROL_CHANGED
+            && moved.route_at(at) == route) {
+            NETW_CHECK_GT(moved.b_at(at), int64_t(0));
+        }
     }
-    rig.client(late)->event_arm(false);
 }
 
 TEST_CASE(

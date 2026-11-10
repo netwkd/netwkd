@@ -36,7 +36,7 @@ bool is_entity_root(godot::Node *p_node);
 void declarations_entered(godot::Node *p_node, uint16_t p_marks);
 void declarations_exiting(godot::Node *p_node);
 
-void despawning(godot::Object *p_wrapper, const godot::StringName &p_reason);
+void despawning(godot::Object *p_wrapper);
 
 #if defined(NETW_TESTS)
 uint64_t watched_by_under_test(godot::Node *p_node);

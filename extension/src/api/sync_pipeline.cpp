@@ -41,11 +41,6 @@ const int LANE_ROW = 0;
 const int LANE_WINDOW = 1;
 const int LANE_RETAINED = 2;
 
-const StringName &decode_seam() {
-    static const StringName name("_sync_decode");
-    return name;
-}
-
 constexpr int INTERPOLATED_LIMIT = 64;
 
 uint64_t interpolated_mask(
@@ -138,14 +133,6 @@ void SyncPipeline::set_channels(
     channel_signal = p_signal;
 }
 
-void SyncPipeline::set_stage_seams(
-    const Callable &p_encode,
-    const Callable &p_decode
-) {
-    encode_stage_seam = p_encode;
-    decode_stage_seam = p_decode;
-}
-
 void SyncPipeline::set_tap_seam(const Callable &p_tap) {
     tap_seam = p_tap;
 }
@@ -154,126 +141,39 @@ ReplicationSend *SyncPipeline::row_send() {
     NetwMultiplayer *plane = core();
     if (!row_sender_armed && plane != nullptr) {
         row_sender_armed = true;
-        row_sender.set_encode_stage(
-            callable_mp(plane, &NetwMultiplayer::sync_pipeline_stage_row_frame)
-        );
         row_sender.watch_store(&plane->store());
     }
     return &row_sender;
 }
 
-PackedByteArray SyncPipeline::stage_row_frame(
-    int64_t p_peer,
-    int64_t p_frame_tick,
-    int64_t,
-    int64_t,
-    int64_t,
-    const PackedByteArray &p_bytes
-) {
-    return run_encode_stage(p_peer, p_frame_tick, p_bytes);
-}
-
-PackedByteArray SyncPipeline::run_encode_stage(
-    int64_t p_peer,
-    int64_t p_tick,
-    const PackedByteArray &p_bytes
-) {
-    NETW_ZONE_NC("SyncPipeline encode stage", colors::CODEC);
-    NETW_ZONE_VALUE(p_bytes.size());
-    PackedByteArray bytes = p_bytes;
-    if (encode_stage_seam.is_valid()) {
-        bytes = encode_stage_seam.call(p_peer, p_bytes, p_tick);
-    }
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr && plane->event_wants(EventPlane::SYNC_ENCODE, 0)) {
-        Dictionary detail;
-        detail[StringName("bytes")] = bytes.size();
-        plane->event_emit(
-            EventPlane::SYNC_ENCODE,
-            0,
-            detail,
-            StringName(),
-            p_peer,
-            OK,
-            Dictionary()
-        );
-    }
-    return bytes;
-}
-
-Error SyncPipeline::decode_stage_body() {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !stage_at.valid()) {
-        return ERR_INVALID_DATA;
-    }
-    if (stage_landing != store::Landing::ACCEPTED) {
-        stage_landing = plane->store().receive(
-            stage_at,
-            int(stage_sender),
-            stage_payload,
-            datagram_tick,
-            stage_windowed
-        );
-    }
-    return stage_landing == store::Landing::ACCEPTED ? OK : ERR_INVALID_DATA;
-}
-
-Error SyncPipeline::run_decode_stage(
+store::Landing SyncPipeline::decode_row(
     const RID &p_entity,
-    int64_t p_comp,
-    const PackedByteArray &p_payload
+    const store::RowAddress &p_at,
+    int64_t p_sender,
+    const PackedByteArray &p_payload,
+    bool p_windowed
 ) {
     NetwMultiplayer *plane = core();
+    const int64_t route = plane->get_liveness_core()->route_of(p_entity);
     NETW_ZONE_LEAF_F(
         "Row decode",
         colors::CODEC,
         profile::SUBSYSTEM_ENTITY,
         "entity %lld",
-        plane != nullptr ? static_cast<long long>(
-                               plane->get_liveness_core()->route_of(p_entity)
-                           )
-                         : 0LL
+        static_cast<long long>(route)
     );
     NETW_ZONE_VALUE(p_payload.size());
-    Error verdict = OK;
-    if (!decode_stage_seam.is_valid() || plane == nullptr
-        || !plane->overrides_seam(decode_seam())) {
-        verdict = decode_stage_body();
-    } else {
-#if defined(NETW_TESTS)
-        plane->idle_work.decode_stages += 1;
-#endif
-        verdict = Error(
-            int(decode_stage_seam.call(
-                p_entity,
-                p_comp,
-                0,
-                -1,
-                p_payload,
-                callable_mp(
-                    plane,
-                    &NetwMultiplayer::sync_pipeline_decode_stage_body
-                )
-            ))
-        );
-    }
-    if (plane != nullptr) {
-        const int64_t route = plane->get_liveness_core()->route_of(p_entity);
-        if (plane->event_wants(EventPlane::SYNC_DECODE, route)) {
-            Dictionary detail;
-            detail[StringName("comp")] = p_comp;
-            plane->event_emit(
-                EventPlane::SYNC_DECODE,
-                route,
-                detail,
-                StringName(),
-                0,
-                verdict,
-                Dictionary()
-            );
-        }
-    }
-    return verdict;
+    const store::Landing landed = plane->store().receive(
+        p_at,
+        int(p_sender),
+        p_payload,
+        datagram_tick,
+        p_windowed
+    );
+    const Error verdict
+        = landed == store::Landing::ACCEPTED ? OK : ERR_INVALID_DATA;
+    plane->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
+    return landed;
 }
 
 void SyncPipeline::register_derived(Node *p_node) {
@@ -1799,20 +1699,14 @@ void SyncPipeline::apply_row(
         );
         return;
     }
-    stage_payload = p_payload;
-    stage_at = at;
-    stage_sender = p_sender;
-    stage_windowed = windowed;
-    stage_landing = store::Landing::MALFORMED;
-    const Error verdict = run_decode_stage(
+    const store::Landing landed = decode_row(
         p_entity->get_rid_handle(),
-        binding->comp,
-        p_payload
+        at,
+        p_sender,
+        p_payload,
+        windowed
     );
-    const store::Landing landed = stage_landing;
-    stage_payload = PackedByteArray();
-    stage_at = store::RowAddress();
-    if (verdict != OK || landed != store::Landing::ACCEPTED) {
+    if (landed != store::Landing::ACCEPTED) {
         if (landed == store::Landing::BASELINE_UNKNOWN) {
             row_send()->note_baseline_drop();
         }
@@ -1952,7 +1846,6 @@ void SyncPipeline::feed_derived_interpolation(
         if (column < INTERPOLATED_LIMIT
             && plane->display_record_followed(
                 route,
-                key,
                 tick,
                 authoring,
                 owner,

@@ -10,6 +10,8 @@
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 
+#include <vector>
+
 #include "godot/object.hpp"
 #include "godot/script.hpp"
 #include "netw/api/context.hpp"
@@ -855,6 +857,137 @@ TEST_CASE(
     CHECK(world.stand.rig.route_node(world.lobby_route, 1) != nullptr);
     CHECK(world.stand.scene_of(1) == "Lobby");
     CHECK(world.stand.rig.route_node(world.lobby_route, 0) == nullptr);
+}
+
+enum EdgeSignal {
+    EDGE_ENTERED,
+    EDGE_EXITED,
+    EDGE_PLAYER_ENTERED,
+    EDGE_PLAYER_LEFT,
+    EDGE_SIGNAL_COUNT,
+};
+
+const char *EDGE_SIGNAL_NAMES[EDGE_SIGNAL_COUNT] = {
+    "entity_entered",
+    "entity_exited",
+    "player_entity_entered",
+    "player_entity_left",
+};
+
+struct EdgeHeard {
+    ObjectID session;
+    int edge = 0;
+    ObjectID entity;
+    bool root_stands = false;
+    bool inside_step = false;
+};
+
+std::vector<EdgeHeard> g_edges;
+
+void hear_edge(const Variant &p_entity, int p_edge, Object *p_session) {
+    const NetwEntity *entity = Object::cast_to<NetwEntity>(p_entity);
+    const NetwMultiplayer *session
+        = Object::cast_to<NetwMultiplayer>(p_session);
+    EdgeHeard heard;
+    heard.session = netw::gd::instance_id(p_session);
+    heard.edge = p_edge;
+    heard.entity = netw::gd::instance_id(entity);
+    heard.root_stands = entity != nullptr && entity->get_owner() != nullptr;
+    heard.inside_step = session != nullptr && session->is_inside_step();
+    g_edges.push_back(heard);
+}
+
+void listen_edges(NetwMultiplayer *p_session, const Ref<NetwScene> &p_scene) {
+    REQUIRE(p_scene.is_valid());
+    for (int edge = 0; edge < EDGE_SIGNAL_COUNT; ++edge) {
+        p_scene->connect(
+            StringName(EDGE_SIGNAL_NAMES[edge]),
+            callable_mp_static(&hear_edge).bind(edge, p_session)
+        );
+    }
+}
+
+struct EdgeTally {
+    int count = 0;
+    ObjectID entity;
+    bool root_stood = true;
+    bool outside_step = true;
+};
+
+EdgeTally tally(NetwMultiplayer *p_session, EdgeSignal p_edge) {
+    EdgeTally out;
+    for (const EdgeHeard &heard : g_edges) {
+        if (heard.session != netw::gd::instance_id(p_session)
+            || heard.edge != p_edge) {
+            continue;
+        }
+        out.count += 1;
+        out.entity = heard.entity;
+        out.root_stood = out.root_stood && heard.root_stands;
+        out.outside_step = out.outside_step && !heard.inside_step;
+    }
+    return out;
+}
+
+TEST_CASE(
+    "[Networked][Scene][SceneTree] SM4 a scene hears an edge the tree makes "
+    "at that edge while the root stands, an edge a poll makes after the "
+    "poll, and every edge once"
+) {
+    g_edges.clear();
+    Stand stand(1);
+    Node *lobby = stand.open("Lobby");
+    stand.rig.pump(8);
+    NETW_REQUIRE_EQ(
+        int(Netw::scene(lobby)->watch(stand.rig.player(0))),
+        int(OK)
+    );
+    stand.rig.pump(8);
+    NetwMultiplayer *server = stand.at(-1);
+    NetwMultiplayer *client = stand.at(0);
+    const Ref<NetwScene> mirror
+        = client->get_session()->find_scene(StringName("Lobby"));
+    REQUIRE(mirror.is_valid());
+    listen_edges(server, Netw::scene(lobby));
+    listen_edges(client, mirror);
+
+    Node *pawn = stand.seat(lobby, 0, "Pawn_");
+    REQUIRE(pawn != nullptr);
+    const ObjectID entity = netw::gd::instance_id(NetwEntity::of(pawn).ptr());
+
+    const EdgeTally entered = tally(server, EDGE_ENTERED);
+    NETW_CHECK_EQ(entered.count, 1);
+    NETW_CHECK_EQ(tally(server, EDGE_PLAYER_ENTERED).count, 1);
+    CHECK(entered.entity == entity);
+    CHECK(entered.root_stood);
+    NETW_CHECK_EQ(tally(client, EDGE_ENTERED).count, 0);
+
+    stand.rig.pump(8);
+    NETW_CHECK_EQ(tally(server, EDGE_ENTERED).count, 1);
+    NETW_CHECK_EQ(tally(server, EDGE_PLAYER_ENTERED).count, 1);
+    const EdgeTally mirrored = tally(client, EDGE_PLAYER_ENTERED);
+    NETW_CHECK_EQ(mirrored.count, 1);
+    NETW_CHECK_EQ(tally(client, EDGE_ENTERED).count, 1);
+    CHECK(mirrored.outside_step);
+
+    NETW_CHECK_EQ(despawn(pawn), int(OK));
+    end_frame();
+    const EdgeTally left = tally(server, EDGE_PLAYER_LEFT);
+    NETW_CHECK_EQ(left.count, 1);
+    NETW_CHECK_EQ(tally(server, EDGE_EXITED).count, 1);
+    CHECK(left.entity == entity);
+    CHECK(left.root_stood);
+    CHECK(tally(server, EDGE_EXITED).root_stood);
+
+    stand.rig.pump(8);
+    NETW_CHECK_EQ(tally(server, EDGE_EXITED).count, 1);
+    NETW_CHECK_EQ(tally(server, EDGE_PLAYER_LEFT).count, 1);
+    const EdgeTally mirror_left = tally(client, EDGE_PLAYER_LEFT);
+    NETW_CHECK_EQ(mirror_left.count, 1);
+    NETW_CHECK_EQ(tally(client, EDGE_EXITED).count, 1);
+    CHECK(mirror_left.outside_step);
+    CHECK(mirror_left.root_stood);
+    g_edges.clear();
 }
 
 #endif

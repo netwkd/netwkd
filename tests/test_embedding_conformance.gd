@@ -39,8 +39,8 @@ func _scenario_host_comes_online(world: NetwEmbeddingWorld) -> void:
 	assert_bool(host.is_online).override_failure_message(
 		"[%s] host never came online through its own verb" % world.provider(),
 	).is_true()
-	assert_bool(host.is_host).override_failure_message(
-		"[%s] online host does not report is_host" % world.provider(),
+	assert_bool(host.is_server()).override_failure_message(
+		"[%s] online host does not report is_server" % world.provider(),
 	).is_true()
 	assert_int(host.get_unique_id()).override_failure_message(
 		"[%s] host is not peer 1" % world.provider(),

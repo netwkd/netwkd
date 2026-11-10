@@ -112,22 +112,11 @@ String NetwWebRTCSignaler::local_signaler_id() {
     if (GDVIRTUAL_CALL(_local_signaler_id, answered)) {
         return answered;
     }
-    return local_signaler_id_default();
-}
-
-String NetwWebRTCSignaler::local_signaler_id_default() {
     return String();
 }
 
 void NetwWebRTCSignaler::session_connected(int64_t p_peer) {
-    if (GDVIRTUAL_CALL(_on_session_connected, p_peer)) {
-        return;
-    }
-    session_connected_default(p_peer);
-}
-
-void NetwWebRTCSignaler::session_connected_default(int64_t p_peer) {
-    (void)p_peer;
+    GDVIRTUAL_CALL(_on_session_connected, p_peer);
 }
 
 void NetwWebRTCSignaler::close() {

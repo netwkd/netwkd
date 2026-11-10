@@ -246,7 +246,7 @@ TEST_CASE(
 
 class RefusingBackend : public NetwDatabaseBackend {
 public:
-    Ref<NetwPromise> open_default(Object *, const StringName &) override {
+    Ref<NetwPromise> open_builtin(Object *, const StringName &) override {
         return NetwPromise::rejected(ERR_CANT_OPEN, "refused open");
     }
 };

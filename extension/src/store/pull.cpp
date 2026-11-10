@@ -18,19 +18,6 @@ uint64_t script_of(Object *p_node) {
     return held.is_valid() ? uint64_t(held->get_instance_id()) : 1;
 }
 
-uint32_t row_named(const Table &p_table, uint32_t p_order, int64_t p_route) {
-    if (p_order < p_table.selected.size()
-        && p_table.routes[p_table.selected[p_order]] == p_route) {
-        return p_table.selected[p_order];
-    }
-    for (uint32_t row = 0; row < p_table.row_count(); ++row) {
-        if (p_table.routes[row] == p_route) {
-            return row;
-        }
-    }
-    return Table::NO_SLOT;
-}
-
 bool resources_held(const Table &p_table, Object *p_node) {
     for (uint32_t at = 0; at < p_table.columns.size(); ++at) {
         if (p_table.columns[at].port == Port::INDEXED
@@ -195,18 +182,17 @@ void World::note_miss(
     report_miss(missed);
 }
 
-void World::pull(uint32_t p_table, int64_t p_tick, bool p_custom) {
+void World::pull(uint32_t p_table, int64_t p_tick) {
     NETW_ZONE_NC("Store pull", colors::TABLE);
     Table &table = *tables[p_table];
     NETW_ZONE_TEXT_F("table %u %s", p_table, family_name(table.family));
     table.pulled_tick = p_tick;
-    table.selected.clear();
     const bool validating = validate_every > 0 && p_tick % validate_every == 0;
 #if defined(NETW_TESTS)
     work.pulls += 1;
     const int64_t allocated = allocations_seen();
 #endif
-    pull_rows(table, p_tick, p_custom, validating);
+    pull_rows(table, p_tick, validating);
 #if defined(NETW_TESTS)
     work.allocations += allocations_seen() - allocated;
 #endif
@@ -261,18 +247,13 @@ bool World::read_live(const RowAddress &p_at, LocalVector<Variant> &r_values) {
     return true;
 }
 
-void World::pull_rows(
-    Table &p_table,
-    int64_t p_tick,
-    bool p_custom,
-    bool p_validating
-) {
+void World::pull_rows(Table &p_table, int64_t p_tick, bool p_validating) {
     Table &table = p_table;
     const bool whole_body
         = table.body_columns > 0 && table.body_columns == table.columns.size();
     if (!whole_body) {
         for (uint32_t row = 0; row < table.row_count(); ++row) {
-            pull_row(table, row, p_tick, p_custom, p_validating, false);
+            pull_row(table, row, p_tick, p_validating, false);
         }
         return;
     }
@@ -286,7 +267,7 @@ void World::pull_rows(
         }
     }
     for (uint32_t at = 0; at < visiting.size(); ++at) {
-        pull_row(table, visiting[at], p_tick, p_custom, p_validating, true);
+        pull_row(table, visiting[at], p_tick, p_validating, true);
     }
     if (p_validating) {
         audit_quiet(table, p_tick);
@@ -315,7 +296,6 @@ void World::pull_row(
     Table &p_table,
     uint32_t p_row,
     int64_t p_tick,
-    bool p_custom,
     bool p_validating,
     bool p_gated
 ) {
@@ -401,10 +381,6 @@ void World::pull_row(
                 return;
             }
         }
-    }
-    if (p_custom) {
-        table.selected.push_back(row);
-        return;
     }
 #if defined(NETW_TESTS)
     work.rows += 1;
@@ -514,74 +490,6 @@ void World::check_codes(
     const int differs = p_table.first_difference(p_row, probe);
     if (differs >= 0) {
         note_miss(p_table, p_row, differs, p_gate, p_tick);
-    }
-}
-
-Array World::gather_rows(uint32_t p_table, const PackedInt64Array &p_routes) {
-    Array out;
-    for (int64_t at = 0; at < p_routes.size(); ++at) {
-        Array values;
-        if (p_table >= tables.size()) {
-            out.push_back(values);
-            continue;
-        }
-        Table &table = *tables[p_table];
-        const uint32_t row = row_named(table, uint32_t(at), p_routes[at]);
-        const NodeCell *cell
-            = row != Table::NO_SLOT ? &resident(table, row) : nullptr;
-        Object *node = cell != nullptr ? cell->object : nullptr;
-        if (node != nullptr) {
-            BodyState body;
-            if (table.body_columns > 0) {
-                body_probe(*cell, body);
-                body_read(body);
-            }
-            for (uint32_t column = 0; column < table.columns.size(); ++column) {
-                const Column &port = table.columns[column];
-                const StringName &key = table.schema.at(int(column))->key;
-                values.push_back(
-                    port.port == Port::BODY
-                        ? body_value(body, port.body, node, key)
-                        : object_value(node, key)
-                );
-            }
-        }
-        out.push_back(values);
-    }
-    return out;
-}
-
-void World::absorb(uint32_t p_table, const Array &p_rows, int64_t p_tick) {
-    Table &table = *tables[p_table];
-    for (uint32_t at = 0; at < table.selected.size(); ++at) {
-        const uint32_t row = table.selected[at];
-        const Array values
-            = int64_t(at) < p_rows.size() ? Array(p_rows[at]) : Array();
-        if (values.size() != int64_t(table.columns.size())) {
-            table.flags[row] |= Table::UNGATHERED;
-            continue;
-        }
-#if defined(NETW_TESTS)
-        work.custom += 1;
-#endif
-        table.scratch.clear();
-        bool encoded = true;
-        for (uint32_t column = 0; encoded && column < table.columns.size();
-             ++column) {
-            table.write_value(row, column, values[column]);
-            encoded = table.encode(column, values[column], table.scratch);
-        }
-        if (!encoded) {
-            table.flags[row] |= Table::UNENCODED;
-            continue;
-        }
-        if (table.settle(row, table.scratch, p_tick)) {
-            table.record_rest(row, p_tick);
-            table.record_codes(row, table.scratch, p_tick);
-            owe_changed(table, row);
-        } else if (table.history_count(row) == 0) {
-            table.record_codes(row, table.scratch, p_tick);
-        }
     }
 }
 

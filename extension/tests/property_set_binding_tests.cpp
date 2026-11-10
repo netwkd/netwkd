@@ -460,7 +460,7 @@ Offered offered(
             );
         }
         table.stamp_tick = p_tick;
-        world.pull(at, p_tick, false);
+        world.pull(at, p_tick);
         for (uint32_t row = 0; row < table.row_count(); ++row) {
             world.stamp(at, row);
         }
@@ -597,7 +597,7 @@ const char *DROPS_VALUE = netw_test::gdsrc::PROPERTY_ABSENT;
 bool pull_reads_field(netw::store::World &p_world, int64_t p_tick) {
     netw::store::Table &table = p_world.table(0);
     table.sources[0] = uint8_t(netw::store::Source::LOCAL);
-    p_world.pull(0, p_tick, false);
+    p_world.pull(0, p_tick);
     return (table.flags[0] & netw::store::Table::UNGATHERED) == 0
         && int64_t(table.read_value(0, 0)) == 7;
 }
@@ -605,7 +605,7 @@ bool pull_reads_field(netw::store::World &p_world, int64_t p_tick) {
 bool pull_offers_nothing(netw::store::World &p_world, int64_t p_tick) {
     netw::store::Table &table = p_world.table(0);
     table.sources[0] = uint8_t(netw::store::Source::LOCAL);
-    p_world.pull(0, p_tick, false);
+    p_world.pull(0, p_tick);
     return (table.flags[0] & netw::store::Table::UNGATHERED) != 0;
 }
 

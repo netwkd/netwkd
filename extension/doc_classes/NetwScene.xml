@@ -112,16 +112,28 @@
 		</member>
 	</members>
 	<signals>
+		<signal name="entity_entered">
+			<param index="0" name="entity" type="NetwEntity" />
+			<description>
+				Emitted when [param entity] enters the tree inside this scene, at the same tree edge as [signal SceneTree.node_added]. An entity added while [method MultiplayerAPI.poll] or a [NetwClock] tick runs, such as a client building an entity the server spawned, is reported when that poll or tick ends.
+			</description>
+		</signal>
+		<signal name="entity_exited">
+			<param index="0" name="entity" type="NetwEntity" />
+			<description>
+				Emitted when [param entity] leaves the tree inside this scene, at the same tree edge as [signal SceneTree.node_removed], so [member NetwEntity.root] still exists. An entity removed while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
+			</description>
+		</signal>
 		<signal name="player_entity_entered">
 			<param index="0" name="entity" type="NetwEntity" />
 			<description>
-				Emitted when [param entity] joins [member player_entities].
+				Emitted when [param entity] joins [member player_entities], together with [signal entity_entered].
 			</description>
 		</signal>
 		<signal name="player_entity_left">
 			<param index="0" name="entity" type="NetwEntity" />
 			<description>
-				Emitted when [param entity] leaves [member player_entities].
+				Emitted when [param entity] leaves [member player_entities], together with [signal entity_exited].
 			</description>
 		</signal>
 		<signal name="viewer_entered">

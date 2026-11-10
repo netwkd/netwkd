@@ -103,24 +103,6 @@ uint32_t value_bytes_of(int p_type) {
     }
 }
 
-const char *port_name(Port p_port) {
-    switch (p_port) {
-        case Port::BODY:
-            return "body";
-        case Port::ENGINE:
-            return "engine";
-        case Port::SCRIPT:
-            return "script";
-        case Port::CUSTOM:
-            return "custom";
-        case Port::ARRAY:
-            return "array";
-        case Port::INDEXED:
-            return "indexed";
-    }
-    return "engine";
-}
-
 const char *family_name(Family p_family) {
     switch (p_family) {
         case Family::VOLATILE:
@@ -279,7 +261,6 @@ uint32_t Table::add_row() {
         senders[at].rows.resize(slots.size());
     }
     push_peer_rows();
-    selected.reserve(slots.size());
     return row;
 }
 
@@ -656,7 +637,7 @@ int64_t Table::held_bytes() const {
         + held::vector(exact) + held::vector(pulled_codes)
         + held::vector(code_offsets) + scratch.held_bytes()
         + landing.held_bytes() + base.held_bytes() + held::vector(landed)
-        + held::vector(decode_codes) + held::vector(selected);
+        + held::vector(decode_codes);
     for (const Sender &sender : senders) {
         bytes += held::vector(sender.rows);
         for (const Received &received : sender.rows) {

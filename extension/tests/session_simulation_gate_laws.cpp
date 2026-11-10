@@ -154,51 +154,31 @@ TEST_CASE(
     };
     for (const int64_t channel : sync_channels) {
         NETW_CHECK_EQ(
-            int(session->sync_admit_frame_default(
-                2,
-                51,
-                0,
-                channel,
-                0,
-                -1,
-                carried
-            )),
+            int(session->sync_admit_frame(51, channel, carried)),
             int(OK)
         );
     }
 
     NETW_CHECK_EQ(
-        int(session->sync_admit_frame_default(
-            2,
+        int(session->sync_admit_frame(
             51,
-            0,
             netw::wire::builtin_channel("SPAWN"),
-            0,
-            -1,
             carried
         )),
         int(ERR_INVALID_DATA)
     );
     NETW_CHECK_EQ(
-        int(session->sync_admit_frame_default(
-            2,
+        int(session->sync_admit_frame(
             51,
-            0,
             netw::wire::builtin_channel("SYNC"),
-            0,
-            -1,
             PackedByteArray()
         )),
         int(ERR_INVALID_DATA)
     );
     NETW_CHECK_EQ(
-        int(session->sync_admit_frame_default(
-            2,
+        int(session->sync_admit_frame(
             52,
-            0,
             netw::wire::builtin_channel("SPAWN"),
-            0,
-            -1,
             PackedByteArray()
         )),
         int(ERR_DOES_NOT_EXIST)

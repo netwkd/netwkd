@@ -29,8 +29,6 @@ struct Column {
 
 uint32_t value_bytes_of(int p_type);
 
-const char *port_name(Port p_port);
-
 const char *family_name(Family p_family);
 
 } // namespace netw::store

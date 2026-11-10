@@ -131,9 +131,6 @@ public:
     virtual godot::String member_name(int64_t p_peer_id);
     virtual godot::String account_of(int64_t p_peer_id);
     virtual godot::String local_member_name();
-
-    static godot::String member_name_default(int64_t p_peer_id);
-    static godot::String local_member_name_default();
     virtual void list_lobbies();
     virtual void stop_listing();
     virtual void leave_lobby();

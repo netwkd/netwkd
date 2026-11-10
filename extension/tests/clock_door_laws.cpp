@@ -181,6 +181,25 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "[Networked][Clock][Door][Hosted] C8 auto_configure_offset on a client "
+    "applies the recommended display offset once its measurement ends"
+) {
+    Ref<NetwMultiplayer> session = make_session();
+    const Ref<NetwClock> door = session->get_clock();
+    session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
+    session->clock_engine().set_configured(true);
+    session->clock_ingest_pong(0.05, 840, 0.0, false);
+    REQUIRE(door->get_is_synchronized());
+    const int64_t recommended = door->get_recommended_display_offset();
+    door->set_display_offset(recommended + 5);
+
+    door->auto_configure_offset();
+    session->clock_step_auto_config(6.0);
+
+    NETW_CHECK_EQ(door->get_display_offset(), recommended);
+}
+
+TEST_CASE(
     "[Networked][Clock][Door][Hosted] C5 a clock door outliving its session "
     "answers a stopped clock rather than dereferencing what is gone"
 ) {

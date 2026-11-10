@@ -51,16 +51,10 @@ struct World {
     Node *account = nullptr;
     ObjectID root_id;
 
-    explicit World(const String &p_store, const Ref<Script> &p_script = {}) {
+    explicit World(const String &p_store) {
         schema_model::clear();
         netw::persist::forget_stores();
-        if (p_script.is_valid()) {
-            session = Ref<NetwMultiplayer>(
-                Object::cast_to<NetwMultiplayer>(p_script->call("new"))
-            );
-        } else {
-            session.instantiate();
-        }
+        session.instantiate();
         account = memnew(Node);
         account->set_name("hero");
         schema = NetwSchema::create("players");
@@ -300,55 +294,5 @@ TEST_CASE(
     NETW_CHECK_EQ(world.log.count("failed"), 1);
     NETW_CHECK_EQ(world.log.count("saved"), 0);
 }
-
-#if defined(NETW_TIER_HOSTED)
-
-const char *TICK_SEAM = R"(extends NetwMultiplayer
-
-var ticks := 0
-var seen := 0.0
-var calls_through := false
-
-func _persist_tick(delta: float) -> void:
-	ticks += 1
-	seen += delta
-	if calls_through:
-		persist_tick_default(delta)
-)";
-
-TEST_CASE(
-    "[Networked][Persistence] PF4 an override of _persist_tick replaces the "
-    "interval pass, and persist_tick_default inside it runs the stock pass"
-) {
-    const Ref<Script> seam = netw_test::minted_script(TICK_SEAM);
-    REQUIRE(seam.is_valid());
-
-    SUBCASE("an override that does not call through") {
-        World world("pf4a", seam);
-        const RID binding = world.enroll(false);
-        world.root->set_position(Vector2(2, 2));
-
-        world.session->persist_pump(1.5);
-
-        NETW_CHECK_EQ(int(world.session->get("ticks")), 1);
-        CHECK(bool(double(world.session->get("seen")) == 1.5));
-        CHECK(world.session->persist_is_dirty_binding(binding));
-    }
-
-    SUBCASE("an override that calls through") {
-        World world("pf4b", seam);
-        const RID binding = world.enroll(false);
-        world.session->set("calls_through", true);
-        world.root->set_position(Vector2(2, 2));
-
-        world.session->persist_pump(1.5);
-
-        NETW_CHECK_EQ(int(world.session->get("ticks")), 1);
-        CHECK_FALSE(world.session->persist_is_dirty_binding(binding));
-        NETW_CHECK_EQ(world.log.count("saved"), 1);
-    }
-}
-
-#endif
 
 } // namespace TestPersistenceFailure

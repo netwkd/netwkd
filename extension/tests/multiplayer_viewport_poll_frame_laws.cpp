@@ -1,8 +1,5 @@
 #include "support/frame_drive.h"
-#include "support/netw_call_log.h"
 #include "support/netw_test.h"
-
-#include <memory>
 
 #include "godot/node.hpp"
 #include "godot/scene_tree.hpp"
@@ -17,7 +14,6 @@ namespace {
 
 using netw::MultiplayerViewport;
 using netw::NetwMultiplayer;
-using netw_test::CallLog;
 
 constexpr int POLL_FRAMES = 30;
 
@@ -34,27 +30,28 @@ TreePollEvidence &tree_poll_evidence() {
 class TreePollScenario final : public netw_test::FrameScenario {
     int step = 0;
     MultiplayerViewport *tree = nullptr;
-    std::unique_ptr<CallLog> polls;
+    int polls_before = 0;
+
+    int polls() const {
+        return int(tree->get_api()->clock_get_monitor(
+            NetwMultiplayer::CLOCK_MONITOR_POLLS
+        ));
+    }
 
     void open() {
-        polls = std::make_unique<CallLog>();
         tree = memnew(MultiplayerViewport);
         tree->set_name("MT11Tree");
         netw::gd::scene_root()->add_child(tree);
-        tree->get_api()->observe(
-            NetwMultiplayer::SESSION_POLL_STARTED,
-            polls->callable("poll")
-        );
+        polls_before = polls();
     }
 
     void close() {
         TreePollEvidence &evidence = tree_poll_evidence();
-        evidence.polls = polls->count("poll");
+        evidence.polls = polls() - polls_before;
         evidence.driven = true;
         netw::gd::scene_root()->remove_child(tree);
         memdelete(tree);
         tree = nullptr;
-        polls.reset();
     }
 
 public:

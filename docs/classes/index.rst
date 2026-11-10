@@ -152,10 +152,7 @@ Other classes
     class_netwphysicsstepper
     class_netwplayer
     class_netwpredictcarrycontext
-    class_netwpredictfold
     class_netwprediction
-    class_netwpredictjudgement
-    class_netwpredictrecovery
     class_netwpredictstats
     class_netwproberesult
     class_netwpromise

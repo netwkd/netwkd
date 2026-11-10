@@ -157,7 +157,7 @@ class ReclaimScenario final : public netw_test::FrameScenario {
         Node *root = netw::gd::scene_root();
         SceneTree *tree = netw::gd::scene_tree();
         for (int at = 0; at < SEATS; ++at) {
-            apis[at] = NetwMultiplayer::create(Ref<Script>());
+            apis[at] = NetwMultiplayer::create();
             apis[at]->session_get_inner()->set_root_path(NodePath("/"));
             Node *branch = memnew(Node);
             branch->set_name(vformat("Reclaim%d", at));

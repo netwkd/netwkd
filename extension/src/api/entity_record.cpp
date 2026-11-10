@@ -402,7 +402,7 @@ bool NetwEntityRecord::begin_despawn(
             ? wrapper->get_multiplayer()
             : Ref<MultiplayerAPI>();
         const RID captured_handle = handle;
-        tree::despawning(p_wrapper, opts->get_reason());
+        tree::despawning(p_wrapper);
         if (wrapper == nullptr
             || (wrapper->get_record() == this && handle == captured_handle
                 && wrapper->get_multiplayer() == session

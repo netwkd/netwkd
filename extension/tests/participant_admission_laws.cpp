@@ -3,6 +3,7 @@
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/participant.hpp"
+#include "netw/api/session.hpp"
 #include "support/netw_recorder.h"
 
 namespace TestParticipantAdmissionLaws {
@@ -97,22 +98,19 @@ TEST_CASE(
     const Ref<netw::NetwPlayer> ours = a_row();
     core->player_adopt(mine, ours);
     Recorder session(
-        core.ptr(),
-        Vector<StringName>({
-            "player_local_joined",
-            "player_joined",
-        })
+        core->get_session().ptr(),
+        Vector<StringName>({"local_joined", "player_joined"})
     );
 
     core->player_admit(mine);
 
     NETW_CHECK_EQ(core->player_admitted_local().ptr(), ours.ptr());
-    NETW_CHECK_EQ(session.count("player_local_joined"), 0);
+    NETW_CHECK_EQ(session.count("local_joined"), 0);
     NETW_CHECK_EQ(session.count("player_joined"), 0);
 
     core->player_publish_joined(mine);
 
-    NETW_CHECK_EQ(session.count("player_local_joined"), 1);
+    NETW_CHECK_EQ(session.count("local_joined"), 1);
     NETW_CHECK_EQ(core->player_admitted_local().ptr(), ours.ptr());
 }
 

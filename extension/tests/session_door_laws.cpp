@@ -57,7 +57,12 @@ TEST_CASE(
         session->player_joined_all().size()
     );
     CHECK(door->get_local_player() == session->player_local());
-    NETW_CHECK_EQ(door->get_stats().size(), session->stats_snapshot().size());
+    NETW_CHECK_EQ(
+        door->stat(NetwMultiplayer::STAT_SENT_PACKETS),
+        session->stats_get(NetwMultiplayer::STAT_SENT_PACKETS)
+    );
+    CHECK_FALSE(door->link_stats(2).is_empty());
+    CHECK(door->link_stats(2) == session->peer_link_stats(2));
 }
 
 TEST_CASE(
@@ -134,7 +139,7 @@ TEST_CASE(
     CHECK(door->get_local_player().is_null());
     NETW_CHECK_EQ(door->get_players().size(), 0);
     NETW_CHECK_EQ(door->get_scenes().size(), 0);
-    NETW_CHECK_EQ(door->get_stats().size(), 0);
+    NETW_CHECK_EQ(door->stat(NetwMultiplayer::STAT_SENT_PACKETS), 0);
     CHECK(door->player_of(1).is_null());
     NETW_CHECK_EQ(
         int(door->bucket_of(1, Variant()).get_type()),

@@ -4,6 +4,7 @@
 #include <cstdio>
 
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/session.hpp"
 #include "netw/session_core.hpp"
 #include "netw/wire/registry.hpp"
 #include "support/netw_recorder.h"
@@ -108,8 +109,8 @@ TEST_CASE(
     host.instantiate();
     SessionCore &core = host->session_plane();
     Recorder recorder(
-        host.ptr(),
-        {"session_state_changed", "session_entered", "session_ended"}
+        host->get_session().ptr(),
+        {"state_changed", "entered", "exiting"}
     );
     core.transition(SessionCore::STATE_CONNECTING);
     core.transition(SessionCore::STATE_ONLINE);
@@ -231,8 +232,8 @@ TEST_CASE(
     CHECK(spend_budget(core, 7, NOW));
 
     Recorder recorder(
-        host.ptr(),
-        {"session_state_changed", "session_entered", "session_ended"}
+        host->get_session().ptr(),
+        {"state_changed", "entered", "exiting"}
     );
     core.clear();
 

@@ -34,16 +34,6 @@ func _init() -> void:
 			.heartbeat(2)
 )";
 
-constexpr const char *DECODING_SOURCE = R"(extends NetwMultiplayer
-
-var decoded := 0
-
-func _sync_decode(_entity: RID, _comp: int, _flags: int, _tick: int,
-		_payload: PackedByteArray) -> Error:
-	decoded += 1
-	return ERR_INVALID_DATA
-)";
-
 constexpr int PILE = 8;
 constexpr int TICKRATE = 30;
 constexpr int SETTLE_FRAMES = 60;
@@ -65,26 +55,21 @@ Node *build_cube(const Variant &p_name) {
 struct ReceiveEvidence {
     bool driven = false;
     int64_t received = 0;
-    int64_t staged = 0;
-    int64_t decoded = 0;
     int64_t allocations = 0;
 };
 
-ReceiveEvidence &receive_evidence(bool p_decoding) {
-    static ReceiveEvidence evidence[2];
-    return evidence[p_decoding ? 1 : 0];
+ReceiveEvidence &receive_evidence() {
+    static ReceiveEvidence evidence;
+    return evidence;
 }
 
 class ReceiveScenario final : public netw_test::FrameScenario {
-    const bool decoding;
     int frame = 0;
     bool done = false;
     netw_test::SimStand *stand = nullptr;
     Ref<Script> script;
-    Ref<Script> session;
     netw_test::AllocProbe probe;
     NetwMultiplayer::IdleWork opened;
-    int64_t decoded = 0;
 
     NetwMultiplayer *server() const {
         return stand->session(-1);
@@ -92,10 +77,6 @@ class ReceiveScenario final : public netw_test::FrameScenario {
 
     NetwMultiplayer *client() const {
         return stand->session(0);
-    }
-
-    int64_t decoded_now() const {
-        return decoding ? int64_t(client()->get("decoded")) : 0;
     }
 
     bool open() {
@@ -107,13 +88,6 @@ class ReceiveScenario final : public netw_test::FrameScenario {
         stand = new netw_test::SimStand(1);
         if (!stand->ready()) {
             return false;
-        }
-        if (decoding) {
-            session = netw_test::minted_script(DECODING_SOURCE);
-            if (session.is_null()) {
-                return false;
-            }
-            client()->set_script(session);
         }
         stand->teach(StringName(CUBE_ID), callable_mp_static(&build_cube));
         stand->mount();
@@ -138,27 +112,21 @@ class ReceiveScenario final : public netw_test::FrameScenario {
     }
 
     void read() {
-        ReceiveEvidence &seen = receive_evidence(decoding);
+        ReceiveEvidence &seen = receive_evidence();
         const NetwMultiplayer::IdleWork &now = client()->idle_work;
         seen.received = now.received_rows - opened.received_rows;
-        seen.staged = now.decode_stages - opened.decode_stages;
         seen.allocations = now.receive_allocations - opened.receive_allocations;
-        seen.decoded = decoded_now() - decoded;
     }
 
     void close() {
-        receive_evidence(decoding).driven = true;
+        receive_evidence().driven = true;
         delete stand;
         stand = nullptr;
         cube_script = nullptr;
         script = Ref<Script>();
-        session = Ref<Script>();
     }
 
 public:
-    explicit ReceiveScenario(bool p_decoding) : decoding(p_decoding) {
-    }
-
     bool advance() override {
         if (netw::gd::scene_root() == nullptr || done) {
             return false;
@@ -170,7 +138,6 @@ public:
         }
         if (frame == SETTLE_FRAMES) {
             client()->store().validate_every = 0;
-            decoded = decoded_now();
             probe.arm();
             opened = client()->idle_work;
         }
@@ -187,31 +154,14 @@ public:
     }
 };
 
-NETW_FRAME_SCENARIO(ReceiveScenario, store_receive_scenario, false);
-NETW_FRAME_SCENARIO(ReceiveScenario, store_receive_decoding_scenario, true);
-
-TEST_CASE(
-    "[Networked][Store][Frame] R1 a received row runs the decode stage only "
-    "when the session's script overrides it, and then for every row that "
-    "arrives"
-) {
-    const ReceiveEvidence &plain = receive_evidence(false);
-    const ReceiveEvidence &decoding = receive_evidence(true);
-    REQUIRE(plain.driven);
-    REQUIRE(decoding.driven);
-    NETW_CHECK_GT(plain.received, int64_t(PILE));
-    NETW_CHECK_EQ(plain.staged, int64_t(0));
-    NETW_CHECK_GT(decoding.staged, int64_t(PILE));
-    NETW_CHECK_EQ(decoding.decoded, decoding.staged);
-    NETW_CHECK_EQ(decoding.received, int64_t(0));
-}
+NETW_FRAME_SCENARIO(ReceiveScenario, store_receive_scenario);
 
 TEST_CASE(
     "[Networked][Store][Frame] R2 a steady stream of received rows, "
     "interpolated and landed on bodies, allocates through the extension's "
     "allocator at most once in every four rows"
 ) {
-    const ReceiveEvidence &seen = receive_evidence(false);
+    const ReceiveEvidence &seen = receive_evidence();
     REQUIRE(seen.driven);
     NETW_CHECK_GT(seen.received, int64_t(PILE));
     NETW_CHECK_LE(seen.allocations * 4, seen.received);

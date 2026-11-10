@@ -4349,7 +4349,7 @@ bool NetwPredictionEngine::demote_for_breach(
     record_breach(p_slot, p_transition);
     if (opened) {
         sync_episode(p_slot);
-        announce_episode(p_slot, EventPlane::EPISODE_OPEN, Dictionary());
+        announce_episode(p_slot, EventPlane::EPISODE_OPEN);
     }
     const Ref<NetwEntity> seated = owner_entity(p_slot);
     record_episode_write(
@@ -5194,19 +5194,6 @@ void NetwPredictionEngine::report_owner_claim(
     if (!mismatched_before) {
         add_held_fact(p_slot, NetwPredictStats::FACT_CLIENT_MISMATCHES, 1);
     }
-    const int64_t attribution = verdict[CLAIM_ATTRIBUTION];
-    NetwMultiplayer *host = core();
-    const Ref<NetwEntity> seated = owner_entity(p_slot);
-    if (attribution < 0 || host == nullptr || seated.is_null()) {
-        return;
-    }
-    const int64_t controller = seated->get_controller();
-    host->notify(
-        NetwMultiplayer::PREDICT_OWNER_DIVERGENCE,
-        controller,
-        p_transition,
-        attribution
-    );
 }
 
 Dictionary NetwPredictionEngine::capture_state_raw(int64_t p_slot) {
@@ -6579,8 +6566,7 @@ bool NetwPredictionEngine::run_recovery_ladder(
     int p_attribution,
     const Dictionary &p_sample,
     const PackedStringArray &p_participants,
-    const Callable &p_demote,
-    const Callable &p_seam
+    const Callable &p_demote
 ) {
     NetwPrediction *handle = Object::cast_to<NetwPrediction>(handle_of(p_slot));
     if (handle == nullptr) {
@@ -6600,7 +6586,7 @@ bool NetwPredictionEngine::run_recovery_ladder(
     bool skip = false;
     bool seated = false;
     if (window != RECOVERY_TRANSPORTED) {
-        const PlannedRows planned = plan_recovery_rows(
+        const predict::WritePlan *planned = plan_recovery_rows(
             p_slot,
             p_ack,
             p_ack_label,
@@ -6608,32 +6594,20 @@ bool NetwPredictionEngine::run_recovery_ladder(
             p_payload,
             escalation_pending(p_slot),
             p_domain,
-            p_attribution,
-            p_seam
+            p_attribution
         );
-        predict::Slot *row = mutable_row_of(p_slot);
-        if (row == nullptr || planned.pool == nullptr) {
+        if (mutable_row_of(p_slot) == nullptr || planned == nullptr) {
             return false;
         }
-        const bool pool_planned = !planned.answered;
-        const predict::WritePlan &plan
-            = pool_planned ? *planned.pool : row->recovering.answer;
-        if (planned.pool->escalated) {
-            if (!pool_planned) {
-                record_episode_escalation(
-                    p_slot,
-                    trigger_shape(p_slot, handle->get_divergence_epsilon())
-                );
-                sync_episode(p_slot);
-            }
+        if (planned->escalated) {
             set_cooldown_until_tick(
                 p_slot,
                 latest_input_tick_of(p_slot)
                     + handle->get_collision_cooldown_ticks()
             );
         }
-        skip = plan.skip;
-        seated = apply_plan_rows(p_slot, plan, p_ack, pool_planned);
+        skip = planned->skip;
+        seated = apply_plan_rows(p_slot, *planned, p_ack);
     }
     predict::Slot *written = mutable_row_of(p_slot);
     if (!skip && written != nullptr
@@ -6655,107 +6629,13 @@ bool NetwPredictionEngine::run_recovery_ladder(
     return true;
 }
 
-Dictionary NetwPredictionEngine::recovery_predicted_of(
-    int64_t p_slot,
-    const predict::StateRow &p_predicted
-) const {
-    const predict::Slot *row = row_of(p_slot);
-    if (row == nullptr) {
-        return Dictionary();
-    }
-    predict::StateRow predicted = p_predicted;
-    for (const predict::CarryAttempt &attempt : row->carry_attempts) {
-        const int field = row->wiring.fields.index_of(attempt.field);
-        if (attempt.verdict == CARRY_CARRIED && field >= 0
-            && field < int(predicted.present.size())) {
-            predicted.present[uint32_t(field)] = 0;
-        }
-    }
-    return predict::payload_of(row->wiring, predicted);
-}
-
-bool NetwPredictionEngine::ask_recover_seam(
-    int64_t p_slot,
-    const predict::StateRow &p_predicted,
-    const Dictionary &p_context,
-    const Callable &p_seam
-) {
-    NetwPrediction *handle = Object::cast_to<NetwPrediction>(handle_of(p_slot));
-    if (handle == nullptr || !p_seam.is_valid()) {
-        return false;
-    }
-    Array asked;
-    asked.push_back(recovery_carried_of(p_slot));
-    asked.push_back(recovery_predicted_of(p_slot, p_predicted));
-    asked.push_back(handle->resolved_recovery_policy());
-    asked.push_back(handle->get_snap_restore());
-    asked.push_back(recovery_projection_of(p_slot));
-    asked.push_back(recovery_before_of(p_slot));
-    asked.push_back(recovery_tier_errors_of(p_slot));
-    asked.push_back(p_context);
-    asked.push_back(tick_delta_of(p_slot));
-    return plan_answered(Ref<NetwPredictRecovery>(p_seam.callv(asked)), p_slot);
-}
-
-bool NetwPredictionEngine::plan_answered(
-    const Ref<NetwPredictRecovery> &p_answered,
-    int64_t p_slot
-) {
-    predict::Slot *row = mutable_row_of(p_slot);
-    if (p_answered.is_valid() && row != nullptr) {
-        predict::WritePlan &answer = row->recovering.answer;
-        predict::read_payload(
-            row->wiring,
-            p_answered->restore(),
-            answer.restore
-        );
-        predict::read_payload(row->wiring, p_answered->write(), answer.write);
-        answer.teleport = p_answered->teleport();
-        answer.skip = p_answered->skip();
-        return true;
-    }
-    refuse_seam(StringName("_predict_recover"), p_slot);
-    return false;
-}
-
-bool NetwPredictionEngine::judgement_answered(
-    const Ref<NetwPredictJudgement> &p_answered,
-    int64_t p_slot,
-    Judgement &r_judged
-) {
-    if (p_answered.is_valid()) {
-        r_judged.divergence = p_answered->divergence();
-        r_judged.corrected = p_answered->corrected();
-        return true;
-    }
-    refuse_seam(StringName("_predict_evaluate"), p_slot);
-    return false;
-}
-
-void NetwPredictionEngine::refuse_seam(
-    const StringName &p_seam,
-    int64_t p_slot
-) {
-    NetwMultiplayer *host = core();
-    if (host == nullptr) {
-        return;
-    }
-    const Ref<NetwEntity> seated = owner_entity(p_slot);
-    host->seam_refused(
-        p_seam,
-        seated.is_valid() ? host->liveness_route_of(seated.ptr()) : 0,
-        String("null")
-    );
-}
-
 predict::Judged NetwPredictionEngine::judge_state(
     int64_t p_slot,
     int64_t p_ack,
     int64_t p_domain,
     int64_t p_row_flags,
     const predict::StateRow &p_predicted,
-    const predict::StateRow &p_payload,
-    const Callable &p_seam
+    const predict::StateRow &p_payload
 ) {
     NetwPrediction *handle = Object::cast_to<NetwPrediction>(handle_of(p_slot));
     const double epsilon
@@ -6770,7 +6650,7 @@ predict::Judged NetwPredictionEngine::judge_state(
     );
     predict::Slot *row = mutable_row_of(p_slot);
     predict::Judged out;
-    if (verdict != nullptr && !p_seam.is_valid()) {
+    if (verdict != nullptr) {
         note_errors(*row, row->report.divergence, verdict->all_field_errors);
         out.divergence = verdict->divergence;
         out.corrected = verdict->corrected;
@@ -6783,27 +6663,7 @@ predict::Judged NetwPredictionEngine::judge_state(
                    ? int(NetwPrediction::EXACT_VERDICT_EQUAL)
                    : int(NetwPrediction::EXACT_VERDICT_UNEQUAL));
         Judgement judged;
-        bool answered = false;
-        if (p_seam.is_valid() && row != nullptr) {
-            Dictionary seam_divergence;
-            Array asked;
-            asked.push_back(p_domain);
-            asked.push_back(exact_verdict);
-            asked.push_back(predict::payload_of(row->wiring, p_predicted));
-            asked.push_back(predict::payload_of(row->wiring, p_payload));
-            asked.push_back(seam_divergence);
-            answered = judgement_answered(
-                Ref<NetwPredictJudgement>(p_seam.callv(asked)),
-                p_slot,
-                judged
-            );
-            if (answered) {
-                note_divergence(p_slot, seam_divergence);
-                out.meter
-                    = meter_of(p_slot, seam_divergence, int(p_domain), epsilon);
-            }
-        }
-        if (!answered && row != nullptr) {
+        if (row != nullptr) {
             bool diverged = true;
             fill_correction_tolerances(
                 *row,
@@ -6832,7 +6692,7 @@ predict::Judged NetwPredictionEngine::judge_state(
             );
             out.meter
                 = predict::measure(row->judged_errors, row->meter_tolerances);
-        } else if (!answered) {
+        } else {
             judged.divergence = std::numeric_limits<double>::infinity();
             judged.corrected = true;
         }
@@ -6841,19 +6701,7 @@ predict::Judged NetwPredictionEngine::judge_state(
         out.settled = p_domain == int64_t(predict::Domain::OUT_OF_DOMAIN)
             || exact_verdict != int(NetwPrediction::EXACT_VERDICT_UNJUDGED);
     }
-    if (wants_report(p_slot, EventPlane::PREDICT_EVALUATE)) {
-        NETW_NOTE_SCRIPT_DICTIONARY();
-        Dictionary detail;
-        detail[StringName("transition")] = p_ack;
-        detail[StringName("divergence")] = out.divergence;
-        detail[StringName("corrected")] = out.corrected;
-        report_predict(
-            p_slot,
-            EventPlane::PREDICT_EVALUATE,
-            detail,
-            Dictionary()
-        );
-    }
+    record_predict(p_slot, EventPlane::PREDICT_EVALUATE, p_ack);
     if (out.corrected && out.meter == 0) {
         out.meter = 1;
     } else if (!out.corrected) {
@@ -8603,8 +8451,7 @@ predict::WritePlan NetwPredictionEngine::recover_for(
     int p_collision_cooldown_ticks,
     int p_domain,
     int p_attribution,
-    bool p_suppressed,
-    const RecoveryPlan *p_answer
+    bool p_suppressed
 ) {
     const predict::Slot *row = row_of(p_slot);
     if (row == nullptr) {
@@ -8637,11 +8484,6 @@ predict::WritePlan NetwPredictionEngine::recover_for(
         p_suppressed,
         !has_pose_fields(p_slot)
     );
-    if (p_answer != nullptr) {
-        request.answered = true;
-        request.answered_teleport = p_answer->teleport;
-        request.answered_skip = p_answer->skip;
-    }
     return recover(p_slot, request);
 }
 
@@ -8661,8 +8503,7 @@ const predict::WritePlan *NetwPredictionEngine::recover_rows(
     int p_collision_cooldown_ticks,
     int p_domain,
     int p_attribution,
-    bool p_suppressed,
-    const predict::WritePlan *p_answer
+    bool p_suppressed
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
     if (row == nullptr) {
@@ -8710,14 +8551,6 @@ const predict::WritePlan *NetwPredictionEngine::recover_rows(
         request.contact_window = contact;
         request.suppressed = p_suppressed;
         request.pose_unmeasured = unmeasured;
-        request.answered = false;
-        request.answered_teleport = false;
-        request.answered_skip = true;
-    }
-    if (p_answer != nullptr) {
-        request.answered = true;
-        request.answered_teleport = p_answer->teleport;
-        request.answered_skip = p_answer->skip;
     }
     return &row->recover(request);
 }
@@ -9742,36 +9575,28 @@ NetwMultiplayer *NetwPredictionEngine::core() const {
     return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
 }
 
-bool NetwPredictionEngine::wants_report(int64_t p_slot, int64_t p_event) const {
-    NetwMultiplayer *host = core();
-    const Ref<NetwEntity> seated = owner_entity(p_slot);
-    return host != nullptr && seated.is_valid()
-        && host->event_wants(p_event, host->liveness_route_of(seated.ptr()));
-}
-
-void NetwPredictionEngine::report_predict(
+void NetwPredictionEngine::record_predict(
     int64_t p_slot,
-    int64_t p_event,
-    const Dictionary &p_detail,
-    const Dictionary &p_model
+    int64_t p_kind,
+    int64_t p_a,
+    int64_t p_b
 ) {
     NetwMultiplayer *host = core();
+    if (host == nullptr || !host->event_records(p_kind)) {
+        return;
+    }
     const Ref<NetwEntity> seated = owner_entity(p_slot);
-    if (host == nullptr || seated.is_null()) {
+    if (seated.is_null()) {
         return;
     }
-    const int64_t route = host->liveness_route_of(seated.ptr());
-    if (!host->event_wants(p_event, route)) {
-        return;
-    }
-    host->event_emit(
-        p_event,
-        route,
-        p_detail,
-        seated->get_name(),
+    host->event_record(
+        p_kind,
+        seated->get_rid_handle(),
+        host->liveness_route_of(seated.ptr()),
         0,
         OK,
-        p_model
+        p_a,
+        p_b
     );
 }
 
@@ -9796,25 +9621,12 @@ int NetwPredictionEngine::episode_change(int64_t p_event) {
 void NetwPredictionEngine::report_consume(
     int64_t p_slot,
     int64_t p_depth,
-    int64_t p_buffer,
-    int64_t p_action
+    int64_t p_buffer
 ) {
-    NetwMultiplayer *host = core();
-    if (host == nullptr || !host->event_wants(EventPlane::PREDICT_CONSUME, 0)) {
-        return;
-    }
-    Dictionary detail;
-    detail[StringName("depth")] = p_depth;
-    detail[StringName("buffer")] = p_buffer;
-    detail[StringName("action")] = p_action;
-    report_predict(p_slot, EventPlane::PREDICT_CONSUME, detail, Dictionary());
+    record_predict(p_slot, EventPlane::PREDICT_CONSUME, p_depth, p_buffer);
 }
 
-void NetwPredictionEngine::announce_episode(
-    int64_t p_slot,
-    int64_t p_event,
-    const Dictionary &p_extra
-) {
+void NetwPredictionEngine::announce_episode(int64_t p_slot, int64_t p_event) {
     const int change = episode_change(p_event);
     if (change < 0) {
         return;
@@ -9826,15 +9638,11 @@ void NetwPredictionEngine::announce_episode(
     }
     const Dictionary generator
         = report.get(StringName("generator"), Dictionary());
-    Dictionary detail;
-    detail[StringName("transition")]
-        = generator.get(StringName("transition"), -1);
-    detail[StringName("attribution")] = generator.get(
-        StringName("boundary"),
-        int(predict::Attribution::UNKNOWN)
+    record_predict(
+        p_slot,
+        p_event,
+        int64_t(generator.get(StringName("transition"), -1))
     );
-    detail.merge(p_extra, true);
-    report_predict(p_slot, p_event, detail, report);
 }
 
 bool NetwPredictionEngine::announce_recovered(
@@ -9915,40 +9723,30 @@ void NetwPredictionEngine::emit_recovered(
     int64_t p_attribution,
     bool p_teleported
 ) {
+    record_predict(p_slot, EventPlane::RECOVERY, p_transition);
     Object *held = handle_of(p_slot);
     const StringName &recovered = signal_recovered();
     const bool heard = held != nullptr && held->has_connections(recovered);
-    if (!heard && !wants_report(p_slot, EventPlane::RECOVERY)) {
+    if (!heard) {
         return;
     }
     const predict::Slot *row = row_of(p_slot);
     if (row == nullptr) {
         return;
     }
-    const Dictionary deltas
-        = predict::payload_of(row->wiring, row->recovering.deltas);
-    if (heard) {
-        held->emit_signal(
-            recovered,
-            p_transition,
-            deltas,
-            p_teleported,
-            p_attribution
-        );
-    }
-    Dictionary detail;
-    detail[StringName("transition")] = p_transition;
-    detail[StringName("attribution")] = p_attribution;
-    detail[StringName("teleport")] = p_teleported;
-    detail[StringName("moved")] = deltas;
-    report_predict(p_slot, EventPlane::RECOVERY, detail, Dictionary());
+    held->emit_signal(
+        recovered,
+        p_transition,
+        predict::payload_of(row->wiring, row->recovering.deltas),
+        p_teleported,
+        p_attribution
+    );
 }
 
 void NetwPredictionEngine::announce_divergence(
     int64_t p_slot,
     int64_t p_transition,
-    int64_t p_attribution,
-    double p_divergence
+    int64_t p_attribution
 ) {
     Object *held = handle_of(p_slot);
     if (held != nullptr) {
@@ -9958,14 +9756,7 @@ void NetwPredictionEngine::announce_divergence(
             p_attribution
         );
     }
-    if (!wants_report(p_slot, EventPlane::DIVERGENCE)) {
-        return;
-    }
-    Dictionary detail;
-    detail[StringName("transition")] = p_transition;
-    detail[StringName("attribution")] = p_attribution;
-    detail[StringName("divergence")] = p_divergence;
-    report_predict(p_slot, EventPlane::DIVERGENCE, detail, Dictionary());
+    record_predict(p_slot, EventPlane::DIVERGENCE, p_transition);
 }
 
 namespace {
@@ -10209,24 +10000,6 @@ Dictionary NetwPredictionEngine::recovery_write_of(int64_t p_slot) const {
         : Dictionary();
 }
 
-Dictionary NetwPredictionEngine::recovery_projection_of(int64_t p_slot) const {
-    Dictionary out;
-    const predict::Slot *row = row_of(p_slot);
-    if (row == nullptr) {
-        return out;
-    }
-    const LocalVector<int> &projection = row->recovering.projection;
-    const int count = std::min(row->wiring.count(), int(projection.size()));
-    for (int at = 0; at < count; ++at) {
-        const int channel = projection[uint32_t(at)];
-        if (channel >= 0) {
-            out[row->wiring.fields.name_at(at)]
-                = row->wiring.fields.name_at(channel);
-        }
-    }
-    return out;
-}
-
 Dictionary NetwPredictionEngine::recovery_carried_of(int64_t p_slot) const {
     const predict::Slot *row = row_of(p_slot);
     return row != nullptr
@@ -10250,36 +10023,7 @@ Dictionary NetwPredictionEngine::recovery_tier_errors_of(int64_t p_slot) const {
     return out;
 }
 
-Dictionary NetwPredictionEngine::recovery_context(
-    int64_t p_slot,
-    int64_t p_ack,
-    int64_t p_ack_label,
-    int p_domain,
-    int p_attribution,
-    bool p_escalated
-) {
-    Dictionary context;
-    const predict::Slot *row = row_of(p_slot);
-    NetwPrediction *handle = Object::cast_to<NetwPrediction>(handle_of(p_slot));
-    if (row == nullptr || handle == nullptr) {
-        return context;
-    }
-    context[StringName("domain")] = p_domain;
-    context[StringName("attribution")] = p_attribution;
-    context[StringName("contact_window")]
-        = out_of_domain_at(p_slot, p_ack_label)
-        || row->recovery.window_contains(p_ack);
-    context[StringName("suppressed")] = handle->get_sleeping()
-        || probation_pending(p_slot)
-        || latest_input_tick_of(p_slot) < cooldown_until_tick_of(p_slot)
-        || row->recovery.suppressed_at(p_ack_label);
-    context[StringName("pose_unmeasured")]
-        = p_escalated || !has_pose_fields(p_slot);
-    context[StringName("ack_age_ticks")] = handle->get_ack_age_ticks();
-    return context;
-}
-
-PlannedRecovery NetwPredictionEngine::plan_recovery(
+predict::WritePlan NetwPredictionEngine::plan_recovery(
     int64_t p_slot,
     int64_t p_ack,
     int64_t p_ack_label,
@@ -10287,19 +10031,17 @@ PlannedRecovery NetwPredictionEngine::plan_recovery(
     const Dictionary &p_payload,
     bool p_escalated,
     int p_domain,
-    int p_attribution,
-    const Callable &p_seam
+    int p_attribution
 ) {
-    PlannedRecovery out;
-    predict::Slot *row = mutable_row_of(p_slot);
+    const predict::Slot *row = row_of(p_slot);
     if (row == nullptr) {
-        return out;
+        return predict::WritePlan();
     }
     predict::StateRow predicted;
     predict::StateRow payload;
     predict::read_payload(row->wiring, p_predicted, predicted);
     predict::read_payload(row->wiring, p_payload, payload);
-    const PlannedRows planned = plan_recovery_rows(
+    const predict::WritePlan *planned = plan_recovery_rows(
         p_slot,
         p_ack,
         p_ack_label,
@@ -10307,21 +10049,12 @@ PlannedRecovery NetwPredictionEngine::plan_recovery(
         payload,
         p_escalated,
         p_domain,
-        p_attribution,
-        p_seam
+        p_attribution
     );
-    if (planned.pool != nullptr) {
-        out.pool = *planned.pool;
-    }
-    out.answered = planned.answered;
-    row = mutable_row_of(p_slot);
-    if (planned.answered && row != nullptr) {
-        out.answer = recovery_of(p_slot, row->recovering.answer);
-    }
-    return out;
+    return planned != nullptr ? *planned : predict::WritePlan();
 }
 
-PlannedRows NetwPredictionEngine::plan_recovery_rows(
+const predict::WritePlan *NetwPredictionEngine::plan_recovery_rows(
     int64_t p_slot,
     int64_t p_ack,
     int64_t p_ack_label,
@@ -10329,14 +10062,12 @@ PlannedRows NetwPredictionEngine::plan_recovery_rows(
     const predict::StateRow &p_payload,
     bool p_escalated,
     int p_domain,
-    int p_attribution,
-    const Callable &p_seam
+    int p_attribution
 ) {
-    PlannedRows out;
     predict::Slot *row = mutable_row_of(p_slot);
     NetwPrediction *handle = Object::cast_to<NetwPrediction>(handle_of(p_slot));
     if (row == nullptr || handle == nullptr) {
-        return out;
+        return nullptr;
     }
     const double epsilon = handle->get_divergence_epsilon();
     const double teleport = handle->get_teleport_threshold();
@@ -10346,7 +10077,7 @@ PlannedRows NetwPredictionEngine::plan_recovery_rows(
     carry_rows(p_slot, p_payload, p_ack, teleport, epsilon);
     row = mutable_row_of(p_slot);
     if (row == nullptr) {
-        return out;
+        return nullptr;
     }
     LocalVector<double> &tier_errors = row->recovering.tier_errors;
     if (p_escalated) {
@@ -10359,32 +10090,13 @@ PlannedRows NetwPredictionEngine::plan_recovery_rows(
     }
     row = mutable_row_of(p_slot);
     if (row == nullptr) {
-        return out;
+        return nullptr;
     }
     note_errors(*row, row->report.tier_error, row->recovering.tier_errors);
 
     const bool suppressed = handle->get_sleeping() || probation_pending(p_slot)
         || latest_input_tick_of(p_slot) < cooldown_until_tick_of(p_slot);
-    if (p_seam.is_valid()) {
-        out.answered = ask_recover_seam(
-            p_slot,
-            p_predicted,
-            recovery_context(
-                p_slot,
-                p_ack,
-                p_ack_label,
-                p_domain,
-                p_attribution,
-                p_escalated
-            ),
-            p_seam
-        );
-        row = mutable_row_of(p_slot);
-        if (row == nullptr) {
-            return out;
-        }
-    }
-    out.pool = recover_rows(
+    return recover_rows(
         p_slot,
         p_ack,
         p_ack_label,
@@ -10400,10 +10112,8 @@ PlannedRows NetwPredictionEngine::plan_recovery_rows(
         handle->get_collision_cooldown_ticks(),
         p_domain,
         p_attribution,
-        suppressed,
-        out.answered ? &row->recovering.answer : nullptr
+        suppressed
     );
-    return out;
 }
 
 void NetwPredictionEngine::guard_projection_rows(
@@ -10570,8 +10280,7 @@ void NetwPredictionEngine::pose_errors_rows(
 bool NetwPredictionEngine::apply_recovery_plan(
     int64_t p_slot,
     const RecoveryPlan &p_plan,
-    int64_t p_ack,
-    bool p_pool_planned
+    int64_t p_ack
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
     if (row == nullptr) {
@@ -10582,14 +10291,13 @@ bool NetwPredictionEngine::apply_recovery_plan(
     predict::read_payload(row->wiring, p_plan.write, staged.write);
     staged.teleport = p_plan.teleport;
     staged.skip = p_plan.skip;
-    return apply_plan_rows(p_slot, staged, p_ack, p_pool_planned);
+    return apply_plan_rows(p_slot, staged, p_ack);
 }
 
 bool NetwPredictionEngine::apply_plan_rows(
     int64_t p_slot,
     const predict::WritePlan &p_plan,
-    int64_t p_ack,
-    bool p_pool_planned
+    int64_t p_ack
 ) {
     predict::Slot *row = mutable_row_of(p_slot);
     NetwPrediction *handle = Object::cast_to<NetwPrediction>(handle_of(p_slot));
@@ -10600,19 +10308,7 @@ bool NetwPredictionEngine::apply_plan_rows(
     for (const int channel : row->recovering.projection) {
         projected = projected || channel >= 0;
     }
-    NetwMultiplayer *host = core();
-    if (host != nullptr && host->event_wants(EventPlane::PREDICT_RECOVER, 0)) {
-        Dictionary detail;
-        detail[StringName("transition")] = p_ack;
-        detail[StringName("skip")] = p_plan.skip;
-        detail[StringName("teleport")] = p_plan.teleport;
-        report_predict(
-            p_slot,
-            EventPlane::PREDICT_RECOVER,
-            detail,
-            Dictionary()
-        );
-    }
+    record_predict(p_slot, EventPlane::PREDICT_RECOVER, p_ack);
     set_last_correction_teleported(p_slot, p_plan.teleport);
     if (p_plan.skip) {
         note_verdict_reason(p_slot, predict::VERDICT_REASON_DECLINED);
@@ -10633,7 +10329,7 @@ bool NetwPredictionEngine::apply_plan_rows(
         op = int(predict::Operator::REBASE_PROJECTED);
     }
     const Ref<NetwEntity> seated = owner_entity(p_slot);
-    if (apply_restore_row(
+    if (!apply_restore_row(
             p_slot,
             p_plan.restore,
             op,
@@ -10643,13 +10339,9 @@ bool NetwPredictionEngine::apply_plan_rows(
             handle->get_ack_age_ticks(),
             handle->get_divergence_epsilon(),
             false,
-            p_pool_planned,
+            true,
             seated_basis ? p_ack + 1 : -1
         )) {
-        if (!p_pool_planned) {
-            sync_episode(p_slot);
-        }
-    } else {
         NETW_BUG_REPORT();
     }
     row = mutable_row_of(p_slot);
@@ -11274,12 +10966,7 @@ void NetwPredictionEngine::sync_episode(int64_t p_slot) {
 
 void NetwPredictionEngine::close_episode(int64_t p_slot) {
     stamp_episode_revision(p_slot);
-    const Dictionary report = episode_record(p_slot);
-    announce_episode(
-        p_slot,
-        EventPlane::EPISODE_CLOSE,
-        report.get(StringName("disposition"), Dictionary())
-    );
+    announce_episode(p_slot, EventPlane::EPISODE_CLOSE);
 }
 
 int NetwPredictionEngine::settle_comparison(
@@ -11310,7 +10997,7 @@ int NetwPredictionEngine::settle_comparison(
             p_slot,
             predict::VERDICT_REASON_PROBATION_REQUARANTINE
         );
-        announce_divergence(p_slot, p_ack, attribution, p_divergence);
+        announce_divergence(p_slot, p_ack, attribution);
         p_enter_fallback.call(p_ack, attribution);
         announce_evaluation(
             handle,
@@ -11330,7 +11017,7 @@ int NetwPredictionEngine::settle_comparison(
         } else if (open_episode(p_slot, p_ack, attribution)) {
             sync_episode(p_slot);
         }
-        announce_divergence(p_slot, p_ack, attribution, p_divergence);
+        announce_divergence(p_slot, p_ack, attribution);
     }
     if (p_settled) {
         mark_aligned_error(p_slot, p_ack, p_divergence);
@@ -11368,7 +11055,7 @@ void NetwPredictionEngine::record_episode_comparison(
     sync_episode(p_slot);
     if (p_previous_state != NetwPrediction::EPISODE_STATE_OPEN
         && state == NetwPrediction::EPISODE_STATE_OPEN) {
-        announce_episode(p_slot, EventPlane::EPISODE_OPEN, Dictionary());
+        announce_episode(p_slot, EventPlane::EPISODE_OPEN);
     }
 }
 
@@ -12502,20 +12189,8 @@ DriveOutcome NetwPredictionEngine::record_drive_hashed(
     if (journal_has(p_slot, p_transition)) {
         mark_domain(p_slot, p_transition, domain);
     }
-    NetwMultiplayer *host = core();
-    if (drove.ran && host != nullptr
-        && host->event_wants(EventPlane::PREDICT_DRIVE, 0)) {
-        Dictionary reported;
-        reported[StringName("transition")] = drove.transition;
-        reported[StringName("label")] = drove.label;
-        reported[StringName("kind")] = drove.kind;
-        reported[StringName("fresh")] = drove.fresh;
-        report_predict(
-            p_slot,
-            EventPlane::PREDICT_DRIVE,
-            reported,
-            Dictionary()
-        );
+    if (drove.ran) {
+        record_predict(p_slot, EventPlane::PREDICT_DRIVE, drove.transition);
     }
     return drove;
 }

@@ -53,7 +53,7 @@ A transport creates peers of one :godot:`MultiplayerPeer` class, lists servers, 
 
 \ :ref:`_make_peer()<class_NetwTransport_private_method__make_peer>` and :ref:`_probe()<class_NetwTransport_private_method__probe>` may ``await``. They report the result by calling :ref:`deliver()<class_NetwTransport_method_deliver>`, :ref:`deliver_probe()<class_NetwTransport_method_deliver_probe>` or :ref:`fail()<class_NetwTransport_method_fail>` once, with the ``ticket`` they received. Keep ``ticket`` in a local variable, not a member, since another request may start while one awaits. With no report, the request fails after :ref:`_timeout_hint()<class_NetwTransport_private_method__timeout_hint>` seconds.
 
-Methods starting with an underscore are overridden. Each has a public method that calls it, and a ``_default`` method with the default behavior.
+Methods starting with an underscore are overridden. Each has a public method that calls it. A method the script does not override gives the default its description names.
 
 .. rst-class:: classref-reftable-group
 
@@ -126,35 +126,19 @@ Methods
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`            | :ref:`accepts_empty_address<class_NetwTransport_method_accepts_empty_address>`\ (\ )                                                                                                                                               |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`            | :ref:`accepts_empty_address_default<class_NetwTransport_method_accepts_empty_address_default>`\ (\ )                                                                                                                               |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`String`          | :ref:`address_help<class_NetwTransport_method_address_help>`\ (\ )                                                                                                                                                                 |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`          | :ref:`address_help_default<class_NetwTransport_method_address_help_default>`\ (\ )                                                                                                                                                 |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`String`          | :ref:`address_label<class_NetwTransport_method_address_label>`\ (\ )                                                                                                                                                               |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`          | :ref:`address_label_default<class_NetwTransport_method_address_label_default>`\ (\ )                                                                                                                                               |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`String`          | :ref:`address_placeholder<class_NetwTransport_method_address_placeholder>`\ (\ )                                                                                                                                                   |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`          | :ref:`address_placeholder_default<class_NetwTransport_method_address_placeholder_default>`\ (\ )                                                                                                                                   |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`            | :ref:`can_browse<class_NetwTransport_method_can_browse>`\ (\ )                                                                                                                                                                     |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`            | :ref:`can_browse_default<class_NetwTransport_method_can_browse_default>`\ (\ )                                                                                                                                                     |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`            | :ref:`can_host_here<class_NetwTransport_method_can_host_here>`\ (\ )                                                                                                                                                               |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`            | :ref:`can_host_here_default<class_NetwTransport_method_can_host_here_default>`\ (\ )                                                                                                                                               |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`            | :ref:`can_probe<class_NetwTransport_method_can_probe>`\ (\ )                                                                                                                                                                       |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`            | :ref:`can_probe_default<class_NetwTransport_method_can_probe_default>`\ (\ )                                                                                                                                                       |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Dictionary`      | :ref:`client_settings<class_NetwTransport_method_client_settings>`\ (\ )                                                                                                                                                           |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`      | :ref:`client_settings_default<class_NetwTransport_method_client_settings_default>`\ (\ )                                                                                                                                           |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                   | :ref:`deliver<class_NetwTransport_method_deliver>`\ (\ ticket\: :godot:`RID`, peer\: :godot:`MultiplayerPeer`\ )                                                                                                                   |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -162,49 +146,29 @@ Methods
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Dictionary`      | :ref:`diagnostics<class_NetwTransport_method_diagnostics>`\ (\ peer_id\: :godot:`int`\ )                                                                                                                                           |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`      | :ref:`diagnostics_default<class_NetwTransport_method_diagnostics_default>`\ (\ peer_id\: :godot:`int`\ )                                                                                                                           |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`String`          | :ref:`display_name<class_NetwTransport_method_display_name>`\ (\ )                                                                                                                                                                 |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`          | :ref:`display_name_default<class_NetwTransport_method_display_name_default>`\ (\ )                                                                                                                                                 |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                   | :ref:`fail<class_NetwTransport_method_fail>`\ (\ ticket\: :godot:`RID`, error\: :godot:`Error <@GlobalScope#enum_@globalscope_Error>`, message\: :godot:`String` = ""\ )                                                           |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Dictionary`      | :ref:`host_settings<class_NetwTransport_method_host_settings>`\ (\ )                                                                                                                                                               |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`      | :ref:`host_settings_default<class_NetwTransport_method_host_settings_default>`\ (\ )                                                                                                                                               |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`            | :ref:`is_available<class_NetwTransport_method_is_available>`\ (\ )                                                                                                                                                                 |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`            | :ref:`is_available_default<class_NetwTransport_method_is_available_default>`\ (\ )                                                                                                                                                 |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`String`          | :ref:`join_address<class_NetwTransport_method_join_address>`\ (\ )                                                                                                                                                                 |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`          | :ref:`join_address_default<class_NetwTransport_method_join_address_default>`\ (\ )                                                                                                                                                 |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`MultiplayerPeer` | :ref:`make_probe_peer<class_NetwTransport_method_make_probe_peer>`\ (\ address\: :godot:`String`\ )                                                                                                                                |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`MultiplayerPeer` | :ref:`make_probe_peer_default<class_NetwTransport_method_make_probe_peer_default>`\ (\ address\: :godot:`String`\ )                                                                                                                |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`StringName`      | :ref:`peer_class<class_NetwTransport_method_peer_class>`\ (\ )                                                                                                                                                                     |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`StringName`      | :ref:`peer_class_default<class_NetwTransport_method_peer_class_default>`\ (\ )                                                                                                                                                     |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`StringName`      | :ref:`peer_class_of<class_NetwTransport_method_peer_class_of>`\ (\ peer\: :godot:`MultiplayerPeer`\ ) |static|                                                                                                                     |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                   | :ref:`probe_default<class_NetwTransport_method_probe_default>`\ (\ ticket\: :godot:`RID`, address\: :godot:`String`\ )                                                                                                             |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                   | :ref:`publish_targets<class_NetwTransport_method_publish_targets>`\ (\ addresses\: :godot:`PackedStringArray`, names\: :godot:`PackedStringArray` = PackedStringArray(), infos\: :godot:`Array` = []\ )                            |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`            | :ref:`recognizes_peer<class_NetwTransport_method_recognizes_peer>`\ (\ peer\: :godot:`MultiplayerPeer`\ )                                                                                                                          |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`            | :ref:`recognizes_peer_default<class_NetwTransport_method_recognizes_peer_default>`\ (\ peer\: :godot:`MultiplayerPeer`\ )                                                                                                          |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                   | :ref:`report<class_NetwTransport_method_report>`\ (\ ticket\: :godot:`RID`, step\: :godot:`StringName`, message\: :godot:`String`, ratio\: :godot:`float`\ )                                                                       |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`float`           | :ref:`timeout_hint<class_NetwTransport_method_timeout_hint>`\ (\ )                                                                                                                                                                 |
-   +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`float`           | :ref:`timeout_hint_default<class_NetwTransport_method_timeout_hint_default>`\ (\ )                                                                                                                                                 |
    +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -397,7 +361,7 @@ Called when the session ends. Free anything the transport holds.
 
 :godot:`Dictionary` **_diagnostics**\ (\ peer_id\: :godot:`int`\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__diagnostics>`
 
-Return any debugging information about ``peer_id``, shown by :ref:`NetwConnection.diagnostics()<class_NetwConnection_method_diagnostics>`.
+Return any debugging information about ``peer_id``, shown by :ref:`NetwConnection.diagnostics()<class_NetwConnection_method_diagnostics>`. Empty by default.
 
 .. rst-class:: classref-item-separator
 
@@ -409,7 +373,7 @@ Return any debugging information about ``peer_id``, shown by :ref:`NetwConnectio
 
 :godot:`String` **_display_name**\ (\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__display_name>`
 
-Return the name shown in a transport picker.
+Return the name shown in a transport picker. ``"Generic"`` by default.
 
 .. rst-class:: classref-item-separator
 
@@ -421,7 +385,7 @@ Return the name shown in a transport picker.
 
 :godot:`Dictionary` **_host_settings**\ (\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__host_settings>`
 
-Return the settings a host form asks for, with their default values. They are passed to :ref:`_make_peer()<class_NetwTransport_private_method__make_peer>` in :ref:`NetwConnection.TRANSPORT_MODE_HOST<class_NetwConnection_constant_TRANSPORT_MODE_HOST>`.
+Return the settings a host form asks for, with their default values. They are passed to :ref:`_make_peer()<class_NetwTransport_private_method__make_peer>` in :ref:`NetwConnection.TRANSPORT_MODE_HOST<class_NetwConnection_constant_TRANSPORT_MODE_HOST>`. Empty by default.
 
 .. rst-class:: classref-item-separator
 
@@ -433,7 +397,7 @@ Return the settings a host form asks for, with their default values. They are pa
 
 :godot:`bool` **_is_available**\ (\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__is_available>`
 
-Return ``false`` when this transport does not work on the current platform.
+Return ``false`` when this transport does not work on the current platform. ``true`` by default.
 
 .. rst-class:: classref-item-separator
 
@@ -445,7 +409,7 @@ Return ``false`` when this transport does not work on the current platform.
 
 :godot:`String` **_join_address**\ (\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__join_address>`
 
-Return the address other players use to join this host.
+Return the address other players use to join this host. Empty by default.
 
 .. rst-class:: classref-item-separator
 
@@ -471,7 +435,7 @@ Deliver the peer while it is still connecting, without waiting for it to connect
 
 :godot:`MultiplayerPeer` **_make_probe_peer**\ (\ address\: :godot:`String`\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__make_probe_peer>`
 
-Return a peer connecting to ``address``, which :ref:`probe_default()<class_NetwTransport_method_probe_default>` uses to check the server. ``null`` by default.
+Return a peer connecting to ``address``, which the default :ref:`_probe()<class_NetwTransport_private_method__probe>` uses to check the server. ``null`` by default.
 
 .. rst-class:: classref-item-separator
 
@@ -507,7 +471,7 @@ Called every frame.
 
 |void| **_probe**\ (\ ticket\: :godot:`RID`, address\: :godot:`String`\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__probe>`
 
-Check the server at ``address`` without joining it, then call :ref:`deliver_probe()<class_NetwTransport_method_deliver_probe>` or :ref:`fail()<class_NetwTransport_method_fail>` with ``ticket``. Calls :ref:`probe_default()<class_NetwTransport_method_probe_default>` by default.
+Check the server at ``address`` without joining it, then call :ref:`deliver_probe()<class_NetwTransport_method_deliver_probe>` or :ref:`fail()<class_NetwTransport_method_fail>` with ``ticket``. By default, connects with :ref:`make_probe_peer()<class_NetwTransport_method_make_probe_peer>`, asks the server for its :ref:`NetwServerInfo<class_NetwServerInfo>`, and reports it. The default fails with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>` when :ref:`make_probe_peer()<class_NetwTransport_method_make_probe_peer>` returns ``null``.
 
 .. rst-class:: classref-item-separator
 
@@ -519,7 +483,7 @@ Check the server at ``address`` without joining it, then call :ref:`deliver_prob
 
 :godot:`bool` **_recognizes_peer**\ (\ peer\: :godot:`MultiplayerPeer`\ ) |virtual| :ref:`🔗<class_NetwTransport_private_method__recognizes_peer>`
 
-Return ``true`` when ``peer``, created by the game itself, belongs to this transport. By default, when its class is :ref:`peer_class()<class_NetwTransport_method_peer_class>`.
+Return ``true`` when ``peer``, created by the game itself, belongs to this transport. By default, when :ref:`peer_class_of()<class_NetwTransport_method_peer_class_of>` of ``peer`` is :ref:`peer_class()<class_NetwTransport_method_peer_class>`.
 
 .. rst-class:: classref-item-separator
 
@@ -543,19 +507,7 @@ Return how many seconds :ref:`_make_peer()<class_NetwTransport_private_method__m
 
 :godot:`bool` **accepts_empty_address**\ (\ ) :ref:`🔗<class_NetwTransport_method_accepts_empty_address>`
 
-Calls :ref:`_accepts_empty_address()<class_NetwTransport_private_method__accepts_empty_address>`, or :ref:`accepts_empty_address_default()<class_NetwTransport_method_accepts_empty_address_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_accepts_empty_address_default:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **accepts_empty_address_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_accepts_empty_address_default>`
-
-Returns ``false``.
+Calls :ref:`_accepts_empty_address()<class_NetwTransport_private_method__accepts_empty_address>`, or returns ``false`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -567,19 +519,7 @@ Returns ``false``.
 
 :godot:`String` **address_help**\ (\ ) :ref:`🔗<class_NetwTransport_method_address_help>`
 
-Calls :ref:`_address_help()<class_NetwTransport_private_method__address_help>`, or :ref:`address_help_default()<class_NetwTransport_method_address_help_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_address_help_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **address_help_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_address_help_default>`
-
-Returns an empty string.
+Calls :ref:`_address_help()<class_NetwTransport_private_method__address_help>`, or returns an empty :godot:`String` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -591,19 +531,7 @@ Returns an empty string.
 
 :godot:`String` **address_label**\ (\ ) :ref:`🔗<class_NetwTransport_method_address_label>`
 
-Calls :ref:`_address_label()<class_NetwTransport_private_method__address_label>`, or :ref:`address_label_default()<class_NetwTransport_method_address_label_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_address_label_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **address_label_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_address_label_default>`
-
-Returns ``"Address"``.
+Calls :ref:`_address_label()<class_NetwTransport_private_method__address_label>`, or returns ``"Address"`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -615,19 +543,7 @@ Returns ``"Address"``.
 
 :godot:`String` **address_placeholder**\ (\ ) :ref:`🔗<class_NetwTransport_method_address_placeholder>`
 
-Calls :ref:`_address_placeholder()<class_NetwTransport_private_method__address_placeholder>`, or :ref:`address_placeholder_default()<class_NetwTransport_method_address_placeholder_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_address_placeholder_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **address_placeholder_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_address_placeholder_default>`
-
-Returns an empty string.
+Calls :ref:`_address_placeholder()<class_NetwTransport_private_method__address_placeholder>`, or returns an empty :godot:`String` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -639,19 +555,7 @@ Returns an empty string.
 
 :godot:`bool` **can_browse**\ (\ ) :ref:`🔗<class_NetwTransport_method_can_browse>`
 
-Calls :ref:`_can_browse()<class_NetwTransport_private_method__can_browse>`, or :ref:`can_browse_default()<class_NetwTransport_method_can_browse_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_can_browse_default:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **can_browse_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_can_browse_default>`
-
-Returns ``false``.
+Calls :ref:`_can_browse()<class_NetwTransport_private_method__can_browse>`, or returns ``false`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -663,19 +567,7 @@ Returns ``false``.
 
 :godot:`bool` **can_host_here**\ (\ ) :ref:`🔗<class_NetwTransport_method_can_host_here>`
 
-Calls :ref:`_can_host_here()<class_NetwTransport_private_method__can_host_here>`, or :ref:`can_host_here_default()<class_NetwTransport_method_can_host_here_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_can_host_here_default:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **can_host_here_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_can_host_here_default>`
-
-Returns ``true``.
+Calls :ref:`_can_host_here()<class_NetwTransport_private_method__can_host_here>`, or returns ``true`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -687,19 +579,7 @@ Returns ``true``.
 
 :godot:`bool` **can_probe**\ (\ ) :ref:`🔗<class_NetwTransport_method_can_probe>`
 
-Calls :ref:`_can_probe()<class_NetwTransport_private_method__can_probe>`, or :ref:`can_probe_default()<class_NetwTransport_method_can_probe_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_can_probe_default:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **can_probe_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_can_probe_default>`
-
-Returns ``false``.
+Calls :ref:`_can_probe()<class_NetwTransport_private_method__can_probe>`, or returns ``false`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -711,19 +591,7 @@ Returns ``false``.
 
 :godot:`Dictionary` **client_settings**\ (\ ) :ref:`🔗<class_NetwTransport_method_client_settings>`
 
-Calls :ref:`_client_settings()<class_NetwTransport_private_method__client_settings>`, or :ref:`client_settings_default()<class_NetwTransport_method_client_settings_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_client_settings_default:
-
-.. rst-class:: classref-method
-
-:godot:`Dictionary` **client_settings_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_client_settings_default>`
-
-Returns an empty :godot:`Dictionary`.
+Calls :ref:`_client_settings()<class_NetwTransport_private_method__client_settings>`, or returns an empty :godot:`Dictionary` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -759,19 +627,7 @@ Reports ``info`` as the result of the :ref:`_probe()<class_NetwTransport_private
 
 :godot:`Dictionary` **diagnostics**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwTransport_method_diagnostics>`
 
-Calls :ref:`_diagnostics()<class_NetwTransport_private_method__diagnostics>`, or :ref:`diagnostics_default()<class_NetwTransport_method_diagnostics_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_diagnostics_default:
-
-.. rst-class:: classref-method
-
-:godot:`Dictionary` **diagnostics_default**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwTransport_method_diagnostics_default>`
-
-Returns an empty :godot:`Dictionary`.
+Calls :ref:`_diagnostics()<class_NetwTransport_private_method__diagnostics>`, or returns an empty :godot:`Dictionary` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -783,19 +639,7 @@ Returns an empty :godot:`Dictionary`.
 
 :godot:`String` **display_name**\ (\ ) :ref:`🔗<class_NetwTransport_method_display_name>`
 
-Calls :ref:`_display_name()<class_NetwTransport_private_method__display_name>`, or :ref:`display_name_default()<class_NetwTransport_method_display_name_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_display_name_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **display_name_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_display_name_default>`
-
-Returns ``"Generic"``.
+Calls :ref:`_display_name()<class_NetwTransport_private_method__display_name>`, or returns ``"Generic"`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -819,19 +663,7 @@ Reports that ``ticket`` failed with ``error`` and a readable ``message``.
 
 :godot:`Dictionary` **host_settings**\ (\ ) :ref:`🔗<class_NetwTransport_method_host_settings>`
 
-Calls :ref:`_host_settings()<class_NetwTransport_private_method__host_settings>`, or :ref:`host_settings_default()<class_NetwTransport_method_host_settings_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_host_settings_default:
-
-.. rst-class:: classref-method
-
-:godot:`Dictionary` **host_settings_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_host_settings_default>`
-
-Returns an empty :godot:`Dictionary`.
+Calls :ref:`_host_settings()<class_NetwTransport_private_method__host_settings>`, or returns an empty :godot:`Dictionary` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -843,19 +675,7 @@ Returns an empty :godot:`Dictionary`.
 
 :godot:`bool` **is_available**\ (\ ) :ref:`🔗<class_NetwTransport_method_is_available>`
 
-Calls :ref:`_is_available()<class_NetwTransport_private_method__is_available>`, or :ref:`is_available_default()<class_NetwTransport_method_is_available_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_is_available_default:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **is_available_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_is_available_default>`
-
-Returns ``true``.
+Calls :ref:`_is_available()<class_NetwTransport_private_method__is_available>`, or returns ``true`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -867,19 +687,7 @@ Returns ``true``.
 
 :godot:`String` **join_address**\ (\ ) :ref:`🔗<class_NetwTransport_method_join_address>`
 
-Calls :ref:`_join_address()<class_NetwTransport_private_method__join_address>`, or :ref:`join_address_default()<class_NetwTransport_method_join_address_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_join_address_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **join_address_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_join_address_default>`
-
-Returns an empty :godot:`String`.
+Calls :ref:`_join_address()<class_NetwTransport_private_method__join_address>`, or returns an empty :godot:`String` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -891,19 +699,7 @@ Returns an empty :godot:`String`.
 
 :godot:`MultiplayerPeer` **make_probe_peer**\ (\ address\: :godot:`String`\ ) :ref:`🔗<class_NetwTransport_method_make_probe_peer>`
 
-Calls :ref:`_make_probe_peer()<class_NetwTransport_private_method__make_probe_peer>`, or :ref:`make_probe_peer_default()<class_NetwTransport_method_make_probe_peer_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_make_probe_peer_default:
-
-.. rst-class:: classref-method
-
-:godot:`MultiplayerPeer` **make_probe_peer_default**\ (\ address\: :godot:`String`\ ) :ref:`🔗<class_NetwTransport_method_make_probe_peer_default>`
-
-Returns ``null``.
+Calls :ref:`_make_probe_peer()<class_NetwTransport_private_method__make_probe_peer>`, or returns ``null`` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -915,19 +711,7 @@ Returns ``null``.
 
 :godot:`StringName` **peer_class**\ (\ ) :ref:`🔗<class_NetwTransport_method_peer_class>`
 
-Calls :ref:`_peer_class()<class_NetwTransport_private_method__peer_class>`, or :ref:`peer_class_default()<class_NetwTransport_method_peer_class_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_peer_class_default:
-
-.. rst-class:: classref-method
-
-:godot:`StringName` **peer_class_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_peer_class_default>`
-
-Returns an empty :godot:`StringName`.
+Calls :ref:`_peer_class()<class_NetwTransport_private_method__peer_class>`, or returns an empty :godot:`StringName` when it is not overridden.
 
 .. rst-class:: classref-item-separator
 
@@ -940,18 +724,6 @@ Returns an empty :godot:`StringName`.
 :godot:`StringName` **peer_class_of**\ (\ peer\: :godot:`MultiplayerPeer`\ ) |static| :ref:`🔗<class_NetwTransport_method_peer_class_of>`
 
 Returns the class name of ``peer``, or its script's ``class_name``.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_probe_default:
-
-.. rst-class:: classref-method
-
-|void| **probe_default**\ (\ ticket\: :godot:`RID`, address\: :godot:`String`\ ) :ref:`🔗<class_NetwTransport_method_probe_default>`
-
-Connects with :ref:`make_probe_peer()<class_NetwTransport_method_make_probe_peer>`, asks the server for its :ref:`NetwServerInfo<class_NetwServerInfo>`, and reports it. Fails with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>` when :ref:`make_probe_peer()<class_NetwTransport_method_make_probe_peer>` returns ``null``.
 
 .. rst-class:: classref-item-separator
 
@@ -988,19 +760,7 @@ Reports the servers :ref:`_browse()<class_NetwTransport_private_method__browse>`
 
 :godot:`bool` **recognizes_peer**\ (\ peer\: :godot:`MultiplayerPeer`\ ) :ref:`🔗<class_NetwTransport_method_recognizes_peer>`
 
-Calls :ref:`_recognizes_peer()<class_NetwTransport_private_method__recognizes_peer>`, or :ref:`recognizes_peer_default()<class_NetwTransport_method_recognizes_peer_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_recognizes_peer_default:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **recognizes_peer_default**\ (\ peer\: :godot:`MultiplayerPeer`\ ) :ref:`🔗<class_NetwTransport_method_recognizes_peer_default>`
-
-Returns ``true`` when :ref:`peer_class_of()<class_NetwTransport_method_peer_class_of>` of ``peer`` is :ref:`peer_class()<class_NetwTransport_method_peer_class>`.
+Calls :ref:`_recognizes_peer()<class_NetwTransport_private_method__recognizes_peer>`. When it is not overridden, returns ``true`` when :ref:`peer_class_of()<class_NetwTransport_method_peer_class_of>` of ``peer`` is :ref:`peer_class()<class_NetwTransport_method_peer_class>`.
 
 .. rst-class:: classref-item-separator
 
@@ -1024,19 +784,7 @@ Reports progress on ``ticket`` through :ref:`NetwConnection.progressed<class_Net
 
 :godot:`float` **timeout_hint**\ (\ ) :ref:`🔗<class_NetwTransport_method_timeout_hint>`
 
-Calls :ref:`_timeout_hint()<class_NetwTransport_private_method__timeout_hint>`, or :ref:`timeout_hint_default()<class_NetwTransport_method_timeout_hint_default>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwTransport_method_timeout_hint_default:
-
-.. rst-class:: classref-method
-
-:godot:`float` **timeout_hint_default**\ (\ ) :ref:`🔗<class_NetwTransport_method_timeout_hint_default>`
-
-Returns ``5.0``.
+Calls :ref:`_timeout_hint()<class_NetwTransport_private_method__timeout_hint>`, or returns ``5.0`` when it is not overridden.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

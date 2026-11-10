@@ -752,7 +752,7 @@ public:
 
     void create(int p_seat) {
         const char *names[SEAT_COUNT] = {"", "ada", "bob", "cy", "dee"};
-        apis[p_seat] = NetwMultiplayer::create(Ref<Script>());
+        apis[p_seat] = NetwMultiplayer::create();
         apis[p_seat]->session_get_inner()->set_root_path(NodePath("/"));
         apis[p_seat]->transfer_set_mode(mode);
         if (p_seat != SEAT_SERVER) {

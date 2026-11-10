@@ -203,7 +203,6 @@ private:
 
     NetwMultiplayer *core() const;
     godot::Object *api() const;
-    godot::Object *stage_seam(const godot::StringName &p_seam) const;
     bool is_server_authority() const;
     bool has_peer() const;
     godot::PackedInt32Array connected_peers() const;

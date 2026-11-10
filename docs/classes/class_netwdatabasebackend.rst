@@ -49,11 +49,11 @@ Methods
    +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_open<class_NetwDatabaseBackend_private_method__open>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) |virtual|               |
    +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`delete_slot_default<class_NetwDatabaseBackend_method_delete_slot_default>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )     |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`delete_slot<class_NetwDatabaseBackend_method_delete_slot>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )                     |
    +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`list_slots_default<class_NetwDatabaseBackend_method_list_slots_default>`\ (\ session\: :godot:`Object`\ )                                   |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`list_slots<class_NetwDatabaseBackend_method_list_slots>`\ (\ session\: :godot:`Object`\ )                                                   |
    +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`open_default<class_NetwDatabaseBackend_method_open_default>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )                   |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`open<class_NetwDatabaseBackend_method_open>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )                                   |
    +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -101,37 +101,37 @@ Resolves a new :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` for `
 
 ----
 
-.. _class_NetwDatabaseBackend_method_delete_slot_default:
+.. _class_NetwDatabaseBackend_method_delete_slot:
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **delete_slot_default**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_delete_slot_default>`
+:ref:`NetwPromise<class_NetwPromise>` **delete_slot**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_delete_slot>`
 
-The stock :ref:`_delete_slot()<class_NetwDatabaseBackend_private_method__delete_slot>`, which rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. A subclass overriding :ref:`_delete_slot()<class_NetwDatabaseBackend_private_method__delete_slot>` calls this to reach it.
+Removes ``slot`` through :ref:`_delete_slot()<class_NetwDatabaseBackend_private_method__delete_slot>`, or through the backend's own storage when no script overrides it. ``session`` may be ``null`` when no session is asking.
 
 .. rst-class:: classref-item-separator
 
 ----
 
-.. _class_NetwDatabaseBackend_method_list_slots_default:
+.. _class_NetwDatabaseBackend_method_list_slots:
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **list_slots_default**\ (\ session\: :godot:`Object`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_list_slots_default>`
+:ref:`NetwPromise<class_NetwPromise>` **list_slots**\ (\ session\: :godot:`Object`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_list_slots>`
 
-The stock :ref:`_list_slots()<class_NetwDatabaseBackend_private_method__list_slots>`, which rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. A subclass overriding :ref:`_list_slots()<class_NetwDatabaseBackend_private_method__list_slots>` calls this to reach it.
+Resolves every slot in storage through :ref:`_list_slots()<class_NetwDatabaseBackend_private_method__list_slots>`, or through the backend's own storage when no script overrides it.
 
 .. rst-class:: classref-item-separator
 
 ----
 
-.. _class_NetwDatabaseBackend_method_open_default:
+.. _class_NetwDatabaseBackend_method_open:
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **open_default**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_open_default>`
+:ref:`NetwPromise<class_NetwPromise>` **open**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_open>`
 
-The stock :ref:`_open()<class_NetwDatabaseBackend_private_method__open>`, which rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. A subclass overriding :ref:`_open()<class_NetwDatabaseBackend_private_method__open>` calls this to reach it.
+Resolves a :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` for ``slot`` through :ref:`_open()<class_NetwDatabaseBackend_private_method__open>`, or through the backend's own storage when no script overrides it.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

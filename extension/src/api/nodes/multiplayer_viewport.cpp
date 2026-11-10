@@ -24,7 +24,7 @@ bool in_editor() {
 MultiplayerViewport::MultiplayerViewport() {
     set_use_own_world_3d(true);
     if (!in_editor()) {
-        api = NetwMultiplayer::create(Ref<Script>());
+        api = NetwMultiplayer::create();
     }
 }
 

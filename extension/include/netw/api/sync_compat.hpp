@@ -16,7 +16,6 @@
 #include "netw/held_bytes.hpp"
 #include "netw/repl/watch_book.hpp"
 #include "netw/spawn/book.hpp"
-#include "netw/sync_kernel.hpp"
 
 namespace netw {
 
@@ -97,8 +96,6 @@ private:
     godot::ObjectID core_id;
     NetwSyncModel *sync_model = nullptr;
     spawn::Book *spawn_book;
-    godot::Callable encode_stage;
-    godot::Callable decode_stage;
     godot::Callable adopt_seam;
     godot::Callable sweep_seam;
     int64_t channel_sync = 0;
@@ -113,8 +110,6 @@ private:
     bool tree_watched = false;
     int64_t pump_local_id = 0;
     bool pump_server = false;
-    bool pump_encodes = false;
-    int64_t stage_calls = 0;
     int64_t feed_lookups = 0;
     godot::PackedInt32Array pump_peers;
     godot::LocalVector<Consumed *> pump_pass;
@@ -126,11 +121,6 @@ private:
     int64_t fields_resolved = 0;
     godot::Array gathered;
     godot::Array gathered_readable;
-    godot::PackedByteArray stage_payload;
-    int64_t stage_columns = 0;
-    bool stage_retained = false;
-    bool stage_valid = false;
-    sync_kernel::DecodedRow stage_decoded;
 
     int64_t sync_frames_out = 0;
     int64_t sync_frames_in = 0;
@@ -190,18 +180,14 @@ private:
         int64_t p_route,
         const godot::PackedInt32Array &p_recipients
     );
-    godot::PackedByteArray run_encode_stage(
-        int64_t p_peer,
-        const godot::PackedByteArray &p_stock
-    );
-    godot::Error run_decode_stage(
+    void note_encoded(int64_t p_peer, int64_t p_route, int64_t p_bytes);
+    bool decode_row(
         const godot::RID &p_entity,
-        int64_t p_comp,
-        int64_t p_flags,
-        const godot::PackedByteArray &p_payload
+        const godot::PackedByteArray &p_payload,
+        int64_t p_columns,
+        bool p_retained,
+        godot::Array &r_values
     );
-
-    godot::Error decode_stage_body();
 
     const Field *field_of(const godot::NodePath &p_path);
     void resolve_fields(
@@ -237,10 +223,6 @@ public:
     void set_core(godot::Object *p_core);
     void set_sync_model(NetwSyncModel *p_model);
     void set_spawn_book(spawn::Book *p_book);
-    void set_stage_seams(
-        const godot::Callable &p_encode,
-        const godot::Callable &p_decode
-    );
     void set_spawn_seams(
         const godot::Callable &p_adopt,
         const godot::Callable &p_sweep
@@ -281,9 +263,6 @@ public:
     }
     int64_t get_fields_resolved() const {
         return fields_resolved;
-    }
-    int64_t get_stage_calls() const {
-        return stage_calls;
     }
     int64_t get_feed_lookups() const {
         return feed_lookups;

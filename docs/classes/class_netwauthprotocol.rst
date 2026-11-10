@@ -254,7 +254,7 @@ Reads a server browser request.
 
 :godot:`PackedByteArray` **encode_client_hello**\ (\ app_tag\: :godot:`int` = 0, flags\: :godot:`int` = 0\ ) |static| :ref:`🔗<class_NetwAuthProtocol_method_encode_client_hello>`
 
-Writes a join packet header with the build tag ``app_tag``. See :ref:`NetwMultiplayer.auth_set_app_tag()<class_NetwMultiplayer_method_auth_set_app_tag>`.
+Writes a join packet header with the build tag ``app_tag``. A session makes its build tag from :ref:`NetwSessionConfig.app_id<class_NetwSessionConfig_property_app_id>`.
 
 .. rst-class:: classref-item-separator
 

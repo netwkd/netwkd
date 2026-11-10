@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Subclass it, together with a [NetwDatabaseBackend] whose [method NetwDatabaseBackend._open] returns it, to store records somewhere the built-in backends do not.
-		Implement [method _read], [method _scan], [method _write_batch] and [method _close]. [NetwDatabase] builds every other operation from these. Each returns a [NetwPromise], and a method left unimplemented rejects with [constant @GlobalScope.ERR_UNAVAILABLE].
+		Implement [method _read], [method _scan], [method _write_batch] and [method _close]. [NetwDatabase] builds every other operation from these. Each returns a [NetwPromise]. A read, scan or write left unimplemented rejects with [constant @GlobalScope.ERR_UNAVAILABLE].
 		[b]Address[/b]
 		Reads, scans and writes name a record with this [Dictionary].
 		[codeblock lang=text]
@@ -22,7 +22,7 @@
 		<method name="_close" qualifiers="virtual">
 			<return type="NetwPromise" />
 			<description>
-				Releases this slot. It is called after every pending operation has finished. [method NetwDatabase.close] does not wait for this promise.
+				Releases this slot. It is called after every pending operation has finished. [method NetwDatabase.close] does not wait for this promise. Not overriding it succeeds without doing anything.
 			</description>
 		</method>
 		<method name="_read" qualifiers="virtual">
@@ -86,33 +86,6 @@
 				┖╴uncertain   PackedByteArray    1 where the outcome is unknown, 0 otherwise
 				[/codeblock]
 				An [code]errors[/code] of the wrong length fails every operation with [constant @GlobalScope.ERR_INVALID_DATA].
-			</description>
-		</method>
-		<method name="close_default">
-			<return type="NetwPromise" />
-			<description>
-				The stock [method _close], which succeeds without doing anything. A subclass overriding [method _close] calls this to reach it.
-			</description>
-		</method>
-		<method name="read_default">
-			<return type="NetwPromise" />
-			<param index="0" name="address" type="Dictionary" />
-			<description>
-				The stock [method _read], which rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. A subclass overriding [method _read] calls this to reach it.
-			</description>
-		</method>
-		<method name="scan_default">
-			<return type="NetwPromise" />
-			<param index="0" name="request" type="Dictionary" />
-			<description>
-				The stock [method _scan], which rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. A subclass overriding [method _scan] calls this to reach it.
-			</description>
-		</method>
-		<method name="write_batch_default">
-			<return type="NetwPromise" />
-			<param index="0" name="operations" type="Array" />
-			<description>
-				The stock [method _write_batch], which rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. A subclass overriding [method _write_batch] calls this to reach it.
 			</description>
 		</method>
 	</methods>

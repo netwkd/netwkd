@@ -6,6 +6,7 @@
 #include "godot/multiplayer_synchronizer.hpp"
 #include "godot/node.hpp"
 #include "godot/object.hpp"
+#include "godot/scene_tree.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/entity.hpp"
@@ -462,22 +463,23 @@ TEST_CASE(
     CHECK_FALSE(stage.holds(route, 1));
 }
 
+void stamp_arrival(Node *p_node, Node *p_arena) {
+    if (p_node->get_parent() == p_arena) {
+        p_node->set(StringName("hp"), STAMPED);
+    }
+}
+
 TEST_CASE(
     "[Networked][Lifecycle][Spawn][SceneTree] first rows, an observer's first "
     "values of a controller's spawn are the session's newest, not the "
     "author's"
 ) {
     SpawnStage stage;
-    NetwMultiplayer *session = stage.rig.server();
-    Callable stamp = callable_mp_static(+[](int64_t p_route,
-                                            const Ref<RefCounted> &p_wrapper) {
-        const Ref<NetwEntity> entity
-            = Object::cast_to<NetwEntity>(p_wrapper.ptr());
-        if (entity.is_valid() && entity->get_owner() != nullptr) {
-            entity->get_owner()->set(StringName("hp"), STAMPED);
-        }
-    });
-    session->observe(NetwMultiplayer::ENTITY_LIVE, stamp);
+    SceneTree *tree = netw::gd::scene_tree();
+    REQUIRE(tree != nullptr);
+    const Callable stamp
+        = callable_mp_static(&stamp_arrival).bind(stage.arena_on(-1));
+    tree->connect(StringName("node_added"), stamp);
 
     Node *made = stage.author_spawns(
         "authored_crate",
@@ -487,7 +489,7 @@ TEST_CASE(
     REQUIRE(made != nullptr);
     const int route = route_of(made);
     stage.rig.step_ticks(2);
-    session->unobserve(NetwMultiplayer::ENTITY_LIVE, stamp);
+    tree->disconnect(StringName("node_added"), stamp);
     stage.rig.step_ticks(SETTLE_TICKS);
 
     Node *observed = stage.rig.route_node(route, 1);

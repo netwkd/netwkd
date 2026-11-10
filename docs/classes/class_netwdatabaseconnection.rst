@@ -23,7 +23,7 @@ Description
 
 Subclass it, together with a :ref:`NetwDatabaseBackend<class_NetwDatabaseBackend>` whose :ref:`NetwDatabaseBackend._open()<class_NetwDatabaseBackend_private_method__open>` returns it, to store records somewhere the built-in backends do not.
 
-Implement :ref:`_read()<class_NetwDatabaseConnection_private_method__read>`, :ref:`_scan()<class_NetwDatabaseConnection_private_method__scan>`, :ref:`_write_batch()<class_NetwDatabaseConnection_private_method__write_batch>` and :ref:`_close()<class_NetwDatabaseConnection_private_method__close>`. :ref:`NetwDatabase<class_NetwDatabase>` builds every other operation from these. Each returns a :ref:`NetwPromise<class_NetwPromise>`, and a method left unimplemented rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`.
+Implement :ref:`_read()<class_NetwDatabaseConnection_private_method__read>`, :ref:`_scan()<class_NetwDatabaseConnection_private_method__scan>`, :ref:`_write_batch()<class_NetwDatabaseConnection_private_method__write_batch>` and :ref:`_close()<class_NetwDatabaseConnection_private_method__close>`. :ref:`NetwDatabase<class_NetwDatabase>` builds every other operation from these. Each returns a :ref:`NetwPromise<class_NetwPromise>`. A read, scan or write left unimplemented rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`.
 
 \ **Address**\ 
 
@@ -55,14 +55,6 @@ Methods
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_write_batch<class_NetwDatabaseConnection_private_method__write_batch>`\ (\ operations\: :godot:`Array`\ ) |virtual| |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`close_default<class_NetwDatabaseConnection_method_close_default>`\ (\ )                                              |
-   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`read_default<class_NetwDatabaseConnection_method_read_default>`\ (\ address\: :godot:`Dictionary`\ )                 |
-   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`scan_default<class_NetwDatabaseConnection_method_scan_default>`\ (\ request\: :godot:`Dictionary`\ )                 |
-   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`write_batch_default<class_NetwDatabaseConnection_method_write_batch_default>`\ (\ operations\: :godot:`Array`\ )     |
-   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -79,7 +71,7 @@ Method Descriptions
 
 :ref:`NetwPromise<class_NetwPromise>` **_close**\ (\ ) |virtual| :ref:`🔗<class_NetwDatabaseConnection_private_method__close>`
 
-Releases this slot. It is called after every pending operation has finished. :ref:`NetwDatabase.close()<class_NetwDatabase_method_close>` does not wait for this promise.
+Releases this slot. It is called after every pending operation has finished. :ref:`NetwDatabase.close()<class_NetwDatabase_method_close>` does not wait for this promise. Not overriding it succeeds without doing anything.
 
 .. rst-class:: classref-item-separator
 
@@ -166,54 +158,6 @@ Applies ``operations`` in order and resolves one outcome per operation, in the s
     ┖╴uncertain   PackedByteArray    1 where the outcome is unknown, 0 otherwise
 
 \ An ``errors`` of the wrong length fails every operation with :godot:`@GlobalScope.ERR_INVALID_DATA <@GlobalScope#class_@GlobalScope_constant_ERR_INVALID_DATA>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwDatabaseConnection_method_close_default:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPromise<class_NetwPromise>` **close_default**\ (\ ) :ref:`🔗<class_NetwDatabaseConnection_method_close_default>`
-
-The stock :ref:`_close()<class_NetwDatabaseConnection_private_method__close>`, which succeeds without doing anything. A subclass overriding :ref:`_close()<class_NetwDatabaseConnection_private_method__close>` calls this to reach it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwDatabaseConnection_method_read_default:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPromise<class_NetwPromise>` **read_default**\ (\ address\: :godot:`Dictionary`\ ) :ref:`🔗<class_NetwDatabaseConnection_method_read_default>`
-
-The stock :ref:`_read()<class_NetwDatabaseConnection_private_method__read>`, which rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. A subclass overriding :ref:`_read()<class_NetwDatabaseConnection_private_method__read>` calls this to reach it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwDatabaseConnection_method_scan_default:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPromise<class_NetwPromise>` **scan_default**\ (\ request\: :godot:`Dictionary`\ ) :ref:`🔗<class_NetwDatabaseConnection_method_scan_default>`
-
-The stock :ref:`_scan()<class_NetwDatabaseConnection_private_method__scan>`, which rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. A subclass overriding :ref:`_scan()<class_NetwDatabaseConnection_private_method__scan>` calls this to reach it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwDatabaseConnection_method_write_batch_default:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPromise<class_NetwPromise>` **write_batch_default**\ (\ operations\: :godot:`Array`\ ) :ref:`🔗<class_NetwDatabaseConnection_method_write_batch_default>`
-
-The stock :ref:`_write_batch()<class_NetwDatabaseConnection_private_method__write_batch>`, which rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. A subclass overriding :ref:`_write_batch()<class_NetwDatabaseConnection_private_method__write_batch>` calls this to reach it.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

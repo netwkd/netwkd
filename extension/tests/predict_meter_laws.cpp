@@ -1,4 +1,5 @@
 #include "support/netw_test.h"
+#include "support/predict_rows.h"
 
 #include "netw/predict/engine.hpp"
 #include "netw/predict/journal.hpp"
@@ -10,42 +11,21 @@ using namespace godot;
 using namespace netw;
 using netw::predict::Domain;
 using netw::predict::ROW_ACKED;
-
-Ref<NetwPredictJudgement> seam_corrected(
-    int64_t p_domain,
-    int64_t p_verdict,
-    Dictionary p_predicted,
-    Dictionary p_payload,
-    Dictionary p_divergence
-) {
-    p_divergence[StringName("value")] = 0.25;
-    return NetwPredictJudgement::of(0.25, true);
-}
-
-Ref<NetwPredictJudgement> seam_agreed(
-    int64_t p_domain,
-    int64_t p_verdict,
-    Dictionary p_predicted,
-    Dictionary p_payload,
-    Dictionary p_divergence
-) {
-    p_divergence[StringName("value")] = 12.0;
-    return NetwPredictJudgement::of(12.0, false);
-}
+using netw::predict::ROW_MATCHED;
 
 LocalVector<netw::predict::FieldDecl> declaration(double p_epsilon) {
     LocalVector<netw::predict::FieldDecl> out;
-    out.push_back(
-        netw::field_decl(
-            StringName("value"),
-            0,
-            StringName(),
-            0.0,
-            false,
-            false,
-            p_epsilon
-        )
+    netw::predict::FieldDecl value = netw::field_decl(
+        StringName("value"),
+        0,
+        StringName(),
+        0.0,
+        false,
+        false,
+        p_epsilon
     );
+    value.type = int(Variant::FLOAT);
+    out.push_back(value);
     return out;
 }
 
@@ -55,71 +35,49 @@ int64_t seated(NetwPredictionEngine &r_pool, double p_epsilon) {
     return slot;
 }
 
-int meter_of_judgement(
-    NetwPredictionEngine *p_pool,
+predict::StateRow valued(
+    const NetwPredictionEngine &p_pool,
     int64_t p_slot,
-    Domain p_domain,
-    const Callable &p_seam
+    double p_value
 ) {
-    const predict::Judged judged = p_pool->judge_state(
-        p_slot,
-        4,
-        int64_t(p_domain),
-        int64_t(ROW_ACKED),
-        predict::StateRow(),
-        predict::StateRow(),
-        p_seam
-    );
-    return judged.meter;
+    Dictionary values;
+    values[StringName("value")] = p_value;
+    return netw_test::state_row(&p_pool, p_slot, values);
 }
 
 TEST_CASE(
     "[Networked][Predict][Hosted][Meter] M1 a correction is never worth "
     "zero, so a budget that spends on one can always tell it happened"
 ) {
-    NetwPredictionEngine held_pool;
-    NetwPredictionEngine *const pool = &held_pool;
-    const int64_t slot = seated(held_pool, 0.5);
+    NetwPredictionEngine pool;
+    const int64_t slot = seated(pool, 0.5);
 
-    const int measured = meter_of_judgement(
-        pool,
+    const predict::Judged judged = pool.judge_state(
         slot,
-        Domain::OUT_OF_DOMAIN,
-        callable_mp_static(&seam_corrected)
+        4,
+        int64_t(Domain::IN_DOMAIN),
+        int64_t(ROW_ACKED),
+        valued(pool, slot, 1.0),
+        valued(pool, slot, 1.0)
     );
-    NETW_CHECK_GE(measured, 1);
-
-    SUBCASE("and the field it corrected sat INSIDE its declared epsilon") {
-        const predict::Judged judged = pool->judge_state(
-            slot,
-            4,
-            int64_t(Domain::OUT_OF_DOMAIN),
-            int64_t(ROW_ACKED),
-            predict::StateRow(),
-            predict::StateRow(),
-            callable_mp_static(&seam_corrected)
-        );
-        CHECK(judged.corrected);
-        NETW_CHECK_CLOSE(judged.divergence, 0.25, 0.0001);
-    }
+    CHECK(judged.corrected);
+    NETW_CHECK_GE(judged.meter, 1);
 }
 
 TEST_CASE(
     "[Networked][Predict][Hosted][Meter] M2 a verdict that corrected nothing "
     "reports a meter of zero however far apart the two states measured"
 ) {
-    NetwPredictionEngine held_pool;
-    NetwPredictionEngine *const pool = &held_pool;
-    const int64_t slot = seated(held_pool, 0.5);
+    NetwPredictionEngine pool;
+    const int64_t slot = seated(pool, 0.5);
 
-    const predict::Judged judged = pool->judge_state(
+    const predict::Judged judged = pool.judge_state(
         slot,
         4,
         int64_t(Domain::IN_DOMAIN),
-        int64_t(ROW_ACKED),
-        predict::StateRow(),
-        predict::StateRow(),
-        callable_mp_static(&seam_agreed)
+        int64_t(ROW_ACKED | ROW_MATCHED),
+        valued(pool, slot, 1.0),
+        valued(pool, slot, 13.0)
     );
     CHECK_FALSE(judged.corrected);
     NETW_CHECK_EQ(judged.meter, 0);

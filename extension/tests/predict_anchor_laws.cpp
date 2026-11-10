@@ -21,7 +21,6 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPrediction;
 using netw::NetwPredictionEngine;
-using netw::NetwPredictRecovery;
 
 const char *ANCHORED_ID = "anchored_player";
 

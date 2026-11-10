@@ -293,59 +293,6 @@ TEST_CASE(
     }
 }
 
-struct Declaring {
-    netw::NetwMultiplayer *api = nullptr;
-    RID staying;
-    RID departing;
-    Error staying_verdict = FAILED;
-    bool staying_seated_inside = true;
-};
-
-Declaring &declaring() {
-    static Declaring held;
-    return held;
-}
-
-void declare_while_configuring() {
-    Declaring &seen = declaring();
-    seen.staying_verdict = seen.api->predict_declare(seen.staying);
-    seen.staying_seated_inside = seen.api->predict_engine_seated(seen.staying);
-    seen.api->predict_declare(seen.departing);
-    seen.api->predict_undeclare(seen.departing);
-}
-
-TEST_CASE(
-    "[Networked][Services] SV3 prediction declared from a callback that "
-    "reacts to the settings being applied waits for that application and "
-    "registers when it ends, unless its entity left first"
-) {
-    LoopbackRig rig(0);
-    rig.mount();
-    netw::NetwMultiplayer *api = rig.server();
-    const RID outer = plain_entity(rig, "Outer");
-    declaring() = Declaring();
-    declaring().api = api;
-    declaring().staying = plain_entity(rig, "Staying");
-    declaring().departing = plain_entity(rig, "Departing");
-    netw::Netw::configure_clock(rig.branch())->ticks_per_second(30);
-    api->observe(
-        netw::NetwMultiplayer::CLOCK_CONFIGURED,
-        callable_mp_static(&declare_while_configuring)
-    );
-
-    NETW_CHECK_EQ(int(api->predict_declare(outer)), int(OK));
-
-    NETW_CHECK_EQ(int(declaring().staying_verdict), int(OK));
-    CHECK_FALSE(declaring().staying_seated_inside);
-    CHECK(api->predict_engine_seated(outer));
-    CHECK(api->predict_engine_seated(declaring().staying));
-    CHECK_FALSE(api->predict_engine_seated(declaring().departing));
-
-    api->config_settle();
-    CHECK_FALSE(api->predict_engine_seated(declaring().departing));
-    declaring() = Declaring();
-}
-
 TEST_CASE(
     "[Networked][Services] arming rewind late adopts the entities already "
     "mounted, so a scene standing before the first declaration is not skipped "

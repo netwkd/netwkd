@@ -43,7 +43,7 @@ The client pings the server every :ref:`ping_interval<class_NetwClock_property_p
 
 \ **Showing remote state**\ 
 
-State from other peers arrives late, so remote entities are shown :ref:`display_offset<class_NetwClock_property_display_offset>` ticks in the past. :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` is the offset the current connection needs, the one-way latency plus the jitter times :ref:`NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER<class_NetwMultiplayer_constant_CLOCK_PARAM_JITTER_MULTIPLIER>`, in ticks. It is not applied automatically. :ref:`NetwMultiplayer.clock_auto_configure_offset()<class_NetwMultiplayer_method_clock_auto_configure_offset>` applies it.
+State from other peers arrives late, so remote entities are shown :ref:`display_offset<class_NetwClock_property_display_offset>` ticks in the past. :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` is the offset the current connection needs, the one-way latency plus the jitter times :ref:`NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER<class_NetwMultiplayer_constant_CLOCK_PARAM_JITTER_MULTIPLIER>`, in ticks. It is not applied automatically. :ref:`auto_configure_offset()<class_NetwClock_method_auto_configure_offset>` applies it.
 
 .. rst-class:: classref-reftable-group
 
@@ -88,6 +88,8 @@ Methods
    :widths: auto
 
    +----------------+--------------------------------------------------------------------------------------------------------------------------+
+   | |void|         | :ref:`auto_configure_offset<class_NetwClock_method_auto_configure_offset>`\ (\ )                                         |
+   +----------------+--------------------------------------------------------------------------------------------------------------------------+
    | :godot:`float` | :ref:`monitor<class_NetwClock_method_monitor>`\ (\ monitor\: :ref:`ClockMonitor<enum_NetwClock_ClockMonitor>`\ ) |const| |
    +----------------+--------------------------------------------------------------------------------------------------------------------------+
 
@@ -131,6 +133,18 @@ Emitted when :ref:`is_synchronized<class_NetwClock_property_is_synchronized>` be
 **ticked**\ (\ delta\: :godot:`float`, tick\: :godot:`int`\ ) :ref:`🔗<class_NetwClock_signal_ticked>`
 
 Emitted after every entity ran ``_network_tick`` for ``tick``. Read results here.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwClock_signal_tickrate_mismatch:
+
+.. rst-class:: classref-signal
+
+**tickrate_mismatch**\ (\ server_tickrate\: :godot:`int`\ ) :ref:`🔗<class_NetwClock_signal_tickrate_mismatch>`
+
+Emitted on a client whose :ref:`tickrate<class_NetwClock_property_tickrate>` differs from ``server_tickrate`` when :ref:`NetwClockConfig.tickrate_mismatch_action<class_NetwClockConfig_property_tickrate_mismatch_action>` is :ref:`MISMATCH_ACTION_SIGNAL<class_NetwClock_constant_MISMATCH_ACTION_SIGNAL>`.
 
 .. rst-class:: classref-section-separator
 
@@ -195,7 +209,7 @@ Disconnect the peer.
 
 :ref:`MismatchAction<enum_NetwClock_MismatchAction>` **MISMATCH_ACTION_SIGNAL** = ``2``
 
-Notify :ref:`NetwMultiplayer.CLOCK_TICKRATE_MISMATCH<class_NetwMultiplayer_constant_CLOCK_TICKRATE_MISMATCH>` and let the game decide.
+Emit :ref:`tickrate_mismatch<class_NetwClock_signal_tickrate_mismatch>` and let the game decide.
 
 .. rst-class:: classref-item-separator
 
@@ -363,7 +377,7 @@ How many ticks in the past remote entities are shown. See :ref:`recommended_disp
 
 - :godot:`bool` **get_is_synchronized**\ (\ )
 
-``true`` once the tick follows the server. Always ``true`` on the server and on a peer with no connection, as :ref:`NetwMultiplayer.is_host<class_NetwMultiplayer_property_is_host>` is.
+``true`` once the tick follows the server. Always ``true`` on the server and on a peer with no connection, as :godot:`MultiplayerAPI.is_server() <MultiplayerAPI#class_MultiplayerAPI_method_is_server>` is.
 
 .. rst-class:: classref-item-separator
 
@@ -503,6 +517,18 @@ Ticks per second, set by :ref:`Netw.configure_clock()<class_Netw_method_configur
 
 Method Descriptions
 -------------------
+
+.. _class_NetwClock_method_auto_configure_offset:
+
+.. rst-class:: classref-method
+
+|void| **auto_configure_offset**\ (\ ) :ref:`🔗<class_NetwClock_method_auto_configure_offset>`
+
+Measures the connection for five seconds, then sets :ref:`display_offset<class_NetwClock_property_display_offset>` to the largest :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` it saw. Does nothing on the server.
+
+.. rst-class:: classref-item-separator
+
+----
 
 .. _class_NetwClock_method_monitor:
 

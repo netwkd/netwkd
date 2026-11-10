@@ -120,16 +120,14 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SW3 an arrival announces the move and writes "
-    "no subscription of its own, because the entity's residency is what "
-    "subscribes and a second writer would disagree with it"
+    "[Networked][Scene][Hosted] SW3 an arrival writes no subscription of its "
+    "own, because the entity's residency is what subscribes and a second "
+    "writer would disagree with it"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
     const CallLog flushed;
     core->set_interest_flush(flushed.callable("flush"));
-    const CallLog moved;
-    core->observe(NetwMultiplayer::SCENE_ENTITY_MOVED, moved.callable("moved"));
     Node *root = memnew(Node);
     const Placed source = place(core, root, true, StringName("Source"));
     const Placed destination = place(core, root, true, StringName("Dest"));
@@ -146,7 +144,6 @@ TEST_CASE(
         Ref<netw::NetwPromise>()
     );
 
-    NETW_CHECK_EQ(moved.count(StringName("moved")), 1);
     CHECK(core->scene_subscribes(source.handle, 7));
     CHECK_FALSE(core->scene_subscribes(destination.handle, 7));
 

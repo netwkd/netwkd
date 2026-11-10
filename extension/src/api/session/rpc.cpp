@@ -194,7 +194,6 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
     const NetwCarrierFrame header = NetwCarrierFrame::read(p_packet);
     if (header.kind == NetwCarrierFrame::FOREIGN) {
         emit_signal(SIG_PEER_PACKET, p_peer, p_packet);
-        notify(PEER_PACKET, p_peer, p_packet);
         return header;
     }
     if (header.kind == NetwCarrierFrame::MALFORMED) {
@@ -205,19 +204,14 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
                 {String(), String(), String(), p_peer}
             );
         }
-        if (plane.wants(EventPlane::DATAGRAM_MALFORMED, 0)) {
-            EventPlane::Emission fact(
-                EventPlane::DATAGRAM_MALFORMED,
-                EventPlane::AFTER,
-                clock_engine().get_tick()
-            );
-            fact.peer = p_peer;
-            fact.verdict = ERR_INVALID_DATA;
-            Dictionary detail;
-            detail["size"] = p_packet.size();
-            fact.detail = detail;
-            plane.emit(fact);
-        }
+        event_record(
+            EventPlane::DATAGRAM_MALFORMED,
+            RID(),
+            0,
+            p_peer,
+            ERR_INVALID_DATA,
+            p_packet.size()
+        );
         return header;
     }
     count_received(p_packet.size() - header.payload_offset);
@@ -234,21 +228,15 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
         header.payload_offset
     );
 #endif
-    if (plane.wants(EventPlane::DATAGRAM_RECEIVED, 0)) {
-        EventPlane::Emission fact(
-            EventPlane::DATAGRAM_RECEIVED,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        const bool reliable = header.kind == NetwCarrierFrame::RELIABLE;
-        fact.peer = p_peer;
-        Dictionary detail;
-        detail["size"] = p_packet.size() - header.payload_offset;
-        detail["seq"] = reliable ? int64_t(-1) : header.seq;
-        detail["reliable"] = reliable;
-        fact.detail = detail;
-        plane.emit(fact);
-    }
+    event_record(
+        EventPlane::DATAGRAM_RECEIVED,
+        RID(),
+        0,
+        p_peer,
+        OK,
+        p_packet.size() - header.payload_offset,
+        header.kind == NetwCarrierFrame::RELIABLE ? int64_t(-1) : header.seq
+    );
     return header;
 }
 
@@ -347,22 +335,11 @@ void NetwMultiplayer::relay_auth_failed(int64_t p_peer) {
         auth_forget_link(p_peer);
         return;
     }
-    Dictionary detail;
-    detail["peer"] = p_peer;
-    event_emit(
-        EventPlane::PEER_AUTH_FAILED,
-        0,
-        detail,
-        StringName(),
-        p_peer,
-        OK,
-        Dictionary()
-    );
+    event_record(EventPlane::PEER_AUTH_FAILED, RID(), 0, p_peer);
     const LinkHandshake *link = link_handshakes.getptr(p_peer);
     const bool reported = link != nullptr && link->refused;
     auth_forget_link(p_peer);
     emit_signal(SIG_PEER_AUTHENTICATION_FAILED, p_peer);
-    notify(PEER_AUTHENTICATION_FAILED, p_peer);
     if (!probe_forget(p_peer) && !reported) {
         NETW_DEBUG(
             netw::sys::SESSION,
@@ -953,7 +930,30 @@ Dictionary NetwMultiplayer::stats_snapshot() {
         out[StringName("interest_" + counter)] = interest[counter];
     }
     out.merge(store_world.arrays.counters());
+    stats_fill_predict(out);
+    stats_fill_display(out);
 
+    out[StringName("verdict_does_not_exist")]
+        = stats_get_verdict_count(ERR_DOES_NOT_EXIST);
+    out[StringName("verdict_skip")] = stats_get_verdict_count(ERR_SKIP);
+    out[StringName("verdict_unavailable")]
+        = stats_get_verdict_count(ERR_UNAVAILABLE);
+    out[StringName("verdict_unauthorized")]
+        = stats_get_verdict_count(ERR_UNAUTHORIZED);
+    out[StringName("verdict_invalid_data")]
+        = stats_get_verdict_count(ERR_INVALID_DATA);
+    out[StringName("verdict_busy")] = stats_get_verdict_count(ERR_BUSY);
+
+#define NETW_SESSION_STAT_FILL(m_name, m_key) \
+    if (!out.has(StringName(m_key))) { \
+        out[StringName(m_key)] = 0; \
+    }
+    NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_FILL)
+#undef NETW_SESSION_STAT_FILL
+    return out;
+}
+
+void NetwMultiplayer::stats_fill_predict(Dictionary &out) const {
     const Dictionary predict = lagcomp_metrics();
     out[StringName("predict_entities")] = predict[StringName("entities")];
     out[StringName("predict_timelines")] = predict[StringName("timelines")];
@@ -980,38 +980,22 @@ Dictionary NetwMultiplayer::stats_snapshot() {
         = joint[StringName("cells_substituted")];
     out[StringName("joint_heal_snaps")] = joint[StringName("heal_snaps")];
     out[StringName("joint_linger_held")] = joint[StringName("linger_held")];
+}
 
-    if (display_book.is_valid()) {
-        const display::PumpStats &display = display_book->get_stats();
-        out[StringName("display_runtimes")] = display.runtimes;
-        out[StringName("display_starving")] = display.starving;
-        out[StringName("display_sleeping")] = display.sleeping;
-        out[StringName("display_projecting")] = display.projecting;
-        out[StringName("display_snaps")] = display.snaps;
-        out[StringName("display_max_display_lag")]
-            = int64_t(display.max_display_lag);
-        out[StringName("display_max_forecast_age")]
-            = int64_t(display.max_forecast_age);
+void NetwMultiplayer::stats_fill_display(Dictionary &r_out) const {
+    if (display_book.is_null()) {
+        return;
     }
-
-    out[StringName("verdict_does_not_exist")]
-        = stats_get_verdict_count(ERR_DOES_NOT_EXIST);
-    out[StringName("verdict_skip")] = stats_get_verdict_count(ERR_SKIP);
-    out[StringName("verdict_unavailable")]
-        = stats_get_verdict_count(ERR_UNAVAILABLE);
-    out[StringName("verdict_unauthorized")]
-        = stats_get_verdict_count(ERR_UNAUTHORIZED);
-    out[StringName("verdict_invalid_data")]
-        = stats_get_verdict_count(ERR_INVALID_DATA);
-    out[StringName("verdict_busy")] = stats_get_verdict_count(ERR_BUSY);
-
-#define NETW_SESSION_STAT_FILL(m_name, m_key) \
-    if (!out.has(StringName(m_key))) { \
-        out[StringName(m_key)] = 0; \
-    }
-    NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_FILL)
-#undef NETW_SESSION_STAT_FILL
-    return out;
+    const display::PumpStats &display = display_book->get_stats();
+    r_out[StringName("display_runtimes")] = display.runtimes;
+    r_out[StringName("display_starving")] = display.starving;
+    r_out[StringName("display_sleeping")] = display.sleeping;
+    r_out[StringName("display_projecting")] = display.projecting;
+    r_out[StringName("display_snaps")] = display.snaps;
+    r_out[StringName("display_max_display_lag")]
+        = int64_t(display.max_display_lag);
+    r_out[StringName("display_max_forecast_age")]
+        = int64_t(display.max_forecast_age);
 }
 
 int64_t NetwMultiplayer::stats_get(Stat p_stat) {
@@ -1023,7 +1007,106 @@ int64_t NetwMultiplayer::stats_get(Stat p_stat) {
     if (p_stat < 0 || p_stat >= int64_t(STAT_COUNT)) {
         return 0;
     }
-    return int64_t(stats_snapshot().get(StringName(STAT_KEYS[p_stat]), 0));
+    const StringName key(STAT_KEYS[p_stat]);
+    Dictionary family;
+    switch (p_stat) {
+        case STAT_SENT_PACKETS:
+            return sent_packets;
+        case STAT_SENT_BYTES:
+            return sent_bytes;
+        case STAT_RECEIVED_PACKETS:
+            return received_packets;
+        case STAT_RECEIVED_BYTES:
+            return received_bytes;
+        case STAT_STATE_ACKS_OUT:
+            return state_acks_out;
+        case STAT_STATE_ACKS_IN:
+            return state_acks_in;
+        case STAT_STANDALONE_ACKS_OUT:
+            return standalone_acks_out;
+        case STAT_ATTRIBUTED_BYTES_OUT:
+            return attribution.get_attributed_out();
+        case STAT_ATTRIBUTED_BYTES_IN:
+            return attribution.get_attributed_in();
+        case STAT_ATTRIBUTED_FRAMES_OUT:
+            return attribution.get_frames_out();
+        case STAT_ATTRIBUTED_FRAMES_IN:
+            return attribution.get_frames_in();
+        case STAT_ATTRIBUTION_FRAMING_OUT:
+            return attribution.get_framing_out();
+        case STAT_ATTRIBUTION_DROPPED_OUT:
+            return attribution.get_staged_dropped_out();
+        case STAT_DROPS_BACKLOG_LIMIT:
+            return rpc_park.refused();
+        case STAT_PENDING_LIVE:
+        case STAT_INTEREST_RELAY_BACKLOG:
+            return liveness_pending_live_count();
+        case STAT_INTEREST_LAYERS:
+            return interest_layers().size();
+        case STAT_INTEREST_ENTITIES_FILTERED:
+            return interest_engine.membership_keys().size();
+        case STAT_INTEREST_VISIBLE_EDGES:
+            return interest_engine.stats_edges();
+        case STAT_INTEREST_DIRTY_ENTITIES:
+            return interest_engine.dirty_count();
+        case STAT_INTEREST_TRANSITIONS_TOTAL:
+            return interest_engine.transitions_total();
+        case STAT_INTEREST_VANISHED_DIRTY_SKIPS:
+            return interest_engine.stats_vanished_dirty_skips();
+        case STAT_VERDICT_DOES_NOT_EXIST:
+            return stats_get_verdict_count(ERR_DOES_NOT_EXIST);
+        case STAT_VERDICT_SKIP:
+            return stats_get_verdict_count(ERR_SKIP);
+        case STAT_VERDICT_UNAVAILABLE:
+            return stats_get_verdict_count(ERR_UNAVAILABLE);
+        case STAT_VERDICT_UNAUTHORIZED:
+            return stats_get_verdict_count(ERR_UNAUTHORIZED);
+        case STAT_VERDICT_INVALID_DATA:
+            return stats_get_verdict_count(ERR_INVALID_DATA);
+        case STAT_VERDICT_BUSY:
+            return stats_get_verdict_count(ERR_BUSY);
+        case STAT_DROPS_TABLE_UNKNOWN:
+        case STAT_DROPS_TABLE_SCHEMA:
+        case STAT_DROPS_TABLE_UNKNOWN_FLAG:
+        case STAT_DROPS_TABLE_TRUNCATED:
+        case STAT_DROPS_TABLE_BAD_SENDER:
+        case STAT_TABLE_DROPS_STALE:
+        case STAT_TABLE_DROPS_TOMBSTONE:
+        case STAT_TABLE_DROPS_STALE_ROW:
+            family = store_world.arrays.counters();
+            break;
+        case STAT_PREDICT_ENTITIES:
+        case STAT_PREDICT_TIMELINES:
+        case STAT_PREDICT_CORRECTIONS:
+        case STAT_PREDICT_INSTALLS:
+        case STAT_PREDICT_MAX_REPLAY_DEPTH:
+        case STAT_PREDICT_CONSUMED:
+        case STAT_PREDICT_MISSING:
+        case STAT_PREDICT_PENDING_ACTIONS:
+        case STAT_PREDICT_EFFECTS_ARMED:
+        case STAT_PREDICT_GATE_FALLBACKS:
+        case STAT_JOINT_PASSES:
+        case STAT_JOINT_MEMBERS:
+        case STAT_JOINT_CELLS_RELAYED:
+        case STAT_JOINT_CELLS_SUBSTITUTED:
+        case STAT_JOINT_HEAL_SNAPS:
+        case STAT_JOINT_LINGER_HELD:
+            stats_fill_predict(family);
+            break;
+        case STAT_DISPLAY_RUNTIMES:
+        case STAT_DISPLAY_STARVING:
+        case STAT_DISPLAY_SLEEPING:
+        case STAT_DISPLAY_PROJECTING:
+        case STAT_DISPLAY_SNAPS:
+        case STAT_DISPLAY_MAX_DISPLAY_LAG:
+        case STAT_DISPLAY_MAX_FORECAST_AGE:
+            stats_fill_display(family);
+            break;
+        default:
+            family = relay_stats_snapshot();
+            break;
+    }
+    return int64_t(family.get(key, 0));
 }
 
 void NetwMultiplayer::rpc_settle_open(
@@ -2338,20 +2421,15 @@ int64_t NetwMultiplayer::send_datagram(
     }
     attribution.note_datagram(false, int64_t(datagram.bytes.size()));
     capture_note(wire::CaptureDirection::OUT, p_peer, datagram.bytes);
-    if (plane.wants(EventPlane::DATAGRAM_SENT, 0)) {
-        EventPlane::Emission fact(
-            EventPlane::DATAGRAM_SENT,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        fact.peer = p_peer;
-        Dictionary detail;
-        detail["size"] = datagram.bytes.size();
-        detail["seq"] = datagram.seq;
-        detail["reliable"] = p_reliable;
-        fact.detail = detail;
-        plane.emit(fact);
-    }
+    event_record(
+        EventPlane::DATAGRAM_SENT,
+        RID(),
+        0,
+        p_peer,
+        OK,
+        datagram.bytes.size(),
+        datagram.seq
+    );
     return datagram.seq;
 }
 
@@ -2586,25 +2664,13 @@ bool NetwMultiplayer::note_peer_ack(
         p_history,
         Time::get_singleton()->get_ticks_usec()
     );
-    if (advanced && plane.wants(EventPlane::ACK_ADVANCED, 0)) {
-        EventPlane::Emission fact(
-            EventPlane::ACK_ADVANCED,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        fact.peer = p_peer;
-        Dictionary detail;
-        detail["ack"] = p_ack;
-        fact.detail = detail;
-        plane.emit(fact);
+    if (advanced) {
+        event_record(EventPlane::ACK_ADVANCED, RID(), 0, p_peer, OK, p_ack);
     }
     return advanced;
 }
 
-void NetwMultiplayer::sync_note_ack_default(
-    int64_t p_peer,
-    int64_t p_sequence
-) {
+void NetwMultiplayer::note_ack(int64_t p_peer, int64_t p_sequence) {
     ReplicationCore *plane = (get_replication_plane());
     if (plane == nullptr) {
         NETW_TRACE(
@@ -2626,26 +2692,12 @@ void NetwMultiplayer::sync_note_ack_default(
     pipeline->note_peer_ack(p_peer, p_sequence, peer_ack_history(p_peer));
 }
 
-Object *NetwMultiplayer::session_seam(const StringName &p_seam) const {
-    Object *published = session_api();
-    if (published == nullptr || published == this
-        || !published->has_method(p_seam)) {
-        return nullptr;
-    }
-    return published;
-}
-
 void NetwMultiplayer::session_note_state_ack(
     int64_t p_peer,
     int64_t p_ack,
     uint32_t p_history
 ) {
     if (!note_peer_ack(p_peer, p_ack, p_history)) {
-        return;
-    }
-    Object *seam = session_seam(StringName("_sync_note_ack"));
-    if (seam != nullptr) {
-        seam->call("_sync_note_ack", p_peer, p_ack);
         return;
     }
     note_ack(p_peer, p_ack);
@@ -2681,24 +2733,7 @@ void NetwMultiplayer::session_on_inner_packet(
     sink_verdict(session_receive_inner_packet(p_sender, p_packet), 0, p_sender);
 }
 
-void NetwMultiplayer::note_ack(int64_t p_peer, int64_t p_sequence) {
-    if (GDVIRTUAL_CALL(_sync_note_ack, p_peer, p_sequence)) {
-        return;
-    }
-    sync_note_ack_default(p_peer, p_sequence);
-}
-
 void NetwMultiplayer::note_sent(int64_t p_peer, int64_t p_sequence) {
-    if (GDVIRTUAL_CALL(_sync_note_sent, p_peer, p_sequence)) {
-        return;
-    }
-    sync_note_sent_default(p_peer, p_sequence);
-}
-
-void NetwMultiplayer::sync_note_sent_default(
-    int64_t p_peer,
-    int64_t p_sequence
-) {
     ReplicationCore *plane = (get_replication_plane());
     if (plane == nullptr) {
         NETW_TRACE(
@@ -2734,20 +2769,7 @@ void NetwMultiplayer::forget_peer_seqs(int64_t p_peer) {
 
 bool NetwMultiplayer::count_verdict(Error p_verdict, int64_t p_route) {
     const bool counted = verdict_book.count(p_verdict);
-    if (plane.wants(EventPlane::VERDICT, p_route)) {
-        EventPlane::Emission fact(
-            EventPlane::VERDICT,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        fact.route = p_route;
-        fact.verdict = p_verdict;
-        Dictionary detail;
-        detail["stage"] = "gate";
-        detail["counted"] = counted;
-        fact.detail = detail;
-        plane.emit(fact);
-    }
+    event_record(EventPlane::VERDICT, RID(), p_route, 0, p_verdict);
     return counted;
 }
 

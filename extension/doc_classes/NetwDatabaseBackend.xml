@@ -41,27 +41,27 @@
 				Resolves a new [NetwDatabaseConnection] for [param slot], or rejects with an error. [param session] is the [NetwMultiplayer] opening the slot.
 			</description>
 		</method>
-		<method name="delete_slot_default">
+		<method name="delete_slot">
 			<return type="NetwPromise" />
 			<param index="0" name="session" type="Object" />
 			<param index="1" name="slot" type="StringName" />
 			<description>
-				The stock [method _delete_slot], which rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. A subclass overriding [method _delete_slot] calls this to reach it.
+				Removes [param slot] through [method _delete_slot], or through the backend's own storage when no script overrides it. [param session] may be [code]null[/code] when no session is asking.
 			</description>
 		</method>
-		<method name="list_slots_default">
+		<method name="list_slots">
 			<return type="NetwPromise" />
 			<param index="0" name="session" type="Object" />
 			<description>
-				The stock [method _list_slots], which rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. A subclass overriding [method _list_slots] calls this to reach it.
+				Resolves every slot in storage through [method _list_slots], or through the backend's own storage when no script overrides it.
 			</description>
 		</method>
-		<method name="open_default">
+		<method name="open">
 			<return type="NetwPromise" />
 			<param index="0" name="session" type="Object" />
 			<param index="1" name="slot" type="StringName" />
 			<description>
-				The stock [method _open], which rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. A subclass overriding [method _open] calls this to reach it.
+				Resolves a [NetwDatabaseConnection] for [param slot] through [method _open], or through the backend's own storage when no script overrides it.
 			</description>
 		</method>
 	</methods>

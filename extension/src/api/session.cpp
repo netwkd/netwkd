@@ -34,6 +34,8 @@ const char *SIG_PLAYER_LEFT = "player_left";
 const char *SIG_JOIN_FAILED = "join_failed";
 const char *SIG_SERVER_TRANSFERRED = "server_transferred";
 const char *SIG_PAUSED_CHANGED = "paused_changed";
+const char *SIG_KICK_REQUESTED = "kick_requested";
+const char *SIG_SCENE_REMOVED = "scene_removed";
 
 } // namespace
 
@@ -94,6 +96,42 @@ Error NetwSession::kick(const Ref<NetwPlayer> &p_who, const String &p_reason) {
     NetwMultiplayer *api = session();
     return api != nullptr ? api->player_kick(p_who, p_reason)
                           : ERR_UNCONFIGURED;
+}
+
+void NetwSession::request_kick(
+    const Ref<NetwPlayer> &p_player,
+    const String &p_reason
+) {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return;
+    }
+    if (p_player.is_null()) {
+        fault::raise(
+            api,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwSession.request_kick}", String(), "player"}
+        );
+        return;
+    }
+    api->peer_request_kick(p_player->get_peer_id(), p_reason);
+}
+
+void NetwSession::announce_kick_requested(
+    const Ref<NetwPlayer> &p_requester,
+    const Ref<NetwPlayer> &p_target,
+    const String &p_reason
+) {
+    emit_signal(
+        StringName(SIG_KICK_REQUESTED),
+        p_requester,
+        p_target,
+        p_reason
+    );
+}
+
+void NetwSession::announce_scene_removed(const Ref<NetwScene> &p_scene) {
+    emit_signal(StringName(SIG_SCENE_REMOVED), p_scene);
 }
 
 Error NetwSession::transfer_server(int64_t p_peer) {
@@ -201,9 +239,9 @@ void NetwSession::set_server_info(const Ref<NetwServerInfo> &p_info) {
     }
 }
 
-Dictionary NetwSession::get_stats() const {
+int64_t NetwSession::stat(enums::NetwMultiplayer::Stat p_stat) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->stats_snapshot() : Dictionary();
+    return api != nullptr ? api->stats_get(p_stat) : 0;
 }
 
 void NetwSession::set_peer_bandwidth(int64_t p_peer, int64_t p_kbps) {
@@ -211,6 +249,11 @@ void NetwSession::set_peer_bandwidth(int64_t p_peer, int64_t p_kbps) {
     if (api != nullptr) {
         api->session_set_peer_bandwidth(p_peer, p_kbps);
     }
+}
+
+Dictionary NetwSession::link_stats(int64_t p_peer) const {
+    NetwMultiplayer *api = session();
+    return api != nullptr ? api->peer_link_stats(p_peer) : Dictionary();
 }
 
 Ref<NetwPromise> NetwSession::leave() {
@@ -476,12 +519,15 @@ void NetwSession::_bind_methods() {
         D_METHOD("set_server_info", "info"),
         &NetwSession::set_server_info
     );
-    ClassDB::bind_method(D_METHOD("get_stats"), &NetwSession::get_stats);
-    ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "stats"), "", "get_stats");
+    ClassDB::bind_method(D_METHOD("stat", "stat"), &NetwSession::stat);
 
     ClassDB::bind_method(
         D_METHOD("set_peer_bandwidth", "peer", "kbps"),
         &NetwSession::set_peer_bandwidth
+    );
+    ClassDB::bind_method(
+        D_METHOD("link_stats", "peer"),
+        &NetwSession::link_stats
     );
     ClassDB::bind_method(
         D_METHOD("transfer_server", "peer_id"),
@@ -503,6 +549,11 @@ void NetwSession::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("kick", "player", "reason"),
         &NetwSession::kick,
+        DEFVAL(String())
+    );
+    ClassDB::bind_method(
+        D_METHOD("request_kick", "player", "reason"),
+        &NetwSession::request_kick,
         DEFVAL(String())
     );
     ClassDB::bind_method(
@@ -665,6 +716,31 @@ void NetwSession::_bind_methods() {
         SIG_SERVER_TRANSFERRED,
         PropertyInfo(Variant::INT, "successor_was"),
         PropertyInfo(Variant::INT, "former_now")
+    ));
+    ADD_SIGNAL(MethodInfo(
+        SIG_KICK_REQUESTED,
+        PropertyInfo(
+            Variant::OBJECT,
+            "requester",
+            PROPERTY_HINT_RESOURCE_TYPE,
+            "NetwPlayer"
+        ),
+        PropertyInfo(
+            Variant::OBJECT,
+            "target",
+            PROPERTY_HINT_RESOURCE_TYPE,
+            "NetwPlayer"
+        ),
+        PropertyInfo(Variant::STRING, "reason")
+    ));
+    ADD_SIGNAL(MethodInfo(
+        SIG_SCENE_REMOVED,
+        PropertyInfo(
+            Variant::OBJECT,
+            "scene",
+            PROPERTY_HINT_RESOURCE_TYPE,
+            "NetwScene"
+        )
     ));
 }
 

@@ -65,11 +65,6 @@ const GameCall MIGRATION_STEP
 
 constexpr double SHUTDOWN_NOTIFY_DELAY = 0.5;
 
-const StringName &display_write_seam() {
-    static const StringName name("_display_write_rows");
-    return name;
-}
-
 enum class OpenSeat : uint8_t {
     SEAT,
     PARK,
@@ -328,35 +323,6 @@ void NetwMultiplayer::sync_pipeline_on_entity_live(
     }
 }
 
-PackedByteArray NetwMultiplayer::sync_pipeline_stage_row_frame(
-    int64_t p_peer,
-    int64_t p_frame_tick,
-    int64_t p_route,
-    int64_t p_comp,
-    int64_t p_mask,
-    const PackedByteArray &p_bytes
-) {
-#if defined(NETW_TESTS)
-    idle_work.staged += 1;
-#endif
-    SyncPipeline *pipeline = sync_pipeline();
-    return pipeline != nullptr ? pipeline->stage_row_frame(
-                                     p_peer,
-                                     p_frame_tick,
-                                     p_route,
-                                     p_comp,
-                                     p_mask,
-                                     p_bytes
-                                 )
-                               : PackedByteArray();
-}
-
-Error NetwMultiplayer::sync_pipeline_decode_stage_body() {
-    SyncPipeline *pipeline = sync_pipeline();
-    return pipeline != nullptr ? pipeline->decode_stage_body()
-                               : ERR_UNCONFIGURED;
-}
-
 void NetwMultiplayer::sync_pipeline_bind_declaration(int64_t p_binding) {
     SyncPipeline *pipeline = sync_pipeline();
     PropertyBinding *binding = binding_book.live(uint64_t(p_binding));
@@ -502,15 +468,12 @@ NodePath NetwMultiplayer::property_path(
     return NodePath(String(relative) + ":" + String(p_property));
 }
 
-Error NetwMultiplayer::sync_admit_frame_default(
-    int64_t,
+Error NetwMultiplayer::sync_admit_frame(
     int64_t p_route,
-    int64_t,
     int64_t p_channel,
-    int64_t,
-    int64_t,
     const PackedByteArray &p_payload
 ) const {
+    NETW_ZONE_LEAF("Row admit frame", colors::WIRE, profile::SUBSYSTEM_WIRE);
     const Error verdict = entity_frame_verdict(p_route);
     if (verdict != OK) {
         return verdict;
@@ -526,64 +489,6 @@ Error NetwMultiplayer::sync_admit_frame_default(
     return OK;
 }
 
-Error NetwMultiplayer::sync_admit_frame(
-    int64_t p_sender,
-    int64_t p_route,
-    int64_t p_comp,
-    int64_t p_channel,
-    int64_t p_flags,
-    int64_t p_tick,
-    const PackedByteArray &p_payload
-) const {
-    NETW_ZONE_LEAF("Row admit frame", colors::WIRE, profile::SUBSYSTEM_WIRE);
-    Error answered = OK;
-    if (GDVIRTUAL_CALL(
-            _sync_admit_frame,
-            p_sender,
-            p_route,
-            p_comp,
-            p_channel,
-            p_flags,
-            p_tick,
-            p_payload,
-            answered
-        )) {
-        return answered;
-    }
-    return sync_admit_frame_default(
-        p_sender,
-        p_route,
-        p_comp,
-        p_channel,
-        p_flags,
-        p_tick,
-        p_payload
-    );
-}
-
-void NetwMultiplayer::report_event(
-    int64_t p_event,
-    int64_t p_route,
-    const Dictionary &p_detail,
-    int64_t p_peer,
-    const StringName &p_entity_id,
-    const Dictionary &p_model,
-    int64_t p_verdict
-) {
-    if (!event_wants(p_event, p_route)) {
-        return;
-    }
-    event_emit(
-        p_event,
-        p_route,
-        p_detail,
-        p_entity_id,
-        p_peer,
-        p_verdict,
-        p_model
-    );
-}
-
 void NetwMultiplayer::table_announce_intake() {
     store::Arrays &arrays = store_world.arrays;
     const TypedArray<RID> touched = arrays.touched_tables();
@@ -595,7 +500,6 @@ void NetwMultiplayer::table_announce_intake() {
 
 void NetwMultiplayer::table_announce(const RID &p_table) {
     const int64_t tick = store_world.arrays.tick_of(p_table);
-    notify(TABLE_RECEIVED, p_table, tick);
     if (const Ref<NetwTable> *handle
         = table_handles.getptr(int64_t(p_table.get_id()))) {
         (*handle)->announce(tick);
@@ -606,11 +510,12 @@ bool NetwMultiplayer::table_publishes() const {
     return is_host();
 }
 
-Error NetwMultiplayer::table_admit_frame_default(
+Error NetwMultiplayer::table_admit_frame(
     int64_t p_sender,
     int64_t p_channel,
     const PackedByteArray &p_payload
 ) {
+    NETW_ZONE_NC("Table admit frame", colors::TABLE);
     if (p_channel != gate_channels.table) {
         return ERR_INVALID_DATA;
     }
@@ -622,25 +527,6 @@ Error NetwMultiplayer::table_admit_frame_default(
         return ERR_INVALID_DATA;
     }
     return store_world.arrays.admit_header(p_payload);
-}
-
-Error NetwMultiplayer::table_admit_frame(
-    int64_t p_sender,
-    int64_t p_channel,
-    const PackedByteArray &p_payload
-) {
-    NETW_ZONE_NC("Table admit frame", colors::TABLE);
-    Error answered = OK;
-    if (GDVIRTUAL_CALL(
-            _table_admit_frame,
-            p_sender,
-            p_channel,
-            p_payload,
-            answered
-        )) {
-        return answered;
-    }
-    return table_admit_frame_default(p_sender, p_channel, p_payload);
 }
 
 Node *NetwMultiplayer::repl_comp_node(
@@ -765,7 +651,6 @@ void NetwMultiplayer::sync_pump_rows(
 #if defined(NETW_TESTS)
     const int64_t allocated = store::allocations_seen();
 #endif
-    const bool by_seam = store_gathers_by_seam();
     if (store_model != p_model || store_model_revision != p_model->revision()) {
         store_model = p_model;
         store_model_revision = p_model->revision();
@@ -776,16 +661,7 @@ void NetwMultiplayer::sync_pump_rows(
     for (uint32_t at = 0; at < store_world.table_count(); ++at) {
         store_world.table(at).stamp_tick = p_tick;
         store_sources(p_model, p_send, at, p_bind, p_tick);
-        store_world.pull(at, p_tick, by_seam);
-        const store::Table &table = store_world.table(at);
-        if (by_seam && !table.selected.is_empty()) {
-            PackedInt64Array routes;
-            routes.resize(int64_t(table.selected.size()));
-            for (uint32_t which = 0; which < table.selected.size(); ++which) {
-                routes.set(int64_t(which), table.routes[table.selected[which]]);
-            }
-            store_world.absorb(at, run_gather_rows(table.rid, routes), p_tick);
-        }
+        store_world.pull(at, p_tick);
     }
     for (uint32_t at = 0; at < store_world.woken.size(); ++at) {
         sim_note_push(gd::object_of(ObjectID(store_world.woken[at])));
@@ -865,11 +741,6 @@ void NetwMultiplayer::sync_flush_rows(
     p_send->set_rate(double(session_settings.bandwidth_kbps) * KBPS_BYTES);
     p_send->publish_tables(table_publishes());
     sync_note_backlog(p_send);
-    static const StringName encode_seam("_sync_encode");
-    p_send->want_encode_stage(
-        overrides_seam(encode_seam)
-        || event_wants(int64_t(EventPlane::SYNC_ENCODE), 0)
-    );
 #if defined(NETW_TESTS)
     const int64_t allocated = store::allocations_seen();
 #endif
@@ -883,21 +754,15 @@ void NetwMultiplayer::sync_flush_rows(
     idle_work.sends += 1;
     idle_work.sent_rows += int64_t(result.sends.size());
 #endif
-    if (event_wants(int64_t(EventPlane::GATHER), 0)) {
-        Dictionary detail;
-        detail[StringName("offers")]
-            = int64_t(result.sends.size() + result.deferred);
-        detail[StringName("sends")] = int64_t(result.sends.size());
-        event_emit(
-            int64_t(EventPlane::GATHER),
-            0,
-            detail,
-            StringName(),
-            0,
-            int64_t(OK),
-            Dictionary()
-        );
-    }
+    event_record(
+        EventPlane::GATHER,
+        RID(),
+        0,
+        0,
+        OK,
+        int64_t(result.sends.size() + result.deferred),
+        int64_t(result.sends.size())
+    );
 #if defined(NETW_TESTS)
     store::AllocationTally framing(idle_work.frame_allocations);
 #endif
@@ -908,6 +773,14 @@ void NetwMultiplayer::sync_flush_rows(
             const store::Table &table = p_send->store()->table(send.table);
             sync_note_columns(table.schema, table.plan, send.mask);
         }
+        event_record(
+            EventPlane::SYNC_ENCODE,
+            RID(),
+            send.route,
+            int64_t(send.peer),
+            OK,
+            send.bytes.size()
+        );
         CarrierRow descriptor;
         const bool owns_baseline = p_send->describe(send, descriptor);
         send_row_to(
@@ -1274,34 +1147,6 @@ Dictionary NetwMultiplayer::peer_link_stats(int64_t p_peer) const {
     return out;
 }
 
-Dictionary NetwMultiplayer::sync_explain(
-    int64_t p_route,
-    int64_t p_comp,
-    int64_t p_peer
-) const {
-    Dictionary out;
-    ReplicationCore *plane = get_replication_plane();
-    SyncPipeline *pipeline
-        = plane != nullptr ? plane->get_sync_pipeline() : nullptr;
-    ReplicationSend *send
-        = pipeline != nullptr ? pipeline->row_send() : nullptr;
-    if (send == nullptr) {
-        return out;
-    }
-    const repl::RowExplain held = send->explain(p_route, p_comp, p_peer);
-    static const char *const NAMES[]
-        = {"unoffered", "sent", "deferred", "caught_up", "ungathered"};
-    out[StringName("verdict")] = String(NAMES[int(held.verdict)]);
-    out[StringName("tick")] = held.tick;
-    out[StringName("confirmed")] = int64_t(held.confirmed);
-    out[StringName("exposed")] = int64_t(held.exposed);
-    out[StringName("has_baseline")] = held.has_baseline;
-    out[StringName("priority")] = double(held.priority);
-    out[StringName("class")] = String(held.row_class);
-    out[StringName("age_ticks")] = held.age_ticks;
-    return out;
-}
-
 Dictionary NetwMultiplayer::sync_flush_stats() const {
     Dictionary out;
     out[StringName("row_frames_out")] = sync_flush.rows;
@@ -1323,22 +1168,13 @@ Error NetwMultiplayer::display_lane(
     const StringName &p_track,
     const Variant &p_value
 ) {
-    const Error verdict = display_write(p_entity, p_track, p_value);
-
-    const int64_t route = liveness_core->route_of(p_entity);
-    if (!event_wants(EventPlane::DISPLAY_WRITE, route)) {
-        return verdict;
-    }
-    Dictionary detail;
-    detail[StringName("track")] = p_track;
-    report_event(
+    const Error verdict = display_write_track(p_entity, p_track, p_value);
+    event_record(
         EventPlane::DISPLAY_WRITE,
-        route,
-        detail,
+        p_entity,
+        liveness_core->route_of(p_entity),
         0,
-        StringName(),
-        Dictionary(),
-        int64_t(verdict)
+        verdict
     );
     return verdict;
 }
@@ -1768,16 +1604,7 @@ Error NetwMultiplayer::finish_stage_verdict(
     int64_t p_route,
     int64_t p_peer
 ) {
-    if (plane.wants(p_stage, p_route)) {
-        EventPlane::Emission fact(
-            p_stage,
-            EventPlane::AFTER,
-            clock_engine().get_tick()
-        );
-        fact.route = p_route;
-        fact.verdict = p_verdict;
-        plane.emit(fact);
-    }
+    event_record(p_stage, RID(), p_route, p_peer, p_verdict);
     return sink_verdict(p_verdict, p_route, p_peer);
 }
 
@@ -1845,10 +1672,6 @@ RID NetwMultiplayer::table_find_or_adopt(const StringName &p_name) {
 
 StringName NetwMultiplayer::schema_get_name(const RID &p_schema) const {
     return schema_core.name_of(p_schema);
-}
-
-Variant::Type NetwMultiplayer::schema_get_element_type(ColumnType p_type) {
-    return Variant::Type(SchemaCore::element_type(p_type));
 }
 
 void NetwMultiplayer::adopt_schema_declarations() {
@@ -2032,20 +1855,17 @@ Error NetwMultiplayer::table_write_column(
 }
 
 Error NetwMultiplayer::table_commit(const RID &p_table) {
-    const int64_t tick = clock_engine().get_tick();
-    const Error verdict = store_world.arrays.commit(p_table, tick);
-    if (plane.wants(EventPlane::TABLE_COMMIT, 0)) {
-        EventPlane::Emission fact(
+    const Error verdict
+        = store_world.arrays.commit(p_table, clock_engine().get_tick());
+    if (event_records(EventPlane::TABLE_COMMIT)) {
+        event_record(
             EventPlane::TABLE_COMMIT,
-            EventPlane::AFTER,
-            tick
+            RID(),
+            0,
+            0,
+            verdict,
+            table_read_routes(p_table).size()
         );
-        fact.verdict = verdict;
-        Dictionary detail;
-        detail["stage"] = "table";
-        detail["rows"] = table_read_routes(p_table).size();
-        fact.detail = detail;
-        plane.emit(fact);
     }
     return verdict;
 }
@@ -2242,152 +2062,6 @@ Error NetwMultiplayer::display_write_track(
         default:
             return ERR_INVALID_DATA;
     }
-}
-
-bool NetwMultiplayer::display_row_of(
-    const RID &p_entity,
-    const StringName &p_track,
-    RID &r_table,
-    int64_t &r_column,
-    int64_t &r_route
-) {
-    r_table = RID();
-    r_column = -1;
-    r_route = liveness_core->route_of(p_entity);
-    const display::Runtime *runtime = display_book->runtime_of(p_entity);
-    if (runtime == nullptr) {
-        return false;
-    }
-    r_route = runtime->get_route();
-    const int track = runtime->display_tracks().by_name(p_track);
-    if (track < 0 || track >= int(runtime->channels().size())) {
-        return false;
-    }
-    r_column = track;
-    uint64_t owner = 0;
-    uint32_t lane = 0;
-    uint32_t column = 0;
-    const display::History &history
-        = runtime->channels()[track]->display_history();
-    if (!history.follow_address(owner, lane, column)) {
-        return true;
-    }
-    const store::RowAddress at = store_world.row_of(owner, lane);
-    if (at.valid()) {
-        r_table = store_world.table(at.table).rid;
-        r_column = int64_t(column);
-    }
-    return true;
-}
-
-Error NetwMultiplayer::display_write_rows_default(
-    const RID &p_table,
-    int64_t p_column,
-    const PackedInt64Array &p_routes,
-    const Array &p_values
-) {
-    const uint32_t index
-        = p_table.is_valid() ? store_world.table_of(p_table) : 0;
-    if (p_table.is_valid() && index == store::Table::NO_SLOT) {
-        return ERR_DOES_NOT_EXIST;
-    }
-    Error verdict = OK;
-    for (int64_t at = 0; at < p_routes.size() && at < p_values.size(); ++at) {
-        const display::Runtime *runtime
-            = display_book->runtime_at(p_routes[at]);
-        if (runtime == nullptr) {
-            verdict = ERR_DOES_NOT_EXIST;
-            continue;
-        }
-        const display::Channel *channel = nullptr;
-        if (p_table.is_valid()) {
-            const store::Table &table = store_world.table(index);
-            const uint32_t lane
-                = table.family == store::Family::RETAINED ? 1 : 0;
-            for (uint32_t row = 0; row < table.row_count(); ++row) {
-                if (table.routes[row] == p_routes[at]) {
-                    channel = runtime->channel_following(
-                        table.owners[row],
-                        lane,
-                        uint32_t(p_column)
-                    );
-                    break;
-                }
-            }
-        } else if (
-            p_column >= 0 && p_column < int64_t(runtime->channels().size())
-        ) {
-            channel = runtime->channels()[uint32_t(p_column)];
-        }
-        if (channel == nullptr) {
-            verdict = ERR_DOES_NOT_EXIST;
-            continue;
-        }
-        verdict = display_write_track(
-            channel->get_entity(),
-            channel->get_target_prop(),
-            p_values[at]
-        );
-    }
-    return verdict;
-}
-
-Error NetwMultiplayer::run_display_write_rows(
-    const RID &p_table,
-    int64_t p_column,
-    const PackedInt64Array &p_routes,
-    const Array &p_values
-) {
-    ReplicationCore *replication = get_replication_plane();
-    Object *seam = replication != nullptr
-        ? replication->gate_seam(display_write_seam())
-        : nullptr;
-    if (seam != nullptr) {
-        return Error(
-            int(seam->call(
-                display_write_seam(),
-                p_table,
-                p_column,
-                p_routes,
-                p_values
-            ))
-        );
-    }
-    Error answered = OK;
-    if (GDVIRTUAL_CALL(
-            _display_write_rows,
-            p_table,
-            p_column,
-            p_routes,
-            p_values,
-            answered
-        )) {
-        return answered;
-    }
-    return display_write_rows_default(p_table, p_column, p_routes, p_values);
-}
-
-Error NetwMultiplayer::display_write(
-    const RID &p_entity,
-    const StringName &p_track,
-    const Variant &p_value
-) {
-    ReplicationCore *replication = get_replication_plane();
-    const bool by_seam = overrides_seam(display_write_seam())
-        || (replication != nullptr
-            && replication->gate_seam(display_write_seam()) != nullptr);
-    if (!by_seam) {
-        return display_write_track(p_entity, p_track, p_value);
-    }
-    RID table;
-    int64_t column = -1;
-    int64_t route = 0;
-    display_row_of(p_entity, p_track, table, column, route);
-    PackedInt64Array routes;
-    routes.push_back(route);
-    Array values;
-    values.push_back(p_value);
-    return run_display_write_rows(table, column, routes, values);
 }
 
 void NetwMultiplayer::display_set_param(
@@ -2918,151 +2592,43 @@ int64_t NetwMultiplayer::lagcomp_effect_count() const {
     return effects.count();
 }
 
-int64_t NetwMultiplayer::event_watch(
-    const PackedInt64Array &p_events,
-    const Dictionary &p_target,
-    const Dictionary &p_predicate,
-    const Callable &p_sink,
-    const Dictionary &p_opts
-) {
-    return plane.watch(this, p_events, p_target, p_predicate, p_sink, p_opts);
+void NetwMultiplayer::event_arm(BitField<EventGroup> p_groups) {
+    plane.arm(int64_t(p_groups));
 }
 
-bool NetwMultiplayer::event_unwatch(int64_t p_id) {
-    return plane.unwatch(p_id);
+PackedInt64Array NetwMultiplayer::event_drain() {
+    return plane.drain();
 }
 
-TypedArray<Dictionary> NetwMultiplayer::event_watches() const {
-    return plane.watches();
-}
-
-TypedArray<Dictionary> NetwMultiplayer::event_ring(int64_t p_route) {
-    return plane.ring(p_route);
-}
-
-void NetwMultiplayer::event_ring_clear(int64_t p_route) {
-    plane.ring_clear(p_route);
-}
-
-void NetwMultiplayer::event_arm(bool p_enabled) {
-    plane.set_armed(p_enabled);
-}
-
-bool NetwMultiplayer::event_wants(int64_t p_event, int64_t p_route) const {
-    return plane.wants(p_event, p_route);
-}
-
-void NetwMultiplayer::event_emit(
-    int64_t p_event,
+void NetwMultiplayer::event_record(
+    int64_t p_kind,
+    const RID &p_entity,
     int64_t p_route,
-    const Dictionary &p_detail,
-    const StringName &p_entity_id,
     int64_t p_peer,
     int64_t p_verdict,
-    const Dictionary &p_model
+    int64_t p_a,
+    int64_t p_b
 ) {
-    if (!plane.wants(p_event, p_route)) {
+    if (!plane.records(p_kind)) {
         return;
     }
-    EventPlane::Emission fact(
-        p_event,
-        EventPlane::AFTER,
-        clock_engine().get_tick()
-    );
-    fact.route = p_route;
-    fact.detail = p_detail;
-    fact.entity_id = p_entity_id;
-    fact.peer = p_peer;
-    fact.verdict = p_verdict;
-    fact.model = p_model;
-    plane.emit(fact);
+    const RID entity = p_entity.is_valid() || p_route == 0
+        ? p_entity
+        : liveness_core->rid_from_route(int(p_route));
+    EventPlane::Row row;
+    row.kind = p_kind;
+    row.tick = clock_engine().get_tick();
+    row.entity = int64_t(entity.get_id());
+    row.route = p_route;
+    row.peer = p_peer;
+    row.verdict = p_verdict;
+    row.a = p_a;
+    row.b = p_b;
+    plane.keep(row);
 }
 
 void NetwMultiplayer::lagcomp_effect_sweep(int64_t p_tick) {
     effects.sweep(p_tick);
-}
-
-PackedByteArray NetwMultiplayer::sync_encode(int64_t p_peer, int64_t p_tick) {
-    PackedByteArray answered;
-    if (GDVIRTUAL_CALL(_sync_encode, p_peer, p_tick, answered)) {
-        return answered;
-    }
-    return sync_encode_armed ? sync_encode_stock : PackedByteArray();
-}
-
-Error NetwMultiplayer::sync_decode(
-    const RID &p_entity,
-    int64_t p_comp,
-    int64_t p_flags,
-    int64_t p_tick,
-    const PackedByteArray &p_payload
-) {
-    Error answered = OK;
-    if (GDVIRTUAL_CALL(
-            _sync_decode,
-            p_entity,
-            p_comp,
-            p_flags,
-            p_tick,
-            p_payload,
-            answered
-        )) {
-        return answered;
-    }
-    if (!sync_decoder.is_valid()) {
-        return ERR_UNCONFIGURED;
-    }
-    return Error(int(sync_decoder.call()));
-}
-
-PackedByteArray NetwMultiplayer::run_sync_encode_stage(
-    int64_t p_peer,
-    const PackedByteArray &p_stock,
-    int64_t p_tick
-) {
-    NETW_ZONE_NC("Sync encode stage", colors::CODEC);
-    sync_encode_stock = p_stock;
-    sync_encode_armed = true;
-    int64_t stamped = p_tick;
-    if (stamped < 0) {
-        stamped = clock_engine().get_configured()
-            ? int64_t(clock_engine().get_tick())
-            : 0;
-    }
-    const PackedByteArray bytes = sync_encode(p_peer, stamped);
-    sync_encode_armed = false;
-    sync_encode_stock = PackedByteArray();
-    NETW_TRACE(
-        sys::CODEC,
-        "Encoded %d bytes for peer %d at tick %d.",
-        int(bytes.size()),
-        int(p_peer),
-        int(stamped)
-    );
-    return bytes;
-}
-
-Error NetwMultiplayer::run_sync_decode_stage(
-    const RID &p_entity,
-    int64_t p_comp,
-    int64_t p_flags,
-    int64_t p_tick,
-    const PackedByteArray &p_payload,
-    const Callable &p_decoder
-) {
-    NETW_ZONE_NC("Sync decode stage", colors::CODEC);
-    sync_decoder = p_decoder;
-    const Error verdict
-        = sync_decode(p_entity, p_comp, p_flags, p_tick, p_payload);
-    sync_decoder = Callable();
-    NETW_TRACE(
-        sys::CODEC,
-        "Decoding returned %d for component %d at tick %d.",
-        int(verdict),
-        int(p_comp),
-        int(p_tick)
-    );
-    return verdict;
 }
 
 } // namespace netw

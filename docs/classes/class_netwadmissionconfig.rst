@@ -76,7 +76,7 @@ Adds ``provider`` to the accounts a joining player proves, in preference order. 
 
 :ref:`NetwAdmissionConfig<class_NetwAdmissionConfig>` **timeout**\ (\ seconds\: :godot:`float`\ ) :ref:`🔗<class_NetwAdmissionConfig_method_timeout>`
 
-Gives a client ``seconds`` from connecting to the server to be admitted, in place of :ref:`NetwMultiplayer.auth_timeout<class_NetwMultiplayer_property_auth_timeout>`. The server tells the client this deadline, so only the server's value counts. A join still waiting when it passes is refused with :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>`. The server's own join does not use this deadline, and its handler is given :ref:`NetwMultiplayer.auth_timeout<class_NetwMultiplayer_property_auth_timeout>` seconds.
+Gives every join ``seconds`` to be admitted, the server's own included. A client's time counts from connecting to the server, and the server tells the client this deadline, so only the server's value counts. A join still waiting when it passes is refused with :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>`. Without it, :ref:`NetwMultiplayer.auth_timeout<class_NetwMultiplayer_property_auth_timeout>` is the deadline.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

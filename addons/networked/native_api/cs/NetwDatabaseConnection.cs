@@ -13,8 +13,8 @@ namespace Networked;
 /// <c>NetwDatabaseBackend._open</c> returns it, to store records somewhere the
 /// built-in backends do not. Implement <c>_read</c>, <c>_scan</c>,
 /// <c>_write_batch</c> and <c>_close</c>. <see cref="NetwDatabase"/> builds
-/// every other operation from these. Each returns a <see cref="NetwPromise"/>,
-/// and a method left unimplemented rejects with
+/// every other operation from these. Each returns a <see cref="NetwPromise"/>.
+/// A read, scan or write left unimplemented rejects with
 /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. <b>Address</b> Reads, scans and writes
 /// name a record with this <see cref="Godot.Collections.Dictionary"/>.
 /// <code>
@@ -48,101 +48,5 @@ public sealed class NetwDatabaseConnection : NetwRefCounted
     public static NetwDatabaseConnection From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
-    }
-
-    private static readonly IntPtr _bindReadDefault =
-        NetwApi.MethodBind(
-            "NetwDatabaseConnection",
-            "read_default",
-            3652349531UL);
-
-    /// <summary>
-    /// The stock <c>_read</c>, which rejects with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. A subclass overriding <c>_read</c>
-    /// calls this to reach it.
-    /// </summary>
-    public NetwPromise ReadDefault(Godot.Collections.Dictionary address)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromDictionary(address);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindReadDefault, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        NetwPromise result =
-            NetwPromise.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindScanDefault =
-        NetwApi.MethodBind(
-            "NetwDatabaseConnection",
-            "scan_default",
-            3652349531UL);
-
-    /// <summary>
-    /// The stock <c>_scan</c>, which rejects with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. A subclass overriding <c>_scan</c>
-    /// calls this to reach it.
-    /// </summary>
-    public NetwPromise ScanDefault(Godot.Collections.Dictionary request)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromDictionary(request);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindScanDefault, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        NetwPromise result =
-            NetwPromise.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindWriteBatchDefault =
-        NetwApi.MethodBind(
-            "NetwDatabaseConnection",
-            "write_batch_default",
-            1303157875UL);
-
-    /// <summary>
-    /// The stock <c>_write_batch</c>, which rejects with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. A subclass overriding
-    /// <c>_write_batch</c> calls this to reach it.
-    /// </summary>
-    public NetwPromise WriteBatchDefault(Godot.Collections.Array operations)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromArray(operations);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindWriteBatchDefault,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        NetwPromise result =
-            NetwPromise.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindCloseDefault =
-        NetwApi.MethodBind(
-            "NetwDatabaseConnection",
-            "close_default",
-            1931563502UL);
-
-    /// <summary>
-    /// The stock <c>_close</c>, which succeeds without doing anything. A
-    /// subclass overriding <c>_close</c> calls this to reach it.
-    /// </summary>
-    public NetwPromise CloseDefault()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindCloseDefault, Checked, ref answered);
-        return NetwPromise.Adopt(answered);
     }
 }

@@ -32,18 +32,18 @@ Ref<NetwPromise> answered(
 
 } // namespace
 
-Ref<NetwPromise> NetwDatabaseBackend::open_default(
+Ref<NetwPromise> NetwDatabaseBackend::open_builtin(
     Object *p_session,
     const StringName &p_slot
 ) {
     return unimplemented("_open");
 }
 
-Ref<NetwPromise> NetwDatabaseBackend::list_slots_default(Object *p_session) {
+Ref<NetwPromise> NetwDatabaseBackend::list_slots_builtin(Object *p_session) {
     return unimplemented("_list_slots");
 }
 
-Ref<NetwPromise> NetwDatabaseBackend::delete_slot_default(
+Ref<NetwPromise> NetwDatabaseBackend::delete_slot_builtin(
     Object *p_session,
     const StringName &p_slot
 ) {
@@ -58,7 +58,7 @@ Ref<NetwPromise> NetwDatabaseBackend::open(
     if (GDVIRTUAL_CALL(_open, p_session, p_slot, answer)) {
         return answered(answer, "_open");
     }
-    return open_default(p_session, p_slot);
+    return open_builtin(p_session, p_slot);
 }
 
 Ref<NetwPromise> NetwDatabaseBackend::list_slots(Object *p_session) {
@@ -66,7 +66,7 @@ Ref<NetwPromise> NetwDatabaseBackend::list_slots(Object *p_session) {
     if (GDVIRTUAL_CALL(_list_slots, p_session, answer)) {
         return answered(answer, "_list_slots");
     }
-    return list_slots_default(p_session);
+    return list_slots_builtin(p_session);
 }
 
 Ref<NetwPromise> NetwDatabaseBackend::delete_slot(
@@ -77,7 +77,7 @@ Ref<NetwPromise> NetwDatabaseBackend::delete_slot(
     if (GDVIRTUAL_CALL(_delete_slot, p_session, p_slot, answer)) {
         return answered(answer, "_delete_slot");
     }
-    return delete_slot_default(p_session, p_slot);
+    return delete_slot_builtin(p_session, p_slot);
 }
 
 void NetwDatabaseBackend::_bind_methods() {
@@ -86,16 +86,16 @@ void NetwDatabaseBackend::_bind_methods() {
     GDVIRTUAL_BIND(_delete_slot, "session", "slot");
 
     ClassDB::bind_method(
-        D_METHOD("open_default", "session", "slot"),
-        &NetwDatabaseBackend::open_default
+        D_METHOD("open", "session", "slot"),
+        &NetwDatabaseBackend::open
     );
     ClassDB::bind_method(
-        D_METHOD("list_slots_default", "session"),
-        &NetwDatabaseBackend::list_slots_default
+        D_METHOD("list_slots", "session"),
+        &NetwDatabaseBackend::list_slots
     );
     ClassDB::bind_method(
-        D_METHOD("delete_slot_default", "session", "slot"),
-        &NetwDatabaseBackend::delete_slot_default
+        D_METHOD("delete_slot", "session", "slot"),
+        &NetwDatabaseBackend::delete_slot
     );
 }
 
@@ -103,7 +103,7 @@ void MemoryDatabase::set_store(const StringName &p_store) {
     store = p_store;
 }
 
-Ref<NetwPromise> MemoryDatabase::open_default(
+Ref<NetwPromise> MemoryDatabase::open_builtin(
     Object *p_session,
     const StringName &p_slot
 ) {
@@ -112,13 +112,13 @@ Ref<NetwPromise> MemoryDatabase::open_default(
     );
 }
 
-Ref<NetwPromise> MemoryDatabase::list_slots_default(Object *p_session) {
+Ref<NetwPromise> MemoryDatabase::list_slots_builtin(Object *p_session) {
     return NetwPromise::resolved(
         persist::store_named(String(store)).slot_names()
     );
 }
 
-Ref<NetwPromise> MemoryDatabase::delete_slot_default(
+Ref<NetwPromise> MemoryDatabase::delete_slot_builtin(
     Object *p_session,
     const StringName &p_slot
 ) {
@@ -147,7 +147,7 @@ void FileSystemDatabase::set_format(Format p_format) {
     format = p_format;
 }
 
-Ref<NetwPromise> FileSystemDatabase::open_default(
+Ref<NetwPromise> FileSystemDatabase::open_builtin(
     Object *p_session,
     const StringName &p_slot
 ) {
@@ -169,11 +169,11 @@ Ref<NetwPromise> FileSystemDatabase::open_default(
     );
 }
 
-Ref<NetwPromise> FileSystemDatabase::list_slots_default(Object *p_session) {
+Ref<NetwPromise> FileSystemDatabase::list_slots_builtin(Object *p_session) {
     return NetwPromise::resolved(persist::FileStore(root).slot_names());
 }
 
-Ref<NetwPromise> FileSystemDatabase::delete_slot_default(
+Ref<NetwPromise> FileSystemDatabase::delete_slot_builtin(
     Object *p_session,
     const StringName &p_slot
 ) {

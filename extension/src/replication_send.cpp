@@ -47,14 +47,6 @@ bool ReplicationSend::describe(const repl::RowSend &p_send, CarrierRow &r_row) {
     return impl.describe(p_send, r_row);
 }
 
-repl::RowExplain ReplicationSend::explain(
-    int64_t p_route,
-    int64_t p_comp,
-    int64_t p_peer
-) const {
-    return impl.explain(p_route, uint8_t(p_comp), int(p_peer));
-}
-
 bool ReplicationSend::commit(
     int64_t p_peer,
     int64_t p_seq,
@@ -74,14 +66,6 @@ void ReplicationSend::cancel(
     int64_t p_tick
 ) {
     impl.cancel(int(p_peer), p_rows, p_tick);
-}
-
-void ReplicationSend::set_encode_stage(const Callable &p_stage) {
-    impl.set_encode_stage(p_stage);
-}
-
-bool ReplicationSend::has_encode_stage() const {
-    return impl.has_encode_stage();
 }
 
 repl::AckReport ReplicationSend::acknowledge(

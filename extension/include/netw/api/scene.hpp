@@ -50,6 +50,10 @@ public:
     godot::Error unwatch(const godot::Ref<NetwPlayer> &p_player);
     bool is_watching(const godot::Ref<NetwPlayer> &p_player) const;
 
+    void announce_entity(
+        const godot::Ref<NetwEntity> &p_entity,
+        bool p_present
+    );
     void announce_player_entity(
         const godot::Ref<NetwEntity> &p_entity,
         bool p_present

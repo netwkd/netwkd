@@ -118,14 +118,6 @@ Object *Pipeline::api() const {
     return gd::instance_from_id(api_id);
 }
 
-Object *Pipeline::stage_seam(const StringName &p_seam) const {
-    Object *seam = api();
-    if (seam == nullptr || seam == core() || !seam->has_method(p_seam)) {
-        return nullptr;
-    }
-    return seam;
-}
-
 void Pipeline::set_core(Object *p_core) {
     NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_core);
     core_id = gd::instance_id(plane);
@@ -333,14 +325,11 @@ void Pipeline::run_carrier_flush() {
 }
 
 Error Pipeline::declare_stage(const RID &p_handle, const Dictionary &p_facts) {
-    Object *seam = stage_seam(StringName("_spawn_declare"));
     NetwMultiplayer *plane = core();
-    if (seam == nullptr && plane == nullptr) {
+    if (plane == nullptr) {
         return OK;
     }
-    const Error declared = seam != nullptr
-        ? Error(int(seam->call("_spawn_declare", p_handle, p_facts)))
-        : plane->spawn_declare(p_handle, p_facts);
+    const Error declared = plane->spawn_declare(p_handle);
     return stage_verdict(
         EventPlane::SPAWN_DECLARE,
         declared,
@@ -1360,20 +1349,15 @@ void Pipeline::despawn_tracked_route(int64_t p_route, Node *p_within) {
     NETW_STAGE(SPAWN, "Spawn despawn route", colors::LIVENESS);
     NETW_ZONE_VALUE(p_route);
     NetwMultiplayer *plane = core();
-    Object *seam = stage_seam(StringName("_spawn_undeclare"));
     if (plane == nullptr) {
         return;
     }
     const bool live = has_peer() && plane->is_online();
-    const Callable undeclare = seam != nullptr
-        ? Callable(seam, StringName("_spawn_undeclare"))
-        : callable_mp(plane, &NetwMultiplayer::spawn_undeclare);
     if (plane->spawn_despawn_route(
             &spawn_book,
             p_route,
             live ? connected_peers() : PackedInt32Array(),
             channel_despawn,
-            undeclare,
             p_within
         )
         && live) {
@@ -1895,34 +1879,17 @@ Node *Pipeline::build_host_fn(
 }
 
 Node *Pipeline::run_construct_stage(const Callable &p_constructor) {
-    Object *seam = stage_seam(StringName("_spawn_construct"));
     NetwMultiplayer *plane = core();
-    Node *node = nullptr;
-    if (seam != nullptr) {
-        seam->set(StringName("_spawn_constructor"), p_constructor);
-        const Variant built = seam->call("_spawn_construct", RID());
-        seam->set(StringName("_spawn_constructor"), Callable());
-        node = Object::cast_to<Node>(gd::live_object(built));
-    } else if (plane != nullptr) {
-        plane->spawn_construct_arm(p_constructor);
-        node = plane->spawn_construct(RID());
-        plane->spawn_construct_arm(Callable());
-    } else {
-        const Variant built = p_constructor.call();
-        node = Object::cast_to<Node>(gd::live_object(built));
-    }
-    if (plane != nullptr
-        && plane->event_wants(EventPlane::SPAWN_CONSTRUCT, 0)) {
-        Dictionary detail;
-        detail[StringName("built")] = node != nullptr;
-        plane->event_emit(
+    Node *node = p_constructor.is_valid()
+        ? Object::cast_to<Node>(gd::live_object(p_constructor.call()))
+        : nullptr;
+    if (plane != nullptr) {
+        plane->event_record(
             EventPlane::SPAWN_CONSTRUCT,
+            RID(),
             0,
-            detail,
-            StringName(),
             0,
-            OK,
-            Dictionary()
+            node != nullptr ? OK : ERR_CANT_CREATE
         );
     }
     return node;
@@ -2064,21 +2031,9 @@ Error Pipeline::admission(
     NETW_STAGE(SPAWN, "Spawn admit frame", colors::LIVENESS);
     NETW_ZONE_VALUE(p_payload.size());
     NetwMultiplayer *plane = core();
-    Object *shell = api();
     const int64_t route = route_named_by(p_payload);
     Error verdict = ERR_UNAVAILABLE;
-    if (shell != nullptr && shell != plane
-        && shell->has_method(StringName("_spawn_admit_frame"))) {
-        verdict = Error(
-            int(shell->call(
-                "_spawn_admit_frame",
-                p_sender,
-                route,
-                p_channel,
-                p_payload
-            ))
-        );
-    } else if (plane != nullptr) {
+    if (plane != nullptr) {
         verdict
             = plane->spawn_admit_frame(p_sender, route, p_channel, p_payload);
     }

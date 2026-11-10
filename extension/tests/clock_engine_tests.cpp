@@ -25,9 +25,6 @@ struct Clocked {
     ClockEngine *operator->() const {
         return clock;
     }
-    Object *sink() const {
-        return session.ptr();
-    }
 };
 
 Clocked make_clock(int rate = EXACT_RATE) {
@@ -44,6 +41,38 @@ Clocked pinned_clock() {
     out->set_use_physics_interpolation(false);
     return out;
 }
+
+struct Hooked {
+    ClockEngine clock;
+    Vector<ClockEngine::Event> heard;
+
+    explicit Hooked(bool p_pinned = false) {
+        clock.set_tickrate(EXACT_RATE);
+        clock.set_configured(p_pinned);
+        clock.set_use_physics_interpolation(!p_pinned);
+        clock.hook_with(&Hooked::hear, this);
+    }
+
+    Hooked(const Hooked &) = delete;
+    Hooked &operator=(const Hooked &) = delete;
+
+    static void hear(
+        void *p_context,
+        ClockEngine::Event p_event,
+        const Variant &,
+        const Variant &
+    ) {
+        static_cast<Hooked *>(p_context)->heard.push_back(p_event);
+    }
+
+    int count(ClockEngine::Event p_event) const {
+        int total = 0;
+        for (const ClockEngine::Event event : heard) {
+            total += event == p_event ? 1 : 0;
+        }
+        return total;
+    }
+};
 
 Vector<bool> admitted(
     const Clocked &p_clock,
@@ -75,34 +104,27 @@ TEST_CASE(
     }
 
     SUBCASE("the loop brackets every frame, tick or not") {
-        Recorder recorder(
-            clock.sink(),
-            {"clock_before_tick_loop",
-             "clock_before_tick",
-             "clock_on_tick",
-             "clock_after_tick",
-             "clock_after_tick_loop"}
-        );
-        clock->physics_step(TICK);
-        CHECK(
-            recorder.order()
-            == Vector<StringName>(
-                {"clock_before_tick_loop",
-                 "clock_before_tick",
-                 "clock_on_tick",
-                 "clock_after_tick",
-                 "clock_after_tick_loop"}
-            )
-        );
+        Hooked hooked;
 
-        recorder.clear();
-        clock->physics_step(0.0);
-        CHECK(
-            recorder.order()
-            == Vector<StringName>(
-                {"clock_before_tick_loop", "clock_after_tick_loop"}
-            )
-        );
+        hooked.clock.physics_step(TICK);
+        const bool a_tick_is_bracketed = hooked.heard
+            == Vector<ClockEngine::Event>(
+                {ClockEngine::EVENT_BEFORE_TICK_LOOP,
+                 ClockEngine::EVENT_BEFORE_TICK,
+                 ClockEngine::EVENT_ON_TICK,
+                 ClockEngine::EVENT_AFTER_TICK,
+                 ClockEngine::EVENT_AFTER_TICK_LOOP}
+            );
+        CHECK(a_tick_is_bracketed);
+
+        hooked.heard.clear();
+        hooked.clock.physics_step(0.0);
+        const bool an_empty_frame_is_bracketed = hooked.heard
+            == Vector<ClockEngine::Event>(
+                {ClockEngine::EVENT_BEFORE_TICK_LOOP,
+                 ClockEngine::EVENT_AFTER_TICK_LOOP}
+            );
+        CHECK(an_empty_frame_is_bracketed);
     }
 }
 
@@ -157,36 +179,30 @@ TEST_CASE(
     "[Networked][Clock][Hosted] L4 the stepped and pumped paths emit the same "
     "schedule"
 ) {
-    const Clocked stepped = make_clock();
-    const Clocked pumped = make_clock();
+    Hooked stepped;
+    Hooked pumped;
 
-    Recorder on_stepped(stepped.sink(), {"clock_on_tick"});
-    Recorder on_pumped(pumped.sink(), {"clock_on_tick"});
+    stepped.clock.force_step(3);
+    pumped.clock.physics_step(TICK * 3.0);
 
-    stepped->force_step(3);
-    pumped->physics_step(TICK * 3.0);
-
-    NETW_CHECK_EQ(stepped->get_tick(), pumped->get_tick());
+    NETW_CHECK_EQ(stepped.clock.get_tick(), pumped.clock.get_tick());
     NETW_CHECK_EQ(
-        on_stepped.count("clock_on_tick"),
-        on_pumped.count("clock_on_tick")
+        stepped.count(ClockEngine::EVENT_ON_TICK),
+        pumped.count(ClockEngine::EVENT_ON_TICK)
     );
-    NETW_CHECK_EQ(on_stepped.count("clock_on_tick"), 3);
+    NETW_CHECK_EQ(stepped.count(ClockEngine::EVENT_ON_TICK), 3);
 
     SUBCASE("a step is not a frame, so it brackets no tick loop") {
-        Recorder brackets(
-            stepped.sink(),
-            {"clock_before_tick_loop", "clock_after_tick_loop"}
-        );
-        stepped->force_step(1);
-        NETW_CHECK_EQ(brackets.count("clock_before_tick_loop"), 0);
-        NETW_CHECK_EQ(brackets.count("clock_after_tick_loop"), 0);
+        stepped.heard.clear();
+        stepped.clock.force_step(1);
+        NETW_CHECK_EQ(stepped.count(ClockEngine::EVENT_BEFORE_TICK_LOOP), 0);
+        NETW_CHECK_EQ(stepped.count(ClockEngine::EVENT_AFTER_TICK_LOOP), 0);
     }
 
     SUBCASE("stepping zero advances nothing") {
-        const int before = stepped->get_tick();
-        stepped->force_step(0);
-        NETW_CHECK_EQ(stepped->get_tick(), before);
+        const int before = stepped.clock.get_tick();
+        stepped.clock.force_step(0);
+        NETW_CHECK_EQ(stepped.clock.get_tick(), before);
     }
 }
 
@@ -386,7 +402,7 @@ TEST_CASE(
     const Clocked clock = make_clock(EXACT_RATE);
     clock->set_sync_mode(ClockEngine::SYNC_SNAP);
     clock->set_lead_ticks(0.0);
-    Recorder recorder(clock.sink(), {"clock_synchronized"});
+    Recorder recorder(clock.session->get_clock().ptr(), {"synchronized"});
 
     CHECK_FALSE(clock->get_synchronized());
 
@@ -398,7 +414,7 @@ TEST_CASE(
 
     SUBCASE("a later pong does not re-announce a synchronization") {
         clock->handle_pong(0.0, 41, 0.5, true);
-        NETW_CHECK_EQ(recorder.count("clock_synchronized"), 1);
+        NETW_CHECK_EQ(recorder.count("synchronized"), 1);
     }
 }
 
@@ -437,16 +453,13 @@ TEST_CASE(
     clock->set_jitter_stability_threshold(0.01);
     clock->set_jitter_multiplier(2.0);
     clock->set_display_offset(1);
-    Recorder recorder(clock.sink(), {"clock_stability_changed"});
 
     clock->handle_pong(0.02, 100, 0.0, true);
     clock->handle_pong(0.02, 100, 0.0, true);
     CHECK(clock->is_stable());
-    NETW_CHECK_EQ(recorder.count("clock_stability_changed"), 0);
 
     clock->handle_pong(0.2, 100, 0.0, true);
     CHECK_FALSE(clock->is_stable());
-    NETW_CHECK_EQ(recorder.count("clock_stability_changed"), 1);
     CHECK(clock->recommended_display_offset() > 1);
 
     SUBCASE("the window forgets, so the outlier ages out of the average") {
@@ -587,67 +600,37 @@ TEST_CASE(
     "[Networked][Clock][Hosted] the tick loop bracket is a verb, so a hand "
     "driven frame opens and closes exactly as a pumped one does"
 ) {
-    const Clocked clock = pinned_clock();
-    Recorder recorder(
-        clock.sink(),
-        {"clock_before_tick_loop",
-         "clock_before_tick",
-         "clock_on_tick",
-         "clock_after_tick",
-         "clock_after_tick_loop"}
-    );
+    Hooked hooked(true);
 
-    clock->begin_tick_loop();
-    clock->force_step(1);
-    clock->end_tick_loop();
+    hooked.clock.begin_tick_loop();
+    hooked.clock.force_step(1);
+    hooked.clock.end_tick_loop();
 
-    CHECK(
-        recorder.order()
-        == Vector<StringName>(
-            {"clock_before_tick_loop",
-             "clock_before_tick",
-             "clock_on_tick",
-             "clock_after_tick",
-             "clock_after_tick_loop"}
-        )
-    );
+    const bool bracketed_as_pumped = hooked.heard
+        == Vector<ClockEngine::Event>(
+            {ClockEngine::EVENT_BEFORE_TICK_LOOP,
+             ClockEngine::EVENT_BEFORE_TICK,
+             ClockEngine::EVENT_ON_TICK,
+             ClockEngine::EVENT_AFTER_TICK,
+             ClockEngine::EVENT_AFTER_TICK_LOOP}
+        );
+    CHECK(bracketed_as_pumped);
 }
 
 TEST_CASE(
     "[Networked][Clock][Hosted] a bracket emits its own edge and nothing "
     "else, so a frame that ran no tick still costs one open and one close"
 ) {
-    const Clocked clock = pinned_clock();
-    Recorder recorder(
-        clock.sink(),
-        {"clock_before_tick_loop", "clock_after_tick_loop", "clock_on_tick"}
-    );
-    const int before = clock->get_tick();
+    Hooked hooked(true);
+    const int before = hooked.clock.get_tick();
 
-    clock->begin_tick_loop();
-    clock->end_tick_loop();
+    hooked.clock.begin_tick_loop();
+    hooked.clock.end_tick_loop();
 
-    NETW_CHECK_EQ(recorder.count("clock_before_tick_loop"), 1);
-    NETW_CHECK_EQ(recorder.count("clock_after_tick_loop"), 1);
-    NETW_CHECK_EQ(recorder.count("clock_on_tick"), 0);
-    NETW_CHECK_EQ(clock->get_tick(), before);
-}
-
-TEST_CASE(
-    "[Networked][Clock][Hosted] stepping still refuses to bracket itself, so "
-    "a rig that owns the frame is the only thing that opens one"
-) {
-    const Clocked clock = pinned_clock();
-    Recorder recorder(
-        clock.sink(),
-        {"clock_before_tick_loop", "clock_after_tick_loop", "clock_on_tick"}
-    );
-
-    clock->force_step(2);
-
-    NETW_CHECK_EQ(recorder.count("clock_on_tick"), 2);
-    NETW_CHECK_EQ(recorder.count("clock_before_tick_loop"), 0);
-    NETW_CHECK_EQ(recorder.count("clock_after_tick_loop"), 0);
+    NETW_CHECK_EQ(hooked.count(ClockEngine::EVENT_BEFORE_TICK_LOOP), 1);
+    NETW_CHECK_EQ(hooked.count(ClockEngine::EVENT_AFTER_TICK_LOOP), 1);
+    NETW_CHECK_EQ(hooked.count(ClockEngine::EVENT_ON_TICK), 0);
+    NETW_CHECK_EQ(hooked.clock.get_tick(), before);
 }
 
 TEST_CASE(

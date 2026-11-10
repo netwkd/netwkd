@@ -2,7 +2,6 @@
 #include "godot/object.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
 #include "netw/display/book.hpp"
 #include "netw/display/runtime.hpp"
@@ -35,11 +34,6 @@ constexpr uint64_t EVERY_COLUMN = ~uint64_t(0);
 using store::push_rank;
 using store::PUSH_RANKS;
 
-const StringName &apply_rows_seam() {
-    static const StringName name("_sync_apply_rows");
-    return name;
-}
-
 bool masked_out(uint64_t p_mask, uint32_t p_column) {
     return p_column < 64 && ((p_mask >> p_column) & 1) == 0;
 }
@@ -52,15 +46,6 @@ Variant pushed_value(
 ) {
     return p_age < 0 ? p_table.read_value(p_row, p_column)
                      : p_table.history_value(p_row, uint32_t(p_age), p_column);
-}
-
-uint32_t row_of_route(const store::Table &p_table, int64_t p_route) {
-    for (uint32_t row = 0; row < p_table.row_count(); ++row) {
-        if (p_table.routes[row] == p_route) {
-            return row;
-        }
-    }
-    return store::Table::NO_SLOT;
 }
 
 bool codes_within_step(
@@ -79,76 +64,6 @@ bool codes_within_step(
 }
 
 } // namespace
-
-bool NetwMultiplayer::store_applies_by_seam() {
-    ReplicationCore *plane = get_replication_plane();
-    if (plane != nullptr && plane->gate_seam(apply_rows_seam()) != nullptr) {
-        return true;
-    }
-    return overrides_seam(apply_rows_seam());
-}
-
-Error NetwMultiplayer::sync_apply_rows_default(
-    const RID &p_table,
-    const PackedInt64Array &p_routes,
-    const Array &p_columns
-) {
-    const uint32_t index = store_world.table_of(p_table);
-    if (index == store::Table::NO_SLOT) {
-        return ERR_DOES_NOT_EXIST;
-    }
-    const store::Table &table = store_world.table(index);
-    if (p_columns.size() != int64_t(table.columns.size())) {
-        return ERR_INVALID_PARAMETER;
-    }
-    for (int64_t at = 0; at < p_routes.size(); ++at) {
-        const uint32_t row = row_of_route(table, p_routes[at]);
-        Object *node = row != store::Table::NO_SLOT
-            ? gd::object_of(ObjectID(table.nodes[row]))
-            : nullptr;
-        if (node == nullptr) {
-            continue;
-        }
-        for (int rank = 0; rank < PUSH_RANKS; ++rank) {
-            for (uint32_t column = 0; column < table.columns.size(); ++column) {
-                const Array values = p_columns[column];
-                if (push_rank(table.columns[column]) != rank
-                    || at >= values.size()) {
-                    continue;
-                }
-                port_set(node, table.schema.at(int(column))->key, values[at]);
-            }
-        }
-    }
-    return OK;
-}
-
-Error NetwMultiplayer::run_apply_rows(
-    const RID &p_table,
-    const PackedInt64Array &p_routes,
-    const Array &p_columns
-) {
-    NETW_ZONE_NC("session apply rows seam", colors::WIRE);
-    ReplicationCore *plane = get_replication_plane();
-    Object *seam
-        = plane != nullptr ? plane->gate_seam(apply_rows_seam()) : nullptr;
-    if (seam != nullptr) {
-        return Error(
-            int(seam->call(apply_rows_seam(), p_table, p_routes, p_columns))
-        );
-    }
-    Error answered = OK;
-    if (GDVIRTUAL_CALL(
-            _sync_apply_rows,
-            p_table,
-            p_routes,
-            p_columns,
-            answered
-        )) {
-        return answered;
-    }
-    return sync_apply_rows_default(p_table, p_routes, p_columns);
-}
 
 bool NetwMultiplayer::store_push(
     const store::RowAddress &p_at,
@@ -175,22 +90,6 @@ bool NetwMultiplayer::store_push(
     store_world.push_work.pushes += 1;
     const int64_t allocated = store::allocations_seen();
 #endif
-    if (store_applies_by_seam()) {
-        PackedInt64Array routes;
-        routes.push_back(table.routes[row]);
-        Array columns;
-        for (uint32_t column = 0; column < table.columns.size(); ++column) {
-            Array one;
-            one.push_back(
-                p_values != nullptr ? (*p_values)[column]
-                                    : pushed_value(table, row, p_age, column)
-            );
-            columns.push_back(one);
-        }
-        run_apply_rows(table.rid, routes, columns);
-        sim_note_push(node);
-        return true;
-    }
     const bool absorbing = p_absorb != nullptr
         && p_absorb->get_pump_mode() == display::PUMP_CHASE;
     Dictionary deltas;

@@ -4,15 +4,11 @@
 #include <cmath>
 #include <limits>
 
-#include "godot/class_db.hpp"
 #include "godot/utility.hpp"
-#include "netw/api/predict_fold.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
 #include "netw/predict/compare.hpp"
 #include "netw/predict/frames.hpp"
-#include "netw/predict/recovery.hpp"
 #include "netw/predict/sensors.hpp"
 #include "netw/profile.hpp"
 #include "netw/project.hpp"
@@ -51,72 +47,6 @@ static Variant pose_delta(
         default:
             return Variant();
     }
-}
-
-static predict::Wiring recovery_wiring(
-    const Dictionary &payload,
-    const Dictionary &current,
-    const Dictionary &pose_errors,
-    const Dictionary &projection,
-    const Dictionary &wiring
-) {
-    predict::Wiring out;
-    const Dictionary *const sources[] = {&payload, &current, &pose_errors};
-    for (const Dictionary *source : sources) {
-        const Array keys = source->keys();
-        for (int index = 0; index < keys.size(); ++index) {
-            out.fields.append(StringName(keys[index]));
-        }
-    }
-    const Array projected = projection.keys();
-    for (int index = 0; index < projected.size(); ++index) {
-        out.fields.append(StringName(projected[index]));
-        out.fields.append(StringName(projection[projected[index]]));
-    }
-    out.resize(out.fields.count());
-
-    const Dictionary withheld
-        = wiring.get(StringName("withheld"), Dictionary());
-    const Dictionary converge
-        = wiring.get(StringName("converge_rules"), Dictionary());
-    const Dictionary angles
-        = wiring.get(StringName("angle_fields"), Dictionary());
-    const Dictionary epsilons
-        = wiring.get(StringName("epsilon_overrides"), Dictionary());
-    const Dictionary teleports
-        = wiring.get(StringName("teleport_thresholds"), Dictionary());
-    for (int at = 0; at < out.count(); ++at) {
-        const StringName &key = out.fields.name_at(at);
-        const uint32_t slot = uint32_t(at);
-        out.causal[slot] = 1;
-        out.withheld[slot] = withheld.has(key) ? 1 : 0;
-        out.angle[slot] = angles.has(key) ? 1 : 0;
-        out.pose[slot] = pose_errors.has(key) ? 1 : 0;
-        out.converge_rate[slot] = double(converge.get(key, -1.0));
-        out.epsilon[slot] = double(epsilons.get(key, -1.0));
-        out.teleport[slot] = double(teleports.get(key, -1.0));
-    }
-    for (int index = 0; index < projected.size(); ++index) {
-        const int field = out.fields.index_of(StringName(projected[index]));
-        out.projection[uint32_t(field)]
-            = out.fields.index_of(StringName(projection[projected[index]]));
-    }
-    return out;
-}
-
-static predict::StateRow recovery_row(
-    const predict::Wiring &wiring,
-    const Dictionary &values
-) {
-    predict::StateRow out;
-    out.resize(wiring.count());
-    for (int at = 0; at < wiring.count(); ++at) {
-        const StringName &key = wiring.fields.name_at(at);
-        if (values.has(key)) {
-            out.set(at, values[key]);
-        }
-    }
-    return out;
 }
 
 static double divergence_by_field(
@@ -203,20 +133,6 @@ static int64_t fingerprint_of(const Dictionary &source) {
     return fnv1a(bytes);
 }
 
-#if defined(NETW_TESTS)
-namespace {
-int64_t minted_records = 0;
-} // namespace
-
-int64_t prediction_core::records_minted() {
-    return minted_records;
-}
-
-void prediction_core::note_record_mint() {
-    ++minted_records;
-}
-#endif
-
 Judgement prediction_core::judge(
     int domain,
     int verdict,
@@ -255,47 +171,6 @@ Judgement prediction_core::judge(
     return out;
 }
 
-Ref<NetwPredictJudgement> prediction_core::evaluate(
-    int domain,
-    int verdict,
-    const Dictionary &predicted,
-    const Dictionary &payload,
-    const Dictionary &wiring,
-    Dictionary field_sink
-) {
-    const Judgement judged
-        = judge(domain, verdict, predicted, payload, wiring, field_sink);
-    return NetwPredictJudgement::of(judged.divergence, judged.corrected);
-}
-
-Ref<NetwPredictJudgement> NetwPredictJudgement::of(
-    double p_divergence,
-    bool p_corrected
-) {
-    NETW_NOTE_RECORD_MINT();
-    Ref<NetwPredictJudgement> out;
-    out.instantiate();
-    out->judged.divergence = p_divergence;
-    out->judged.corrected = p_corrected;
-    return out;
-}
-
-void NetwPredictJudgement::_bind_methods() {
-    ClassDB::bind_static_method(
-        "NetwPredictJudgement",
-        D_METHOD("of", "divergence", "corrected"),
-        &NetwPredictJudgement::of
-    );
-    ClassDB::bind_method(
-        D_METHOD("divergence"),
-        &NetwPredictJudgement::divergence
-    );
-    ClassDB::bind_method(
-        D_METHOD("corrected"),
-        &NetwPredictJudgement::corrected
-    );
-}
-
 Fold prediction_core::fold(
     int64_t latest_input_tick,
     int64_t last_driven_input_tick,
@@ -306,56 +181,6 @@ Fold prediction_core::fold(
     out.label = latest_input_tick >= 0 ? latest_input_tick : frame_tick;
     out.kind = out.fresh ? DriveKind::FRESH : DriveKind::REPEAT;
     return out;
-}
-
-Ref<NetwPredictFold> prediction_core::predict_fold(
-    int64_t latest_input_tick,
-    int64_t last_driven_input_tick,
-    int64_t frame_tick
-) {
-    const Fold decided
-        = fold(latest_input_tick, last_driven_input_tick, frame_tick);
-    return NetwPredictFold::of(
-        decided.label,
-        decided.fresh,
-        static_cast<NetwPrediction::DriveKind>(int(decided.kind))
-    );
-}
-
-Ref<NetwPredictFold> NetwPredictFold::of(
-    int64_t p_label,
-    bool p_fresh,
-    NetwPrediction::DriveKind p_kind
-) {
-    const int kind = int(p_kind);
-    if (kind < int(DriveKind::NONE) || kind > int(DriveKind::SUBSTITUTED)) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_BAD_VALUE,
-            {String("{NetwPredictFold.of}"),
-             String::num_int64(kind),
-             String("a {NetwPrediction.DriveKind} value")}
-        );
-        return Ref<NetwPredictFold>();
-    }
-    NETW_NOTE_RECORD_MINT();
-    Ref<NetwPredictFold> out;
-    out.instantiate();
-    out->decided.label = p_label;
-    out->decided.fresh = p_fresh;
-    out->decided.kind = DriveKind(kind);
-    return out;
-}
-
-void NetwPredictFold::_bind_methods() {
-    ClassDB::bind_static_method(
-        "NetwPredictFold",
-        D_METHOD("of", "label", "fresh", "kind"),
-        &NetwPredictFold::of
-    );
-    ClassDB::bind_method(D_METHOD("label"), &NetwPredictFold::label);
-    ClassDB::bind_method(D_METHOD("fresh"), &NetwPredictFold::fresh);
-    ClassDB::bind_method(D_METHOD("kind"), &NetwPredictFold::kind);
 }
 
 int prediction_core::consume_action(int depth, int buffer) {
@@ -430,97 +255,6 @@ Dictionary prediction_core::project_payload(
         out[field] = project::forward(value, payload[velocity_key], age);
     }
     return out;
-}
-
-Ref<NetwPredictRecovery> NetwPredictRecovery::of(
-    const Dictionary &p_restore,
-    const Dictionary &p_write,
-    bool p_teleport,
-    bool p_skip
-) {
-    NETW_NOTE_RECORD_MINT();
-    Ref<NetwPredictRecovery> out;
-    out.instantiate();
-    out->restored = p_restore;
-    out->written = p_write;
-    out->teleported = p_teleport;
-    out->skipped = p_skip;
-    return out;
-}
-
-void NetwPredictRecovery::_bind_methods() {
-    ClassDB::bind_static_method(
-        "NetwPredictRecovery",
-        D_METHOD("of", "restore", "write", "teleport", "skip"),
-        &NetwPredictRecovery::of
-    );
-    ClassDB::bind_method(D_METHOD("restore"), &NetwPredictRecovery::restore);
-    ClassDB::bind_method(D_METHOD("write"), &NetwPredictRecovery::write);
-    ClassDB::bind_method(D_METHOD("teleport"), &NetwPredictRecovery::teleport);
-    ClassDB::bind_method(D_METHOD("skip"), &NetwPredictRecovery::skip);
-}
-
-Ref<NetwPredictRecovery> prediction_core::recover(
-    const Dictionary &payload,
-    const Dictionary &predicted,
-    int policy,
-    int snap_restore,
-    const Dictionary &projection,
-    const Dictionary &current,
-    const Dictionary &pose_errors,
-    const Dictionary &wiring,
-    const Dictionary &verdict,
-    double tick_delta
-) {
-    NETW_ZONE_NC("NetwPredict recover", colors::PREDICTION);
-    const predict::Wiring fields
-        = recovery_wiring(payload, current, pose_errors, projection, wiring);
-
-    predict::Config config;
-    config.correction = predict::correction_for_recovery_policy(policy);
-    config.restore = snap_restore;
-
-    predict::RecoveryRequest request;
-    request.authority = recovery_row(fields, payload);
-    request.current = recovery_row(fields, current);
-    request.predicted = recovery_row(fields, predicted);
-    request.field_errors.resize(uint32_t(fields.count()));
-    for (int at = 0; at < fields.count(); ++at) {
-        request.field_errors[uint32_t(at)]
-            = double(pose_errors.get(fields.fields.name_at(at), -1.0));
-    }
-    request.policy = policy;
-    request.fallback_epsilon = wiring.get(StringName("epsilon"), 0.0);
-    request.fallback_teleport
-        = wiring.get(StringName("teleport_threshold"), 0.0);
-    request.max_restore_ticks = wiring.get(StringName("max_restore_ticks"), 0);
-    request.ack_age_ticks = verdict.get(StringName("ack_age_ticks"), 0);
-    request.tick_delta = tick_delta;
-    request.domain = predict::Domain(
-        int(verdict.get(StringName("domain"), int(Domain::IN_DOMAIN)))
-    );
-    request.attribution = predict::Attribution(
-        int(verdict.get(StringName("attribution"), int(Attribution::UNKNOWN)))
-    );
-    request.contact_window = verdict.get(StringName("contact_window"), false);
-    request.suppressed = verdict.get(StringName("suppressed"), false);
-    request.pose_unmeasured = verdict.get(StringName("pose_unmeasured"), false);
-
-    predict::RecoveryState fresh;
-    const predict::WritePlan plan
-        = predict::stage_recovery(fields, config, request, fresh);
-    Dictionary restore;
-    Dictionary write;
-    for (int at = 0; at < fields.count(); ++at) {
-        const StringName &key = fields.fields.name_at(at);
-        if (plan.restore.has(at)) {
-            restore[key] = plan.restore.values[uint32_t(at)];
-        }
-        if (plan.write.has(at)) {
-            write[key] = plan.write.values[uint32_t(at)];
-        }
-    }
-    return NetwPredictRecovery::of(restore, write, plan.teleport, plan.skip);
 }
 
 int prediction_core::domain_of(
@@ -723,13 +457,13 @@ PredictionVerdict prediction_core::evaluate_struct_verdict(
     const Dictionary &wiring
 ) {
     Dictionary sink;
-    const Ref<NetwPredictJudgement> judged
-        = evaluate(domain, verdict, predicted, payload, wiring, sink);
+    const Judgement judged
+        = judge(domain, verdict, predicted, payload, wiring, sink);
     PredictionVerdict pv;
     pv.domain = domain;
     pv.verdict = verdict;
-    pv.corrected = judged->corrected();
-    pv.max_error = judged->divergence();
+    pv.corrected = judged.corrected;
+    pv.max_error = judged.divergence;
     return pv;
 }
 

@@ -116,37 +116,22 @@ RID NetwMultiplayer::scene_report_entity_edge(
             p_present,
             p_subject
         );
-        const Ref<NetwScene> view = scene_handle_of(scene);
-        if (view.is_valid()) {
-            view->announce_player_entity(entity_get_view(p_subject), p_present);
-        }
         NETW_ZONE_NC("scene edge display invalidate", colors::SCENE);
         scene_player_display_invalidate();
     }
+    announce_entity_edge(scene, p_subject, p_present, p_is_player);
     return scene;
 }
 
 void NetwMultiplayer::scene_publish_live(
     int64_t p_route,
-    const RID &p_container,
-    const String &p_name
+    const RID &p_container
 ) {
-    Dictionary detail;
-    detail["scene"] = p_name;
-    event_emit(
-        EventPlane::SCENE_LIVE,
-        p_route,
-        detail,
-        StringName(),
-        0,
-        OK,
-        Dictionary()
-    );
+    event_record(EventPlane::SCENE_LIVE, p_container, p_route, 0);
     const Ref<NetwScene> live = scene_handle_of(p_container);
     if (session_handle.is_valid()) {
         session_handle->announce_scene_ready(live);
     }
-    notify(SCENE_LIVE, live);
 }
 
 RID NetwMultiplayer::scene_released_scene(
@@ -282,7 +267,7 @@ void NetwMultiplayer::scene_root_online(Node *p_root) {
     }
     const Callable publish
         = callable_mp(this, &NetwMultiplayer::scene_publish_live)
-              .bind(record->get_route(), live, String(p_root->get_name()));
+              .bind(record->get_route(), live);
     if (gd::node_ready(p_root)) {
         publish.call();
         return;
@@ -546,7 +531,6 @@ void NetwMultiplayer::scene_announce_startup() {
         host_join_waits_startup = false;
         session_submit_host_join_on_startup();
     }
-    notify(SCENE_STARTUP_SPAWNED);
 }
 
 void NetwMultiplayer::scene_on_native_change() {
@@ -574,7 +558,6 @@ bool NetwMultiplayer::scene_remember(Node *p_root) {
         return false;
     }
     scene_core->scene_enter(seat, scene_stem(seat), scene_owns_its_world(seat));
-    notify(SCENE_SPAWNED, p_root);
     scene_player_display_invalidate();
     return true;
 }
@@ -586,7 +569,6 @@ void NetwMultiplayer::scene_arrive(
     const Ref<NetwPromise> &p_promise
 ) {
     NETW_ZONE_NC("session scene arrive", colors::SCENE);
-    notify(SCENE_ENTITY_MOVED, p_entity, p_source, p_target);
     if (p_promise.is_valid()) {
         p_promise->resolve(OK);
     }
@@ -609,9 +591,60 @@ void NetwMultiplayer::scene_free_layer(const RID &p_scene) {
     }
 }
 
+void NetwMultiplayer::announce_entity_edge(
+    const RID &p_scene,
+    const RID &p_entity,
+    bool p_present,
+    bool p_is_player
+) {
+    const uint64_t entity_id = p_entity.get_id();
+    const uint64_t *announced = announced_scene_of_entity.getptr(entity_id);
+    const bool was_present
+        = announced != nullptr && *announced == p_scene.get_id();
+    if (p_present && was_present) {
+        return;
+    }
+    if (p_present) {
+        announced_scene_of_entity.insert(entity_id, p_scene.get_id());
+    } else if (was_present) {
+        announced_scene_of_entity.erase(entity_id);
+    }
+    NetwEntityRecord *const record = slot_record(p_scene.get_id());
+    if (record == nullptr) {
+        return;
+    }
+    const Ref<NetwScene> minted
+        = record->minted_part(NetwEntityRecord::PART_SCENE);
+    const Ref<NetwEntity> view = wrapper_for_id(int64_t(entity_id));
+    if (minted.is_null() || view.is_null()) {
+        return;
+    }
+    if (!is_inside_step()) {
+        minted->announce_entity(view, p_present);
+        if (p_is_player) {
+            minted->announce_player_entity(view, p_present);
+        }
+        return;
+    }
+    Announcement row;
+    row.kind = p_present ? AnnouncementKind::ENTITY_ENTERED
+                         : AnnouncementKind::ENTITY_EXITED;
+    row.entity = view;
+    row.entity_is_player = p_is_player;
+    row.scene = minted;
+    announcements.push_back(row);
+}
+
 void NetwMultiplayer::scene_leave(const RID &p_scene, Object *p_container) {
+    if (session_handle.is_valid() && scene_core->is_live(p_scene)) {
+        Announcement row;
+        row.kind = AnnouncementKind::SCENE_REMOVED;
+        row.scene = scene_handle_of(p_scene);
+        if (row.scene.is_valid()) {
+            announcements.push_back(row);
+        }
+    }
     scene_core->scene_exit(p_scene);
-    notify(SCENE_DESPAWNED, p_container);
     scene_player_display_invalidate();
 }
 
@@ -1177,7 +1210,7 @@ Ref<NetwPromise> NetwMultiplayer::scene_move_entity(
         target != nullptr,
         source == target
     );
-    if (verdict == SCENE_MOVE_REFUSED) {
+    if (verdict == NetwSceneCore::MOVE_REFUSED) {
         fault::raise(
             this,
             NETW_FAULT_ENTITY_MOVED,
@@ -1194,7 +1227,7 @@ Ref<NetwPromise> NetwMultiplayer::scene_move_entity(
         );
         return promise;
     }
-    if (verdict == SCENE_MOVE_ALREADY_THERE) {
+    if (verdict == NetwSceneCore::MOVE_ALREADY_THERE) {
         NETW_TRACE(
             sys::SCENE,
             "Entity %d is already in scene %d.",

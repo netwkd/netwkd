@@ -43,9 +43,7 @@ public:
     );
     virtual godot::String room_id();
     virtual godot::String local_signaler_id();
-    godot::String local_signaler_id_default();
     virtual void session_connected(int64_t p_peer);
-    void session_connected_default(int64_t p_peer);
     virtual void close();
 
     GDVIRTUAL2R(godot::Error, _open, godot::String, int64_t)

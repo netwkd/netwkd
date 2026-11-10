@@ -111,7 +111,6 @@ private:
     godot::Error admit_entity_frame(
         int64_t p_sender,
         int64_t p_route,
-        int64_t p_comp,
         int64_t p_channel,
         const godot::PackedByteArray &p_payload
     );
@@ -129,7 +128,6 @@ public:
     ReplicationCore();
 
     void install(godot::Object *p_api);
-    godot::Object *gate_seam(const godot::StringName &p_seam) const;
     void set_tap_seam(const godot::Callable &p_tap);
 
     NetwSyncModel *get_sync_model() {

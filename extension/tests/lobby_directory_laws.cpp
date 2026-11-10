@@ -1,6 +1,8 @@
 #include "support/netw_test.h"
 
+#include "godot/class_db.hpp"
 #include "godot/object.hpp"
+#include "godot/script.hpp"
 #include "netw/api/nodes/lobby_directory.hpp"
 #include "netw/connect/directory_transport.hpp"
 
@@ -161,5 +163,49 @@ TEST_CASE(
     );
     memdelete(stray);
 }
+
+#if defined(NETW_TIER_HOSTED)
+
+TEST_CASE(
+    "[Networked][Connect] LD7 a scripted directory that answers an empty name "
+    "gives the stock player name, and any other answer is the name"
+) {
+    struct Row {
+        const char *answer;
+        const char *member;
+        const char *local;
+    };
+    for (const Row &row : {
+             Row{"", "Player 7", "Player"},
+             Row{"Ana", "Ana", "Ana"},
+         }) {
+        NETW_FORMAT_TEXT(answer, row.answer);
+        CAPTURE(answer);
+        const Ref<Script> shape
+            = netw::gd::instantiate_class(StringName("GDScript"));
+        shape->set_source_code(
+            String(
+                "extends LobbyDirectory\n\n"
+                "func _member_name(_peer_id: int) -> String:\n"
+                "\treturn \"%s\"\n\n"
+                "func _local_member_name() -> String:\n"
+                "\treturn \"%s\"\n"
+            )
+                .replace("%s", String(row.answer))
+        );
+        shape->reload();
+        LobbyDirectory *scripted = memnew(LobbyDirectory);
+        scripted->set_script(shape);
+
+        NETW_CHECK_EQ(int(scripted->member_name(7) == String(row.member)), 1);
+        NETW_CHECK_EQ(
+            int(scripted->local_member_name() == String(row.local)),
+            1
+        );
+        memdelete(scripted);
+    }
+}
+
+#endif
 
 } // namespace TestLobbyDirectoryLaws

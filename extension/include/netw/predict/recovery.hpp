@@ -27,9 +27,6 @@ struct RecoveryRequest {
     bool contact_window = false;
     bool suppressed = false;
     bool pose_unmeasured = false;
-    bool answered = false;
-    bool answered_teleport = false;
-    bool answered_skip = true;
 };
 
 struct WritePlan {

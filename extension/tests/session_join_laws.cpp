@@ -12,6 +12,7 @@
 #include "netw/api/join_config.hpp"
 #include "netw/api/join_request.hpp"
 #include "netw/api/quantize.hpp"
+#include "netw/api/session.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/session_decl.hpp"
 #include "support/declared_seams.h"
@@ -302,7 +303,10 @@ TEST_CASE(
     const Ref<RefCounted> handler = script->call("new");
     REQUIRE(handler.is_valid());
     CallLog announced;
-    core->observe(NetwMultiplayer::PLAYER_JOINED, announced.callable("joined"));
+    core->get_session()->connect(
+        StringName("player_joined"),
+        announced.callable("joined")
+    );
 
     Array carried;
     carried.push_back(arena_node);
@@ -648,12 +652,6 @@ TEST_CASE(
     branch->add_child(seat);
     const Ref<NetwMultiplayer> api = branch_session(branch);
 
-    CallLog log;
-    api->observe(
-        NetwMultiplayer::SESSION_JOIN_SUBMITTED,
-        log.callable("submitted")
-    );
-
     SUBCASE("an offline session prepares, and nothing goes out yet") {
         const Ref<netw::NetwPromise> asked
             = netw::Netw::prepare_join(seat, StringName("ana"), Array());
@@ -661,7 +659,7 @@ TEST_CASE(
         NETW_CHECK_EQ(int(asked->get_result()), int(OK));
         REQUIRE(api->session_prepared_join().has_value());
         CHECK(api->session_prepared_join()->username == StringName("ana"));
-        NETW_CHECK_EQ(log.count("submitted"), 0);
+        CHECK_FALSE(api->session_take_submitted_join_under_test().has_value());
     }
 
     SUBCASE("an online session refuses the join and sends nothing") {
@@ -671,7 +669,7 @@ TEST_CASE(
             = netw::Netw::prepare_join(seat, StringName("ana"), Array());
         REQUIRE(asked.is_valid());
         NETW_CHECK_EQ(int(asked->get_result()), int(ERR_ALREADY_IN_USE));
-        NETW_CHECK_EQ(log.count("submitted"), 0);
+        CHECK_FALSE(api->session_take_submitted_join_under_test().has_value());
         CHECK_FALSE(api->session_prepared_join().has_value());
     }
 
@@ -683,7 +681,7 @@ TEST_CASE(
                     ->get_result()),
             int(ERR_INVALID_PARAMETER)
         );
-        NETW_CHECK_EQ(log.count("submitted"), 0);
+        CHECK_FALSE(api->session_take_submitted_join_under_test().has_value());
         CHECK_FALSE(api->session_prepared_join().has_value());
     }
 
@@ -932,16 +930,16 @@ TEST_CASE(
     const int waiting = rig.peer_id(1);
     const int seated = rig.peer_id(2);
     netw_test::Recorder stranger_heard(
-        rig.client(0),
-        {StringName("session_join_failed")}
+        rig.client(0)->get_session().ptr(),
+        {StringName("join_failed")}
     );
     netw_test::Recorder waiting_heard(
-        rig.client(1),
-        {StringName("session_join_failed")}
+        rig.client(1)->get_session().ptr(),
+        {StringName("join_failed")}
     );
     netw_test::Recorder seated_heard(
-        rig.client(2),
-        {StringName("session_join_failed")}
+        rig.client(2)->get_session().ptr(),
+        {StringName("join_failed")}
     );
 
     netw::JoinRequest older;
@@ -968,7 +966,7 @@ TEST_CASE(
     }
     rig.pump(4);
 
-    const StringName failed("session_join_failed");
+    const StringName failed("join_failed");
     NETW_REQUIRE_EQ(stranger_heard.count(failed), 1);
     NETW_CHECK_EQ(
         int64_t(stranger_heard.args(failed)[0]),

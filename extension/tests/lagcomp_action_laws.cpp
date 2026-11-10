@@ -274,21 +274,12 @@ TEST_CASE(
     ActionRig fixture;
     fixture.gate_deadline(2);
     const int64_t fire_tick = fixture.authority_tick() + 3;
-    const CallLog log;
-    fixture.rig.server()->observe(
-        netw::NetwMultiplayer::LAGCOMP_ACTION_GATE_FALLBACK,
-        log.callable(StringName("fell_back"))
-    );
 
     fixture.owner->fire(fire_tick, STATE_READY);
     fixture.rig.step_ticks(6);
 
     NETW_CHECK_EQ(fixture.authority->requests(), 1);
     NETW_CHECK_EQ(fixture.authority->viewed_tick(), fire_tick);
-    NETW_CHECK_EQ(log.count(StringName("fell_back")), 1);
-    const Array said = log.args(StringName("fell_back"));
-    REQUIRE(said.size() == 2);
-    NETW_CHECK_EQ(int64_t(said[1]), fire_tick);
     NETW_CHECK_EQ(fixture.gate_fallbacks(), int64_t(1));
 }
 
@@ -521,29 +512,6 @@ struct ClientAction {
     }
 };
 
-struct Configuring {
-    netw::NetwMultiplayer *session = nullptr;
-    Carrier *carrier = nullptr;
-    int calls = 0;
-    int64_t future_seen = -1;
-    int ghosts_seen = -1;
-    int64_t effects_seen = -1;
-};
-
-Configuring &configuring() {
-    static Configuring held;
-    return held;
-}
-
-void request_while_configuring() {
-    Configuring &seen = configuring();
-    seen.calls += 1;
-    seen.future_seen = seen.session->get_max_future_action_ticks();
-    seen.carrier->fire(5, IMMEDIATE);
-    seen.ghosts_seen = seen.carrier->ghosts();
-    seen.effects_seen = seen.session->lagcomp_effect_count();
-}
-
 TEST_CASE(
     "[Networked][LagComp][Action] AC13 a completed lag compensation draft "
     "runs an action in the declaring frame without premature defaults"
@@ -639,40 +607,6 @@ TEST_CASE(
     NETW_CHECK_EQ(fixture.session()->lagcomp_effect_count(), 0);
     CHECK_FALSE(fixture.session()->lagcomp_is_configured());
     CHECK((said.is_empty() || watch.log->error_count_containing(said) >= 1));
-}
-
-TEST_CASE(
-    "[Networked][LagComp][Action] AC15 a request made from a callback that "
-    "reacts to the settings being applied is refused as busy, while that "
-    "callback already reads every applied setting"
-) {
-    ClientAction fixture;
-    fixture.owner->arm_action(fixture.session());
-    netw::Netw::configure_clock(fixture.rig.branch(0))->ticks_per_second(24);
-    netw::Netw::configure_lagcomp(fixture.rig.branch(0))->max_future_action(17);
-    configuring() = Configuring();
-    configuring().session = fixture.session();
-    configuring().carrier = fixture.owner;
-    fixture.session()->observe(
-        netw::NetwMultiplayer::CLOCK_CONFIGURED,
-        callable_mp_static(&request_while_configuring)
-    );
-    const FaultWatch watch;
-
-    fixture.fire(0);
-    fixture.rig.step_ticks(30);
-
-    NETW_CHECK_EQ(configuring().calls, 1);
-    NETW_CHECK_EQ(configuring().future_seen, 17);
-    NETW_CHECK_EQ(configuring().ghosts_seen, 0);
-    NETW_CHECK_EQ(configuring().effects_seen, 0);
-    NETW_CHECK_EQ(fixture.owner->ghosts(), 1);
-    NETW_CHECK_EQ(fixture.authority->requests(), 1);
-    NETW_CHECK_EQ(
-        watch.log->error_count_containing("while the session applied"),
-        1
-    );
-    configuring() = Configuring();
 }
 
 PackedByteArray forged_request(int64_t p_view_tick) {

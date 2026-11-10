@@ -246,20 +246,20 @@ TEST_CASE(
 
     const Vector3 first(1.001, -2.002, 0.5003);
     src->set_position(first);
-    world.pull(table, 1, false);
+    world.pull(table, 1);
     CHECK(bool((held.flags[at.row] & Table::DIRTY) != 0));
     CHECK(holds_codes_of(held, at.row, first));
 
     const Vector3 nudged = first + Vector3(0.0002, -0.0002, 0.0002);
     src->set_position(nudged);
-    world.pull(table, 2, false);
+    world.pull(table, 2);
     CHECK(bool((held.flags[at.row] & Table::DIRTY) == 0));
     NETW_CHECK_EQ(held.changed_ticks[at.row], int64_t(1));
     CHECK(holds_codes_of(held, at.row, first));
 
     const Vector3 moved = first + Vector3(0.01, 0.0, -0.01);
     src->set_position(moved);
-    world.pull(table, 3, false);
+    world.pull(table, 3);
     CHECK(bool((held.flags[at.row] & Table::DIRTY) != 0));
     NETW_CHECK_EQ(held.changed_ticks[at.row], int64_t(3));
     CHECK(holds_codes_of(held, at.row, moved));

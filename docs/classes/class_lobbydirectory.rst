@@ -132,10 +132,6 @@ Methods
    +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|              | :ref:`invite<class_LobbyDirectory_method_invite>`\ (\ address\: :godot:`String`, from_name\: :godot:`String`\ )                                                                                                              |
    +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`     | :ref:`local_member_name_default<class_LobbyDirectory_method_local_member_name_default>`\ (\ ) |static|                                                                                                                       |
-   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`     | :ref:`member_name_default<class_LobbyDirectory_method_member_name_default>`\ (\ peer_id\: :godot:`int`\ ) |static|                                                                                                           |
-   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|              | :ref:`publish_lobbies<class_LobbyDirectory_method_publish_lobbies>`\ (\ addresses\: :godot:`PackedStringArray`, names\: :godot:`PackedStringArray`, infos\: :godot:`Array`\[:ref:`NetwServerInfo<class_NetwServerInfo>`\]\ ) |
    +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`       | :ref:`supports<class_LobbyDirectory_method_supports>`\ (\ capability\: :ref:`Capability<enum_LobbyDirectory_Capability>`\ )                                                                                                  |
@@ -539,7 +535,7 @@ List the lobbies, then call :ref:`publish_lobbies()<class_LobbyDirectory_method_
 
 :godot:`String` **_local_member_name**\ (\ ) |virtual| :ref:`🔗<class_LobbyDirectory_private_method__local_member_name>`
 
-Return the local player's display name. :ref:`local_member_name_default()<class_LobbyDirectory_method_local_member_name_default>` by default.
+Return the local player's display name. An empty answer gives ``"Player"``, as not overriding does.
 
 .. rst-class:: classref-item-separator
 
@@ -551,7 +547,7 @@ Return the local player's display name. :ref:`local_member_name_default()<class_
 
 :godot:`String` **_member_name**\ (\ peer_id\: :godot:`int`\ ) |virtual| :ref:`🔗<class_LobbyDirectory_private_method__member_name>`
 
-Return the display name of ``peer_id``. :ref:`member_name_default()<class_LobbyDirectory_method_member_name_default>` by default.
+Return the display name of ``peer_id``. An empty answer gives ``"Player <peer_id>"``, as not overriding does.
 
 .. rst-class:: classref-item-separator
 
@@ -612,30 +608,6 @@ Reports that the current request failed. ``message`` is shown to the player.
 |void| **invite**\ (\ address\: :godot:`String`, from_name\: :godot:`String`\ ) :ref:`🔗<class_LobbyDirectory_method_invite>`
 
 Calls :ref:`NetwConnection.invite()<class_NetwConnection_method_invite>` for this directory's :godot:`MultiplayerPeer` class and emits :ref:`NetwConnection.invited<class_NetwConnection_signal_invited>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_LobbyDirectory_method_local_member_name_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **local_member_name_default**\ (\ ) |static| :ref:`🔗<class_LobbyDirectory_method_local_member_name_default>`
-
-The default :ref:`_local_member_name()<class_LobbyDirectory_private_method__local_member_name>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_LobbyDirectory_method_member_name_default:
-
-.. rst-class:: classref-method
-
-:godot:`String` **member_name_default**\ (\ peer_id\: :godot:`int`\ ) |static| :ref:`🔗<class_LobbyDirectory_method_member_name_default>`
-
-The default :ref:`_member_name()<class_LobbyDirectory_private_method__member_name>`, ``"Player <peer_id>"``.
 
 .. rst-class:: classref-item-separator
 

@@ -928,29 +928,6 @@ internal static class NetwThunks
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void Ptrcall2_Double_Byte_IntPtrFn(
-        IntPtr bind,
-        IntPtr instance,
-        in double a0,
-        in byte a1,
-        ref IntPtr answered);
-
-    private static Ptrcall2_Double_Byte_IntPtrFn _ptrcall2_Double_Byte_IntPtr;
-
-    internal static void Ptrcall2_Double_Byte_IntPtr(
-        IntPtr bind,
-        IntPtr instance,
-        in double a0,
-        in byte a1,
-        ref IntPtr answered)
-    {
-        Ptrcall2_Double_Byte_IntPtrFn thunk =
-            _ptrcall2_Double_Byte_IntPtr ??= NetwApi.Thunk<Ptrcall2_Double_Byte_IntPtrFn>(
-                "ptrcall2");
-        thunk(bind, instance, in a0, in a1, ref answered);
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void Ptrcall2_Double_Double_IntPtrFn(
         IntPtr bind,
         IntPtr instance,
@@ -1103,29 +1080,6 @@ internal static class NetwThunks
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void Ptrcall2_Int_Int_LongFn(
-        IntPtr bind,
-        IntPtr instance,
-        in int a0,
-        in int a1,
-        ref long answered);
-
-    private static Ptrcall2_Int_Int_LongFn _ptrcall2_Int_Int_Long;
-
-    internal static void Ptrcall2_Int_Int_Long(
-        IntPtr bind,
-        IntPtr instance,
-        in int a0,
-        in int a1,
-        ref long answered)
-    {
-        Ptrcall2_Int_Int_LongFn thunk =
-            _ptrcall2_Int_Int_Long ??= NetwApi.Thunk<Ptrcall2_Int_Int_LongFn>(
-                "ptrcall2");
-        thunk(bind, instance, in a0, in a1, ref answered);
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void Ptrcall1_Long_IntPtrFn(
         IntPtr bind,
         IntPtr instance,
@@ -1254,31 +1208,6 @@ internal static class NetwThunks
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void Ptrcall3_Long_Byte_Long_IntPtrFn(
-        IntPtr bind,
-        IntPtr instance,
-        in long a0,
-        in byte a1,
-        in long a2,
-        ref IntPtr answered);
-
-    private static Ptrcall3_Long_Byte_Long_IntPtrFn _ptrcall3_Long_Byte_Long_IntPtr;
-
-    internal static void Ptrcall3_Long_Byte_Long_IntPtr(
-        IntPtr bind,
-        IntPtr instance,
-        in long a0,
-        in byte a1,
-        in long a2,
-        ref IntPtr answered)
-    {
-        Ptrcall3_Long_Byte_Long_IntPtrFn thunk =
-            _ptrcall3_Long_Byte_Long_IntPtr ??= NetwApi.Thunk<Ptrcall3_Long_Byte_Long_IntPtrFn>(
-                "ptrcall3");
-        thunk(bind, instance, in a0, in a1, in a2, ref answered);
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void Ptrcall2_Long_Int_LongFn(
         IntPtr bind,
         IntPtr instance,
@@ -1322,31 +1251,6 @@ internal static class NetwThunks
             _ptrcall2_Long_Long_Long ??= NetwApi.Thunk<Ptrcall2_Long_Long_LongFn>(
                 "ptrcall2");
         thunk(bind, instance, in a0, in a1, ref answered);
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void Ptrcall3_Long_Long_Long_IntPtrFn(
-        IntPtr bind,
-        IntPtr instance,
-        in long a0,
-        in long a1,
-        in long a2,
-        ref IntPtr answered);
-
-    private static Ptrcall3_Long_Long_Long_IntPtrFn _ptrcall3_Long_Long_Long_IntPtr;
-
-    internal static void Ptrcall3_Long_Long_Long_IntPtr(
-        IntPtr bind,
-        IntPtr instance,
-        in long a0,
-        in long a1,
-        in long a2,
-        ref IntPtr answered)
-    {
-        Ptrcall3_Long_Long_Long_IntPtrFn thunk =
-            _ptrcall3_Long_Long_Long_IntPtr ??= NetwApi.Thunk<Ptrcall3_Long_Long_Long_IntPtrFn>(
-                "ptrcall3");
-        thunk(bind, instance, in a0, in a1, in a2, ref answered);
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]

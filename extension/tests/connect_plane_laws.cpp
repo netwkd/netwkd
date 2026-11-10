@@ -628,9 +628,12 @@ TEST_CASE(
 ) {
     const Ref<NetwMultiplayer> core = lone_session();
     CallLog announced;
-    core->observe(NetwMultiplayer::ENDPOINT_ADDED, announced.callable("added"));
-    core->observe(
-        NetwMultiplayer::ENDPOINT_REMOVED,
+    core->get_connection()->connect(
+        StringName("endpoint_added"),
+        announced.callable("added")
+    );
+    core->get_connection()->connect(
+        StringName("endpoint_removed"),
         announced.callable("removed")
     );
 

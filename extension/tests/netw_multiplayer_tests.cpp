@@ -9,6 +9,7 @@
 #include "godot/script.hpp"
 #include "godot/utility.hpp"
 #include "godot/viewport.hpp"
+#include "netw/api/clock.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_record.hpp"
 #include "netw/api/loopback.hpp"
@@ -16,6 +17,7 @@
 #include "netw/api/participant.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/scene.hpp"
+#include "netw/api/session.hpp"
 #include "netw/api/session_config.hpp"
 #include "netw/carrier_frame.hpp"
 #include "netw/predict/frames.hpp"
@@ -23,7 +25,6 @@
 #include "netw/wire/registry.hpp"
 #include "support/entity_facets.h"
 #include "support/entity_record_box.h"
-#include "support/event_ring.h"
 #include "support/netw_call_log.h"
 #include "support/netw_recorder.h"
 
@@ -1066,16 +1067,6 @@ using netw_test::Recorder;
 constexpr int EXACT_BINARY_TICKRATE = 8;
 constexpr double ONE_TICK_AT_EXACT_BINARY_RATE = 0.125;
 
-Vector<StringName> declared_tick_band() {
-    return Vector<StringName>({
-        "clock_before_tick_loop",
-        "clock_before_tick",
-        "clock_on_tick",
-        "clock_after_tick",
-        "clock_after_tick_loop",
-    });
-}
-
 Ref<NetwMultiplayer> clocked_core() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -1084,71 +1075,18 @@ Ref<NetwMultiplayer> clocked_core() {
 }
 
 TEST_CASE(
-    "[Networked][Multiplayer][Hosted] the session announces the whole tick "
-    "band in one order, carrying the clock's own advancing tick rather than "
-    "a constant an announcer could invent"
-) {
-    Ref<NetwMultiplayer> core = clocked_core();
-    Recorder session(core.ptr(), declared_tick_band());
-
-    netw::ClockEngine &clock = core->clock_engine();
-    clock.physics_step(ONE_TICK_AT_EXACT_BINARY_RATE);
-    clock.physics_step(ONE_TICK_AT_EXACT_BINARY_RATE);
-
-    Vector<StringName> twice = declared_tick_band();
-    twice.append_array(declared_tick_band());
-    CHECK(session.order() == twice);
-
-    REQUIRE(session.args("clock_on_tick", 0).size() == 2);
-    NETW_CHECK_EQ(
-        double(session.args("clock_on_tick", 0)[0]),
-        ONE_TICK_AT_EXACT_BINARY_RATE
-    );
-    NETW_CHECK_EQ(int(session.args("clock_on_tick", 0)[1]), 0);
-    REQUIRE(session.args("clock_after_tick", 1).size() == 2);
-    NETW_CHECK_EQ(int(session.args("clock_after_tick", 1)[1]), 1);
-}
-
-TEST_CASE(
-    "[Networked][Multiplayer][Hosted] a calibration edge reaches the session "
-    "with its argument type intact, driven rather than staged"
-) {
-    Ref<NetwMultiplayer> core = clocked_core();
-    netw::ClockEngine &clock = core->clock_engine();
-    clock.set_jitter_window(4);
-    clock.set_jitter_stability_threshold(0.01);
-    clock.set_jitter_multiplier(2.0);
-    clock.set_display_offset(1);
-    Recorder session(
-        core.ptr(),
-        Vector<StringName>({
-            "clock_synchronized",
-            "clock_stability_changed",
-        })
-    );
-
-    clock.handle_pong(0.02, 100, 0.0, true);
-    clock.handle_pong(0.02, 100, 0.0, true);
-    clock.handle_pong(0.2, 100, 0.0, true);
-
-    NETW_CHECK_EQ(session.count("clock_synchronized"), 1);
-    REQUIRE(session.args("clock_stability_changed").size() == 1);
-    NETW_CHECK_EQ(bool(session.args("clock_stability_changed")[0]), false);
-}
-
-TEST_CASE(
     "[Networked][Multiplayer][Hosted] two sessions announce their own tick "
     "band, the one wiring error a single session cannot show"
 ) {
     Ref<NetwMultiplayer> first = clocked_core();
     Ref<NetwMultiplayer> second = clocked_core();
-    Recorder watched(first.ptr(), declared_tick_band());
-    Recorder quiet(second.ptr(), declared_tick_band());
+    Recorder watched(first->get_clock().ptr(), {"ticked"});
+    Recorder quiet(second->get_clock().ptr(), {"ticked"});
 
     first->clock_engine().physics_step(ONE_TICK_AT_EXACT_BINARY_RATE);
 
-    NETW_CHECK_EQ(watched.count("clock_on_tick"), 1);
-    NETW_CHECK_EQ(quiet.count("clock_on_tick"), 0);
+    NETW_CHECK_EQ(watched.count("ticked"), 1);
+    NETW_CHECK_EQ(quiet.count("ticked"), 0);
 }
 
 } // namespace TestNetwMultiplayerSessionBand
@@ -1162,11 +1100,7 @@ using netw::SessionCore;
 using netw_test::Recorder;
 
 Vector<StringName> session_edges() {
-    return Vector<StringName>({
-        "session_state_changed",
-        "session_entered",
-        "session_ended",
-    });
+    return Vector<StringName>({"state_changed", "entered", "exiting"});
 }
 
 TEST_CASE(
@@ -1355,47 +1289,32 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Recorder session(core.ptr(), session_edges());
+    Recorder session(core->get_session().ptr(), session_edges());
 
     core->session_plane().transition(SessionCore::STATE_CONNECTING);
     core->session_plane().transition(SessionCore::STATE_ONLINE);
     core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
 
-    CHECK(
-        session.order()
+    const bool bracketed = session.order()
         == Vector<StringName>({
-            "session_state_changed",
-            "session_state_changed",
-            "session_entered",
-            "session_ended",
-            "session_state_changed",
-        })
-    );
-    REQUIRE(session.args("session_state_changed", 1).size() == 2);
+            "state_changed",
+            "state_changed",
+            "entered",
+            "exiting",
+            "state_changed",
+        });
+    CHECK(bracketed);
     NETW_CHECK_EQ(
-        int(session.args("session_state_changed", 1)[0]),
-        int(SessionCore::STATE_CONNECTING)
+        int(session.args("state_changed", 0)[0]),
+        int(NetwMultiplayer::SESSION_STATE_CONNECTING)
     );
     NETW_CHECK_EQ(
-        int(session.args("session_state_changed", 1)[1]),
-        int(SessionCore::STATE_ONLINE)
+        int(session.args("state_changed", 1)[0]),
+        int(NetwMultiplayer::SESSION_STATE_ONLINE)
     );
-}
-
-TEST_CASE(
-    "[Networked][Multiplayer][Hosted] a transition the machine refuses, "
-    "OFFLINE straight to ONLINE with no connect between, publishes nothing"
-) {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    Recorder session(core.ptr(), session_edges());
-
-    core->session_plane().transition(SessionCore::STATE_ONLINE);
-
-    NETW_CHECK_EQ(session.order().size(), 0);
     NETW_CHECK_EQ(
-        int(core->session_plane().get_state()),
-        int(SessionCore::STATE_OFFLINE)
+        int(session.args("state_changed", 2)[0]),
+        int(NetwMultiplayer::SESSION_STATE_DISCONNECTING)
     );
 }
 
@@ -1409,7 +1328,7 @@ TEST_CASE(
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Recorder session(core.ptr(), session_edges());
+    Recorder session(core->get_session().ptr(), session_edges());
 
     core->session_set_state(NetwMultiplayer::SESSION_STATE_CREATING);
     core->session_transition(NetwMultiplayer::SESSION_STATE_CREATING);
@@ -1426,9 +1345,7 @@ TEST_CASE(
 namespace TestNetwMultiplayerAuthEdges {
 
 using namespace godot;
-using netw::EventPlane;
 using netw::NetwMultiplayer;
-using netw_test::EventRing;
 using netw_test::Recorder;
 
 Vector<StringName> auth_edges() {
@@ -1476,30 +1393,6 @@ TEST_CASE(
     );
     REQUIRE(session.args("peer_authentication_failed").size() == 1);
     NETW_CHECK_EQ(int(session.args("peer_authentication_failed")[0]), 7);
-}
-
-TEST_CASE(
-    "[Networked][Multiplayer][Hosted] a refused peer is recorded as well as "
-    "announced"
-) {
-    netw_test::FaultWatch expected_faults;
-
-    Transported rig = transported_core();
-    rig.core->event_arm(true);
-    rig.core->event_watch(
-        PackedInt64Array({EventPlane::PEER_AUTH_FAILED}),
-        Dictionary(),
-        Dictionary(),
-        Callable(),
-        Dictionary()
-    );
-
-    rig.inner->emit_signal("peer_authentication_failed", 7);
-
-    const EventRing ring(rig.core->event_ring(0));
-    REQUIRE(ring.size() == 1);
-    NETW_CHECK_EQ(ring.event_at(0), int64_t(EventPlane::PEER_AUTH_FAILED));
-    NETW_CHECK_EQ(int64_t(ring.at(0)[netw::event_key::peer()]), int64_t(7));
 }
 
 TEST_CASE(
@@ -1581,7 +1474,7 @@ TEST_CASE(
     const GateIds ids = gate_ids();
 
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             SERVER,
             PRE_ADMIT_ROUTE,
             ids.spawn,
@@ -1590,7 +1483,7 @@ TEST_CASE(
         OK
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             SERVER,
             PRE_ADMIT_ROUTE,
             ids.reparent,
@@ -1599,7 +1492,7 @@ TEST_CASE(
         OK
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             CLIENT,
             PRE_ADMIT_ROUTE,
             ids.spawn,
@@ -1608,7 +1501,7 @@ TEST_CASE(
         ERR_UNAUTHORIZED
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             CLIENT,
             PRE_ADMIT_ROUTE,
             ids.sync,
@@ -1617,7 +1510,7 @@ TEST_CASE(
         ERR_UNAUTHORIZED
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             SERVER,
             PRE_ADMIT_ROUTE,
             ids.sync,
@@ -1626,7 +1519,7 @@ TEST_CASE(
         ERR_INVALID_DATA
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             SERVER,
             PRE_ADMIT_ROUTE,
             ids.spawn,
@@ -1645,7 +1538,7 @@ TEST_CASE(
     const GateIds ids = gate_ids();
 
     NETW_CHECK_EQ(
-        core->table_admit_frame_default(CLIENT, ids.table, body(4)),
+        core->table_admit_frame(CLIENT, ids.table, body(4)),
         ERR_UNAUTHORIZED
     );
 
@@ -1662,73 +1555,17 @@ TEST_CASE(
     const GateIds ids = gate_ids();
 
     NETW_CHECK_EQ(
-        core->table_admit_frame_default(SERVER, ids.sync, body(4)),
+        core->table_admit_frame(SERVER, ids.sync, body(4)),
         ERR_INVALID_DATA
     );
     NETW_CHECK_EQ(
-        core->table_admit_frame_default(SERVER, ids.table, body(0)),
+        core->table_admit_frame(SERVER, ids.table, body(0)),
         ERR_INVALID_DATA
     );
     NETW_CHECK_EQ(
-        core->table_admit_frame_default(SERVER, ids.table, body(1)),
+        core->table_admit_frame(SERVER, ids.table, body(1)),
         ERR_INVALID_DATA
     );
-}
-
-TEST_CASE(
-    "[Networked][Multiplayer][Hosted][SceneTree] the spawn, table, sync and "
-    "predict gate doors answer exactly their stock default when no script "
-    "overrides the virtual, because nothing is installed to answer otherwise"
-) {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    const GateIds ids = gate_ids();
-
-    NETW_CHECK_EQ(
-        core->spawn_admit_frame(SERVER, PRE_ADMIT_ROUTE, ids.spawn, body(4)),
-        core->spawn_admit_frame_default(
-            SERVER,
-            PRE_ADMIT_ROUTE,
-            ids.spawn,
-            body(4)
-        )
-    );
-    NETW_CHECK_EQ(
-        core->spawn_admit_frame(CLIENT, PRE_ADMIT_ROUTE, ids.spawn, body(4)),
-        ERR_UNAUTHORIZED
-    );
-
-    NETW_CHECK_EQ(
-        core->table_admit_frame(SERVER, ids.table, body(4)),
-        core->table_admit_frame_default(SERVER, ids.table, body(4))
-    );
-    NETW_CHECK_EQ(
-        core->table_admit_frame(CLIENT, ids.table, body(4)),
-        ERR_UNAUTHORIZED
-    );
-
-    Node *owner = memnew(Node);
-    netw::gd::scene_root()->add_child(owner);
-    const Ref<netw::NetwEntity> wrapper = netw::NetwEntity::ensure(owner);
-    REQUIRE(core->liveness_bind_route(51, wrapper.ptr()));
-    REQUIRE(int(core->entity_frame_verdict(51)) == int(OK));
-
-    const PackedByteArray carried({1});
-    NETW_CHECK_EQ(
-        core->sync_admit_frame(2, 51, 0, ids.sync, 0, -1, carried),
-        core->sync_admit_frame_default(2, 51, 0, ids.sync, 0, -1, carried)
-    );
-    NETW_CHECK_EQ(
-        core->sync_admit_frame(2, 51, 0, ids.sync, 0, -1, PackedByteArray()),
-        ERR_INVALID_DATA
-    );
-
-    NETW_CHECK_EQ(
-        core->predict_admit_frame(2, 51, ids.spawn, carried),
-        core->predict_admit_frame_default(2, 51, ids.spawn, carried)
-    );
-
-    owner->queue_free();
 }
 
 TEST_CASE(
@@ -1739,10 +1576,7 @@ TEST_CASE(
     core.instantiate();
 
     const RID unknown = core->get_liveness_core()->entity_create();
-    NETW_CHECK_EQ(
-        core->spawn_declare_default(unknown, Variant()),
-        ERR_DOES_NOT_EXIST
-    );
+    NETW_CHECK_EQ(core->spawn_declare(unknown), ERR_DOES_NOT_EXIST);
 
     const RID entity = core->get_liveness_core()->entity_create();
     const int64_t route = core->get_liveness_core()->reserve_route();
@@ -1753,7 +1587,7 @@ TEST_CASE(
     record->set_route(route);
     REQUIRE(core->liveness_bind(entity, route, wrapper, record, nullptr));
 
-    NETW_CHECK_EQ(core->spawn_declare_default(entity, Variant()), OK);
+    NETW_CHECK_EQ(core->spawn_declare(entity), OK);
 }
 
 TEST_CASE(
@@ -1767,7 +1601,7 @@ TEST_CASE(
     REQUIRE(plane != nullptr);
     REQUIRE(plane->get_sync_pipeline() != nullptr);
 
-    core->sync_note_sent_default(1, 1);
+    core->note_sent(1, 1);
 }
 
 TEST_CASE(
@@ -1780,11 +1614,11 @@ TEST_CASE(
     const GateIds ids = gate_ids();
 
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(7, PRE_ADMIT_ROUTE, ids.spawn, body(4)),
+        core->spawn_admit_frame(7, PRE_ADMIT_ROUTE, ids.spawn, body(4)),
         ERR_UNAUTHORIZED
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             7,
             PRE_ADMIT_ROUTE,
             ids.reparent,
@@ -1794,11 +1628,11 @@ TEST_CASE(
     );
 
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(1, PRE_ADMIT_ROUTE, ids.spawn, body(4)),
+        core->spawn_admit_frame(1, PRE_ADMIT_ROUTE, ids.spawn, body(4)),
         OK
     );
     NETW_CHECK_EQ(
-        core->spawn_admit_frame_default(
+        core->spawn_admit_frame(
             1,
             PRE_ADMIT_ROUTE,
             ids.reparent,
@@ -1824,7 +1658,7 @@ TEST_CASE(
     REQUIRE(int(core->entity_frame_verdict(51)) == int(OK));
 
     NETW_CHECK_EQ(
-        core->predict_admit_frame_default(
+        core->predict_admit_frame(
             42,
             51,
             netw::predict::CHANNEL_COMMAND,
@@ -1833,7 +1667,7 @@ TEST_CASE(
         OK
     );
     NETW_CHECK_EQ(
-        core->predict_admit_frame_default(
+        core->predict_admit_frame(
             1,
             51,
             netw::predict::CHANNEL_ACK,
@@ -1842,7 +1676,7 @@ TEST_CASE(
         OK
     );
     NETW_CHECK_EQ(
-        core->predict_admit_frame_default(
+        core->predict_admit_frame(
             7,
             51,
             netw::predict::CHANNEL_ACK,
@@ -1866,70 +1700,20 @@ using netw_test::Recorder;
 constexpr int64_t SECOND = 1000000;
 
 TEST_CASE(
-    "[Networked][Multiplayer][Hosted] marking a poll announces it with the "
-    "gap since the last mark, zero on the first poll"
+    "[Networked][Multiplayer][Hosted] marking a poll answers the gap since "
+    "the last mark, zero on the first poll and for a second reader of the "
+    "same poll"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Recorder session(core.ptr(), Vector<StringName>({"session_poll_started"}));
 
-    core->poll_delta(9000);
-    core->poll_delta(9000 + SECOND / 2);
+    const double first = core->poll_delta(9000);
+    const double second = core->poll_delta(9000 + SECOND / 2);
+    const double again = core->poll_delta(9000 + SECOND / 2);
 
-    NETW_CHECK_EQ(session.count("session_poll_started"), 2);
-    REQUIRE(session.args("session_poll_started", 0).size() == 1);
-    NETW_CHECK_EQ(double(session.args("session_poll_started", 0)[0]), 0.0);
-    REQUIRE(session.args("session_poll_started", 1).size() == 1);
-    NETW_CHECK_CLOSE(
-        double(session.args("session_poll_started", 1)[0]),
-        0.5,
-        1e-9
-    );
-}
-
-TEST_CASE("[Networked][Multiplayer][Hosted] a second reader marked no poll") {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    Recorder session(core.ptr(), Vector<StringName>({"session_poll_started"}));
-
-    core->poll_delta(9000);
-    const double again = core->poll_delta(9000);
-
+    NETW_CHECK_EQ(first, 0.0);
+    NETW_CHECK_CLOSE(second, 0.5, 1e-9);
     NETW_CHECK_EQ(again, 0.0);
-    NETW_CHECK_EQ(session.count("session_poll_started"), 1);
-}
-
-TEST_CASE(
-    "[Networked][Multiplayer][Hosted] an intake announces what it touched, "
-    "not a table it only committed and published locally, and reopens"
-) {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    const RID schema = core->schema_create("Row");
-    core->schema_add_column(schema, "value", NetwMultiplayer::COLUMN_I8, 0);
-    core->schema_seal(schema);
-    const RID table = core->table_create(schema);
-    Recorder session(core.ptr(), Vector<StringName>({"table_received"}));
-
-    PackedInt64Array routes;
-    routes.push_back(7);
-    core->table_write_routes(table, routes);
-    PackedInt64Array values;
-    values.push_back(3);
-    core->table_write_column(table, 0, values);
-    core->table_commit(table);
-
-    core->table_announce(table);
-
-    core->table_announce_intake();
-
-    NETW_CHECK_EQ(session.count("table_received"), 1);
-    REQUIRE(session.args("table_received").size() == 2);
-    CHECK(RID(session.args("table_received")[0]) == table);
-    NETW_CHECK_EQ(
-        int64_t(session.args("table_received")[1]),
-        core->table_get_tick(table)
-    );
 }
 
 TEST_CASE(
@@ -2001,15 +1785,6 @@ using netw_test::Recorder;
 constexpr int64_t SERVER = 1;
 constexpr int64_t CLIENT = 4;
 
-Vector<StringName> control_band() {
-    return Vector<StringName>({
-        "peer_kicked",
-        "session_server_disconnecting",
-        "peer_kick_requested",
-        "session_disconnect_requested",
-    });
-}
-
 int64_t control_channel(const char *p_name) {
     const netw::wire::WireRegistry registry
         = netw::wire::WireRegistry::create_default();
@@ -2025,13 +1800,6 @@ PackedByteArray reason_frame(const char *p_reason) {
     return netw::session::frame_write(stated);
 }
 
-PackedByteArray kick_frame(int64_t p_peer, const char *p_reason) {
-    netw::session::KickRequest asked;
-    asked.peer = p_peer;
-    asked.reason = String(p_reason);
-    return netw::session::frame_write(asked);
-}
-
 Ref<NetwMultiplayer> session_at_peer_one() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -2045,42 +1813,28 @@ TEST_CASE(
     "speaks for the session"
 ) {
     Ref<NetwMultiplayer> core = session_at_peer_one();
-    Recorder session(core.ptr(), control_band());
+    Recorder session(core->get_session().ptr(), {"exiting"});
+    core->session_plane().transition(netw::SessionCore::STATE_CONNECTING);
+    core->session_plane().transition(netw::SessionCore::STATE_ONLINE);
     const int64_t kicked = control_channel("SESSION_KICKED");
     const int64_t shutdown = control_channel("SESSION_SHUTDOWN");
 
     NETW_CHECK_EQ(
-        core->session_publish_control(kicked, SERVER, reason_frame("rude")),
-        true
-    );
-    NETW_CHECK_EQ(
         core->session_publish_control(shutdown, CLIENT, reason_frame("bye")),
         true
     );
+    NETW_CHECK_EQ(
+        core->session_publish_control(kicked, SERVER, reason_frame("rude")),
+        true
+    );
+    core->session_plane().transition(netw::SessionCore::STATE_DISCONNECTING);
 
-    CHECK(session.order() == Vector<StringName>({"peer_kicked"}));
-    REQUIRE(session.args("peer_kicked").size() == 1);
-    CHECK(String(session.args("peer_kicked")[0]) == String("rude"));
-}
-
-TEST_CASE(
-    "[Networked][Multiplayer][Hosted] a kick request names its target from "
-    "the payload pair and drops a payload that is not one, and the "
-    "requester it announces is the frame's own sender, never anything the "
-    "payload claims"
-) {
-    Ref<NetwMultiplayer> core = session_at_peer_one();
-    Recorder session(core.ptr(), control_band());
-    const int64_t request = control_channel("SESSION_KICK_REQUEST");
-
-    core->session_publish_control(request, CLIENT, kick_frame(9, "afk"));
-    core->session_publish_control(request, CLIENT, reason_frame("afk"));
-
-    NETW_CHECK_EQ(session.count("peer_kick_requested"), 1);
-    REQUIRE(session.args("peer_kick_requested").size() == 3);
-    NETW_CHECK_EQ(int(session.args("peer_kick_requested")[0]), int(CLIENT));
-    NETW_CHECK_EQ(int(session.args("peer_kick_requested")[1]), 9);
-    CHECK(String(session.args("peer_kick_requested")[2]) == String("afk"));
+    NETW_REQUIRE_EQ(session.count("exiting"), 1);
+    NETW_CHECK_EQ(
+        int(session.args("exiting")[0]),
+        int(netw::NetwSession::KICKED)
+    );
+    CHECK(String(session.args("exiting")[1]) == String("rude"));
 }
 
 TEST_CASE(
@@ -2089,10 +1843,7 @@ TEST_CASE(
     "same announcement, and a client's unpause is not an edge at all"
 ) {
     Ref<NetwMultiplayer> core = session_at_peer_one();
-    Recorder session(
-        core.ptr(),
-        Vector<StringName>({"session_tree_paused", "session_tree_unpaused"})
-    );
+    Recorder session(core->get_session().ptr(), {"paused_changed"});
     const int64_t pause = control_channel("SESSION_PAUSE");
     const int64_t unpause = control_channel("SESSION_UNPAUSE");
 
@@ -2100,14 +1851,12 @@ TEST_CASE(
     core->session_publish_control(unpause, CLIENT, PackedByteArray());
     core->session_publish_control(unpause, SERVER, PackedByteArray());
 
+    NETW_REQUIRE_EQ(session.count("paused_changed"), 2);
+    CHECK(bool(session.args("paused_changed", 0)[0]));
     CHECK(
-        session.order()
-        == Vector<StringName>({"session_tree_paused", "session_tree_unpaused"})
+        String(session.args("paused_changed", 0)[1]) == String("intermission")
     );
-    REQUIRE(session.args("session_tree_paused").size() == 1);
-    CHECK(
-        String(session.args("session_tree_paused")[0]) == String("intermission")
-    );
+    CHECK_FALSE(bool(session.args("paused_changed", 1)[0]));
 }
 
 TEST_CASE(
@@ -2132,7 +1881,6 @@ TEST_CASE(
     "consumed"
 ) {
     Ref<NetwMultiplayer> core = session_at_peer_one();
-    Recorder session(core.ptr(), control_band());
 
     NETW_CHECK_EQ(
         core->session_publish_control(
@@ -2142,8 +1890,6 @@ TEST_CASE(
         ),
         false
     );
-
-    NETW_CHECK_EQ(session.order().size(), 0);
 }
 
 } // namespace TestNetwMultiplayerControlBand
@@ -2152,12 +1898,6 @@ namespace TestNetwMultiplayerServices {
 
 using namespace godot;
 using netw::NetwMultiplayer;
-using netw_test::Recorder;
-
-Vector<StringName> service_edges() {
-    return Vector<StringName>({"service_registered", "service_unregistered"});
-}
-
 Ref<Resource> an_identity_only_type() {
     Ref<Resource> type;
     type.instantiate();
@@ -2165,27 +1905,21 @@ Ref<Resource> an_identity_only_type() {
 }
 
 TEST_CASE(
-    "[Networked][Multiplayer][Hosted] registering is announcing, and "
-    "re-registering the identical instance is inert"
+    "[Networked][Multiplayer][Hosted] a registered service answers its type "
+    "until it unregisters, and re-registering the identical instance is inert"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Recorder session(core.ptr(), service_edges());
     const Ref<Resource> type = an_identity_only_type();
     Node *service = memnew(Node);
 
     core->service_register(service, type.ptr());
     core->service_register(service, type.ptr());
 
-    NETW_CHECK_EQ(session.count("service_registered"), 1);
     NETW_CHECK_EQ(core->get_service(type.ptr()), service);
 
     core->service_unregister(service, type.ptr());
 
-    CHECK(
-        session.order()
-        == Vector<StringName>({"service_registered", "service_unregistered"})
-    );
     NETW_CHECK_EQ(core->get_service(type.ptr()), nullptr);
     memdelete(service);
 }
@@ -2206,11 +1940,9 @@ TEST_CASE(
     Node *second = memnew(Node);
     core->service_register(first, type.ptr());
     core->service_register(second, type.ptr());
-    Recorder session(core.ptr(), service_edges());
 
     core->service_unregister(first, type.ptr());
 
-    NETW_CHECK_EQ(session.count("service_unregistered"), 0);
     NETW_CHECK_EQ(core->get_service(type.ptr()), second);
     memdelete(first);
     memdelete(second);
@@ -2238,15 +1970,6 @@ namespace TestNetwMultiplayerWrapperIndex {
 using namespace godot;
 using netw::NetwLivenessCore;
 using netw::NetwMultiplayer;
-using netw_test::Recorder;
-
-Vector<StringName> entity_edges() {
-    return Vector<StringName>({
-        "entity_live",
-        "entity_lingering",
-        "entity_dead",
-    });
-}
 
 Ref<netw::NetwEntity> an_identity_only_wrapper() {
     Ref<netw::NetwEntity> wrapper;
@@ -2295,36 +2018,36 @@ TEST_CASE("[Networked][Multiplayer][Hosted] a route's life is three edges") {
     core.instantiate();
     const RID entity = core->get_liveness_core()->entity_create();
     const int64_t route = core->get_liveness_core()->reserve_route();
-    Recorder session(core.ptr(), entity_edges());
     netw_test::RecordBox seated;
+    const Ref<netw::NetwEntity> wrapper = an_identity_only_wrapper();
 
     NETW_CHECK_EQ(
         core->liveness_bind(
             entity,
             route,
-            an_identity_only_wrapper(),
+            wrapper,
             a_record_holding_peer_and_route(seated, 0),
             nullptr
         ),
         true
     );
     core->liveness_publish_live(route);
-    core->liveness_linger(entity);
-    core->liveness_retire(route);
-
-    CHECK(
-        session.order()
-        == Vector<StringName>({
-            "entity_live",
-            "entity_lingering",
-            "entity_dead",
-        })
-    );
-    REQUIRE(session.args("entity_live").size() == 2);
-    NETW_CHECK_EQ(int64_t(session.args("entity_live")[0]), route);
     NETW_CHECK_EQ(
-        Object::cast_to<Object>(session.args("entity_live")[1]),
-        core->wrapper_for_id(entity.get_id()).ptr()
+        int(core->entity_get_state(entity)),
+        int(NetwMultiplayer::ENTITY_STATE_LIVE)
+    );
+    NETW_CHECK_EQ(core->wrapper_for_route(route).ptr(), wrapper.ptr());
+
+    core->liveness_linger(entity);
+    NETW_CHECK_EQ(
+        int(core->entity_get_state(entity)),
+        int(NetwMultiplayer::ENTITY_STATE_LINGERING)
+    );
+
+    core->liveness_retire(route);
+    NETW_CHECK_EQ(
+        int(core->entity_get_state(entity)),
+        int(NetwMultiplayer::ENTITY_STATE_DEAD)
     );
 }
 
@@ -2364,10 +2087,10 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Multiplayer][Hosted] a refused bind announces nothing, "
-    "because a route names one handle for the whole session and a second "
-    "wrapper arriving for a live route is refused rather than allowed to "
-    "rename it"
+    "[Networked][Multiplayer][Hosted] a refused bind keeps the standing "
+    "wrapper, because a route names one handle for the whole session and a "
+    "second wrapper arriving for a live route is refused rather than allowed "
+    "to rename it"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -2376,14 +2099,14 @@ TEST_CASE(
     const int64_t route = core->get_liveness_core()->reserve_route();
     netw_test::RecordBox seated;
     netw_test::RecordBox arriving;
+    const Ref<netw::NetwEntity> standing = an_identity_only_wrapper();
     core->liveness_bind(
         first,
         route,
-        an_identity_only_wrapper(),
+        standing,
         a_record_holding_peer_and_route(seated, 0),
         nullptr
     );
-    Recorder session(core.ptr(), entity_edges());
 
     NETW_CHECK_EQ(
         core->liveness_bind(
@@ -2396,7 +2119,7 @@ TEST_CASE(
         false
     );
 
-    NETW_CHECK_EQ(session.order().size(), 0);
+    NETW_CHECK_EQ(core->wrapper_for_route(route).ptr(), standing.ptr());
     NETW_CHECK_EQ(core->entity_get_view(second).is_valid(), false);
 }
 
@@ -2522,10 +2245,7 @@ using netw::NetwMultiplayer;
 using netw_test::Recorder;
 
 Vector<StringName> join_edges() {
-    return Vector<StringName>({
-        "player_local_joined",
-        "player_joined",
-    });
+    return Vector<StringName>({"local_joined", "player_joined"});
 }
 
 Ref<netw::NetwPlayer> a_row() {
@@ -2573,19 +2293,18 @@ TEST_CASE(
     const int64_t mine = core->get_unique_id();
     core->player_adopt(mine, a_row());
     core->player_adopt(mine + 1, a_row());
-    Recorder session(core.ptr(), join_edges());
+    Recorder session(core->get_session().ptr(), join_edges());
 
     core->player_publish_joined(mine + 1);
     core->player_publish_joined(mine);
 
-    CHECK(
-        session.order()
+    const bool local_first = session.order()
         == Vector<StringName>({
             "player_joined",
-            "player_local_joined",
+            "local_joined",
             "player_joined",
-        })
-    );
+        });
+    CHECK(local_first);
 }
 
 TEST_CASE(
@@ -2594,7 +2313,7 @@ TEST_CASE(
     "player in front of every listener"
 ) {
     Ref<NetwMultiplayer> core = peered_core();
-    Recorder session(core.ptr(), join_edges());
+    Recorder session(core->get_session().ptr(), join_edges());
 
     core->player_publish_joined(9);
 
@@ -2763,17 +2482,16 @@ TEST_CASE(
     const Bound inside = bind_under(core, container.owner, true, false);
     const Ref<netw::NetwScene> container_handle
         = core->scene_handle_of(container.handle);
-    Recorder session(core.ptr(), Vector<StringName>({"scene_live"}));
+    Recorder session(core->get_session().ptr(), {"scene_ready"});
 
     core->scene_publish_live(
         core->get_liveness_core()->route_of(inside.handle),
-        container.handle,
-        "Level"
+        container.handle
     );
 
-    REQUIRE(session.args("scene_live").size() == 1);
+    REQUIRE(session.args("scene_ready").size() == 1);
     NETW_CHECK_EQ(
-        Object::cast_to<Object>(session.args("scene_live")[0]),
+        Object::cast_to<Object>(session.args("scene_ready")[0]),
         container_handle.ptr()
     );
     CHECK(core->scene_handle_of(inside.handle) != container_handle);

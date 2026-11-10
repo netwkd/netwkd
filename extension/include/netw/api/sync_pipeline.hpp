@@ -80,8 +80,6 @@ private:
     ) const;
     godot::HashMap<int64_t, int64_t> contract_hashes;
 
-    godot::Callable encode_stage_seam;
-    godot::Callable decode_stage_seam;
     godot::Callable tap_seam;
 
     int64_t channel_row = 0;
@@ -96,13 +94,7 @@ private:
     int64_t rows_refused_stale = 0;
     int64_t writes_refused = 0;
 
-    godot::PackedByteArray stage_bytes;
     godot::Array stage_values;
-    godot::PackedByteArray stage_payload;
-    store::RowAddress stage_at;
-    int64_t stage_sender = 0;
-    bool stage_windowed = false;
-    store::Landing stage_landing = store::Landing::MALFORMED;
     const godot::LocalVector<CarrierRow> *carrier_rows = nullptr;
     int64_t carrier_peer = 0;
     int64_t carrier_frames = 0;
@@ -158,25 +150,13 @@ public:
 private:
 #endif
 
-    godot::PackedByteArray stage_row_frame(
-        int64_t p_peer,
-        int64_t p_frame_tick,
-        int64_t p_route,
-        int64_t p_comp,
-        int64_t p_mask,
-        const godot::PackedByteArray &p_bytes
-    );
-    godot::PackedByteArray run_encode_stage(
-        int64_t p_peer,
-        int64_t p_tick,
-        const godot::PackedByteArray &p_bytes
-    );
-    godot::Error run_decode_stage(
+    store::Landing decode_row(
         const godot::RID &p_entity,
-        int64_t p_comp,
-        const godot::PackedByteArray &p_payload
+        const store::RowAddress &p_at,
+        int64_t p_sender,
+        const godot::PackedByteArray &p_payload,
+        bool p_windowed
     );
-    godot::Error decode_stage_body();
     godot::Array gather_stage();
 
     void capture_declaration_key(const repl::PropertyBindingPtr &p_b);
@@ -256,10 +236,6 @@ public:
         int64_t p_row_control,
         int64_t p_property,
         int64_t p_signal
-    );
-    void set_stage_seams(
-        const godot::Callable &p_encode,
-        const godot::Callable &p_decode
     );
     void set_tap_seam(const godot::Callable &p_tap);
 

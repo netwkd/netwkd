@@ -112,6 +112,28 @@
 				Leaves the session. The server saves its entity rows first, and stays online if the database refuses a row. The promise resolves with an [enum @GlobalScope.Error] once the peer is down or the save failed. Closing the game window leaves the same way. On a server whose [MultiplayerPeer] can move the server, closing the window tells no client, so the peer promotes one when it can. A server that saves entities loses unsaved changes when its window closes, so it sets [member SceneTree.auto_accept_quit] to [code]false[/code] and quits after [method leave] resolves.
 			</description>
 		</method>
+		<method name="link_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="peer" type="int" />
+			<description>
+				Measured connection quality to [param peer], and what this peer's byte budget sends it.
+				[codeblock lang=text]
+				Dictionary
+				┠╴loss           float   share of the last 32 packets lost
+				┠╴rtt            float   round trip time, in seconds
+				┠╴jitter         float   round trip variation, in seconds
+				┠╴reorders       int     packets that arrived out of order
+				┠╴duplicates     int     packets that arrived twice
+				┠╴mode           String  "good", or "bad" while its budget is cut
+				┠╴budget_bits    int     most bits one packet to this peer may use
+				┠╴budget_bytes   int     bytes it may be sent each tick
+				┠╴sent_bytes     int     bytes charged to it since it joined
+				┠╴debt_bytes     int     bytes it was sent past its budget
+				┖╴deferred_rows  int     rows left waiting by the last tick
+				[/codeblock]
+				Losing packets halves [code]budget_bytes[/code] and [code]budget_bits[/code]. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While [code]debt_bytes[/code] is above zero, volatile properties wait, and retained properties and RPCs still go.
+			</description>
+		</method>
 		<method name="pause">
 			<return type="void" />
 			<param index="0" name="reason" type="String" default="&quot;&quot;" />
@@ -133,6 +155,15 @@
 			<param index="1" name="type" type="Object" default="null" />
 			<description>
 				Registers [param service] so [method service] returns it. [param type] defaults to the script of [param service]. A [NetwService] registers itself.
+			</description>
+		</method>
+		<method name="request_kick">
+			<return type="void" />
+			<param index="0" name="player" type="NetwPlayer" />
+			<param index="1" name="reason" type="String" default="&quot;&quot;" />
+			<description>
+				Asks the server to kick [param player]. The server receives [signal kick_requested] and decides.
+				[b]Player request.[/b]
 			</description>
 		</method>
 		<method name="save_entities">
@@ -179,6 +210,16 @@
 			<description>
 				Replaces what this session advertises about itself, such as the name shown in a server list.
 				[b]Server Only.[/b]
+			</description>
+		</method>
+		<method name="stat" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="stat" type="int" enum="NetwMultiplayer.Stat" />
+			<description>
+				Returns one of this session's counters, the same value [method NetwMultiplayer.stats_get] reads.
+				[codeblock]
+				var corrections := session.stat(NetwMultiplayer.STAT_PREDICT_CORRECTIONS)
+				[/codeblock]
 			</description>
 		</method>
 		<method name="step_away">
@@ -284,9 +325,6 @@
 			            connecting_popup.hide()
 			[/codeblock]
 		</member>
-		<member name="stats" type="Dictionary" setter="" getter="get_stats">
-			Every counter this session keeps, keyed by [enum NetwMultiplayer.Stat].
-		</member>
 	</members>
 	<signals>
 		<signal name="entered">
@@ -317,6 +355,14 @@
 				- [constant @GlobalScope.ERR_UNCONFIGURED] the two peers are set up differently, such as another build, another Networked version or other [method Netw.configure_join] arguments
 				- [constant @GlobalScope.ERR_TIMEOUT] the player was not admitted before [method NetwAdmissionConfig.timeout] or [member NetwMultiplayer.auth_timeout] passed
 				- [constant @GlobalScope.ERR_ALREADY_IN_USE] the account already plays as the server's player
+			</description>
+		</signal>
+		<signal name="kick_requested">
+			<param index="0" name="requester" type="NetwPlayer" />
+			<param index="1" name="target" type="NetwPlayer" />
+			<param index="2" name="reason" type="String" />
+			<description>
+				Emitted on the server when [param requester] asks to kick [param target] with [method request_kick]. [method kick] performs it.
 			</description>
 		</signal>
 		<signal name="local_joined">
@@ -353,6 +399,12 @@
 				func on_scene_ready(arena: NetwScene) -&gt; void:
 				    arena.root.get_node(^"Spawns").arrange()
 				[/codeblock]
+			</description>
+		</signal>
+		<signal name="scene_removed">
+			<param index="0" name="scene" type="NetwScene" />
+			<description>
+				Emitted after [param scene] leaves [member scenes].
 			</description>
 		</signal>
 		<signal name="server_transferred">

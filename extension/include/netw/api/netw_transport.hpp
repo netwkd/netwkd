@@ -34,6 +34,10 @@ class NetwTransport : public godot::RefCounted {
     );
     void probe_connection_failed();
     void probe_authentication_failed(int64_t p_peer_id);
+    void probe_by_connecting(
+        const godot::RID &p_ticket,
+        const godot::String &p_address
+    );
 
 protected:
     static void _bind_methods();
@@ -53,10 +57,6 @@ public:
         const godot::StringName &p_step,
         const godot::String &p_message,
         double p_ratio
-    );
-    void probe_default(
-        const godot::RID &p_ticket,
-        const godot::String &p_address
     );
 
     void arm(
@@ -83,33 +83,19 @@ public:
     );
 
     virtual godot::StringName peer_class();
-    godot::StringName peer_class_default();
     virtual bool recognizes_peer(
         const godot::Ref<godot::MultiplayerPeer> &p_peer
     );
-    bool recognizes_peer_default(
-        const godot::Ref<godot::MultiplayerPeer> &p_peer
-    );
     virtual godot::String display_name();
-    godot::String display_name_default();
     virtual bool is_available();
-    bool is_available_default();
     virtual bool can_host_here();
-    bool can_host_here_default();
     virtual bool can_probe();
-    bool can_probe_default();
     virtual godot::String address_label();
-    godot::String address_label_default();
     virtual godot::String address_placeholder();
-    godot::String address_placeholder_default();
     virtual godot::String address_help();
-    godot::String address_help_default();
     virtual bool accepts_empty_address();
-    bool accepts_empty_address_default();
     virtual godot::Dictionary host_settings();
-    godot::Dictionary host_settings_default();
     virtual godot::Dictionary client_settings();
-    godot::Dictionary client_settings_default();
 
     virtual void make_peer(
         const godot::RID &p_ticket,
@@ -123,23 +109,16 @@ public:
         const godot::String &p_address
     );
     virtual bool can_browse();
-    bool can_browse_default();
     virtual void browse();
     virtual godot::Ref<godot::MultiplayerPeer> make_probe_peer(
-        const godot::String &p_address
-    );
-    godot::Ref<godot::MultiplayerPeer> make_probe_peer_default(
         const godot::String &p_address
     );
 
     virtual void adopt(const godot::Ref<godot::MultiplayerPeer> &p_peer);
     virtual void poll(double p_delta);
     virtual godot::String join_address();
-    godot::String join_address_default();
     virtual godot::Dictionary diagnostics(int64_t p_peer_id);
-    godot::Dictionary diagnostics_default(int64_t p_peer_id);
     virtual double timeout_hint();
-    double timeout_hint_default();
     virtual void close();
 
     GDVIRTUAL0R(godot::StringName, _peer_class)

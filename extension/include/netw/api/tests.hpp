@@ -42,6 +42,8 @@ public:
     static void schema_model_clear();
     static void tracker_book_clear();
     static godot::Dictionary prediction_stats(godot::Object *handle);
+    static void attribution_arm(NetwMultiplayer *session);
+    static godot::Dictionary attribution_snapshot(NetwMultiplayer *session);
     static godot::TypedArray<godot::StringName> property_set_keys_of_script(
         const godot::Ref<godot::Script> &script,
         int64_t record

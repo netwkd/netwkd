@@ -117,15 +117,6 @@ struct Evidence {
     bool mirror_holds_flip = false;
 };
 
-int64_t rows_of(const Array &p_ring, int64_t p_event) {
-    const EventRing ring(p_ring);
-    int64_t seen = 0;
-    for (int index = 0; index < ring.size(); index++) {
-        seen += ring.event_at(index) == p_event ? 1 : 0;
-    }
-    return seen;
-}
-
 int64_t stat_of(godot::Object *p_core, const char *p_name) {
     return int64_t(
         netw_test::flow_core(p_core)->stats_snapshot().get(p_name, 0)
@@ -211,16 +202,17 @@ class FlowRun {
         if (!declared.armed) {
             return;
         }
-        const Array server_pass
-            = netw_test::flow_core(p_rig.server())->event_ring(0);
-        seen.gather_rows = rows_of(server_pass, EventPlane::GATHER);
-        seen.encode_rows = rows_of(server_pass, EventPlane::SYNC_ENCODE);
-        const Array client_route
-            = netw_test::flow_core(p_rig.client(0))->event_ring(p_pair.route);
-        seen.decode_rows = rows_of(client_route, EventPlane::SYNC_DECODE);
-        const Array client_pass
-            = netw_test::flow_core(p_rig.client(0))->event_ring(0);
-        seen.apply_rows = rows_of(client_pass, EventPlane::APPLY);
+        const EventRing sender(
+            netw_test::flow_core(p_rig.server())->event_drain()
+        );
+        seen.gather_rows = sender.count_of(EventPlane::GATHER);
+        seen.encode_rows = sender.count_of(EventPlane::SYNC_ENCODE);
+        const EventRing receiver(
+            netw_test::flow_core(p_rig.client(0))->event_drain()
+        );
+        seen.decode_rows
+            = receiver.count_of(EventPlane::SYNC_DECODE, p_pair.route);
+        seen.apply_rows = receiver.count_of(EventPlane::APPLY);
     }
 
     void record_values(LoopbackRig &p_rig, const FlowPair &p_pair) {
@@ -278,8 +270,10 @@ public:
             netw_test::steer(pair, rig.peer_id(0));
         }
         if (p_scenario.armed) {
-            netw_test::flow_core(rig.server())->event_arm(true);
-            netw_test::flow_core(rig.client(0))->event_arm(true);
+            netw_test::flow_core(rig.server())
+                ->event_arm(netw::NetwMultiplayer::EVENT_GROUP_STAGE);
+            netw_test::flow_core(rig.client(0))
+                ->event_arm(netw::NetwMultiplayer::EVENT_GROUP_STAGE);
         }
         impair(rig);
 

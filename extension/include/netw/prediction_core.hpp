@@ -121,90 +121,14 @@ struct RecoveryPlan {
     bool skip = true;
 };
 
-class NetwPredictRecovery : public godot::RefCounted {
-    GDCLASS(NetwPredictRecovery, godot::RefCounted)
-
-    godot::Dictionary restored;
-    godot::Dictionary written;
-    bool teleported = false;
-    bool skipped = true;
-
-protected:
-    static void _bind_methods();
-
-public:
-    static godot::Ref<NetwPredictRecovery> of(
-        const godot::Dictionary &p_restore,
-        const godot::Dictionary &p_write,
-        bool p_teleport,
-        bool p_skip
-    );
-
-    godot::Dictionary restore() const {
-        return restored;
-    }
-
-    godot::Dictionary write() const {
-        return written;
-    }
-
-    bool teleport() const {
-        return teleported;
-    }
-
-    bool skip() const {
-        return skipped;
-    }
-};
-
 struct Judgement {
     double divergence = 0.0;
     bool corrected = false;
 };
 
-class NetwPredictJudgement : public godot::RefCounted {
-    GDCLASS(NetwPredictJudgement, godot::RefCounted)
-
-    Judgement judged;
-
-protected:
-    static void _bind_methods();
-
-public:
-    static godot::Ref<NetwPredictJudgement> of(
-        double p_divergence,
-        bool p_corrected
-    );
-
-    double divergence() const {
-        return judged.divergence;
-    }
-
-    bool corrected() const {
-        return judged.corrected;
-    }
-};
-
 namespace prediction_core {
 
-#if defined(NETW_TESTS)
-int64_t records_minted();
-void note_record_mint();
-#define NETW_NOTE_RECORD_MINT() ::netw::prediction_core::note_record_mint()
-#else
-#define NETW_NOTE_RECORD_MINT() ((void)0)
-#endif
-
 Judgement judge(
-    int domain,
-    int verdict,
-    const godot::Dictionary &predicted,
-    const godot::Dictionary &payload,
-    const godot::Dictionary &wiring,
-    godot::Dictionary field_sink
-);
-
-godot::Ref<NetwPredictJudgement> evaluate(
     int domain,
     int verdict,
     const godot::Dictionary &predicted,
@@ -237,19 +161,6 @@ godot::Dictionary project_payload(
     const godot::Dictionary &payload,
     const godot::Dictionary &projection,
     double age
-);
-
-godot::Ref<NetwPredictRecovery> recover(
-    const godot::Dictionary &payload,
-    const godot::Dictionary &predicted,
-    int policy,
-    int snap_restore,
-    const godot::Dictionary &projection,
-    const godot::Dictionary &current,
-    const godot::Dictionary &pose_errors,
-    const godot::Dictionary &wiring,
-    const godot::Dictionary &verdict,
-    double tick_delta
 );
 
 int measure(

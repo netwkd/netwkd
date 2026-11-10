@@ -416,7 +416,7 @@ bool is_entity_root(Node *p_node) {
     return p_node->has_meta(NetwMultiplayer::wrapper_meta());
 }
 
-void despawning(Object *p_wrapper, const StringName &p_reason) {
+void despawning(Object *p_wrapper) {
     NetwEntity *entity = Object::cast_to<NetwEntity>(p_wrapper);
     if (entity == nullptr || !entity->watches_despawning()) {
         return;
@@ -424,7 +424,7 @@ void despawning(Object *p_wrapper, const StringName &p_reason) {
     const Ref<MultiplayerAPI> api = entity->get_multiplayer();
     NetwMultiplayer *core = Object::cast_to<NetwMultiplayer>(api.ptr());
     if (core != nullptr) {
-        core->liveness_owner_despawning(p_reason, p_wrapper);
+        core->liveness_owner_despawning(p_wrapper);
     }
 }
 

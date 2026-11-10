@@ -409,11 +409,6 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const CallLog seen;
-    core->observe(
-        NetwMultiplayer::SESSION_TREE_UNPAUSED,
-        seen.callable(StringName("unpaused"))
-    );
 
     core->session_publish_control(
         netw::wire::builtin_channel("SESSION_PAUSE"),
@@ -424,10 +419,10 @@ TEST_CASE(
 
     const int64_t channel = netw::wire::builtin_channel("SESSION_UNPAUSE");
     core->session_publish_control(channel, MESH_OTHER, PackedByteArray());
-    NETW_CHECK_EQ(seen.count(StringName("unpaused")), 0);
+    CHECK(core->session_is_paused());
 
     core->session_publish_control(channel, MESH_SERVER, PackedByteArray());
-    NETW_CHECK_EQ(seen.count(StringName("unpaused")), 1);
+    CHECK_FALSE(core->session_is_paused());
 }
 
 constexpr const char *ANSWERING_SINK = R"(extends Node

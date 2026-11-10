@@ -13,8 +13,6 @@
 
 namespace netw {
 
-class NetwPredictJudgement;
-class NetwPredictRecovery;
 class NetwPredictionEngine;
 class NetwPredictSlotEngine;
 
@@ -227,24 +225,6 @@ public:
     void seat_breach(int64_t p_transition, const godot::Dictionary &p_solve);
     void seat_reconcile_mode();
     void seat_command_frame();
-    godot::Ref<NetwPredictRecovery> seat_recover_seam(
-        const godot::Dictionary &p_carried,
-        const godot::Dictionary &p_predicted,
-        NetwPrediction::RecoveryPolicy p_policy,
-        NetwSimulation::Restore p_snap_restore,
-        const godot::Dictionary &p_projection,
-        const godot::Dictionary &p_before,
-        const godot::Dictionary &p_tier_errors,
-        const godot::Dictionary &p_context,
-        double p_tick_delta
-    );
-    godot::Ref<NetwPredictJudgement> seat_evaluate_seam(
-        NetwPrediction::Domain p_domain,
-        NetwPrediction::ExactVerdict p_exact_verdict,
-        const godot::Dictionary &p_predicted,
-        const godot::Dictionary &p_payload,
-        const godot::Dictionary &p_field_sink
-    );
 
     godot::Ref<NetwEntity> get_entity() const;
     bool is_registered() const;

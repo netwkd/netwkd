@@ -84,7 +84,7 @@ func test_tree_less_root_comes_online_as_a_host() -> void:
 	assert_bool(online).override_failure_message(
 		"tree-less root session never came online through a peer assignment",
 	).is_true()
-	assert_that(_host_api.is_host).is_true()
+	assert_that(_host_api.is_server()).is_true()
 	assert_that(_host_api.get_unique_id()).is_equal(1)
 
 

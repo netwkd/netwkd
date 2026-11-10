@@ -90,13 +90,37 @@ Methods
 Signals
 -------
 
+.. _class_NetwScene_signal_entity_entered:
+
+.. rst-class:: classref-signal
+
+**entity_entered**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwScene_signal_entity_entered>`
+
+Emitted when ``entity`` enters the tree inside this scene, at the same tree edge as :godot:`SceneTree.node_added <SceneTree#class_SceneTree_signal_node_added>`. An entity added while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs, such as a client building an entity the server spawned, is reported when that poll or tick ends.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwScene_signal_entity_exited:
+
+.. rst-class:: classref-signal
+
+**entity_exited**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwScene_signal_entity_exited>`
+
+Emitted when ``entity`` leaves the tree inside this scene, at the same tree edge as :godot:`SceneTree.node_removed <SceneTree#class_SceneTree_signal_node_removed>`, so :ref:`NetwEntity.root<class_NetwEntity_property_root>` still exists. An entity removed while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwScene_signal_player_entity_entered:
 
 .. rst-class:: classref-signal
 
 **player_entity_entered**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwScene_signal_player_entity_entered>`
 
-Emitted when ``entity`` joins :ref:`player_entities<class_NetwScene_property_player_entities>`.
+Emitted when ``entity`` joins :ref:`player_entities<class_NetwScene_property_player_entities>`, together with :ref:`entity_entered<class_NetwScene_signal_entity_entered>`.
 
 .. rst-class:: classref-item-separator
 
@@ -108,7 +132,7 @@ Emitted when ``entity`` joins :ref:`player_entities<class_NetwScene_property_pla
 
 **player_entity_left**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwScene_signal_player_entity_left>`
 
-Emitted when ``entity`` leaves :ref:`player_entities<class_NetwScene_property_player_entities>`.
+Emitted when ``entity`` leaves :ref:`player_entities<class_NetwScene_property_player_entities>`, together with :ref:`entity_exited<class_NetwScene_signal_entity_exited>`.
 
 .. rst-class:: classref-item-separator
 

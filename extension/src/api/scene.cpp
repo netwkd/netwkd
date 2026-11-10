@@ -14,6 +14,8 @@ namespace netw {
 
 namespace {
 
+const char *SNAME_ENTITY_ENTERED = "entity_entered";
+const char *SNAME_ENTITY_EXITED = "entity_exited";
 const char *SNAME_PLAYER_ENTITY_ENTERED = "player_entity_entered";
 const char *SNAME_PLAYER_ENTITY_LEFT = "player_entity_left";
 const char *SNAME_VIEWER_ENTERED = "viewer_entered";
@@ -207,6 +209,16 @@ bool NetwScene::is_watching(const Ref<NetwPlayer> &p_player) const {
         && session->scene_subscribes(get_rid(), p_player->get_peer_id());
 }
 
+void NetwScene::announce_entity(
+    const Ref<NetwEntity> &p_entity,
+    bool p_present
+) {
+    emit_signal(
+        p_present ? SNAME_ENTITY_ENTERED : SNAME_ENTITY_EXITED,
+        p_entity
+    );
+}
+
 void NetwScene::announce_player_entity(
     const Ref<NetwEntity> &p_entity,
     bool p_present
@@ -339,6 +351,24 @@ void NetwScene::_bind_methods() {
         &NetwScene::is_watching
     );
 
+    ADD_SIGNAL(MethodInfo(
+        SNAME_ENTITY_ENTERED,
+        PropertyInfo(
+            Variant::OBJECT,
+            "entity",
+            PROPERTY_HINT_RESOURCE_TYPE,
+            "NetwEntity"
+        )
+    ));
+    ADD_SIGNAL(MethodInfo(
+        SNAME_ENTITY_EXITED,
+        PropertyInfo(
+            Variant::OBJECT,
+            "entity",
+            PROPERTY_HINT_RESOURCE_TYPE,
+            "NetwEntity"
+        )
+    ));
     ADD_SIGNAL(MethodInfo(
         SNAME_PLAYER_ENTITY_ENTERED,
         PropertyInfo(

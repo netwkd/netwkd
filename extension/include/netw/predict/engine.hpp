@@ -80,17 +80,6 @@ predict::FieldDecl field_decl(
     int p_type = int(godot::Variant::NIL)
 );
 
-struct PlannedRecovery {
-    predict::WritePlan pool;
-    RecoveryPlan answer;
-    bool answered = false;
-};
-
-struct PlannedRows {
-    const predict::WritePlan *pool = nullptr;
-    bool answered = false;
-};
-
 struct ComparisonChoice {
     int64_t label = -1;
     int64_t key = -1;
@@ -1548,8 +1537,7 @@ public:
         int p_collision_cooldown_ticks,
         int p_domain,
         int p_attribution,
-        bool p_suppressed,
-        const RecoveryPlan *p_answer = nullptr
+        bool p_suppressed
     );
     const predict::WritePlan *recover_rows(
         int64_t p_slot,
@@ -1567,8 +1555,7 @@ public:
         int p_collision_cooldown_ticks,
         int p_domain,
         int p_attribution,
-        bool p_suppressed,
-        const predict::WritePlan *p_answer
+        bool p_suppressed
     );
     void open_recovery_window(int64_t p_slot, int64_t p_label, int p_cooldown);
     void suppress_recovery_until(
@@ -1587,10 +1574,9 @@ public:
     bool capture_canonical(int64_t p_slot, predict::StateRow &r_row);
     godot::Dictionary recovery_before_of(int64_t p_slot) const;
     godot::Dictionary recovery_write_of(int64_t p_slot) const;
-    godot::Dictionary recovery_projection_of(int64_t p_slot) const;
     godot::Dictionary recovery_carried_of(int64_t p_slot) const;
     godot::Dictionary recovery_tier_errors_of(int64_t p_slot) const;
-    PlannedRecovery plan_recovery(
+    predict::WritePlan plan_recovery(
         int64_t p_slot,
         int64_t p_ack,
         int64_t p_ack_label,
@@ -1598,10 +1584,9 @@ public:
         const godot::Dictionary &p_payload,
         bool p_escalated,
         int p_domain,
-        int p_attribution,
-        const godot::Callable &p_seam = godot::Callable()
+        int p_attribution
     );
-    PlannedRows plan_recovery_rows(
+    const predict::WritePlan *plan_recovery_rows(
         int64_t p_slot,
         int64_t p_ack,
         int64_t p_ack_label,
@@ -1609,8 +1594,7 @@ public:
         const predict::StateRow &p_payload,
         bool p_escalated,
         int p_domain,
-        int p_attribution,
-        const godot::Callable &p_seam
+        int p_attribution
     );
     void carry_rows(
         int64_t p_slot,
@@ -1626,25 +1610,15 @@ public:
         int p_ack_age_ticks,
         godot::LocalVector<double> &r_errors
     );
-    godot::Dictionary recovery_context(
-        int64_t p_slot,
-        int64_t p_ack,
-        int64_t p_ack_label,
-        int p_domain,
-        int p_attribution,
-        bool p_escalated
-    );
     bool apply_recovery_plan(
         int64_t p_slot,
         const RecoveryPlan &p_plan,
-        int64_t p_ack,
-        bool p_pool_planned
+        int64_t p_ack
     );
     bool apply_plan_rows(
         int64_t p_slot,
         const predict::WritePlan &p_plan,
-        int64_t p_ack,
-        bool p_pool_planned
+        int64_t p_ack
     );
     int open_recovery(
         int64_t p_slot,
@@ -1994,24 +1968,14 @@ public:
     void attach_bindings(repl::BindingBook *p_book);
     repl::PropertyBinding *binding_by_id(uint64_t p_id) const;
 
-    bool wants_report(int64_t p_slot, int64_t p_event) const;
-    void report_predict(
+    void record_predict(
         int64_t p_slot,
-        int64_t p_event,
-        const godot::Dictionary &p_detail,
-        const godot::Dictionary &p_model
+        int64_t p_kind,
+        int64_t p_a,
+        int64_t p_b = 0
     );
-    void report_consume(
-        int64_t p_slot,
-        int64_t p_depth,
-        int64_t p_buffer,
-        int64_t p_action
-    );
-    void announce_episode(
-        int64_t p_slot,
-        int64_t p_event,
-        const godot::Dictionary &p_extra
-    );
+    void report_consume(int64_t p_slot, int64_t p_depth, int64_t p_buffer);
+    void announce_episode(int64_t p_slot, int64_t p_event);
     bool announce_recovered(
         int64_t p_slot,
         int64_t p_transition,
@@ -2038,8 +2002,7 @@ public:
     void announce_divergence(
         int64_t p_slot,
         int64_t p_transition,
-        int64_t p_attribution,
-        double p_divergence
+        int64_t p_attribution
     );
     void report_authority_model(int64_t p_slot);
     int64_t property_class_report_hash(
@@ -2295,37 +2258,15 @@ public:
         int p_attribution,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote,
-        const godot::Callable &p_seam
+        const godot::Callable &p_demote
     );
-    godot::Dictionary recovery_predicted_of(
-        int64_t p_slot,
-        const predict::StateRow &p_predicted
-    ) const;
-    bool ask_recover_seam(
-        int64_t p_slot,
-        const predict::StateRow &p_predicted,
-        const godot::Dictionary &p_context,
-        const godot::Callable &p_seam
-    );
-    bool plan_answered(
-        const godot::Ref<NetwPredictRecovery> &p_answered,
-        int64_t p_slot
-    );
-    bool judgement_answered(
-        const godot::Ref<NetwPredictJudgement> &p_answered,
-        int64_t p_slot,
-        Judgement &r_judged
-    );
-    void refuse_seam(const godot::StringName &p_seam, int64_t p_slot);
     predict::Judged judge_state(
         int64_t p_slot,
         int64_t p_ack,
         int64_t p_domain,
         int64_t p_row_flags,
         const predict::StateRow &p_predicted,
-        const predict::StateRow &p_payload,
-        const godot::Callable &p_seam
+        const predict::StateRow &p_payload
     );
     void close_state_recovery(
         int64_t p_slot,

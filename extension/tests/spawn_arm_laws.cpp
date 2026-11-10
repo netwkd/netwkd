@@ -304,20 +304,11 @@ Node *build_crate(int64_t p_slot) {
     return crate;
 }
 
-const char *REFUSES_DECLARE = R"(extends NetwMultiplayer
-
-func _spawn_declare(_entity: RID, _recipe: Variant) -> Error:
-	return ERR_UNAUTHORIZED
-)";
-
 TEST_CASE(
     "[Networked][Spawn][SceneTree] SM5 a spawn for a player this session "
-    "does not hold, or one whose declaration is refused, answers nothing and "
-    "frees the node it built, and the same spawn for a seated player goes "
-    "through"
+    "does not hold answers nothing and frees the node it built, and the same "
+    "spawn for a seated player goes through"
 ) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*refused*[NW1000]*", 1);
     netw_test::LoopbackRig rig(0);
     rig.mount();
     NetwMultiplayer *server = rig.server();
@@ -342,18 +333,6 @@ TEST_CASE(
     CHECK(netw::gd::object_of(ObjectID(built_crate)) == nullptr);
 
     const Ref<NetwPlayer> admitted = seated(Ref<NetwMultiplayer>(server), 9);
-    const Ref<Script> refusing
-        = netw::gd::instantiate_class(StringName("GDScript"));
-    refusing->set_source_code(String(REFUSES_DECLARE));
-    refusing->reload();
-    server->set_script(refusing);
-    const RID undeclared
-        = server->spawn_registered(StringName("crate"), slot, admitted.ptr());
-    server->set_script(Variant());
-
-    CHECK_FALSE(undeclared.is_valid());
-    CHECK(netw::gd::object_of(ObjectID(built_crate)) == nullptr);
-
     const RID armed
         = server->spawn_registered(StringName("crate"), slot, admitted.ptr());
     REQUIRE(armed.is_valid());

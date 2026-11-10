@@ -7,8 +7,10 @@
 #include "godot/class_db.hpp"
 #include "godot/object.hpp"
 #include "godot/time.hpp"
+#include "netw/api/connection.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/promise.hpp"
+#include "netw/api/session.hpp"
 #include "netw/connect/creation.hpp"
 
 using namespace godot;
@@ -64,7 +66,7 @@ AttemptEvidence &attempt_evidence() {
     return evidence;
 }
 
-void record_state(int64_t, int64_t p_state, int64_t p_side) {
+void record_state(int64_t p_state, int64_t p_side) {
     attempt_evidence().sides[p_side].states.push_back(p_state);
 }
 
@@ -122,12 +124,12 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
     static Ref<netw::NetwMultiplayer> watched(Side p_side) {
         Ref<netw::NetwMultiplayer> made;
         made.instantiate();
-        made->observe(
-            netw::NetwMultiplayer::SESSION_STATE_CHANGED,
+        made->get_session()->connect(
+            StringName("state_changed"),
             callable_mp_static(&record_state).bind(int64_t(p_side))
         );
-        made->observe(
-            netw::NetwMultiplayer::CONNECTION_FAILED,
+        made->get_connection()->connect(
+            StringName("failed"),
             callable_mp_static(&record_failed).bind(int64_t(p_side))
         );
         return made;

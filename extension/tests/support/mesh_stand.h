@@ -69,7 +69,7 @@ class MeshStand {
         const godot::StringName &p_username
     ) {
         godot::Ref<netw::NetwMultiplayer> session
-            = netw::NetwMultiplayer::create(godot::Ref<godot::Script>());
+            = netw::NetwMultiplayer::create();
         REQUIRE_MESSAGE(session.is_valid(), "the session did not instantiate");
         if (session.is_valid()) {
             const godot::Ref<godot::SceneMultiplayer> inner

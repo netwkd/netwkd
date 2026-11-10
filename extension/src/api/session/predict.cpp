@@ -52,12 +52,13 @@ using namespace netw;
 
 namespace netw {
 
-Error NetwMultiplayer::predict_admit_frame_default(
+Error NetwMultiplayer::predict_admit_frame(
     int64_t p_sender,
     int64_t p_route,
     int64_t p_channel,
     const PackedByteArray &p_payload
 ) {
+    NETW_ZONE_NC("Predict admit frame", colors::PREDICTION);
     const Ref<NetwEntity> entity
         = Object::cast_to<NetwEntity>(wrapper_for_route(p_route).ptr());
     return Error(
@@ -71,27 +72,6 @@ Error NetwMultiplayer::predict_admit_frame_default(
             int(entity_frame_verdict(p_route))
         )
     );
-}
-
-Error NetwMultiplayer::predict_admit_frame(
-    int64_t p_sender,
-    int64_t p_route,
-    int64_t p_channel,
-    const PackedByteArray &p_payload
-) {
-    NETW_ZONE_NC("Predict admit frame", colors::PREDICTION);
-    Error answered = OK;
-    if (GDVIRTUAL_CALL(
-            _predict_admit_frame,
-            p_sender,
-            p_route,
-            p_channel,
-            p_payload,
-            answered
-        )) {
-        return answered;
-    }
-    return predict_admit_frame_default(p_sender, p_route, p_channel, p_payload);
 }
 
 void NetwMultiplayer::predict_relay_subscribe(
@@ -467,179 +447,6 @@ NetwPredictTiming NetwMultiplayer::tick_timing(
         clock_engine().ticktime(),
         physics_frame,
         declared_quantum()
-    );
-}
-
-Ref<NetwPredictFold> NetwMultiplayer::predict_drive(
-    int64_t p_latest_input_tick,
-    int64_t p_last_driven_input_tick,
-    int64_t p_frame_tick
-) {
-    Ref<NetwPredictFold> answered;
-    if (GDVIRTUAL_CALL(
-            _predict_drive,
-            p_latest_input_tick,
-            p_last_driven_input_tick,
-            p_frame_tick,
-            answered
-        )) {
-        return answered;
-    }
-    return predict_drive_default(
-        p_latest_input_tick,
-        p_last_driven_input_tick,
-        p_frame_tick
-    );
-}
-
-Ref<NetwPredictFold> NetwMultiplayer::predict_drive_default(
-    int64_t p_latest_input_tick,
-    int64_t p_last_driven_input_tick,
-    int64_t p_frame_tick
-) {
-    return prediction_core::predict_fold(
-        p_latest_input_tick,
-        p_last_driven_input_tick,
-        p_frame_tick
-    );
-}
-
-NetwPrediction::ConsumeAction NetwMultiplayer::predict_consume(
-    int p_depth,
-    int p_buffer
-) {
-    NetwPrediction::ConsumeAction answered
-        = NetwPrediction::CONSUME_ACTION_REPLAY;
-    if (GDVIRTUAL_CALL(_predict_consume, p_depth, p_buffer, answered)) {
-        return answered;
-    }
-    return predict_consume_default(p_depth, p_buffer);
-}
-
-NetwPrediction::ConsumeAction NetwMultiplayer::predict_consume_default(
-    int p_depth,
-    int p_buffer
-) {
-    return NetwPrediction::ConsumeAction(
-        prediction_core::consume_action(p_depth, p_buffer)
-    );
-}
-
-Ref<NetwPredictJudgement> NetwMultiplayer::predict_evaluate(
-    NetwPrediction::Domain p_domain,
-    NetwPrediction::ExactVerdict p_verdict,
-    const Dictionary &p_predicted,
-    const Dictionary &p_payload,
-    const Dictionary &p_wiring,
-    const Dictionary &p_field_sink
-) {
-    Ref<NetwPredictJudgement> answered;
-    if (GDVIRTUAL_CALL(
-            _predict_evaluate,
-            p_domain,
-            p_verdict,
-            p_predicted,
-            p_payload,
-            p_wiring,
-            p_field_sink,
-            answered
-        )) {
-        return answered;
-    }
-    return predict_evaluate_default(
-        p_domain,
-        p_verdict,
-        p_predicted,
-        p_payload,
-        p_wiring,
-        p_field_sink
-    );
-}
-
-Ref<NetwPredictJudgement> NetwMultiplayer::predict_evaluate_default(
-    NetwPrediction::Domain p_domain,
-    NetwPrediction::ExactVerdict p_verdict,
-    const Dictionary &p_predicted,
-    const Dictionary &p_payload,
-    const Dictionary &p_wiring,
-    const Dictionary &p_field_sink
-) {
-    return prediction_core::evaluate(
-        p_domain,
-        p_verdict,
-        p_predicted,
-        p_payload,
-        p_wiring,
-        p_field_sink
-    );
-}
-
-Ref<NetwPredictRecovery> NetwMultiplayer::predict_recover(
-    const Dictionary &p_payload,
-    const Dictionary &p_predicted,
-    NetwPrediction::RecoveryPolicy p_policy,
-    NetwSimulation::Restore p_snap_restore,
-    const Dictionary &p_projection,
-    const Dictionary &p_current,
-    const Dictionary &p_pose_errors,
-    const Dictionary &p_wiring,
-    const Dictionary &p_verdict,
-    double p_tick_delta
-) {
-    Ref<NetwPredictRecovery> answered;
-    if (GDVIRTUAL_CALL(
-            _predict_recover,
-            p_payload,
-            p_predicted,
-            p_policy,
-            p_snap_restore,
-            p_projection,
-            p_current,
-            p_pose_errors,
-            p_wiring,
-            p_verdict,
-            p_tick_delta,
-            answered
-        )) {
-        return answered;
-    }
-    return predict_recover_default(
-        p_payload,
-        p_predicted,
-        p_policy,
-        p_snap_restore,
-        p_projection,
-        p_current,
-        p_pose_errors,
-        p_wiring,
-        p_verdict,
-        p_tick_delta
-    );
-}
-
-Ref<NetwPredictRecovery> NetwMultiplayer::predict_recover_default(
-    const Dictionary &p_payload,
-    const Dictionary &p_predicted,
-    NetwPrediction::RecoveryPolicy p_policy,
-    NetwSimulation::Restore p_snap_restore,
-    const Dictionary &p_projection,
-    const Dictionary &p_current,
-    const Dictionary &p_pose_errors,
-    const Dictionary &p_wiring,
-    const Dictionary &p_verdict,
-    double p_tick_delta
-) {
-    return prediction_core::recover(
-        p_payload,
-        p_predicted,
-        p_policy,
-        p_snap_restore,
-        p_projection,
-        p_current,
-        p_pose_errors,
-        p_wiring,
-        p_verdict,
-        p_tick_delta
     );
 }
 
@@ -1499,7 +1306,6 @@ void NetwMultiplayer::session_cancel_deferred(const StringName &p_key) {
 }
 
 PackedStringArray NetwMultiplayer::settle_drain() {
-    plane.drain_staged();
     return settle_queue.drain();
 }
 
@@ -1652,7 +1458,7 @@ void NetwMultiplayer::register_prediction(const Ref<NetwEntity> &p_entity) {
     if (handle.is_valid()) {
         handle->bind_engine(engine);
     }
-    engine->attach(session_api(), p_entity);
+    engine->attach(this, p_entity);
 }
 
 void NetwMultiplayer::unregister_prediction(const Ref<NetwEntity> &p_entity) {

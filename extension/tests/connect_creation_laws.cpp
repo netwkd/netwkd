@@ -212,8 +212,8 @@ struct Bench {
             String("Creation")
         );
         core.instantiate();
-        core->observe(
-            NetwMultiplayer::CONNECTION_PROGRESSED,
+        core->get_connection()->connect(
+            StringName("progressed"),
             callable_mp_static(&on_progress)
         );
         answer().target = core.ptr();

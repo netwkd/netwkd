@@ -403,6 +403,43 @@ public sealed class NetwSession : NetwRefCounted
         remove => DisconnectBridge("server_transferred", value);
     }
 
+    /// <summary>
+    /// Emitted on the server when <c>requester</c> asks to kick <c>target</c>
+    /// with <see cref="NetwSession.RequestKick"/>.
+    /// <see cref="NetwSession.Kick"/> performs it.
+    /// </summary>
+    public event Action<NetwPlayer, NetwPlayer, string> KickRequested
+    {
+        add => ConnectBridge(
+            "kick_requested",
+            value,
+            Callable.From(
+                (Variant a0, Variant a1, string a2) =>
+                    value(
+                        Wrapped(a0, NetwPlayer.From),
+                        Wrapped(a1, NetwPlayer.From),
+                        a2)
+            )
+        );
+        remove => DisconnectBridge("kick_requested", value);
+    }
+
+    /// <summary>
+    /// Emitted after <c>scene</c> leaves <see cref="NetwSession.Scenes"/>.
+    /// </summary>
+    public event Action<NetwScene> SceneRemoved
+    {
+        add => ConnectBridge(
+            "scene_removed",
+            value,
+            Callable.From(
+                (Variant a0) =>
+                    value(Wrapped(a0, NetwScene.From))
+            )
+        );
+        remove => DisconnectBridge("scene_removed", value);
+    }
+
     private static readonly IntPtr _bindGetPlayers =
         NetwApi.MethodBind("NetwSession", "get_players", 3995934104UL);
 
@@ -612,26 +649,6 @@ public sealed class NetwSession : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetStats =
-        NetwApi.MethodBind("NetwSession", "get_stats", 3102165223UL);
-
-    /// <summary>
-    /// Every counter this session keeps, keyed by
-    /// <see cref="NetwMultiplayer.Stat"/>.
-    /// </summary>
-    public Godot.Collections.Dictionary Stats
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetStats, Checked, ref answered);
-            Godot.Collections.Dictionary result =
-                VariantUtils.ConvertToDictionary(answered);
-            answered.Dispose();
-            return result;
-        }
-    }
-
     private static readonly IntPtr _bindGetClock =
         NetwApi.MethodBind("NetwSession", "get_clock", 3440571674UL);
 
@@ -754,6 +771,28 @@ public sealed class NetwSession : NetwRefCounted
             ref discarded);
     }
 
+    private static readonly IntPtr _bindStat =
+        NetwApi.MethodBind("NetwSession", "stat", 1409237031UL);
+
+    /// <summary>
+    /// Returns one of this session's counters, the same value
+    /// <see cref="NetwMultiplayer.StatsGet"/> reads.
+    /// <code>
+    /// var corrections := session.stat(NetwMultiplayer.STAT_PREDICT_CORRECTIONS)
+    /// </code>
+    /// </summary>
+    public long Stat(NetwMultiplayer.Stat stat)
+    {
+        long slot0 = (long)stat;
+        long answered = default;
+        NetwThunks.Ptrcall1_Long_Long(
+            _bindStat,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
     private static readonly IntPtr _bindSetPeerBandwidth =
         NetwApi.MethodBind("NetwSession", "set_peer_bandwidth", 3937882851UL);
 
@@ -777,6 +816,46 @@ public sealed class NetwSession : NetwRefCounted
             in slot0,
             in slot1,
             ref discarded);
+    }
+
+    private static readonly IntPtr _bindLinkStats =
+        NetwApi.MethodBind("NetwSession", "link_stats", 3485342025UL);
+
+    /// <summary>
+    /// Measured connection quality to <paramref name="peer"/>, and what this
+    /// peer's byte budget sends it.
+    /// <code>
+    /// Dictionary
+    /// ┠╴loss           float   share of the last 32 packets lost
+    /// ┠╴rtt            float   round trip time, in seconds
+    /// ┠╴jitter         float   round trip variation, in seconds
+    /// ┠╴reorders       int     packets that arrived out of order
+    /// ┠╴duplicates     int     packets that arrived twice
+    /// ┠╴mode           String  "good", or "bad" while its budget is cut
+    /// ┠╴budget_bits    int     most bits one packet to this peer may use
+    /// ┠╴budget_bytes   int     bytes it may be sent each tick
+    /// ┠╴sent_bytes     int     bytes charged to it since it joined
+    /// ┠╴debt_bytes     int     bytes it was sent past its budget
+    /// ┖╴deferred_rows  int     rows left waiting by the last tick
+    /// </code>
+    /// <para>
+    /// Losing packets halves <c>budget_bytes</c> and <c>budget_bits</c>. Each
+    /// round trip without loss adds back an eighth of the configured budget,
+    /// stopping an eighth short of the rate that lost packets for the next
+    /// minute. While <c>debt_bytes</c> is above zero, volatile properties wait,
+    /// and retained properties and RPCs still go.
+    /// </para>
+    /// </summary>
+    public Godot.Collections.Dictionary LinkStats(long peer)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindLinkStats, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        Godot.Collections.Dictionary result =
+            VariantUtils.ConvertToDictionary(answered);
+        answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindTransferServer =
@@ -948,6 +1027,32 @@ public sealed class NetwSession : NetwRefCounted
         Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindRequestKick =
+        NetwApi.MethodBind("NetwSession", "request_kick", 3199686229UL);
+
+    /// <summary>
+    /// Asks the server to kick <paramref name="player"/>. The server receives
+    /// <see cref="NetwSession.KickRequested"/> and decides. <b>Player
+    /// request.</b>
+    /// </summary>
+    public void RequestKick(NetwPlayer player, string reason = "")
+    {
+        godot_variant slot0 =
+            VariantUtils.CreateFromGodotObjectPtr(
+                player?.Native ?? IntPtr.Zero);
+        godot_variant slot1 = VariantUtils.CreateFromString(reason);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindRequestKick,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        answered.Dispose();
     }
 
     private static readonly IntPtr _bindFindScene =

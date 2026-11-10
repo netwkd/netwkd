@@ -7,6 +7,7 @@
 
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/table.hpp"
 #include "netw/schema_core.hpp"
 #include "netw/schema_model.hpp"
 
@@ -141,14 +142,14 @@ TEST_CASE(
     NetwMultiplayer *host = rig.server();
     NetwMultiplayer *guest = rig.client(0);
     const RID table = host->table_find_or_adopt("FlowMob");
-    Vector<StringName> watched;
-    watched.push_back(StringName("table_received"));
-    const Recorder heard(guest, watched);
+    const Ref<netw::NetwTable> door = netw::NetwTable::named(guest, "FlowMob");
+    REQUIRE(door.is_valid());
+    const Recorder heard(door.ptr(), {"received"});
 
     const PackedInt64Array first = host->liveness_claim_routes(2);
     publish(host, table, first, int32s({1, 2}));
     rig.step_ticks(3);
-    NETW_CHECK_EQ(heard.count("table_received"), 1);
+    NETW_CHECK_EQ(heard.count("received"), 1);
 
     const RID mirror = guest->table_find("FlowMob");
     NETW_CHECK_EQ(int(mirror.is_valid()), 1);
@@ -162,7 +163,7 @@ TEST_CASE(
     publish(host, table, int64s({first[0], second[0]}), int32s({3, 4}));
     rig.step_ticks(3);
 
-    NETW_CHECK_EQ(heard.count("table_received"), 2);
+    NETW_CHECK_EQ(heard.count("received"), 2);
     NETW_CHECK_EQ(guest->table_read_births(mirror).size(), 1);
     NETW_CHECK_EQ(guest->table_read_deaths(mirror).size(), 1);
 }
@@ -267,15 +268,13 @@ TEST_CASE(
     LoopbackRig rig(1);
     NetwMultiplayer *host = rig.server();
     const RID table = host->table_find_or_adopt("FlowMob");
-    Vector<StringName> watched;
-    watched.push_back(StringName("table_received"));
-    const Recorder heard(host, watched);
+    const Recorder heard(host->get_table_handle(table).ptr(), {"received"});
 
     const PackedInt64Array routes = host->liveness_claim_routes(2);
     publish(host, table, routes, int32s({41, 42}));
     rig.step_ticks(2);
 
-    NETW_CHECK_EQ(heard.count("table_received"), 1);
+    NETW_CHECK_EQ(heard.count("received"), 1);
     NETW_CHECK_EQ(host->table_read_routes(table).size(), 2);
     const PackedInt32Array mine = host->table_read_column(table, 1);
     NETW_CHECK_EQ(mine.size(), 2);

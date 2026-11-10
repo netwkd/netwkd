@@ -1,20 +1,11 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
-#include <mutex>
 
-#include "godot/callable.hpp"
 #include "godot/local_vector.hpp"
-#include "godot/ref_counted.hpp"
-#include "godot/rid.hpp"
-#include "godot/templates.hpp"
 #include "godot/variant.hpp"
-#include "netw/profile.hpp"
 
 namespace netw {
-
-class NetwMultiplayer;
 
 class EventPlane {
 public:
@@ -63,9 +54,7 @@ public:
         TABLE_COMMIT = 74,
 
         VERDICT = 96,
-        SEAM_MISUSE = 97,
 
-        SESSION_STATE = 112,
         PEER_JOINED = 113,
         PEER_LEFT = 114,
         PEER_AUTH_FAILED = 115,
@@ -77,118 +66,38 @@ public:
         ACK_ADVANCED = 131,
     };
 
-    enum Phase : int64_t {
-        BEFORE = 0,
-        AFTER = 1,
-    };
-
     static constexpr int64_t EVENT_LIMIT = 144;
-    static constexpr int RING_CAPACITY = 64;
+    static constexpr int64_t ROW_WIDTH = 8;
+    static constexpr uint32_t ROW_CAPACITY = 4096;
 
-    struct Emission {
-        int64_t event = 0;
-        int64_t phase = AFTER;
+    struct Row {
+        int64_t kind = 0;
         int64_t tick = 0;
+        int64_t entity = 0;
         int64_t route = 0;
-        godot::StringName entity_id;
         int64_t peer = 0;
         int64_t verdict = 0;
-        godot::Dictionary detail;
-        godot::Dictionary model;
-
-        Emission() = default;
-        Emission(int64_t p_event, int64_t p_phase, int64_t p_tick)
-            : event(p_event), phase(p_phase), tick(p_tick) {
-        }
+        int64_t a = 0;
+        int64_t b = 0;
     };
+    static_assert(sizeof(Row) == sizeof(int64_t) * ROW_WIDTH);
 
-    static bool is_event(int64_t event);
-    static const char *group_of(int64_t event);
     static const char *name_of(int64_t event);
-    static bool is_terminal(int64_t event);
     static int taxonomy_size();
     static int64_t value_at(int index);
 
-    int64_t watch(
-        NetwMultiplayer *session,
-        const godot::PackedInt64Array &events,
-        const godot::Dictionary &target,
-        const godot::Dictionary &predicate,
-        const godot::Callable &sink,
-        const godot::Dictionary &opts
-    );
-    bool unwatch(int64_t id);
-    godot::TypedArray<godot::Dictionary> watches() const;
-
-    bool wants(int64_t event, int64_t route) const;
-    void emit(const Emission &fact);
-    void stage(const Emission &fact);
-    void drain_staged();
-
-    godot::TypedArray<godot::Dictionary> ring(int64_t route);
-    void ring_clear(int64_t route);
-
-    void set_armed(bool enabled);
-    bool is_armed() const;
-
-    void clear();
+    void arm(int64_t groups);
+    bool records(int64_t kind) const {
+        return kind >= 0 && kind < EVENT_LIMIT
+            && (recorded_groups & (int64_t(1) << (kind >> 4))) != 0;
+    }
+    void keep(const Row &row);
+    godot::PackedInt64Array drain();
 
 private:
-    struct Watch {
-        int64_t id = 0;
-        godot::LocalVector<int64_t> events;
-        int64_t phase = AFTER;
-        int64_t route = 0;
-        godot::StringName entity_id;
-        int64_t peer = 0;
-        godot::Dictionary predicate;
-        godot::Callable sink;
-        bool enabled = true;
-        bool once = false;
-        bool dedupe = false;
-        godot::String note;
-        int64_t hit_count = 0;
-        godot::HashMap<int64_t, godot::HashSet<int64_t>> claimed;
-    };
-
-    struct Ring {
-        godot::LocalVector<Emission> rows;
-        int head = 0;
-    };
-
-    godot::LocalVector<Watch> rows;
-    godot::HashMap<int64_t, Ring> rings;
-    godot::HashMap<int64_t, godot::Dictionary> snapshots;
-    godot::HashMap<int64_t, godot::StringName> identities;
-    int64_t next_id = 1;
-
-    std::atomic_bool armed_for_lane_threads = {false};
-    std::atomic<int32_t> hot_for_lane_threads[EVENT_LIMIT] = {};
-
-    mutable NETW_LOCKABLE(std::mutex, staged_lock);
-    godot::LocalVector<Emission> staged;
-
-    void rebuild_hot();
-    bool matches(const Watch &row, const Emission &fact) const;
-    void deliver(const Emission &fact);
-    void record(int64_t route, const Emission &fact);
+    int64_t recorded_groups = 0;
+    godot::LocalVector<Row> kept;
+    uint32_t kept_head = 0;
 };
-
-godot::Dictionary event_record(const EventPlane::Emission &fact);
-
-namespace event_key {
-
-const godot::StringName &event();
-const godot::StringName &event_name();
-const godot::StringName &phase();
-const godot::StringName &tick();
-const godot::StringName &route();
-const godot::StringName &entity_id();
-const godot::StringName &peer();
-const godot::StringName &verdict();
-const godot::StringName &detail();
-const godot::StringName &model();
-
-} // namespace event_key
 
 } // namespace netw

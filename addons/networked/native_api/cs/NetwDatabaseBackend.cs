@@ -46,25 +46,20 @@ public class NetwDatabaseBackend : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
-    private static readonly IntPtr _bindOpenDefault =
-        NetwApi.MethodBind("NetwDatabaseBackend", "open_default", 4122934444UL);
+    private static readonly IntPtr _bindOpen =
+        NetwApi.MethodBind("NetwDatabaseBackend", "open", 4122934444UL);
 
     /// <summary>
-    /// The stock <c>_open</c>, which rejects with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. A subclass overriding <c>_open</c>
-    /// calls this to reach it.
+    /// Resolves a <see cref="NetwDatabaseConnection"/> for
+    /// <paramref name="slot"/> through <c>_open</c>, or through the backend's
+    /// own storage when no script overrides it.
     /// </summary>
-    public NetwPromise OpenDefault(GodotObject session, StringName slot)
+    public NetwPromise Open(GodotObject session, StringName slot)
     {
         godot_variant slot0 = VariantUtils.CreateFromGodotObject(session);
         godot_variant slot1 = VariantUtils.CreateFromStringName(slot);
         godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindOpenDefault,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
+        NetwThunks.Call2(_bindOpen, Checked, in slot0, in slot1, ref answered);
         slot0.Dispose();
         slot1.Dispose();
         NetwPromise result =
@@ -75,47 +70,40 @@ public class NetwDatabaseBackend : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindListSlotsDefault =
-        NetwApi.MethodBind(
-            "NetwDatabaseBackend",
-            "list_slots_default",
-            3111021262UL);
+    private static readonly IntPtr _bindListSlots =
+        NetwApi.MethodBind("NetwDatabaseBackend", "list_slots", 3111021262UL);
 
     /// <summary>
-    /// The stock <c>_list_slots</c>, which rejects with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. A subclass overriding
-    /// <c>_list_slots</c> calls this to reach it.
+    /// Resolves every slot in storage through <c>_list_slots</c>, or through
+    /// the backend's own storage when no script overrides it.
     /// </summary>
-    public NetwPromise ListSlotsDefault(GodotObject session)
+    public NetwPromise ListSlots(GodotObject session)
     {
         IntPtr slot0 = session?.NativeInstance ?? IntPtr.Zero;
         IntPtr answered = default;
         NetwThunks.Ptrcall1_IntPtr_IntPtr(
-            _bindListSlotsDefault,
+            _bindListSlots,
             Checked,
             in slot0,
             ref answered);
         return NetwPromise.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindDeleteSlotDefault =
-        NetwApi.MethodBind(
-            "NetwDatabaseBackend",
-            "delete_slot_default",
-            4122934444UL);
+    private static readonly IntPtr _bindDeleteSlot =
+        NetwApi.MethodBind("NetwDatabaseBackend", "delete_slot", 4122934444UL);
 
     /// <summary>
-    /// The stock <c>_delete_slot</c>, which rejects with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c>. A subclass overriding
-    /// <c>_delete_slot</c> calls this to reach it.
+    /// Removes <paramref name="slot"/> through <c>_delete_slot</c>, or through
+    /// the backend's own storage when no script overrides it.
+    /// <paramref name="session"/> may be <c>null</c> when no session is asking.
     /// </summary>
-    public NetwPromise DeleteSlotDefault(GodotObject session, StringName slot)
+    public NetwPromise DeleteSlot(GodotObject session, StringName slot)
     {
         godot_variant slot0 = VariantUtils.CreateFromGodotObject(session);
         godot_variant slot1 = VariantUtils.CreateFromStringName(slot);
         godot_variant answered = default;
         NetwThunks.Call2(
-            _bindDeleteSlotDefault,
+            _bindDeleteSlot,
             Checked,
             in slot0,
             in slot1,

@@ -250,14 +250,14 @@ TEST_CASE(
     world.set_source(at, Source::LOCAL);
     const uint32_t peer = world.peer_join(PEER);
     world.admit(at, peer, true);
-    world.pull(table, 1, false);
+    world.pull(table, 1);
     seat(world, 5, 100);
     confirm(world, at, 1);
     const bool settled = !held.peers[peer].owed.get(at.row);
     CHECK(settled);
 
     node->set_position(Vector2(3.0, 1.0));
-    world.pull(table, 2, false);
+    world.pull(table, 2);
 
     CHECK(held.peers[peer].owed.get(at.row));
     memdelete(node);

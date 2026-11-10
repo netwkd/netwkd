@@ -817,7 +817,7 @@ TEST_CASE(
         }
     }
     REQUIRE(enet.is_valid());
-    Ref<NetwMultiplayer> hosted = NetwMultiplayer::create(Ref<Script>());
+    Ref<NetwMultiplayer> hosted = NetwMultiplayer::create();
     hosted->NETW_API_VIRTUAL(set_multiplayer_peer)(enet);
     NETW_REQUIRE_EQ(
         int(hosted->session_get_state()),

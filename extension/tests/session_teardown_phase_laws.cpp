@@ -1,8 +1,6 @@
+#include "support/loopback_rig.h"
 #include "support/netw_test.h"
 
-#include <memory>
-
-#include "godot/callable.hpp"
 #include "godot/node.hpp"
 #include "godot/object.hpp"
 #include "godot/spatial_node.hpp"
@@ -11,6 +9,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_slot_engine.hpp"
+#include "netw/api/session.hpp"
 #include "netw/display/book.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/session_core.hpp"
@@ -23,108 +22,12 @@ using netw::NetwMultiplayer;
 using netw::SessionCore;
 using netw_test::Recorder;
 
-const char *ENDED = "session_ended";
-const char *RECLAIMED = "session_reclaimed";
-
-enum PhaseAct {
-    ACT_NOTE,
-    ACT_OBSERVE,
-    ACT_FREE,
-};
-
-struct PhaseLog {
-    Vector<StringName> order;
-    ObjectID watched;
-    Vector<int> watched_was_live;
-};
-
-class PhaseSink final : public CallableCustom {
-    std::shared_ptr<PhaseLog> log;
-    StringName tag;
-    PhaseAct act;
-    ObjectID anchor;
-
-    static bool same(const CallableCustom *a, const CallableCustom *b) {
-        return a == b;
-    }
-
-    static bool before(const CallableCustom *a, const CallableCustom *b) {
-        return a < b;
-    }
-
-public:
-    PhaseSink(
-        const std::shared_ptr<PhaseLog> &p_log,
-        const StringName &p_tag,
-        PhaseAct p_act,
-        const Object *p_anchor
-    )
-        : log(p_log), tag(p_tag), act(p_act),
-          anchor(netw::gd::instance_id(p_anchor)) {
-    }
-
-    uint32_t hash() const override {
-        return uint32_t(uintptr_t(this));
-    }
-
-    String get_as_text() const override {
-        return String("PhaseSink::") + String(tag);
-    }
-
-    CompareEqualFunc get_compare_equal_func() const override {
-        return &PhaseSink::same;
-    }
-
-    CompareLessFunc get_compare_less_func() const override {
-        return &PhaseSink::before;
-    }
-
-    ObjectID get_object() const override {
-        return anchor;
-    }
-
-    void call(
-        const Variant **,
-        int,
-        Variant &r_return_value,
-        netw::gd::CallError &r_call_error
-    ) const override {
-        log->order.push_back(tag);
-        Object *held = netw::gd::object_of(log->watched);
-        if (act == ACT_OBSERVE) {
-            log->watched_was_live.push_back(held != nullptr ? 1 : 0);
-        } else if (act == ACT_FREE && held != nullptr) {
-            memdelete(held);
-        }
-        r_return_value = Variant();
-        netw::gd::call_ok(r_call_error);
-    }
-};
-
 Ref<NetwMultiplayer> online() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
     core->session_plane().transition(SessionCore::STATE_CONNECTING);
     core->session_plane().transition(SessionCore::STATE_ONLINE);
     return core;
-}
-
-Callable sink(
-    const std::shared_ptr<PhaseLog> &p_log,
-    const char *p_tag,
-    PhaseAct p_act,
-    const Object *p_anchor
-) {
-    return Callable(
-        memnew(PhaseSink(p_log, StringName(p_tag), p_act, p_anchor))
-    );
-}
-
-Vector<StringName> both_phases_reversed() {
-    Vector<StringName> watched;
-    watched.push_back(StringName(RECLAIMED));
-    watched.push_back(StringName(ENDED));
-    return watched;
 }
 
 TEST_CASE(
@@ -152,136 +55,101 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] TP1 the emitter decides which teardown "
-    "phase runs first, so a listener connected to the reclaim ahead of every "
-    "announcement listener still runs after all of them"
-) {
-    Ref<NetwMultiplayer> core = online();
-    const Recorder heard(core.ptr(), both_phases_reversed());
-
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
-
-    const Vector<StringName> order = heard.order();
-    REQUIRE(order.size() == 2);
-    CHECK(order[0] == StringName(ENDED));
-    CHECK(order[1] == StringName(RECLAIMED));
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted] TP2 a node a reclaim listener frees is "
-    "still live for every announcement listener, which is the whole reason "
-    "the phases are two"
-) {
-    Ref<NetwMultiplayer> core = online();
-    Node *stage = memnew(Node);
-    const std::shared_ptr<PhaseLog> log = std::make_shared<PhaseLog>();
-    log->watched = netw::gd::instance_id(stage);
-    core->observe(
-        NetwMultiplayer::SESSION_ENDED,
-        sink(log, "observe", ACT_OBSERVE, core.ptr())
-    );
-    core->observe(
-        NetwMultiplayer::SESSION_RECLAIMED,
-        sink(log, "free", ACT_FREE, core.ptr())
-    );
-
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
-
-    REQUIRE(log->order.size() == 2);
-    CHECK(log->order[0] == StringName("observe"));
-    CHECK(log->order[1] == StringName("free"));
-    REQUIRE(log->watched_was_live.size() == 1);
-    NETW_CHECK_EQ(log->watched_was_live[0], 1);
-    CHECK(netw::gd::object_of(log->watched) == nullptr);
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted] TP3 freeing on the announcement hands the "
-    "next announcement listener a node that no longer exists, and connecting "
-    "first is what buys that, so connect order is no defense"
-) {
-    Ref<NetwMultiplayer> core = online();
-    Node *stage = memnew(Node);
-    const std::shared_ptr<PhaseLog> log = std::make_shared<PhaseLog>();
-    log->watched = netw::gd::instance_id(stage);
-    core->observe(
-        NetwMultiplayer::SESSION_ENDED,
-        sink(log, "free", ACT_FREE, core.ptr())
-    );
-    core->observe(
-        NetwMultiplayer::SESSION_ENDED,
-        sink(log, "observe", ACT_OBSERVE, core.ptr())
-    );
-
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
-
-    REQUIRE(log->order.size() == 2);
-    CHECK(log->order[0] == StringName("free"));
-    REQUIRE(log->watched_was_live.size() == 1);
-    NETW_CHECK_EQ(log->watched_was_live[0], 0);
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted] TP4 the reclaim rides the announcement's "
-    "own edge, so it fires once per ending and never for a bring-up that was "
+    "[Networked][Session][Hosted] TP4 exiting rides the ending edge ahead of "
+    "exited, so it fires once per ending and never for a bring-up that was "
     "not live"
 ) {
     Ref<NetwMultiplayer> failed;
     failed.instantiate();
-    const Recorder unlived(failed.ptr(), both_phases_reversed());
+    const Recorder unlived(failed->get_session().ptr(), {"exiting"});
     failed->session_plane().transition(SessionCore::STATE_CONNECTING);
     failed->session_plane().transition(SessionCore::STATE_OFFLINE);
 
-    NETW_CHECK_EQ(unlived.count(StringName(ENDED)), 0);
-    NETW_CHECK_EQ(unlived.count(StringName(RECLAIMED)), 0);
+    NETW_CHECK_EQ(unlived.count(StringName("exiting")), 0);
 
     Ref<NetwMultiplayer> core = online();
-    const Recorder heard(core.ptr(), both_phases_reversed());
+    const Recorder heard(core->get_session().ptr(), {"exiting", "exited"});
     core->session_plane().transition(SessionCore::STATE_ONLINE);
 
-    NETW_CHECK_EQ(heard.count(StringName(RECLAIMED)), 0);
+    NETW_CHECK_EQ(heard.count(StringName("exiting")), 0);
 
     core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
     core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
 
-    NETW_CHECK_EQ(heard.count(StringName(ENDED)), 1);
-    NETW_CHECK_EQ(heard.count(StringName(RECLAIMED)), 1);
+    NETW_CHECK_EQ(heard.count(StringName("exiting")), 1);
+    NETW_CHECK_EQ(heard.count(StringName("exited")), 0);
+}
+
+#if defined(NETW_TIER_HOSTED)
+
+const char *BODY_ID = "teardown_body";
+
+Node *build_body(const Variant &p_name) {
+    Node2D *made = memnew(Node2D);
+    made->set_name(String(p_name));
+    return made;
+}
+
+struct ExitingSight {
+    ObjectID replica;
+    int heard = 0;
+    bool replica_standing = false;
+};
+
+ExitingSight &exiting_sight() {
+    static ExitingSight sight;
+    return sight;
+}
+
+bool standing(const ObjectID &p_id) {
+    const Node *node = Object::cast_to<Node>(netw::gd::object_of(p_id));
+    return node != nullptr && !node->is_queued_for_deletion();
+}
+
+void see_at_exiting(int64_t, const String &) {
+    exiting_sight().heard += 1;
+    exiting_sight().replica_standing = standing(exiting_sight().replica);
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] TP5 republishing the phases through the "
-    "session shell preserves them, so a listener on the shell's announcement "
-    "reads a node the machine's reclaim listener has not freed yet"
+    "[Networked][Session][SceneTree] TP2 a node the session spawned still "
+    "stands for an exiting listener, and is freed once exiting returns"
 ) {
-    Ref<NetwMultiplayer> core;
-    core.instantiate();
-    SessionCore &machine = core->session_plane();
-    machine.transition(SessionCore::STATE_CONNECTING);
-    machine.transition(SessionCore::STATE_ONLINE);
-
-    Node *stage = memnew(Node);
-    const std::shared_ptr<PhaseLog> log = std::make_shared<PhaseLog>();
-    log->watched = netw::gd::instance_id(stage);
-    core->observe(
-        NetwMultiplayer::SESSION_ENDED,
-        sink(log, "observe", ACT_OBSERVE, core.ptr())
+    netw_test::LoopbackRig rig(1);
+    rig.mount();
+    Node *arena = rig.mirror_child("Arena");
+    Array types;
+    types.push_back(int(Variant::STRING));
+    Array named;
+    named.push_back(String("Kept"));
+    const int route = rig.spawn_registered(
+        StringName(BODY_ID),
+        callable_mp_static(&build_body),
+        named,
+        types,
+        arena,
+        Variant(),
+        false
     );
-    core->observe(
-        NetwMultiplayer::SESSION_RECLAIMED,
-        sink(log, "free", ACT_FREE, core.ptr())
+    rig.pump(10);
+    Node *replica = rig.route_node(route, 0);
+    REQUIRE(replica != nullptr);
+    exiting_sight() = ExitingSight();
+    exiting_sight().replica = netw::gd::instance_id(replica);
+    rig.client(0)->get_session()->connect(
+        StringName("exiting"),
+        callable_mp_static(&see_at_exiting)
     );
-    const Recorder heard(core.ptr(), both_phases_reversed());
 
-    machine.transition(SessionCore::STATE_DISCONNECTING);
+    rig.client(0)->session_relay_peer_disconnected(1);
 
-    const Vector<StringName> order = heard.order();
-    REQUIRE(order.size() == 2);
-    CHECK(order[0] == StringName(ENDED));
-    CHECK(order[1] == StringName(RECLAIMED));
-    REQUIRE(log->watched_was_live.size() == 1);
-    NETW_CHECK_EQ(log->watched_was_live[0], 1);
-    CHECK(netw::gd::object_of(log->watched) == nullptr);
+    NETW_CHECK_EQ(exiting_sight().heard, 1);
+    CHECK(exiting_sight().replica_standing);
+    CHECK_FALSE(standing(exiting_sight().replica));
+    exiting_sight() = ExitingSight();
 }
+
+#endif
 
 TEST_CASE(
     "[Networked][Session][Hosted] TP6 session shutdown drops interpolation "

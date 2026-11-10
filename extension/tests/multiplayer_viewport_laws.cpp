@@ -181,7 +181,7 @@ TEST_CASE(
 
     MultiplayerViewport *tree = memnew(MultiplayerViewport);
     tree->set_name("MT10Tree");
-    const Ref<NetwMultiplayer> chosen = NetwMultiplayer::create(Ref<Script>());
+    const Ref<NetwMultiplayer> chosen = NetwMultiplayer::create();
     REQUIRE(chosen.is_valid());
     tree->set_api(chosen);
     NETW_CHECK_EQ(int(tree->get_api() == chosen), 1);
@@ -193,7 +193,7 @@ TEST_CASE(
         = scene->get_multiplayer(tree->get_path());
     NETW_CHECK_EQ(int(mounted.ptr() == chosen.ptr()), 1);
 
-    const Ref<NetwMultiplayer> late = NetwMultiplayer::create(Ref<Script>());
+    const Ref<NetwMultiplayer> late = NetwMultiplayer::create();
     tree->set_api(late);
     NETW_CHECK_EQ(int(tree->get_api() == chosen), 1);
     const Ref<MultiplayerAPI> still = scene->get_multiplayer(tree->get_path());

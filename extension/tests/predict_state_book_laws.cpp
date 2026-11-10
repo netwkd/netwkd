@@ -155,8 +155,7 @@ TEST_CASE(
             int64_t(netw::predict::Domain::IN_DOMAIN),
             0,
             predicted,
-            predicted,
-            Callable()
+            predicted
         );
         agreed += judged.corrected ? 0 : 1;
     };

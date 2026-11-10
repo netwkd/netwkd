@@ -51,7 +51,8 @@ namespace Networked;
 /// variable, not a member, since another request may start while one awaits.
 /// With no report, the request fails after <c>_timeout_hint</c> seconds.
 /// Methods starting with an underscore are overridden. Each has a public method
-/// that calls it, and a <c>_default</c> method with the default behavior.
+/// that calls it. A method the script does not override gives the default its
+/// description names.
 /// </para>
 /// </remarks>
 public sealed class NetwTransport : NetwRefCounted
@@ -94,8 +95,8 @@ public sealed class NetwTransport : NetwRefCounted
         NetwApi.MethodBind("NetwTransport", "peer_class", 2737447660UL);
 
     /// <summary>
-    /// Calls <c>_peer_class</c>, or
-    /// <see cref="NetwTransport.PeerClassDefault"/>.
+    /// Calls <c>_peer_class</c>, or returns an empty <see cref="StringName"/>
+    /// when it is not overridden.
     /// </summary>
     public StringName PeerClass()
     {
@@ -106,27 +107,13 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindPeerClassDefault =
-        NetwApi.MethodBind("NetwTransport", "peer_class_default", 2737447660UL);
-
-    /// <summary>
-    /// Returns an empty <see cref="StringName"/>.
-    /// </summary>
-    public StringName PeerClassDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindPeerClassDefault, Checked, ref answered);
-        StringName result = VariantUtils.ConvertToStringName(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindRecognizesPeer =
         NetwApi.MethodBind("NetwTransport", "recognizes_peer", 3984432719UL);
 
     /// <summary>
-    /// Calls <c>_recognizes_peer</c>, or
-    /// <see cref="NetwTransport.RecognizesPeerDefault"/>.
+    /// Calls <c>_recognizes_peer</c>. When it is not overridden, returns
+    /// <c>true</c> when <see cref="NetwTransport.PeerClassOf"/> of
+    /// <paramref name="peer"/> is <see cref="NetwTransport.PeerClass"/>.
     /// </summary>
     public bool RecognizesPeer(MultiplayerPeer peer)
     {
@@ -140,34 +127,12 @@ public sealed class NetwTransport : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindRecognizesPeerDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "recognizes_peer_default",
-            3984432719UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when <see cref="NetwTransport.PeerClassOf"/> of
-    /// <paramref name="peer"/> is <see cref="NetwTransport.PeerClass"/>.
-    /// </summary>
-    public bool RecognizesPeerDefault(MultiplayerPeer peer)
-    {
-        IntPtr slot0 = peer?.NativeInstance ?? IntPtr.Zero;
-        byte answered = default;
-        NetwThunks.Ptrcall1_IntPtr_Byte(
-            _bindRecognizesPeerDefault,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered != 0;
-    }
-
     private static readonly IntPtr _bindDisplayName =
         NetwApi.MethodBind("NetwTransport", "display_name", 2841200299UL);
 
     /// <summary>
-    /// Calls <c>_display_name</c>, or
-    /// <see cref="NetwTransport.DisplayNameDefault"/>.
+    /// Calls <c>_display_name</c>, or returns <c>"Generic"</c> when it is not
+    /// overridden.
     /// </summary>
     public string DisplayName()
     {
@@ -178,30 +143,12 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindDisplayNameDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "display_name_default",
-            2841200299UL);
-
-    /// <summary>
-    /// Returns <c>"Generic"</c>.
-    /// </summary>
-    public string DisplayNameDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindDisplayNameDefault, Checked, ref answered);
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindIsAvailable =
         NetwApi.MethodBind("NetwTransport", "is_available", 2240911060UL);
 
     /// <summary>
-    /// Calls <c>_is_available</c>, or
-    /// <see cref="NetwTransport.IsAvailableDefault"/>.
+    /// Calls <c>_is_available</c>, or returns <c>true</c> when it is not
+    /// overridden.
     /// </summary>
     public bool IsAvailable()
     {
@@ -210,31 +157,12 @@ public sealed class NetwTransport : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindIsAvailableDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "is_available_default",
-            2240911060UL);
-
-    /// <summary>
-    /// Returns <c>true</c>.
-    /// </summary>
-    public bool IsAvailableDefault()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(
-            _bindIsAvailableDefault,
-            Checked,
-            ref answered);
-        return answered != 0;
-    }
-
     private static readonly IntPtr _bindCanHostHere =
         NetwApi.MethodBind("NetwTransport", "can_host_here", 2240911060UL);
 
     /// <summary>
-    /// Calls <c>_can_host_here</c>, or
-    /// <see cref="NetwTransport.CanHostHereDefault"/>.
+    /// Calls <c>_can_host_here</c>, or returns <c>true</c> when it is not
+    /// overridden.
     /// </summary>
     public bool CanHostHere()
     {
@@ -243,30 +171,12 @@ public sealed class NetwTransport : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindCanHostHereDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "can_host_here_default",
-            2240911060UL);
-
-    /// <summary>
-    /// Returns <c>true</c>.
-    /// </summary>
-    public bool CanHostHereDefault()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(
-            _bindCanHostHereDefault,
-            Checked,
-            ref answered);
-        return answered != 0;
-    }
-
     private static readonly IntPtr _bindCanProbe =
         NetwApi.MethodBind("NetwTransport", "can_probe", 2240911060UL);
 
     /// <summary>
-    /// Calls <c>_can_probe</c>, or <see cref="NetwTransport.CanProbeDefault"/>.
+    /// Calls <c>_can_probe</c>, or returns <c>false</c> when it is not
+    /// overridden.
     /// </summary>
     public bool CanProbe()
     {
@@ -275,48 +185,17 @@ public sealed class NetwTransport : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindCanProbeDefault =
-        NetwApi.MethodBind("NetwTransport", "can_probe_default", 2240911060UL);
-
-    /// <summary>
-    /// Returns <c>false</c>.
-    /// </summary>
-    public bool CanProbeDefault()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(_bindCanProbeDefault, Checked, ref answered);
-        return answered != 0;
-    }
-
     private static readonly IntPtr _bindAddressLabel =
         NetwApi.MethodBind("NetwTransport", "address_label", 2841200299UL);
 
     /// <summary>
-    /// Calls <c>_address_label</c>, or
-    /// <see cref="NetwTransport.AddressLabelDefault"/>.
+    /// Calls <c>_address_label</c>, or returns <c>"Address"</c> when it is not
+    /// overridden.
     /// </summary>
     public string AddressLabel()
     {
         godot_variant answered = default;
         NetwThunks.Call0(_bindAddressLabel, Checked, ref answered);
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindAddressLabelDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "address_label_default",
-            2841200299UL);
-
-    /// <summary>
-    /// Returns <c>"Address"</c>.
-    /// </summary>
-    public string AddressLabelDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindAddressLabelDefault, Checked, ref answered);
         string result = VariantUtils.ConvertToString(answered);
         answered.Dispose();
         return result;
@@ -329,8 +208,8 @@ public sealed class NetwTransport : NetwRefCounted
             2841200299UL);
 
     /// <summary>
-    /// Calls <c>_address_placeholder</c>, or
-    /// <see cref="NetwTransport.AddressPlaceholderDefault"/>.
+    /// Calls <c>_address_placeholder</c>, or returns an empty
+    /// <see cref="string"/> when it is not overridden.
     /// </summary>
     public string AddressPlaceholder()
     {
@@ -341,53 +220,17 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindAddressPlaceholderDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "address_placeholder_default",
-            2841200299UL);
-
-    /// <summary>
-    /// Returns an empty string.
-    /// </summary>
-    public string AddressPlaceholderDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindAddressPlaceholderDefault, Checked, ref answered);
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindAddressHelp =
         NetwApi.MethodBind("NetwTransport", "address_help", 2841200299UL);
 
     /// <summary>
-    /// Calls <c>_address_help</c>, or
-    /// <see cref="NetwTransport.AddressHelpDefault"/>.
+    /// Calls <c>_address_help</c>, or returns an empty <see cref="string"/>
+    /// when it is not overridden.
     /// </summary>
     public string AddressHelp()
     {
         godot_variant answered = default;
         NetwThunks.Call0(_bindAddressHelp, Checked, ref answered);
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindAddressHelpDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "address_help_default",
-            2841200299UL);
-
-    /// <summary>
-    /// Returns an empty string.
-    /// </summary>
-    public string AddressHelpDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindAddressHelpDefault, Checked, ref answered);
         string result = VariantUtils.ConvertToString(answered);
         answered.Dispose();
         return result;
@@ -400,8 +243,8 @@ public sealed class NetwTransport : NetwRefCounted
             2240911060UL);
 
     /// <summary>
-    /// Calls <c>_accepts_empty_address</c>, or
-    /// <see cref="NetwTransport.AcceptsEmptyAddressDefault"/>.
+    /// Calls <c>_accepts_empty_address</c>, or returns <c>false</c> when it is
+    /// not overridden.
     /// </summary>
     public bool AcceptsEmptyAddress()
     {
@@ -413,31 +256,12 @@ public sealed class NetwTransport : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindAcceptsEmptyAddressDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "accepts_empty_address_default",
-            2240911060UL);
-
-    /// <summary>
-    /// Returns <c>false</c>.
-    /// </summary>
-    public bool AcceptsEmptyAddressDefault()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(
-            _bindAcceptsEmptyAddressDefault,
-            Checked,
-            ref answered);
-        return answered != 0;
-    }
-
     private static readonly IntPtr _bindHostSettings =
         NetwApi.MethodBind("NetwTransport", "host_settings", 2382534195UL);
 
     /// <summary>
-    /// Calls <c>_host_settings</c>, or
-    /// <see cref="NetwTransport.HostSettingsDefault"/>.
+    /// Calls <c>_host_settings</c>, or returns an empty
+    /// <see cref="Godot.Collections.Dictionary"/> when it is not overridden.
     /// </summary>
     public Godot.Collections.Dictionary HostSettings()
     {
@@ -449,31 +273,12 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindHostSettingsDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "host_settings_default",
-            2382534195UL);
-
-    /// <summary>
-    /// Returns an empty <see cref="Godot.Collections.Dictionary"/>.
-    /// </summary>
-    public Godot.Collections.Dictionary HostSettingsDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindHostSettingsDefault, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindClientSettings =
         NetwApi.MethodBind("NetwTransport", "client_settings", 2382534195UL);
 
     /// <summary>
-    /// Calls <c>_client_settings</c>, or
-    /// <see cref="NetwTransport.ClientSettingsDefault"/>.
+    /// Calls <c>_client_settings</c>, or returns an empty
+    /// <see cref="Godot.Collections.Dictionary"/> when it is not overridden.
     /// </summary>
     public Godot.Collections.Dictionary ClientSettings()
     {
@@ -485,31 +290,12 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindClientSettingsDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "client_settings_default",
-            2382534195UL);
-
-    /// <summary>
-    /// Returns an empty <see cref="Godot.Collections.Dictionary"/>.
-    /// </summary>
-    public Godot.Collections.Dictionary ClientSettingsDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindClientSettingsDefault, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindMakeProbePeer =
         NetwApi.MethodBind("NetwTransport", "make_probe_peer", 3101019611UL);
 
     /// <summary>
-    /// Calls <c>_make_probe_peer</c>, or
-    /// <see cref="NetwTransport.MakeProbePeerDefault"/>.
+    /// Calls <c>_make_probe_peer</c>, or returns <c>null</c> when it is not
+    /// overridden.
     /// </summary>
     public MultiplayerPeer MakeProbePeer(string address)
     {
@@ -523,37 +309,12 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindMakeProbePeerDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "make_probe_peer_default",
-            3101019611UL);
-
-    /// <summary>
-    /// Returns <c>null</c>.
-    /// </summary>
-    public MultiplayerPeer MakeProbePeerDefault(string address)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromString(address);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindMakeProbePeerDefault,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        MultiplayerPeer result =
-            (MultiplayerPeer)VariantUtils.ConvertToGodotObject(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindJoinAddress =
         NetwApi.MethodBind("NetwTransport", "join_address", 2841200299UL);
 
     /// <summary>
-    /// Calls <c>_join_address</c>, or
-    /// <see cref="NetwTransport.JoinAddressDefault"/>.
+    /// Calls <c>_join_address</c>, or returns an empty <see cref="string"/>
+    /// when it is not overridden.
     /// </summary>
     public string JoinAddress()
     {
@@ -564,30 +325,12 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindJoinAddressDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "join_address_default",
-            2841200299UL);
-
-    /// <summary>
-    /// Returns an empty <see cref="string"/>.
-    /// </summary>
-    public string JoinAddressDefault()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindJoinAddressDefault, Checked, ref answered);
-        string result = VariantUtils.ConvertToString(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindDiagnostics =
         NetwApi.MethodBind("NetwTransport", "diagnostics", 3554694381UL);
 
     /// <summary>
-    /// Calls <c>_diagnostics</c>, or
-    /// <see cref="NetwTransport.DiagnosticsDefault"/>.
+    /// Calls <c>_diagnostics</c>, or returns an empty
+    /// <see cref="Godot.Collections.Dictionary"/> when it is not overridden.
     /// </summary>
     public Godot.Collections.Dictionary Diagnostics(long peerId)
     {
@@ -601,61 +344,17 @@ public sealed class NetwTransport : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindDiagnosticsDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "diagnostics_default",
-            3554694381UL);
-
-    /// <summary>
-    /// Returns an empty <see cref="Godot.Collections.Dictionary"/>.
-    /// </summary>
-    public Godot.Collections.Dictionary DiagnosticsDefault(long peerId)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindDiagnosticsDefault,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindTimeoutHint =
         NetwApi.MethodBind("NetwTransport", "timeout_hint", 191475506UL);
 
     /// <summary>
-    /// Calls <c>_timeout_hint</c>, or
-    /// <see cref="NetwTransport.TimeoutHintDefault"/>.
+    /// Calls <c>_timeout_hint</c>, or returns <c>5.0</c> when it is not
+    /// overridden.
     /// </summary>
     public double TimeoutHint()
     {
         double answered = default;
         NetwThunks.Ptrcall0_Double(_bindTimeoutHint, Checked, ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindTimeoutHintDefault =
-        NetwApi.MethodBind(
-            "NetwTransport",
-            "timeout_hint_default",
-            191475506UL);
-
-    /// <summary>
-    /// Returns <c>5.0</c>.
-    /// </summary>
-    public double TimeoutHintDefault()
-    {
-        double answered = default;
-        NetwThunks.Ptrcall0_Double(
-            _bindTimeoutHintDefault,
-            Checked,
-            ref answered);
         return answered;
     }
 
@@ -689,31 +388,6 @@ public sealed class NetwTransport : NetwRefCounted
         slot1.Dispose();
         slot2.Dispose();
         slot3.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindProbeDefault =
-        NetwApi.MethodBind("NetwTransport", "probe_default", 2726140452UL);
-
-    /// <summary>
-    /// Connects with <see cref="NetwTransport.MakeProbePeer"/>, asks the server
-    /// for its <see cref="NetwServerInfo"/>, and reports it. Fails with
-    /// <c>@GlobalScope.ERR_UNAVAILABLE</c> when
-    /// <see cref="NetwTransport.MakeProbePeer"/> returns <c>null</c>.
-    /// </summary>
-    public void ProbeDefault(Rid ticket, string address)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(ticket);
-        godot_variant slot1 = VariantUtils.CreateFromString(address);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindProbeDefault,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
         answered.Dispose();
     }
 
@@ -786,26 +460,13 @@ public sealed class NetwTransport : NetwRefCounted
         NetwApi.MethodBind("NetwTransport", "can_browse", 2240911060UL);
 
     /// <summary>
-    /// Calls <c>_can_browse</c>, or
-    /// <see cref="NetwTransport.CanBrowseDefault"/>.
+    /// Calls <c>_can_browse</c>, or returns <c>false</c> when it is not
+    /// overridden.
     /// </summary>
     public bool CanBrowse()
     {
         byte answered = default;
         NetwThunks.Ptrcall0_Byte(_bindCanBrowse, Checked, ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindCanBrowseDefault =
-        NetwApi.MethodBind("NetwTransport", "can_browse_default", 2240911060UL);
-
-    /// <summary>
-    /// Returns <c>false</c>.
-    /// </summary>
-    public bool CanBrowseDefault()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(_bindCanBrowseDefault, Checked, ref answered);
         return answered != 0;
     }
 

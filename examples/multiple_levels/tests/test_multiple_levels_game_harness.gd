@@ -16,7 +16,7 @@ var game: NetwGameHarness
 func before_test() -> void:
 	var saves: FileSystemDatabase = SAVES
 	saves.root = create_temp_dir("multiple_levels_saves")
-	saves.delete_slot_default(null, &"campaign")
+	saves.delete_slot(null, &"campaign")
 	game = make_game_harness(MAIN)
 	await game.setup()
 	game.show_views()

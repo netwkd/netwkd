@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/display_stand.h"
+#include "support/event_ring.h"
 #include "support/netw_cells.h"
 
 #include "godot/node.hpp"
@@ -291,39 +292,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] recording a sample, pumping the runtime "
-    "and writing a visual are three acts, and each leaves a row of its own "
-    "kind on the route it ran for"
-) {
-    const Ref<NetwMultiplayer> core = netw_test::clocked_session();
-    const netw_test::DisplaySubject subject = netw_test::stand_subject(core, 0);
-    core->event_arm(true);
-
-    netw_test::record_sample(core, subject.body, START, 0);
-    netw_test::record_sample(core, subject.body, FINISH, 1);
-    netw_test::pump_at(core, 1, 1, 0.5);
-
-    int64_t records = 0;
-    int64_t pumps = 0;
-    int64_t writes = 0;
-    const Array rows = core->event_ring(subject.route);
-    for (int index = 0; index < rows.size(); ++index) {
-        const Dictionary row = rows[index];
-        REQUIRE(!row.is_empty());
-        const int64_t event = int64_t(row[netw::event_key::event()]);
-        records += event == netw::EventPlane::DISPLAY_RECORD ? 1 : 0;
-        pumps += event == netw::EventPlane::DISPLAY_PUMP ? 1 : 0;
-        writes += event == netw::EventPlane::DISPLAY_WRITE ? 1 : 0;
-    }
-    NETW_CHECK_EQ(records, int64_t(2));
-    NETW_CHECK_EQ(pumps, int64_t(1));
-    CHECK(writes > 0);
-    NETW_CHECK_EQ(int64_t(core->event_ring(0).size()), int64_t(0));
-
-    netw_test::retire_subject(subject);
-}
-
-TEST_CASE(
     "[Networked][Display][SceneTree] the handle and the flat verb write ONE "
     "record, so a setting authored before the session knew the entity is what "
     "the book publishes and a flat write reads back on the handle"
@@ -448,6 +416,64 @@ TEST_CASE(
     );
 
     netw_test::retire_subject(subject);
+}
+
+struct Pumped {
+    Vector<Vector2> visuals;
+    int64_t pumps = 0;
+    int64_t entity = 0;
+    PackedInt64Array rows;
+};
+
+Pumped pump_to_rest(int64_t p_groups) {
+    Pumped seen;
+    const Ref<NetwMultiplayer> core = netw_test::clocked_session();
+    const netw_test::DisplaySubject subject = netw_test::stand_subject(core, 0);
+    core->event_arm(p_groups);
+    netw_test::record_sample(core, subject.body, START, 0);
+    netw_test::record_sample(core, subject.body, FINISH, 1);
+    const int64_t opened = core->idle_work.pumped;
+    for (int tick = 1; tick <= 6; tick++) {
+        netw_test::pump_at(core, tick, 1, 0.5);
+        seen.visuals.push_back(subject.first->get_global_position());
+    }
+    seen.pumps = core->idle_work.pumped - opened;
+    seen.entity = int64_t(subject.entity->get_rid_handle().get_id());
+    seen.rows = core->event_drain();
+    netw_test::retire_subject(subject);
+    return seen;
+}
+
+TEST_CASE(
+    "[Networked][Display][SceneTree] EV4 recording every group changes "
+    "neither what a display shows nor how often it pumps, and its record, "
+    "pump and write rows name the entity by RID and by route"
+) {
+    const int64_t every_group = NetwMultiplayer::EVENT_GROUP_LIFECYCLE
+        | NetwMultiplayer::EVENT_GROUP_INTEREST
+        | NetwMultiplayer::EVENT_GROUP_PREDICTION
+        | NetwMultiplayer::EVENT_GROUP_GATE | NetwMultiplayer::EVENT_GROUP_STAGE
+        | NetwMultiplayer::EVENT_GROUP_VERDICT
+        | NetwMultiplayer::EVENT_GROUP_SESSION
+        | NetwMultiplayer::EVENT_GROUP_CARRIER;
+    const Pumped quiet = pump_to_rest(0);
+    const Pumped armed = pump_to_rest(every_group);
+
+    CHECK(quiet.visuals == armed.visuals);
+    NETW_CHECK_EQ(armed.pumps, quiet.pumps);
+    NETW_CHECK_EQ(int(quiet.rows.size()), 0);
+
+    const netw_test::EventRing ring(armed.rows);
+    NETW_CHECK_EQ(ring.count_of(netw::EventPlane::DISPLAY_RECORD), 2);
+    NETW_CHECK_GT(ring.count_of(netw::EventPlane::DISPLAY_PUMP), 0);
+    NETW_CHECK_GT(ring.count_of(netw::EventPlane::DISPLAY_WRITE), 0);
+    int unnamed = 0;
+    for (int index = 0; index < ring.size(); index++) {
+        const bool named = ring.route_at(index) == 7
+            && ring.entity_at(index) == armed.entity;
+        unnamed += named ? 0 : 1;
+    }
+    NETW_CHECK_EQ(unnamed, 0);
 }
 
 } // namespace TestNetwDisplaySettleLaws

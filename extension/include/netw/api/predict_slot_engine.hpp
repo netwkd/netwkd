@@ -56,7 +56,6 @@ class NetwPredictSlotEngine {
     NetwPredictSlotEngine *sibling(
         const godot::Ref<NetwEntity> &p_member
     ) const;
-    bool overrides_seam(const godot::StringName &p_seam) const;
     Declaration resolved_declaration() const;
     Declaration declaration_of(const godot::Ref<NetwEntity> &p_entity) const;
 
@@ -237,24 +236,6 @@ class NetwPredictSlotEngine {
     void maybe_demote_for_breach(
         int64_t p_transition,
         const godot::Dictionary &p_solve
-    );
-    godot::Ref<NetwPredictRecovery> recover_through_seam(
-        const godot::Dictionary &p_carried,
-        const godot::Dictionary &p_predicted,
-        NetwPrediction::RecoveryPolicy p_policy,
-        NetwSimulation::Restore p_snap_restore,
-        const godot::Dictionary &p_projection,
-        const godot::Dictionary &p_before,
-        const godot::Dictionary &p_tier_errors,
-        const godot::Dictionary &p_context,
-        double p_tick_delta
-    );
-    godot::Ref<NetwPredictJudgement> evaluate_through_seam(
-        NetwPrediction::Domain p_domain,
-        NetwPrediction::ExactVerdict p_exact_verdict,
-        const godot::Dictionary &p_predicted,
-        const godot::Dictionary &p_payload,
-        const godot::Dictionary &p_field_sink
     );
 
 public:

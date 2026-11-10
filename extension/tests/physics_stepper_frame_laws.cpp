@@ -670,7 +670,7 @@ public:
                 Vector3(0.0, real_t(DROP_HEIGHT), 0.0),
                 Vector3()
             );
-            session = netw::NetwMultiplayer::create(Ref<Script>());
+            session = netw::NetwMultiplayer::create();
             recorder.instantiate();
             ++step;
             return true;

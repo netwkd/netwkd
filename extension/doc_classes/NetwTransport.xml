@@ -35,7 +35,7 @@
 		    Netw.session(self).connection.register_transport(RelayTransport)
 		[/codeblock]
 		[method _make_peer] and [method _probe] may [code]await[/code]. They report the result by calling [method deliver], [method deliver_probe] or [method fail] once, with the [code]ticket[/code] they received. Keep [code]ticket[/code] in a local variable, not a member, since another request may start while one awaits. With no report, the request fails after [method _timeout_hint] seconds.
-		Methods starting with an underscore are overridden. Each has a public method that calls it, and a [code]_default[/code] method with the default behavior.
+		Methods starting with an underscore are overridden. Each has a public method that calls it. A method the script does not override gives the default its description names.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -127,31 +127,31 @@
 			<return type="Dictionary" />
 			<param index="0" name="peer_id" type="int" />
 			<description>
-				Return any debugging information about [param peer_id], shown by [method NetwConnection.diagnostics].
+				Return any debugging information about [param peer_id], shown by [method NetwConnection.diagnostics]. Empty by default.
 			</description>
 		</method>
 		<method name="_display_name" qualifiers="virtual">
 			<return type="String" />
 			<description>
-				Return the name shown in a transport picker.
+				Return the name shown in a transport picker. [code]"Generic"[/code] by default.
 			</description>
 		</method>
 		<method name="_host_settings" qualifiers="virtual">
 			<return type="Dictionary" />
 			<description>
-				Return the settings a host form asks for, with their default values. They are passed to [method _make_peer] in [constant NetwConnection.TRANSPORT_MODE_HOST].
+				Return the settings a host form asks for, with their default values. They are passed to [method _make_peer] in [constant NetwConnection.TRANSPORT_MODE_HOST]. Empty by default.
 			</description>
 		</method>
 		<method name="_is_available" qualifiers="virtual">
 			<return type="bool" />
 			<description>
-				Return [code]false[/code] when this transport does not work on the current platform.
+				Return [code]false[/code] when this transport does not work on the current platform. [code]true[/code] by default.
 			</description>
 		</method>
 		<method name="_join_address" qualifiers="virtual">
 			<return type="String" />
 			<description>
-				Return the address other players use to join this host.
+				Return the address other players use to join this host. Empty by default.
 			</description>
 		</method>
 		<method name="_make_peer" qualifiers="virtual">
@@ -169,7 +169,7 @@
 			<return type="MultiplayerPeer" />
 			<param index="0" name="address" type="String" />
 			<description>
-				Return a peer connecting to [param address], which [method probe_default] uses to check the server. [code]null[/code] by default.
+				Return a peer connecting to [param address], which the default [method _probe] uses to check the server. [code]null[/code] by default.
 			</description>
 		</method>
 		<method name="_peer_class" qualifiers="virtual">
@@ -190,14 +190,14 @@
 			<param index="0" name="ticket" type="RID" />
 			<param index="1" name="address" type="String" />
 			<description>
-				Check the server at [param address] without joining it, then call [method deliver_probe] or [method fail] with [param ticket]. Calls [method probe_default] by default.
+				Check the server at [param address] without joining it, then call [method deliver_probe] or [method fail] with [param ticket]. By default, connects with [method make_probe_peer], asks the server for its [NetwServerInfo], and reports it. The default fails with [constant @GlobalScope.ERR_UNAVAILABLE] when [method make_probe_peer] returns [code]null[/code].
 			</description>
 		</method>
 		<method name="_recognizes_peer" qualifiers="virtual">
 			<return type="bool" />
 			<param index="0" name="peer" type="MultiplayerPeer" />
 			<description>
-				Return [code]true[/code] when [param peer], created by the game itself, belongs to this transport. By default, when its class is [method peer_class].
+				Return [code]true[/code] when [param peer], created by the game itself, belongs to this transport. By default, when [method peer_class_of] of [param peer] is [method peer_class].
 			</description>
 		</method>
 		<method name="_timeout_hint" qualifiers="virtual">
@@ -209,97 +209,49 @@
 		<method name="accepts_empty_address">
 			<return type="bool" />
 			<description>
-				Calls [method _accepts_empty_address], or [method accepts_empty_address_default].
-			</description>
-		</method>
-		<method name="accepts_empty_address_default">
-			<return type="bool" />
-			<description>
-				Returns [code]false[/code].
+				Calls [method _accepts_empty_address], or returns [code]false[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="address_help">
 			<return type="String" />
 			<description>
-				Calls [method _address_help], or [method address_help_default].
-			</description>
-		</method>
-		<method name="address_help_default">
-			<return type="String" />
-			<description>
-				Returns an empty string.
+				Calls [method _address_help], or returns an empty [String] when it is not overridden.
 			</description>
 		</method>
 		<method name="address_label">
 			<return type="String" />
 			<description>
-				Calls [method _address_label], or [method address_label_default].
-			</description>
-		</method>
-		<method name="address_label_default">
-			<return type="String" />
-			<description>
-				Returns [code]"Address"[/code].
+				Calls [method _address_label], or returns [code]"Address"[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="address_placeholder">
 			<return type="String" />
 			<description>
-				Calls [method _address_placeholder], or [method address_placeholder_default].
-			</description>
-		</method>
-		<method name="address_placeholder_default">
-			<return type="String" />
-			<description>
-				Returns an empty string.
+				Calls [method _address_placeholder], or returns an empty [String] when it is not overridden.
 			</description>
 		</method>
 		<method name="can_browse">
 			<return type="bool" />
 			<description>
-				Calls [method _can_browse], or [method can_browse_default].
-			</description>
-		</method>
-		<method name="can_browse_default">
-			<return type="bool" />
-			<description>
-				Returns [code]false[/code].
+				Calls [method _can_browse], or returns [code]false[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="can_host_here">
 			<return type="bool" />
 			<description>
-				Calls [method _can_host_here], or [method can_host_here_default].
-			</description>
-		</method>
-		<method name="can_host_here_default">
-			<return type="bool" />
-			<description>
-				Returns [code]true[/code].
+				Calls [method _can_host_here], or returns [code]true[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="can_probe">
 			<return type="bool" />
 			<description>
-				Calls [method _can_probe], or [method can_probe_default].
-			</description>
-		</method>
-		<method name="can_probe_default">
-			<return type="bool" />
-			<description>
-				Returns [code]false[/code].
+				Calls [method _can_probe], or returns [code]false[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="client_settings">
 			<return type="Dictionary" />
 			<description>
-				Calls [method _client_settings], or [method client_settings_default].
-			</description>
-		</method>
-		<method name="client_settings_default">
-			<return type="Dictionary" />
-			<description>
-				Returns an empty [Dictionary].
+				Calls [method _client_settings], or returns an empty [Dictionary] when it is not overridden.
 			</description>
 		</method>
 		<method name="deliver">
@@ -322,26 +274,13 @@
 			<return type="Dictionary" />
 			<param index="0" name="peer_id" type="int" />
 			<description>
-				Calls [method _diagnostics], or [method diagnostics_default].
-			</description>
-		</method>
-		<method name="diagnostics_default">
-			<return type="Dictionary" />
-			<param index="0" name="peer_id" type="int" />
-			<description>
-				Returns an empty [Dictionary].
+				Calls [method _diagnostics], or returns an empty [Dictionary] when it is not overridden.
 			</description>
 		</method>
 		<method name="display_name">
 			<return type="String" />
 			<description>
-				Calls [method _display_name], or [method display_name_default].
-			</description>
-		</method>
-		<method name="display_name_default">
-			<return type="String" />
-			<description>
-				Returns [code]"Generic"[/code].
+				Calls [method _display_name], or returns [code]"Generic"[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="fail">
@@ -356,63 +295,32 @@
 		<method name="host_settings">
 			<return type="Dictionary" />
 			<description>
-				Calls [method _host_settings], or [method host_settings_default].
-			</description>
-		</method>
-		<method name="host_settings_default">
-			<return type="Dictionary" />
-			<description>
-				Returns an empty [Dictionary].
+				Calls [method _host_settings], or returns an empty [Dictionary] when it is not overridden.
 			</description>
 		</method>
 		<method name="is_available">
 			<return type="bool" />
 			<description>
-				Calls [method _is_available], or [method is_available_default].
-			</description>
-		</method>
-		<method name="is_available_default">
-			<return type="bool" />
-			<description>
-				Returns [code]true[/code].
+				Calls [method _is_available], or returns [code]true[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="join_address">
 			<return type="String" />
 			<description>
-				Calls [method _join_address], or [method join_address_default].
-			</description>
-		</method>
-		<method name="join_address_default">
-			<return type="String" />
-			<description>
-				Returns an empty [String].
+				Calls [method _join_address], or returns an empty [String] when it is not overridden.
 			</description>
 		</method>
 		<method name="make_probe_peer">
 			<return type="MultiplayerPeer" />
 			<param index="0" name="address" type="String" />
 			<description>
-				Calls [method _make_probe_peer], or [method make_probe_peer_default].
-			</description>
-		</method>
-		<method name="make_probe_peer_default">
-			<return type="MultiplayerPeer" />
-			<param index="0" name="address" type="String" />
-			<description>
-				Returns [code]null[/code].
+				Calls [method _make_probe_peer], or returns [code]null[/code] when it is not overridden.
 			</description>
 		</method>
 		<method name="peer_class">
 			<return type="StringName" />
 			<description>
-				Calls [method _peer_class], or [method peer_class_default].
-			</description>
-		</method>
-		<method name="peer_class_default">
-			<return type="StringName" />
-			<description>
-				Returns an empty [StringName].
+				Calls [method _peer_class], or returns an empty [StringName] when it is not overridden.
 			</description>
 		</method>
 		<method name="peer_class_of" qualifiers="static">
@@ -420,14 +328,6 @@
 			<param index="0" name="peer" type="MultiplayerPeer" />
 			<description>
 				Returns the class name of [param peer], or its script's [code]class_name[/code].
-			</description>
-		</method>
-		<method name="probe_default">
-			<return type="void" />
-			<param index="0" name="ticket" type="RID" />
-			<param index="1" name="address" type="String" />
-			<description>
-				Connects with [method make_probe_peer], asks the server for its [NetwServerInfo], and reports it. Fails with [constant @GlobalScope.ERR_UNAVAILABLE] when [method make_probe_peer] returns [code]null[/code].
 			</description>
 		</method>
 		<method name="publish_targets">
@@ -455,14 +355,7 @@
 			<return type="bool" />
 			<param index="0" name="peer" type="MultiplayerPeer" />
 			<description>
-				Calls [method _recognizes_peer], or [method recognizes_peer_default].
-			</description>
-		</method>
-		<method name="recognizes_peer_default">
-			<return type="bool" />
-			<param index="0" name="peer" type="MultiplayerPeer" />
-			<description>
-				Returns [code]true[/code] when [method peer_class_of] of [param peer] is [method peer_class].
+				Calls [method _recognizes_peer]. When it is not overridden, returns [code]true[/code] when [method peer_class_of] of [param peer] is [method peer_class].
 			</description>
 		</method>
 		<method name="report">
@@ -478,13 +371,7 @@
 		<method name="timeout_hint">
 			<return type="float" />
 			<description>
-				Calls [method _timeout_hint], or [method timeout_hint_default].
-			</description>
-		</method>
-		<method name="timeout_hint_default">
-			<return type="float" />
-			<description>
-				Returns [code]5.0[/code].
+				Calls [method _timeout_hint], or returns [code]5.0[/code] when it is not overridden.
 			</description>
 		</method>
 	</methods>

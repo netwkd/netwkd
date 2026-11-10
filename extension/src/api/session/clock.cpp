@@ -70,8 +70,6 @@ Variant NetwMultiplayer::clock_get_param(ClockParam p_param) const {
             return engine.get_jitter_stability_threshold();
         case CLOCK_PARAM_USE_PHYSICS_INTERPOLATION:
             return engine.get_use_physics_interpolation();
-        case CLOCK_PARAM_ENABLE_DRIFT_LOGGING:
-            return engine.get_enable_drift_logging();
         case CLOCK_PARAM_MANUAL_TICK:
             return engine.get_manual_tick();
         case CLOCK_PARAM_TICK_FACTOR_OVERRIDE:
@@ -123,9 +121,6 @@ Error NetwMultiplayer::clock_set_param(
             return OK;
         case CLOCK_PARAM_USE_PHYSICS_INTERPOLATION:
             engine.set_use_physics_interpolation(bool(p_value));
-            return OK;
-        case CLOCK_PARAM_ENABLE_DRIFT_LOGGING:
-            engine.set_enable_drift_logging(bool(p_value));
             return OK;
         case CLOCK_PARAM_MANUAL_TICK:
             engine.set_manual_tick(bool(p_value));
@@ -186,14 +181,6 @@ int64_t NetwMultiplayer::clock_get_tick() const {
     return clock_engine().get_tick();
 }
 
-int64_t NetwMultiplayer::clock_get_display_tick() const {
-    return clock_engine().display_tick();
-}
-
-int64_t NetwMultiplayer::clock_get_physics_steps_per_tick() const {
-    return clock_engine().physics_steps_per_tick();
-}
-
 int64_t NetwMultiplayer::clock_get_simulation_behind_count() const {
     return clock_engine().get_simulation_behind_count();
 }
@@ -210,16 +197,15 @@ bool NetwMultiplayer::clock_is_simulating() const {
     return clock_engine().is_simulating();
 }
 
-bool NetwMultiplayer::clock_is_stable() const {
-    return clock_engine().is_stable();
-}
-
 bool NetwMultiplayer::clock_is_gated() const {
     return clock_engine().is_gated();
 }
 
 void NetwMultiplayer::clock_step(int64_t p_count) {
+    ++step_depth;
     clock_engine().force_step(int(p_count));
+    --step_depth;
+    announce_flush();
 }
 
 void NetwMultiplayer::clock_physics_step(double p_delta) {

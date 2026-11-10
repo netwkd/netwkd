@@ -27,6 +27,9 @@ scons -C extension netw_profiling=yes
 
 Put personal SCons defaults in `extension/custom.py`.
 
+Set `NETW_STORE_VALIDATE=1` before starting Godot to check cached node and
+row lookups against a fresh lookup, and report a mismatch as a Networked bug.
+
 ## Tests
 
 Build the library with its tests, then run them.

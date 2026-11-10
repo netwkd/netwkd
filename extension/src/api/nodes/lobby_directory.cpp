@@ -112,20 +112,13 @@ String LobbyDirectory::join_address() {
     return String();
 }
 
-String LobbyDirectory::member_name_default(int64_t p_peer_id) {
-    return String("Player ") + String::num_int64(p_peer_id);
-}
-
-String LobbyDirectory::local_member_name_default() {
-    return String("Player");
-}
-
 String LobbyDirectory::member_name(int64_t p_peer_id) {
     String answered;
-    if (GDVIRTUAL_CALL(_member_name, p_peer_id, answered)) {
+    if (GDVIRTUAL_CALL(_member_name, p_peer_id, answered)
+        && !answered.is_empty()) {
         return answered;
     }
-    return member_name_default(p_peer_id);
+    return String("Player ") + String::num_int64(p_peer_id);
 }
 
 String LobbyDirectory::account_of(int64_t p_peer_id) {
@@ -138,10 +131,10 @@ String LobbyDirectory::account_of(int64_t p_peer_id) {
 
 String LobbyDirectory::local_member_name() {
     String answered;
-    if (GDVIRTUAL_CALL(_local_member_name, answered)) {
+    if (GDVIRTUAL_CALL(_local_member_name, answered) && !answered.is_empty()) {
         return answered;
     }
-    return local_member_name_default();
+    return String("Player");
 }
 
 void LobbyDirectory::list_lobbies() {
@@ -208,16 +201,6 @@ void LobbyDirectory::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("supports", "capability"),
         &LobbyDirectory::supports
-    );
-    ClassDB::bind_static_method(
-        "LobbyDirectory",
-        D_METHOD("member_name_default", "peer_id"),
-        &LobbyDirectory::member_name_default
-    );
-    ClassDB::bind_static_method(
-        "LobbyDirectory",
-        D_METHOD("local_member_name_default"),
-        &LobbyDirectory::local_member_name_default
     );
 
     ClassDB::bind_method(

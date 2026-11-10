@@ -225,47 +225,6 @@ TEST_CASE(
     );
 }
 
-TEST_CASE(
-    "[Networked][Predict] PR6 the recover seam's default carries the "
-    "authority's difference onto the present body"
-) {
-    Ref<netw::NetwMultiplayer> session;
-    session.instantiate();
-    Dictionary payload;
-    payload[StringName("position")] = Vector2(2.0, 1.0);
-    Dictionary predicted;
-    predicted[StringName("position")] = Vector2(2.0, 0.0);
-    Dictionary current;
-    current[StringName("position")] = Vector2(5.0, 0.0);
-    Dictionary pose_errors;
-    pose_errors[StringName("position")] = 1.0;
-    Dictionary wiring;
-    wiring[StringName("epsilon")] = 0.01;
-    wiring[StringName("teleport_threshold")] = 100.0;
-    Dictionary verdict;
-    verdict[StringName("domain")] = int(netw::Domain::OUT_OF_DOMAIN);
-    const Ref<netw::NetwPredictRecovery> planned
-        = session->predict_recover_default(
-            payload,
-            predicted,
-            netw::NetwPrediction::RECOVERY_POLICY_REBASE_RECOVER,
-            netw::NetwSimulation::RESTORE_EXACT,
-            Dictionary(),
-            current,
-            pose_errors,
-            wiring,
-            verdict,
-            1.0 / 30.0
-        );
-    REQUIRE(planned.is_valid());
-    CHECK_FALSE(planned->skip());
-    CHECK_FALSE(planned->teleport());
-    const Vector2 written
-        = planned->write().get(StringName("position"), Vector2());
-    NETW_CHECK_CLOSE(double(written.x), 5.0, CLOSE);
-    NETW_CHECK_CLOSE(double(written.y), 1.0, CLOSE);
-}
-
 } // namespace TestNetwPredictRecoveryCarry
 
 #endif

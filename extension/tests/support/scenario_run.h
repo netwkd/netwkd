@@ -9,7 +9,6 @@
 
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/predict_fold.hpp"
 #include "netw/predict/drive.hpp"
 #include "netw/prediction_core.hpp"
 
@@ -281,14 +280,13 @@ inline void ScenarioRun::drive(int p_tick, Plant p_plant) {
     Track *rows = tracks.ptrw();
     for (int at = 0; at < tracks.size(); ++at) {
         Track &track = rows[at];
-        const godot::Ref<netw::NetwPredictFold> fold
-            = netw::prediction_core::predict_fold(
-                track.latest_input_tick,
-                track.last_driven_input_tick,
-                p_tick
-            );
-        const bool fresh
-            = p_plant == PLANT_DRIVE_EVERY_TICK || fold->kind() == DRIVE_FRESH;
+        const netw::Fold fold = netw::prediction_core::fold(
+            track.latest_input_tick,
+            track.last_driven_input_tick,
+            p_tick
+        );
+        const bool fresh = p_plant == PLANT_DRIVE_EVERY_TICK
+            || int(fold.kind) == DRIVE_FRESH;
         if (fresh) {
             track.last_driven_input_tick = track.latest_input_tick;
             track.lane.lane_consumed += 1;
@@ -315,19 +313,18 @@ inline void ScenarioRun::judge(int p_tick, Plant p_plant) {
         const int domain
             = netw::prediction_core::domain_of(true, false, p_tick, -1);
         godot::Dictionary pose_errors;
-        const godot::Ref<netw::NetwPredictJudgement> judgement
-            = netw::prediction_core::evaluate(
-                domain,
-                VERDICT_UNJUDGED,
-                predicted,
-                payload,
-                wiring,
-                pose_errors
-            );
+        const netw::Judgement judgement = netw::prediction_core::judge(
+            domain,
+            VERDICT_UNJUDGED,
+            predicted,
+            payload,
+            wiring,
+            pose_errors
+        );
         judged += 1;
-        const double divergence = judgement->divergence();
+        const double divergence = judgement.divergence;
         track.lane.lane_divergence.push_back(divergence);
-        if (!judgement->corrected()) {
+        if (!judgement.corrected) {
             continue;
         }
 

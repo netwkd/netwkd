@@ -96,8 +96,6 @@ Properties
    +-------------------------------------------------------+--------------------------------------------------------------------+
    | :ref:`State<enum_NetwSession_State>`                  | :ref:`state<class_NetwSession_property_state>`                     |
    +-------------------------------------------------------+--------------------------------------------------------------------+
-   | :godot:`Dictionary`                                   | :ref:`stats<class_NetwSession_property_stats>`                     |
-   +-------------------------------------------------------+--------------------------------------------------------------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -126,11 +124,15 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                 | :ref:`leave<class_NetwSession_method_leave>`\ (\ )                                                                                                                                    |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Dictionary`                                   | :ref:`link_stats<class_NetwSession_method_link_stats>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                             |
+   +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`pause<class_NetwSession_method_pause>`\ (\ reason\: :godot:`String` = ""\ )                                                                                                     |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPlayer<class_NetwPlayer>`                   | :ref:`player_of<class_NetwSession_method_player_of>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                               |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`register_service<class_NetwSession_method_register_service>`\ (\ service\: :godot:`Object`, type\: :godot:`Object` = null\ )                                                    |
+   +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | |void|                                                | :ref:`request_kick<class_NetwSession_method_request_kick>`\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :godot:`String` = ""\ )                                         |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                 | :ref:`save_entities<class_NetwSession_method_save_entities>`\ (\ )                                                                                                                    |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -139,6 +141,8 @@ Methods
    | |void|                                                | :ref:`set_peer_bandwidth<class_NetwSession_method_set_peer_bandwidth>`\ (\ peer\: :godot:`int`, kbps\: :godot:`int`\ )                                                                |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`set_server_info<class_NetwSession_method_set_server_info>`\ (\ info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ )                                                            |
+   +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`int`                                          | :ref:`stat<class_NetwSession_method_stat>`\ (\ stat\: :ref:`Stat<enum_NetwMultiplayer_Stat>`\ ) |const|                                                                               |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                 | :ref:`step_away<class_NetwSession_method_step_away>`\ (\ )                                                                                                                            |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -216,6 +220,18 @@ Networked refuses with three codes, and any other ``code`` is the one the admiss
 
 ----
 
+.. _class_NetwSession_signal_kick_requested:
+
+.. rst-class:: classref-signal
+
+**kick_requested**\ (\ requester\: :ref:`NetwPlayer<class_NetwPlayer>`, target\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :godot:`String`\ ) :ref:`🔗<class_NetwSession_signal_kick_requested>`
+
+Emitted on the server when ``requester`` asks to kick ``target`` with :ref:`request_kick()<class_NetwSession_method_request_kick>`. :ref:`kick()<class_NetwSession_method_kick>` performs it.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwSession_signal_local_joined:
 
 .. rst-class:: classref-signal
@@ -276,6 +292,18 @@ Emitted after the root of ``scene`` is ready, so the whole scene can be accessed
 
     func on_scene_ready(arena: NetwScene) -> void:
         arena.root.get_node(^"Spawns").arrange()
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwSession_signal_scene_removed:
+
+.. rst-class:: classref-signal
+
+**scene_removed**\ (\ scene\: :ref:`NetwScene<class_NetwScene>`\ ) :ref:`🔗<class_NetwSession_signal_scene_removed>`
+
+Emitted after ``scene`` leaves :ref:`scenes<class_NetwSession_property_scenes>`.
 
 .. rst-class:: classref-item-separator
 
@@ -713,22 +741,6 @@ Where this peer is in connecting, playing and leaving, reported by :ref:`state_c
             _:
                 connecting_popup.hide()
 
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwSession_property_stats:
-
-.. rst-class:: classref-property
-
-:godot:`Dictionary` **stats** :ref:`🔗<class_NetwSession_property_stats>`
-
-.. rst-class:: classref-property-setget
-
-- :godot:`Dictionary` **get_stats**\ (\ )
-
-Every counter this session keeps, keyed by :ref:`Stat<enum_NetwMultiplayer_Stat>`.
-
 .. rst-class:: classref-section-separator
 
 ----
@@ -853,6 +865,35 @@ Leaves the session. The server saves its entity rows first, and stays online if 
 
 ----
 
+.. _class_NetwSession_method_link_stats:
+
+.. rst-class:: classref-method
+
+:godot:`Dictionary` **link_stats**\ (\ peer\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwSession_method_link_stats>`
+
+Measured connection quality to ``peer``, and what this peer's byte budget sends it.
+
+.. code:: text
+
+    Dictionary
+    ┠╴loss           float   share of the last 32 packets lost
+    ┠╴rtt            float   round trip time, in seconds
+    ┠╴jitter         float   round trip variation, in seconds
+    ┠╴reorders       int     packets that arrived out of order
+    ┠╴duplicates     int     packets that arrived twice
+    ┠╴mode           String  "good", or "bad" while its budget is cut
+    ┠╴budget_bits    int     most bits one packet to this peer may use
+    ┠╴budget_bytes   int     bytes it may be sent each tick
+    ┠╴sent_bytes     int     bytes charged to it since it joined
+    ┠╴debt_bytes     int     bytes it was sent past its budget
+    ┖╴deferred_rows  int     rows left waiting by the last tick
+
+\ Losing packets halves ``budget_bytes`` and ``budget_bits``. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While ``debt_bytes`` is above zero, volatile properties wait, and retained properties and RPCs still go.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwSession_method_pause:
 
 .. rst-class:: classref-method
@@ -886,6 +927,20 @@ The :ref:`NetwPlayer<class_NetwPlayer>` of ``peer``, ``null`` when there is none
 |void| **register_service**\ (\ service\: :godot:`Object`, type\: :godot:`Object` = null\ ) :ref:`🔗<class_NetwSession_method_register_service>`
 
 Registers ``service`` so :ref:`service()<class_NetwSession_method_service>` returns it. ``type`` defaults to the script of ``service``. A :ref:`NetwService<class_NetwService>` registers itself.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwSession_method_request_kick:
+
+.. rst-class:: classref-method
+
+|void| **request_kick**\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwSession_method_request_kick>`
+
+Asks the server to kick ``player``. The server receives :ref:`kick_requested<class_NetwSession_signal_kick_requested>` and decides.
+
+\ **Player request.**
 
 .. rst-class:: classref-item-separator
 
@@ -957,6 +1012,22 @@ Gives ``peer`` its own budget in kbit/s, in place of :ref:`NetwSessionConfig.ban
 Replaces what this session advertises about itself, such as the name shown in a server list.
 
 \ **Server Only.**
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwSession_method_stat:
+
+.. rst-class:: classref-method
+
+:godot:`int` **stat**\ (\ stat\: :ref:`Stat<enum_NetwMultiplayer_Stat>`\ ) |const| :ref:`🔗<class_NetwSession_method_stat>`
+
+Returns one of this session's counters, the same value :ref:`NetwMultiplayer.stats_get()<class_NetwMultiplayer_method_stats_get>` reads.
+
+::
+
+    var corrections := session.stat(NetwMultiplayer.STAT_PREDICT_CORRECTIONS)
 
 .. rst-class:: classref-item-separator
 

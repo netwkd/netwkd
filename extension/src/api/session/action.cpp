@@ -101,11 +101,6 @@ void NetwMultiplayer::execute_ready_action(
             "arrived.",
             String(p_request.key).utf8().get_data()
         );
-        notify(
-            LAGCOMP_ACTION_GATE_FALLBACK,
-            p_request.key,
-            p_request.view_tick
-        );
     }
     execute_action(p_request, p_tick);
 }

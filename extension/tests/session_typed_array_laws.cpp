@@ -24,8 +24,6 @@ TEST_CASE(
     core.instantiate();
 
     const TypingRow rows[] = {
-        {"event_watches", Variant::DICTIONARY, "", core->event_watches()},
-        {"event_ring", Variant::DICTIONARY, "", core->event_ring(0)},
         {"scene_list", Variant::RID, "", core->scene_list()},
         {"scene_find_all",
          Variant::RID,

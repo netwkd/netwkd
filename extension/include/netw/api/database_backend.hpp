@@ -25,14 +25,14 @@ public:
         const godot::StringName &p_slot
     );
 
-    virtual godot::Ref<NetwPromise> open_default(
+    virtual godot::Ref<NetwPromise> open_builtin(
         godot::Object *p_session,
         const godot::StringName &p_slot
     );
-    virtual godot::Ref<NetwPromise> list_slots_default(
+    virtual godot::Ref<NetwPromise> list_slots_builtin(
         godot::Object *p_session
     );
-    virtual godot::Ref<NetwPromise> delete_slot_default(
+    virtual godot::Ref<NetwPromise> delete_slot_builtin(
         godot::Object *p_session,
         const godot::StringName &p_slot
     );
@@ -66,14 +66,14 @@ public:
         return store;
     }
 
-    godot::Ref<NetwPromise> open_default(
+    godot::Ref<NetwPromise> open_builtin(
         godot::Object *p_session,
         const godot::StringName &p_slot
     ) override;
-    godot::Ref<NetwPromise> list_slots_default(
+    godot::Ref<NetwPromise> list_slots_builtin(
         godot::Object *p_session
     ) override;
-    godot::Ref<NetwPromise> delete_slot_default(
+    godot::Ref<NetwPromise> delete_slot_builtin(
         godot::Object *p_session,
         const godot::StringName &p_slot
     ) override;
@@ -105,14 +105,14 @@ public:
         return format;
     }
 
-    godot::Ref<NetwPromise> open_default(
+    godot::Ref<NetwPromise> open_builtin(
         godot::Object *p_session,
         const godot::StringName &p_slot
     ) override;
-    godot::Ref<NetwPromise> list_slots_default(
+    godot::Ref<NetwPromise> list_slots_builtin(
         godot::Object *p_session
     ) override;
-    godot::Ref<NetwPromise> delete_slot_default(
+    godot::Ref<NetwPromise> delete_slot_builtin(
         godot::Object *p_session,
         const godot::StringName &p_slot
     ) override;

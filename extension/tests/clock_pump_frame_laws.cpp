@@ -10,6 +10,7 @@
 #include "netw/api/clock_config.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/wire/registry.hpp"
 
 #include <godot_cpp/classes/scene_multiplayer.hpp>
 
@@ -51,22 +52,18 @@ PumpEvidence &pump_evidence() {
     return evidence;
 }
 
-int &client_pong_count() {
-    static int count = 0;
-    return count;
-}
-
-int &host_pong_count() {
-    static int count = 0;
-    return count;
-}
-
-void count_client_pong(const Dictionary &) {
-    client_pong_count() += 1;
-}
-
-void count_host_pong(const Dictionary &) {
-    host_pong_count() += 1;
+int pongs_in(const Ref<netw::NetwMultiplayer> &p_api) {
+    const int64_t pong
+        = int64_t(netw::wire::builtin_channel(StringName("CLOCK_PONG")));
+    const Dictionary rows
+        = p_api->attribution_snapshot()["frames_in_by_channel"];
+    const Array senders = rows.keys();
+    int total = 0;
+    for (int at = 0; at < senders.size(); ++at) {
+        const Dictionary channels = rows[senders[at]];
+        total += int(channels.get(pong, 0));
+    }
+    return total;
 }
 
 class ClockPumpScenario final : public netw_test::FrameScenario {
@@ -78,6 +75,7 @@ class ClockPumpScenario final : public netw_test::FrameScenario {
     Ref<netw::NetwMultiplayer> host;
     Ref<netw::NetwMultiplayer> client;
     Ref<MultiplayerPeer> client_peer;
+    int client_pongs_at_sync = 0;
 
     static int64_t now_msec() {
         return int64_t(Time::get_singleton()->get_ticks_msec());
@@ -131,10 +129,6 @@ class ClockPumpScenario final : public netw_test::FrameScenario {
             host_branch = mount("ClockPumpHost", host);
             declare_clock(host_branch);
             host->config_settle();
-            host->observe(
-                netw::NetwMultiplayer::CLOCK_PONG_RECEIVED,
-                callable_mp_static(&count_host_pong)
-            );
             host->session_prepare_join(StringName("host"), Array());
             host->NETW_API_VIRTUAL(set_multiplayer_peer)(peer);
             return candidate;
@@ -162,10 +156,6 @@ class ClockPumpScenario final : public netw_test::FrameScenario {
         client_branch = mount("ClockPumpClient", client);
         declare_clock(client_branch);
         client->config_settle();
-        client->observe(
-            netw::NetwMultiplayer::CLOCK_PONG_RECEIVED,
-            callable_mp_static(&count_client_pong)
-        );
         client->session_prepare_join(StringName("joiner"), Array());
         client->NETW_API_VIRTUAL(set_multiplayer_peer)(peer);
         return true;
@@ -246,7 +236,7 @@ public:
                 if (client->clock_is_synchronized()) {
                     evidence.client_synchronized = true;
                     evidence.client_ticks_at_sync = client->clock_get_tick();
-                    client_pong_count() = 0;
+                    client_pongs_at_sync = pongs_in(client);
                     enter(4);
                 } else if (over_budget()) {
                     enter(99);
@@ -260,9 +250,10 @@ public:
                 if (client->clock_get_tick() == before) {
                     evidence.polls_without_a_tick += 2;
                 }
-                if (client_pong_count() >= 3 || over_budget()) {
-                    evidence.client_pongs_after_sync = client_pong_count();
-                    evidence.host_pongs = host_pong_count();
+                const int pongs = pongs_in(client) - client_pongs_at_sync;
+                if (pongs >= 3 || over_budget()) {
+                    evidence.client_pongs_after_sync = pongs;
+                    evidence.host_pongs = pongs_in(host);
                     evidence.client_ticks_after_run = client->clock_get_tick();
                     evidence.frames_after_sync = frames_in_step;
                     enter(5);

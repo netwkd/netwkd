@@ -35,12 +35,6 @@ public:
 
     bool describe(const repl::RowSend &p_send, CarrierRow &r_row);
 
-    repl::RowExplain explain(
-        int64_t p_route,
-        int64_t p_comp,
-        int64_t p_peer
-    ) const;
-
     bool commit(
         int64_t p_peer,
         int64_t p_seq,
@@ -54,13 +48,6 @@ public:
         const godot::LocalVector<CarrierRow> &p_rows,
         int64_t p_tick
     );
-
-    void set_encode_stage(const godot::Callable &p_stage);
-    bool has_encode_stage() const;
-
-    void want_encode_stage(bool p_wanted) {
-        impl.want_encode_stage(p_wanted);
-    }
 
     void publish_tables(bool p_publishes) {
         impl.publish_tables(p_publishes);

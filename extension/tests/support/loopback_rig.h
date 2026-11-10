@@ -123,8 +123,7 @@ class LoopbackRig {
         const godot::StringName &p_username = godot::StringName(),
         const godot::Array &p_args = godot::Array()
     ) const {
-        godot::Ref<netw::NetwMultiplayer> api
-            = netw::NetwMultiplayer::create(godot::Ref<godot::Script>());
+        godot::Ref<netw::NetwMultiplayer> api = netw::NetwMultiplayer::create();
         REQUIRE_MESSAGE(api.is_valid(), "the session did not instantiate");
         if (api.is_valid()) {
             api->session_get_inner()->set_root_path(godot::NodePath("/"));

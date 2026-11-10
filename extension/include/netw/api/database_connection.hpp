@@ -21,13 +21,6 @@ public:
     );
     virtual godot::Ref<NetwPromise> close();
 
-    godot::Ref<NetwPromise> read_default(const godot::Dictionary &p_address);
-    godot::Ref<NetwPromise> scan_default(const godot::Dictionary &p_request);
-    godot::Ref<NetwPromise> write_batch_default(
-        const godot::Array &p_operations
-    );
-    godot::Ref<NetwPromise> close_default();
-
     GDVIRTUAL1R(godot::Ref<NetwPromise>, _read, const godot::Dictionary &)
     GDVIRTUAL1R(godot::Ref<NetwPromise>, _scan, const godot::Dictionary &)
     GDVIRTUAL1R(godot::Ref<NetwPromise>, _write_batch, const godot::Array &)

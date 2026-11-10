@@ -1,7 +1,8 @@
 #include "support/netw_test.h"
 
+#include "support/event_ring.h"
+
 #include "godot/node.hpp"
-#include "godot/scene_tree.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_options.hpp"
 #include "netw/api/entity_record.hpp"
@@ -15,45 +16,19 @@ using netw::EventPlane;
 using netw::NetwEntity;
 using netw::NetwEntityRecord;
 using netw::NetwMultiplayer;
+using netw_test::EventRing;
 
 constexpr int64_t REPORTED_ROUTE = 11;
 
-Ref<NetwMultiplayer> a_watching_session() {
+TEST_CASE(
+    "[Networked][Entity][Hosted] EL1 a body that materializes goes live and "
+    "records it on its own route, so a tool learns the entity that asked for "
+    "the route the session already published as live"
+) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
     core->session_set_role(NetwMultiplayer::ROLE_LISTEN_SERVER);
-    core->event_arm(true);
-    PackedInt64Array events;
-    events.push_back(EventPlane::SPAWNING);
-    events.push_back(EventPlane::STAGE_TRANSITION);
-    events.push_back(EventPlane::REPARENTED);
-    core->event_watch(
-        events,
-        Dictionary(),
-        Dictionary(),
-        Callable(),
-        Dictionary()
-    );
-    return core;
-}
-
-Dictionary row_of(const Array &p_rows, int64_t p_event) {
-    for (int index = 0; index < p_rows.size(); index++) {
-        const Dictionary row = p_rows[index];
-        if (!row.is_empty()
-            && int64_t(row[netw::event_key::event()]) == p_event) {
-            return row;
-        }
-    }
-    return Dictionary();
-}
-
-TEST_CASE(
-    "[Networked][Entity][Hosted] EL1 a body that materializes reports it on "
-    "its own route, so a watcher learns the entity that asked for the route "
-    "the session already published as live"
-) {
-    Ref<NetwMultiplayer> core = a_watching_session();
+    core->event_arm(NetwMultiplayer::EVENT_GROUP_LIFECYCLE);
     Node *owner = memnew(Node);
     owner->set_name("Born");
     const Ref<NetwEntity> wrapper = NetwEntity::ensure(owner);
@@ -72,64 +47,20 @@ TEST_CASE(
         true
     );
 
-    const Array rows = core->event_ring(REPORTED_ROUTE);
-    const Dictionary materialized = row_of(rows, EventPlane::SPAWNING);
-    CHECK(!materialized.is_empty());
-    if (!materialized.is_empty()) {
-        const StringName entity_id = materialized[netw::event_key::entity_id()];
-        CHECK(entity_id == record->get_entity_id());
-        NETW_CHECK_EQ(
-            int64_t(materialized[netw::event_key::peer()]),
-            record->get_peer_id()
-        );
-    }
+    NETW_CHECK_EQ(
+        int64_t(wrapper->get_stage()),
+        int64_t(NetwEntity::STAGE_LIVE)
+    );
+    const EventRing ring(core->event_drain());
+    const int materialized = ring.first_of(EventPlane::SPAWNING);
+    REQUIRE(materialized >= 0);
+    NETW_CHECK_EQ(ring.route_at(materialized), REPORTED_ROUTE);
+    NETW_CHECK_EQ(ring.peer_at(materialized), record->get_peer_id());
+    NETW_CHECK_EQ(
+        ring.entity_at(materialized),
+        int64_t(wrapper->get_rid_handle().get_id())
+    );
 
-    const Dictionary transition = row_of(rows, EventPlane::STAGE_TRANSITION);
-    REQUIRE(!transition.is_empty());
-    const Dictionary detail = transition[netw::event_key::detail()];
-    NETW_CHECK_EQ(int64_t(detail["from"]), int64_t(NetwEntity::STAGE_ARMED));
-    NETW_CHECK_EQ(int64_t(detail["to"]), int64_t(NetwEntity::STAGE_LIVE));
-
-    memdelete(owner);
-}
-
-TEST_CASE(
-    "[Networked][Entity][Hosted][SceneTree] EL2 a settled move reports itself "
-    "on the mover's own route, carrying the entity it is about and nothing "
-    "the caller said, because the landing is the fact and the request is not"
-) {
-    Ref<NetwMultiplayer> core = a_watching_session();
-    Node *root = netw::gd::scene_root();
-    REQUIRE(root != nullptr);
-    Node *owner = memnew(Node);
-    owner->set_name("Moved");
-    root->add_child(owner);
-
-    const Ref<NetwEntity> wrapper = NetwEntity::ensure(owner);
-    REQUIRE(wrapper.is_valid());
-    NetwEntityRecord *const record = wrapper->get_record();
-    REQUIRE(record != nullptr);
-    record->set_entity_id(StringName("moved"));
-    record->set_peer_id(6);
-    record->set_route(REPORTED_ROUTE);
-
-    core->entity_announce_reparented(wrapper);
-
-    const Dictionary moved
-        = row_of(core->event_ring(REPORTED_ROUTE), EventPlane::REPARENTED);
-    CHECK(!moved.is_empty());
-    if (!moved.is_empty()) {
-        const StringName entity_id = moved[netw::event_key::entity_id()];
-        CHECK(entity_id == record->get_entity_id());
-        NETW_CHECK_EQ(
-            int64_t(moved[netw::event_key::peer()]),
-            record->get_peer_id()
-        );
-        const Dictionary detail = moved[netw::event_key::detail()];
-        CHECK(detail.is_empty());
-    }
-
-    root->remove_child(owner);
     memdelete(owner);
 }
 

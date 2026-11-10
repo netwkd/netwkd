@@ -17,28 +17,6 @@ Ref<NetwPromise> unimplemented(const char *p_verb) {
 
 } // namespace
 
-Ref<NetwPromise> NetwDatabaseConnection::read_default(
-    const Dictionary &p_address
-) {
-    return unimplemented("_read");
-}
-
-Ref<NetwPromise> NetwDatabaseConnection::scan_default(
-    const Dictionary &p_request
-) {
-    return unimplemented("_scan");
-}
-
-Ref<NetwPromise> NetwDatabaseConnection::write_batch_default(
-    const Array &p_operations
-) {
-    return unimplemented("_write_batch");
-}
-
-Ref<NetwPromise> NetwDatabaseConnection::close_default() {
-    return NetwPromise::resolved(OK);
-}
-
 Ref<NetwPromise> NetwDatabaseConnection::read(const Dictionary &p_address) {
     Ref<NetwPromise> answer;
     if (GDVIRTUAL_CALL(_read, p_address, answer)) {
@@ -48,7 +26,7 @@ Ref<NetwPromise> NetwDatabaseConnection::read(const Dictionary &p_address) {
                                        "_read answered no promise"
                                    );
     }
-    return read_default(p_address);
+    return unimplemented("_read");
 }
 
 Ref<NetwPromise> NetwDatabaseConnection::scan(const Dictionary &p_request) {
@@ -60,7 +38,7 @@ Ref<NetwPromise> NetwDatabaseConnection::scan(const Dictionary &p_request) {
                                        "_scan answered no promise"
                                    );
     }
-    return scan_default(p_request);
+    return unimplemented("_scan");
 }
 
 Ref<NetwPromise> NetwDatabaseConnection::write_batch(
@@ -74,7 +52,7 @@ Ref<NetwPromise> NetwDatabaseConnection::write_batch(
                                        "_write_batch answered no promise"
                                    );
     }
-    return write_batch_default(p_operations);
+    return unimplemented("_write_batch");
 }
 
 Ref<NetwPromise> NetwDatabaseConnection::close() {
@@ -82,7 +60,7 @@ Ref<NetwPromise> NetwDatabaseConnection::close() {
     if (GDVIRTUAL_CALL(_close, answer)) {
         return answer.is_valid() ? answer : NetwPromise::resolved(OK);
     }
-    return close_default();
+    return NetwPromise::resolved(OK);
 }
 
 void NetwDatabaseConnection::_bind_methods() {
@@ -90,23 +68,6 @@ void NetwDatabaseConnection::_bind_methods() {
     GDVIRTUAL_BIND(_scan, "request");
     GDVIRTUAL_BIND(_write_batch, "operations");
     GDVIRTUAL_BIND(_close);
-
-    ClassDB::bind_method(
-        D_METHOD("read_default", "address"),
-        &NetwDatabaseConnection::read_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("scan_default", "request"),
-        &NetwDatabaseConnection::scan_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("write_batch_default", "operations"),
-        &NetwDatabaseConnection::write_batch_default
-    );
-    ClassDB::bind_method(
-        D_METHOD("close_default"),
-        &NetwDatabaseConnection::close_default
-    );
 }
 
 } // namespace netw

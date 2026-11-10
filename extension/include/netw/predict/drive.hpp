@@ -201,7 +201,6 @@ struct RecoveryRows {
     godot::LocalVector<double> tier_errors;
     RecoveryRequest request;
     RecoveryRequest effective;
-    WritePlan answer;
     WritePlan staged;
     wire::CodeRow scratch;
     godot::PackedInt64Array codes;

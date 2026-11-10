@@ -75,29 +75,6 @@ int64_t tag_of(const char *p_app) {
     return NetwMultiplayer::session_app_tag(StringName(p_app));
 }
 
-struct Configuring {
-    Mounted *branch = nullptr;
-    Ref<MultiplayerPeer> intruder;
-    int calls = 0;
-    int64_t tag_seen = 0;
-    int64_t tickrate_seen = 0;
-};
-
-Configuring &configuring() {
-    static Configuring held;
-    return held;
-}
-
-void assign_while_configuring() {
-    Configuring &seen = configuring();
-    seen.calls += 1;
-    seen.tag_seen = seen.branch->api()->auth_app_tag_of();
-    seen.tickrate_seen = int64_t(seen.branch->api()->clock_get_param(
-        NetwMultiplayer::CLOCK_PARAM_TICKRATE
-    ));
-    seen.branch->assign(seen.intruder);
-}
-
 } // namespace
 
 TEST_CASE(
@@ -233,39 +210,6 @@ TEST_CASE(
 
     CHECK(branch.peer() == offered);
     NETW_CHECK_EQ(branch.api()->auth_app_tag_of(), tag_of("fixed-app"));
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] CS8 a peer assigned from a "
-    "callback that reacts to the settings being applied is refused as busy, "
-    "while that callback already reads every applied setting"
-) {
-    Mounted branch("CS8Tree");
-    Netw::configure_session(child_named(branch.tree, "Session"))
-        ->app(StringName("busy-app"));
-    Netw::configure_clock(child_named(branch.tree, "Clock"))
-        ->ticks_per_second(24);
-    configuring() = Configuring();
-    configuring().branch = &branch;
-    configuring().intruder = a_server();
-    branch.api()->observe(
-        NetwMultiplayer::CLOCK_CONFIGURED,
-        callable_mp_static(&assign_while_configuring)
-    );
-    const Ref<MultiplayerPeer> offered = a_server();
-    const FaultWatch watch;
-
-    branch.assign(offered);
-
-    NETW_CHECK_EQ(configuring().calls, 1);
-    NETW_CHECK_EQ(configuring().tag_seen, tag_of("busy-app"));
-    NETW_CHECK_EQ(configuring().tickrate_seen, 24);
-    CHECK(branch.peer() == offered);
-    NETW_CHECK_EQ(
-        watch.log->error_count_containing("while the session applied"),
-        1
-    );
-    configuring() = Configuring();
 }
 
 #if defined(NETW_TIER_HOSTED)

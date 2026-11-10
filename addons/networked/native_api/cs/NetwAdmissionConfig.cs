@@ -71,13 +71,12 @@ public sealed class NetwAdmissionConfig : NetwRefCounted
         NetwApi.MethodBind("NetwAdmissionConfig", "timeout", 1717963889UL);
 
     /// <summary>
-    /// Gives a client <paramref name="seconds"/> from connecting to the server
-    /// to be admitted, in place of <see cref="NetwMultiplayer.AuthTimeout"/>.
-    /// The server tells the client this deadline, so only the server's value
+    /// Gives every join <paramref name="seconds"/> to be admitted, the server's
+    /// own included. A client's time counts from connecting to the server, and
+    /// the server tells the client this deadline, so only the server's value
     /// counts. A join still waiting when it passes is refused with
-    /// <c>@GlobalScope.ERR_TIMEOUT</c>. The server's own join does not use this
-    /// deadline, and its handler is given
-    /// <see cref="NetwMultiplayer.AuthTimeout"/> seconds.
+    /// <c>@GlobalScope.ERR_TIMEOUT</c>. Without it,
+    /// <see cref="NetwMultiplayer.AuthTimeout"/> is the deadline.
     /// </summary>
     public NetwAdmissionConfig Timeout(double seconds)
     {

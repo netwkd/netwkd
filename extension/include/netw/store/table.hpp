@@ -147,7 +147,6 @@ public:
     wire::CodeRow base;
     godot::LocalVector<uint8_t> landed;
     godot::LocalVector<godot::PackedInt64Array> decode_codes;
-    godot::LocalVector<uint32_t> selected;
 
     void compile(const SchemaRecord &p_schema, Family p_family);
 

@@ -8,6 +8,7 @@
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/promise.hpp"
+#include "netw/api/session.hpp"
 #include "netw/connect/core.hpp"
 #include "netw/connect/transport.hpp"
 
@@ -72,7 +73,7 @@ netw::connect::Transport *make_silent() {
     return new SilentTransport();
 }
 
-void record_state(int64_t, int64_t p_state) {
+void record_state(int64_t p_state) {
     attempt_log().states.push_back(p_state);
 }
 
@@ -98,16 +99,16 @@ struct Bench {
             String("silent")
         );
         core.instantiate();
-        core->observe(
-            NetwMultiplayer::SESSION_STATE_CHANGED,
+        core->get_session()->connect(
+            StringName("state_changed"),
             callable_mp_static(&record_state)
         );
-        core->observe(
-            NetwMultiplayer::CONNECTION_FAILED,
+        core->get_connection()->connect(
+            StringName("failed"),
             callable_mp_static(&record_failed)
         );
-        core->observe(
-            NetwMultiplayer::CONNECTION_PROGRESSED,
+        core->get_connection()->connect(
+            StringName("progressed"),
             callable_mp_static(&record_progress)
         );
     }
@@ -288,12 +289,6 @@ TEST_CASE(
     CHECK(attempt_log().progress_message.is_empty());
 }
 
-int heard_on_signal = 0;
-
-void hear_failed(int64_t, String) {
-    heard_on_signal += 1;
-}
-
 int64_t unhandled_after_timed_out_join(Bench &p_bench) {
     const netw_test::FaultWatch faults;
     attempt_log().hint = 0.2;
@@ -310,27 +305,13 @@ TEST_CASE(
 ) {
     {
         Bench bench;
-        bench.core->unobserve(
-            NetwMultiplayer::CONNECTION_FAILED,
-            callable_mp_static(&record_failed)
-        );
-        heard_on_signal = 0;
-        bench.core->get_connection()->connect(
-            StringName("failed"),
-            callable_mp_static(&hear_failed)
-        );
-        NETW_CHECK_EQ(unhandled_after_timed_out_join(bench), 0);
-        NETW_CHECK_EQ(heard_on_signal, 1);
-    }
-    {
-        Bench bench;
         NETW_CHECK_EQ(unhandled_after_timed_out_join(bench), 0);
         NETW_CHECK_EQ(attempt_log().failed, 1);
     }
     {
         Bench bench;
-        bench.core->unobserve(
-            NetwMultiplayer::CONNECTION_FAILED,
+        bench.core->get_connection()->disconnect(
+            StringName("failed"),
             callable_mp_static(&record_failed)
         );
         NETW_CHECK_EQ(unhandled_after_timed_out_join(bench), 1);

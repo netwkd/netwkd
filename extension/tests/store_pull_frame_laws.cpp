@@ -66,15 +66,6 @@ func _init() -> void:
 	Netw.configure_property(self, &"sleeping").broadcast()
 )";
 
-constexpr const char *SESSION_SOURCE = R"(extends NetwMultiplayer
-
-var asked: Array = []
-
-func _sync_gather_rows(table: RID, routes: PackedInt64Array) -> Array:
-	asked.append(routes)
-	return sync_gather_rows_default(table, routes)
-)";
-
 constexpr int CUBES = 5;
 constexpr int TICKRATE = 30;
 constexpr int SETTLE_FRAMES = 60;
@@ -87,8 +78,6 @@ constexpr int WRITE_READ_AT = WRITE_AT + 2;
 constexpr int MISS_AT = WRITE_READ_AT;
 constexpr int MISS_READ_AT = MISS_AT + 2;
 constexpr int PULL_END = MISS_READ_AT;
-constexpr int CUSTOM_WINDOW = 20;
-constexpr int CUSTOM_END = SETTLE_FRAMES + CUSTOM_WINDOW;
 constexpr int64_t TINT = 7;
 constexpr double MASS = 3.5;
 const Vector3 NUDGE(1.0, 0.0, 0.0);
@@ -158,19 +147,6 @@ PullEvidence &pull_evidence() {
     return evidence;
 }
 
-struct CustomEvidence {
-    bool driven = false;
-    int64_t calls = 0;
-    int64_t routes_asked = 0;
-    bool only_awake = false;
-    bool absorbed = false;
-};
-
-CustomEvidence &custom_evidence() {
-    static CustomEvidence evidence;
-    return evidence;
-}
-
 class PullStand {
 protected:
     netw_test::SimStand *stand = nullptr;
@@ -196,11 +172,7 @@ protected:
         return row_of_node(server()->store(), cube(p_index)).row;
     }
 
-    bool open_stand(
-        const Ref<Script> &p_session,
-        const char *p_source,
-        int p_cubes = CUBES
-    ) {
+    bool open_stand(const char *p_source, int p_cubes = CUBES) {
         script = netw_test::minted_script(p_source);
         if (script.is_null()) {
             return false;
@@ -209,9 +181,6 @@ protected:
         stand = new netw_test::SimStand(0);
         if (!stand->ready()) {
             return false;
-        }
-        if (p_session.is_valid()) {
-            server()->set_script(p_session);
         }
         stand->teach(StringName(CUBE_ID), callable_mp_static(&build_cube));
         stand->mount();
@@ -317,7 +286,7 @@ public:
         if (netw::gd::scene_root() == nullptr || done) {
             return false;
         }
-        if (frame == 0 && !open_stand(Ref<Script>(), CUBE_SOURCE)) {
+        if (frame == 0 && !open_stand(CUBE_SOURCE)) {
             close_stand();
             pull_evidence().driven = true;
             done = true;
@@ -378,65 +347,6 @@ public:
 
 NETW_FRAME_SCENARIO(PullScenario, store_pull_scenario);
 
-class CustomScenario final : public netw_test::FrameScenario, PullStand {
-    int frame = 0;
-    bool done = false;
-    Ref<Script> session;
-    int64_t custom_opened = 0;
-
-    void read() {
-        CustomEvidence &seen = custom_evidence();
-        const Array asked = server()->get("asked");
-        const int64_t route = table_of(0).routes[row_at(0)];
-        seen.only_awake = true;
-        for (int64_t at = asked.size() - CUSTOM_WINDOW; at < asked.size();
-             ++at) {
-            const PackedInt64Array routes = asked[at];
-            seen.calls += 1;
-            seen.routes_asked += routes.size();
-            seen.only_awake
-                = seen.only_awake && routes.size() == 1 && routes[0] == route;
-        }
-        seen.absorbed
-            = server()->store().work.custom - custom_opened == CUSTOM_WINDOW;
-    }
-
-public:
-    bool advance() override {
-        if (netw::gd::scene_root() == nullptr || done) {
-            return false;
-        }
-        if (frame == 0) {
-            session = netw_test::minted_script(SESSION_SOURCE);
-            if (session.is_null() || !open_stand(session, BODY_SOURCE)) {
-                close_stand();
-                custom_evidence().driven = true;
-                done = true;
-                return false;
-            }
-        }
-        if (frame == SETTLE_FRAMES) {
-            custom_opened = server()->store().work.custom;
-        }
-        if (frame == CUSTOM_END) {
-            read();
-            close_stand();
-            session = Ref<Script>();
-            custom_evidence().driven = true;
-            done = true;
-            return false;
-        }
-        if (frame >= SETTLE_FRAMES) {
-            cube(0)->set_linear_velocity(NUDGE);
-        }
-        stand->step_ticks(1);
-        ++frame;
-        return true;
-    }
-};
-
-NETW_FRAME_SCENARIO(CustomScenario, store_custom_scenario);
-
 constexpr int PILE = 64;
 constexpr int ALLOC_WINDOW = 30;
 
@@ -480,7 +390,7 @@ public:
         if (netw::gd::scene_root() == nullptr || done) {
             return false;
         }
-        if (frame == 0 && !open_stand(Ref<Script>(), BODY_SOURCE, PILE)) {
+        if (frame == 0 && !open_stand(BODY_SOURCE, PILE)) {
             close_stand();
             alloc_evidence().driven = true;
             done = true;
@@ -522,15 +432,6 @@ func _init() -> void:
 	Netw.configure_property(self, &"quaternion").broadcast().heartbeat(3)
 )";
 
-constexpr const char *ENCODING_SOURCE = R"(extends NetwMultiplayer
-
-var encoded := 0
-
-func _sync_encode(_peer: int, _tick: int) -> PackedByteArray:
-	encoded += 1
-	return PackedByteArray()
-)";
-
 constexpr int SEND_PILE = 16;
 constexpr int SEND_WINDOW = 60;
 
@@ -539,8 +440,6 @@ struct SendAllocEvidence {
     int asleep = 0;
     int64_t sends = 0;
     int64_t sent_rows = 0;
-    int64_t staged = 0;
-    int64_t encoded = 0;
     int64_t in_pump = 0;
     int64_t in_send = 0;
     int64_t in_frames = 0;
@@ -549,25 +448,22 @@ struct SendAllocEvidence {
     int64_t in_transport = 0;
 };
 
-enum SendArm { ONE_PEER, ENCODED, ALONE };
+enum SendArm { ONE_PEER, ALONE };
 
 SendAllocEvidence &send_alloc_evidence(SendArm p_arm) {
-    static SendAllocEvidence evidence[3];
+    static SendAllocEvidence evidence[2];
     return evidence[p_arm];
 }
 
 class SendAllocScenario final : public netw_test::FrameScenario {
     const SendArm arm;
-    const bool overridden;
     int frame = 0;
     bool done = false;
     netw_test::SimStand *stand = nullptr;
     Ref<Script> script;
-    Ref<Script> session;
     LocalVector<RID> cubes;
     netw_test::AllocProbe probe;
     NetwMultiplayer::IdleWork opened;
-    int64_t encoded = 0;
 
     NetwMultiplayer *server() const {
         return stand->session(-1);
@@ -582,13 +478,6 @@ class SendAllocScenario final : public netw_test::FrameScenario {
         stand = new netw_test::SimStand(arm == ALONE ? 0 : 1);
         if (!stand->ready()) {
             return false;
-        }
-        if (overridden) {
-            session = netw_test::minted_script(ENCODING_SOURCE);
-            if (session.is_null()) {
-                return false;
-            }
-            server()->set_script(session);
         }
         stand->teach(StringName(CUBE_ID), callable_mp_static(&build_cube));
         stand->mount();
@@ -620,9 +509,6 @@ class SendAllocScenario final : public netw_test::FrameScenario {
             = now.transport_allocations - opened.transport_allocations;
         seen.sends = now.sends - opened.sends;
         seen.sent_rows = now.sent_rows - opened.sent_rows;
-        seen.staged = now.staged - opened.staged;
-        seen.encoded
-            = overridden ? int64_t(server()->get("encoded")) - encoded : 0;
         seen.in_pump = now.pump_allocations - opened.pump_allocations;
         seen.in_send = now.send_allocations - opened.send_allocations;
         for (const RID &cube : cubes) {
@@ -638,12 +524,10 @@ class SendAllocScenario final : public netw_test::FrameScenario {
         stand = nullptr;
         cube_script = nullptr;
         script = Ref<Script>();
-        session = Ref<Script>();
     }
 
 public:
-    explicit SendAllocScenario(SendArm p_arm)
-        : arm(p_arm), overridden(p_arm == ENCODED) {
+    explicit SendAllocScenario(SendArm p_arm) : arm(p_arm) {
     }
 
     bool advance() override {
@@ -657,7 +541,6 @@ public:
         }
         if (frame == SETTLE_FRAMES) {
             server()->store().validate_every = 0;
-            encoded = overridden ? int64_t(server()->get("encoded")) : 0;
             probe.arm();
             opened = server()->idle_work;
         }
@@ -675,7 +558,6 @@ public:
 };
 
 NETW_FRAME_SCENARIO(SendAllocScenario, store_send_alloc_scenario, ONE_PEER);
-NETW_FRAME_SCENARIO(SendAllocScenario, store_send_encoded_scenario, ENCODED);
 NETW_FRAME_SCENARIO(SendAllocScenario, store_send_alone_scenario, ALONE);
 
 TEST_CASE(
@@ -738,19 +620,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P6 a table override receives exactly the rows "
-    "the change policy selected, once per tick, and the store keeps what it "
-    "answers"
-) {
-    const CustomEvidence &seen = custom_evidence();
-    REQUIRE(seen.driven);
-    NETW_CHECK_EQ(seen.calls, int64_t(CUSTOM_WINDOW));
-    NETW_CHECK_EQ(seen.routes_asked, int64_t(CUSTOM_WINDOW));
-    CHECK(seen.only_awake);
-    CHECK(seen.absorbed);
-}
-
-TEST_CASE(
     "[Networked][Store][Frame] P7 a steady pull over a sleeping pile makes "
     "no heap allocation through the extension's allocator, while the same "
     "window around it does"
@@ -803,22 +672,6 @@ TEST_CASE(
     NETW_CHECK_EQ(paired.in_frames, int64_t(0));
     NETW_CHECK_EQ(paired.in_carrier, paired.in_transport);
     NETW_CHECK_EQ(paired.in_display, int64_t(0));
-}
-
-TEST_CASE(
-    "[Networked][Store][Frame] P9 rows sent to a peer run the encode stage "
-    "only when the session's script overrides it, and then for every row the "
-    "send selects"
-) {
-    const SendAllocEvidence &plain = send_alloc_evidence(ONE_PEER);
-    const SendAllocEvidence &encoding = send_alloc_evidence(ENCODED);
-    REQUIRE(plain.driven);
-    REQUIRE(encoding.driven);
-    NETW_CHECK_GT(plain.sent_rows, int64_t(0));
-    NETW_CHECK_EQ(plain.staged, int64_t(0));
-    NETW_CHECK_GT(encoding.staged, int64_t(0));
-    NETW_CHECK_EQ(encoding.encoded, encoding.staged);
-    NETW_CHECK_EQ(encoding.sent_rows, int64_t(0));
 }
 
 } // namespace TestNetwStorePull

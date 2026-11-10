@@ -7,6 +7,7 @@
 
 #include "godot/node.hpp"
 #include "godot/performance.hpp"
+#include "support/event_ring.h"
 #include "support/netw_recorder.h"
 
 #include "netw/api/entity.hpp"
@@ -70,26 +71,8 @@ Ref<NetwEntity> seat_player(LoopbackRig &p_rig, Node *p_parent) {
     return NetwEntity::of(node);
 }
 
-Dictionary charged(int64_t p_transition) {
-    Dictionary out;
-    out[StringName("transition")] = p_transition;
-    return out;
-}
-
-Array rows_of(const Array &p_drained, int64_t p_event) {
-    Array kept;
-    for (int at = 0; at < p_drained.size(); ++at) {
-        const Dictionary row = p_drained[at];
-        if (!row.is_empty()
-            && int64_t(row[netw::event_key::event()]) == p_event) {
-            kept.push_back(row);
-        }
-    }
-    return kept;
-}
-
 TEST_CASE(
-    "[Networked][Predict][Report] PR1 a prediction fact names the "
+    "[Networked][Predict][Report] PR1 a prediction row names the "
     "entity seated in the slot it is about, and rides that entity's own "
     "liveness route, so a caller states what happened and never spells who "
     "it happened to"
@@ -109,34 +92,25 @@ TEST_CASE(
     const int64_t route = core->liveness_route_of(seated.ptr());
     REQUIRE(route > 0);
 
-    core->event_arm(true);
-    core->event_ring(route);
-    pool->report_predict(
-        slot,
-        netw::EventPlane::PREDICT_DRIVE,
-        charged(7),
-        Dictionary()
-    );
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
+    core->event_arm(NetwMultiplayer::EVENT_GROUP_PREDICTION);
+    core->event_drain();
+    pool->record_predict(slot, netw::EventPlane::PREDICT_DRIVE, 7);
+    const EventRing ring(core->event_drain());
 
-    const Array driven = rows_of(drained, netw::EventPlane::PREDICT_DRIVE);
-    REQUIRE(driven.size() == 1);
-    const Dictionary row = driven[0];
-    const StringName entity_id = row[netw::event_key::entity_id()];
-    CHECK(entity_id == seated->get_name());
-    NETW_CHECK_EQ(int64_t(row[netw::event_key::route()]), route);
-    const Dictionary detail = row[netw::event_key::detail()];
+    NETW_REQUIRE_EQ(ring.count_of(netw::EventPlane::PREDICT_DRIVE), 1);
+    const int row = ring.first_of(netw::EventPlane::PREDICT_DRIVE);
     NETW_CHECK_EQ(
-        int64_t(detail.get(StringName("transition"), -1)),
-        int64_t(7)
+        ring.entity_at(row),
+        int64_t(seated->get_rid_handle().get_id())
     );
+    NETW_CHECK_EQ(ring.route_at(row), route);
+    NETW_CHECK_EQ(ring.a_at(row), int64_t(7));
 }
 
 TEST_CASE(
     "[Networked][Predict][Report] PR2 a slot with no seated entity "
-    "names no route, and a fact naming no subject is one no watcher can act "
-    "on, so it reaches nobody"
+    "names no route, and a fact naming no subject is one no tool can act "
+    "on, so it is not recorded"
 ) {
     LoopbackRig rig(1);
     rig.mount();
@@ -153,21 +127,12 @@ TEST_CASE(
     const int64_t unseated = pool->open();
     REQUIRE(unseated >= 0);
 
-    core->event_arm(true);
-    core->event_ring(route);
-    core->event_ring(0);
-    pool->report_predict(
-        unseated,
-        netw::EventPlane::PREDICT_DRIVE,
-        charged(7),
-        Dictionary()
-    );
-    const Array on_route = core->event_ring(route);
-    const Array unrouted = core->event_ring(0);
-    core->event_arm(false);
+    core->event_arm(NetwMultiplayer::EVENT_GROUP_PREDICTION);
+    core->event_drain();
+    pool->record_predict(unseated, netw::EventPlane::PREDICT_DRIVE, 7);
+    const EventRing ring(core->event_drain());
 
-    NETW_CHECK_EQ(rows_of(on_route, netw::EventPlane::PREDICT_DRIVE).size(), 0);
-    NETW_CHECK_EQ(rows_of(unrouted, netw::EventPlane::PREDICT_DRIVE).size(), 0);
+    NETW_CHECK_EQ(ring.count_of(netw::EventPlane::PREDICT_DRIVE), 0);
 }
 
 Vector<StringName> episode_edges() {
@@ -194,8 +159,7 @@ Dictionary last_report(const Recorder &p_edges) {
 
 TEST_CASE(
     "[Networked][Predict][Report] PR3 an episode edge takes its "
-    "signal from the event that names it, and an event naming no edge "
-    "announces nothing at all"
+    "signal from the event that names it"
 ) {
     LoopbackRig rig(1);
     rig.mount();
@@ -208,23 +172,13 @@ TEST_CASE(
     NetwPredictionEngine *const pool = core->get_prediction_engine();
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
-    const int64_t route = core->liveness_route_of(seated.ptr());
 
     Object *held = netw::gd::live_object(seated->get_prediction());
     REQUIRE_MESSAGE(held != nullptr, "the entity minted no prediction handle");
     Recorder edges(held, episode_edges());
 
-    core->event_arm(true);
-    core->event_ring(route);
-    pool->announce_episode(slot, netw::EventPlane::EPISODE_OPEN, Dictionary());
-    pool->announce_episode(
-        slot,
-        netw::EventPlane::EPISODE_FALLBACK,
-        Dictionary()
-    );
-    pool->announce_episode(slot, netw::EventPlane::PREDICT_DRIVE, Dictionary());
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
+    pool->announce_episode(slot, netw::EventPlane::EPISODE_OPEN);
+    pool->announce_episode(slot, netw::EventPlane::EPISODE_FALLBACK);
 
     NETW_CHECK_EQ(edges.count(StringName("episode_changed")), 2);
     NETW_CHECK_EQ(
@@ -239,18 +193,11 @@ TEST_CASE(
         changes_of(edges, netw::NetwPrediction::EPISODE_CHANGE_CLOSED),
         0
     );
-    NETW_CHECK_EQ(rows_of(drained, netw::EventPlane::EPISODE_OPEN).size(), 1);
-    NETW_CHECK_EQ(
-        rows_of(drained, netw::EventPlane::EPISODE_FALLBACK).size(),
-        1
-    );
-    NETW_CHECK_EQ(rows_of(drained, netw::EventPlane::PREDICT_DRIVE).size(), 0);
 }
 
 TEST_CASE(
     "[Networked][Predict][Report] PR4 a judged disagreement reaches "
-    "the game's signal and the watcher's row carrying the same transition "
-    "and the same boundary"
+    "the game's signal carrying its transition and its boundary"
 ) {
     LoopbackRig rig(1);
     rig.mount();
@@ -262,7 +209,6 @@ TEST_CASE(
     NetwPredictionEngine *const pool = core->get_prediction_engine();
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
-    const int64_t route = core->liveness_route_of(seated.ptr());
 
     Object *held = netw::gd::live_object(seated->get_prediction());
     REQUIRE(held != nullptr);
@@ -271,37 +217,18 @@ TEST_CASE(
     Recorder judged(held, watched);
 
     const int64_t contact = int64_t(netw::predict::Attribution::CONTACT);
-    core->event_arm(true);
-    core->event_ring(route);
-    pool->announce_divergence(slot, 7, contact, 0.5);
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
+    pool->announce_divergence(slot, 7, contact);
 
     NETW_CHECK_EQ(judged.count(StringName("divergence_detected")), 1);
     const Array said = judged.args(StringName("divergence_detected"));
     REQUIRE(said.size() == 2);
     NETW_CHECK_EQ(int64_t(said[0]), int64_t(7));
     NETW_CHECK_EQ(int64_t(said[1]), contact);
-
-    const Array rows = rows_of(drained, netw::EventPlane::DIVERGENCE);
-    REQUIRE(rows.size() == 1);
-    const Dictionary row = rows[0];
-    const Dictionary detail = row[netw::event_key::detail()];
-    NETW_CHECK_EQ(
-        int64_t(detail.get(StringName("transition"), -1)),
-        int64_t(7)
-    );
-    NETW_CHECK_EQ(int64_t(detail.get(StringName("attribution"), -1)), contact);
-    NETW_CHECK_CLOSE(
-        double(detail.get(StringName("divergence"), 0.0)),
-        0.5,
-        1.0e-9
-    );
 }
 
 TEST_CASE(
-    "[Networked][Predict][Report] PR5 a consume pass reports the "
-    "queue it was handed and the action it took on it"
+    "[Networked][Predict][Report] PR5 a consume pass records the "
+    "depth and the buffer of the queue it was handed"
 ) {
     LoopbackRig rig(1);
     rig.mount();
@@ -315,19 +242,15 @@ TEST_CASE(
     REQUIRE(slot >= 0);
     const int64_t route = core->liveness_route_of(seated.ptr());
 
-    core->event_arm(true);
-    core->event_ring(route);
-    pool->report_consume(slot, 3, 2, 1);
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
+    core->event_arm(NetwMultiplayer::EVENT_GROUP_PREDICTION);
+    core->event_drain();
+    pool->report_consume(slot, 3, 2);
+    const EventRing ring(core->event_drain());
 
-    const Array rows = rows_of(drained, netw::EventPlane::PREDICT_CONSUME);
-    REQUIRE(rows.size() == 1);
-    const Dictionary row = rows[0];
-    const Dictionary detail = row[netw::event_key::detail()];
-    NETW_CHECK_EQ(int64_t(detail.get(StringName("depth"), -1)), int64_t(3));
-    NETW_CHECK_EQ(int64_t(detail.get(StringName("buffer"), -1)), int64_t(2));
-    NETW_CHECK_EQ(int64_t(detail.get(StringName("action"), -1)), int64_t(1));
+    NETW_REQUIRE_EQ(ring.count_of(netw::EventPlane::PREDICT_CONSUME, route), 1);
+    const int row = ring.first_of(netw::EventPlane::PREDICT_CONSUME);
+    NETW_CHECK_EQ(ring.a_at(row), int64_t(3));
+    NETW_CHECK_EQ(ring.b_at(row), int64_t(2));
 }
 
 TEST_CASE(
@@ -345,28 +268,22 @@ TEST_CASE(
     NetwPredictionEngine *const pool = core->get_prediction_engine();
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
-    const int64_t route = core->liveness_route_of(seated.ptr());
     REQUIRE(pool->open_episode(slot, 3, 1));
 
     Object *held = netw::gd::live_object(seated->get_prediction());
     REQUIRE(held != nullptr);
     Recorder edges(held, episode_edges());
 
-    core->event_arm(true);
-    core->event_ring(route);
     pool->record_episode_comparison(slot, -1);
     pool->record_episode_comparison(
         slot,
         int64_t(netw::NetwPrediction::EPISODE_STATE_OPEN)
     );
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
 
     NETW_CHECK_EQ(
         changes_of(edges, netw::NetwPrediction::EPISODE_CHANGE_OPENED),
         1
     );
-    NETW_CHECK_EQ(rows_of(drained, netw::EventPlane::EPISODE_OPEN).size(), 1);
 
     const Dictionary carried = last_report(edges);
     CHECK_FALSE(carried.is_empty());
@@ -818,7 +735,7 @@ TEST_CASE(
 
     netw::RecoveryPlan declined;
     declined.write = written;
-    pool->apply_recovery_plan(slot, declined, 4, true);
+    pool->apply_recovery_plan(slot, declined, 4);
     NETW_CHECK_EQ(
         int64_t(pool->verdict_reason_of(slot)),
         int64_t(netw::predict::VERDICT_REASON_DECLINED)
@@ -831,7 +748,7 @@ TEST_CASE(
     teleported.write = written;
     teleported.teleport = true;
     teleported.skip = false;
-    pool->apply_recovery_plan(slot, teleported, 5, true);
+    pool->apply_recovery_plan(slot, teleported, 5);
     NETW_CHECK_EQ(pool->recovery_write_of(slot).is_empty(), 0);
     NETW_CHECK_EQ(pool->last_correction_teleported_of(slot), 1);
 }
@@ -1068,7 +985,7 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Predict][Report] PR25 a drive the pool RECORDED is "
-    "reported, and a drive it refused is not, because a watcher counting "
+    "recorded, and a drive it refused is not, because a tool counting "
     "rows would otherwise count passes that never opened a transition"
 ) {
     LoopbackRig rig(1);
@@ -1096,8 +1013,8 @@ TEST_CASE(
     );
     const int64_t route = core->liveness_route_of(seated.ptr());
 
-    core->event_arm(true);
-    core->event_ring(route);
+    core->event_arm(NetwMultiplayer::EVENT_GROUP_PREDICTION);
+    core->event_drain();
     const int64_t empty_hash
         = pool->command_hash_row(slot, netw::predict::StateRow());
     const netw::DriveOutcome drove = pool->record_drive_hashed(
@@ -1122,12 +1039,11 @@ TEST_CASE(
         true,
         true
     );
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
+    const EventRing ring(core->event_drain());
 
     NETW_CHECK_EQ(drove.ran, 1);
     NETW_CHECK_EQ(refused.ran, 0);
-    NETW_CHECK_EQ(rows_of(drained, netw::EventPlane::PREDICT_DRIVE).size(), 1);
+    NETW_CHECK_EQ(ring.count_of(netw::EventPlane::PREDICT_DRIVE, route), 1);
 }
 
 TEST_CASE(
@@ -1178,7 +1094,6 @@ TEST_CASE(
     NetwPredictionEngine *const pool = core->get_prediction_engine();
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
-    const int64_t route = core->liveness_route_of(seated.ptr());
 
     Object *held = netw::gd::live_object(seated->get_prediction());
     REQUIRE(held != nullptr);
@@ -1186,17 +1101,12 @@ TEST_CASE(
     watched.push_back(StringName("recovered"));
     Recorder repaired(held, watched);
 
-    core->event_arm(true);
-    core->event_ring(route);
     NETW_CHECK_EQ(
         pool->announce_recovered(slot, 4, 1, Dictionary(), Dictionary()),
         0
     );
-    const Array drained = core->event_ring(route);
-    core->event_arm(false);
 
     NETW_CHECK_EQ(repaired.count(StringName("recovered")), 0);
-    NETW_CHECK_EQ(rows_of(drained, netw::EventPlane::RECOVERY).size(), 0);
 }
 
 int findings_emitted = 0;
@@ -1429,161 +1339,6 @@ TEST_CASE(
     NETW_CHECK_EQ(int(pool->command_of(slot)->values[0]), 0);
 }
 
-namespace {
-
-Ref<netw::NetwPredictJudgement> abstaining_seam(
-    int64_t,
-    int64_t,
-    const Dictionary &,
-    const Dictionary &,
-    const Dictionary &
-) {
-    return Ref<netw::NetwPredictJudgement>();
-}
-
-Dictionary at_position(double p_x) {
-    Dictionary out;
-    out[StringName("position")] = Vector2(p_x, 0.0);
-    return out;
-}
-
-int64_t judging_slot(LoopbackRig &p_rig, const Ref<NetwEntity> &p_seated) {
-    NetwPredictionEngine *const pool = p_rig.server()->get_prediction_engine();
-    const int64_t slot = pool->slot_register(p_seated);
-    REQUIRE(slot >= 0);
-    LocalVector<predict::FieldDecl> declared;
-    predict::FieldDecl position;
-    position.key = StringName("position");
-    position.type = int(Variant::VECTOR2);
-    declared.push_back(position);
-    pool->rewire(slot, declared);
-    pool->bind_property_sets(
-        slot,
-        pose_binding(p_rig.server(), p_seated->get_owner()),
-        PropertyBindingPtr()
-    );
-    pool->configure(
-        slot,
-        int(netw::Schedule::TICK),
-        int(netw::Role::PREDICT),
-        int(netw::CorrectionMode::SNAP),
-        int(netw::RestoreMode::EXACT)
-    );
-    return slot;
-}
-
-} // namespace
-
-TEST_CASE(
-    "[Networked][Predict][Report] PR20 a stock decision is a value, so a "
-    "tick that installs no seam mints no record to carry an answer the "
-    "engine unwraps and drops on the next line"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-    const Ref<NetwEntity> seated = seat_player(rig, arena);
-    REQUIRE(seated.is_valid());
-    NetwPredictionEngine *const pool = rig.server()->get_prediction_engine();
-    const int64_t slot = judging_slot(rig, seated);
-
-    const Dictionary predicted = at_position(0.0);
-    const Dictionary payload = at_position(5.0);
-    const predict::StateRow predicted_row
-        = netw_test::state_row(pool, slot, predicted);
-    const predict::StateRow payload_row
-        = netw_test::state_row(pool, slot, payload);
-    pool->judge_state(slot, 4, 0, 0, predicted_row, payload_row, Callable());
-    pool->plan_recovery(slot, 4, 4, predicted, payload, false, 0, 1);
-
-    const int64_t before = netw::prediction_core::records_minted();
-    for (int at = 0; at < 8; ++at) {
-        pool->judge_state(
-            slot,
-            5 + at,
-            0,
-            0,
-            predicted_row,
-            payload_row,
-            Callable()
-        );
-        const int64_t ack = 5 + at;
-        pool->plan_recovery(slot, ack, ack, predicted, payload, false, 0, 1);
-    }
-    NETW_CHECK_EQ(netw::prediction_core::records_minted(), before);
-}
-
-TEST_CASE(
-    "[Networked][Predict][Report] PR21 a seam that answers nothing is "
-    "refused rather than read as agreement, so the stock judgement stands "
-    "and the misuse is reported on the entity's own route"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "*the override of _predict_evaluate*[NW1007]*",
-        1
-    );
-
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-    const Ref<NetwEntity> seated = seat_player(rig, arena);
-    REQUIRE(seated.is_valid());
-
-    NetwMultiplayer *core = rig.server();
-    core->event_arm(true);
-    PackedInt64Array events;
-    events.push_back(netw::EventPlane::SEAM_MISUSE);
-    core->event_watch(
-        events,
-        Dictionary(),
-        Dictionary(),
-        Callable(),
-        Dictionary()
-    );
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
-    const int64_t slot = judging_slot(rig, seated);
-    const int64_t route = core->liveness_route_of(seated.ptr());
-
-    const Dictionary predicted = at_position(0.0);
-    const Dictionary payload = at_position(5.0);
-    Dictionary sink;
-    const netw::Judgement stock = netw::prediction_core::judge(
-        0,
-        int(NetwPrediction::EXACT_VERDICT_UNJUDGED),
-        predicted,
-        payload,
-        pool->wiring_snapshot(slot),
-        sink
-    );
-    REQUIRE(stock.corrected);
-
-    const predict::StateRow predicted_row
-        = netw_test::state_row(pool, slot, predicted);
-    const predict::StateRow payload_row
-        = netw_test::state_row(pool, slot, payload);
-    const predict::Judged judged = pool->judge_state(
-        slot,
-        4,
-        0,
-        0,
-        predicted_row,
-        payload_row,
-        callable_mp_static(&abstaining_seam)
-    );
-    NETW_CHECK_EQ(judged.corrected ? 1 : 0, stock.corrected ? 1 : 0);
-    NETW_CHECK_CLOSE(judged.divergence, stock.divergence, 0.0);
-
-    const Array refusals
-        = rows_of(core->event_ring(route), netw::EventPlane::SEAM_MISUSE);
-    NETW_CHECK_EQ(int64_t(refusals.size()), int64_t(1));
-    const Dictionary refusal = refusals[0];
-    REQUIRE(!refusal.is_empty());
-    const Dictionary detail = refusal[netw::event_key::detail()];
-    CHECK(String(detail[StringName("seam")]) == String("_predict_evaluate"));
-    CHECK(String(detail[StringName("reason")]) == String("null"));
-}
-
 predict::FieldDecl momentum_field(const char *p_key) {
     predict::FieldDecl decl;
     decl.key = StringName(p_key);
@@ -1709,69 +1464,34 @@ PropertyBindingPtr recovering_state(NetwMultiplayer *p_core, Node *p_node) {
     return p_core->property_binding_book().create(declared, p_node);
 }
 
-netw::RecoveryPlan check_parity(
-    NetwMultiplayer *p_core,
-    const Ref<NetwEntity> &p_seated,
+netw::RecoveryPlan planned_recovery(
     NetwPredictionEngine *p_pool,
     int64_t p_slot,
     int64_t p_ack,
     int p_domain
 ) {
-    const int closure = int(predict::Attribution::CLOSURE);
     Dictionary authority;
     authority[StringName("position")] = Vector2(1.0, 0.0);
     authority[StringName("scale")] = Vector2(2.0, 1.0);
     authority[StringName("rotation")] = 1.0;
 
-    const Ref<NetwPrediction> handle = p_seated->get_prediction();
-    REQUIRE(handle.is_valid());
     p_pool->open_recovery(p_slot, p_ack, Dictionary(), authority, 1, 0);
-    const bool escalated = p_pool->escalation_pending(p_slot);
-    const Dictionary context = p_pool->recovery_context(
-        p_slot,
-        p_ack,
-        p_ack,
-        p_domain,
-        closure,
-        escalated
-    );
-    const netw::PlannedRecovery planned = p_pool->plan_recovery(
+    const predict::WritePlan planned = p_pool->plan_recovery(
         p_slot,
         p_ack,
         p_ack,
         Dictionary(),
         authority,
-        escalated,
+        p_pool->escalation_pending(p_slot),
         p_domain,
-        closure
+        int(predict::Attribution::CLOSURE)
     );
-    const netw::RecoveryPlan pooled = p_pool->recovery_of(p_slot, planned.pool);
-    const Ref<netw::NetwPredictRecovery> seamed
-        = p_core->predict_recover_default(
-            p_pool->recovery_carried_of(p_slot),
-            Dictionary(),
-            handle->resolved_recovery_policy(),
-            handle->get_snap_restore(),
-            p_pool->recovery_projection_of(p_slot),
-            p_pool->recovery_before_of(p_slot),
-            p_pool->recovery_tier_errors_of(p_slot),
-            p_pool->wiring_snapshot(p_slot),
-            context,
-            p_pool->tick_delta_of(p_slot)
-        );
-    REQUIRE(seamed.is_valid());
-    const bool restores_agree = seamed->restore() == pooled.restore;
-    const bool writes_agree = seamed->write() == pooled.write;
-    NETW_CHECK_EQ(restores_agree ? 1 : 0, 1);
-    NETW_CHECK_EQ(writes_agree ? 1 : 0, 1);
-    NETW_CHECK_EQ(seamed->teleport() ? 1 : 0, pooled.teleport ? 1 : 0);
-    NETW_CHECK_EQ(seamed->skip() ? 1 : 0, pooled.skip ? 1 : 0);
-    return pooled;
+    return p_pool->recovery_of(p_slot, planned);
 }
 
 TEST_CASE(
-    "[Networked][Predict][Report] PR28 the recover seam's default plans "
-    "exactly what the pool plans from the same recovery rows"
+    "[Networked][Predict][Report] PR28 a rebase recovery withholds teleport "
+    "only fields, escalates once, suppresses and projects the pose"
 ) {
     LoopbackRig rig(1);
     rig.mount();
@@ -1809,7 +1529,7 @@ TEST_CASE(
     for (const int domain : domains) {
         escalations += pool->escalation_pending(slot) ? 1 : 0;
         const netw::RecoveryPlan pooled
-            = check_parity(core, seated, pool, slot, ack, domain);
+            = planned_recovery(pool, slot, ack, domain);
         withheld += !pooled.skip && !pooled.restore.has(StringName("rotation"))
             ? 1
             : 0;
@@ -1838,8 +1558,7 @@ TEST_CASE(
         false
     );
     ack += 8;
-    const netw::RecoveryPlan projected
-        = check_parity(core, seated, pool, slot, ack, 0);
+    const netw::RecoveryPlan projected = planned_recovery(pool, slot, ack, 0);
     const Vector2 pose = projected.restore[StringName("position")];
     NETW_CHECK_CLOSE(double(pose.y), 1.0 / 60.0, 1.0e-4);
 }

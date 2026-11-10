@@ -180,9 +180,6 @@ Error NetwMultiplayer::apply_pending_config(
             input_gate_deadline_ticks
         );
     }
-    if (clock_committed) {
-        notify(CLOCK_CONFIGURED);
-    }
     config_applying = false;
 
     if (committed != OK || predict_awaiting_config.is_empty()

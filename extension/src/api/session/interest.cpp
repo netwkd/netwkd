@@ -462,20 +462,16 @@ void NetwMultiplayer::interest_report_edge(
         value = p_entered ? EventPlane::OBSERVER_ENTERED
                           : EventPlane::OBSERVER_LEFT;
     }
-    if (!event_wants(value, p_edge.route)) {
-        return;
+    if (event_records(value)) {
+        event_record(
+            value,
+            p_entity.is_valid() ? p_entity->get_rid_handle() : RID(),
+            p_edge.route,
+            p_edge.observer_peer,
+            OK,
+            int64_t(interest_layer_find(p_edge.layer_id).get_id())
+        );
     }
-    Dictionary detail;
-    detail[StringName("layer")] = p_edge.layer_id;
-    event_emit(
-        value,
-        p_edge.route,
-        detail,
-        p_entity->get_name(),
-        p_edge.observer_peer,
-        OK,
-        Dictionary()
-    );
 }
 
 bool NetwMultiplayer::interest_can_send_to(int64_t p_peer_id) {
@@ -1127,17 +1123,7 @@ void NetwMultiplayer::interest_commit() {
     interest_refresh_all_perception();
     interest_pending = interest::Delta();
     interest_pending_live = false;
-    if (event_wants(EventPlane::INTEREST_COMMIT, 0)) {
-        event_emit(
-            EventPlane::INTEREST_COMMIT,
-            0,
-            Dictionary(),
-            StringName(),
-            0,
-            OK,
-            Dictionary()
-        );
-    }
+    event_record(EventPlane::INTEREST_COMMIT, RID(), 0, 0);
 }
 
 void NetwMultiplayer::interest_refresh_compat_intents() {
@@ -1925,13 +1911,6 @@ void NetwMultiplayer::interest_leave(
             record->remove_entity(entity);
         }
     }
-}
-
-TypedArray<StringName> NetwMultiplayer::interest_layer_ids(
-    const RID &p_entity
-) {
-    interest::Facet *facet = interest_facet_of(p_entity);
-    return facet != nullptr ? facet->layer_ids() : TypedArray<StringName>();
 }
 
 void NetwMultiplayer::interest_on_enter(
