@@ -1,786 +1,320 @@
+#include "support/link.h"
 #include "support/netw_test.h"
 
-#include <cmath>
+#if defined(NETW_TIER_HOSTED)
 
-#include "netw/prediction_core.hpp"
+#include "support/fault_log.h"
+#include "support/loopback_rig.h"
+#include "support/netw_cells.h"
+#include "support/netw_recorder.h"
 
-namespace TestPredictionCore {
+#include "netw/api/entity.hpp"
+#include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/prediction.hpp"
+#include "netw/api/simulation.hpp"
+
+namespace TestPrediction {
 
 using namespace godot;
-using netw::Attribution;
-using netw::Fold;
-using netw::Judgement;
-using netw::PredictionVerdict;
-using netw::StateFamily;
+using netw::NetwEntity;
+using netw::NetwMultiplayer;
+using netw::NetwPrediction;
+using netw::NetwSimulation;
+using netw_test::EntityDecl;
+using netw_test::FaultWatch;
+using netw_test::law_broken;
+using netw_test::law_held;
+using netw_test::LawRowFor;
+using netw_test::LawVerdict;
+using netw_test::LoopbackRig;
+using netw_test::Recorder;
+using netw_test::WorldDecl;
 
-namespace prediction_core = netw::prediction_core;
+constexpr int SERVER = -1;
+constexpr int SETTLE_TICKS = 30;
+constexpr int RECOVER_TICKS = 70;
+constexpr int PAST_HORIZON = NetwPrediction::ACK_AGE_MAX + 16;
 
-constexpr double TAU = 6.2831853071795864769252867666;
+struct World {
+    String label;
+};
 
-constexpr int DOMAIN_IN = int(netw::Domain::IN_DOMAIN);
-constexpr int DOMAIN_OUT = int(netw::Domain::OUT_OF_DOMAIN);
+typedef LawRowFor<World> Row;
 
-constexpr int VERDICT_UNJUDGED = int(netw::ExactVerdict::UNJUDGED);
-constexpr int VERDICT_EQUAL = int(netw::ExactVerdict::EQUAL);
-constexpr int VERDICT_UNEQUAL = int(netw::ExactVerdict::UNEQUAL);
-
-constexpr int DRIVE_FRESH = int(netw::DriveKind::FRESH);
-constexpr int DRIVE_REPEAT = int(netw::DriveKind::REPEAT);
-
-constexpr int CONSUME_REPLAY = int(netw::ConsumeAction::REPLAY);
-constexpr int CONSUME_HOLD = int(netw::ConsumeAction::HOLD);
-constexpr int CONSUME_STARVED = int(netw::ConsumeAction::STARVED);
-
-Dictionary one_field(const StringName &p_key, const Variant &p_value) {
-    Dictionary row;
-    row[p_key] = p_value;
-    return row;
+EntityDecl runner(const char *p_name) {
+    return EntityDecl()
+        .named(p_name)
+        .on_schema("RunnerPose")
+        .synced("position")
+        .placed_at(Vector2())
+        .predicted(0.01);
 }
 
-int joint_cell(bool p_authored, bool p_relayed, bool p_predictor_valid) {
-    return prediction_core::calculate_joint_cell(
-        p_authored,
-        p_relayed,
-        p_predictor_valid
+Node2D *body(LoopbackRig &p_rig, const char *p_name, int p_at) {
+    return Object::cast_to<Node2D>(
+        p_rig.node_of(p_rig.entity_of(StringName(p_name), p_at), p_at)
     );
 }
 
-Dictionary wiring_with(const StringName &p_key, const Variant &p_value) {
-    Dictionary wiring;
-    wiring[p_key] = p_value;
-    return wiring;
-}
-
-TEST_CASE(
-    "[Networked][Predict] A declared undisturbed transition is in domain"
+Ref<NetwPrediction> prediction(
+    LoopbackRig &p_rig,
+    const char *p_name,
+    int p_at
 ) {
-    NETW_CHECK_EQ(prediction_core::domain_of(true, false, 10, -1), DOMAIN_IN);
+    return NetwEntity::of(body(p_rig, p_name, p_at))->get_prediction();
 }
 
-TEST_CASE(
-    "[Networked][Predict] An undeclared entity is out of domain whatever its "
-    "label"
-) {
-    NETW_CHECK_EQ(prediction_core::domain_of(false, false, 0, -1), DOMAIN_OUT);
-    NETW_CHECK_EQ(
-        prediction_core::domain_of(false, false, 999, -1),
-        DOMAIN_OUT
-    );
+void run(LoopbackRig &p_rig, const char *p_name, int p_at) {
+    body(p_rig, p_name, p_at)->set("motion", Vector2(1.0, 0.0));
 }
 
-TEST_CASE(
-    "[Networked][Predict] An approximate island is out of domain whatever its "
-    "label"
-) {
-    NETW_CHECK_EQ(prediction_core::domain_of(true, true, 999, -1), DOMAIN_OUT);
-    NETW_CHECK_EQ(prediction_core::domain_of(true, true, 999, 0), DOMAIN_OUT);
+void delay_every_link(LoopbackRig &p_rig) {
+    for (int at = SERVER; at < p_rig.count(); ++at) {
+        p_rig.conditions(at, netw_test::polls(4));
+    }
 }
 
-TEST_CASE(
-    "[Networked][Predict] A label short of the window's end is out of domain, "
-    "and the end itself is in"
-) {
-    const int64_t until = 6;
-
-    NETW_CHECK_EQ(
-        prediction_core::domain_of(true, false, until - 1, until),
-        DOMAIN_OUT
-    );
-    NETW_CHECK_EQ(
-        prediction_core::domain_of(true, false, until, until),
-        DOMAIN_IN
-    );
-    NETW_CHECK_EQ(
-        prediction_core::domain_of(true, false, 0, until),
-        DOMAIN_OUT
-    );
-    NETW_CHECK_EQ(
-        prediction_core::domain_of(true, false, until + 1, until),
-        DOMAIN_IN
-    );
+void shove(LoopbackRig &p_rig, const char *p_name) {
+    Node2D *served = body(p_rig, p_name, SERVER);
+    served->set_position(served->get_position() + Vector2(60.0, -40.0));
 }
 
-TEST_CASE(
-    "[Networked][Predict] A negative window admits every label of a declared "
-    "entity"
-) {
-    NETW_CHECK_EQ(prediction_core::domain_of(true, false, 0, -1), DOMAIN_IN);
+LawVerdict horizon_resumes(const World &) {
+    LoopbackRig rig(1);
+    rig.declare_world(
+        WorldDecl().clocked(30, 3).lag_compensated().player(runner("P"), 0)
+    );
+    run(rig, "P", 0);
+    rig.step_ticks(SETTLE_TICKS);
+
+    Ref<netw::NetwLinkConditions> deaf = netw_test::link(1);
+    deaf->set_loss_chance(1.0);
+    rig.conditions(0, deaf);
+    rig.step_ticks(PAST_HORIZON);
+    const double stalled = body(rig, "P", 0)->get_position().x;
+    const int age = prediction(rig, "P", 0)->get_ack_age_ticks();
+    rig.step_ticks(8);
+    if (body(rig, "P", 0)->get_position().x != stalled) {
+        return law_broken(
+            "a client nobody answered kept predicting past x %g",
+            stalled
+        );
+    }
+    if (age != NetwPrediction::ACK_AGE_MAX) {
+        return law_broken("the client stalled at an ack age of %d", age);
+    }
+
+    rig.conditions(0, Ref<netw::NetwLinkConditions>());
+    rig.step_ticks(SETTLE_TICKS);
+    if (body(rig, "P", 0)->get_position().x <= stalled) {
+        return law_broken("the client never resumed from x %g", stalled);
+    }
+    if (prediction(rig, "P", 0)->get_ack_age_ticks()
+        >= NetwPrediction::ACK_AGE_MAX) {
+        return law_broken("the server answered and the ack age stayed full");
+    }
+    return law_held();
 }
 
-TEST_CASE(
-    "[Networked][Predict] A newer input label drives fresh, and a stale one "
-    "repeats"
-) {
-    const Fold fresh = prediction_core::fold(7, 4, 99);
-    NETW_CHECK_EQ(fresh.label, 7);
-    CHECK(fresh.fresh);
-    NETW_CHECK_EQ(int(fresh.kind), DRIVE_FRESH);
+LawVerdict signals_in_order(const World &) {
+    LoopbackRig rig(1);
+    rig.declare_world(
+        WorldDecl().clocked(30, 3).lag_compensated().player(runner("P"), 0)
+    );
+    delay_every_link(rig);
+    run(rig, "P", 0);
+    rig.step_ticks(SETTLE_TICKS);
 
-    const Fold repeat = prediction_core::fold(4, 4, 99);
-    NETW_CHECK_EQ(repeat.label, 4);
-    CHECK_FALSE(repeat.fresh);
-    NETW_CHECK_EQ(int(repeat.kind), DRIVE_REPEAT);
+    Vector<StringName> signals;
+    signals.push_back(StringName("divergence_detected"));
+    signals.push_back(StringName("episode_changed"));
+    signals.push_back(StringName("recovered"));
+    const Recorder heard(prediction(rig, "P", 0).ptr(), signals);
+    shove(rig, "P");
+    rig.step_ticks(RECOVER_TICKS);
+
+    const Vector<StringName> order = heard.order();
+    if (order.size() < 4 || order[0] != signals[0] || order[1] != signals[1]
+        || order[2] != signals[2]) {
+        return law_broken(
+            "the client heard %d signal(s), not a divergence, an episode "
+            "and a recovery in that order",
+            int(order.size())
+        );
+    }
+    const int64_t diverged = heard.args(signals[0])[0];
+    const int64_t moved = heard.args(signals[2])[0];
+    if (diverged != moved) {
+        return law_broken(
+            "the divergence names tick %d and the recovery tick %d",
+            int(diverged),
+            int(moved)
+        );
+    }
+    const int changes = heard.count(signals[1]);
+    if (int(heard.args(signals[1], 0)[0])
+            != NetwPrediction::EPISODE_CHANGE_OPENED
+        || int(heard.args(signals[1], changes - 1)[0])
+            != NetwPrediction::EPISODE_CHANGE_CLOSED) {
+        return law_broken("the episode did not open first and close last");
+    }
+    if (heard.count(signals[2]) != 1) {
+        return law_broken(
+            "one shove moved the client %d time(s)",
+            heard.count(signals[2])
+        );
+    }
+    return law_held();
 }
 
-TEST_CASE(
-    "[Networked][Predict] A pass with no input yet labels from its frame"
-) {
-    const Fold fold = prediction_core::fold(-1, -1, 99);
-
-    NETW_CHECK_EQ(fold.label, 99);
-    CHECK_FALSE(fold.fresh);
-}
-
-TEST_CASE(
-    "[Networked][Predict] Authority replays only past the standing buffer"
-) {
-    NETW_CHECK_EQ(prediction_core::consume_action(3, 2), CONSUME_REPLAY);
-    NETW_CHECK_EQ(prediction_core::consume_action(2, 2), CONSUME_HOLD);
-    NETW_CHECK_EQ(prediction_core::consume_action(0, 0), CONSUME_STARVED);
-}
-
-TEST_CASE(
-    "[Networked][Predict] Provenance takes the highest cell its evidence "
-    "supports"
-) {
-    NETW_CHECK_EQ(joint_cell(true, false, false), 3);
-    NETW_CHECK_EQ(joint_cell(false, true, false), 2);
-    NETW_CHECK_EQ(joint_cell(false, false, true), 1);
-    NETW_CHECK_EQ(joint_cell(false, false, false), 0);
-
-    NETW_CHECK_EQ(joint_cell(true, true, true), 3);
-    NETW_CHECK_EQ(joint_cell(false, true, true), 2);
-}
-
-TEST_CASE("[Networked][Predict] The joint floor is the lowest base offered") {
-    Dictionary bases;
-    bases[StringName("A")] = (int64_t)10;
-    bases[StringName("B")] = (int64_t)5;
-
-    const Dictionary res = prediction_core::calculate_joint_floor(
-        bases,
-        Dictionary(),
-        -1,
-        0,
-        20
-    );
-
-    NETW_CHECK_EQ((int64_t)res[StringName("floor")], 5);
-    CHECK_FALSE(bool(res[StringName("heal")]));
-}
-
-TEST_CASE(
-    "[Networked][Predict] A relay floor and an epoch floor pull the joint "
-    "floor down like a base"
-) {
-    Dictionary bases;
-    bases[StringName("A")] = (int64_t)10;
-
-    const Dictionary relayed = prediction_core::calculate_joint_floor(
-        bases,
-        one_field(StringName("A"), (int64_t)5),
-        -1,
-        0,
-        20
-    );
-    NETW_CHECK_EQ((int64_t)relayed[StringName("floor")], 5);
-
-    const Dictionary epoched
-        = prediction_core::calculate_joint_floor(bases, Dictionary(), 3, 0, 20);
-    NETW_CHECK_EQ((int64_t)epoched[StringName("floor")], 3);
-}
-
-TEST_CASE(
-    "[Networked][Predict] With nothing offered the joint floor is the present"
-) {
-    const Dictionary res = prediction_core::calculate_joint_floor(
-        Dictionary(),
-        Dictionary(),
-        -1,
-        0,
-        20
-    );
-
-    NETW_CHECK_EQ((int64_t)res[StringName("floor")], 20);
-    CHECK_FALSE(bool(res[StringName("heal")]));
-}
-
-TEST_CASE(
-    "[Networked][Predict] A negative base is an absent one and cannot pull the "
-    "floor down"
-) {
-    const Dictionary res = prediction_core::calculate_joint_floor(
-        one_field(StringName("A"), (int64_t)-4),
-        Dictionary(),
-        -1,
-        0,
-        20
-    );
-
-    NETW_CHECK_EQ((int64_t)res[StringName("floor")], 20);
-}
-
-TEST_CASE(
-    "[Networked][Predict] A floor under the history floor heals to the present"
-) {
-    const Dictionary res = prediction_core::calculate_joint_floor(
-        one_field(StringName("A"), (int64_t)2),
-        Dictionary(),
-        -1,
-        8,
-        20
-    );
-
-    CHECK(bool(res[StringName("heal")]));
-    NETW_CHECK_EQ((int64_t)res[StringName("floor")], 20);
-}
-
-TEST_CASE(
-    "[Networked][Predict] An empty prediction diverges without bound and "
-    "corrects"
-) {
-    Dictionary sink;
-    const Judgement res = prediction_core::judge(
-        DOMAIN_IN,
-        VERDICT_UNJUDGED,
-        Dictionary(),
-        one_field(StringName("pos"), Vector2(1.0, 0.0)),
-        Dictionary(),
-        sink
-    );
-
-    CHECK(res.corrected);
-    const bool unbounded = std::isinf(res.divergence);
-    CHECK(unbounded);
-}
-
-TEST_CASE("[Networked][Predict] A prediction matching its payload is clean") {
-    Dictionary sink;
-    const Judgement res = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        one_field(StringName("pos"), Vector2(1.0, 1.0)),
-        one_field(StringName("pos"), Vector2(1.0, 1.0)),
-        Dictionary(),
-        sink
-    );
-
-    CHECK_FALSE(res.corrected);
-    NETW_CHECK_CLOSE(res.divergence, 0.0, 1e-9);
-}
-
-TEST_CASE(
-    "[Networked][Predict] Out of domain, a field is judged against epsilon"
-) {
-    const Dictionary wiring = wiring_with(StringName("epsilon"), 0.5);
-    const Dictionary payload = one_field(StringName("pos"), Vector2(0.0, 0.0));
-    Dictionary sink;
-
-    const Judgement within = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        one_field(StringName("pos"), Vector2(0.25, 0.0)),
-        payload,
-        wiring,
-        sink
-    );
-    CHECK_FALSE(within.corrected);
-
-    const Judgement past = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        one_field(StringName("pos"), Vector2(0.75, 0.0)),
-        payload,
-        wiring,
-        sink
-    );
-    CHECK(past.corrected);
-    NETW_CHECK_CLOSE(past.divergence, 0.75, 1e-9);
-}
-
-TEST_CASE(
-    "[Networked][Predict] An epsilon override widens the tolerance of its own "
-    "field alone"
-) {
-    Dictionary wiring;
-    wiring[StringName("epsilon")] = 0.1;
-    wiring[StringName("epsilon_overrides")]
-        = one_field(StringName("loose"), 5.0);
-
-    Dictionary predicted;
-    predicted[StringName("loose")] = 0.0;
-    predicted[StringName("tight")] = 0.0;
-
-    Dictionary payload;
-    payload[StringName("loose")] = 4.0;
-    payload[StringName("tight")] = 0.0;
-    Dictionary sink;
-
-    const Judgement widened = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        predicted,
-        payload,
-        wiring,
-        sink
-    );
-    CHECK_FALSE(widened.corrected);
-
-    payload[StringName("tight")] = 4.0;
-    const Judgement neighbour = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        predicted,
-        payload,
-        wiring,
-        sink
-    );
-    CHECK(neighbour.corrected);
-}
-
-TEST_CASE("[Networked][Predict] An excluded field cannot force a correction") {
-    Dictionary wiring;
-    wiring[StringName("epsilon")] = 0.1;
-    wiring[StringName("vote_excludes")]
-        = one_field(StringName("cosmetic"), true);
-
-    Dictionary predicted;
-    predicted[StringName("cosmetic")] = 0.0;
-    Dictionary payload;
-    payload[StringName("cosmetic")] = 90.0;
-    Dictionary sink;
-
-    const Judgement res = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        predicted,
-        payload,
-        wiring,
-        sink
-    );
-
-    CHECK_FALSE(res.corrected);
-    NETW_CHECK_CLOSE(res.divergence, 90.0, 1e-9);
-}
-
-TEST_CASE(
-    "[Networked][Predict] A payload field the prediction never carried corrects"
-) {
-    Dictionary sink;
-    Dictionary payload;
-    payload[StringName("pos")] = 0.0;
-    payload[StringName("unpredicted")] = 1.0;
-
-    const Judgement res = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        one_field(StringName("pos"), 0.0),
-        payload,
-        wiring_with(StringName("epsilon"), 1000.0),
-        sink
-    );
-
-    CHECK(res.corrected);
-}
-
-TEST_CASE(
-    "[Networked][Predict] In domain a judged transition decides, and epsilon "
-    "is never consulted"
-) {
-    const Dictionary wiring = wiring_with(StringName("epsilon"), 1000.0);
-    const Dictionary predicted = one_field(StringName("pos"), 0.0);
-    const Dictionary payload = one_field(StringName("pos"), 1.0);
-    Dictionary sink;
-
-    const Judgement unequal = prediction_core::judge(
-        DOMAIN_IN,
-        VERDICT_UNEQUAL,
-        predicted,
-        predicted,
-        wiring,
-        sink
-    );
-    CHECK(unequal.corrected);
-
-    const Judgement equal = prediction_core::judge(
-        DOMAIN_IN,
-        VERDICT_EQUAL,
-        predicted,
-        payload,
-        wiring,
-        sink
-    );
-    CHECK_FALSE(equal.corrected);
-}
-
-TEST_CASE(
-    "[Networked][Predict] Out of domain the verdict is ignored and epsilon "
-    "decides"
-) {
-    Dictionary sink;
-    const Judgement res = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNEQUAL,
-        one_field(StringName("pos"), 0.0),
-        one_field(StringName("pos"), 0.0),
-        wiring_with(StringName("epsilon"), 0.1),
-        sink
-    );
-
-    CHECK_FALSE(res.corrected);
-}
-
-TEST_CASE(
-    "[Networked][Predict] An angle field compares the short way around the "
-    "circle"
-) {
-    const Dictionary wiring = wiring_with(
-        StringName("angle_fields"),
-        one_field(StringName("heading"), true)
-    );
-    Dictionary sink;
-
-    const Judgement res = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        one_field(StringName("heading"), 0.1),
-        one_field(StringName("heading"), TAU - 0.1),
-        wiring,
-        sink
-    );
-
-    NETW_CHECK_CLOSE(res.divergence, 0.2, 1e-6);
-}
-
-TEST_CASE(
-    "[Networked][Predict] The field sink records one error per payload field"
-) {
-    Dictionary predicted;
-    predicted[StringName("a")] = 0.0;
-    predicted[StringName("b")] = 0.0;
-
-    Dictionary payload;
-    payload[StringName("a")] = 3.0;
-    payload[StringName("b")] = 1.0;
-
-    Dictionary sink;
-    const Judgement res = prediction_core::judge(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        predicted,
-        payload,
-        Dictionary(),
-        sink
-    );
-
-    NETW_CHECK_EQ(sink.size(), 2);
-    NETW_CHECK_CLOSE(double(sink[StringName("a")]), 3.0, 1e-9);
-    NETW_CHECK_CLOSE(double(sink[StringName("b")]), 1.0, 1e-9);
-
-    NETW_CHECK_CLOSE(res.divergence, 3.0, 1e-9);
-}
-
-TEST_CASE(
-    "[Networked][Predict] The struct verdict carries the divergence the "
-    "dictionary reported"
-) {
-    const PredictionVerdict pv = prediction_core::evaluate_struct_verdict(
-        DOMAIN_OUT,
-        VERDICT_UNJUDGED,
-        one_field(StringName("pos"), Vector2(0.0, 0.0)),
-        one_field(StringName("pos"), Vector2(3.0, 4.0)),
-        wiring_with(StringName("epsilon"), 0.5)
-    );
-
-    CHECK(pv.corrected);
-    NETW_CHECK_CLOSE(pv.max_error, 5.0, 1e-9);
-    NETW_CHECK_EQ(pv.domain, DOMAIN_OUT);
-    NETW_CHECK_EQ(pv.verdict, VERDICT_UNJUDGED);
-}
-
-TEST_CASE(
-    "[Networked][Predict] The meter reads a tolerance as a zero region and "
-    "counts whole tolerances past it"
-) {
-    Dictionary sink;
-    Dictionary tolerances;
-    sink[StringName("position")] = 0.5;
-    tolerances[StringName("position")] = 0.5;
-    NETW_CHECK_EQ(prediction_core::measure(sink, tolerances), 0);
-
-    sink[StringName("position")] = 1.0;
-    NETW_CHECK_EQ(prediction_core::measure(sink, tolerances), 1);
-
-    Dictionary exact_sink;
-    Dictionary exact_tolerances;
-    exact_sink[StringName("raw")] = 0.000001;
-    exact_tolerances[StringName("raw")] = 0.0;
-    NETW_CHECK_EQ(prediction_core::measure(exact_sink, exact_tolerances), 1);
-}
-
-TEST_CASE(
-    "[Networked][Predict] A field the sink never measured saturates the meter"
-) {
-    Dictionary tolerances;
-    tolerances[StringName("position")] = 0.5;
-    NETW_CHECK_EQ(
-        prediction_core::measure(Dictionary(), tolerances),
-        0x7FFFFFFF
-    );
-}
-
-TEST_CASE(
-    "[Networked][Predict] Attribution charges the first unequal boundary in "
-    "causal order"
-) {
-    const int witness = 1;
-    NETW_CHECK_EQ(
-        prediction_core::attribute(
-            false,
-            false,
-            false,
-            true,
-            true,
-            true,
-            witness,
-            witness,
-            true
-        ),
-        int(Attribution::PRE_STATE)
-    );
-    NETW_CHECK_EQ(
-        prediction_core::attribute(
-            true,
-            false,
-            false,
-            true,
-            true,
-            true,
-            witness,
-            witness,
-            true
-        ),
-        int(Attribution::COMMAND)
-    );
-    NETW_CHECK_EQ(
-        prediction_core::attribute(
-            true,
-            true,
-            false,
-            true,
-            true,
-            true,
-            witness,
-            witness,
-            true
-        ),
-        int(Attribution::ENVIRONMENT)
-    );
-    NETW_CHECK_EQ(
-        prediction_core::attribute(
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            witness,
-            witness,
-            true
-        ),
-        int(Attribution::CLOSURE)
-    );
-}
-
-TEST_CASE(
-    "[Networked][Predict] Missing evidence is unknown rather than agreement"
-) {
-    const int witness = 1;
-    NETW_CHECK_EQ(
-        prediction_core::attribute(
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            witness,
-            witness,
-            false
-        ),
-        int(Attribution::UNKNOWN)
-    );
-
-    NETW_CHECK_EQ(
-        prediction_core::
-            attribute(true, true, true, true, true, false, witness, 0, true),
-        int(Attribution::UNKNOWN)
-    );
-}
-
-TEST_CASE("[Networked][Predict] Fingerprints fold their keys in text order") {
-    Dictionary forward;
-    forward[StringName("alpha")] = 1;
-    forward[StringName("zulu")] = 2;
-    Dictionary reversed;
-    reversed[StringName("zulu")] = 2;
-    reversed[StringName("alpha")] = 1;
-
-    NETW_CHECK_EQ(
-        prediction_core::fact_fingerprint(forward),
-        prediction_core::fact_fingerprint(reversed)
-    );
-    NETW_CHECK_EQ(
-        prediction_core::raw_state_fingerprint(forward),
-        prediction_core::raw_state_fingerprint(reversed)
-    );
-
-    Dictionary moved;
-    moved[StringName("alpha")] = 1;
-    moved[StringName("zulu")] = 3;
-    CHECK(
-        prediction_core::raw_state_fingerprint(forward)
-        != prediction_core::raw_state_fingerprint(moved)
-    );
-}
-
-TEST_CASE(
-    "[Networked][Predict] The compared scope keeps the causal fields, and no "
-    "declared scope keeps them all"
-) {
-    Dictionary payload;
-    payload[StringName("position")] = 1;
-    payload[StringName("tint")] = 2;
-    Dictionary causal;
-    causal[StringName("position")] = true;
-
-    const Dictionary scoped = prediction_core::compared_state(payload, causal);
-    NETW_CHECK_EQ(scoped.size(), 1);
-    CHECK(scoped.has(StringName("position")));
-    CHECK_FALSE(scoped.has(StringName("tint")));
-
-    const Dictionary whole
-        = prediction_core::compared_state(payload, Dictionary());
-    NETW_CHECK_EQ(whole.size(), payload.size());
-
-    Dictionary absent;
-    absent[StringName("never_declared")] = true;
-    NETW_CHECK_EQ(prediction_core::compared_state(payload, absent).size(), 0);
-}
-
-TEST_CASE("[Networked][Predict] Contact counts bucket at four and above") {
-    NETW_CHECK_EQ(prediction_core::contact_count_bucket(0), 0);
-    NETW_CHECK_EQ(prediction_core::contact_count_bucket(3), 3);
-    NETW_CHECK_EQ(prediction_core::contact_count_bucket(4), 4);
-    NETW_CHECK_EQ(prediction_core::contact_count_bucket(99), 4);
-}
-
-TEST_CASE(
-    "[Networked][Predict] The family search returns the first differing "
-    "family and needs all three"
-) {
-    PackedInt32Array local;
-    local.push_back(1);
-    local.push_back(2);
-    local.push_back(3);
-
-    PackedInt32Array same = local;
-    NETW_CHECK_EQ(
-        prediction_core::differing_family(local, same),
-        int(StateFamily::NONE)
-    );
-
-    PackedInt32Array momentum = local;
-    momentum.set(1, 9);
-    NETW_CHECK_EQ(
-        prediction_core::differing_family(local, momentum),
-        int(StateFamily::MOMENTUM)
-    );
-
-    PackedInt32Array short_peer;
-    short_peer.push_back(9);
-    NETW_CHECK_EQ(
-        prediction_core::differing_family(local, short_peer),
-        int(StateFamily::NONE)
-    );
-}
-
-TEST_CASE(
-    "[Networked][Predict] A window covers the transition that opened it and "
-    "merges rather than restarting"
-) {
-    NETW_CHECK_EQ(prediction_core::window_after(10, 2, -1), (int64_t)13);
-
-    NETW_CHECK_EQ(prediction_core::window_after(10, -5, -1), (int64_t)11);
-
-    const int64_t wide = prediction_core::window_after(10, 20, -1);
-    NETW_CHECK_EQ(prediction_core::window_after(11, 1, wide), wide);
-}
-
-TEST_CASE(
-    "[Networked][Predict] The environment digest folds the epoch and ignores "
-    "declaration order"
-) {
-    Dictionary forward;
-    forward[StringName("a")] = 1.0;
-    forward[StringName("b")] = 2.0;
-    Dictionary reversed;
-    reversed[StringName("b")] = 2.0;
-    reversed[StringName("a")] = 1.0;
-
-    NETW_CHECK_EQ(
-        prediction_core::environment_digest(7, forward),
-        prediction_core::environment_digest(7, reversed)
-    );
-    CHECK(
-        prediction_core::environment_digest(7, Dictionary())
-        != prediction_core::environment_digest(8, Dictionary())
-    );
-    CHECK(
-        prediction_core::environment_digest(7, forward)
-        != prediction_core::environment_digest(7, Dictionary())
-    );
-}
-
-TEST_CASE(
-    "[Networked][Predict] A direction names the dominant axis and its sign"
-) {
-    const Dictionary along = prediction_core::delta_direction(
+Error replace_state(NetwMultiplayer *p_api, const RID &p_entity) {
+    const RID schema = p_api->schema_create(StringName("RunnerPositionOnly"));
+    p_api->schema_add_column(
+        schema,
         StringName("position"),
-        Vector3(1.0, 0.0, -2.0)
+        NetwMultiplayer::COLUMN_VECTOR2,
+        1
     );
-    CHECK(bool(String(along[StringName("key")]) == String("position:2")));
-    NETW_CHECK_EQ((int)along[StringName("sign")], -1);
-
-    const Dictionary none
-        = prediction_core::delta_direction(StringName("flag"), true);
-    NETW_CHECK_EQ((int)none[StringName("sign")], 0);
-    CHECK(String(none[StringName("key")]).is_empty());
+    p_api->schema_seal(schema);
+    const RID set = p_api->property_set_create(
+        schema,
+        NetwMultiplayer::RECORD_KIND_STATE
+    );
+    p_api->property_set_add_column(set, 0);
+    p_api->property_set_seal(set);
+    return p_api->entity_add_property_set(p_entity, set, 0);
 }
+
+LawVerdict replaced_state_keeps_client(const World &) {
+    const FaultWatch faults;
+    LoopbackRig rig(1);
+    rig.declare_world(
+        WorldDecl().clocked(30, 3).lag_compensated().player(
+            runner("P").synced("lean").spawned(),
+            0
+        )
+    );
+    run(rig, "P", 0);
+    rig.step_ticks(SETTLE_TICKS);
+    const Dictionary before = prediction(rig, "P", 0)->reachability();
+    if (!Dictionary(before["fields"]).has(StringName("lean"))) {
+        return law_broken("the declared state never carried lean");
+    }
+
+    for (int at = SERVER; at < 1; ++at) {
+        NetwMultiplayer *api = at < 0 ? rig.server() : rig.client(at);
+        if (replace_state(api, rig.entity_of(StringName("P"), at)) != OK) {
+            return law_broken("the replacement did not attach");
+        }
+    }
+    rig.step_ticks(SETTLE_TICKS);
+    if (faults.errors_containing("NW0025")
+            + faults.warnings_containing("NW0025")
+        != 0) {
+        return law_broken("the server refused the client after the swap");
+    }
+    const Dictionary fields = prediction(rig, "P", 0)->reachability()["fields"];
+    if (!fields.has(StringName("position")) || fields.has(StringName("lean"))) {
+        return law_broken("the prediction still reads the replaced set");
+    }
+    return law_held();
+}
+
+LawVerdict refused_joint_once(bool p_spawned) {
+    EntityDecl p = runner("P");
+    EntityDecl q = runner("Q");
+    if (p_spawned) {
+        p.spawned();
+        q.spawned();
+    }
+    LoopbackRig rig(2);
+    rig.declare_world(
+        WorldDecl().clocked(30, 3).lag_compensated().player(p, 0).player(q, 1)
+    );
+    run(rig, "P", 0);
+    run(rig, "Q", 1);
+    rig.step_ticks(SETTLE_TICKS);
+
+    const FaultWatch faults;
+    const char *const copies[][2] = {
+        {"P", "-1"},
+        {"Q", "-1"},
+        {"P", "0"},
+        {"Q", "1"},
+    };
+    for (const auto &copy : copies) {
+        const int at = String(copy[1]).to_int();
+        const Ref<NetwEntity> entity = NetwEntity::of(body(rig, copy[0], at));
+        entity->get_prediction()->set_reconcile_mode(
+            NetwPrediction::RECONCILE_JOINT
+        );
+        entity->get_simulation()->set_schedule(
+            NetwSimulation::SCHEDULE_STEPPED
+        );
+    }
+    rig.step_ticks(SETTLE_TICKS);
+
+    for (const char *name : {"P", "Q"}) {
+        const int64_t named = faults.warnings_containing(
+            String("'") + String(name) + String("'")
+        );
+        if (named != 1) {
+            return law_broken(
+                "the refused JOINT of %s was reported %d time(s)",
+                name,
+                int(named)
+            );
+        }
+    }
+    if (faults.warnings_containing("[NW1014]") != 2) {
+        return law_broken(
+            "%d NW1014 warning(s) for two refused groups",
+            int(faults.warnings_containing("[NW1014]"))
+        );
+    }
+    return law_held();
+}
+
+LawVerdict refused_joint_placed(const World &) {
+    return refused_joint_once(false);
+}
+
+LawVerdict refused_joint_spawned(const World &) {
+    return refused_joint_once(true);
+}
+
+const Row ROWS[] = {
+    {"a client whose server stops answering",
+     "it stops predicting when ack_age_ticks reaches ACK_AGE_MAX, and "
+     "resumes once the server answers again",
+     &horizon_resumes},
+    {"a client the server shoves once",
+     "it hears divergence_detected, episode_changed opening, recovered for "
+     "the same tick, and episode_changed closing, and is moved once",
+     &signals_in_order},
+    {"a state set replaced on both copies of a spawned predicted runner",
+     "the client stays in the session and the prediction reads the new set",
+     &replaced_state_keeps_client},
+    {"RECONCILE_JOINT on placed runners whose schedule cannot replay",
+     "each is reported once with NW1014, by the peer that predicts it",
+     &refused_joint_placed},
+    {"RECONCILE_JOINT on spawned runners whose schedule cannot replay",
+     "each is reported once with NW1014, by the peer that predicts it",
+     &refused_joint_spawned},
+};
 
 TEST_CASE(
-    "[Networked][Predict] The projection guard costs a diverged channel only "
-    "its own field"
+    "[Networked][Predict][SceneTree] a predicting client stops at its "
+    "horizon and resumes, hears its correction in order, and keeps its "
+    "seat through a changed declaration"
 ) {
-    Dictionary projection;
-    projection[StringName("position")] = StringName("velocity");
-    projection[StringName("heading")] = StringName("spin");
-
-    Dictionary divergence;
-    divergence[StringName("velocity")] = 10.0;
-    divergence[StringName("spin")] = 0.0;
-
-    const Dictionary guarded = prediction_core::guard_projection(
-        projection,
-        divergence,
-        0.1,
-        Dictionary(),
-        8,
-        4,
-        1.0
-    );
-    CHECK_FALSE(guarded.has(StringName("position")));
-    CHECK(guarded.has(StringName("heading")));
+    const World world = {String("a server and clients on a loopback")};
+    for (const Row &row : ROWS) {
+        NETW_CELL(row, world);
+        NETW_LAW_HOLDS(row, world);
+    }
 }
 
-} // namespace TestPredictionCore
+} // namespace TestPrediction
+
+#endif

@@ -19,6 +19,7 @@
 		[/codeblock]
 		Changes apply at the end of the frame, or at [method NetwMultiplayer.interest_flush_now]. On the server, use [signal interest_entered] and [signal interest_exited]. On a client, use [signal visibility_changed].
 		An entity inside a multiplayer scene is only visible to peers in that scene, whatever other layers say.
+		A [NetwEntity] under another entity is only visible to peers that also see the entity above it, whatever its own layers say.
 	</description>
 	<tutorials>
 	</tutorials>

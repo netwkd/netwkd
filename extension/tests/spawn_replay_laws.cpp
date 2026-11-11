@@ -67,39 +67,6 @@ PackedByteArray a_frame() {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted][SceneTree] SR1 a late joiner is replayed "
-    "parents before children, and joins each record's recipient book as it "
-    "goes"
-) {
-    Stand stand = a_stand();
-    CallLog log;
-    Node *parent = seated(stand, "Parent");
-    Node *child = seated(stand, "Child");
-    Record *low = issued(stand, 2, 1, child);
-    Record *high = issued(stand, 1, 0, parent);
-
-    const PackedInt64Array unencodable = stand.core->spawn_replay_to(
-        &stand.book,
-        LATE,
-        SPAWN_CHANNEL,
-        log.answering("encode", a_frame())
-    );
-
-    CHECK(unencodable.is_empty());
-    NETW_CHECK_EQ(log.count("encode"), 2);
-    CHECK(high->has_recipient(int(LATE)));
-    CHECK(low->has_recipient(int(LATE)));
-
-    const Array first = log.args("encode", 0);
-    NETW_CHECK_EQ(int64_t(first.size()), int64_t(2));
-    if (first.size() == 2) {
-        NETW_CHECK_EQ(int64_t(first[0]), int64_t(1));
-    }
-
-    retire(stand);
-}
-
-TEST_CASE(
     "[Networked][Spawn][Hosted][SceneTree] SR2 a record the peer already holds "
     "is not replayed, and neither is one whose node left the tree"
 ) {

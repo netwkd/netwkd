@@ -138,7 +138,7 @@
 			<return type="void" />
 			<param index="0" name="reason" type="String" default="&quot;&quot;" />
 			<description>
-				Pauses the [SceneTree] on every peer, which emits [signal paused_changed] with [param reason]. A player who joins while paused joins paused.
+				Pauses the [SceneTree] on every peer, which emits [signal paused_changed] with [param reason]. A player who joins while paused joins paused. A session that ends while paused unpauses the [SceneTree] it paused.
 				[b]Server Only.[/b]
 			</description>
 		</method>

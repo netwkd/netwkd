@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="quay"]
+script/source = "extends Node3D
+
+const ANNEX := \"res://extension/tests/compliance/worlds/annex.tscn\"
+const BUOY := \"res://extension/tests/compliance/worlds/buoy.tscn\"
+
+
+func _ready() -> void:
+	if not multiplayer.is_server():
+		return
+	var workshop := MultiplayerSpawner.new()
+	workshop.name = &\"Workshop\"
+	workshop.spawn_path = ^\"../Yard\"
+	workshop.add_spawnable_scene(BUOY)
+	add_child(workshop)
+
+
+func open_annex_and_launch(called: String) -> void:
+	var annex: Node = load(ANNEX).instantiate()
+	annex.name = &\"Annex\"
+	$Dock.add_child(annex)
+	annex.launch(called)
+
+
+func build_in_workshop(called: String) -> void:
+	var buoy: Node = load(BUOY).instantiate()
+	buoy.name = called
+	$Yard.add_child(buoy)
+"
+
+[node name="Level" type="Node3D"]
+script = SubResource("quay")
+
+[node name="Dock" type="Node3D" parent="."]
+
+[node name="Yard" type="Node3D" parent="."]
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://extension/tests/compliance/worlds/annex.tscn")
+spawn_path = NodePath("../Dock")

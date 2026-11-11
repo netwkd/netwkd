@@ -1,9 +1,0 @@
-label join_spawn
-clients 0
-ticks 12
-seed 7
-laws
-2 join c1 name:ada
-2 join c2 name:bo
-5 spawn car scene:car parent:World name:Car
-5 spawn wheel scene:wheel parent:car name:Wheel

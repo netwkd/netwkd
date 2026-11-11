@@ -42,32 +42,6 @@ int64_t kick_request_channel() {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] SC1 a pause is a broadcast authority hears "
-    "with everyone else, so the host that issued it stops on the same edge "
-    "its clients do rather than on a local shortcut of its own"
-) {
-    const Ref<NetwMultiplayer> core = authority();
-    const CallLog seen;
-    core->get_session()->connect(
-        StringName("paused_changed"),
-        seen.callable("paused_changed")
-    );
-
-    core->session_pause(String("waiting"));
-
-    NETW_CHECK_EQ(seen.count("paused_changed"), 1);
-    const Array paused = seen.args("paused_changed");
-    REQUIRE(paused.size() == 2);
-    CHECK(bool(paused[0]));
-    CHECK(String(paused[1]) == String("waiting"));
-
-    core->session_unpause();
-
-    NETW_CHECK_EQ(seen.count("paused_changed"), 2);
-    CHECK_FALSE(bool(seen.args("paused_changed", 1)[0]));
-}
-
-TEST_CASE(
     "[Networked][Session][Hosted] SC2 a kick request reaches the server as "
     "kick_requested at the next poll, naming the player who asked and the "
     "player named, whether the host asked or a client's frame did"

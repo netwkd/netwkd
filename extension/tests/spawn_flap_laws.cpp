@@ -143,67 +143,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] IF2 a RETAIN layer leaves the peer holding the very "
-    "instance it already had when visibility goes, so a retained copy is the "
-    "same body rather than a rebuilt one"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-
-    const Flapped made
-        = a_hidden_body(rig, arena, "policy", Decl::LEAVE_RETAIN);
-    const int64_t watcher = rig.peer_id(0);
-
-    made.layer->add_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-    Node *seated = rig.route_node(made.route, 0);
-    REQUIRE_MESSAGE(seated != nullptr, "the admission never reached the peer");
-
-    made.layer->remove_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-
-    NETW_CHECK_EQ(
-        state_of(rig, 0, made.route),
-        int64_t(NetwLivenessCore::STATE_LIVE)
-    );
-    CHECK(rig.route_node(made.route, 0) == seated);
-}
-
-TEST_CASE(
-    "[Networked][Spawn] IF3 a HIDE layer ends the copy on the same loss a "
-    "RETAIN layer survives, which is the whole difference the policy names"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-
-    const Flapped made = a_hidden_body(rig, arena, "ending", Decl::LEAVE_HIDE);
-    const int64_t watcher = rig.peer_id(0);
-
-    made.layer->add_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-    REQUIRE(rig.route_node(made.route, 0) != nullptr);
-
-    made.layer->remove_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-
-    NETW_CHECK_EQ(
-        state_of(rig, 0, made.route),
-        int64_t(NetwLivenessCore::STATE_ABSENT)
-    );
-    CHECK(rig.route_node(made.route, 0) == nullptr);
-    NETW_CHECK_EQ(
-        state_of(rig, -1, made.route),
-        int64_t(NetwLivenessCore::STATE_LIVE)
-    );
-}
-
-TEST_CASE(
     "[Networked][Spawn] IF4 a hidden route keeps naming its entity, so a "
     "re-admission binds the same handle rather than minting a second identity "
     "for one route"
@@ -410,51 +349,6 @@ TEST_CASE(
 
         memdelete(body);
     }
-}
-
-TEST_CASE(
-    "[Networked][Spawn] IF9 a peer is never hidden from an entity it "
-    "controls while that entity's anchor is visible to it, because a mover "
-    "cannot be told its own body is gone"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-
-    const int route = rig.spawn_registered(
-        StringName(FLAP_ID),
-        callable_mp_static(&build_flap_body),
-        named("Driven"),
-        one_type(),
-        arena,
-        rig.player(0),
-        false
-    );
-    rig.pump(10);
-    const Ref<NetwEntity> driven = NetwEntity::of(rig.route_node(route));
-    REQUIRE(driven.is_valid());
-    NETW_CHECK_EQ(driven->get_controller(), int64_t(rig.peer_id(0)));
-    REQUIRE(rig.route_node(route, 0) != nullptr);
-
-    const Ref<NetwInterestLayer> layer
-        = rig.server()->interest_layer(StringName("elsewhere"));
-    REQUIRE(layer.is_valid());
-    layer->set_default_leave_policy(netw::NetwMultiplayer::LEAVE_POLICY_HIDE);
-    layer->add_entity(driven);
-    layer->add_viewer(rig.peer_id(0));
-    rig.flush_interest();
-    rig.pump(10);
-
-    layer->remove_viewer(rig.peer_id(0));
-    rig.flush_interest();
-    rig.pump(10);
-
-    NETW_CHECK_EQ(
-        state_of(rig, 0, route),
-        int64_t(NetwLivenessCore::STATE_LIVE)
-    );
-    CHECK(rig.route_node(route, 0) != nullptr);
-    CHECK(rig.server()->rpc_get_recipients(driven).has(rig.peer_id(0)));
 }
 
 } // namespace TestSpawnFlapLaws

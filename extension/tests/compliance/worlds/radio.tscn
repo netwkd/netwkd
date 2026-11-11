@@ -1,0 +1,49 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="radio"]
+script/source = "extends Node3D
+
+var hails := 0
+var honest_hails := 0
+var orders := 0
+
+
+@rpc(\"any_peer\", \"call_remote\", \"reliable\")
+func hail(caller: int) -> void:
+	hails += 1
+	if multiplayer.get_remote_sender_id() == caller:
+		honest_hails += 1
+
+
+@rpc(\"authority\", \"call_remote\", \"reliable\")
+func order() -> void:
+	orders += 1
+
+
+func hail_another_client() -> void:
+	var me := multiplayer.get_unique_id()
+	for player: NetwPlayer in Netw.session(self).players:
+		if player.peer_id != 1 and player.peer_id != me:
+			hail.rpc_id(player.peer_id, me)
+
+
+func hail_everyone() -> void:
+	hail.rpc(multiplayer.get_unique_id())
+
+
+func give_order() -> void:
+	order.rpc()
+"
+
+[sub_resource type="SceneReplicationConfig" id="radio_sync"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="Level" type="Node3D"]
+
+[node name="Radio" type="Node3D" parent="."]
+script = SubResource("radio")
+
+[node name="RadioSync" type="MultiplayerSynchronizer" parent="Radio"]
+replication_config = SubResource("radio_sync")

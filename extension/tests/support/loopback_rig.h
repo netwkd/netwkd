@@ -61,6 +61,7 @@ class LoopbackRig {
     godot::Vector<godot::HashMap<godot::StringName, godot::RID>>
         client_state_sets;
     double tick_period_ms = 1000.0 / 30.0;
+    WorldDecl services;
     void (*adopt)(
         netw::NetwMultiplayer *,
         const godot::Ref<netw::LocalMultiplayerPeer> &
@@ -796,6 +797,15 @@ public:
         return made;
     }
 
+    int late_client(const godot::StringName &p_username) {
+        const int made = add_client(p_username);
+        install_services(client(made), services);
+        if (!mounts.is_empty()) {
+            mount_late(made, false);
+        }
+        return made;
+    }
+
     int arrive(
         const godot::StringName &p_username,
         const godot::Array &p_args = godot::Array()
@@ -1148,6 +1158,10 @@ public:
         if (p_world.wants_clock) {
             tick_period_ms = 1000.0 / double(p_world.clock_tickrate);
         }
+        services.wants_clock = p_world.wants_clock;
+        services.wants_lagcomp = p_world.wants_lagcomp;
+        services.clock_tickrate = p_world.clock_tickrate;
+        services.clock_display_offset = p_world.clock_display_offset;
         install_services(server(), p_world);
         for (int index = 0; index < count(); ++index) {
             install_services(client(index), p_world);

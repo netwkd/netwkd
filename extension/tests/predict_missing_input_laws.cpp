@@ -30,7 +30,7 @@ constexpr int QUEUED = 6;
 
 const Vector2 HELD_MOTION = Vector2(1.0, 0.0);
 
-Scenario framed_lane(MissingInput p_policy, int p_window = -1) {
+Scenario framed_lane(MissingInput p_policy) {
     Scenario scenario;
     scenario.label = "missing-input";
     scenario.epsilon = 0.01;
@@ -42,8 +42,7 @@ Scenario framed_lane(MissingInput p_policy, int p_window = -1) {
             .placed_at(Vector2())
             .predicted(0.01)
             .scheduled(netw::Schedule::FRAME)
-            .missing_input(p_policy)
-            .windowed(p_window),
+            .missing_input(p_policy),
         0
     );
     scenario.hold_input(1, "P", HELD_MOTION);
@@ -259,39 +258,6 @@ TEST_CASE(
     NETW_CHECK_EQ(lane.fact("missing"), missing + 1);
     NETW_CHECK_EQ(lane.fact("consumed"), consumed + QUEUED);
     NETW_CHECK_EQ(lane.cursor(), lane.hole + QUEUED);
-}
-
-int64_t missing_after_silence(int p_window, int p_silenced) {
-    const Scenario scenario = framed_lane(MissingInput::REPEAT_LAST, p_window);
-    LoopbackRig rig(scenario.clients);
-    ScenarioRun::session(rig, scenario);
-    Lane lane = seat(rig);
-    const int64_t flowing = lane.fact("consumed");
-    lane.step(4);
-    const bool live = lane.fact("consumed") > flowing;
-    REQUIRE_MESSAGE(live, "the owner's inputs stopped reaching the server");
-
-    const int64_t missing = lane.fact("missing");
-    Ref<netw::NetwLinkConditions> silent = netw_test::link();
-    silent->set_loss_chance(1.0);
-    rig.conditions(-1, silent);
-    lane.step(p_silenced);
-    rig.conditions(-1, Ref<netw::NetwLinkConditions>());
-    lane.step(p_silenced + p_window + 8);
-    return lane.fact("missing") - missing;
-}
-
-TEST_CASE(
-    "[Networked][Predict][Lane] L6 windowed(n) repeats the newest n + 2 "
-    "inputs in every command frame, so n + 1 lost frames in a row lose no "
-    "input and n + 2 lose exactly one, which runs as missing"
-) {
-    for (const int window : {1, 3}) {
-        NETW_FORMAT_INT(window_text, window);
-        CAPTURE(window_text);
-        NETW_CHECK_EQ(missing_after_silence(window, window + 1), 0);
-        NETW_CHECK_EQ(missing_after_silence(window, window + 2), 1);
-    }
 }
 
 TEST_CASE(

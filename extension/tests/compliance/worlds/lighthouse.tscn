@@ -1,0 +1,33 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="lamp"]
+script/source = "extends Node3D
+
+var turns_back := 0
+var turns := 0:
+	set(value):
+		if value < turns:
+			turns_back += 1
+		turns = value
+
+
+func turn() -> void:
+	turns += 1
+	position.x += 1.0
+"
+
+[sub_resource type="SceneReplicationConfig" id="lamp_sync"]
+properties/0/path = NodePath(".:turns")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:position")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
+[node name="Level" type="Node3D"]
+
+[node name="Lamp" type="Node3D" parent="."]
+script = SubResource("lamp")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Lamp"]
+replication_config = SubResource("lamp_sync")

@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="slipway"]
+script/source = "extends Node3D
+
+const BUOY := \"res://extension/tests/compliance/worlds/buoy.tscn\"
+
+
+func _ready() -> void:
+	$Spawner.spawn_function = make_buoy
+
+
+func make_buoy(paint: String) -> Node:
+	var buoy: Node = load(BUOY).instantiate()
+	buoy.name = paint.capitalize()
+	buoy.paint = paint
+	buoy.label = paint
+	return buoy
+
+
+func moor() -> void:
+	var buoy: Node = load(BUOY).instantiate()
+	buoy.name = &\"Moored\"
+	$Dock.add_child(buoy)
+
+
+func launch(paint: String) -> void:
+	$Spawner.spawn(paint)
+
+
+func seize_and_launch(paint: String) -> void:
+	$Spawner.set_multiplayer_authority(multiplayer.get_unique_id())
+	$Spawner.spawn(paint)
+
+
+func sink(called: String) -> void:
+	$Dock.get_node(called).queue_free()
+"
+
+[node name="Level" type="Node3D"]
+script = SubResource("slipway")
+
+[node name="Dock" type="Node3D" parent="."]
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://extension/tests/compliance/worlds/buoy.tscn")
+spawn_path = NodePath("../Dock")

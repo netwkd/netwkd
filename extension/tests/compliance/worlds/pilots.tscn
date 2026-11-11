@@ -1,0 +1,59 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="pilots"]
+script/source = "extends Node3D
+
+
+func hand_input_to(username: String) -> void:
+	for player: NetwPlayer in Netw.session(self).players:
+		if player.username == username:
+			$InputFirst/InputSync.set_multiplayer_authority(player.peer_id)
+			$ServerFirst/InputSync.set_multiplayer_authority(player.peer_id)
+
+
+func steer() -> void:
+	$InputFirst.steering += 1
+	$ServerFirst.steering += 1
+
+
+func drive() -> void:
+	for pilot: Node3D in [$InputFirst, $ServerFirst]:
+		pilot.position.x = pilot.steering
+"
+
+[sub_resource type="GDScript" id="pilot"]
+script/source = "extends Node3D
+
+var steering := 0
+"
+
+[sub_resource type="SceneReplicationConfig" id="position_sync"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[sub_resource type="SceneReplicationConfig" id="input_sync"]
+properties/0/path = NodePath(".:steering")
+properties/0/spawn = false
+properties/0/replication_mode = 1
+
+[node name="Level" type="Node3D"]
+script = SubResource("pilots")
+
+[node name="InputFirst" type="Node3D" parent="."]
+script = SubResource("pilot")
+
+[node name="InputSync" type="MultiplayerSynchronizer" parent="InputFirst"]
+replication_config = SubResource("input_sync")
+
+[node name="ServerSync" type="MultiplayerSynchronizer" parent="InputFirst"]
+replication_config = SubResource("position_sync")
+
+[node name="ServerFirst" type="Node3D" parent="."]
+script = SubResource("pilot")
+
+[node name="ServerSync" type="MultiplayerSynchronizer" parent="ServerFirst"]
+replication_config = SubResource("position_sync")
+
+[node name="InputSync" type="MultiplayerSynchronizer" parent="ServerFirst"]
+replication_config = SubResource("input_sync")

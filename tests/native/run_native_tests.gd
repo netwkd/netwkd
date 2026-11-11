@@ -17,7 +17,8 @@ func _physics_process(_delta: float) -> bool:
 			quit(2)
 			return true
 		runner = ClassDB.instantiate(&"NetwNativeTests")
-	if runner.frame_advance():
+	var frames := not OS.get_cmdline_user_args().has("--no-frames")
+	if frames and runner.frame_advance():
 		return false
 	var filter := "*"
 	var cells_path := ""

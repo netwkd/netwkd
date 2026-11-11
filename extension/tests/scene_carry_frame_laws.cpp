@@ -22,26 +22,6 @@ namespace NetwTests {
 namespace {
 
 constexpr int CARRY_FRAME_CAP = 16;
-constexpr int64_t MOVER_LAYER = 6;
-constexpr int64_t MOVER_MASK = 3;
-
-struct LandingEvidence {
-    bool driven = false;
-    bool built = false;
-    bool settled_on_the_starting_frame = false;
-    bool started_under_source = false;
-    int mode_in_flight = 0;
-    int64_t layer_in_flight = -1;
-    int64_t mask_in_flight = -1;
-    int frames_spent = 0;
-    bool settled = false;
-    bool failed = false;
-    int code = -1;
-    bool landed_under_target = false;
-    int mode_after = 0;
-    int64_t layer_after = -1;
-    int64_t mask_after = -1;
-};
 
 struct AbandonEvidence {
     bool driven = false;
@@ -52,23 +32,15 @@ struct AbandonEvidence {
     int frames_spent = 0;
 };
 
-struct CarryEvidence {
-    LandingEvidence landing;
-    AbandonEvidence abandon;
-};
-
-CarryEvidence &carry_evidence() {
-    static CarryEvidence evidence;
+AbandonEvidence &abandon_evidence() {
+    static AbandonEvidence evidence;
     return evidence;
 }
 
 struct CarryRun {
     Ref<netw::NetwMultiplayer> core;
     Ref<netw::NetwPromise> settling;
-    Ref<netw::NetwEntity> mover_entity;
     Node *root = nullptr;
-    Node *source_level = nullptr;
-    Node *target_level = nullptr;
     CharacterBody2D *mover = nullptr;
     RID mover_handle;
     RID target_handle;
@@ -103,27 +75,12 @@ struct CarryRun {
         core.instantiate();
         root = memnew(Node);
         netw::gd::scene_root()->add_child(root);
-
-        source_level = level_named("Source");
-        target_level = level_named("Destination");
-        target_handle = seat(target_level);
-
+        Node *source = level_named("Source");
+        target_handle = seat(level_named("Destination"));
         mover = memnew(CharacterBody2D);
         mover->set_name("Crate");
-        mover->set_collision_layer(MOVER_LAYER);
-        mover->set_collision_mask(MOVER_MASK);
-        source_level->add_child(mover);
+        source->add_child(mover);
         mover_handle = seat(mover);
-        mover_entity = netw::NetwEntity::of(mover);
-    }
-
-    bool built() const {
-        return mover_entity.is_valid() && mover_handle.is_valid()
-            && target_handle.is_valid();
-    }
-
-    void start() {
-        settling = core->scene_move_entity(mover_handle, target_handle);
     }
 
     void drop_mover() {
@@ -134,7 +91,6 @@ struct CarryRun {
 
     ~CarryRun() {
         settling.unref();
-        mover_entity.unref();
         if (mover != nullptr) {
             drop_mover();
         }
@@ -147,55 +103,21 @@ struct CarryRun {
 
 class CarryScenario final : public netw_test::FrameScenario {
     CarryRun *live = nullptr;
-    int run = 0;
     int step = 0;
 
-    void close() {
-        delete live;
-        live = nullptr;
-        step = 0;
-        ++run;
-    }
-
-    bool drive_landing() {
-        LandingEvidence &seen = carry_evidence().landing;
+public:
+    bool advance() override {
+        if (netw::gd::scene_root() == nullptr) {
+            return false;
+        }
+        AbandonEvidence &seen = abandon_evidence();
         if (step == 0) {
             live = new CarryRun();
-            seen.driven = true;
-            seen.built = live->built();
-            live->start();
-            seen.settled_on_the_starting_frame
-                = live->settling->get_is_settled();
-            seen.started_under_source
-                = live->mover->get_parent() == live->source_level;
-            seen.mode_in_flight = int(live->mover->get_process_mode());
-            seen.layer_in_flight = int64_t(live->mover->get_collision_layer());
-            seen.mask_in_flight = int64_t(live->mover->get_collision_mask());
-            ++step;
-            return true;
-        }
-        if (!live->settling->get_is_settled() && step < CARRY_FRAME_CAP) {
-            ++step;
-            return true;
-        }
-        seen.frames_spent = step;
-        seen.settled = live->settling->get_is_settled();
-        seen.failed = live->settling->get_is_failed();
-        seen.code = live->settling->get_code();
-        seen.landed_under_target
-            = live->mover->get_parent() == live->target_level;
-        seen.mode_after = int(live->mover->get_process_mode());
-        seen.layer_after = int64_t(live->mover->get_collision_layer());
-        seen.mask_after = int64_t(live->mover->get_collision_mask());
-        close();
-        return true;
-    }
-
-    bool drive_abandon() {
-        AbandonEvidence &seen = carry_evidence().abandon;
-        if (step == 0) {
-            live = new CarryRun();
-            live->start();
+            live->settling
+                = live->core->scene_move_entity(
+                    live->mover_handle,
+                    live->target_handle
+                );
             seen.driven = true;
             ++step;
             return true;
@@ -214,21 +136,8 @@ class CarryScenario final : public netw_test::FrameScenario {
         seen.settled = live->settling->get_is_settled();
         seen.failed = live->settling->get_is_failed();
         seen.code = live->settling->get_code();
-        close();
-        return false;
-    }
-
-public:
-    bool advance() override {
-        if (netw::gd::scene_root() == nullptr) {
-            return false;
-        }
-        if (run == 0) {
-            return drive_landing();
-        }
-        if (run == 1) {
-            return drive_abandon();
-        }
+        delete live;
+        live = nullptr;
         return false;
     }
 };
@@ -238,59 +147,11 @@ NETW_FRAME_SCENARIO(CarryScenario, carry_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Scene][Frame] CF1 a move inside the tree stays unsettled on "
-    "the frame it starts, because the physics server has not yet dropped the "
-    "body from the areas it is leaving"
-) {
-    const LandingEvidence &seen = carry_evidence().landing;
-    REQUIRE(seen.driven);
-    REQUIRE(seen.built);
-    CHECK_FALSE(seen.settled_on_the_starting_frame);
-    CHECK(seen.started_under_source);
-}
-
-TEST_CASE(
-    "[Networked][Scene][Frame] CF2 the carry holds the body out of the "
-    "physics world while it is in flight, so the reparent generates no "
-    "phantom area enter and exit pair"
-) {
-    const LandingEvidence &seen = carry_evidence().landing;
-    REQUIRE(seen.driven);
-    NETW_CHECK_EQ(seen.mode_in_flight, int(Node::PROCESS_MODE_DISABLED));
-    NETW_CHECK_EQ(int(seen.layer_in_flight), 0);
-    NETW_CHECK_EQ(int(seen.mask_in_flight), 0);
-}
-
-TEST_CASE(
-    "[Networked][Scene][Frame] CF3 the carry lands the body under its "
-    "destination within the frames it spends, and answers its promise there"
-) {
-    const LandingEvidence &seen = carry_evidence().landing;
-    REQUIRE(seen.driven);
-    CHECK(seen.settled);
-    CHECK_FALSE(seen.failed);
-    NETW_CHECK_EQ(seen.code, int(OK));
-    CHECK(seen.landed_under_target);
-    NETW_CHECK_LT(seen.frames_spent, CARRY_FRAME_CAP);
-}
-
-TEST_CASE(
-    "[Networked][Scene][Frame] CF4 a landed carry gives the body back the "
-    "process mode and the collision masks it was suppressing"
-) {
-    const LandingEvidence &seen = carry_evidence().landing;
-    REQUIRE(seen.driven);
-    NETW_CHECK_EQ(seen.mode_after, int(Node::PROCESS_MODE_INHERIT));
-    NETW_CHECK_EQ(int(seen.layer_after), int(MOVER_LAYER));
-    NETW_CHECK_EQ(int(seen.mask_after), int(MOVER_MASK));
-}
-
-TEST_CASE(
     "[Networked][Scene][Frame] CF5 a body freed mid-flight abandons its "
     "carry and answers the promise, so nothing dereferences it on the next "
     "frame and no move is left waiting forever"
 ) {
-    const AbandonEvidence &seen = carry_evidence().abandon;
+    const AbandonEvidence &seen = abandon_evidence();
     REQUIRE(seen.driven);
     CHECK_FALSE(seen.settled_when_the_body_went);
     CHECK(seen.settled);

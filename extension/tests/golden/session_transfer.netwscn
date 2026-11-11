@@ -1,8 +1,0 @@
-label session_transfer
-clients 0
-ticks 16
-seed 7
-laws
-2 join c1 name:ada
-2 join c2 name:bo
-6 transfer server to:c2

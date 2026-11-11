@@ -1,6 +1,5 @@
 #include "support/fault_log.h"
 #include "support/internals.h"
-#include "support/link.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -202,70 +201,6 @@ TEST_CASE(
     NETW_CHECK_EQ(fixed->get_code(), ERR_UNAVAILABLE);
     NETW_CHECK_EQ(entity_at(rig, route, 1)->get_controller(), represented);
     NETW_CHECK_EQ(rig.route_node(route, 1)->get_multiplayer_authority(), 1);
-}
-
-TEST_CASE(
-    "[Networked][Entity] CA4 a controller that drops returns the entity to "
-    "the server by default and ends it when the entity asked for that, "
-    "because a steered body outlives its steerer only if it was told to"
-) {
-    LoopbackRig rig(2);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-
-    const int route = seat_player(rig, arena, "Steered");
-    const Ref<NetwEntity> host = entity_at(rig, route, -1);
-    REQUIRE(host.is_valid());
-    const int64_t controller = rig.peer_id(1);
-
-    host->set_controller(controller);
-    rig.pump(8);
-    NETW_CHECK_EQ(host->get_controller(), controller);
-
-    host->_on_peer_disconnected(controller);
-    rig.pump(4);
-
-    NETW_CHECK_EQ(host->get_controller(), int64_t(1));
-    NETW_CHECK_EQ(host->get_stage(), int64_t(netw::entity::Stage::LIVE));
-    NETW_CHECK_EQ(
-        rig.route_node(route, -1)->get_multiplayer_authority(),
-        int64_t(1)
-    );
-}
-
-TEST_CASE(
-    "[Networked][Entity] CA5 an entity that asked to end with its controller "
-    "begins despawning on that drop instead of reverting, which is the whole "
-    "difference the rule buys over the default"
-) {
-    LoopbackRig rig(2);
-    rig.mount();
-    Node *pen = rig.mirror_child("Pen");
-
-    const int route = seat_player(rig, pen, "Ending");
-    const Ref<NetwEntity> doomed = entity_at(rig, route, -1);
-    REQUIRE(doomed.is_valid());
-    doomed->set_on_controller_disconnect(NetwEntity::DISCONNECT_DESPAWN);
-
-    const int64_t steerer = rig.peer_id(1);
-    doomed->set_controller(steerer);
-    rig.pump(8);
-    NETW_CHECK_EQ(doomed->get_controller(), steerer);
-    NETW_CHECK_EQ(doomed->get_stage(), int64_t(netw::entity::Stage::LIVE));
-
-    doomed->_on_peer_disconnected(steerer);
-    rig.pump(4);
-
-    NETW_CHECK_EQ(
-        doomed->get_stage(),
-        int64_t(netw::entity::Stage::DESPAWNING)
-    );
-    NETW_CHECK_EQ(doomed->get_controller(), steerer);
-
-    Node *ending = rig.route_node(route, -1);
-    REQUIRE(ending != nullptr);
-    ending->get_parent()->remove_child(ending);
-    memdelete(ending);
 }
 
 void teach_every_session(LoopbackRig &p_rig) {
@@ -770,59 +705,6 @@ TEST_CASE(
     NETW_CHECK_EQ(entity_at(rig, route, -1)->get_controller(), int64_t(1));
     NETW_CHECK_EQ(issuer->get_controller(), int64_t(1));
     NETW_CHECK_EQ(int(asked->get_code()), int(ERR_TIMEOUT));
-}
-
-TEST_CASE(
-    "[Networked][Entity] CA14 a peer's requests reach the server in the "
-    "order it issued them across entities, however the link shuffles its "
-    "datagrams"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-    teach_every_session(rig);
-
-    const int COUNT = 6;
-    int routes[COUNT];
-    CallLog log;
-    const char *tags[COUNT] = {"e0", "e1", "e2", "e3", "e4", "e5"};
-    for (int at = 0; at < COUNT; ++at) {
-        routes[at] = seat_free(rig, arena, tags[at]);
-        entity_at(rig, routes[at], -1)
-            ->connect(
-                StringName("control_requested"),
-                log.callable(StringName(tags[at]))
-            );
-    }
-
-    const Ref<netw::NetwLinkConditions> shuffling = netw_test::link(11);
-    shuffling->set_latency_ms(20.0);
-    shuffling->set_jitter_ms(120.0);
-    rig.session()->set_link_conditions(
-        rig.session()->get_server_peer().ptr(),
-        shuffling,
-        rig.peer_id(0)
-    );
-
-    for (int at = 0; at < COUNT; ++at) {
-        entity_at(rig, routes[at], 0)->claim_control();
-    }
-    for (int step = 0; step < 30; ++step) {
-        rig.advance(20.0);
-        rig.pump();
-    }
-
-    const Vector<StringName> heard = log.order();
-    NETW_REQUIRE_EQ(int64_t(heard.size()), int64_t(COUNT));
-    for (int at = 0; at < COUNT; ++at) {
-        int issued = -1;
-        for (int tag = 0; tag < COUNT; ++tag) {
-            if (heard[at] == StringName(tags[tag])) {
-                issued = tag;
-            }
-        }
-        NETW_CHECK_EQ(issued, at);
-    }
 }
 
 TEST_CASE(

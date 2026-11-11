@@ -1,18 +1,14 @@
 #include "support/netw_test.h"
 
-#include "support/fault_log.h"
-
 #include "godot/multiplayer.hpp"
 #include "godot/node.hpp"
 #include "godot/scene_tree.hpp"
-#include "netw/api/clock_config.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/link_conditions.hpp"
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/nodes/multiplayer_viewport.hpp"
 #include "netw/api/session_config.hpp"
-#include "netw/session_decl.hpp"
 
 namespace TestNetwConfigureSession {
 
@@ -20,14 +16,11 @@ using namespace godot;
 using netw::MultiplayerViewport;
 using netw::Netw;
 using netw::NetwMultiplayer;
-using netw::NetwSessionConfig;
-using netw_test::FaultWatch;
 
 namespace {
 
 struct Mounted {
     MultiplayerViewport *tree = nullptr;
-    Node *orphan = nullptr;
 
     explicit Mounted(const char *p_name) {
         tree = memnew(MultiplayerViewport);
@@ -39,9 +32,6 @@ struct Mounted {
         api()->NETW_API_VIRTUAL(set_multiplayer_peer)(Ref<MultiplayerPeer>());
         tree->get_parent()->remove_child(tree);
         memdelete(tree);
-        if (orphan != nullptr) {
-            memdelete(orphan);
-        }
     }
 
     NetwMultiplayer *api() const {
@@ -89,127 +79,6 @@ TEST_CASE(
     branch.api()->config_settle();
 
     NETW_CHECK_EQ(branch.api()->auth_app_tag_of(), tag_of("tagged-arena"));
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] CS5 completed configuration "
-    "is applied before a direct peer assignment returns, and the deferred "
-    "pass and a repeated assignment that follow change nothing"
-) {
-    Mounted branch("CS5Tree");
-    const Ref<NetwSessionConfig> draft
-        = Netw::configure_session(child_named(branch.tree, "Session"));
-    draft->app(StringName("still-authoring"));
-    const Ref<MultiplayerPeer> offered = a_server();
-    const FaultWatch watch;
-
-    branch.assign(offered);
-
-    CHECK(branch.peer() == offered);
-    NETW_CHECK_EQ(branch.api()->auth_app_tag_of(), tag_of("still-authoring"));
-    CHECK(branch.api()->config_is_consumed(
-        netw::session_decl::KIND_SESSION_CONFIG
-    ));
-
-    branch.api()->config_settle();
-    branch.assign(offered);
-
-    CHECK(branch.peer() == offered);
-    NETW_CHECK_EQ(branch.api()->auth_app_tag_of(), tag_of("still-authoring"));
-    NETW_CHECK_EQ(watch.log->warnings_logged(), 0);
-    NETW_CHECK_EQ(watch.log->errors_logged(), 0);
-
-    draft->app(StringName("too-late"));
-    NETW_CHECK_EQ(watch.log->error_count_containing("[NW0019]"), 1);
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] CS6 settings declared in a "
-    "constructor before the node enters the tree are applied by a peer "
-    "assignment in the first ready, with no frame in between"
-) {
-    Mounted branch("CS6Tree");
-    Node *declaring = memnew(Node);
-    declaring->set_name(StringName("Game"));
-    Netw::configure_clock(declaring)->ticks_per_second(60);
-    CHECK_FALSE(branch.api()->clock_is_configured());
-
-    branch.tree->add_child(declaring);
-    const Ref<MultiplayerPeer> offered = a_server();
-    branch.assign(offered);
-
-    CHECK(branch.peer() == offered);
-    CHECK(branch.api()->clock_is_configured());
-    const int tickrate
-        = branch.api()->clock_get_param(NetwMultiplayer::CLOCK_PARAM_TICKRATE);
-    NETW_CHECK_EQ(tickrate, 60);
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] CS7 settings the session cannot "
-    "apply refuse the new peer before the standing one is torn down, leave "
-    "every draft open, and a retry after the fix applies them"
-) {
-    Mounted branch("CS7Tree");
-    const Ref<MultiplayerPeer> standing = a_server();
-    branch.assign(standing);
-    REQUIRE(branch.peer() == standing);
-    const int64_t state = int64_t(branch.api()->session_get_state());
-
-    Node *first = child_named(branch.tree, "First");
-    const FaultWatch watch;
-    String said;
-    Node *removable = nullptr;
-    Ref<NetwSessionConfig> open_draft;
-
-    SUBCASE("two nodes declare the session") {
-        open_draft = Netw::configure_session(first);
-        open_draft->app(StringName("first-app"));
-        removable = child_named(branch.tree, "Second");
-        Netw::configure_session(removable)->app(StringName("other-app"));
-        said = "[NW0034]";
-    }
-    SUBCASE("the declaration holds something other than settings") {
-        netw::session_decl::declare(
-            first,
-            netw::session_decl::KIND_SESSION_CONFIG,
-            Callable(),
-            Variant(int64_t(5)),
-            "configure_session"
-        );
-    }
-
-    const Ref<MultiplayerPeer> offered = a_server();
-    branch.assign(offered);
-    branch.assign(offered);
-
-    CHECK(branch.peer() == standing);
-    NETW_CHECK_EQ(int64_t(branch.api()->session_get_state()), state);
-    CHECK_FALSE(branch.api()->config_is_consumed(
-        netw::session_decl::KIND_SESSION_CONFIG
-    ));
-    CHECK((said.is_empty() || watch.log->error_count_containing(said) >= 1));
-
-    if (open_draft.is_valid()) {
-        open_draft->app(StringName("fixed-app"));
-        branch.tree->remove_child(removable);
-        branch.orphan = removable;
-    } else {
-        Ref<NetwSessionConfig> repaired;
-        repaired.instantiate();
-        repaired->app(StringName("fixed-app"));
-        netw::session_decl::declare(
-            first,
-            netw::session_decl::KIND_SESSION_CONFIG,
-            Callable(),
-            Variant(repaired),
-            "configure_session"
-        );
-    }
-    branch.assign(offered);
-
-    CHECK(branch.peer() == offered);
-    NETW_CHECK_EQ(branch.api()->auth_app_tag_of(), tag_of("fixed-app"));
 }
 
 #if defined(NETW_TIER_HOSTED)

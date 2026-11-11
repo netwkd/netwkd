@@ -250,30 +250,6 @@ TEST_CASE(
     NETW_CHECK_EQ(int(stand.book_status()), int(SceneLoads::STATUS_NONE));
 }
 
-TEST_CASE(
-    "[Networked][Spawn] LC9 a spawn waiting for a MultiplayerSpawner that "
-    "never appears is dropped at its deadline, though nothing else spawns"
-) {
-    const Ref<PackedScene> level = a_level();
-    LoopbackRig rig(1);
-    rig.mount();
-    rig.spawn_plane(0)->set_park_timeout_seconds(SHORT_PARK_DEADLINE);
-    StockWorld world;
-    world.scenes.push_back(level->get_path());
-    seat_stock_branch(rig.branch(-1), world);
-    rig.pump(2);
-    const FaultWatch watch;
-
-    world.arena(-1)->add_child(level->instantiate(), true);
-    rig.pump(PAST_THE_DEADLINE);
-
-    NETW_CHECK_EQ(
-        watch.log->warning_count_containing("its MultiplayerSpawner does not exist on this peer"),
-        int64_t(1)
-    );
-    NETW_CHECK_EQ(rig.spawn_plane(0)->get_park().size(), 0);
-}
-
 } // namespace TestSpawnLoadLaws
 
 #endif

@@ -106,38 +106,6 @@ int edges_for(const CallLog &p_seen, const RID &p_scene, bool p_subscribed) {
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR1 an entity residing in a scene subscribes the "
-    "player "
-    "who owns it, with no seat and no admission call, and that player then "
-    "receives the rest of that scene's content"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    NetwMultiplayer *host = rig.server();
-    const RID arena = open_scene(rig, StringName("Arena"), nullptr);
-    Node *level = level_of(rig, arena);
-    const int peer = rig.peer_id(0);
-    const Ref<netw::NetwPlayer> ana
-        = netw_test::seated_peer(host, peer, StringName("ana"));
-
-    CHECK_FALSE(host->scene_subscribes(arena, peer));
-
-    const int player = spawn_into(rig, level, ana, "player");
-    NETW_CHECK_GT(player, 0);
-
-    CHECK(host->scene_subscribes(arena, peer));
-    CHECK_FALSE(host->scene_watches(arena, peer));
-    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 1);
-
-    const int furniture
-        = spawn_into(rig, level, Ref<netw::NetwPlayer>(), "furniture");
-    rig.pump(8);
-
-    CHECK(rig.route_node(furniture, 0) != nullptr);
-    CHECK(rig.route_node(player, 0) != nullptr);
-}
-
-TEST_CASE(
     "[Networked][Scene] JR2 two entities of one player in one scene are two "
     "reasons, so the first one leaving keeps the player subscribed and the "
     "last one leaving takes the subscription away"

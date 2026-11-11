@@ -184,55 +184,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] W4 on a listen host the view of the "
-    "scene its "
-    "player stands in is visible and every other view is hidden, and both "
-    "turn over when the player moves"
-) {
-    const Ref<NetwMultiplayer> core
-        = playing(NetwMultiplayer::ROLE_LISTEN_SERVER);
-    Node *root = memnew(Node);
-    const Wrapped arena = wrapped(core, root, StringName("Arena"));
-    const Wrapped annex = wrapped(core, root, StringName("Annex"));
-    Node *pawn = stand(core, annex.root);
-    settle(core);
-
-    CHECK(annex.view->is_visible());
-    CHECK_FALSE(arena.view->is_visible());
-
-    annex.root->remove_child(pawn);
-    arena.root->add_child(pawn);
-    settle(core);
-
-    CHECK(arena.view->is_visible());
-    CHECK_FALSE(annex.view->is_visible());
-
-    memdelete(root);
-}
-
-TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] W5 with no player standing anywhere "
-    "the one "
-    "live scene is shown, and a second live scene leaves neither shown"
-) {
-    const Ref<NetwMultiplayer> core
-        = playing(NetwMultiplayer::ROLE_DEDICATED_SERVER);
-    Node *root = memnew(Node);
-    const Wrapped arena = wrapped(core, root, StringName("Arena"));
-    settle(core);
-
-    CHECK(arena.view->is_visible());
-
-    const Wrapped annex = wrapped(core, root, StringName("Annex"));
-    settle(core);
-
-    CHECK_FALSE(arena.view->is_visible());
-    CHECK_FALSE(annex.view->is_visible());
-
-    memdelete(root);
-}
-
-TEST_CASE(
     "[Networked][Scene][Hosted][SceneTree] W6 a view the game shows itself "
     "stays shown "
     "through a settle that does not change the shown scene"

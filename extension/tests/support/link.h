@@ -20,4 +20,17 @@ inline godot::Ref<netw::NetwLinkConditions> polls(
     return conditions;
 }
 
+inline godot::Ref<netw::NetwLinkConditions> rough(
+    int64_t p_seed,
+    double p_tick_ms
+) {
+    const godot::Ref<netw::NetwLinkConditions> conditions = link(p_seed);
+    conditions->set_latency_ms(2.0 * p_tick_ms);
+    conditions->set_jitter_ms(6.0 * p_tick_ms);
+    conditions->set_reorder_chance(1.0);
+    conditions->set_duplicate_chance(0.3);
+    conditions->set_loss_chance(0.05);
+    return conditions;
+}
+
 } // namespace netw_test

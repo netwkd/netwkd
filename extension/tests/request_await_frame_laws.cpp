@@ -22,8 +22,6 @@ using netw::NetwSession;
 constexpr const char *PROBE_ID = "request_await_probe";
 constexpr const char *PROBE_PATH = "res://tests/support/awaiting_rpc.gd";
 constexpr int TICKRATE = 30;
-constexpr int AWAIT_FRAMES = 6;
-constexpr int64_t AWAITED_VALUE = 42;
 constexpr int STALE_FRAMES = 8;
 constexpr int64_t STALE_VALUE = 777;
 constexpr int FRESH_FRAMES = 20;
@@ -52,20 +50,17 @@ struct AwaitEvidence {
     bool suspended_at_loss = false;
     bool stale_finished = false;
     bool completed = false;
-    int result_type = -1;
     int64_t result = -1;
     int asked_frame = -1;
     int settled_frame = -1;
 };
 
-AwaitEvidence &evidence_of(bool p_transfers) {
-    static AwaitEvidence settles;
+AwaitEvidence &evidence() {
     static AwaitEvidence transfers;
-    return p_transfers ? transfers : settles;
+    return transfers;
 }
 
 class AwaitScenario final : public netw_test::FrameScenario {
-    const bool transfers;
     int frame = 0;
     bool done = false;
     netw_test::SimStand *stand = nullptr;
@@ -75,10 +70,6 @@ class AwaitScenario final : public netw_test::FrameScenario {
     int answerer = 0;
     Ref<NetwPromise> stale;
     Ref<NetwPromise> asked;
-
-    AwaitEvidence &evidence() const {
-        return evidence_of(transfers);
-    }
 
     Array finished() const {
         Node *probe = stand->node_at(answerer, route);
@@ -102,8 +93,8 @@ class AwaitScenario final : public netw_test::FrameScenario {
             return false;
         }
         probe_script = script.ptr();
-        const int clients = transfers ? 2 : 1;
-        stand = new netw_test::SimStand(clients, transfers);
+        const int clients = 2;
+        stand = new netw_test::SimStand(clients, true);
         if (!stand->ready()) {
             return false;
         }
@@ -112,11 +103,9 @@ class AwaitScenario final : public netw_test::FrameScenario {
         Node *arena = stand->arena();
         stand->arm(TICKRATE);
         for (int at = -1; at < clients; ++at) {
-            if (transfers) {
-                stand->session(at)->transfer_set_mode(
-                    NetwSession::TRANSFER_CONTINUE
-                );
-            }
+            stand->session(at)->transfer_set_mode(
+                NetwSession::TRANSFER_CONTINUE
+            );
         }
         stand->session(-1)->session_submit_join(StringName("seat0"), Array());
         stand->pump(4 * (clients + 1));
@@ -132,10 +121,8 @@ class AwaitScenario final : public netw_test::FrameScenario {
         arena->add_child(built);
         stand->pump(8);
         route = int(server->entity_get_route(made));
-        if (transfers) {
-            asker = stand->peer_id(0) < stand->peer_id(1) ? 0 : 1;
-            answerer = 1 - asker;
-        }
+        asker = stand->peer_id(0) < stand->peer_id(1) ? 0 : 1;
+        answerer = 1 - asker;
         if (stand->node_at(answerer, route) == nullptr
             || stand->node_at(asker, route) == nullptr) {
             return false;
@@ -158,7 +145,6 @@ class AwaitScenario final : public netw_test::FrameScenario {
         seen.completed = asked.is_valid() && asked->get_is_completed();
         const Variant result
             = asked.is_valid() ? asked->get_result() : Variant();
-        seen.result_type = int(result.get_type());
         seen.result = result.get_type() == Variant::INT ? int64_t(result) : -1;
         seen.stale_finished = finished().has(STALE_VALUE);
     }
@@ -174,9 +160,6 @@ class AwaitScenario final : public netw_test::FrameScenario {
     }
 
 public:
-    explicit AwaitScenario(bool p_transfers) : transfers(p_transfers) {
-    }
-
     bool advance() override {
         if (netw::gd::scene_root() == nullptr || done) {
             return false;
@@ -187,14 +170,9 @@ public:
                 done = true;
                 return false;
             }
-            if (transfers) {
-                stale = ask(-1, STALE_FRAMES, STALE_VALUE);
-            } else {
-                asked = ask(-1, AWAIT_FRAMES, AWAITED_VALUE);
-                evidence().asked_frame = frame;
-            }
+            stale = ask(-1, STALE_FRAMES, STALE_VALUE);
         }
-        if (transfers && frame == LOSE_AT) {
+        if (frame == LOSE_AT) {
             lose_server();
         }
         AwaitEvidence &seen = evidence();
@@ -214,27 +192,13 @@ public:
     }
 };
 
-NETW_FRAME_SCENARIO(AwaitScenario, request_await_settles, false);
-NETW_FRAME_SCENARIO(AwaitScenario, request_await_transfers, true);
-
-TEST_CASE(
-    "[Networked][Rpc][Frame] RQ1 a requested method that awaits replies "
-    "with its return value once it returns, not with the suspended call"
-) {
-    const AwaitEvidence &seen = evidence_of(false);
-    REQUIRE(seen.driven);
-    REQUIRE(seen.seated);
-    CHECK(seen.completed);
-    NETW_CHECK_EQ(seen.result_type, int(Variant::INT));
-    NETW_CHECK_EQ(seen.result, AWAITED_VALUE);
-    NETW_CHECK_GE(seen.settled_frame, seen.asked_frame + AWAIT_FRAMES);
-}
+NETW_FRAME_SCENARIO(AwaitScenario, request_await_transfers);
 
 TEST_CASE(
     "[Networked][Rpc][Frame] RQ2 a method still awaiting when the server is "
     "lost sends no reply, so it cannot settle the successor's own request"
 ) {
-    const AwaitEvidence &seen = evidence_of(true);
+    const AwaitEvidence &seen = evidence();
     REQUIRE(seen.driven);
     REQUIRE(seen.seated);
     REQUIRE(seen.lost);

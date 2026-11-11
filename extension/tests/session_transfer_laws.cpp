@@ -592,76 +592,6 @@ TEST_CASE(
     }
 }
 
-TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX3 after the server is lost "
-    "with the world kept, every survivor reads the successor's player and "
-    "entity as peer 1, a third client's entity keeps its controller, and a "
-    "server entity stays with the server"
-) {
-    Table table;
-    table.keep_world();
-    const int successor = table.lowest_client();
-    const int third = (successor + 1) % CLIENTS;
-    const int64_t successor_was = table.was(successor);
-    const int64_t third_label = table.was(third);
-    const int carried = table.spawn_body("Carried", successor, successor_was);
-    const int steered = table.spawn_body("Steered", third, third_label);
-    const int served = table.spawn_body("Served", -2, 0);
-    for (int at = 0; at < CLIENTS; ++at) {
-        present(table.body_at(steered, at));
-        present(table.body_at(served, at));
-        NETW_REQUIRE_EQ(
-            NetwEntity::of(present(table.body_at(carried, at)))
-                ->get_controller(),
-            successor_was
-        );
-    }
-
-    REQUIRE(int(table.rig.session()->lose_server()) == int(OK));
-    table.rig.pump(SETTLE_PUMPS);
-
-    const struct {
-        int route;
-        int64_t controller;
-        bool player_controlled;
-    } rows[] = {
-        {carried, 1, true},
-        {steered, third_label, true},
-        {served, 1, false},
-    };
-    for (int at = 0; at < CLIENTS; ++at) {
-        NETW_FORMAT_INT(seat_text, at);
-        CAPTURE(seat_text);
-        NetwMultiplayer *seat = table.seat(at);
-        const Ref<NetwPlayer> host = seat->player_of(1);
-        REQUIRE(host.is_valid());
-        NETW_CHECK_EQ(
-            int(same(host->get_username(), vformat("guest%d", successor))),
-            1
-        );
-        const Ref<NetwPlayer> kept = seat->player_of(third_label);
-        REQUIRE(kept.is_valid());
-        NETW_CHECK_EQ(
-            int(same(kept->get_username(), vformat("guest%d", third))),
-            1
-        );
-        for (const auto &row : rows) {
-            NETW_FORMAT_INT(route_text, row.route);
-            CAPTURE(route_text);
-            Node *body = present(table.body_at(row.route, at));
-            NETW_CHECK_EQ(
-                NetwEntity::of(body)->get_controller(),
-                row.controller
-            );
-            NETW_CHECK_EQ(int64_t(body->get_multiplayer_authority()), 1);
-            NETW_CHECK_EQ(
-                int(NetwEntity::of(body)->get_controller_player().is_valid()),
-                int(row.player_controlled)
-            );
-        }
-    }
-}
-
 constexpr double REPORT_LATENCY_MS = 60000.0;
 
 void slow_reports(Table &p_table, int p_successor) {
@@ -1575,15 +1505,6 @@ func _init() -> void:
 	Netw.configure_property(self, &"hp").broadcast()
 )";
 
-const char *KEEPER_SOURCE = R"(extends Node
-
-func _init() -> void:
-	Netw.configure_transfer(keep)
-
-func keep(node: Node) -> bool:
-	return node.name != &"Doomed"
-)";
-
 Node *build_leased(const Variant &p_name) {
     Node *made = build_body(p_name);
     NetwEntity::ensure(made)->set_lifecycle(NetwEntity::LIFECYCLE_CONTROLLER);
@@ -1666,18 +1587,6 @@ struct Vitals {
     }
 };
 
-void seat_keepers(Table &p_table) {
-    const Ref<Script> script = netw_test::minted_script(KEEPER_SOURCE);
-    REQUIRE(script.is_valid());
-    for (int at = -1; at < CLIENTS; ++at) {
-        Node *keeper
-            = Object::cast_to<Node>(netw::gd::live_object(script->call("new")));
-        keeper->set_name("Keeper");
-        p_table.rig.branch(at)->add_child(keeper);
-    }
-    p_table.rig.pump(SETTLE_PUMPS);
-}
-
 TEST_CASE(
     "[Networked][Session][Transfer][SceneTree] TX18 after the server is lost "
     "every survivor holds exactly the entities the successor serves it, each "
@@ -1744,50 +1653,6 @@ TEST_CASE(
         NETW_REQUIRE_EQ(int(held != nullptr), 1);
         NETW_CHECK_EQ(int64_t(held->get(StringName("hp"))), int64_t(42));
     }
-}
-
-TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX19 an entity the "
-    "Netw.configure_transfer handler refuses after the server is lost "
-    "despawns on the successor and reaches no survivor, while the rest stay "
-    "everywhere"
-) {
-    Table table;
-    const int successor = table.lowest_client();
-    seat_keepers(table);
-    const int kept = table.spawn_body("Kept", -2, 0);
-    const int doomed = table.spawn_body("Doomed", -2, 0);
-    int64_t heard[CLIENTS];
-    for (int at = 0; at < CLIENTS; ++at) {
-        NETW_REQUIRE_EQ(int(alive(table, doomed, at)), 1);
-        heard[at] = spawn_frames_in(table.seat(at), "SPAWN");
-    }
-
-    netw_test::FaultWatch faults;
-    NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));
-    table.rig.pump(SETTLE_PUMPS);
-    NETW_CHECK_EQ(faults.errors(), 0);
-
-    const int64_t served
-        = table.rig.spawn_plane(successor)->get_spawn_book()->spawned_count();
-    for (int at = 0; at < CLIENTS; ++at) {
-        NETW_FORMAT_INT(seat_text, at);
-        CAPTURE(seat_text);
-        NETW_CHECK_EQ(int(alive(table, doomed, at)), 0);
-        NETW_CHECK_EQ(int(alive(table, kept, at)), 1);
-        if (at != successor) {
-            NETW_CHECK_EQ(
-                spawn_frames_in(table.seat(at), "SPAWN") - heard[at],
-                served
-            );
-        }
-    }
-    NETW_CHECK_EQ(
-        int(table.rig.spawn_plane(successor)->get_spawn_book()->has_spawned(
-            doomed
-        )),
-        0
-    );
 }
 
 TEST_CASE(

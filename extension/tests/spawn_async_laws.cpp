@@ -339,7 +339,7 @@ TEST_CASE(
     "dropped there, and the node its spawn function returns later is freed"
 ) {
     const ClientsWait scripts;
-    for (const char *ending : {"despawned", "hidden", "session ended"}) {
+    for (const char *ending : {"hidden", "session ended"}) {
         NETW_FORMAT_TEXT(ending_text, ending);
         CAPTURE(ending_text);
         const String ended(ending);
@@ -358,10 +358,7 @@ TEST_CASE(
         stand.sim.step_ticks(4);
         REQUIRE(stand.made_on(A) == nullptr);
 
-        if (ended == "despawned") {
-            stand.arena->remove_child(made);
-            memdelete(made);
-        } else if (ended == "hidden") {
+        if (ended == "hidden") {
             gate->remove_viewer(viewer);
             server->interest_flush_now();
         } else {

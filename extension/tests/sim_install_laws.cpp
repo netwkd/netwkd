@@ -1,5 +1,4 @@
 #include "support/internals.h"
-#include "support/link.h"
 #include "support/netw_test.h"
 
 #include "support/minted_script.h"
@@ -41,7 +40,6 @@ using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
 constexpr int DISPLAY_OFFSET = 3;
-constexpr int BEAT_TICKS = 10;
 constexpr double FRAME_DELTA = 1.0 / 60.0;
 
 constexpr const char *FIELD = "body_position";
@@ -81,10 +79,6 @@ const std::string CARRY_SOURCE = std::string(BODY)
     + "\tNetw.configure_property(self, &\"body_position\").state()"
       ".carry_along(&\"body_velocity\")\n"
       "\tNetw.configure_property(self, &\"body_velocity\").state()\n";
-
-const std::string HEARTBEAT_SOURCE = std::string(BODY)
-    + "\tNetw.configure_property(self, &\"body_position\").broadcast()"
-      ".heartbeat(10)\n";
 
 struct Stand {
     LoopbackRig rig;
@@ -198,61 +192,6 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Sim][SceneTree] a state body with replicas active runs "
-    "unfrozen on a client that registered no prediction, and installs the "
-    "rows the session authors"
-) {
-    Stand stand(1, STATE_SOURCE);
-    stand.activate(0, Restore::BUFFERED);
-    stand.author_ticks(-1, 12, 10.0);
-
-    const netw::sim::Row *row = stand.row(0);
-    REQUIRE(bool(row != nullptr));
-    if (row == nullptr) {
-        return;
-    }
-    NETW_CHECK_EQ(int(row->mode), int(Mode::ACTIVE));
-    NETW_CHECK_EQ(int(row->bodies.applied), int(Mode::ACTIVE));
-    CHECK_FALSE(stand.body(0)->is_freeze_enabled());
-    CHECK(
-        bool(
-            Internals::predict_engine_for(stand.core(0), stand.rid(0))
-            == nullptr
-        )
-    );
-    NETW_CHECK_GT(row->installs.stats.installed, int64_t(0));
-    const double newest = stand.held(-1).x;
-    const double installed = stand.held(0).x;
-    NETW_CHECK_GT(installed, 0.0);
-    NETW_CHECK_LT(installed, newest);
-}
-
-InstallStats jittered_ages(Restore p_restore) {
-    Stand stand(1, STATE_SOURCE);
-    stand.activate(0, p_restore);
-    const Ref<netw::NetwLinkConditions> link = netw_test::link(29);
-    link->set_latency_ms(10.0);
-    link->set_jitter_ms(25.0);
-    stand.rig.conditions(0, link, 1);
-    stand.author_ticks(-1, 48, 10.0);
-    return stand.stats(0);
-}
-
-TEST_CASE(
-    "[Networked][Sim][SceneTree] under link jitter a buffered copy installs "
-    "every row at the same age and an exact copy does not"
-) {
-    const InstallStats buffered = jittered_ages(Restore::BUFFERED);
-    NETW_CHECK_GT(buffered.installed, int64_t(30));
-    NETW_CHECK_EQ(buffered.youngest_age, int64_t(DISPLAY_OFFSET));
-    NETW_CHECK_EQ(buffered.oldest_age, int64_t(DISPLAY_OFFSET));
-
-    const InstallStats exact = jittered_ages(Restore::EXACT);
-    NETW_CHECK_GT(exact.installed, int64_t(30));
-    NETW_CHECK_LT(exact.youngest_age, exact.oldest_age);
-}
-
-TEST_CASE(
     "[Networked][Sim][SceneTree] an install hands a jump inside the offset "
     "bound to the drawn value, so the visual stays where it was while the "
     "body takes the row as authored"
@@ -315,67 +254,6 @@ TEST_CASE(
     NETW_CHECK_EQ(stand.pending(1), 0);
     CHECK(stand.held(1).is_equal_approx(before));
     stand.rig.release(1);
-}
-
-TEST_CASE(
-    "[Networked][Sim][SceneTree] a held row from its author's earlier tenure "
-    "is dropped at install even when that author controls the entity again"
-) {
-    Stand stand(2, BROADCAST_SOURCE);
-    netw_test::steer(stand.pair, stand.rig.peer_id(0));
-    stand.activate(1, Restore::BUFFERED);
-    stand.author_ticks(0, 10, 10.0);
-    REQUIRE(bool(stand.row(1) != nullptr));
-    if (stand.row(1) == nullptr) {
-        return;
-    }
-    NETW_CHECK_GT(stand.pending(1), 0);
-    const int64_t dropped = stand.stats(1).dropped;
-
-    const Ref<NetwEntity> host = NetwEntity::of(stand.copy(-1));
-    host->set_controller(stand.rig.peer_id(1));
-    host->set_controller(stand.rig.peer_id(0));
-    stand.rig.pump(4);
-    REQUIRE(
-        NetwEntity::of(stand.copy(1))->get_control_tenure()
-        == host->get_control_tenure()
-    );
-    NETW_CHECK_EQ(
-        NetwEntity::of(stand.copy(1))->get_controller(),
-        int64_t(stand.rig.peer_id(0))
-    );
-    stand.rig.step_ticks(DISPLAY_OFFSET + 2);
-
-    NETW_CHECK_GT(stand.stats(1).dropped, dropped);
-}
-
-TEST_CASE(
-    "[Networked][Sim][SceneTree] a heartbeat that agrees with a sleeping "
-    "active copy writes nothing, and one that finds it perturbed heals it"
-) {
-    Stand stand(1, HEARTBEAT_SOURCE);
-    netw_test::steer(stand.pair, 0);
-    stand.activate(0, Restore::BUFFERED);
-    const Vector2 rest(25.0, -5.0);
-    stand.author(-1, rest);
-    stand.rig.step_ticks(BEAT_TICKS * 2);
-    REQUIRE(stand.held(0).is_equal_approx(rest));
-    NETW_CHECK_EQ(int(stand.row(0)->mode), int(Mode::ACTIVE));
-
-    stand.body(0)->set_sleeping(true);
-    const int64_t writes = stand.writes(0);
-    const InstallStats quiet = stand.stats(0);
-    stand.rig.step_ticks(BEAT_TICKS * 2 + DISPLAY_OFFSET);
-    NETW_CHECK_GT(stand.stats(0).skipped, quiet.skipped);
-    NETW_CHECK_EQ(stand.stats(0).installed, quiet.installed);
-    NETW_CHECK_EQ(stand.writes(0), writes);
-    CHECK(stand.body(0)->is_sleeping());
-
-    stand.body(0)->set_position(Vector2(-60.0, 12.0));
-    stand.body(0)->set_sleeping(true);
-    stand.rig.step_ticks(BEAT_TICKS + DISPLAY_OFFSET + 2);
-    CHECK(stand.held(0).is_equal_approx(rest));
-    NETW_CHECK_GT(stand.stats(0).installed, quiet.installed);
 }
 
 netw::predict::Arrival simulated_arrival(
@@ -524,32 +402,6 @@ TEST_CASE(
     );
     NETW_CHECK_EQ(age, int64_t(0));
     CHECK(Vector2(fresh[0]).is_equal_approx(Vector2(10.0, 0.0)));
-}
-
-TEST_CASE(
-    "[Networked][Sim][SceneTree] O5 a predicted copy that leaves proxy for "
-    "active starts from the newest row it received, not from where its body "
-    "was left"
-) {
-    Stand stand(1, STATE_SOURCE);
-    NetwMultiplayer *session = stand.core(0);
-    const RID copy = stand.rid(0);
-    netw::sim::Row &seated = Internals::sim_row(session, copy);
-    seated.declaration.bodies.push_back(NodePath("Body"));
-    seated.facts.predicted = true;
-    seated.mode = Mode::PROXY;
-    session->sim_settle_body(NetwEntity::of(stand.copy(0)));
-    stand.author_ticks(-1, 12, 10.0);
-    REQUIRE(stand.held(0).x > 0.0);
-
-    stand.copy(0)->set(StringName(FIELD), Vector2(-500.0, 0.0));
-    Internals::sim_row(session, copy).mode = Mode::ACTIVE;
-    session->sim_settle_body(NetwEntity::of(stand.copy(0)));
-    NETW_CHECK_EQ(
-        int(session->sim_row_of(copy)->bodies.applied),
-        int(Mode::ACTIVE)
-    );
-    NETW_CHECK_GT(stand.held(0).x, 0.0);
 }
 
 } // namespace TestNetwSimInstallLaws

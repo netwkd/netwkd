@@ -300,6 +300,7 @@
 				Netw.despawn(bullet)
 				[/codeblock]
 				Despawning the root of a [NetwScene] removes the scene at once, with everything in it.
+				When players move to a new [NetwScene], a client never holds the old and the new one together, whether the old root is despawned before or after the new one is spawned.
 				See [NetwDespawnOpts] for [param opts]. Returns [constant @GlobalScope.ERR_DOES_NOT_EXIST] for a node that was not spawned, and [constant @GlobalScope.ERR_UNAVAILABLE] outside a session.
 				A client can call it when its player is the [member NetwEntity.controller] and [member NetwEntity.lifecycle] is [constant NetwEntity.LIFECYCLE_CONTROLLER]. The node is removed on that client at once, and comes back if the server refuses.
 			</description>
@@ -355,7 +356,7 @@
 			<param index="0" name="node" type="Node" />
 			<param index="1" name="new_parent" type="Node" />
 			<description>
-				Moves [param node] under [param new_parent] like [method Node.reparent]. The promise resolves once the server has moved it. Other peers move it after.
+				Moves [param node] under [param new_parent] like [method Node.reparent]. The promise resolves once the server has moved it. Other peers move it after. Every peer keeps the node's global transform across the move.
 				[codeblock]
 				await Netw.reparent(avatar, level2.get_node(^"Players")).wait()
 				[/codeblock]

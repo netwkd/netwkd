@@ -181,41 +181,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN4 a despawn that arrives while a spawn is parked "
-    "cancels it with NET RESULT ZERO, so the parent lands holding nothing"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    rig.hold(0);
-    const Nested pair = spawn_pair(rig, rig.mirror_child("Arena"));
-
-    const PackedByteArray parent_frame = rig.spawn_frame_of(pair.parent_route);
-    const PackedByteArray child_frame = rig.spawn_frame_of(pair.child_route);
-
-    rig.deliver_spawn(0, child_frame);
-    rig.deliver_despawn(0, pair.child_route);
-
-    const Dictionary cancelled = Dictionary(rig.spawn_plane(0)->counters());
-    NETW_CHECK_EQ(
-        int64_t(cancelled[StringName("spawn_parked_cancelled")]),
-        int64_t(1)
-    );
-
-    rig.deliver_spawn(0, parent_frame);
-
-    Node *seat_parent = rig.route_node(pair.parent_route, 0);
-    const bool parent_landed = seat_parent != nullptr;
-    CHECK(parent_landed);
-    if (parent_landed) {
-        NETW_CHECK_EQ(seat_parent->get_child_count(), 0);
-    }
-    NETW_CHECK_EQ(
-        state_of(rig, 0, pair.child_route),
-        int64_t(netw::NetwLivenessCore::STATE_UNKNOWN)
-    );
-}
-
-TEST_CASE(
     "[Networked][Spawn] SN5 a move keeps the route and the receiver's own "
     "instance and MOVES it, because a cross-parent move is a reparent and "
     "not a despawn followed by a respawn"

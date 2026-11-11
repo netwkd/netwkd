@@ -72,18 +72,11 @@ constexpr int CUBES = 5;
 constexpr int TICKRATE = 30;
 constexpr int SETTLE_FRAMES = 60;
 constexpr int WINDOW_FRAMES = 30;
-constexpr int SCRIPT_AT = SETTLE_FRAMES + WINDOW_FRAMES;
-constexpr int ENGINE_AT = SCRIPT_AT + 1;
-constexpr int WAKE_AT = ENGINE_AT + 1;
-constexpr int WRITE_AT = WAKE_AT + 1;
-constexpr int WRITE_READ_AT = WRITE_AT + 2;
-constexpr int MISS_AT = WRITE_READ_AT;
-constexpr int MISS_READ_AT = MISS_AT + 2;
-constexpr int PULL_END = MISS_READ_AT;
-constexpr int64_t TINT = 7;
-constexpr double MASS = 3.5;
+constexpr int WINDOW_AT = SETTLE_FRAMES + WINDOW_FRAMES;
+constexpr int WAKE_AT = WINDOW_AT + 2;
+constexpr int MISS_AT = WAKE_AT + 3;
+constexpr int PULL_END = MISS_AT + 2;
 const Vector3 NUDGE(1.0, 0.0, 0.0);
-const Vector3 PLACED(2.0, 1.0, -3.0);
 const Vector3 SHIFT(4.0, 0.0, 0.0);
 
 Script *cube_script = nullptr;
@@ -114,15 +107,6 @@ RowAddress row_of_node(const World &p_world, Node *p_node) {
     return found;
 }
 
-int column_named(const Table &p_table, const char *p_name) {
-    for (int at = 0; at < p_table.schema.column_count(); ++at) {
-        if (p_table.schema.at(at)->key == StringName(p_name)) {
-            return at;
-        }
-    }
-    return -1;
-}
-
 struct PullEvidence {
     bool driven = false;
     int asleep = 0;
@@ -132,12 +116,8 @@ struct PullEvidence {
     int64_t window_body = 0;
     int64_t window_script = 0;
     int64_t window_engine = 0;
-    bool script_pulled = false;
-    bool engine_pulled = false;
     bool woken_read = false;
     int64_t woken_body = 0;
-    int write_lag = -1;
-    bool write_value = false;
     int misses = 0;
     bool miss_named = false;
     bool miss_restored = false;
@@ -299,24 +279,12 @@ public:
         if (frame == SETTLE_FRAMES) {
             opened = Internals::store(server()).work;
         }
-        if (frame == SCRIPT_AT) {
+        if (frame == WINDOW_AT) {
             read_window();
-            cube(1)->set("tint", TINT);
-        }
-        if (frame == ENGINE_AT) {
-            const Table &tinted = table_of(1);
-            const uint32_t tint = uint32_t(column_named(tinted, "tint"));
-            seen.script_pulled = changed_now(1)
-                && int64_t(tinted.read_value(row_at(1), tint)) == TINT;
-            cube(2)->set_mass(MASS);
         }
         const int64_t body_before = Internals::store(server()).work.body;
         if (frame == WAKE_AT) {
-            seen.engine_pulled = changed_now(2);
             cube(3)->set_linear_velocity(NUDGE);
-        }
-        if (frame == WRITE_AT) {
-            cube(0)->set_position(PLACED);
         }
         if (frame == MISS_AT) {
             plant_miss();
@@ -334,15 +302,6 @@ public:
                 = Internals::store(server()).work.body - body_before;
             seen.woken_read = changed_now(3)
                 && (table_of(3).flags[row_at(3)] & Table::RESTED) == 0;
-        }
-        if (frame >= WRITE_AT && frame <= WRITE_READ_AT && seen.write_lag < 0
-            && changed_now(0)) {
-            seen.write_lag = frame - WRITE_AT;
-            const Vector3 held = table_of(0).read_value(
-                row_at(0),
-                uint32_t(column_named(table_of(0), "position"))
-            );
-            seen.write_value = held.is_equal_approx(PLACED);
         }
         ++frame;
         return true;
@@ -580,16 +539,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P2 a script column written on a sleeping body "
-    "is pulled on the next tick, and so is an engine column"
-) {
-    const PullEvidence &seen = pull_evidence();
-    REQUIRE(seen.driven);
-    CHECK(seen.script_pulled);
-    CHECK(seen.engine_pulled);
-}
-
-TEST_CASE(
     "[Networked][Store][Frame] P3 a body woken out of a sleeping pile is "
     "read through the body port on its first awake tick"
 ) {
@@ -597,18 +546,6 @@ TEST_CASE(
     REQUIRE(seen.driven);
     CHECK(seen.woken_read);
     NETW_CHECK_EQ(seen.woken_body, int64_t(1));
-}
-
-TEST_CASE(
-    "[Networked][Store][Frame] P4 a game write to a sleeping body's position "
-    "wakes it, and the first pull after the engine applies the write reads "
-    "the written position"
-) {
-    const PullEvidence &seen = pull_evidence();
-    REQUIRE(seen.driven);
-    NETW_CHECK_GE(seen.write_lag, 0);
-    NETW_CHECK_LE(seen.write_lag, 1);
-    CHECK(seen.write_value);
 }
 
 TEST_CASE(

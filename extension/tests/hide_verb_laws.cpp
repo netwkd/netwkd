@@ -10,7 +10,6 @@
 #include "netw/api/prediction.hpp"
 #include "netw/interest/decl.hpp"
 #include "netw/liveness_core.hpp"
-#include "support/netw_call_log.h"
 
 #include <godot_cpp/classes/node2d.hpp>
 
@@ -134,32 +133,6 @@ TEST_CASE(
             int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
         );
     }
-}
-
-TEST_CASE(
-    "[Networked][Liveness] HV3 a hidden node is told it is hidden and "
-    "never that it is ending, and its stage does not move"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-    const int route = a_body_the_client_holds(rig, arena);
-
-    const Ref<NetwEntity> entity = NetwEntity::of(rig.route_node(route, 0));
-    REQUIRE(entity.is_valid());
-    const int64_t stage = entity->get_stage();
-
-    CallLog log;
-    entity->connect(StringName("hidden"), log.callable("hidden"));
-    entity->connect(StringName("despawning"), log.callable("despawning"));
-    entity->connect(StringName("despawned"), log.callable("despawned"));
-
-    entity->_remote_hide();
-
-    NETW_CHECK_EQ(log.count("hidden"), 1);
-    NETW_CHECK_EQ(log.count("despawning"), 0);
-    NETW_CHECK_EQ(log.count("despawned"), 0);
-    NETW_CHECK_EQ(entity->get_stage(), stage);
 }
 
 TEST_CASE(

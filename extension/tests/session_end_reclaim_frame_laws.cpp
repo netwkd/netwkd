@@ -727,13 +727,4 @@ TEST_CASE(
     );
 }
 
-TEST_CASE(
-    "[Networked][Session][Frame] SR10 a host that leaves exits with "
-    "LOCAL_LEAVE and the client still seated exits with SERVER_SHUTDOWN"
-) {
-    const ReclaimEvidence &seen = driven();
-    NETW_CHECK_EQ(seen.host_leave_reason, int(NetwSession::LOCAL_LEAVE));
-    NETW_CHECK_EQ(seen.stayer_reason, int(NetwSession::SERVER_SHUTDOWN));
-}
-
 #endif

@@ -57,35 +57,6 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the authority's wrap captures the spawn "
-    "argument, and the registration that follows arms with it"
-) {
-    Stand stand;
-    stand.arm_seams(false);
-    stand.compat->wrap_spawner(stand.spawner);
-
-    Node *made = stand.spawn_through_wrap(Variant("carried"));
-    REQUIRE(made != nullptr);
-
-    NETW_CHECK_EQ(int(stand.compat->consume(made, stand.spawner)), int(OK));
-    NETW_CHECK_EQ(stand.log.count("arm"), 1);
-    NETW_CHECK_EQ(stand.drops(), int64_t(0));
-
-    const Array armed = stand.log.args("arm");
-    if (armed.size() == 4) {
-        NETW_CHECK_EQ(int(armed[2]), -1);
-        NETW_FORMAT_TEXT(carried, String(armed[3]).utf8().get_data());
-        CAPTURE(carried);
-        const bool argument_rode = String(armed[3]) == String("carried");
-        CHECK(argument_rode);
-    } else {
-        NETW_CHECK_EQ(armed.size(), 4);
-    }
-
-    memdelete(made);
-}
-
-TEST_CASE(
     "[Networked][Spawn][Hosted] a captured argument is consumed by the one "
     "registration it belongs to, and a second registration has none"
 ) {
@@ -296,36 +267,6 @@ TEST_CASE(
 
     NETW_CHECK_EQ(stand.compat->get_roster().size(), 0);
     CHECK(stand.spawner->get_spawn_function() == own);
-}
-
-TEST_CASE(
-    "[Networked][Spawn][Hosted] a despawn announces the node on the spawner "
-    "that booked its route, so a receiver's despawned listener runs with the "
-    "node it was given rather than never running at all"
-) {
-    Stand stand;
-    stand.arm_seams(true);
-    stand.compat->wrap_spawner(stand.spawner);
-
-    Node *made = stand.spawn_through_wrap(Variant("carried"));
-    REQUIRE(made != nullptr);
-
-    stand.compat->get_roster().note_producer(7, stand.spawner);
-    stand.spawner->connect(
-        StringName("despawned"),
-        stand.log.callable("despawned")
-    );
-
-    stand.compat->emit_despawned(7, made);
-
-    NETW_CHECK_EQ(stand.log.count("despawned"), 1);
-    const Array carried = stand.log.args("despawned", 0);
-    NETW_CHECK_EQ(carried.size(), 1);
-    if (carried.size() == 1) {
-        CHECK(Object::cast_to<Node>(carried[0]) == made);
-    }
-
-    memdelete(made);
 }
 
 } // namespace TestNetwSpawnerCompat

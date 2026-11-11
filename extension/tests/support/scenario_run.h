@@ -18,7 +18,6 @@
 
 #include "loopback_rig.h"
 #include "netw_recorder.h"
-#include "scenario_verbs.h"
 #endif
 
 namespace netw_test {
@@ -702,7 +701,6 @@ inline ScenarioRun ScenarioRun::session(
         recorders.push_back(std::make_unique<Recorder>(handle, signals));
     }
 
-    ScenarioVerbs verbs(p_rig, p_scenario);
     for (int tick = 1; tick <= p_scenario.run_ticks; ++tick) {
         Track *tick_tracks = run.tracks.ptrw();
         for (int at = 0; at < run.tracks.size(); ++at) {
@@ -717,7 +715,7 @@ inline ScenarioRun ScenarioRun::session(
             }
         }
         for (const Scenario::Step &step : p_scenario.steps) {
-            if (step.tick != tick || scenario_verbs::run(verbs, step)) {
+            if (step.tick != tick) {
                 continue;
             }
             int track_index = -1;

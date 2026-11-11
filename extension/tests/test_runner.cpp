@@ -133,6 +133,25 @@ std::string first_line(const std::string &p_text) {
     return p_text.substr(0, p_text.find('\n'));
 }
 
+std::vector<std::string> &checks_failed_outside_a_case() {
+    static std::vector<std::string> rows;
+    return rows;
+}
+
+void note_check_outside_a_case(const doctest::AssertData &p_assert) {
+    std::ostringstream row;
+    row << p_assert.m_expr << " at " << p_assert.m_file << ":"
+        << p_assert.m_line;
+    const int count = doctest::IReporter::get_num_active_contexts();
+    const doctest::IContextScope *const *scopes
+        = doctest::IReporter::get_active_contexts();
+    for (int index = 0; index < count; ++index) {
+        row << ", ";
+        scopes[index]->stringify(&row);
+    }
+    checks_failed_outside_a_case().push_back(row.str());
+}
+
 Ref<netw_test::FaultLog> &run_faults() {
     return netw_test::run_fault_log();
 }
@@ -340,9 +359,13 @@ public:
         const netw::store::validation_audit::Ledger &validated
             = netw::store::validation_audit::ledger();
         const int64_t stray = validated.faults - store_faults_in_cases;
+        const std::vector<std::string> &outside
+            = checks_failed_outside_a_case();
         const unsigned int reported = stats.numTestCasesPassingFilters
-            + (diverged ? 1u : 0u) + (stray > 0 ? 1u : 0u);
-        failures += (diverged ? 1 : 0) + (stray > 0 ? 1 : 0);
+            + (diverged ? 1u : 0u) + (stray > 0 ? 1u : 0u)
+            + (outside.empty() ? 0u : 1u);
+        failures += (diverged ? 1 : 0) + (stray > 0 ? 1 : 0)
+            + (outside.empty() ? 0 : 1);
         RunSummary &summary = run_summary();
         summary.cases = int64_t(reported);
         summary.failed = int64_t(failures + errors);
@@ -355,6 +378,11 @@ public:
         if (stray > 0) {
             summary.failing.push_back(
                 {"SV0 store validation", validated.first.c_str()}
+            );
+        }
+        if (!outside.empty()) {
+            summary.failing.push_back(
+                {"FS0 frame scenario checks", outside.front()}
             );
         }
         for (const Case &test_case : cases) {
@@ -409,6 +437,18 @@ public:
                 "checks. first %s</failure></testcase>\n",
                 (long long)stray,
                 (long long)validated.checks,
+                first.c_str()
+            );
+        }
+        if (!outside.empty()) {
+            const std::string first = escape_xml(outside.front().c_str());
+            std::fprintf(
+                output,
+                "    <testcase classname=\"frame_drive.h\" name=\"FS0 every "
+                "check a frame scenario makes while it runs holds\" "
+                "time=\"0.0\"><failure>%lld checks failed outside any case. "
+                "first %s</failure></testcase>\n",
+                (long long)outside.size(),
                 first.c_str()
             );
         }
@@ -806,6 +846,9 @@ Dictionary NetwNativeTests::run(
 }
 
 bool NetwNativeTests::frame_advance() {
+    static doctest::Context outside_a_case;
+    outside_a_case.setAsDefaultForAssertsOutOfTestCases();
+    outside_a_case.setAssertHandler(&note_check_outside_a_case);
     open_run_faults();
     netw_test::smooth_when_headless(true);
     return netw_test::frame_drive_advance();

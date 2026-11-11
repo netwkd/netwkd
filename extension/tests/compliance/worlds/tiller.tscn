@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="tiller"]
+script/source = "extends Node3D
+
+
+func hand_helm_to(username: String) -> void:
+	for player: NetwPlayer in Netw.session(self).players:
+		if player.username == username:
+			$Helm/HelmSync.set_multiplayer_authority(player.peer_id)
+"
+
+[sub_resource type="GDScript" id="helm"]
+script/source = "extends Node3D
+
+var turns := 0
+
+
+func turn() -> void:
+	turns += 1
+"
+
+[sub_resource type="SceneReplicationConfig" id="helm_sync"]
+properties/0/path = NodePath(".:turns")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="Level" type="Node3D"]
+script = SubResource("tiller")
+
+[node name="Helm" type="Node3D" parent="."]
+script = SubResource("helm")
+
+[node name="HelmSync" type="MultiplayerSynchronizer" parent="Helm"]
+replication_config = SubResource("helm_sync")

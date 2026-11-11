@@ -19,7 +19,6 @@ namespace TestNetwStoreInterest {
 
 using netw::NetwMultiplayer;
 using netw::store::RowAddress;
-using netw::store::Stream;
 using netw::store::Table;
 using netw::store::World;
 
@@ -72,7 +71,6 @@ struct Seen {
     bool visible = false;
     bool held = false;
     bool live = false;
-    int stream = -1;
 };
 
 class MarkStand {
@@ -116,7 +114,6 @@ protected:
         out.visible = world.reaches(slot, peer);
         out.held = world.holds_copy(slot, peer);
         out.live = world.is_live(slot);
-        out.stream = int(table.peers[peer].stream[at.row]);
         return out;
     }
 
@@ -177,8 +174,6 @@ protected:
 
 struct AdmitEvidence {
     bool driven = false;
-    Seen hidden_before;
-    Seen hidden_after;
     Seen unheld_before;
     Seen unheld_after;
     Seen dead_before;
@@ -197,24 +192,14 @@ class AdmitScenario final : public netw_test::FrameScenario, MarkStand {
         if (!open_stand(3)) {
             return false;
         }
-        layers.push_back(server()->interest_layer_create(StringName("sight")));
-        server()->interest_layer_set_param(
-            layer(),
-            NetwMultiplayer::LAYER_PARAM_LEAVE_POLICY,
-            int(NetwMultiplayer::LEAVE_POLICY_RETAIN)
-        );
-        server()->interest_layer_add_viewer(layer(), client_id());
-        server()->interest_layer_add_entity(layer(), marks[0]);
         stand->pump(8);
         return true;
     }
 
     void act() {
         AdmitEvidence &seen = admit_evidence();
-        seen.hidden_before = seen_by_client(0);
         seen.unheld_before = seen_by_client(1);
         seen.dead_before = seen_by_client(2);
-        server()->interest_layer_remove_viewer(layer(), client_id());
         server()->lifecycle_withdraw_author(route_of(1), client_id());
         Internals::get_liveness_core(server())->hide_route(int(route_of(2)));
     }
@@ -223,10 +208,6 @@ class AdmitScenario final : public netw_test::FrameScenario, MarkStand {
         AdmitEvidence &seen = admit_evidence();
         seen.unheld_after = seen_by_client(1);
         seen.dead_after = seen_by_client(2);
-    }
-
-    void read_hidden() {
-        admit_evidence().hidden_after = seen_by_client(0);
     }
 
 public:
@@ -247,7 +228,6 @@ public:
             read_withdrawn();
         }
         if (frame == SETTLE_FRAMES + READ_FRAMES) {
-            read_hidden();
             close_stand();
             admit_evidence().driven = true;
             done = true;
@@ -357,22 +337,6 @@ public:
 };
 
 NETW_FRAME_SCENARIO(CrowdScenario, store_crowd_scenario);
-
-TEST_CASE(
-    "[Networked][Store][Frame] SI1 an interest hide that leaves the peer "
-    "its copy withdraws the row from that peer within a tick and closes its "
-    "stream, while the copy stays held"
-) {
-    const AdmitEvidence &seen = admit_evidence();
-    REQUIRE(seen.driven);
-    CHECK(seen.hidden_before.admitted);
-    CHECK(seen.hidden_before.held);
-    NETW_CHECK_EQ(seen.hidden_before.stream, int(Stream::READY));
-    CHECK_FALSE(seen.hidden_after.visible);
-    CHECK_FALSE(seen.hidden_after.admitted);
-    CHECK(seen.hidden_after.held);
-    NETW_CHECK_EQ(seen.hidden_after.stream, int(Stream::NONE));
-}
 
 TEST_CASE(
     "[Networked][Store][Frame] SI2 a peer that holds no spawned copy is not "

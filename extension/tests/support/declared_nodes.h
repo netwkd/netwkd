@@ -116,26 +116,6 @@ func apply_value(next_value: int) -> void:
 	value = next_value
 )";
 
-constexpr const char *CALLER_RPC_SINK = R"(extends Node
-
-var calls: int = 0
-var last_sender: int = 0
-var last_tag: int = 0
-
-@rpc("any_peer", "call_remote", "reliable")
-func note_call(tag: int) -> void:
-	calls += 1
-	last_tag = tag
-	last_sender = multiplayer.get_remote_sender_id()
-
-@rpc("any_peer", "call_remote", "reliable")
-func double_tag(tag: int) -> int:
-	calls += 1
-	last_tag = tag
-	last_sender = multiplayer.get_remote_sender_id()
-	return tag * 2
-)";
-
 constexpr const char *A_PLAIN_SCRIPT = R"(extends Node
 
 var value: int = 0

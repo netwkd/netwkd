@@ -174,30 +174,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a real action tick survives the bias, "
-    "including tick zero, which the sentinel must not collide with"
-) {
-    Node *owner = memnew(Node);
-    const Ref<netw::NetwEntity> entity = netw::NetwEntity::ensure(owner);
-    REQUIRE(entity.is_valid());
-
-    Record record;
-    record.set_route(1);
-    record.set_node_name(String("Bolt"));
-
-    const int64_t ticks[] = {0, 1, 126, 127, 128, 65535};
-    for (int at = 0; at < 6; at++) {
-        entity->set_action_spawn_tick(ticks[at]);
-        const Dictionary header = round_trip_header(record, entity.ptr());
-        NETW_CHECK_EQ(
-            int64_t(header[StringName("action_spawn_tick")]),
-            ticks[at]
-        );
-    }
-    memdelete(owner);
-}
-
-TEST_CASE(
     "[Networked][Spawn][Hosted] the live entity's controller beats the "
     "record's, because a late joiner must see a mid-session grant"
 ) {

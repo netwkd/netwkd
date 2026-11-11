@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[sub_resource type="GDScript" id="harbor"]
+script/source = "extends Node3D
+
+const BUOY := \"res://extension/tests/compliance/worlds/buoy.tscn\"
+
+
+func launch(paint: String) -> void:
+	var buoy: Node = load(BUOY).instantiate()
+	buoy.name = &\"Buoy\"
+	buoy.paint = paint
+	$Dock.add_child(buoy)
+"
+
+[node name="Level" type="Node3D"]
+script = SubResource("harbor")
+
+[node name="Dock" type="Node3D" parent="."]
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://extension/tests/compliance/worlds/buoy.tscn")
+spawn_path = NodePath("../Dock")

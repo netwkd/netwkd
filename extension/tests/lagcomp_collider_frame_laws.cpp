@@ -296,17 +296,6 @@ NETW_FRAME_SCENARIO(ColliderScenario, collider_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][LagComp][Frame] K-RW1 a ray inside a rewind hits an Area "
-    "hitbox below the entity root at the rewound pose and not the live one"
-) {
-    const ColliderEvidence &evidence = collider_evidence();
-    REQUIRE(evidence.driven);
-    CHECK(evidence.hitbox_at_past);
-    CHECK_FALSE(evidence.hitbox_at_live);
-    CHECK(evidence.hitbox_after);
-}
-
-TEST_CASE(
     "[Networked][LagComp][Frame] K-RW2 a ray inside a rewind sees a kinematic "
     "root at the rewound pose on a build that flushes, and at its live pose "
     "on one that does not"

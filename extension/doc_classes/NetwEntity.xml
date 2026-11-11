@@ -31,6 +31,7 @@
 		func _ready() -&gt; void:
 		    NetwEntity.of(self).despawning.connect(_on_despawning)
 		[/codeblock]
+		A root placed in a scene goes online with no call, and each peer's copy of that scene, a late joiner's too, holds the same entity with the server's values.
 		A node placed in a scene by hand can set its own [member name]. A spawned copy receives it with the spawn.
 		[codeblock]
 		func _init() -&gt; void:
@@ -71,6 +72,7 @@
 				┖╴ERR_TIMEOUT        no decision arrived within one second
 				[/codeblock]
 				Under [constant TRANSFER_IMMEDIATE] this peer runs the node before the decision. A refusal restores the controller's latest values.
+				The server emits [signal control_requested] for one peer's claims in the order that peer made them, whichever entities they name.
 				[codeblock]
 				entity.claim_control(NetwEntity.HOLD_SOFT) \
 				    .then(func(_held: NetwEntity) -&gt; void: pick_up()) \
@@ -84,6 +86,7 @@
 			<param index="0" name="opts" type="NetwDespawnOpts" default="null" />
 			<description>
 				Frees [member root] after emitting [signal despawning] and saving its [member persistence]. Entities under it despawn too, unless their [member on_parent_despawn] is [constant PARENT_DESPAWN_DETACH].
+				Values a client sent before it learned of the despawn are dropped without an error, and never reach an entity spawned later.
 				[codeblock]
 				entity.despawn()
 

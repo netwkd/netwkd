@@ -107,22 +107,6 @@ Nest read_nest(Node *p_arena) {
     return out;
 }
 
-int seat_late(LoopbackRig &p_rig, const PackedInt64Array &p_replay) {
-    const int late = p_rig.add_client();
-    p_rig.register_constructor(
-        p_rig.client(late),
-        StringName("nested_arena"),
-        callable_mp_static(&build_nested_arena),
-        one_type()
-    );
-    p_rig.mount_late(late);
-    for (int at = 0; at < p_replay.size(); ++at) {
-        p_rig.deliver_spawn(late, p_rig.spawn_frame_of(int(p_replay[at])));
-    }
-    p_rig.pump(6);
-    return late;
-}
-
 void check_matches(const Nest &p_host, const Nest &p_seat) {
     const bool ball_is_published = p_host.ball > 0;
     CHECK(ball_is_published);
@@ -132,32 +116,6 @@ void check_matches(const Nest &p_host, const Nest &p_seat) {
     CHECK(ball_agrees);
     const bool spin_agrees = p_seat.spin == p_host.spin;
     CHECK(spin_agrees);
-}
-
-TEST_CASE(
-    "[Networked][Spawn] CN1 a spawned root publishes the identity of every "
-    "entity nested inside it, parent before child, so the receiver reads the "
-    "same nonzero route for a grandchild it never asked for"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    const int arena_route = spawn_arena(rig);
-
-    Node *authored = rig.route_node(arena_route);
-    Node *seat = rig.route_node(arena_route, 0);
-    const bool seat_arrived = seat != nullptr && seat != authored;
-    REQUIRE(seat_arrived);
-
-    const Nest host = read_nest(authored);
-    const Nest mirror = read_nest(seat);
-    check_matches(host, mirror);
-
-    Node *seat_ball = rig.route_node(int(host.ball), 0);
-    const bool ball_is_the_seat_child = seat_ball == descend(seat, BALL);
-    CHECK(ball_is_the_seat_child);
-    const bool spin_under_ball
-        = rig.route_node(int(host.spin), 0) == descend(seat, "ball/spin");
-    CHECK(spin_under_ball);
 }
 
 TEST_CASE(
@@ -223,32 +181,6 @@ TEST_CASE(
     const bool seat_arrived = seat == pre_placed;
     REQUIRE(seat_arrived);
     check_matches(host, read_nest(seat));
-}
-
-TEST_CASE(
-    "[Networked][Spawn] CN4 a peer that joins after the spawn replays the "
-    "nested identities too, so a late seat is not missing the routes an "
-    "early one holds"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    const int arena_route = spawn_arena(rig);
-    const Nest host = read_nest(rig.route_node(arena_route));
-    const bool published = host.ball > 0;
-    REQUIRE(published);
-
-    const PackedInt64Array replay
-        = rig.spawn_plane()->get_spawn_book()->ancestry_order();
-    NETW_CHECK_EQ(replay.find(host.arena) >= 0, true);
-    const bool ball_replays_after_arena
-        = replay.find(host.ball) > replay.find(host.arena);
-    CHECK(ball_replays_after_arena);
-    const bool spin_replays_after_ball
-        = replay.find(host.spin) > replay.find(host.ball);
-    CHECK(spin_replays_after_ball);
-
-    const int late = seat_late(rig, replay);
-    check_matches(host, read_nest(rig.route_node(arena_route, late)));
 }
 
 TEST_CASE(
@@ -321,34 +253,6 @@ TEST_CASE(
     Node *plain = rig.route_node(plain_route);
     const TypedArray<Dictionary> whole = pipeline->collect_spawn_state(plain);
     NETW_CHECK_EQ(whole.size(), 1);
-}
-
-TEST_CASE(
-    "[Networked][Spawn] CN7 a nested entity's own on-spawn column travels "
-    "with its own snapshot, so the receiver reads the value the author set "
-    "and not the default its constructor built"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    const int arena_route = spawn_arena(rig);
-
-    Node *authored = rig.route_node(arena_route);
-    Node2D *ball = Object::cast_to<Node2D>(descend(authored, BALL));
-    REQUIRE(ball != nullptr);
-    ball->set_position(Vector2(12.0, 7.0));
-    rig.pump(4);
-
-    const int late
-        = seat_late(rig, rig.spawn_plane()->get_spawn_book()->ancestry_order());
-
-    Node2D *seat_ball = Object::cast_to<Node2D>(
-        descend(rig.route_node(arena_route, late), BALL)
-    );
-    const bool ball_arrived = seat_ball != nullptr;
-    REQUIRE(ball_arrived);
-    const bool pose_travelled
-        = seat_ball->get_position().distance_to(Vector2(12.0, 7.0)) < 0.01;
-    CHECK(pose_travelled);
 }
 
 struct ForeignParent {
@@ -511,94 +415,10 @@ func _init() -> void:
 	Netw.configure_property(self, &"position").state()
 )";
 
-struct PlacedCrate {
-    const char *label;
-    const char *source;
-    const char *name;
-};
-
-const PlacedCrate PLACED_CRATES[] = {
-    {"no-name", UNNAMED_CRATE, nullptr},
-    {"named-in-init", NAMED_CRATE, "crate"},
-};
-
-struct PlacedEvidence {
-    int64_t ready_stage = -1;
-    int64_t host_route = 0;
-    StringName host_name;
-    int64_t seat_route = 0;
-    StringName seat_name;
-    int64_t late_route = 0;
-    StringName late_name;
-    bool late_visible = true;
-};
-
-Node *place_crate_level(LoopbackRig &p_rig, int p_client, const char *p_src) {
-    Node2D *level = memnew(Node2D);
-    level->set_name("Level");
-    Node *crate = scripted_root(p_src, "Crate");
-    level->add_child(crate);
-    crate->set_owner(level);
-    p_rig.branch(p_client)->add_child(level);
-    return crate;
-}
-
 void read_crate(Node *p_crate, int64_t &r_route, StringName &r_name) {
     const Ref<NetwEntity> entity = NetwEntity::of(p_crate);
     r_route = entity.is_valid() ? entity->get_route() : int64_t(0);
     r_name = entity.is_valid() ? entity->get_name() : StringName();
-}
-
-PlacedEvidence run_placed_crate(const PlacedCrate &p_case) {
-    PlacedEvidence seen;
-    LoopbackRig rig(1);
-    rig.mount();
-    flow_clocks(rig, 30);
-    Node *host = place_crate_level(rig, -1, p_case.source);
-    const Ref<NetwEntity> hosted = NetwEntity::of(host);
-    seen.ready_stage = hosted.is_valid() ? hosted->get_stage() : -1;
-    read_crate(host, seen.host_route, seen.host_name);
-    Node *seat = place_crate_level(rig, 0, p_case.source);
-    rig.step_ticks(12);
-    read_crate(seat, seen.seat_route, seen.seat_name);
-
-    Object::cast_to<CanvasItem>(host)->set_visible(false);
-    rig.step_ticks(4);
-    const int late = rig.add_client();
-    rig.mount_late(late, false);
-    Node *joiner = place_crate_level(rig, late, p_case.source);
-    const PackedInt64Array replay
-        = rig.spawn_plane()->get_spawn_book()->ancestry_order();
-    for (int at = 0; at < replay.size(); ++at) {
-        rig.deliver_spawn(late, rig.spawn_frame_of(int(replay[at])));
-    }
-    rig.step_ticks(8);
-    read_crate(joiner, seen.late_route, seen.late_name);
-    seen.late_visible = Object::cast_to<CanvasItem>(joiner)->is_visible();
-    return seen;
-}
-
-TEST_CASE(
-    "[Networked][Spawn] NA1 to NA5 an entity placed in a level under the "
-    "session root goes online with or without a name and with no verb, and "
-    "every peer, a late one too, reads the server's name and state"
-) {
-    for (const PlacedCrate &placement : PLACED_CRATES) {
-        NETW_FORMAT_TEXT(netw_cell_text, placement.label);
-        CAPTURE(netw_cell_text);
-        const PlacedEvidence seen = run_placed_crate(placement);
-        NETW_CHECK_EQ(seen.ready_stage, int64_t(NetwEntity::STAGE_LIVE));
-        REQUIRE(seen.host_route > 0);
-        const StringName expected = placement.name != nullptr
-            ? StringName(placement.name)
-            : StringName(vformat("Crate@%d", seen.host_route));
-        CHECK(seen.host_name == expected);
-        NETW_CHECK_EQ(seen.seat_route, seen.host_route);
-        CHECK(seen.seat_name == expected);
-        NETW_CHECK_EQ(seen.late_route, seen.host_route);
-        CHECK(seen.late_name == expected);
-        CHECK_FALSE(seen.late_visible);
-    }
 }
 
 struct UnconnectedPair {

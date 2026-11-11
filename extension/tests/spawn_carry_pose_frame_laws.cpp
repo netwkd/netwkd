@@ -307,23 +307,6 @@ NETW_FRAME_SCENARIO(CarryPoseScenario, carry_pose_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Spawn][Frame] a peer applying a reparent frame keeps the "
-    "body's world pose, so it lands under the new parent where it stood "
-    "under the old one, for every body kind"
-) {
-    for (int kind = 0; kind < KIND_COUNT; ++kind) {
-        const PoseEvidence &seen = carry_pose_evidence().kinds[kind];
-        NETW_FORMAT_TEXT(netw_kind_text, KIND_LABELS[kind]);
-        CAPTURE(netw_kind_text);
-        REQUIRE(seen.driven);
-        CHECK(seen.landed);
-        NETW_CHECK_LT(seen.origin_error, POSE_TOLERANCE);
-        NETW_CHECK_LT(seen.basis_error, POSE_TOLERANCE);
-        NETW_CHECK_GE(seen.origin_error, 0.0);
-    }
-}
-
-TEST_CASE(
     "[Networked][Spawn][Frame] a peer applying a reparent frame keeps a "
     "moving body's velocity"
 ) {

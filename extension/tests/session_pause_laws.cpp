@@ -5,11 +5,9 @@
 #include "godot/scene_tree.hpp"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/session.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/wire/registry.hpp"
 #include "support/loopback_rig.h"
-#include "support/netw_call_log.h"
 
 #if defined(NETW_TIER_HOSTED)
 
@@ -17,7 +15,6 @@ namespace TestNetwSessionPauseLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
-using netw_test::CallLog;
 using netw_test::LoopbackRig;
 using netw_test::Internals;
 
@@ -57,71 +54,6 @@ int64_t ticks_over_frames(NetwMultiplayer *p_core, int p_frames) {
         p_core->clock_on_physics_frame();
     }
     return Internals::clock_engine(p_core).get_ticks_run() - before;
-}
-
-TEST_CASE(
-    "[Networked][Session] a player who joins a paused session joins "
-    "paused, and a second pause is not announced again"
-) {
-    const TreeUnpausedAfter restore;
-    LoopbackRig rig(1);
-    rig.pump(4);
-    rig.join(-1, StringName("host"));
-
-    const CallLog seen;
-    rig.client(0)->get_session()->connect(
-        StringName("paused_changed"),
-        seen.callable("early")
-    );
-
-    rig.server()->session_pause(String("menu"));
-    rig.server()->session_pause(String("menu"));
-    rig.pump(4);
-
-    const int late = rig.add_client();
-    rig.client(late)->get_session()->connect(
-        StringName("paused_changed"),
-        seen.callable("late")
-    );
-    rig.pump(8);
-
-    NETW_CHECK_EQ(int(rig.client(late)->session_is_paused()), 1);
-    NETW_CHECK_EQ(seen.count("late"), 1);
-    NETW_CHECK_EQ(seen.count("early"), 1);
-    const Array late_heard = seen.args("late");
-    REQUIRE(late_heard.size() == 2);
-    CHECK(bool(late_heard[0]));
-    CHECK(String(late_heard[1]) == String("menu"));
-}
-
-TEST_CASE(
-    "[Networked][Session] a session that ends while paused unpauses the "
-    "tree it paused"
-) {
-    const TreeUnpausedAfter restore;
-    LoopbackRig rig(1);
-    rig.pump(4);
-    rig.join(-1, StringName("host"));
-
-    const CallLog seen;
-    rig.client(0)->get_session()->connect(
-        StringName("paused_changed"),
-        seen.callable("client")
-    );
-
-    rig.server()->session_pause(String("menu"));
-    rig.pump(4);
-    NETW_CHECK_EQ(int(tree_paused()), 1);
-    NETW_CHECK_EQ(int(rig.client(0)->session_is_paused()), 1);
-
-    rig.close_link();
-    rig.pump(8);
-
-    NETW_CHECK_EQ(int(rig.client(0)->session_is_paused()), 0);
-    NETW_CHECK_EQ(int(rig.server()->session_is_paused()), 0);
-    NETW_CHECK_EQ(seen.count("client"), 2);
-    CHECK_FALSE(bool(seen.args("client", 1)[0]));
-    NETW_CHECK_EQ(int(tree_paused()), 0);
 }
 
 TEST_CASE(
@@ -167,30 +99,6 @@ TEST_CASE(
     NETW_CHECK_EQ(ticks_over_frames(rig.server(), 4), 0);
     rig.server()->session_unpause();
     NETW_CHECK_EQ(int(ticks_over_frames(rig.server(), 4) > 0), 1);
-}
-
-TEST_CASE(
-    "[Networked][Session] a player kicked while the session is paused is "
-    "disconnected without waiting for unpause"
-) {
-    const TreeUnpausedAfter restore;
-    LoopbackRig rig(1);
-    rig.pump(4);
-    Ref<netw::NetwClockConfig> clock;
-    clock.instantiate();
-    NETW_REQUIRE_EQ(rig.server()->clock_initialize(clock), OK);
-    Internals::clock_engine(rig.server()).set_manual_tick(true);
-    rig.join(-1, StringName("host"));
-
-    rig.server()->session_pause(String());
-    rig.pump(4);
-    const Ref<netw::NetwPlayer> alice
-        = rig.server()->peer_get_player(rig.peer_id(0));
-    NETW_REQUIRE_EQ(int(alice.is_valid()), 1);
-    NETW_CHECK_EQ(int(rig.server()->player_kick(alice, String())), int(OK));
-    rig.pump(8);
-
-    NETW_CHECK_EQ(int(rig.client(0)->is_online()), 0);
 }
 
 } // namespace TestNetwSessionPauseLaws

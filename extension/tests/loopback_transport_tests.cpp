@@ -1,9 +1,7 @@
 #include "support/link.h"
 
-#include "support/netw_recorder.h"
+#include "support/netw_cells.h"
 #include "support/netw_test.h"
-
-#include <cstring>
 
 #include "netw/api/loopback.hpp"
 
@@ -13,9 +11,17 @@ using namespace godot;
 using netw::LocalLoopbackSession;
 using netw::LocalMultiplayerPeer;
 using netw::NetwLinkConditions;
-using netw_test::Recorder;
+using netw_test::law_broken;
+using netw_test::law_held;
+using netw_test::LawVerdict;
 
 constexpr double PERIOD_MS = 1000.0 / 60.0;
+
+struct Stand {
+    String label;
+};
+
+typedef netw_test::LawRowFor<Stand> Row;
 
 struct Pair {
     Ref<LocalLoopbackSession> session;
@@ -29,40 +35,8 @@ Pair connected_pair() {
     pair.server = pair.session->get_server_peer();
     pair.client = pair.session->create_client_peer();
     pair.session->poll();
+    pair.client->set_target_peer(1);
     return pair;
-}
-
-Error send(
-    const Ref<LocalMultiplayerPeer> &p_peer,
-    const PackedByteArray &p_bytes
-) {
-#if defined(NETW_TIER_MODULE)
-    return p_peer->put_packet(p_bytes.ptr(), p_bytes.size());
-#else
-    return p_peer->put_packet(p_bytes);
-#endif
-}
-
-PackedByteArray receive(const Ref<LocalMultiplayerPeer> &p_peer) {
-#if defined(NETW_TIER_MODULE)
-    const uint8_t *buffer = nullptr;
-    int size = 0;
-    if (p_peer->get_packet(&buffer, size) != Error::OK) {
-        return PackedByteArray();
-    }
-    PackedByteArray bytes;
-    bytes.resize(size);
-    if (size > 0) {
-        memcpy(bytes.ptrw(), buffer, size);
-    }
-    return bytes;
-#else
-    return p_peer->get_packet();
-#endif
-}
-
-bool is_server(const Ref<LocalMultiplayerPeer> &p_peer) {
-    return p_peer->NETW_PEER_VIRTUAL(is_server)();
 }
 
 PackedByteArray one_byte(int p_value) {
@@ -71,20 +45,18 @@ PackedByteArray one_byte(int p_value) {
     return bytes;
 }
 
-void send_counted(
-    const Pair &p_pair,
-    int p_count,
-    MultiplayerPeer::TransferMode p_mode,
-    bool p_poll_between
-) {
-    p_pair.client->set_target_peer(1);
-    p_pair.client->set_transfer_mode(p_mode);
-    for (int value = 0; value < p_count; ++value) {
-        send(p_pair.client, one_byte(value));
-        if (p_poll_between) {
-            p_pair.session->poll();
-        }
+void send(const Ref<LocalMultiplayerPeer> &p_peer, int p_value) {
+    p_peer->put_packet(one_byte(p_value));
+}
+
+void poll(const Pair &p_pair, int p_count) {
+    for (int at = 0; at < p_count; ++at) {
+        p_pair.session->poll();
     }
+}
+
+int waiting(const Pair &p_pair) {
+    return p_pair.server->get_available_packet_count();
 }
 
 String drain(const Ref<LocalMultiplayerPeer> &p_peer) {
@@ -93,660 +65,245 @@ String drain(const Ref<LocalMultiplayerPeer> &p_peer) {
         if (!text.is_empty()) {
             text += String(",");
         }
-        text += String::num_int64(receive(p_peer)[0]);
+        text += String::num_int64(p_peer->get_packet()[0]);
     }
     return text;
 }
 
-void check_sequence(
+LawVerdict sequence_is(
     const char *p_what,
-    const String &p_actual,
-    const String &p_expected
+    const String &p_read,
+    const char *p_expected
 ) {
-    const CharString actual = p_actual.utf8();
-    const CharString expected = p_expected.utf8();
-    CAPTURE(p_what);
-    CAPTURE(actual.get_data());
-    CAPTURE(expected.get_data());
-    CHECK(bool(p_actual == p_expected));
+    if (p_read == String(p_expected)) {
+        return law_held();
+    }
+    return law_broken(
+        "%s read %s, not %s",
+        p_what,
+        p_read.utf8().get_data(),
+        p_expected
+    );
 }
 
-int survives(
-    const Ref<LocalLoopbackSession> &p_session,
-    const Ref<LocalMultiplayerPeer> &p_server,
-    const Ref<LocalMultiplayerPeer> &p_client
-) {
-    p_client->set_target_peer(1);
-    p_client->set_transfer_mode(MultiplayerPeer::TRANSFER_MODE_UNRELIABLE);
-    send(p_client, one_byte(0));
-    p_session->poll();
-    const int arrived = p_server->get_available_packet_count();
-    drain(p_server);
-    return arrived;
+Ref<NetwLinkConditions> three_periods() {
+    return netw_test::polls(3);
 }
 
-Ref<NetwLinkConditions> jittered(int64_t p_seed) {
-    Ref<NetwLinkConditions> conditions = netw_test::link(p_seed);
-    conditions->set_jitter_ms(4.0 * PERIOD_MS);
-    conditions->set_reorder_chance(1.0);
-    return conditions;
-}
-
-Vector<int> arrival_order(
-    const Ref<NetwLinkConditions> &p_conditions,
-    int p_count
-) {
+LawVerdict delays(const Stand &) {
     Pair pair = connected_pair();
-    pair.session->set_link_conditions(pair.server.ptr(), p_conditions);
-    send_counted(
-        pair,
-        p_count,
-        MultiplayerPeer::TRANSFER_MODE_UNRELIABLE,
-        true
-    );
-    for (int poll = 0; poll < p_count + 10; ++poll) {
-        pair.session->poll();
+    send(pair.client, 1);
+    pair.session->set_link_conditions(pair.server.ptr(), three_periods());
+    send(pair.client, 2);
+
+    if (waiting(pair) != 0) {
+        return law_broken("a packet queued before the link was set arrived");
     }
-
-    Vector<int> arrived;
-    while (pair.server->get_available_packet_count() > 0) {
-        const int value = int(receive(pair.server)[0]);
-        if (!arrived.has(value)) {
-            arrived.push_back(value);
-        }
+    poll(pair, 2);
+    if (waiting(pair) != 0) {
+        return law_broken("a packet arrived two polls into three periods");
     }
-    pair.session->reset();
-    return arrived;
+    poll(pair, 1);
+    return sequence_is("three periods later", drain(pair.server), "1,2");
 }
 
-String as_text(const Vector<int> &p_values) {
-    String text;
-    for (const int value : p_values) {
-        if (!text.is_empty()) {
-            text += String(",");
-        }
-        text += String::num_int64(value);
-    }
-    return text;
-}
-
-Ref<NetwLinkConditions> with_latency(int64_t p_seed, double p_periods) {
-    Ref<NetwLinkConditions> conditions = netw_test::link(p_seed);
-    conditions->set_latency_ms(p_periods * PERIOD_MS);
-    return conditions;
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] A peer knows its side, and a client "
-    "reaches CONNECTED on its first poll"
-) {
-    Ref<LocalMultiplayerPeer> server;
-    server.instantiate();
-    Ref<LocalMultiplayerPeer> client;
-    client.instantiate();
-    server->create_server();
-    client->create_client(42);
-    server->force_connect_peer(42, client.ptr());
-    client->force_connect_peer(1, server.ptr());
-
-    CHECK(is_server(server));
-    CHECK_FALSE(is_server(client));
-    NETW_CHECK_EQ(server->get_unique_id(), 1);
-    NETW_CHECK_EQ(client->get_unique_id(), 42);
-    CHECK(server->is_linked_to(42));
-    NETW_CHECK_EQ(
-        client->get_connection_status(),
-        MultiplayerPeer::CONNECTION_CONNECTING
-    );
-
-    Recorder events(server.ptr(), {"peer_connected"});
-    server->poll();
-    NETW_CHECK_EQ(events.count("peer_connected"), 1);
-    CHECK(bool(events.args("peer_connected")[0] == Variant(42)));
-
-    client->poll();
-    NETW_CHECK_EQ(
-        client->get_connection_status(),
-        MultiplayerPeer::CONNECTION_CONNECTED
-    );
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] A packet reaches the peer it is addressed "
-    "to, and target zero reaches every link"
-) {
-    Ref<LocalMultiplayerPeer> server;
-    server.instantiate();
-    Ref<LocalMultiplayerPeer> first;
-    first.instantiate();
-    Ref<LocalMultiplayerPeer> second;
-    second.instantiate();
-    server->create_server();
-    first->create_client(42);
-    second->create_client(99);
-    server->force_connect_peer(42, first.ptr());
-    server->force_connect_peer(99, second.ptr());
-    first->force_connect_peer(1, server.ptr());
-    second->force_connect_peer(1, server.ptr());
-    first->poll();
-    second->poll();
-
-    const PackedByteArray payload = one_byte(7);
-    first->set_target_peer(1);
-    CHECK_EQ(send(first, payload), Error::OK);
-    NETW_CHECK_EQ(server->get_available_packet_count(), 1);
-    NETW_CHECK_EQ(server->get_packet_peer(), 42);
-    CHECK(bool(receive(server) == payload));
-
-    server->set_target_peer(0);
-    CHECK_EQ(send(server, one_byte(8)), Error::OK);
-    NETW_CHECK_EQ(first->get_available_packet_count(), 1);
-    NETW_CHECK_EQ(second->get_available_packet_count(), 1);
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] A negative target excludes exactly that "
-    "peer"
-) {
-    Ref<LocalMultiplayerPeer> server;
-    server.instantiate();
-    Ref<LocalMultiplayerPeer> first;
-    first.instantiate();
-    Ref<LocalMultiplayerPeer> second;
-    second.instantiate();
-    server->create_server();
-    first->create_client(42);
-    second->create_client(99);
-    server->force_connect_peer(42, first.ptr());
-    server->force_connect_peer(99, second.ptr());
-
-    server->set_target_peer(-42);
-    CHECK_EQ(send(server, one_byte(5)), Error::OK);
-
-    NETW_CHECK_EQ(first->get_available_packet_count(), 0);
-    NETW_CHECK_EQ(second->get_available_packet_count(), 1);
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] A client addressing another client routes "
-    "through the server"
-) {
-    Ref<LocalMultiplayerPeer> server;
-    server.instantiate();
-    Ref<LocalMultiplayerPeer> first;
-    first.instantiate();
-    Ref<LocalMultiplayerPeer> second;
-    second.instantiate();
-    server->create_server();
-    first->create_client(42);
-    second->create_client(99);
-    server->force_connect_peer(42, first.ptr());
-    server->force_connect_peer(99, second.ptr());
-    first->force_connect_peer(1, server.ptr());
-    second->force_connect_peer(1, server.ptr());
-
-    CHECK_FALSE(first->is_linked_to(99));
-    first->set_target_peer(99);
-    CHECK_EQ(send(first, one_byte(3)), Error::OK);
-
-    NETW_CHECK_EQ(second->get_available_packet_count(), 0);
-    NETW_CHECK_EQ(server->get_available_packet_count(), 1);
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Closing a peer disconnects its partner, "
-    "and disconnect_peer unlinks both sides"
-) {
-    Ref<LocalMultiplayerPeer> server;
-    server.instantiate();
-    Ref<LocalMultiplayerPeer> client;
-    client.instantiate();
-    server->create_server();
-    client->create_client(42);
-    server->force_connect_peer(42, client.ptr());
-    client->force_connect_peer(1, server.ptr());
-    client->poll();
-    server->poll();
-
-    Recorder events(server.ptr(), {"peer_disconnected"});
-    client->close();
-    server->poll();
-    NETW_CHECK_EQ(events.count("peer_disconnected"), 1);
-    CHECK(bool(events.args("peer_disconnected")[0] == Variant(42)));
-    CHECK_FALSE(server->is_linked_to(42));
-
-    Ref<LocalMultiplayerPeer> rejoined;
-    rejoined.instantiate();
-    rejoined->create_client(42);
-    server->force_connect_peer(42, rejoined.ptr());
-    rejoined->force_connect_peer(1, server.ptr());
-    rejoined->poll();
-
-    server->disconnect_peer(42);
-
-    CHECK_FALSE(server->is_linked_to(42));
-    CHECK_FALSE(rejoined->is_linked_to(1));
-    NETW_CHECK_EQ(
-        rejoined->get_connection_status(),
-        MultiplayerPeer::CONNECTION_DISCONNECTED
-    );
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] A session hands out one server and "
-    "distinct clients, and reset unlinks all of them"
-) {
-    Ref<LocalLoopbackSession> session;
-    session.instantiate();
-
-    Ref<LocalMultiplayerPeer> server = session->get_server_peer();
-    Ref<LocalMultiplayerPeer> first = session->create_client_peer();
-    Ref<LocalMultiplayerPeer> second = session->create_client_peer();
-
-    CHECK(server.is_valid());
-    CHECK(is_server(server));
-    CHECK(bool(first.ptr() != second.ptr()));
-    CHECK(first->get_unique_id() != second->get_unique_id());
-    CHECK(server->is_linked_to(first->get_unique_id()));
-    CHECK(server->is_linked_to(second->get_unique_id()));
-    NETW_CHECK_EQ(session->get_client_peers().size(), 2);
-
-    session->poll();
-    NETW_CHECK_EQ(
-        first->get_connection_status(),
-        MultiplayerPeer::CONNECTION_CONNECTED
-    );
-    NETW_CHECK_EQ(
-        second->get_connection_status(),
-        MultiplayerPeer::CONNECTION_CONNECTED
-    );
-
-    Recorder events(server.ptr(), {"peer_disconnected"});
-    const int first_id = first->get_unique_id();
-    first->close();
-    session->poll();
-    CHECK_FALSE(server->is_linked_to(first_id));
-    NETW_CHECK_EQ(events.count("peer_disconnected"), 1);
-    CHECK(bool(events.args("peer_disconnected")[0] == Variant(first_id)));
-
-    Ref<LocalMultiplayerPeer> third = session->get_client_peer();
-    session->poll();
-    NETW_CHECK_EQ(
-        third->get_connection_status(),
-        MultiplayerPeer::CONNECTION_CONNECTED
-    );
-    NETW_CHECK_EQ(session->get_client_peers().size(), 2);
-
-    session->set_server_app_id("test-app");
-    session->reset();
-    CHECK_FALSE(session->has_live_server());
-    CHECK(bool(session->get_server_app_id() == StringName()));
-    NETW_CHECK_EQ(session->get_client_peers().size(), 0);
-    CHECK(bool(server->get_loopback_session() == nullptr));
-    CHECK(bool(second->get_loopback_session() == nullptr));
-    CHECK(bool(third->get_loopback_session() == nullptr));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Latency holds a packet for as many polls "
-    "as it is periods long"
-) {
-    Pair pair = connected_pair();
-    pair.session->set_link_conditions(pair.server.ptr(), with_latency(10, 3.0));
-
-    const PackedByteArray payload = one_byte(1);
-    pair.client->set_target_peer(1);
-    CHECK_EQ(send(pair.client, payload), Error::OK);
-
-    pair.session->poll();
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 0);
-    pair.session->poll();
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 0);
-    pair.session->poll();
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 1);
-    CHECK(bool(receive(pair.server) == payload));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Installing conditions captures the "
-    "packets already queued"
-) {
-    Pair pair = connected_pair();
-
-    const PackedByteArray payload = one_byte(9);
-    pair.client->set_target_peer(1);
-    CHECK_EQ(send(pair.client, payload), Error::OK);
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 1);
-
-    pair.session->set_link_conditions(pair.server.ptr(), with_latency(10, 3.0));
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 0);
-
-    for (int poll = 0; poll < 3; ++poll) {
-        pair.session->poll();
-    }
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 1);
-    CHECK(bool(receive(pair.server) == payload));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] A lost reliable packet is retransmitted "
-    "and a lost unreliable one is gone"
-) {
+LawVerdict loses(const Stand &) {
     Pair reliable = connected_pair();
     Ref<NetwLinkConditions> always_lost = netw_test::link(10);
     always_lost->set_loss_chance(1.0);
     always_lost->set_latency_ms(10.0);
     reliable.session->set_link_conditions(reliable.server.ptr(), always_lost);
-
-    const PackedByteArray payload = one_byte(4);
-    reliable.client->set_target_peer(1);
-    CHECK_EQ(send(reliable.client, payload), Error::OK);
-    reliable.session->poll();
-    NETW_CHECK_EQ(reliable.server->get_available_packet_count(), 0);
-    reliable.session->poll();
-    NETW_CHECK_EQ(reliable.server->get_available_packet_count(), 0);
-    reliable.session->poll();
-    NETW_CHECK_EQ(reliable.server->get_available_packet_count(), 1);
-    CHECK(bool(receive(reliable.server) == payload));
+    send(reliable.client, 4);
+    poll(reliable, 3);
+    const LawVerdict resent
+        = sequence_is("a lost reliable packet", drain(reliable.server), "4");
+    if (!resent.held) {
+        return resent;
+    }
 
     Pair unreliable = connected_pair();
     Ref<NetwLinkConditions> dropped = netw_test::link(10);
     dropped->set_loss_chance(1.0);
     unreliable.session->set_link_conditions(unreliable.server.ptr(), dropped);
-    send_counted(
-        unreliable,
-        1,
-        MultiplayerPeer::TRANSFER_MODE_UNRELIABLE,
-        true
+    unreliable.client->set_transfer_mode(
+        MultiplayerPeer::TRANSFER_MODE_UNRELIABLE
     );
-    NETW_CHECK_EQ(unreliable.server->get_available_packet_count(), 0);
+    send(unreliable.client, 5);
+    poll(unreliable, 4);
+    return sequence_is(
+        "a lost unreliable packet",
+        drain(unreliable.server),
+        ""
+    );
 }
 
-TEST_CASE(
-    "[Networked][Transport][Hosted] Reliable delivery keeps per-channel order "
-    "under jitter"
-) {
+LawVerdict keeps_reliable_order(const Stand &) {
     Pair pair = connected_pair();
     Ref<NetwLinkConditions> shuffling = netw_test::link(123);
     shuffling->set_jitter_ms(6.0 * PERIOD_MS);
     shuffling->set_reorder_chance(1.0);
     pair.session->set_link_conditions(pair.server.ptr(), shuffling);
-
-    send_counted(pair, 12, MultiplayerPeer::TRANSFER_MODE_RELIABLE, true);
-    for (int poll = 0; poll < 12; ++poll) {
-        pair.session->poll();
+    for (int value = 0; value < 12; ++value) {
+        send(pair.client, value);
+        poll(pair, 1);
     }
-    check_sequence(
-        "reliable order",
+    poll(pair, 12);
+    return sequence_is(
+        "reliable packets under jitter",
         drain(pair.server),
-        String("0,1,2,3,4,5,6,7,8,9,10,11")
+        "0,1,2,3,4,5,6,7,8,9,10,11"
     );
 }
 
-TEST_CASE(
-    "[Networked][Transport][Hosted] Duplication delivers the same packet "
-    "twice, one period apart"
-) {
+String late_packet(MultiplayerPeer::TransferMode p_mode) {
+    Pair pair = connected_pair();
+    pair.session->set_link_conditions(pair.server.ptr(), netw_test::polls(4));
+    pair.client->set_transfer_mode(p_mode);
+    pair.client->set_transfer_channel(2);
+    send(pair.client, 0);
+    pair.client->set_transfer_channel(3);
+    send(pair.client, 2);
+    const Ref<LocalMultiplayerPeer> other = pair.session->create_client_peer();
+    other->set_target_peer(1);
+    other->set_transfer_mode(p_mode);
+    other->set_transfer_channel(2);
+    send(other, 3);
+    pair.session->set_link_conditions(pair.server.ptr(), netw_test::link());
+    pair.client->set_transfer_channel(2);
+    send(pair.client, 1);
+    poll(pair, 5);
+    return drain(pair.server);
+}
+
+LawVerdict orders_unreliable(const Stand &) {
+    const LawVerdict plain = sequence_is(
+        "unreliable",
+        late_packet(MultiplayerPeer::TRANSFER_MODE_UNRELIABLE),
+        "1,0,2,3"
+    );
+    if (!plain.held) {
+        return plain;
+    }
+    return sequence_is(
+        "ordered unreliable",
+        late_packet(MultiplayerPeer::TRANSFER_MODE_UNRELIABLE_ORDERED),
+        "1,2,3"
+    );
+}
+
+LawVerdict duplicates(const Stand &) {
     Pair pair = connected_pair();
     Ref<NetwLinkConditions> doubling = netw_test::link(10);
     doubling->set_duplicate_chance(1.0);
     pair.session->set_link_conditions(pair.server.ptr(), doubling);
-
-    pair.client->set_target_peer(1);
     pair.client->set_transfer_mode(MultiplayerPeer::TRANSFER_MODE_UNRELIABLE);
-    CHECK_EQ(send(pair.client, one_byte(7)), Error::OK);
-
-    pair.session->poll();
-    pair.session->poll();
-    check_sequence("duplicated", drain(pair.server), String("7,7"));
+    send(pair.client, 7);
+    poll(pair, 2);
+    return sequence_is("a duplicated packet", drain(pair.server), "7,7");
 }
 
-TEST_CASE(
-    "[Networked][Transport][Hosted] Throttling holds every packet until the "
-    "window closes"
-) {
-    Pair pair = connected_pair();
-    Ref<NetwLinkConditions> stalling = netw_test::link(10);
-    stalling->set_stall_chance(1.0);
-    stalling->set_stall_ms(4.0 * PERIOD_MS);
-    pair.session->set_link_conditions(pair.server.ptr(), stalling);
-
-    pair.client->set_target_peer(1);
-    pair.client->set_transfer_mode(MultiplayerPeer::TRANSFER_MODE_UNRELIABLE);
-    for (int value = 0; value < 3; ++value) {
-        CHECK_EQ(send(pair.client, one_byte(value)), Error::OK);
-        pair.session->poll();
-        NETW_CHECK_EQ(pair.server->get_available_packet_count(), 0);
-    }
-
-    pair.session->poll();
-    check_sequence("throttled", drain(pair.server), String("0,1,2"));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Conditions installed for one sender leave "
-    "another sender alone"
-) {
-    Ref<LocalLoopbackSession> session;
-    session.instantiate();
-    Ref<LocalMultiplayerPeer> server = session->get_server_peer();
-    Ref<LocalMultiplayerPeer> delayed = session->create_client_peer();
-    Ref<LocalMultiplayerPeer> immediate = session->create_client_peer();
-    session->poll();
-
-    session->set_link_conditions(
-        server.ptr(),
-        with_latency(10, 3.0),
-        delayed->get_unique_id()
-    );
-
-    delayed->set_target_peer(1);
-    immediate->set_target_peer(1);
-    CHECK_EQ(send(delayed, one_byte(1)), Error::OK);
-    CHECK_EQ(send(immediate, one_byte(2)), Error::OK);
-
-    session->poll();
-    check_sequence("unconditioned sender", drain(server), String("2"));
-    session->poll();
-    NETW_CHECK_EQ(server->get_available_packet_count(), 0);
-    session->poll();
-    check_sequence("delayed sender", drain(server), String("1"));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] purge_packets_from drops one sender's "
-    "in-flight packets"
-) {
-    Ref<LocalLoopbackSession> session;
-    session.instantiate();
-    Ref<LocalMultiplayerPeer> server = session->get_server_peer();
-    Ref<LocalMultiplayerPeer> first = session->create_client_peer();
-    Ref<LocalMultiplayerPeer> second = session->create_client_peer();
-    session->poll();
-    session->set_link_conditions(server.ptr(), with_latency(10, 3.0));
-
-    first->set_target_peer(1);
-    second->set_target_peer(1);
-    CHECK_EQ(send(first, one_byte(1)), Error::OK);
-    CHECK_EQ(send(second, one_byte(2)), Error::OK);
-    NETW_CHECK_EQ(session->in_flight_count(server.ptr()), 2);
-
-    session->purge_packets_from(first->get_unique_id());
-    NETW_CHECK_EQ(session->in_flight_count(server.ptr()), 1);
-
-    for (int poll = 0; poll < 3; ++poll) {
-        session->poll();
-    }
-    check_sequence("surviving sender", drain(server), String("2"));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Held packets release ahead of the packets "
-    "that arrived after them"
-) {
-    Pair pair = connected_pair();
-    pair.session->hold_inbound_packets(pair.server.ptr());
-    CHECK(pair.session->is_holding_inbound(pair.server.ptr()));
-
-    pair.client->set_target_peer(1);
-    CHECK_EQ(send(pair.client, one_byte(1)), Error::OK);
-    pair.session->poll();
-    CHECK_EQ(send(pair.client, one_byte(2)), Error::OK);
-    NETW_CHECK_EQ(pair.server->get_available_packet_count(), 0);
-
-    pair.session->release_inbound_packets(pair.server.ptr());
-    CHECK_FALSE(pair.session->is_holding_inbound(pair.server.ptr()));
-    check_sequence("held then queued", drain(pair.server), String("1,2"));
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Re-installing conditions resets only that "
-    "sender's random streams"
-) {
-    Ref<NetwLinkConditions> half_lost = netw_test::link(21);
-    half_lost->set_loss_chance(0.5);
-
-    Pair reference = connected_pair();
-    reference.session->set_link_conditions(reference.server.ptr(), half_lost);
-    const int first_draw
-        = survives(reference.session, reference.server, reference.client);
-    const int second_draw
-        = survives(reference.session, reference.server, reference.client);
-
-    REQUIRE(first_draw != second_draw);
-
-    Ref<LocalLoopbackSession> session;
-    session.instantiate();
-    Ref<LocalMultiplayerPeer> server = session->get_server_peer();
-    Ref<LocalMultiplayerPeer> reset_sender = session->create_client_peer();
-    Ref<LocalMultiplayerPeer> untouched = session->create_client_peer();
-    session->poll();
-    session->set_link_conditions(
-        server.ptr(),
-        half_lost,
-        reset_sender->get_unique_id()
-    );
-    session->set_link_conditions(
-        server.ptr(),
-        half_lost,
-        untouched->get_unique_id()
-    );
-
-    NETW_CHECK_EQ(survives(session, server, reset_sender), first_draw);
-    NETW_CHECK_EQ(survives(session, server, untouched), first_draw);
-
-    session->set_link_conditions(
-        server.ptr(),
-        half_lost,
-        reset_sender->get_unique_id()
-    );
-
-    NETW_CHECK_EQ(survives(session, server, reset_sender), first_draw);
-    NETW_CHECK_EQ(survives(session, server, untouched), second_draw);
-}
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Duplication is rolled on a stream of its "
-    "own, so switching it on repeats arrivals without moving them"
-) {
-    constexpr int COUNT = 12;
-    constexpr int64_t SEED = 2026;
-
-    const Vector<int> jitter_alone = arrival_order(jittered(SEED), COUNT);
-    REQUIRE(jitter_alone.size() == COUNT);
-
-    Ref<NetwLinkConditions> duplicating = jittered(SEED);
-    duplicating->set_duplicate_chance(0.5);
-
-    const String produced = as_text(arrival_order(duplicating, COUNT));
-    const String expected = as_text(jitter_alone);
-    NETW_FORMAT_TEXT(duplicated, produced.utf8().get_data());
-    NETW_FORMAT_TEXT(undisturbed, expected.utf8().get_data());
-    CAPTURE(duplicated);
-    CAPTURE(undisturbed);
-    CHECK(bool(produced == expected));
-}
-
-} // namespace TestNetwLoopbackTransport
-
-namespace TestNetwLoopbackTransport {
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Ordered unreliable discards a late "
-    "packet only on the sender and channel that already delivered newer"
-) {
-    for (const auto mode :
-         {MultiplayerPeer::TRANSFER_MODE_UNRELIABLE,
-          MultiplayerPeer::TRANSFER_MODE_UNRELIABLE_ORDERED}) {
-        Pair pair = connected_pair();
-        Ref<NetwLinkConditions> delayed = netw_test::polls(4);
-        pair.session->set_link_conditions(pair.server.ptr(), delayed);
-        pair.client->set_target_peer(1);
-        pair.client->set_transfer_mode(mode);
-        pair.client->set_transfer_channel(2);
-        CHECK_EQ(send(pair.client, one_byte(0)), Error::OK);
-        pair.client->set_transfer_channel(3);
-        CHECK_EQ(send(pair.client, one_byte(2)), Error::OK);
-        const Ref<LocalMultiplayerPeer> other
-            = pair.session->create_client_peer();
-        other->set_target_peer(1);
-        other->set_transfer_mode(mode);
-        other->set_transfer_channel(2);
-        CHECK_EQ(send(other, one_byte(3)), Error::OK);
-        pair.session->set_link_conditions(pair.server.ptr(), netw_test::link());
-        pair.client->set_transfer_channel(2);
-        CHECK_EQ(send(pair.client, one_byte(1)), Error::OK);
-        for (int poll = 0; poll < 5; ++poll) {
-            pair.session->poll();
-        }
-        const String expected
-            = mode == MultiplayerPeer::TRANSFER_MODE_UNRELIABLE
-            ? String("1,0,2,3")
-            : String("1,2,3");
-        CHECK(bool(drain(pair.server) == expected));
-    }
-}
-
-} // namespace TestNetwLoopbackTransport
-
-namespace TestNetwLoopbackTransport {
-
-TEST_CASE(
-    "[Networked][Transport][Hosted] Stall holds reliable packets and "
-    "unreliable packets until the same window closes"
-) {
+LawVerdict stalls(const Stand &) {
     for (const auto mode :
          {MultiplayerPeer::TRANSFER_MODE_RELIABLE,
           MultiplayerPeer::TRANSFER_MODE_UNRELIABLE}) {
-        for (bool prequeued : {false, true}) {
+        for (const bool queued : {false, true}) {
             Pair pair = connected_pair();
             Ref<NetwLinkConditions> conditions = netw_test::link(17);
-            pair.client->set_target_peer(1);
             pair.client->set_transfer_mode(mode);
-            if (prequeued) {
+            if (queued) {
                 conditions->set_latency_ms(3.0 * PERIOD_MS);
                 pair.session->set_link_conditions(
                     pair.server.ptr(),
                     conditions
                 );
-                CHECK_EQ(send(pair.client, one_byte(0)), Error::OK);
-                pair.session->poll();
+                send(pair.client, 0);
+                poll(pair, 1);
                 conditions->set_latency_ms(0.0);
             }
             conditions->set_stall_chance(1.0);
             conditions->set_stall_ms(4.0 * PERIOD_MS);
             pair.session->set_link_conditions(pair.server.ptr(), conditions);
-            CHECK_EQ(send(pair.client, one_byte(1)), Error::OK);
-            for (int poll = 0; poll < 3; ++poll) {
-                pair.session->poll();
-                NETW_CHECK_EQ(pair.server->get_available_packet_count(), 0);
+            send(pair.client, 1);
+            for (int at = 0; at < 3; ++at) {
+                poll(pair, 1);
+                if (waiting(pair) != 0) {
+                    return law_broken(
+                        "a packet arrived %d polls into a four period stall",
+                        at + 1
+                    );
+                }
             }
-            pair.session->poll();
-            NETW_CHECK_EQ(
-                pair.server->get_available_packet_count(),
-                prequeued ? 2 : 1
+            poll(pair, 1);
+            const LawVerdict released = sequence_is(
+                "the stall's end",
+                drain(pair.server),
+                queued ? "0,1" : "1"
             );
+            if (!released.held) {
+                return released;
+            }
         }
+    }
+    return law_held();
+}
+
+LawVerdict shapes_one_sender(const Stand &) {
+    Pair pair = connected_pair();
+    const Ref<LocalMultiplayerPeer> other = pair.session->create_client_peer();
+    other->set_target_peer(1);
+    pair.session->poll();
+    pair.session->set_link_conditions(
+        pair.server.ptr(),
+        three_periods(),
+        pair.client->get_unique_id()
+    );
+    send(pair.client, 1);
+    send(other, 2);
+
+    poll(pair, 1);
+    const LawVerdict untouched
+        = sequence_is("the other sender", drain(pair.server), "2");
+    if (!untouched.held) {
+        return untouched;
+    }
+    poll(pair, 2);
+    return sequence_is("the delayed sender", drain(pair.server), "1");
+}
+
+const Row ROWS[] = {
+    {"a link with latency, set while a packet waits",
+     "both packets arrive after as many polls as the latency is periods long",
+     &delays},
+    {"a link that loses every packet",
+     "a reliable packet arrives after it is resent, and an unreliable one "
+     "never does",
+     &loses},
+    {"reliable packets on a link that reorders",
+     "they arrive in the order they were sent",
+     &keeps_reliable_order},
+    {"a late packet on an unreliable or an ordered unreliable channel",
+     "unreliable delivers it late, and ordered unreliable drops it only for "
+     "the sender and channel that already delivered newer",
+     &orders_unreliable},
+    {"a link that duplicates every packet",
+     "each packet arrives twice",
+     &duplicates},
+    {"a link that stalls, with and without a packet already on it",
+     "reliable and unreliable packets wait out the same stall, then arrive",
+     &stalls},
+    {"a latency set for one sender",
+     "another sender's packets are not delayed",
+     &shapes_one_sender},
+};
+
+TEST_CASE(
+    "[Networked][Transport] a local link drops, delays and reorders what its "
+    "conditions say"
+) {
+    const Stand stand = {String("a LocalLoopbackSession")};
+    for (const Row &row : ROWS) {
+        NETW_CELL(row, stand);
+        NETW_LAW_HOLDS(row, stand);
     }
 }
 

@@ -12,6 +12,7 @@
 		pred.breach_response = NetwPrediction.BREACH_RESPONSE_DEMOTE
 		[/codeblock]
 		Only an entity with a [method NetwPropertyConfig.state] property is predicted, because that state is what gets compared and restored. Per-property tolerances are set with [NetwPropertyConfig]. The schedule and the simulation mode are on [member NetwEntity.simulation].
+		An entity keeps predicting through [method Netw.reparent], and one taken out of the tree with [method Node.remove_child] and added back later predicts again.
 		Values set on a [MultiplayerSynchronizer] in the scene act as defaults, and values set in code override them.
 		[b]Settings[/b]
 		- [enum Archetype] a preset for the other settings
