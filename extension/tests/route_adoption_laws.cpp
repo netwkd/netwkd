@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -24,7 +25,10 @@ TEST_CASE(
 
     const RID birth = wrapper->get_rid_handle();
     CHECK(birth.is_valid());
-    NETW_CHECK_EQ(int(session->get_liveness_core()->entity_is_valid(birth)), 0);
+    NETW_CHECK_EQ(
+        int(Internals::get_liveness_core(session)->entity_is_valid(birth)),
+        0
+    );
 }
 
 TEST_CASE(
@@ -78,9 +82,9 @@ TEST_CASE(
 
     CHECK(second->get_rid_handle() != held);
     NETW_CHECK_EQ(
-        int(
-            api->get_liveness_core()->entity_is_valid(second->get_rid_handle())
-        ),
+        int(Internals::get_liveness_core(api)->entity_is_valid(
+            second->get_rid_handle()
+        )),
         0
     );
     CHECK(api->entity_from_route(route) == held);

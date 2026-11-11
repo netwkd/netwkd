@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -16,6 +17,7 @@
 #include "netw/store/validate.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwSimContactCostFrameLaws {
 
@@ -195,8 +197,8 @@ class CostScenario final : public netw_test::FrameScenario {
     void open_window() {
         for (int session = 0; session < SESSIONS; ++session) {
             NetwMultiplayer *api = stand->session(session - 1);
-            api->store().validate_every = 0;
-            opened[session] = api->idle_work;
+            Internals::store(api).validate_every = 0;
+            opened[session] = Internals::idle_work(api);
         }
         probe.arm();
     }
@@ -206,7 +208,7 @@ class CostScenario final : public netw_test::FrameScenario {
         CostEvidence &seen = evidence();
         for (int session = 0; session < SESSIONS; ++session) {
             const NetwMultiplayer::IdleWork &now
-                = stand->session(session - 1)->idle_work;
+                = Internals::idle_work(stand->session(session - 1));
             const NetwMultiplayer::IdleWork &was = opened[session];
             SessionEvidence &into = seen.sessions[session];
             into.passes = now.contacts - was.contacts;

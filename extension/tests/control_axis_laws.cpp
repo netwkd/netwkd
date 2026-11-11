@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/loopback_rig.h"
 
@@ -8,10 +9,10 @@
 #include "netw/api/context.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_options.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/promise.hpp"
 #include "netw/entity/control.hpp"
+#include "netw/session/event_plane.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/wire/registry.hpp"
 #include "support/event_ring.h"
@@ -755,7 +756,9 @@ TEST_CASE(
         int64_t(rig.peer_id(0))
     );
 
-    rig.step_ticks(int(rig.client(0)->clock_engine().get_tickrate()) + 1);
+    rig.step_ticks(
+        int(Internals::clock_engine(rig.client(0)).get_tickrate()) + 1
+    );
     CHECK(asked->get_is_failed());
     NETW_CHECK_EQ(int(asked->get_code()), int(ERR_TIMEOUT));
     CHECK_FALSE(issuer->get_is_control_pending());

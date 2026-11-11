@@ -205,7 +205,7 @@ Error NetwScene::unwatch(const Ref<NetwPlayer> &p_player) {
 bool NetwScene::is_watching(const Ref<NetwPlayer> &p_player) const {
     NetwMultiplayer *session = core();
     return session != nullptr && p_player.is_valid()
-        && session->get_scene_core()->is_live(get_rid())
+        && session->scene_is_live(get_rid())
         && session->scene_subscribes(get_rid(), p_player->get_peer_id());
 }
 

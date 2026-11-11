@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/netw_recorder.h"
@@ -12,6 +13,7 @@ using namespace godot;
 using netw::Netw;
 using netw::NetwClock;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> make_session() {
     Ref<NetwMultiplayer> session;
@@ -142,8 +144,8 @@ TEST_CASE(
          StringName("synchronized")}
     );
 
-    const int64_t tick = session->clock_engine().get_tick();
-    session->clock_engine().force_step(1);
+    const int64_t tick = Internals::clock_engine(session).get_tick();
+    Internals::clock_engine(session).force_step(1);
 
     NETW_REQUIRE_EQ(heard.count(StringName("before_tick")), 1);
     NETW_REQUIRE_EQ(heard.count(StringName("ticked")), 1);
@@ -157,7 +159,7 @@ TEST_CASE(
     NETW_CHECK_EQ(heard.count(StringName("synchronized")), 1);
     NETW_CHECK_ORDER(
         double(heard.args(StringName("before_tick"))[0]),
-        session->clock_engine().ticktime(),
+        Internals::clock_engine(session).ticktime(),
         ==
     );
 }
@@ -187,7 +189,7 @@ TEST_CASE(
     Ref<NetwMultiplayer> session = make_session();
     const Ref<NetwClock> door = session->get_clock();
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
-    session->clock_engine().set_configured(true);
+    Internals::clock_engine(session).set_configured(true);
     session->clock_ingest_pong(0.05, 840, 0.0, false);
     REQUIRE(door->get_is_synchronized());
     const int64_t recommended = door->get_recommended_display_offset();

@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -6,8 +7,8 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/quantize.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/repl/property_set.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 namespace TestSyncPipeline {
 
@@ -19,6 +20,7 @@ using netw::SyncPipeline;
 using netw::repl::PropertyColumn;
 using netw::repl::PropertySet;
 using netw::repl::SetBook;
+using netw_test::Internals;
 
 uint64_t one_column(
     SetBook &r_sets,
@@ -52,7 +54,7 @@ struct Stand {
     }
 
     uint64_t sealed(const char *p_key, int64_t p_record) {
-        SetBook &sets = core->property_set_book();
+        SetBook &sets = Internals::property_set_book(core);
         const uint64_t declared = one_column(sets, p_key, p_record);
         sets.get(declared)->sealed = true;
         return declared;
@@ -71,7 +73,7 @@ TEST_CASE(
     Node *node = memnew(Node);
 
     const uint64_t unsealed = one_column(
-        stand.core->property_set_book(),
+        Internals::property_set_book(stand.core),
         "position",
         PropertySet::RECORD_STATE
     );

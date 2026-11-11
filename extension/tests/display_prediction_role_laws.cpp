@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/minted_script.h"
@@ -25,6 +26,7 @@ using netw::NetwMultiplayer;
 using netw::NetwPrediction;
 using netw::sim::Mode;
 using netw_test::FlowPair;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -148,7 +150,7 @@ public:
         const RID rid = on_client->get_rid_handle();
 
         if (declared.replicas_active) {
-            client->sim_row(rid).declaration.replicas
+            Internals::sim_row(client, rid).declaration.replicas
                 = netw::sim::Replicas::ACTIVE;
         }
         if (!plant_is(PLANT_NOBODY_REGISTERED_THE_ENGINE)) {

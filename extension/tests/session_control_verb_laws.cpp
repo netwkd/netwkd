@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/clock_config.hpp"
@@ -13,11 +14,12 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwPlayer;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> authority() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->clock_engine().set_configured(true);
+    Internals::clock_engine(core).set_configured(true);
     core->session_set_role(NetwMultiplayer::ROLE_LISTEN_SERVER);
     return core;
 }
@@ -129,7 +131,7 @@ TEST_CASE(
     config.instantiate();
     config->set("tickrate", 60);
     NETW_REQUIRE_EQ(int(core->clock_initialize(config)), int(OK));
-    core->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(core).set_manual_tick(true);
     core->session_set_role(NetwMultiplayer::ROLE_CLIENT);
     core->clock_set_mismatch_action(NetwMultiplayer::MISMATCH_ACTION_SIGNAL);
     const CallLog seen;

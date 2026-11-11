@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/class_db.hpp"
@@ -28,6 +29,7 @@ namespace TestNetwSessionJoinLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 using netw_test::CallLog;
 using netw_test::EntityDecl;
 using netw_test::LoopbackRig;
@@ -657,9 +659,12 @@ TEST_CASE(
             = netw::Netw::prepare_join(seat, StringName("ana"), Array());
         REQUIRE(asked.is_valid());
         NETW_CHECK_EQ(int(asked->get_result()), int(OK));
-        REQUIRE(api->session_prepared_join().has_value());
-        CHECK(api->session_prepared_join()->username == StringName("ana"));
-        CHECK_FALSE(api->session_take_submitted_join_under_test().has_value());
+        REQUIRE(Internals::session_prepared_join(api).has_value());
+        CHECK(
+            Internals::session_prepared_join(api)->username
+            == StringName("ana")
+        );
+        CHECK_FALSE(Internals::take_submitted_join(api).has_value());
     }
 
     SUBCASE("an online session refuses the join and sends nothing") {
@@ -669,8 +674,8 @@ TEST_CASE(
             = netw::Netw::prepare_join(seat, StringName("ana"), Array());
         REQUIRE(asked.is_valid());
         NETW_CHECK_EQ(int(asked->get_result()), int(ERR_ALREADY_IN_USE));
-        CHECK_FALSE(api->session_take_submitted_join_under_test().has_value());
-        CHECK_FALSE(api->session_prepared_join().has_value());
+        CHECK_FALSE(Internals::take_submitted_join(api).has_value());
+        CHECK_FALSE(Internals::session_prepared_join(api).has_value());
     }
 
     SUBCASE("an empty username prepares nothing") {
@@ -681,8 +686,8 @@ TEST_CASE(
                     ->get_result()),
             int(ERR_INVALID_PARAMETER)
         );
-        CHECK_FALSE(api->session_take_submitted_join_under_test().has_value());
-        CHECK_FALSE(api->session_prepared_join().has_value());
+        CHECK_FALSE(Internals::take_submitted_join(api).has_value());
+        CHECK_FALSE(Internals::session_prepared_join(api).has_value());
     }
 
     api->embed_dispose();

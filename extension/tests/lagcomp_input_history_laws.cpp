@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -81,7 +82,7 @@ TEST_CASE(
     NetwMultiplayer *owner_session = rig.client(0);
     const int64_t owner_slot = owner_session->native_prediction_slot(owned);
     netw::NetwPredictionEngine *owner_pool
-        = owner_session->get_prediction_engine();
+        = Internals::get_prediction_engine(owner_session);
     const netw::predict::TransitionBook *owner_book
         = owner_pool->predicted_book(owner_slot);
     REQUIRE(owner_book != nullptr);
@@ -97,7 +98,7 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    NetwLagCompCore *history = server->get_lagcomp_core();
+    NetwLagCompCore *history = Internals::get_lagcomp_core(server);
     REQUIRE(history != nullptr);
     const Ref<godot::RefCounted> seated
         = server->entity_get_view(rig.entity_of(StringName("P")));

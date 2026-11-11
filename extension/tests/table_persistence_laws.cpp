@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -17,6 +18,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw::persist::MemoryConnection;
+using netw_test::Internals;
 namespace schema_model = netw::schema_model;
 
 const int GAME_ROUTES = 50;
@@ -45,9 +47,9 @@ struct World {
         table = session->table_create(schema);
         session->liveness_claim_routes(GAME_ROUTES);
 
-        database = session->get_databases()->create("saves");
+        database = Internals::get_databases(session)->create("saves");
         connection = MemoryConnection::opened(p_store, "slot1");
-        session->get_databases()
+        Internals::get_databases(session)
             ->open(database, "slot1", NetwPromise::resolved(connection));
     }
 
@@ -88,7 +90,7 @@ struct World {
     }
 
     netw::store::Arrays *core() const {
-        return &session->store_arrays();
+        return &Internals::store_arrays(session);
     }
 };
 
@@ -244,7 +246,8 @@ TEST_CASE(
 ) {
     World world("tp7");
     world.commit(world.table, 10, 2, 100);
-    world.session->session_plane().set_role(netw::SessionCore::ROLE_CLIENT);
+    Internals::session_plane(world.session)
+        .set_role(netw::SessionCore::ROLE_CLIENT);
 
     NETW_CHECK_EQ(int(world.save(ids_of(2))), int(ERR_UNAUTHORIZED));
     const Dictionary refused = world.load();

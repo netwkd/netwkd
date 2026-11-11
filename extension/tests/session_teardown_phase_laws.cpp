@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/netw_test.h"
 
@@ -20,13 +21,14 @@ namespace TestNetwSessionTeardownPhaseLaws {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::SessionCore;
+using netw_test::Internals;
 using netw_test::Recorder;
 
 Ref<NetwMultiplayer> online() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->session_plane().transition(SessionCore::STATE_CONNECTING);
-    core->session_plane().transition(SessionCore::STATE_ONLINE);
+    Internals::session_plane(core).transition(SessionCore::STATE_CONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_ONLINE);
     return core;
 }
 
@@ -62,19 +64,19 @@ TEST_CASE(
     Ref<NetwMultiplayer> failed;
     failed.instantiate();
     const Recorder unlived(failed->get_session().ptr(), {"exiting"});
-    failed->session_plane().transition(SessionCore::STATE_CONNECTING);
-    failed->session_plane().transition(SessionCore::STATE_OFFLINE);
+    Internals::session_plane(failed).transition(SessionCore::STATE_CONNECTING);
+    Internals::session_plane(failed).transition(SessionCore::STATE_OFFLINE);
 
     NETW_CHECK_EQ(unlived.count(StringName("exiting")), 0);
 
     Ref<NetwMultiplayer> core = online();
     const Recorder heard(core->get_session().ptr(), {"exiting", "exited"});
-    core->session_plane().transition(SessionCore::STATE_ONLINE);
+    Internals::session_plane(core).transition(SessionCore::STATE_ONLINE);
 
     NETW_CHECK_EQ(heard.count(StringName("exiting")), 0);
 
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_DISCONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_DISCONNECTING);
 
     NETW_CHECK_EQ(heard.count(StringName("exiting")), 1);
     NETW_CHECK_EQ(heard.count(StringName("exited")), 0);
@@ -163,22 +165,22 @@ TEST_CASE(
     REQUIRE(
         core->liveness_adopt_route(17, entity, entity->get_record(), body) == OK
     );
-    REQUIRE(core->display_runtime_for(17, entity) != nullptr);
+    REQUIRE(Internals::display_runtime_for(core, 17, entity) != nullptr);
     const RID handle = entity->get_rid_handle();
-    auto *pool = core->get_prediction_engine();
+    auto *pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(entity);
     REQUIRE(pool->bind_owner(slot, body));
     auto *prediction = memnew(netw::NetwPredictSlotEngine);
-    prediction->attach(core.ptr(), entity);
+    prediction->attach(core.ptr(), entity, &Internals::books(core));
     core->predict_engine_install(handle, prediction);
     const ObjectID wrapper = netw::gd::instance_id(entity.ptr());
     entity.unref();
     memdelete(body);
 
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_DISCONNECTING);
     core->session_flush_deferred();
 
-    CHECK(core->get_display_book()->runtimes().is_empty());
+    CHECK(Internals::get_display_book(core)->runtimes().is_empty());
     CHECK_FALSE(core->predict_engine_seated(handle));
     NETW_CHECK_EQ(pool->slot_registered(), 0);
     const bool wrapper_freed = netw::gd::object_of(wrapper) == nullptr;
@@ -186,22 +188,22 @@ TEST_CASE(
     if (core->predict_engine_seated(handle)) {
         core->unregister_prediction(prediction->seated_entity());
     }
-    core->get_display_book()->clear();
+    Internals::get_display_book(core)->clear();
 
-    core->session_plane().transition(SessionCore::STATE_OFFLINE);
-    core->session_plane().transition(SessionCore::STATE_CONNECTING);
-    core->session_plane().transition(SessionCore::STATE_ONLINE);
+    Internals::session_plane(core).transition(SessionCore::STATE_OFFLINE);
+    Internals::session_plane(core).transition(SessionCore::STATE_CONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_ONLINE);
     body = memnew(Node2D);
     entity.instantiate();
     entity->set_owner(body);
     REQUIRE(
         core->liveness_adopt_route(17, entity, entity->get_record(), body) == OK
     );
-    auto *runtime = core->display_runtime_for(17, entity);
+    auto *runtime = Internals::display_runtime_for(core, 17, entity);
     REQUIRE(runtime != nullptr);
     CHECK(runtime->entity() == entity);
     core->liveness_clear_session();
-    CHECK(core->get_display_book()->runtimes().is_empty());
+    CHECK(Internals::get_display_book(core)->runtimes().is_empty());
     core->display_clear_runtimes();
     memdelete(body);
 }
@@ -216,11 +218,11 @@ TEST_CASE(
     Ref<netw::NetwEntity> entity;
     entity.instantiate();
     entity->set_owner(body);
-    auto *pool = core->get_prediction_engine();
+    auto *pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(entity);
     REQUIRE(pool->bind_owner(slot, body));
     netw::NetwPredictSlotEngine engine;
-    engine.attach(core.ptr(), entity);
+    engine.attach(core.ptr(), entity, &Internals::books(core));
     REQUIRE(engine.seated_pool() == pool);
     REQUIRE(engine.native_slot() == slot);
 

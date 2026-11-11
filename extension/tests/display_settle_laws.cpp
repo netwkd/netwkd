@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -14,12 +15,12 @@
 #include "netw/api/context.hpp"
 #include "netw/api/display.hpp"
 #include "netw/api/entity.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/tests.hpp"
 #include "netw/display/runtime.hpp"
 #include "netw/script/model.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestNetwDisplaySettleLaws {
 
@@ -31,6 +32,7 @@ using netw::NetwInterpolate;
 using netw::NetwMultiplayer;
 using netw::NetwNativeTests;
 using netw::display::Runtime;
+using netw_test::Internals;
 namespace script_model = netw::script::model;
 using netw_test::law_broken;
 using netw_test::law_held;
@@ -432,12 +434,12 @@ Pumped pump_to_rest(int64_t p_groups) {
     core->event_arm(p_groups);
     netw_test::record_sample(core, subject.body, START, 0);
     netw_test::record_sample(core, subject.body, FINISH, 1);
-    const int64_t opened = core->idle_work.pumped;
+    const int64_t opened = Internals::idle_work(core).pumped;
     for (int tick = 1; tick <= 6; tick++) {
         netw_test::pump_at(core, tick, 1, 0.5);
         seen.visuals.push_back(subject.first->get_global_position());
     }
-    seen.pumps = core->idle_work.pumped - opened;
+    seen.pumps = Internals::idle_work(core).pumped - opened;
     seen.entity = int64_t(subject.entity->get_rid_handle().get_id());
     seen.rows = core->event_drain();
     netw_test::retire_subject(subject);

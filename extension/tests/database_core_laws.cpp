@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/database_result.hpp"
@@ -14,6 +15,7 @@ using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw::SchemaCore;
 using netw::persist::Databases;
+using netw_test::Internals;
 using netw::persist::MemoryConnection;
 using netw::persist::State;
 
@@ -26,7 +28,7 @@ struct World {
 
     World(const String &p_root, int p_version = 1) {
         session.instantiate();
-        plane = session->get_databases();
+        plane = Internals::get_databases(session);
         database = plane->create("saves");
         schema = session->schema_create("players");
         session
@@ -544,7 +546,7 @@ TEST_CASE(
 
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    Databases *plane = session->get_databases();
+    Databases *plane = Internals::get_databases(session);
     const RID database = plane->create("saves");
     const RID schema = session->schema_create("players");
     session->schema_add_column(schema, "gold", NetwMultiplayer::COLUMN_I64, 1);
@@ -580,7 +582,7 @@ TEST_CASE(
 
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    Databases *plane = session->get_databases();
+    Databases *plane = Internals::get_databases(session);
     const RID database = plane->create("saves");
     const RID schema = session->schema_create("players");
     session->schema_add_column(schema, "gold", NetwMultiplayer::COLUMN_I64, 1);

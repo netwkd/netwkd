@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
@@ -18,6 +19,7 @@
 #include "netw/api/simulation.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestPredictJointSettleFrameLaws {
 
@@ -197,7 +199,7 @@ class SettleScenario final : public netw_test::FrameScenario {
     void bump() {
         Node3D *a = Object::cast_to<Node3D>(stand->node_at(SERVER, route_a));
         a->set_position(a->get_position() + Vector3(real_t(BUMP), 0.0, 0.0));
-        bump_tick = stand->session(CLIENT)->clock_engine().get_tick();
+        bump_tick = Internals::clock_engine(stand->session(CLIENT)).get_tick();
     }
 
     void judge() {

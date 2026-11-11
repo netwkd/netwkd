@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -10,6 +11,7 @@ namespace TestNetwSlotBookLaws {
 using namespace godot;
 using netw::repl::PropertySet;
 using netw::repl::SetBook;
+using netw_test::Internals;
 
 TEST_CASE(
     "[Networked][Store][Hosted] a set id read after its set leaves answers "
@@ -46,7 +48,7 @@ TEST_CASE(
 ) {
     Ref<netw::NetwMultiplayer> session;
     session.instantiate();
-    SetBook &sets = session->property_set_book();
+    SetBook &sets = Internals::property_set_book(session);
     const uint64_t held = sets.create();
     REQUIRE(sets.get(held) != nullptr);
 

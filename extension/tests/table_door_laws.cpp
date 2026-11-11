@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/netw_recorder.h"
@@ -13,6 +14,7 @@ using namespace godot;
 using netw::Netw;
 using netw::NetwMultiplayer;
 using netw::NetwTable;
+using netw_test::Internals;
 using netw_test::Recorder;
 
 Ref<NetwMultiplayer> make_session() {
@@ -68,7 +70,7 @@ TEST_CASE(
     NETW_CHECK_EQ(int(door->get_reliable()), 0);
     door->set_reliable(true);
     NETW_CHECK_EQ(int(door->get_reliable()), 1);
-    NETW_CHECK_EQ(int(core->store_arrays().is_reliable(table)), 1);
+    NETW_CHECK_EQ(int(Internals::store_arrays(core).is_reliable(table)), 1);
 }
 
 TEST_CASE(

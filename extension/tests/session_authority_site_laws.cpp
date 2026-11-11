@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/mesh_stand.h"
 #include "support/netw_test.h"
 
@@ -15,6 +16,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwPlayer;
 using netw_test::MeshStand;
+using netw_test::Internals;
 
 struct Placed {
     Ref<netw::NetwEntity> wrapper;
@@ -28,11 +30,11 @@ Placed place(NetwMultiplayer *p_core, Node *p_parent, bool p_declares_scene) {
     made.owner = memnew(Node);
     p_parent->add_child(made.owner);
     made.wrapper.instantiate();
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     made.wrapper->set_rid_handle(made.handle);
     made.record = made.wrapper->get_record();
     made.record->set_declares_scene(p_declares_scene);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         made.handle,
         route,
@@ -45,7 +47,7 @@ Placed place(NetwMultiplayer *p_core, Node *p_parent, bool p_declares_scene) {
         Node *level = memnew(Node);
         level->set_name(StringName("Arena"));
         made.owner->add_child(level);
-        p_core->get_scene_core()
+        Internals::get_scene_core(p_core)
             ->scene_enter(made.handle, StringName("Arena"), false);
     }
     return made;

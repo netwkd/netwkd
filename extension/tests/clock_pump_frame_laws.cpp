@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/class_db.hpp"
@@ -15,6 +16,7 @@
 #include <godot_cpp/classes/scene_multiplayer.hpp>
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace NetwClockPumpFrameLaws {
 
@@ -220,10 +222,10 @@ public:
             }
             case 2: {
                 evidence.client_clock_configured
-                    = client->clock_engine().get_configured();
+                    = Internals::clock_engine(client).get_configured();
                 evidence.client_rooted = client->session_root() != nullptr;
                 evidence.client_manual
-                    = client->clock_engine().get_manual_tick();
+                    = Internals::clock_engine(client).get_manual_tick();
                 if (client->NETW_API_VIRTUAL(get_unique_id)() > 1) {
                     evidence.client_seated = true;
                     enter(3);

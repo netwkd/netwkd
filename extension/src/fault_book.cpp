@@ -198,9 +198,8 @@ void raise(
 ) {
     FaultBook::Admit admit = {true, nullptr};
     if (p_session != nullptr) {
-        admit = p_session->fault_book().admit(
-            {p_code, p_subject, p_values.peer, p_values.name.hash()},
-            p_session->clock_get_tick()
+        admit = p_session->fault_admit(
+            {p_code, p_subject, p_values.peer, p_values.name.hash()}
         );
         if (admit.what == nullptr) {
             return;

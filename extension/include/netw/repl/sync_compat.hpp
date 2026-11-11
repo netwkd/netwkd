@@ -12,10 +12,14 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/interpolate.hpp"
-#include "netw/api/sync_model.hpp"
 #include "netw/held_bytes.hpp"
+#include "netw/repl/sync_model.hpp"
 #include "netw/repl/watch_book.hpp"
 #include "netw/spawn/book.hpp"
+
+namespace netw::session {
+struct Books;
+} // namespace netw::session
 
 namespace netw {
 
@@ -94,6 +98,7 @@ private:
     };
 
     godot::ObjectID core_id;
+    const session::Books *books = nullptr;
     NetwSyncModel *sync_model = nullptr;
     spawn::Book *spawn_book;
     godot::Callable adopt_seam;
@@ -220,7 +225,7 @@ private:
 public:
     ~SyncCompat();
 
-    void set_core(godot::Object *p_core);
+    void set_core(godot::Object *p_core, const session::Books *p_books);
     void set_sync_model(NetwSyncModel *p_model);
     void set_spawn_book(spawn::Book *p_book);
     void set_spawn_seams(

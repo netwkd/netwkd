@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
@@ -14,6 +15,7 @@
 #include "netw/predict/engine.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestLifecycleReplayFrameLaws {
 
@@ -111,7 +113,7 @@ class ReplayScenario final : public netw_test::FrameScenario {
     }
 
     int64_t tick_at(int p_client) const {
-        return stand->session(p_client)->clock_engine().get_tick();
+        return Internals::clock_engine(stand->session(p_client)).get_tick();
     }
 
     bool open() {
@@ -159,7 +161,8 @@ class ReplayScenario final : public netw_test::FrameScenario {
 
     void replay() {
         NetwMultiplayer *author = stand->session(A);
-        netw::NetwPredictionEngine *engine = author->get_prediction_engine();
+        netw::NetwPredictionEngine *engine
+            = Internals::get_prediction_engine(author);
         const int64_t slot = engine->slot_of(NetwEntity::of(avatar_at(A)));
         for (int at = 0; at < DEPTH_COUNT; ++at) {
             replay_evidence().windows[at] = engine->replay_tick_window(

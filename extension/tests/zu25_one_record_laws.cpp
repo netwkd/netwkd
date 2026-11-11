@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/local_vector.hpp"
@@ -10,6 +11,7 @@ namespace TestZu25OneRecordLaws {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 class Wrappers {
     LocalVector<Node *> owners;
@@ -54,7 +56,7 @@ TEST_CASE("[Networked][Liveness][Hosted] both doors keep one record") {
     second_data_route.push_back(data_first_route);
     core->liveness_bind_routes_data(second_data_route);
     const RID data_handle
-        = core->get_liveness_core()->rid_from_route(data_first_route);
+        = Internals::get_liveness_core(core)->rid_from_route(data_first_route);
     REQUIRE(data_handle.is_valid());
 
     const Ref<NetwEntity> arriving = made.make();

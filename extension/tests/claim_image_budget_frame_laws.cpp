@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
@@ -18,6 +19,7 @@
 #include "netw/wire/registry.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwClaimImageBudgetFrameLaws {
 
@@ -142,7 +144,7 @@ class BudgetScenario final : public netw_test::FrameScenario {
     void indebt_claimant() {
         NetwMultiplayer *claimant = stand->session(0);
         netw::ReplicationSend *send
-            = NetwMultiplayer::row_send_of(claimant->get_replication_plane());
+            = Internals::row_send_of(claimant->get_replication_plane());
         if (send != nullptr) {
             send->charge(stand->peer_id(-1), DEBT_BYTES);
         }

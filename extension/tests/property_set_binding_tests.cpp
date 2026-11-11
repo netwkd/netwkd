@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/stream_seat.h"
@@ -32,6 +33,7 @@ using netw::repl::PropertyColumn;
 using netw::repl::PropertySet;
 using netw_test::Books;
 using netw_test::DeclaredSet;
+using netw_test::Internals;
 using netw_test::ReplicationSend;
 
 const int64_t SYNC_ROW = 39;
@@ -436,21 +438,21 @@ Offered offered(
 ) {
     Offered out;
     out.session.instantiate();
-    netw::repl::SetBook &sets = out.session->property_set_book();
+    netw::repl::SetBook &sets = Internals::property_set_book(out.session);
     const uint64_t declared = sets.create();
     PropertySet *set = sets.get(declared);
     fill_set(*set, p_decls);
     set->stamp = p_shape.stamp;
     set->window = p_shape.window;
     set->masked = p_shape.masked;
-    PropertyBinding *p_binding
-        = out.session->property_binding_book().create(declared, p_node);
+    PropertyBinding *p_binding = Internals::property_binding_book(out.session)
+                                     .create(declared, p_node);
     p_binding->route = p_shape.route;
     p_binding->authored_tick = p_shape.authored_tick;
     p_binding->reconcile_ack = p_shape.reconcile_ack;
     p_binding->volatile_external = p_shape.volatile_external;
     out.session->store_admit(p_binding);
-    netw::store::World &world = out.session->store();
+    netw::store::World &world = Internals::store(out.session);
     for (uint32_t at = 0; at < world.table_count(); ++at) {
         netw::store::Table &table = world.table(at);
         for (uint32_t row = 0; row < table.row_count(); ++row) {
@@ -623,22 +625,22 @@ TEST_CASE(
     probe->set_script(holds);
     Ref<netw::NetwMultiplayer> session;
     session.instantiate();
-    netw::repl::SetBook &sets = session->property_set_book();
+    netw::repl::SetBook &sets = Internals::property_set_book(session);
     const uint64_t declared = sets.create();
     fill_set(
         *sets.get(declared),
         one_column(SchemaCore::VARIANT, StringName("replicated_value"))
     );
     session->store_admit(
-        session->property_binding_book().create(declared, probe)
+        Internals::property_binding_book(session).create(declared, probe)
     );
-    REQUIRE(session->store().table_count() == 1);
+    REQUIRE(Internals::store(session).table_count() == 1);
 
-    CHECK(pull_reads_field(session->store(), 1));
+    CHECK(pull_reads_field(Internals::store(session), 1));
 
     probe->set_script(drops);
 
-    CHECK(pull_offers_nothing(session->store(), 2));
+    CHECK(pull_offers_nothing(Internals::store(session), 2));
 
     memdelete(probe);
 }

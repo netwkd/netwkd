@@ -21,6 +21,7 @@
 #include "netw/display/playhead.hpp"
 #include "netw/display/runtime.hpp"
 #include "netw/predict/engine.hpp"
+#include "netw/session/books.hpp"
 #include "netw/store/table.hpp"
 #include "netw/store/world.hpp"
 
@@ -513,7 +514,7 @@ InterpolationView::InterpolationView() {
     held_values.resize(SAMPLE_CAP);
 }
 
-void InterpolationView::sample(NetwMultiplayer &p_session) {
+void InterpolationView::sample(const session::Books &p_books) {
     ++generation;
     sampled.clear();
     held.clear();
@@ -521,7 +522,7 @@ void InterpolationView::sample(NetwMultiplayer &p_session) {
     candidates.clear();
     texted.clear();
     cameras.clear();
-    const ClockEngine &clock = p_session.clock_engine();
+    const ClockEngine &clock = *p_books.clock;
     if (!clock.get_configured()) {
         forget_departed();
         return;
@@ -588,7 +589,7 @@ void InterpolationView::sample(NetwMultiplayer &p_session) {
     }
     keep_nearest_per_world(candidates, ENTITY_CAP);
     for (const Candidate &each : candidates) {
-        read(p_session, each, now);
+        read(p_books, each, now);
     }
     forget_departed();
 }
@@ -626,7 +627,7 @@ bool InterpolationView::resolve_pose(
 void InterpolationView::resolve_heading(
     Seen &r_entry,
     const display::Channel &p_pose,
-    NetwMultiplayer &p_session
+    const session::Books &p_books
 ) {
     if (r_entry.heading_from != HEADING_UNRESOLVED) {
         return;
@@ -642,11 +643,11 @@ void InterpolationView::resolve_heading(
         r_entry.heading_from = HEADING_NONE;
         return;
     }
-    const store::RowAddress at = p_session.store().row_of(owner, lane);
+    const store::RowAddress at = p_books.store->row_of(owner, lane);
     if (!at.valid()) {
         return;
     }
-    const store::Table &table = p_session.store().table(at.table);
+    const store::Table &table = p_books.store->table(at.table);
     if (!table.holds_values(at.row)) {
         return;
     }
@@ -664,7 +665,7 @@ void InterpolationView::resolve_heading(
 }
 
 void InterpolationView::read(
-    NetwMultiplayer &p_session,
+    const session::Books &p_books,
     const Candidate &p_candidate,
     const Now &p_now
 ) {
@@ -703,16 +704,16 @@ void InterpolationView::read(
         sampled.push_back(row);
         return;
     }
-    resolve_heading(entry, pose, p_session);
+    resolve_heading(entry, pose, p_books);
     if (row.pump == display::PUMP_CHASE) {
-        read_forecast(p_session, entry, runtime, frame, row, p_now);
+        read_forecast(p_books, entry, runtime, frame, row, p_now);
         return;
     }
-    read_remote(p_session, entry, runtime, frame, row, p_now);
+    read_remote(p_books, entry, runtime, frame, row, p_now);
 }
 
 void InterpolationView::read_remote(
-    NetwMultiplayer &p_session,
+    const session::Books &p_books,
     Seen &r_entry,
     display::Runtime &p_runtime,
     Node *p_frame,
@@ -738,7 +739,7 @@ void InterpolationView::read_remote(
         ? r_row.finished && playhead_tick >= newest_held
         : every_channel_sleeping(p_runtime);
     hold_marks(
-        p_session,
+        p_books,
         r_entry,
         p_frame,
         count,
@@ -796,7 +797,7 @@ void InterpolationView::read_remote(
 }
 
 void InterpolationView::read_forecast(
-    NetwMultiplayer &p_session,
+    const session::Books &p_books,
     Seen &r_entry,
     display::Runtime &p_runtime,
     Node *p_frame,
@@ -812,8 +813,8 @@ void InterpolationView::read_forecast(
     if (count == 0) {
         return;
     }
-    hold_marks(p_session, r_entry, p_frame, count, INFINITY, r_row);
-    NetwPredictionEngine *engine = p_session.get_prediction_engine();
+    hold_marks(p_books, r_entry, p_frame, count, INFINITY, r_row);
+    NetwPredictionEngine *engine = p_books.prediction;
     const int64_t offset = engine != nullptr
         ? engine->joint_world_offset_of(engine->slot_of(p_runtime.entity()))
         : 0;
@@ -838,7 +839,7 @@ void InterpolationView::read_forecast(
 }
 
 void InterpolationView::hold_marks(
-    NetwMultiplayer &p_session,
+    const session::Books &p_books,
     const Seen &p_entry,
     Node *p_frame,
     uint32_t p_count,
@@ -848,12 +849,12 @@ void InterpolationView::hold_marks(
     const store::Table *heading_table = nullptr;
     uint32_t heading_row = 0;
     if (p_entry.heading_from == HEADING_COLUMN) {
-        const store::RowAddress at = p_session.store().row_of(
+        const store::RowAddress at = p_books.store->row_of(
             p_entry.heading_owner,
             p_entry.heading_lane
         );
         if (at.valid()) {
-            heading_table = &p_session.store().table(at.table);
+            heading_table = &p_books.store->table(at.table);
             heading_row = at.row;
         }
     }

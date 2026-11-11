@@ -9,6 +9,7 @@
 #include "netw/api/prediction.hpp"
 #include "netw/diag/prediction_rings.hpp"
 #include "netw/predict/engine.hpp"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 using namespace godot;
@@ -22,6 +23,7 @@ using netw::diag::MARK_SHOWN;
 using netw::diag::PredictionRings;
 using netw::diag::RingRow;
 using netw_test::EntityDecl;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
@@ -51,7 +53,7 @@ struct Watch {
 
     void poll() {
         session->diag_gather(rings.sources);
-        rings.sample(*session);
+        rings.sample(netw_test::Internals::books(session), *session);
         for (const RingRow &row : rings.rows()) {
             if (row.erred()) {
                 largest_error = MAX(largest_error, row.gap);
@@ -99,7 +101,8 @@ void walking(LoopbackRig &p_rig, const Vector2 &p_motion) {
 
 uint64_t serial_of(LoopbackRig &p_rig, const StringName &p_name) {
     netw::NetwMultiplayer *session = p_rig.client(0);
-    netw::NetwPredictionEngine *pool = session->get_prediction_engine();
+    netw::NetwPredictionEngine *pool
+        = Internals::get_prediction_engine(session);
     const int64_t slot = pool->slot_of(
         netw::NetwEntity::of(p_rig.node_of(p_rig.entity_of(p_name, 0), 0))
     );

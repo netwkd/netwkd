@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -19,6 +20,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw_test::LoopbackRig;
+using netw_test::Internals;
 
 constexpr int TICKRATE = 30;
 constexpr int PER_ROUND = 4;
@@ -165,7 +167,7 @@ public:
         clock.instantiate();
         clock->set_tickrate(TICKRATE);
         NETW_REQUIRE_EQ(rig.client(joined)->clock_initialize(clock), OK);
-        rig.client(joined)->clock_engine().set_manual_tick(true);
+        Internals::clock_engine(rig.client(joined)).set_manual_tick(true);
         rig.mount_late(joined);
         rig.step_ticks(6);
         rig.drop_client(joined);

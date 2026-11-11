@@ -3,6 +3,7 @@
 
 #include "support/fault_log.h"
 #include "support/installable_stepper.h"
+#include "support/internals.h"
 
 #include "support/netw_cells.h"
 #include "support/scenario_run.h"
@@ -91,7 +92,8 @@ Scenario hosted_tick_lane() {
 }
 
 Dictionary stats_of_slot(NetwMultiplayer *p_core, int64_t p_slot) {
-    netw::NetwPredictionEngine *const pool = p_core->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(p_core);
     const TypedArray<NetwEntity> stepped = p_core->predict_stepped_entities();
     for (int at = 0; at < stepped.size(); ++at) {
         const Ref<NetwEntity> wrapper = stepped[at];
@@ -180,7 +182,7 @@ TEST_CASE(
     }
 
     SUBCASE("and the timeline count is the history's own, never a recount") {
-        NetwLagCompCore *history = server->get_lagcomp_core();
+        NetwLagCompCore *history = Internals::get_lagcomp_core(server);
         REQUIRE(history != nullptr);
         REQUIRE(history->timeline_registered() > 0);
         NETW_CHECK_EQ(
@@ -204,7 +206,8 @@ TEST_CASE(
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
 
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -259,7 +262,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -315,7 +319,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -363,7 +368,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -419,7 +425,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
     REQUIRE(stepped.size() == 2);
@@ -480,7 +487,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -525,8 +533,10 @@ TEST_CASE(
     NetwMultiplayer *owner = rig.client(0);
     REQUIRE(server != nullptr);
     REQUIRE(owner != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
-    netw::NetwPredictionEngine *const authored = owner->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
+    netw::NetwPredictionEngine *const authored
+        = Internals::get_prediction_engine(owner);
     REQUIRE(pool != nullptr);
     REQUIRE(authored != nullptr);
 
@@ -622,7 +632,8 @@ TEST_CASE(
 
     NetwMultiplayer *owner = rig.client(0);
     REQUIRE(owner != nullptr);
-    netw::NetwPredictionEngine *const authored = owner->get_prediction_engine();
+    netw::NetwPredictionEngine *const authored
+        = Internals::get_prediction_engine(owner);
     REQUIRE(authored != nullptr);
 
     const TypedArray<NetwEntity> mine = owner->predict_stepped_entities();
@@ -670,7 +681,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -729,7 +741,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -789,7 +802,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -848,7 +862,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -905,7 +920,8 @@ int64_t refused_joint(
     const Ref<NetwEntity> &p_wrapper,
     const FaultWatch &p_watch
 ) {
-    netw::NetwPredictionEngine *const pool = p_core->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(p_core);
     const int64_t slot = pool->slot_of(p_wrapper);
     REQUIRE(slot >= 0);
     const Ref<NetwPrediction> handle = p_wrapper->get_prediction();
@@ -938,7 +954,7 @@ TEST_CASE(
         REQUIRE(server != nullptr);
         REQUIRE(predictor != nullptr);
         netw::NetwPredictionEngine *const pool
-            = predictor->get_prediction_engine();
+            = Internals::get_prediction_engine(predictor);
 
         Ref<NetwEntity> predicted;
         const TypedArray<NetwEntity> held
@@ -993,7 +1009,8 @@ TEST_CASE(
 
     NetwMultiplayer *predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    netw::NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
 
     const Ref<NetwPrediction> handle
         = rig.prediction_handle(StringName("Q"), 0);
@@ -1025,7 +1042,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -1065,7 +1083,8 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    netw::NetwPredictionEngine *const pool = server->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const TypedArray<NetwEntity> stepped = server->predict_stepped_entities();
@@ -1096,7 +1115,8 @@ TEST_CASE(
     for (int client = 0; client < scenario.clients; ++client) {
         NetwMultiplayer *peer = rig.client(client);
         REQUIRE(peer != nullptr);
-        netw::NetwPredictionEngine *const lanes = peer->get_prediction_engine();
+        netw::NetwPredictionEngine *const lanes
+            = Internals::get_prediction_engine(peer);
         REQUIRE(lanes != nullptr);
         const TypedArray<NetwEntity> seated = peer->predict_engine_entities();
         REQUIRE(seated.size() == 1);

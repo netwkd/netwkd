@@ -8,7 +8,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_compat.hpp"
+#include "netw/repl/sync_compat.hpp"
 #include "netw/sync_kernel.hpp"
 
 namespace TestSyncCompat {

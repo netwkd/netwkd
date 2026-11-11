@@ -1,6 +1,7 @@
 #pragma once
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 #include "support/netw_test.h"
 
@@ -30,6 +31,7 @@ using netw::NetwCarrierFrame;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
+using netw_test::Internals;
 
 struct SessionSide {
     godot::Ref<LocalMultiplayerPeer> peer;
@@ -101,7 +103,7 @@ godot::PackedByteArray two_bytes(uint8_t p_first, uint8_t p_second) {
 
 godot::PackedByteArray clock_reply(SessionSide &p_receiver) {
     netw::session::ClockRate rate;
-    rate.tickrate = p_receiver.core->clock_engine().get_tickrate();
+    rate.tickrate = Internals::clock_engine(p_receiver.core).get_tickrate();
     return netw::wire::frame_pack(
         0,
         0,

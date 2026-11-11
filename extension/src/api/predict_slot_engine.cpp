@@ -8,9 +8,7 @@
 #include "godot/math.hpp"
 #include "godot/os.hpp"
 #include "godot/utility.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/predict_runner.hpp"
 #include "netw/api/predict_stats.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/scene.hpp"
@@ -20,9 +18,13 @@
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
+#include "netw/predict/runner.hpp"
 #include "netw/predict/tick_work.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
+#include "netw/session/books.hpp"
+#include "netw/session/event_plane.hpp"
+#include "netw/sim/row.hpp"
 #include "netw/stage.hpp"
 #include "netw/subsystems.hpp"
 
@@ -187,7 +189,9 @@ NetwPredictSlotEngine *NetwPredictSlotEngine::sibling(
     if (seated == nullptr || p_member.is_null()) {
         return nullptr;
     }
-    return seated->predict_engine_for(p_member->get_rid_handle());
+    NetwPredictSlotEngine *const *held
+        = books->slot_engines->getptr(p_member->get_rid_handle().get_id());
+    return held != nullptr ? *held : nullptr;
 }
 
 NetwPredictSlotEngine::Declaration NetwPredictSlotEngine::declaration_of(
@@ -288,7 +292,8 @@ int64_t NetwPredictSlotEngine::route() const {
 
 void NetwPredictSlotEngine::attach(
     Object *p_iface,
-    const Ref<NetwEntity> &p_entity
+    const Ref<NetwEntity> &p_entity,
+    const session::Books *p_books
 ) {
     NETW_ZONE_NC("Predict attach", colors::PREDICTION);
     if (p_iface == nullptr || p_entity.is_null()) {
@@ -310,8 +315,10 @@ void NetwPredictSlotEngine::attach(
         );
         return;
     }
+    NETW_BUG_COND(p_books == nullptr);
     core_id = gd::instance_id(seated);
-    pool = seated->get_prediction_engine();
+    books = p_books;
+    pool = books->prediction;
     seat = pool != nullptr ? pool->slot_of(p_entity) : -1;
     entity = p_entity;
     handle = p_entity->get_prediction();
@@ -1064,7 +1071,7 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
         session->display_mark_role_dirty(entity->get_rid_handle());
         session->sim_announce(entity->get_rid_handle());
         const sim::Row *selection
-            = session->sim_row_of(entity->get_rid_handle());
+            = books->sims->row_of(entity->get_rid_handle());
         pool->follow_relay_subscription(
             slot,
             selection != nullptr && selection->selected_by.count() > 0
@@ -1111,7 +1118,7 @@ int NetwPredictSlotEngine::pool_island() const {
     }
     NetwMultiplayer *session = core_seated();
     const sim::Row *row = session != nullptr && entity.is_valid()
-        ? session->sim_row_of(entity->get_rid_handle())
+        ? books->sims->row_of(entity->get_rid_handle())
         : nullptr;
     const bool chosen = row != nullptr && row->choice.declared(true);
     const bool selected = row != nullptr && row->selected_by.count() > 0
@@ -1125,7 +1132,7 @@ int NetwPredictSlotEngine::pool_island() const {
 sim::Mode NetwPredictSlotEngine::resolved_mode() const {
     NetwMultiplayer *session = core_seated();
     const sim::Row *row = session != nullptr && entity.is_valid()
-        ? session->sim_row_of(entity->get_rid_handle())
+        ? books->sims->row_of(entity->get_rid_handle())
         : nullptr;
     return row != nullptr ? row->mode : sim::Mode::NONE;
 }
@@ -2464,8 +2471,7 @@ void NetwPredictSlotEngine::restore_row(
 
 void NetwPredictSlotEngine::register_with_loop() {
     NetwMultiplayer *seated = core_seated();
-    NetwPredictRunner *runner
-        = seated != nullptr ? seated->predict_runner_seated() : nullptr;
+    NetwPredictRunner *runner = seated != nullptr ? books->runner : nullptr;
     if (runner != nullptr) {
         runner->register_engine(this);
         pool->set_registered(native_slot(), true);
@@ -2476,8 +2482,7 @@ void NetwPredictSlotEngine::register_with_loop() {
 
 void NetwPredictSlotEngine::unregister_from_loop() {
     NetwMultiplayer *seated = core_seated();
-    NetwPredictRunner *runner
-        = seated != nullptr ? seated->predict_runner_seated() : nullptr;
+    NetwPredictRunner *runner = seated != nullptr ? books->runner : nullptr;
     const int64_t slot = native_slot();
     if (runner != nullptr) {
         runner->unregister_engine(this);

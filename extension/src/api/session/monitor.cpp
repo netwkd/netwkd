@@ -5,8 +5,8 @@
 #include <algorithm>
 
 #include "netw/api/predict_stats.hpp"
-#include "netw/api/sync_compat.hpp"
 #include "netw/display/book.hpp"
+#include "netw/repl/sync_compat.hpp"
 
 using namespace godot;
 

@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -403,7 +404,7 @@ TEST_CASE(
     clock.instantiate();
     clock->set_tickrate(TICKRATE);
     NETW_REQUIRE_EQ(stand.rig.client(late)->clock_initialize(clock), OK);
-    stand.rig.client(late)->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(stand.rig.client(late)).set_manual_tick(true);
     stand.rig.register_constructor(
         stand.rig.client(late),
         StringName(HOLDER_ID),

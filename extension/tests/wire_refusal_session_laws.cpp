@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -11,6 +12,7 @@ namespace TestWireRefusalSessionLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 int64_t verdict_count(
@@ -72,7 +74,7 @@ TEST_CASE(
     );
     NETW_CHECK_EQ(
         int64_t(residual[StringName("attributed_out")]),
-        host->attribution_book().get_attributed_out()
+        Internals::attribution_book(host).get_attributed_out()
     );
 
     const int64_t out = int64_t(residual[StringName("datagram_bytes_out")]);
@@ -84,7 +86,7 @@ TEST_CASE(
     );
     const bool dropped_stands_apart
         = int64_t(residual[StringName("staged_dropped_out")])
-        == host->attribution_book().get_staged_dropped_out();
+        == Internals::attribution_book(host).get_staged_dropped_out();
     CHECK(dropped_stands_apart);
 
     NETW_CHECK_EQ(
@@ -94,7 +96,7 @@ TEST_CASE(
     NETW_CHECK_EQ(
         int64_t(residual[StringName("residual_in")]),
         host->get_received_bytes()
-            - host->attribution_book().get_attributed_in()
+            - Internals::attribution_book(host).get_attributed_in()
     );
 }
 
@@ -107,7 +109,7 @@ TEST_CASE(
     rig.step_ticks(4);
 
     NetwMultiplayer *guest = rig.client(0);
-    const int64_t before = guest->attribution_book().get_refused_in();
+    const int64_t before = Internals::attribution_book(guest).get_refused_in();
     const int64_t channel = netw::wire::builtin_channel(StringName("SYNC_ROW"));
     REQUIRE(channel > 0);
 
@@ -121,7 +123,7 @@ TEST_CASE(
     const int64_t gated = verdict_count(snapshot, 1, channel, "gate");
     const bool counted = unrouted + gated >= 1;
     const bool total_moved
-        = guest->attribution_book().get_refused_in() > before;
+        = Internals::attribution_book(guest).get_refused_in() > before;
     CHECK(counted);
     CHECK(total_moved);
 }
@@ -155,7 +157,7 @@ TEST_CASE(
             counted += int64_t(channels[ids[row]]);
         }
     }
-    NETW_CHECK_EQ(counted, guest->attribution_book().get_frames_in());
+    NETW_CHECK_EQ(counted, Internals::attribution_book(guest).get_frames_in());
     const bool heard = counted > 0;
     CHECK(heard);
 }

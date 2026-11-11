@@ -1,5 +1,6 @@
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -14,6 +15,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestPredictIndependentFrameLaws {
 
@@ -158,8 +160,8 @@ class IndependentScenario final : public netw_test::FrameScenario {
     }
 
     void tick_in_physics() {
-        stand->session(SERVER)->clock_engine().force_step(1);
-        stand->session(A)->clock_engine().force_step(1);
+        Internals::clock_engine(stand->session(SERVER)).force_step(1);
+        Internals::clock_engine(stand->session(A)).force_step(1);
         stand->loopback()->advance_time(1000.0 / double(TICKRATE));
         stand->session(SERVER)->poll();
     }

@@ -2,16 +2,18 @@
 
 #include "godot/class_db.hpp"
 #include "godot/multiplayer.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/call_args.hpp"
 #include "netw/entity/control.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/liveness_core.hpp"
 #include "netw/log.hpp"
+#include "netw/session/books.hpp"
+#include "netw/session/event_plane.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/spawn/record.hpp"
 #include "netw/store/array.hpp"
+#include "netw/store/world.hpp"
 #include "netw/wire/frame.hpp"
 
 using namespace godot;
@@ -84,19 +86,21 @@ Object *ReplicationCore::api() const {
     return gd::instance_from_id(api_id);
 }
 
-void ReplicationCore::install(Object *p_api) {
+void ReplicationCore::install(Object *p_api, const session::Books *p_books) {
     api_id = gd::instance_id(p_api);
     if (p_api == nullptr) {
         return;
     }
     NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_api);
+    NETW_BUG_COND(plane != nullptr && p_books == nullptr);
     core_id = gd::instance_id(plane);
+    books = plane != nullptr ? p_books : nullptr;
     if (plane == nullptr) {
         return;
     }
-    channels = plane->get_channel_book();
+    channels = books->channels;
 
-    sync_pipeline.set_core(plane);
+    sync_pipeline.set_core(plane, books);
     sync_pipeline.set_api(p_api);
     sync_pipeline.set_sync_model(&sync_model);
     sync_pipeline.set_channels(
@@ -108,7 +112,7 @@ void ReplicationCore::install(Object *p_api) {
         ids.signal
     );
 
-    spawn_pipeline.set_core(plane);
+    spawn_pipeline.set_core(plane, books);
     spawn_pipeline.set_api(p_api);
     spawn_pipeline.set_channels(ids.spawn, ids.despawn, ids.hide, ids.reparent);
     spawn_pipeline.set_encode_seams(
@@ -132,7 +136,7 @@ void ReplicationCore::install(Object *p_api) {
         callable_mp(plane, &NetwMultiplayer::spawn_arm_consumed)
     );
 
-    sync_compat.set_core(plane);
+    sync_compat.set_core(plane, books);
     sync_compat.set_sync_model(&sync_model);
     sync_compat.set_spawn_book(spawn_pipeline.get_spawn_book());
     sync_compat.set_spawn_seams(
@@ -349,7 +353,7 @@ bool ReplicationCore::lanes_stream_to(
     int64_t p_peer_id
 ) {
     NetwMultiplayer *plane = core();
-    ReplicationSend *send = NetwMultiplayer::row_send_of(this);
+    ReplicationSend *send = sync_pipeline.row_send();
     if (plane == nullptr || send == nullptr) {
         return true;
     }
@@ -421,7 +425,7 @@ void ReplicationCore::send_claim_images(int64_t p_tick) {
         if (payload.is_empty()) {
             continue;
         }
-        ReplicationSend *send = NetwMultiplayer::row_send_of(this);
+        ReplicationSend *send = sync_pipeline.row_send();
         for (int which = 0; which < owed.size(); ++which) {
             const repl::PeerAccount *account
                 = send != nullptr ? send->account(owed[which]) : nullptr;
@@ -448,7 +452,7 @@ void ReplicationCore::expire_control(int64_t p_tick) {
     if (plane == nullptr || control_waiting.is_empty()) {
         return;
     }
-    const int64_t deadline = plane->clock_engine().get_tickrate();
+    const int64_t deadline = books->clock->get_tickrate();
     LocalVector<ObjectID> held;
     held.reserve(control_waiting.size());
     for (uint32_t at = 0; at < control_waiting.size(); ++at) {
@@ -562,7 +566,7 @@ Error ReplicationCore::receive_carrier(
         const uint32_t provisional = plane == nullptr
             ? wire::NetworkProfiler::NONE
             : handler_names_arrival(frame.channel)
-            ? plane->profiler().aggregate(frame.channel)
+            ? books->profiler->aggregate(frame.channel)
             : plane->profiler_frame_subject(
                   frame.route,
                   frame.comp,
@@ -570,7 +574,7 @@ Error ReplicationCore::receive_carrier(
                   frame.path
               );
         wire::ProfileArrivalScope observation(
-            plane != nullptr ? &plane->profiler() : nullptr,
+            plane != nullptr ? books->profiler : nullptr,
             !loopback,
             p_sender,
             (reader.bit_length() - before) / 8,
@@ -707,8 +711,8 @@ void ReplicationCore::dispatch_reply(
             || !reader.align_verify() || reader.bits_remaining() != 0) {
             return;
         }
-        NETW_NETWORK_PROFILE(plane->profiler().name_arrival(
-            plane->profiler().take_reply(p_sender, txn, false)
+        NETW_NETWORK_PROFILE(books->profiler->name_arrival(
+            books->profiler->take_reply(p_sender, txn, false)
         ));
         plane->rpc_handle_reply_failed(txn, p_sender, Error(code), detail);
         return;
@@ -718,8 +722,8 @@ void ReplicationCore::dispatch_reply(
         || !reader.align_verify() || reader.bits_remaining() != 0) {
         return;
     }
-    NETW_NETWORK_PROFILE(plane->profiler().name_arrival(
-        plane->profiler().take_reply(p_sender, txn, false)
+    NETW_NETWORK_PROFILE(books->profiler->name_arrival(
+        books->profiler->take_reply(p_sender, txn, false)
     ));
     if (slots.is_empty() || !slots[0].addresses_node) {
         plane->rpc_handle_reply(
@@ -1041,7 +1045,7 @@ void ReplicationCore::on_clock_tick(int64_t p_tick) {
     }
     NetwMultiplayer *plane = core();
     if (plane != nullptr && plane->lagcomp_is_configured()
-        && plane->clock_engine().is_closing_tick()) {
+        && books->clock->is_closing_tick()) {
         return;
     }
     flush_all_buffers();
@@ -1063,7 +1067,7 @@ void ReplicationCore::pump_tables(int64_t p_tick) {
         || plane->session_get_inner()->get_multiplayer_peer().is_null()) {
         return;
     }
-    store::Arrays &arrays = plane->store_arrays();
+    store::Arrays &arrays = books->store->arrays;
     const TypedArray<RID> dirty = arrays.dirty_tables();
     for (int at = 0; at < dirty.size(); ++at) {
         arrays.clear_dirty(dirty[at]);
@@ -1078,7 +1082,7 @@ void ReplicationCore::send_table_removals(int64_t p_tick) {
         || plane->session_get_inner()->get_multiplayer_peer().is_null()) {
         return;
     }
-    store::Arrays &arrays = plane->store_arrays();
+    store::Arrays &arrays = books->store->arrays;
     const int64_t budget = plane->datagram_budget();
     const PackedInt64Array retired = arrays.take_lifecycle_removals();
     if (!retired.is_empty()) {
@@ -1149,7 +1153,7 @@ void ReplicationCore::handle_table_frame(
         != OK) {
         return;
     }
-    store::Arrays &arrays = plane->store_arrays();
+    store::Arrays &arrays = books->store->arrays;
     const store::ArrayLanding landed = arrays.apply_frame(p_payload);
     if (!landed.bound.is_empty()) {
         plane->liveness_bind_routes_data(landed.bound);
@@ -1166,7 +1170,7 @@ void ReplicationCore::replay_tables(int64_t p_peer_id) {
         || plane->session_get_inner()->get_multiplayer_peer().is_null()) {
         return;
     }
-    store::Arrays &arrays = plane->store_arrays();
+    store::Arrays &arrays = books->store->arrays;
     const int64_t budget = plane->datagram_budget();
     const TypedArray<RID> published = arrays.published_tables();
     for (int at = 0; at < published.size(); ++at) {
@@ -1190,7 +1194,7 @@ void ReplicationCore::replay_tables(int64_t p_peer_id) {
 void ReplicationCore::on_frame_end() {
     flush_all_buffers();
     NetwMultiplayer *plane = core();
-    if (plane != nullptr && plane->clock_engine().closed_a_tick()) {
+    if (plane != nullptr && books->clock->closed_a_tick()) {
         plane->flush_standalone_acks();
     }
 }
@@ -1200,7 +1204,7 @@ void ReplicationCore::on_poll() {
     if (plane == nullptr) {
         return;
     }
-    if (plane->clock_engine().get_configured()) {
+    if (books->clock->get_configured()) {
         return;
     }
     if (plane->is_online() && sync_pipeline.owes_rows()) {
@@ -1315,7 +1319,7 @@ TypedArray<Dictionary> ReplicationCore::spawn_state_of(Node *p_root) {
     NetwMultiplayer *plane = core();
     const Ref<NetwEntity> wrapper = NetwEntity::of(p_root);
     if (plane != nullptr && wrapper.is_valid()
-        && plane->get_liveness_core()->entity_is_valid(
+        && books->liveness->entity_is_valid(
             wrapper->get_rid_handle()
         )) {
         return plane->spawn_get_state(wrapper->get_rid_handle());

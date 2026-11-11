@@ -7,8 +7,8 @@
 
 #include "support/event_ring.h"
 
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestNetwLagCompEpisodeReportLaws {
 

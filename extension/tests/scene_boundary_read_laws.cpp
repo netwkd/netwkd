@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -12,6 +13,7 @@ using namespace godot;
 using netw::NetwInterestLayer;
 using netw::NetwMultiplayer;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 struct BoundScene {
     Node *root = nullptr;
@@ -27,7 +29,7 @@ BoundScene bind_scene(const Ref<NetwMultiplayer> &p_core, const char *p_stem) {
         made.root->set_name(p_stem);
         made.entity->attach_to(made.root);
     }
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     made.entity->get_record()->adopt_handle(made.handle);
     if (made.root != nullptr) {
         REQUIRE(p_core->entity_of(made.root) == made.handle);

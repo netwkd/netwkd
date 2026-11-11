@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/netw_cells.h"
@@ -15,6 +16,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::repl::PropertySet;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -136,7 +138,8 @@ public:
             ? OK
             : session->property_set_seal(minted_set);
 
-        const PropertySet *record = session->property_set_of(minted_set);
+        const PropertySet *record
+            = Internals::property_set_of(session, minted_set);
         if (record != nullptr) {
             bound_columns = int64_t(record->columns.size());
             record_keys = record->keys();

@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -15,6 +16,7 @@ namespace TestClockServiceLifetimeLaws {
 using namespace godot;
 using netw::ClockEngine;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 struct Branch {
     netw::MultiplayerViewport *tree = nullptr;
@@ -29,7 +31,7 @@ struct Branch {
     }
 
     netw::ClockEngine &clock() const {
-        return core->clock_engine();
+        return Internals::clock_engine(core);
     }
 
     Node *mount(int p_tickrate) const {

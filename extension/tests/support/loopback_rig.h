@@ -13,6 +13,7 @@
 #include "godot/templates.hpp"
 #include "godot/utility.hpp"
 #include "godot/variant.hpp"
+#include "internals.h"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/join_request.hpp"
@@ -169,7 +170,7 @@ class LoopbackRig {
             config->set("tickrate", p_world.clock_tickrate);
             config->set("display_offset", p_world.clock_display_offset);
             NETW_CHECK_EQ(int(p_api->clock_initialize(config)), int(godot::OK));
-            p_api->clock_engine().set_manual_tick(true);
+            Internals::clock_engine(p_api).set_manual_tick(true);
         }
         if (p_world.wants_lagcomp) {
             NETW_CHECK_EQ(
@@ -750,7 +751,7 @@ public:
 
     netw::ClockEngine &clock_of(netw::NetwMultiplayer *p_core) const {
         REQUIRE_MESSAGE(p_core != nullptr, "a clock needs a session to be on");
-        return p_core->clock_engine();
+        return Internals::clock_engine(p_core);
     }
 
     godot::RID client_entity_of(
@@ -1403,7 +1404,7 @@ public:
     netw::NetwPredictionEngine *prediction_pool(int p_client = -1) const {
         netw::NetwMultiplayer *api = p_client < 0 ? server() : client(p_client);
         REQUIRE_MESSAGE(api != nullptr, "prediction needs a session");
-        return api->get_prediction_engine();
+        return Internals::get_prediction_engine(api);
     }
 
     int64_t prediction_slot(

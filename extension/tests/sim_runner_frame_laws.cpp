@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -22,6 +23,7 @@ namespace TestNetwSimRunnerFrameLaws {
 
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *COUNTERS = R"(
 var calls := 0
@@ -268,7 +270,7 @@ public:
     void mark() {
         for (int client = -1; client < CLIENTS; ++client) {
             window_tick[client + 1]
-                = stand->session(client)->clock_engine().get_tick();
+                = Internals::clock_engine(stand->session(client)).get_tick();
             for (int kind = 0; kind < KINDS; ++kind) {
                 Node *node
                     = routes[kind] == 0 ? nullptr : node_at(Kind(kind), client);
@@ -295,7 +297,7 @@ public:
             = int64_t(node->get("fresh")) - window_fresh[p_kind][p_client + 1];
         out.repeats = int64_t(node->get("repeats"))
             - window_repeats[p_kind][p_client + 1];
-        out.ticks = stand->session(p_client)->clock_engine().get_tick()
+        out.ticks = Internals::clock_engine(stand->session(p_client)).get_tick()
             - window_tick[p_client + 1];
         return out;
     }
@@ -348,7 +350,8 @@ class RunScenario final : public netw_test::FrameScenario {
         NetwMultiplayer *session = stage.get()->session(p_client);
         const Ref<NetwEntity> entity
             = NetwEntity::of(stage.node_at(KIND_CAR, p_client));
-        netw::sim::Row &row = session->sim_row(entity->get_rid_handle());
+        netw::sim::Row &row
+            = Internals::sim_row(session, entity->get_rid_handle());
         row.declaration.bodies.push_back(NodePath("Sphere"));
         if (p_client < 0) {
             row.declaration.replicas = netw::sim::Replicas::ACTIVE;
@@ -363,7 +366,8 @@ class RunScenario final : public netw_test::FrameScenario {
         }
         for (int client = -1; client < CLIENTS; ++client) {
             declare_car(client);
-            stage.get()->session(client)->sim_row(
+            Internals::sim_row(
+                stage.get()->session(client),
                 stage.rid_at(KIND_SCRIPTED, client)
             );
         }
@@ -486,7 +490,8 @@ class PaceScenario final : public netw_test::FrameScenario {
             += at.distance_to(free_last) > DRIVE_SPEED * frame_delta() * 0.5
             ? 1
             : 0;
-        const int64_t tick = stage.get()->session(0)->clock_engine().get_tick();
+        const int64_t tick
+            = Internals::clock_engine(stage.get()->session(0)).get_tick();
         evidence.client_frames_without_tick += tick == client_tick ? 1 : 0;
         client_tick = tick;
     }
@@ -529,8 +534,8 @@ public:
             }
             if (frame == WARM_FRAMES + 1) {
                 stage.mark();
-                client_tick
-                    = stage.get()->session(0)->clock_engine().get_tick();
+                client_tick = Internals::clock_engine(stage.get()->session(0))
+                                  .get_tick();
             }
             free_last = free_body->get_global_position();
             stage.get()->physics_frame(frame_delta(), PACE_CLIENT_SCALE);

@@ -10,6 +10,10 @@
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
 
+namespace netw::session {
+struct Books;
+} // namespace netw::session
+
 namespace netw {
 
 class NetwMultiplayer;
@@ -25,6 +29,7 @@ class NetwPredictRunner {
     godot::HashMap<int64_t, NetwPredictSlotEngine *> by_slot;
     bool sort_dirty = true;
     godot::ObjectID core_id;
+    const session::Books *books = nullptr;
 
     NetwMultiplayer *core() const;
     int64_t index_of(NetwPredictSlotEngine *p_engine) const;
@@ -35,7 +40,7 @@ class NetwPredictRunner {
     void run_held_recoveries();
 
 public:
-    void seat_core(NetwMultiplayer *p_core);
+    void seat_core(NetwMultiplayer *p_core, const session::Books *p_books);
 
     void register_engine(NetwPredictSlotEngine *p_engine);
     void unregister_engine(NetwPredictSlotEngine *p_engine);

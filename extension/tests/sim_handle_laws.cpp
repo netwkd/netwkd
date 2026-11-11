@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -125,7 +126,7 @@ TEST_CASE(
     CHECK(core->sim_row_of(subject) == nullptr);
     CHECK(names(owner->get_simulation()->selection_choice(), member));
 
-    CHECK(names(core->sim_row(subject).choice, member));
+    CHECK(names(Internals::sim_row(core, subject).choice, member));
 }
 
 TEST_CASE(

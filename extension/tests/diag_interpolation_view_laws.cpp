@@ -6,6 +6,7 @@
 #include "support/declared_nodes.h"
 #include "support/display_stand.h"
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/value_flow_stand.h"
 
 #include "godot/node.hpp"
@@ -34,6 +35,7 @@ namespace TestDiagInterpolationViewLaws {
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwNativeTests;
+using netw_test::Internals;
 using netw::diag::HeldSample;
 using netw::diag::InterpolationView;
 using netw::diag::TimelineRow;
@@ -100,7 +102,7 @@ struct Stand {
 
     void look() {
         core->diag_gather(view.sources);
-        view.sample(*core.ptr());
+        view.sample(Internals::books(core));
     }
 
     void frame(int64_t p_tick, int p_offset, double p_factor) {
@@ -274,7 +276,7 @@ TEST_CASE(
     NetwMultiplayer *client = netw_test::flow_core(rig.client(0));
     InterpolationView view;
     client->diag_gather(view.sources);
-    view.sample(*client);
+    view.sample(Internals::books(client));
 
     const TimelineRow &row = required(row_at(view, pair.route));
     const netw::display::Runtime *runtime
@@ -490,7 +492,7 @@ struct Chased {
         );
         const RID rid = mirrored->get_rid_handle();
         if (!p_steered_here) {
-            client->sim_row(rid).declaration.replicas
+            Internals::sim_row(client, rid).declaration.replicas
                 = netw::sim::Replicas::ACTIVE;
         }
         NETW_REQUIRE_EQ(int(client->predict_declare(rid)), int(OK));
@@ -518,7 +520,7 @@ struct Chased {
     }
 
     const TimelineRow &look() {
-        view.sample(*client);
+        view.sample(Internals::books(client));
         return required(row_at(view, pair.route));
     }
 
@@ -532,7 +534,7 @@ TEST_CASE(
     "text row while it glides and no marks at all"
 ) {
     Chased chased(true);
-    chased.view.sample(*chased.client);
+    chased.view.sample(Internals::books(chased.client));
     NETW_CHECK_EQ(chased.view.rows().size(), 0);
 
     chased.runtime->channels()[0]->render_offset().absorb(
@@ -633,7 +635,7 @@ TEST_CASE(
     NetwMultiplayer *client = netw_test::flow_core(rig.client(0));
     InterpolationView view;
     client->diag_gather(view.sources);
-    view.sample(*client);
+    view.sample(Internals::books(client));
 
     const TimelineRow &row = required(row_at(view, pair.route));
     const bool filled = row.sample_count > 2;
@@ -750,7 +752,7 @@ TEST_CASE(
     netw_test::pump_at(core, 15, 3, 0.5);
     InterpolationView view;
     core->diag_gather(view.sources);
-    view.sample(*core.ptr());
+    view.sample(Internals::books(core));
 
     const TimelineRow &row = required(row_at(view, route));
     NETW_CHECK_EQ(row.phase, int(netw::diag::PHASE_BUFFERED));
@@ -820,7 +822,7 @@ TEST_CASE(
     netw_test::pump_at(core, 15, 3, 0.5);
     InterpolationView view;
     core->diag_gather(view.sources);
-    view.sample(*core.ptr());
+    view.sample(Internals::books(core));
 
     netw::diag::Drawing drawing;
     netw::diag::draw_timelines(view.rows(), view.marks(), drawing);
@@ -904,7 +906,7 @@ TEST_CASE(
         );
         netw_test::pump_at(core, tick + 1, 3, 0.5);
         core->diag_gather(view.sources);
-        view.sample(*core.ptr());
+        view.sample(Internals::books(core));
         NETW_CHECK_EQ(view.ghosts().size(), 1);
     }
     NETW_CHECK_EQ(view.part_walks, uint64_t(1));
@@ -915,7 +917,7 @@ TEST_CASE(
     memdelete(part);
     netw_test::pump_at(core, 18, 3, 0.5);
     core->diag_gather(view.sources);
-    view.sample(*core.ptr());
+    view.sample(Internals::books(core));
     NETW_CHECK_EQ(view.ghosts().size(), 0);
 
     body->get_parent()->remove_child(body);

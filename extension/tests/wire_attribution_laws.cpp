@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #include "support/stream_seat.h"
@@ -17,6 +18,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwSchema;
 using netw_test::EntityDecl;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 namespace schema_model = netw::schema_model;
@@ -38,7 +40,8 @@ struct Declared {
 };
 
 int64_t reconcile_gap(NetwMultiplayer *p_core) {
-    const netw::wire::AttributionBook &book = p_core->attribution_book();
+    const netw::wire::AttributionBook &book
+        = Internals::attribution_book(p_core);
     return p_core->get_sent_bytes() - book.get_attributed_out()
         - book.get_framing_out();
 }
@@ -137,7 +140,8 @@ TEST_CASE(
     drive(rig);
 
     NetwMultiplayer *guest = rig.client(0);
-    const netw::wire::AttributionBook &book = guest->attribution_book();
+    const netw::wire::AttributionBook &book
+        = Internals::attribution_book(guest);
     const bool heard = book.get_attributed_in() > 0;
     CHECK(heard);
     const bool within = book.get_attributed_in() <= guest->get_received_bytes();
@@ -281,7 +285,8 @@ TEST_CASE(
 
     NetwMultiplayer *host = rig.server();
     host->attribution_set_armed(true);
-    const int64_t before = host->attribution_book().get_attributed_out();
+    const int64_t before
+        = Internals::attribution_book(host).get_attributed_out();
     const bool spent = before > 0;
     CHECK(spent);
 
@@ -290,7 +295,10 @@ TEST_CASE(
     const bool carried = first == second;
     CHECK(carried);
 
-    NETW_CHECK_EQ(host->attribution_book().get_attributed_out(), before);
+    NETW_CHECK_EQ(
+        Internals::attribution_book(host).get_attributed_out(),
+        before
+    );
     const int64_t gap = reconcile_gap(host);
     NETW_CHECK_EQ(gap, int64_t(0));
 }

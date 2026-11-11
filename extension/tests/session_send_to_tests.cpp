@@ -1,9 +1,11 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwSessionSendTo {
 
@@ -28,7 +30,7 @@ PackedByteArray payload(int p_size) {
 Ref<NetwMultiplayer> configured_core() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->clock_engine().set_configured(true);
+    Internals::clock_engine(core).set_configured(true);
     return core;
 }
 

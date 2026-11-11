@@ -18,6 +18,7 @@
 #include "netw/schema_model.hpp"
 #include "netw/script/model.hpp"
 #include "netw/session_core.hpp"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -33,6 +34,7 @@ using netw::NetwPersistence;
 using netw::NetwPromise;
 using netw::NetwQuantize;
 using netw::NetwSchema;
+using netw_test::Internals;
 using netw::NetwSession;
 using netw::SessionCore;
 using netw::persist::MemoryConnection;
@@ -61,9 +63,9 @@ struct World {
         schema->replicated(false);
         schema->vector2("where", Ref<NetwQuantize>(), 1);
 
-        const RID made = session->get_databases()->create("saves");
+        const RID made = Internals::get_databases(session)->create("saves");
         connection = MemoryConnection::opened(p_store, "slot1");
-        session->get_databases()
+        Internals::get_databases(session)
             ->open(made, "slot1", NetwPromise::resolved(connection));
         database = session->database_handle(made);
         database->connect("failed", log.callable("failed"));
@@ -181,8 +183,9 @@ TEST_CASE(
         const Ref<NetwPromise> saving
             = world.session->persist_save_binding(binding);
 
-        world.session->session_plane().set_role(SessionCore::ROLE_CLIENT);
-        world.session->session_plane().set_role(SessionCore::ROLE_NONE);
+        SessionCore &plane = Internals::session_plane(world.session);
+        plane.set_role(SessionCore::ROLE_CLIENT);
+        plane.set_role(SessionCore::ROLE_NONE);
         world.connection->release();
 
         CHECK(saving->get_is_failed());
@@ -266,7 +269,7 @@ TEST_CASE(
     NETW_CHECK_EQ(int(waiting->get_result()), int(OK));
     CHECK_FALSE(world.session->persist_is_dirty_binding(binding));
 
-    world.session->session_plane().set_role(SessionCore::ROLE_CLIENT);
+    Internals::session_plane(world.session).set_role(SessionCore::ROLE_CLIENT);
     NETW_CHECK_EQ(
         int(handle->save_entities()->get_result()),
         int(ERR_UNAUTHORIZED)

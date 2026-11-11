@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdio>
@@ -14,6 +15,7 @@ namespace TestNetwSessionCore {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::SessionCore;
+using netw_test::Internals;
 using netw_test::Recorder;
 
 constexpr int64_t NOW = 1'000'000;
@@ -107,7 +109,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> host;
     host.instantiate();
-    SessionCore &core = host->session_plane();
+    SessionCore &core = Internals::session_plane(host);
     Recorder recorder(
         host->get_session().ptr(),
         {"state_changed", "entered", "exiting"}
@@ -227,7 +229,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> host;
     host.instantiate();
-    SessionCore &core = host->session_plane();
+    SessionCore &core = Internals::session_plane(host);
     core.on_peer_assigned(true, 1);
     CHECK(spend_budget(core, 7, NOW));
 

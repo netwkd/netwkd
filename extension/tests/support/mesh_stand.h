@@ -9,6 +9,7 @@
 #include "godot/scene_tree.hpp"
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
+#include "internals.h"
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/participant.hpp"
@@ -375,7 +376,7 @@ public:
         for (int step = 0; step < p_ticks; ++step) {
             for (const godot::Ref<netw::NetwMultiplayer> &session : sessions) {
                 if (session.is_valid()) {
-                    session->clock_engine().force_step(1);
+                    Internals::clock_engine(session).force_step(1);
                 }
             }
             link->advance_time(tick_period_ms);

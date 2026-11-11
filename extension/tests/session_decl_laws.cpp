@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/multiplayer.hpp"
@@ -17,6 +18,7 @@ using netw::Netw;
 using netw::NetwMultiplayer;
 using netw::NetwServerInfo;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 namespace {
 
@@ -64,7 +66,7 @@ bool probe_answers(NetwMultiplayer *p_api) {
 }
 
 bool reports_ambiguity(const Ref<NetwMultiplayer> &p_api) {
-    return p_api->declaration_book().report_unresolved(
+    return Internals::declaration_book(p_api).report_unresolved(
         p_api.ptr(),
         netw::session_decl::KIND_SERVER_INFO,
         netw::session_decl::AMBIGUOUS

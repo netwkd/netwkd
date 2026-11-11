@@ -10,8 +10,8 @@
 #include "godot/script.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/repl/property_set.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 namespace TestNetwDerivedRegistrationLaws {
 

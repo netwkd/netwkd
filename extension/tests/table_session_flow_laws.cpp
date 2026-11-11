@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/loopback_rig.h"
 
@@ -241,7 +242,7 @@ TEST_CASE(
     NetwMultiplayer *host = rig.server();
     NetwMultiplayer *guest = rig.client(0);
     const RID table = host->table_find_or_adopt("FlowMob");
-    NETW_CHECK_EQ(int(host->store_arrays().is_reliable(table)), 1);
+    NETW_CHECK_EQ(int(Internals::store_arrays(host).is_reliable(table)), 1);
 
     Ref<NetwLinkConditions> lossy = netw_test::link(7);
     lossy->set_loss_chance(0.6);

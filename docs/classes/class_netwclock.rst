@@ -410,7 +410,7 @@ Physics frames per tick. Multiply a per-frame value by it to get a per-tick valu
 - |void| **set_ping_interval**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_ping_interval**\ (\ )
 
-Seconds between pings. Shorter follows the connection more closely and sends more packets.
+Seconds between pings. Shorter follows the connection more closely and sends more packets. The clock pings five times slower once :ref:`CLOCK_MONITOR_RTT_JITTER<class_NetwClock_constant_CLOCK_MONITOR_RTT_JITTER>` is under half a tick.
 
 .. rst-class:: classref-item-separator
 

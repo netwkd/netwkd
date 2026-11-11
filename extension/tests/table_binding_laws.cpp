@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -8,6 +9,7 @@ namespace TestTableBinding {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::SchemaCore;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> session() {
     Ref<NetwMultiplayer> core;
@@ -73,7 +75,7 @@ TEST_CASE(
 
     core->table_set_param(table, NetwMultiplayer::TABLE_PARAM_RELIABLE, true);
 
-    CHECK(core->store_arrays().is_reliable(table));
+    CHECK(Internals::store_arrays(core).is_reliable(table));
     NETW_CHECK_EQ(core->table_get_wire_hash(table), before);
     NETW_CHECK_EQ(core->schema_get_hash(schema), before);
 }
@@ -169,11 +171,15 @@ TEST_CASE(
     core->table_write_column(table, 0, hp);
     NETW_CHECK_EQ(core->table_commit(table), OK);
     core->liveness_release_routes(routes);
-    NETW_CHECK_ORDER(core->store_arrays().lifecycle_removals().size(), 0, >);
+    NETW_CHECK_ORDER(
+        Internals::store_arrays(core).lifecycle_removals().size(),
+        0,
+        >
+    );
 
     core->clear_flat_family_state();
 
-    NETW_CHECK_EQ(core->store_arrays().lifecycle_removals().size(), 0);
+    NETW_CHECK_EQ(Internals::store_arrays(core).lifecycle_removals().size(), 0);
     NETW_CHECK_EQ(core->table_read_routes(table).size(), 0);
     CHECK(bool(core->table_find("Torn") == table));
     NETW_CHECK_EQ(core->schema_get_column_count(schema), 1);

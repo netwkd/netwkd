@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -24,6 +25,7 @@ namespace TestNetwSimBodyFrameLaws {
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::sim::Bodies;
+using netw_test::Internals;
 using netw::sim::Mode;
 
 constexpr double FLOOR_Y = 200.0;
@@ -276,7 +278,9 @@ class TransferScenario final : public netw_test::FrameScenario {
         NetwMultiplayer *session = stand->session(p_client);
         const Ref<NetwEntity> entity = entity_at(p_car, p_client);
         const RID rid = entity->get_rid_handle();
-        session->sim_row(rid).declaration.bodies.push_back(NodePath("Sphere"));
+        Internals::sim_row(session, rid).declaration.bodies.push_back(
+            NodePath("Sphere")
+        );
         session->sim_settle_body(entity);
         const netw::sim::Row *row = session->sim_row_of(rid);
         if (row != nullptr) {
@@ -398,7 +402,8 @@ public:
                 seen.step_first = read(car, 0);
                 seen.step_second = read(car, 1);
                 const Ref<NetwEntity> entity = entity_at(car, -1);
-                server->sim_row(entity->get_rid_handle()).declaration.replicas
+                Internals::sim_row(server, entity->get_rid_handle())
+                    .declaration.replicas
                     = netw::sim::Replicas::ACTIVE;
                 server->sim_settle_body(entity);
             }

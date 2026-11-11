@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <optional>
@@ -12,6 +13,7 @@ namespace TestNetwSessionPreparedJoin {
 using namespace godot;
 using netw::LocalMultiplayerPeer;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *NOTHING = "(nothing submitted)";
 
@@ -23,7 +25,7 @@ Ref<NetwMultiplayer> a_session() {
 
 String submitted(const Ref<NetwMultiplayer> &p_session) {
     const std::optional<netw::JoinRequest> taken
-        = p_session->session_take_submitted_join_under_test();
+        = Internals::take_submitted_join(p_session);
     if (!taken.has_value()) {
         return NOTHING;
     }
@@ -42,14 +44,17 @@ TEST_CASE(
                 ->get_result()),
         int(OK)
     );
-    REQUIRE(session->session_prepared_join().has_value());
-    CHECK(session->session_prepared_join()->username == StringName("ana"));
+    REQUIRE(Internals::session_prepared_join(session).has_value());
+    CHECK(
+        Internals::session_prepared_join(session)->username
+        == StringName("ana")
+    );
 
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
     session->session_announce_entered();
 
     CHECK(submitted(session) == String("ana"));
-    CHECK_FALSE(session->session_prepared_join().has_value());
+    CHECK_FALSE(Internals::session_prepared_join(session).has_value());
 
     session->session_announce_entered();
     CHECK(submitted(session) == String());
@@ -70,15 +75,18 @@ TEST_CASE(
 
     CHECK(submitted(session) == NOTHING);
     CHECK(session->player_local().is_null());
-    REQUIRE(session->session_prepared_join().has_value());
-    CHECK(session->session_prepared_join()->username == StringName("ana"));
+    REQUIRE(Internals::session_prepared_join(session).has_value());
+    CHECK(
+        Internals::session_prepared_join(session)->username
+        == StringName("ana")
+    );
 
     session->scene_announce_startup();
 
     const Ref<netw::NetwPlayer> seated = session->player_local();
     REQUIRE(seated.is_valid());
     CHECK(seated->get_username() == StringName("ana"));
-    CHECK_FALSE(session->session_prepared_join().has_value());
+    CHECK_FALSE(Internals::session_prepared_join(session).has_value());
 
     session->scene_announce_startup();
     CHECK(session->player_local() == seated);
@@ -109,12 +117,12 @@ TEST_CASE(
 ) {
     const Ref<NetwMultiplayer> session = a_session();
     session->session_prepare_join(StringName("ana"), Array());
-    CHECK(session->session_prepared_join().has_value());
+    CHECK(Internals::session_prepared_join(session).has_value());
 
     session->session_transition(NetwMultiplayer::SESSION_STATE_CONNECTING);
     session->session_transition(NetwMultiplayer::SESSION_STATE_OFFLINE);
 
-    CHECK_FALSE(session->session_prepared_join().has_value());
+    CHECK_FALSE(Internals::session_prepared_join(session).has_value());
 
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
     session->session_announce_entered();
@@ -136,7 +144,7 @@ TEST_CASE(
         int(session->session_prepare_join(StringName(), Array())->get_result()),
         int(ERR_INVALID_PARAMETER)
     );
-    CHECK_FALSE(session->session_prepared_join().has_value());
+    CHECK_FALSE(Internals::session_prepared_join(session).has_value());
 
     session->embed_dispose();
 }
@@ -159,7 +167,7 @@ TEST_CASE(
 ) {
     const Ref<NetwMultiplayer> session = a_client(9);
     session->session_prepare_join(StringName("ana"), Array());
-    REQUIRE(session->session_prepared_join().has_value());
+    REQUIRE(Internals::session_prepared_join(session).has_value());
 
     session->session_announce_entered();
     CHECK(submitted(session) == String("ana"));
@@ -212,7 +220,7 @@ TEST_CASE(
     const Ref<NetwMultiplayer> session = a_session();
     session->NETW_API_VIRTUAL(set_multiplayer_peer)(client);
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
-    REQUIRE_FALSE(session->session_prepared_join().has_value());
+    REQUIRE_FALSE(Internals::session_prepared_join(session).has_value());
 
     session->session_announce_entered();
 

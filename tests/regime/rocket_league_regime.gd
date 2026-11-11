@@ -307,8 +307,9 @@ func start_match() -> void:
 
 func local_car() -> RocketCar:
 	var here: NetwPlayer = session_handle.local_player
-	var mine: Array[NetwEntity] = here.entities if here else []
-	return mine[0].root as RocketCar if mine.size() == 1 else null
+	if here == null or here.entities.size() != 1:
+		return null
+	return here.entities[0].root as RocketCar
 
 
 func arena_level() -> Node:

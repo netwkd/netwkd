@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -18,6 +19,7 @@ using namespace godot;
 namespace TestNetwDisplayChaseRestFrameLaws {
 
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *CUBE_ID = "display_rest_cube";
 
@@ -89,7 +91,7 @@ class ChaseRestScenario final : public netw_test::FrameScenario {
     netw::display::Runtime *runtime_at(int p_index) const {
         NetwMultiplayer *client = stand->session(A);
         const RID entity = client->entity_from_route(routes[p_index]);
-        return client->get_display_book()->runtime_of(entity);
+        return Internals::get_display_book(client)->runtime_of(entity);
     }
 
     RigidBody3D *body_at(int p_index) const {

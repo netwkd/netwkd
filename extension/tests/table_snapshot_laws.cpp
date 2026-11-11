@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -12,6 +13,7 @@ using netw::NetwMultiplayer;
 using netw::SchemaCore;
 using netw::SchemaRecord;
 using netw::store::Arrays;
+using netw_test::Internals;
 
 struct World {
     Ref<NetwMultiplayer> session;
@@ -35,7 +37,7 @@ struct World {
     }
 
     Arrays *core() const {
-        return &session->store_arrays();
+        return &Internals::store_arrays(session);
     }
 
     const SchemaRecord *record() const {

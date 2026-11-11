@@ -9,15 +9,19 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/participant.hpp"
-#include "netw/api/sync_compat.hpp"
-#include "netw/api/sync_model.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/channel_book.hpp"
 #include "netw/repl/property_binding.hpp"
+#include "netw/repl/sync_compat.hpp"
+#include "netw/repl/sync_model.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/spawn/pipeline.hpp"
 #include "netw/spawn/spawner_compat.hpp"
 #include "netw/wire/registry.hpp"
+
+namespace netw::session {
+struct Books;
+} // namespace netw::session
 
 namespace netw {
 
@@ -63,6 +67,7 @@ private:
 
     godot::ObjectID core_id;
     godot::ObjectID api_id;
+    const session::Books *books = nullptr;
 
     NetwChannelBook *channels = nullptr;
     godot::LocalVector<godot::ObjectID> control_waiting;
@@ -127,7 +132,7 @@ private:
 public:
     ReplicationCore();
 
-    void install(godot::Object *p_api);
+    void install(godot::Object *p_api, const session::Books *p_books);
     void set_tap_seam(const godot::Callable &p_tap);
 
     NetwSyncModel *get_sync_model() {

@@ -10,7 +10,6 @@
 #include "netw/api/link_conditions.hpp"
 #include "netw/api/native_api.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/colors.hpp"
 #include "netw/connect/transport.hpp"
 #include "netw/decl_sites.hpp"
@@ -269,26 +268,19 @@ void inject_component_registration(Node *p_node) {
     tree::mark(p_node, tree::MARK_COMPONENT_SEEN | tree::MARK_COMPONENT);
 }
 
-SyncPipeline *pipeline_of(Node *p_node) {
-    NetwMultiplayer *api = NetwMultiplayer::of(p_node);
-    return api != nullptr ? api->sync_pipeline() : nullptr;
-}
-
 void register_derived_now(const Variant &p_node) {
     Node *node = node_behind(p_node);
     if (node == nullptr) {
         return;
     }
-    if (SyncPipeline *pipeline = pipeline_of(node)) {
-        pipeline->register_derived(node);
+    if (NetwMultiplayer *api = NetwMultiplayer::of(node)) {
+        api->sync_register_derived(node);
     }
 }
 
 void unregister_derived_leaving(Node *p_node) {
-    NetwMultiplayer *api = NetwMultiplayer::of_leaving(p_node);
-    SyncPipeline *pipeline = api != nullptr ? api->sync_pipeline() : nullptr;
-    if (pipeline != nullptr) {
-        pipeline->unregister_derived(p_node);
+    if (NetwMultiplayer *api = NetwMultiplayer::of_leaving(p_node)) {
+        api->sync_unregister_derived(p_node);
     }
 }
 

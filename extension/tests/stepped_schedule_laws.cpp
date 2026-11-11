@@ -1,5 +1,6 @@
 #include "support/fault_log.h"
 #include "support/installable_stepper.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -16,6 +17,7 @@
 #include "netw/predict/engine.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestSteppedScheduleLaws {
 
@@ -119,7 +121,8 @@ struct Seated {
     }
 
     int64_t resolved() const {
-        netw::NetwPredictionEngine *pool = server()->get_prediction_engine();
+        netw::NetwPredictionEngine *pool
+            = Internals::get_prediction_engine(server());
         return pool->schedule_of(pool->slot_of(entity));
     }
 };

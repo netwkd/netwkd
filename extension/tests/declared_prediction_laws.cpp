@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -638,7 +639,8 @@ TEST_CASE(
 
     netw::NetwMultiplayer *owner = rig.client(0);
     REQUIRE(owner != nullptr);
-    netw::NetwPredictionEngine *const pool = owner->get_prediction_engine();
+    netw::NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(owner);
     REQUIRE(pool != nullptr);
 
     const godot::RID seated = rig.entity_of(godot::StringName("P"), 0);

@@ -1,5 +1,6 @@
 #include "support/books.h"
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/predict_rows.h"
 
@@ -11,7 +12,6 @@
 #include "support/netw_recorder.h"
 
 #include "netw/api/entity.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/schema_core.hpp"
@@ -20,6 +20,7 @@
 #include "netw/prediction_core.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/script/model.hpp"
+#include "netw/session/event_plane.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 
@@ -85,7 +86,7 @@ TEST_CASE(
 
     NetwMultiplayer *core = rig.server();
     REQUIRE(core != nullptr);
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     REQUIRE(pool != nullptr);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
@@ -120,7 +121,7 @@ TEST_CASE(
 
     NetwMultiplayer *core = rig.server();
     REQUIRE(core != nullptr);
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     REQUIRE(pool != nullptr);
     const int64_t route = core->liveness_route_of(seated.ptr());
     REQUIRE(route > 0);
@@ -169,7 +170,7 @@ TEST_CASE(
 
     NetwMultiplayer *core = rig.server();
     REQUIRE(core != nullptr);
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -206,7 +207,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -237,7 +238,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     const int64_t route = core->liveness_route_of(seated.ptr());
@@ -265,7 +266,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     REQUIRE(pool->open_episode(slot, 3, 1));
@@ -311,7 +312,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -366,7 +367,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -423,7 +424,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->configure(
@@ -508,7 +509,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     NETW_CHECK_EQ(pool->current_tick(), core->clock_get_tick());
 
     const int64_t first = pool->register_rewind(seated);
@@ -534,7 +535,7 @@ TEST_CASE(
     REQUIRE(handle != nullptr);
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     REQUIRE(pool->open_episode(slot, 3, 1));
@@ -575,8 +576,8 @@ PropertyBindingPtr pose_binding(netw_test::Books &r_books, Node *p_node) {
 }
 
 PropertyBindingPtr pose_binding(NetwMultiplayer *p_core, Node *p_node) {
-    return p_core->property_binding_book().create(
-        pose_and_momentum(p_core->property_set_book()),
+    return Internals::property_binding_book(p_core).create(
+        pose_and_momentum(Internals::property_set_book(p_core)),
         p_node
     );
 }
@@ -627,11 +628,11 @@ TEST_CASE(
     REQUIRE(owner != nullptr);
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
-    SetBook &sets = core->property_set_book();
+    SetBook &sets = Internals::property_set_book(core);
     const uint64_t state = pose_and_momentum(sets);
     PropertyColumn &pose = sets.get(state)->columns[0];
     pose.carry_channel = StringName("velocity");
@@ -640,7 +641,7 @@ TEST_CASE(
     NETW_CHECK_EQ(
         pool->adopt_declaration(
             seated,
-            core->property_binding_book().create(state, owner),
+            Internals::property_binding_book(core).create(state, owner),
             pose_binding(core, owner),
             int(netw::Schedule::TICK),
             int(netw::Role::PREDICT),
@@ -677,7 +678,7 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->rewire(slot, declared_pose(false));
@@ -720,7 +721,7 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->rewire(slot, declared_pose(false));
@@ -774,7 +775,7 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->bind_property_sets(
@@ -840,15 +841,15 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
-    SetBook &sets = core->property_set_book();
+    SetBook &sets = Internals::property_set_book(core);
     const uint64_t declared = pose_and_momentum(sets);
     sets.get(declared)->columns[0].carry_channel = StringName("velocity");
     pool->adopt_declaration(
         seated,
-        core->property_binding_book().create(declared, owner),
+        Internals::property_binding_book(core).create(declared, owner),
         PropertyBindingPtr(),
         int(netw::Schedule::TICK),
         int(netw::Role::PREDICT),
@@ -925,15 +926,15 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
-    SetBook &sets = core->property_set_book();
+    SetBook &sets = Internals::property_set_book(core);
     const uint64_t declared = pose_and_momentum(sets);
     sets.get(declared)->columns[0].carry_channel = StringName("velocity");
     pool->adopt_declaration(
         seated,
-        core->property_binding_book().create(declared, owner),
+        Internals::property_binding_book(core).create(declared, owner),
         PropertyBindingPtr(),
         int(netw::Schedule::TICK),
         int(netw::Role::PREDICT),
@@ -996,7 +997,7 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->adopt_declaration(
@@ -1091,7 +1092,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -1127,7 +1128,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -1313,7 +1314,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     LocalVector<netw::predict::FieldDecl> input;
@@ -1442,7 +1443,7 @@ TEST_CASE(
 }
 
 PropertyBindingPtr recovering_state(NetwMultiplayer *p_core, Node *p_node) {
-    SetBook &sets = p_core->property_set_book();
+    SetBook &sets = Internals::property_set_book(p_core);
     const uint64_t declared = sets.create();
     PropertySet *set = sets.get(declared);
     set->record = PropertySet::RECORD_STATE;
@@ -1461,7 +1462,7 @@ PropertyBindingPtr recovering_state(NetwMultiplayer *p_core, Node *p_node) {
     pose.carry_channel = StringName("scale");
     pose.converge_stiffness = 0.5;
     set->columns[2].explicit_teleport_only = true;
-    return p_core->property_binding_book().create(declared, p_node);
+    return Internals::property_binding_book(p_core).create(declared, p_node);
 }
 
 netw::RecoveryPlan planned_recovery(
@@ -1501,7 +1502,7 @@ TEST_CASE(
     Node *owner = seated->get_owner();
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->adopt_declaration(

@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -29,6 +30,7 @@ using netw::NetwNativeTests;
 using netw::diag::InterpolationView;
 using netw::diag::TimelineRow;
 using netw::repl::PropertySet;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 constexpr int SERVER = 1;
@@ -171,7 +173,7 @@ struct Glide {
 
     const TimelineRow *look() {
         client()->diag_gather(view.sources);
-        view.sample(*client());
+        view.sample(Internals::books(client()));
         for (const TimelineRow &each : view.rows()) {
             if (each.route == pair.route) {
                 return &each;
@@ -185,7 +187,7 @@ struct Glide {
         const netw::repl::PropertyBindingPtr binding
             = netw_test::binding_of(pair.authored, PropertySet::RECORD_STATE);
         REQUIRE_MESSAGE(binding != nullptr, "the author holds no state set");
-        const netw::store::World &world = server->store();
+        const netw::store::World &world = Internals::store(server);
         const netw::store::RowAddress at = world.row_of(binding->id, 0);
         REQUIRE_MESSAGE(at.valid(), "the author holds no state row");
         const uint32_t peer = world.peer_of(rig.peer_id(0));
@@ -208,14 +210,14 @@ struct Glide {
     }
 
     int64_t refused() const {
-        return client()->attribution_book().get_refused_in();
+        return Internals::attribution_book(client()).get_refused_in();
     }
 
     bool holds_early_edge() const {
         const netw::repl::PropertyBindingPtr binding
             = netw_test::binding_of(pair.mirror(0), PropertySet::RECORD_STATE);
         REQUIRE_MESSAGE(binding != nullptr, "the mirror holds no state set");
-        const netw::store::World &world = client()->store();
+        const netw::store::World &world = Internals::store(client());
         const netw::store::RowAddress at = world.row_of(binding->id, 0);
         REQUIRE_MESSAGE(at.valid(), "the mirror holds no state row");
         const netw::store::Table &table = world.table(at.table);
@@ -284,7 +286,8 @@ TEST_CASE(
     Glide glide(GLIDER);
     glide.glide(10);
     const uint64_t token = glide.server_token();
-    const int64_t refused = glide.client()->attribution_book().get_refused_in();
+    const int64_t refused
+        = Internals::attribution_book(glide.client()).get_refused_in();
     glide.rig.hold(0);
     glide.glide(1);
     glide.drop_held();
@@ -312,7 +315,10 @@ TEST_CASE(
         }
     }
     NETW_CHECK_EQ(glide.server_token(), token);
-    NETW_CHECK_GT(glide.client()->attribution_book().get_refused_in(), refused);
+    NETW_CHECK_GT(
+        Internals::attribution_book(glide.client()).get_refused_in(),
+        refused
+    );
     CHECK(landed);
     NETW_CHECK_GT(late, int64_t(0));
     CHECK(rested);

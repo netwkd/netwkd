@@ -1,5 +1,6 @@
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -13,6 +14,7 @@
 #include "netw/predict/engine.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestEntityPredictedReadmissionFrameLaws {
 
@@ -163,9 +165,8 @@ class ReadmissionScenario final : public netw_test::FrameScenario {
         if (p_node == nullptr) {
             return -1;
         }
-        return stand->session(p_side)->get_prediction_engine()->slot_of(
-            NetwEntity::of(p_node)
-        );
+        return Internals::get_prediction_engine(stand->session(p_side))
+            ->slot_of(NetwEntity::of(p_node));
     }
 
     int spawn(const char *p_id, const char *p_name) {

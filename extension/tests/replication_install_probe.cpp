@@ -6,6 +6,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/wire/registry.hpp"
+#include "support/internals.h"
 
 namespace TestReplicationInstallProbe {
 
@@ -40,7 +41,7 @@ int edges(NetwMultiplayer *p_core, const char *p_signal) {
 }
 
 InstallState read_state(NetwMultiplayer *p_core, ReplicationCore *p_plane) {
-    netw::NetwChannelBook *book = p_core->get_channel_book();
+    netw::NetwChannelBook *book = Internals::get_channel_book(p_core);
     InstallState state;
     state.channels = book->size();
     state.entity_live = edges(p_core, "entity_live");
@@ -70,8 +71,9 @@ TEST_CASE(
     ReplicationCore *plane = core->get_replication_plane();
     REQUIRE(plane != nullptr);
 
+    const netw::session::Books *books = &Internals::books(core);
     const InstallState before = read_state(core, plane);
-    plane->install(api);
+    plane->install(api, books);
     const InstallState after = read_state(core, plane);
 
     NETW_CHECK_EQ(after.channels, before.channels);
@@ -86,8 +88,8 @@ TEST_CASE(
     CHECK(after.sync_model == before.sync_model);
     CHECK(before.spawn_protocol);
 
-    plane->install(core);
-    plane->install(api);
+    plane->install(core, books);
+    plane->install(api, books);
     const InstallState reseamed = read_state(core, plane);
 
     NETW_CHECK_EQ(reseamed.channels, before.channels);
@@ -111,10 +113,10 @@ TEST_CASE(
 
     ReplicationCore *plane = core->get_replication_plane();
     REQUIRE(plane != nullptr);
-    CHECK(core->spawn_plane() == plane->get_spawn_pipeline());
-    CHECK(core->sync_pipeline() == plane->get_sync_pipeline());
+    CHECK(Internals::spawn_plane(core) == plane->get_spawn_pipeline());
+    CHECK(Internals::sync_pipeline(core) == plane->get_sync_pipeline());
 
-    netw::NetwChannelBook *book = core->get_channel_book();
+    netw::NetwChannelBook *book = Internals::get_channel_book(core);
     REQUIRE(book != nullptr);
     const char *protocols[] = {
         "SPAWN",

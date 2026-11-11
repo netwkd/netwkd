@@ -11,11 +11,12 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/property_config.hpp"
 #include "netw/api/record.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/lagcomp_core.hpp"
 #include "netw/property_set_builder.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "support/books.h"
 #include "support/carrier.h"
+#include "support/internals.h"
 
 namespace TestNetwLagCompTimelineEnrollmentLaws {
 
@@ -50,7 +51,7 @@ void arm_simulation(NetwMultiplayer *p_session) {
     clock.instantiate();
     clock->set("tickrate", TICKRATE);
     NETW_CHECK_EQ(int(p_session->clock_initialize(clock)), int(OK));
-    p_session->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(p_session).set_manual_tick(true);
     NETW_CHECK_EQ(int(p_session->lagcomp_initialize(8, 12)), int(OK));
 }
 
@@ -61,7 +62,7 @@ uint64_t a_state_stream(NetwMultiplayer *p_session, Node *p_node) {
     Dictionary configs;
     configs[StringName("position")] = config;
     const uint64_t set = sealed_set(
-        p_session->property_set_book(),
+        Internals::property_set_book(p_session),
         configs,
         PropertySet::RECORD_STATE
     );
@@ -84,7 +85,8 @@ Carrier *a_state_body(
     p_branch->add_child(body);
     body->set_owner(p_branch);
     NETW_CHECK_EQ(
-        int(p_session->sync_pipeline()->register_property_set(body, set)),
+        int(Internals::sync_pipeline(p_session)
+                ->register_property_set(body, set)),
         int(OK)
     );
     return body;
@@ -97,7 +99,7 @@ RID handle_of(NetwMultiplayer *p_session, Node *p_body) {
 }
 
 int64_t rewind_slot(NetwMultiplayer *p_session, const RID &p_entity) {
-    return p_session->get_lagcomp_core()->timeline_slot_of(
+    return Internals::get_lagcomp_core(p_session)->timeline_slot_of(
         p_session->entity_get_view(p_entity)
     );
 }
@@ -107,9 +109,9 @@ int enrolled(NetwMultiplayer *p_session, const RID &p_entity) {
 }
 
 int64_t newest_recorded_tick(NetwMultiplayer *p_session, const RID &p_entity) {
-    return p_session->get_lagcomp_core()->timeline_sample_tick(
+    return Internals::get_lagcomp_core(p_session)->timeline_sample_tick(
         rewind_slot(p_session, p_entity),
-        int64_t(p_session->clock_engine().get_tick())
+        int64_t(Internals::clock_engine(p_session).get_tick())
     );
 }
 
@@ -232,14 +234,15 @@ TEST_CASE(
     NETW_CHECK_EQ(enrolled(host, gone), 1);
     NETW_CHECK_EQ(enrolled(host, kept), 1);
 
-    host->sync_pipeline()->unregister_derived(leaving);
-    host->sync_pipeline()->reconcile_state_timeline_for_test(leaving);
+    Internals::sync_pipeline(host)->unregister_derived(leaving);
+    Internals::sync_pipeline(host)->reconcile_state_timeline_for_test(leaving);
 
     NETW_CHECK_EQ(enrolled(host, gone), 0);
     NETW_CHECK_EQ(enrolled(host, kept), 1);
 
-    host->sync_pipeline()->unregister_derived(staying);
-    host->sync_pipeline()->reconcile_dropped_state_timelines_for_test();
+    Internals::sync_pipeline(host)->unregister_derived(staying);
+    Internals::sync_pipeline(host)
+        ->reconcile_dropped_state_timelines_for_test();
 
     NETW_CHECK_EQ(enrolled(host, kept), 0);
 

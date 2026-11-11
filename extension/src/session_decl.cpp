@@ -141,7 +141,7 @@ void install_now(const Variant &p_held) {
     if (api == nullptr) {
         return;
     }
-    api->declaration_book().install_from(api, scope);
+    api->declarations_install_from(scope);
     api->declarations_changed();
 }
 
@@ -266,8 +266,11 @@ Error declare(
             int64_t(generation)
         );
         if (NetwMultiplayer *api = last_api_of(p_scope)) {
-            api->declaration_book()
-                .withdraw(gd::instance_id(p_scope), p_kind, generation);
+            api->declarations_withdraw(
+                gd::instance_id(p_scope),
+                p_kind,
+                generation
+            );
         }
         return OK;
     }

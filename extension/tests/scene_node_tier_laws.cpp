@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -22,6 +23,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwSceneCore;
 using netw_test::CallLog;
+using netw_test::Internals;
 using netw_test::Recorder;
 
 struct Mounted {
@@ -54,10 +56,11 @@ Mounted mount(
         p_owns_its_world ? int64_t(NetwSceneCore::ISOLATION_OWN_WORLD)
                          : int64_t(NetwSceneCore::ISOLATION_NONE)
     );
-    made.scene = p_core->get_liveness_core()->entity_create();
+    made.scene = Internals::get_liveness_core(p_core)->entity_create();
     made.entity->get_record()->adopt_handle(made.scene);
     REQUIRE(p_core->entity_of(made.root) == made.scene);
-    p_core->get_scene_core()->scene_enter(made.scene, p_stem, p_owns_its_world);
+    Internals::get_scene_core(p_core)
+        ->scene_enter(made.scene, p_stem, p_owns_its_world);
     REQUIRE(named_scene_node(p_core, p_stem) == made.root);
     return made;
 }
@@ -131,7 +134,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(core->scene_containing(arena.root), arena.root);
 
-    core->get_scene_core()->scene_exit(arena.scene);
+    Internals::get_scene_core(core)->scene_exit(arena.scene);
 
     NETW_CHECK_EQ(core->scene_containing(arena.root), nullptr);
 
@@ -149,11 +152,11 @@ TEST_CASE(
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
     const Mounted annex = mount_plain(core, root, StringName("Annex"));
 
-    NETW_CHECK_EQ(core->get_scene_core()->live_count(), 2);
+    NETW_CHECK_EQ(Internals::get_scene_core(core)->live_count(), 2);
 
     core->scene_forget(arena.root);
 
-    NETW_CHECK_EQ(core->get_scene_core()->live_count(), 1);
+    NETW_CHECK_EQ(Internals::get_scene_core(core)->live_count(), 1);
     NETW_CHECK_EQ(named_scene_node(core, StringName("Arena")), nullptr);
     NETW_CHECK_EQ(arena.root->get_parent(), root);
     NETW_CHECK_EQ(annex.root->get_parent(), root);
@@ -161,7 +164,7 @@ TEST_CASE(
 
     core->scene_forget(annex.root);
 
-    NETW_CHECK_EQ(core->get_scene_core()->live_count(), 0);
+    NETW_CHECK_EQ(Internals::get_scene_core(core)->live_count(), 0);
     CHECK_FALSE(core->scene_presented().is_valid());
 
     memdelete(root);
@@ -210,7 +213,7 @@ TEST_CASE(
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
     REQUIRE(core->liveness_bind(
         arena.scene,
-        core->get_liveness_core()->reserve_route(),
+        Internals::get_liveness_core(core)->reserve_route(),
         arena.entity,
         arena.entity->get_record(),
         arena.root
@@ -255,7 +258,7 @@ TEST_CASE(
     seated.instantiate();
     seated->attach_to(arena);
     seated->get_record()->adopt_handle(
-        core->get_liveness_core()->entity_create()
+        Internals::get_liveness_core(core)->entity_create()
     );
 
     Node *bare = memnew(Node);
@@ -319,12 +322,14 @@ TEST_CASE(
     waiting->bind_to(core.ptr(), 9);
     core->player_adopt(9, waiting);
     core->player_admit(9);
-    CHECK(core->get_scene_core()->admission_park(arena.scene, 9));
-    CHECK(core->get_scene_core()->admission_is_parked(arena.scene, 9));
+    CHECK(Internals::get_scene_core(core)->admission_park(arena.scene, 9));
+    CHECK(Internals::get_scene_core(core)->admission_is_parked(arena.scene, 9));
 
     core->scene_on_player_joined(waiting);
 
-    CHECK_FALSE(core->get_scene_core()->admission_is_parked(arena.scene, 9));
+    CHECK_FALSE(
+        Internals::get_scene_core(core)->admission_is_parked(arena.scene, 9)
+    );
     NETW_CHECK_EQ(seen.count(StringName("viewer")), 1);
 
     Ref<netw::NetwPlayer> stranger;
@@ -382,7 +387,7 @@ TEST_CASE(
     core->scene_close_admission(arena.scene);
 
     NETW_CHECK_EQ(
-        int(core->membership_book().members_of(arena.scene).size()),
+        int(Internals::membership_book(core).members_of(arena.scene).size()),
         0
     );
 
@@ -408,7 +413,7 @@ TEST_CASE(
     arena_wrapper.instantiate();
     arena_wrapper->attach_to(arena);
     arena_wrapper->set_declares_scene(true);
-    const RID scene = core->get_liveness_core()->entity_create();
+    const RID scene = Internals::get_liveness_core(core)->entity_create();
     arena_wrapper->get_record()->adopt_handle(scene);
     REQUIRE(core->entity_of(arena) == scene);
     REQUIRE(core->liveness_bind(
@@ -424,7 +429,7 @@ TEST_CASE(
     Ref<netw::NetwEntity> player;
     player.instantiate();
     player->attach_to(body);
-    const RID mover = core->get_liveness_core()->entity_create();
+    const RID mover = Internals::get_liveness_core(core)->entity_create();
     player->get_record()->adopt_handle(mover);
     REQUIRE(core->entity_of(body) == mover);
     REQUIRE(core->liveness_bind(mover, 62, player, player->get_record(), body));

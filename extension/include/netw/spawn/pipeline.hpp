@@ -12,8 +12,8 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/participant.hpp"
 #include "netw/api/promise.hpp"
-#include "netw/api/sync_compat.hpp"
 #include "netw/call_args.hpp"
+#include "netw/repl/sync_compat.hpp"
 #include "netw/spawn/book.hpp"
 #include "netw/spawn/park.hpp"
 #include "netw/spawn/record.hpp"
@@ -22,6 +22,10 @@
 namespace netw {
 class NetwMultiplayer;
 }
+
+namespace netw::session {
+struct Books;
+} // namespace netw::session
 
 namespace netw::spawn {
 
@@ -130,6 +134,7 @@ class Pipeline {
 private:
     godot::ObjectID core_id;
     godot::ObjectID api_id;
+    const session::Books *books = nullptr;
 
     Book spawn_book;
     Park park;
@@ -457,7 +462,7 @@ public:
         return park_timeout_seconds;
     }
 
-    void set_core(godot::Object *p_core);
+    void set_core(godot::Object *p_core, const session::Books *p_books);
     void set_api(godot::Object *p_api);
     void set_adapters(SpawnerCompat *p_spawner, SyncCompat *p_sync);
     void set_channels(

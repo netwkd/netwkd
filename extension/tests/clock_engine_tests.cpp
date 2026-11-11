@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/engine.hpp"
@@ -12,6 +13,7 @@ using namespace godot;
 using netw::ClockEngine;
 using netw::NetwMultiplayer;
 using netw_test::Recorder;
+using netw_test::Internals;
 
 constexpr int EXACT_RATE = 8;
 constexpr double TICK = 0.125;
@@ -30,7 +32,7 @@ struct Clocked {
 Clocked make_clock(int rate = EXACT_RATE) {
     Clocked out;
     out.session.instantiate();
-    out.clock = &out.session->clock_engine();
+    out.clock = &Internals::clock_engine(out.session);
     out.clock->set_tickrate(rate);
     return out;
 }

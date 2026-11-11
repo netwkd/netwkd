@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "godot/variant.hpp"
+#include "internals.h"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/predict/arrival.hpp"
 #include "netw/repl/property_binding.hpp"
@@ -62,7 +63,7 @@ struct StoreArrival {
     }
 
     netw::store::World &world() {
-        return session->store();
+        return Internals::store(session);
     }
 
     netw::store::RowAddress at(uint32_t p_lane) {

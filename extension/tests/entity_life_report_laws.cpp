@@ -6,8 +6,8 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_options.hpp"
 #include "netw/api/entity_record.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestNetwEntityLifeReportLaws {
 

@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -11,6 +12,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwSessionConfig;
 using netw::SessionCore;
+using netw_test::Internals;
 
 static Ref<NetwSessionConfig> authoring(NetwMultiplayer::Role p_role) {
     Ref<NetwSessionConfig> config;
@@ -61,7 +63,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    SessionCore &session = core->session_plane();
+    SessionCore &session = Internals::session_plane(core);
     const Ref<NetwSessionConfig> config
         = authoring(NetwMultiplayer::ROLE_CLIENT);
     core->session_initialize(config);

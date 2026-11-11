@@ -513,7 +513,7 @@ Error NetwMultiplayer::database_batch_erase(
 persist::Bindings *NetwMultiplayer::get_bindings() {
     if (!bindings_bound) {
         bindings_bound = true;
-        bindings.bind(this);
+        bindings.bind(this, &books);
     }
     return &bindings;
 }

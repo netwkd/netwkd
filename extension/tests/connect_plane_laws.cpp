@@ -17,6 +17,7 @@
 #include "netw/api/session_config.hpp"
 #include "netw/connect/creation.hpp"
 #include "netw/connect/transport.hpp"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -30,6 +31,7 @@ using netw::NetwConnection;
 using netw::NetwEndpoint;
 using netw::NetwLinkConditions;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 using netw::NetwServerInfo;
 using netw::NetwTransport;
 using netw_test::CallLog;
@@ -464,8 +466,11 @@ TEST_CASE(
     core->session_set_prepared_join(StringName("ana"), mine);
     mine.push_back(StringName("south"));
 
-    REQUIRE(core->session_prepared_join().has_value());
-    NETW_CHECK_EQ(core->session_prepared_join()->arg_values.size(), 1);
+    REQUIRE(Internals::session_prepared_join(core).has_value());
+    NETW_CHECK_EQ(
+        Internals::session_prepared_join(core)->arg_values.size(),
+        1
+    );
 
     core->embed_dispose();
 }

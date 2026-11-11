@@ -1398,8 +1398,10 @@ void NetwEntity::start_claim_images() {
         || get_transfer() != TRANSFER_IMMEDIATE) {
         return;
     }
-    const int64_t now = core->clock_engine().get_tick();
-    claim_image_until = now + 2 * core->clock_engine().get_tickrate();
+    const int64_t now = core->clock_get_tick();
+    const int64_t tickrate
+        = int64_t(core->clock_get_param(NetwMultiplayer::CLOCK_PARAM_TICKRATE));
+    claim_image_until = now + 2 * tickrate;
     plane->watch_claim_image(Ref<NetwEntity>(this));
 }
 
@@ -1451,9 +1453,10 @@ void NetwEntity::install_held_claim_image(bool p_tenure_changed) {
     const HeldClaimImage held = held_claim_image;
     held_claim_image = HeldClaimImage();
     NetwMultiplayer *core = session_core();
-    const int64_t now = core != nullptr ? core->clock_engine().get_tick() : -1;
-    const int64_t window
-        = core != nullptr ? core->clock_engine().get_tickrate() : 0;
+    const int64_t now = core != nullptr ? core->clock_get_tick() : -1;
+    const int64_t window = core != nullptr
+        ? int64_t(core->clock_get_param(NetwMultiplayer::CLOCK_PARAM_TICKRATE))
+        : 0;
     if (now - held.received_tick > window
         || !claim_image_admits(held.sender, held.observed_revision)) {
         return;
@@ -1479,7 +1482,7 @@ void NetwEntity::_handle_claim_image(
     held_claim_image.sender = p_sender;
     held_claim_image.observed_revision = p_image.observed_revision;
     held_claim_image.received_tick
-        = core != nullptr ? core->clock_engine().get_tick() : -1;
+        = core != nullptr ? core->clock_get_tick() : -1;
     held_claim_image.state = p_image.state;
 }
 

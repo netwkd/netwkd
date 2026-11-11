@@ -16,7 +16,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/simulation.hpp"
-#include "netw/api/sync_pipeline.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/sync_authoring.hpp"
 
 namespace TestNetwPredictionContractSettleLaws {

@@ -3,9 +3,9 @@
 #include "support/netw_cells.h"
 
 #include "godot/variant.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/session_stats.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestNetwSessionStatsLaws {
 

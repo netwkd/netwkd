@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/scenario_run.h"
@@ -54,7 +55,7 @@ PackedInt64Array pool_book(LoopbackRig &p_rig) {
     if (core == nullptr) {
         return PackedInt64Array();
     }
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     REQUIRE(pool != nullptr);
     const Ref<godot::RefCounted> seated
         = core->entity_get_view(p_rig.entity_of(StringName("P"), 0));

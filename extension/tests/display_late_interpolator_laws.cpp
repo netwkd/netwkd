@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/minted_script.h"
@@ -19,6 +20,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw_test::FlowPair;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
@@ -66,10 +68,10 @@ TEST_CASE(
     REQUIRE(mirror.is_valid());
     const RID rid = mirror->get_rid_handle();
 
-    const NetwMultiplayer::IdleWork opened = client->idle_work;
+    const NetwMultiplayer::IdleWork opened = Internals::idle_work(client);
     author_ticks(rig, pair, TICKS);
     NETW_CHECK_GT(
-        client->idle_work.received_rows - opened.received_rows,
+        Internals::idle_work(client).received_rows - opened.received_rows,
         int64_t(TICKS / 2)
     );
     NETW_CHECK_LE(stat_of(client, rid, "channels"), int64_t(0));

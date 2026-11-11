@@ -19,6 +19,7 @@
 #include "netw/schema_model.hpp"
 #include "netw/script/model.hpp"
 #include "netw/wire/registry.hpp"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
 #include "support/value_flow_stand.h"
@@ -29,6 +30,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
@@ -266,7 +268,8 @@ TEST_CASE(
     NETW_CHECK_EQ(frames_in(author, session_peer, "SPAWN") - echoed, 0);
     NETW_CHECK_EQ(frames_in(observer, session_peer, "SPAWN") > 0, true);
     CHECK_FALSE(
-        session->get_liveness_core()->lease_holds(int(author_peer), route)
+        Internals::get_liveness_core(session)
+            ->lease_holds(int(author_peer), route)
     );
 
     const int late = stage.rig.add_client();
@@ -274,7 +277,7 @@ TEST_CASE(
     clock.instantiate();
     clock->set_tickrate(TICKRATE);
     NETW_REQUIRE_EQ(stage.rig.client(late)->clock_initialize(clock), OK);
-    stage.rig.client(late)->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(stage.rig.client(late)).set_manual_tick(true);
     stage.register_on(stage.rig.client(late));
     stage.rig.hold(late);
     stage.rig.mount_late(late);
@@ -321,7 +324,8 @@ TEST_CASE(
     CHECK_FALSE(stage.holds(route, 1));
     NETW_CHECK_EQ(frames_in(observer, session_peer, "SPAWN") - observed, 0);
     CHECK_FALSE(
-        session->get_liveness_core()->lease_holds(int(author_peer), route)
+        Internals::get_liveness_core(session)
+            ->lease_holds(int(author_peer), route)
     );
 }
 
@@ -691,8 +695,8 @@ TEST_CASE(
     const Ref<netw::NetwSchema> schema = netw::NetwSchema::create("blocks");
     schema->replicated(false);
     schema->i64("hp", 1);
-    const RID database = session->get_databases()->create("saves");
-    session->get_databases()->open(
+    const RID database = Internals::get_databases(session)->create("saves");
+    Internals::get_databases(session)->open(
         database,
         "slot1",
         NetwPromise::resolved(

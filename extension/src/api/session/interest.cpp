@@ -22,7 +22,7 @@
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
-#include "netw/api/sync_pipeline.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"

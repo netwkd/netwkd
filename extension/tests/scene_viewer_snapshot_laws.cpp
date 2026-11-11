@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -13,6 +14,7 @@ namespace TestSceneViewerSnapshotLaws {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::session::SceneViewersHead;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 LocalVector<uint64_t> roster(std::initializer_list<uint64_t> p_members) {
@@ -31,7 +33,7 @@ SceneViewersHead head_for(
     SceneViewersHead head;
     head.route = p_route;
     head.epoch = uint64_t(p_api->liveness_route_epoch(p_route));
-    head.generation = p_api->session_plane().get_generation();
+    head.generation = Internals::session_plane(p_api).get_generation();
     head.revision = p_revision;
     return head;
 }
@@ -253,7 +255,7 @@ TEST_CASE(
 }
 
 void cycle_online(NetwMultiplayer *p_api) {
-    netw::SessionCore &core = p_api->session_plane();
+    netw::SessionCore &core = Internals::session_plane(p_api);
     core.transition(netw::SessionCore::STATE_DISCONNECTING);
     core.transition(netw::SessionCore::STATE_OFFLINE);
     core.transition(netw::SessionCore::STATE_CONNECTING);
@@ -262,10 +264,10 @@ void cycle_online(NetwMultiplayer *p_api) {
 
 uint64_t cycle_server(LoopbackRig &p_rig) {
     NetwMultiplayer *host = p_rig.server();
-    const uint64_t first = host->session_plane().get_generation();
+    const uint64_t first = Internals::session_plane(host).get_generation();
     cycle_online(host);
     REQUIRE(host->session_get_state() == NetwMultiplayer::SESSION_STATE_ONLINE);
-    REQUIRE(host->session_plane().get_generation() > first);
+    REQUIRE(Internals::session_plane(host).get_generation() > first);
     return first;
 }
 

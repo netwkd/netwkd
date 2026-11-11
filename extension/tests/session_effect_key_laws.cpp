@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/callable.hpp"
@@ -10,6 +11,7 @@ namespace TestNetwSessionEffectKey {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> make_session() {
     Ref<NetwMultiplayer> session;
@@ -81,7 +83,7 @@ TEST_CASE(
     SUBCASE("and undeclaring one that was never declared is a no-op") {
         session->lagcomp_timeline_undeclare(entity);
         NETW_CHECK_EQ(
-            session->get_lagcomp_core()->timeline_registered(),
+            Internals::get_lagcomp_core(session)->timeline_registered(),
             int64_t(0)
         );
     }

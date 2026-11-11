@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -17,6 +18,7 @@ using netw::NetwLagCompCore;
 using netw::NetwMultiplayer;
 using netw::NetwPredictionEngine;
 using netw::SchemaCore;
+using netw_test::Internals;
 using netw::store::EntityRef;
 using netw::store::Family;
 using netw::store::RowAddress;
@@ -54,9 +56,9 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    World &world = session->store();
-    NetwPredictionEngine *pool = session->get_prediction_engine();
-    NetwLagCompCore *rewind = session->get_lagcomp_core();
+    World &world = Internals::store(session);
+    NetwPredictionEngine *pool = Internals::get_prediction_engine(session);
+    NetwLagCompCore *rewind = Internals::get_lagcomp_core(session);
     const uint32_t table = world.table_for(1, Family::VOLATILE, pose_schema());
 
     RowAddress old_row;

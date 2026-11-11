@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -85,7 +86,7 @@ TEST_CASE(
     const Ref<NetwEntity> second = seat(rig, arena, "Second");
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(owner);
     REQUIRE(slot >= 0);
     pool->set_latest_input_tick(slot, 40);
@@ -113,7 +114,7 @@ TEST_CASE(
     const Ref<NetwEntity> member = seat(rig, arena, "Other");
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(owner);
     REQUIRE(slot >= 0);
 
@@ -141,7 +142,7 @@ TEST_CASE(
     const Ref<NetwEntity> second = seat(rig, arena, "Alfa");
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(owner);
     REQUIRE(slot >= 0);
 
@@ -270,7 +271,7 @@ TEST_CASE(
     const Ref<NetwEntity> committed = seat(rig, arena, "Committed");
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(owner);
     REQUIRE(slot >= 0);
     REQUIRE(core->sim_simulate(rid(owner), declared) == OK);

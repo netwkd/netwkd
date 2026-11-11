@@ -4,6 +4,8 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "internals.h"
+
 #include "godot/node.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/spatial_node.hpp"
@@ -32,7 +34,7 @@ inline void install_clock(netw::NetwMultiplayer *p_core) {
     clock_config->set_tickrate(30);
     clock_config->set_display_offset(0);
     p_core->clock_initialize(clock_config);
-    p_core->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(p_core).set_manual_tick(true);
 }
 
 inline godot::Ref<netw::NetwMultiplayer> clocked_session() {
@@ -43,7 +45,7 @@ inline godot::Ref<netw::NetwMultiplayer> clocked_session() {
     clock_config->set_tickrate(30);
     clock_config->set_display_offset(0);
     core->clock_initialize(clock_config);
-    core->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(core).set_manual_tick(true);
     return core;
 }
 
@@ -121,7 +123,7 @@ inline void pump_at(
     int p_offset,
     double p_factor
 ) {
-    netw::ClockEngine &clock = p_core->clock_engine();
+    netw::ClockEngine &clock = Internals::clock_engine(p_core);
     clock.set_tick(int(p_tick));
     clock.set_display_offset(p_offset);
     clock.set_tick_factor_override(p_factor);

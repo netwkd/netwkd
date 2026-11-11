@@ -8,7 +8,6 @@
 #include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
-#include "netw/spawn/pipeline.hpp"
 
 using namespace godot;
 
@@ -69,10 +68,7 @@ bool built_async(Node *p_node) {
         return false;
     }
     const Ref<NetwMultiplayer> plane = entity->get_multiplayer();
-    spawn::Pipeline *spawning
-        = plane.is_valid() ? plane->spawn_plane() : nullptr;
-    return spawning != nullptr
-        && spawning->get_spawn_book()->fn_waits_of(entity->get_route());
+    return plane.is_valid() && plane->spawn_fn_waits(entity->get_route());
 }
 
 } // namespace

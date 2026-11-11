@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -18,6 +19,7 @@ namespace TestNetwScenePresentationLaws {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 struct Mounted {
     Ref<netw::NetwEntity> wrapper;
@@ -36,10 +38,10 @@ Mounted mount(
     made.root->set_meta(NetwMultiplayer::scene_container_meta(), true);
     p_parent->add_child(made.root);
     made.wrapper.instantiate();
-    made.scene = p_core->get_liveness_core()->entity_create();
+    made.scene = Internals::get_liveness_core(p_core)->entity_create();
     made.wrapper->set_rid_handle(made.scene);
     made.wrapper->get_record()->set_declares_scene(true);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         made.scene,
         route,
@@ -49,7 +51,7 @@ Mounted mount(
     ));
     made.wrapper->set_owner(made.root);
     made.root->set_meta(NetwMultiplayer::wrapper_meta(), made.wrapper);
-    p_core->get_scene_core()->scene_enter(made.scene, p_stem, false);
+    Internals::get_scene_core(p_core)->scene_enter(made.scene, p_stem, false);
     p_core->scene_player_display_invalidate();
     return made;
 }
@@ -64,9 +66,9 @@ Node *stand(
     p_parent->add_child(owner);
     Ref<netw::NetwEntity> wrapper;
     wrapper.instantiate();
-    const RID handle = p_core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(p_core)->entity_create();
     wrapper->set_rid_handle(handle);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         handle,
         route,
@@ -86,7 +88,7 @@ void watch(
     const RID &p_scene,
     int64_t p_peer
 ) {
-    p_core->membership_book().watch(p_peer, p_scene);
+    Internals::membership_book(p_core).watch(p_peer, p_scene);
     p_core->scene_player_display_invalidate();
 }
 
@@ -107,7 +109,7 @@ TEST_CASE(
     mount(core, root, StringName("Arena"));
     mount(core, root, StringName("Annex"));
 
-    NETW_CHECK_EQ(core->get_scene_core()->live_count(), 2);
+    NETW_CHECK_EQ(Internals::get_scene_core(core)->live_count(), 2);
     CHECK_FALSE(core->scene_presented().is_valid());
 
     memdelete(root);
@@ -224,7 +226,7 @@ TEST_CASE(
 
     core->scene_forget(arena.root);
 
-    NETW_CHECK_EQ(core->get_scene_core()->live_count(), 1);
+    NETW_CHECK_EQ(Internals::get_scene_core(core)->live_count(), 1);
     CHECK_FALSE(core->scene_presented().is_valid());
 
     memdelete(root);

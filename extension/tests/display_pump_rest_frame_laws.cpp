@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -20,6 +21,7 @@ using namespace godot;
 namespace TestNetwDisplayPumpRestFrameLaws {
 
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *MARKER_ID = "display_pump_rest_marker";
 constexpr const char *CUBE_ID = "display_pump_rest_cube";
@@ -118,7 +120,7 @@ class PumpRestScenario final : public netw_test::FrameScenario {
     netw::display::Runtime *runtime_at(int p_client, int p_route) const {
         NetwMultiplayer *session = stand->session(p_client);
         const RID entity = session->entity_from_route(p_route);
-        return session->get_display_book()->runtime_of(entity);
+        return Internals::get_display_book(session)->runtime_of(entity);
     }
 
     RigidBody3D *host_body() const {

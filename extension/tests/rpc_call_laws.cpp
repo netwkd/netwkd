@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/fault_log.h"
@@ -18,6 +19,7 @@ namespace TestNetwRpcCallLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> hosting() {
     Ref<NetwMultiplayer> session;
@@ -87,7 +89,8 @@ TEST_CASE(
     );
 
     SUBCASE("an entity the record plane knows but nothing owns is the same") {
-        const RID handle = session->get_liveness_core()->entity_create();
+        const RID handle
+            = Internals::get_liveness_core(session)->entity_create();
         NETW_CHECK_EQ(
             int(session->entity_call(handle, 0, StringName("go"), Array(), 0)),
             int(ERR_DOES_NOT_EXIST)

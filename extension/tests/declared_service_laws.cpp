@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -220,12 +221,13 @@ TEST_CASE(
 
     CHECK(api->predict_engine_seated(entity));
     NETW_CHECK_EQ(int(api->get_max_future_action_ticks()), 21);
-    const netw::NetwPredictSlotEngine *seated = api->predict_engine_for(entity);
+    const netw::NetwPredictSlotEngine *seated
+        = Internals::predict_engine_for(api, entity);
 
     api->config_settle();
     NETW_CHECK_EQ(int(api->predict_declare(entity)), int(OK));
 
-    CHECK(api->predict_engine_for(entity) == seated);
+    CHECK(Internals::predict_engine_for(api, entity) == seated);
     NETW_CHECK_EQ(int(api->get_max_future_action_ticks()), 21);
     NETW_CHECK_EQ(watch.log->warnings_logged(), 0);
     NETW_CHECK_EQ(watch.log->errors_logged(), 0);

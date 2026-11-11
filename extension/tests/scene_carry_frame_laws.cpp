@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -14,6 +15,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace NetwTests {
 
@@ -74,11 +76,11 @@ struct CarryRun {
     RID seat(Node *p_container) {
         const Ref<netw::NetwEntity> entity
             = netw::NetwEntity::ensure(p_container);
-        const RID handle = core->get_liveness_core()->entity_create();
+        const RID handle = Internals::get_liveness_core(core)->entity_create();
         entity->get_record()->adopt_handle(handle);
         core->liveness_bind(
             handle,
-            core->get_liveness_core()->reserve_route(),
+            Internals::get_liveness_core(core)->reserve_route(),
             entity,
             entity->get_record(),
             p_container

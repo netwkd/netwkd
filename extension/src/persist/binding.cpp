@@ -12,6 +12,7 @@
 #include "netw/object_port.hpp"
 #include "netw/schema_core.hpp"
 #include "netw/script/model.hpp"
+#include "netw/session/books.hpp"
 
 using namespace godot;
 
@@ -128,21 +129,21 @@ void order_by_key(
 }
 
 bool schema_matches(
-    NetwMultiplayer *p_session,
+    const SchemaCore &p_schemas,
     const RID &p_schema,
     const LocalVector<BoundColumn> &p_bound,
     const LocalVector<int> &p_types,
     int p_version
 ) {
-    SchemaCore *core = p_session->get_schema_core();
-    if (core->column_count(p_schema) != int(p_bound.size())
-        || core->storage_version_of(p_schema) != p_version) {
+    if (p_schemas.column_count(p_schema) != int(p_bound.size())
+        || p_schemas.storage_version_of(p_schema) != p_version) {
         return false;
     }
     for (uint32_t at = 0; at < p_bound.size(); ++at) {
-        const int column = core->find_column(p_schema, p_bound[at].key);
-        if (column < 0 || core->column_type(p_schema, column) != p_types[at]
-            || core->column_stride(p_schema, column) != 1) {
+        const int column = p_schemas.find_column(p_schema, p_bound[at].key);
+        if (column < 0
+            || p_schemas.column_type(p_schema, column) != p_types[at]
+            || p_schemas.column_stride(p_schema, column) != 1) {
             return false;
         }
     }
@@ -151,6 +152,7 @@ bool schema_matches(
 
 RID durable_schema(
     NetwMultiplayer *p_session,
+    SchemaCore &p_schemas,
     const StringName &p_name,
     const LocalVector<BoundColumn> &p_bound,
     const LocalVector<int> &p_types,
@@ -160,7 +162,7 @@ RID durable_schema(
     const int version = p_config->get_storage_version();
     const RID existing = p_session->schema_find(p_name);
     if (existing.is_valid()) {
-        if (!schema_matches(p_session, existing, p_bound, p_types, version)) {
+        if (!schema_matches(p_schemas, existing, p_bound, p_types, version)) {
             r_detail = "Another entity already declared it with other "
                        "columns, types or storage version. Declare the same "
                        "saved properties on both.";
@@ -177,14 +179,13 @@ RID durable_schema(
             1
         );
     }
-    SchemaCore *core = p_session->get_schema_core();
-    core->set_storage_version(schema, version);
+    p_schemas.set_storage_version(schema, version);
     const Dictionary steps = p_config->get_migrations();
     const Array froms = steps.keys();
     for (int at = 0; at < froms.size(); ++at) {
         const Callable step = steps[froms[at]];
         game_call_declared(step, MIGRATION_STEP);
-        core->add_migration(schema, int(froms[at]), step);
+        p_schemas.add_migration(schema, int(froms[at]), step);
     }
     if (p_session->schema_seal(schema) != OK) {
         r_detail = "Its columns could not be built into a table.";
@@ -199,8 +200,13 @@ Bindings::~Bindings() {
     clear();
 }
 
-void Bindings::bind(NetwMultiplayer *p_session) {
+void Bindings::bind(
+    NetwMultiplayer *p_session,
+    const netw::session::Books *p_books
+) {
+    NETW_BUG_COND(p_session != nullptr && p_books == nullptr);
     session = p_session;
+    books = p_session != nullptr ? p_books : nullptr;
 }
 
 Binding *Bindings::at(const RID &p_binding) {
@@ -476,8 +482,15 @@ RID Bindings::compile(Node *p_root) {
         bound[at].index = int(at);
     }
     String detail;
-    const RID schema
-        = durable_schema(session, schema_name, bound, types, config, detail);
+    const RID schema = durable_schema(
+        session,
+        *books->schemas,
+        schema_name,
+        bound,
+        types,
+        config,
+        detail
+    );
     if (!schema.is_valid()) {
         fault::raise(
             session,

@@ -7,9 +7,9 @@
 #include "godot/node.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/schema_core.hpp"
-#include "netw/api/sync_model.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/repl/set_model.hpp"
+#include "netw/repl/sync_model.hpp"
 
 using namespace godot;
 

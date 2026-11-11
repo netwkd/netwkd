@@ -1,11 +1,10 @@
-#include "netw/api/sync_pipeline.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 #include <cstdlib>
 
 #include "godot/class_db.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/utility.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/api/member_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -21,6 +20,8 @@
 #include "netw/property_set_builder.hpp"
 #include "netw/repl/snapshot_frame.hpp"
 #include "netw/script/model.hpp"
+#include "netw/session/books.hpp"
+#include "netw/session/event_plane.hpp"
 #include "netw/subsystems.hpp"
 #include "netw/sync_authoring.hpp"
 
@@ -77,17 +78,16 @@ uint64_t interpolated_mask(
 
 #if defined(NETW_TESTS)
 struct ReceiveAllocations {
-    NetwMultiplayer *plane;
+    session::IdleWork *idle;
     const int64_t opened;
 
-    explicit ReceiveAllocations(NetwMultiplayer *p_plane)
-        : plane(p_plane), opened(store::allocations_seen()) {
+    explicit ReceiveAllocations(session::IdleWork *p_idle)
+        : idle(p_idle), opened(store::allocations_seen()) {
     }
 
     ~ReceiveAllocations() {
-        if (plane != nullptr) {
-            plane->idle_work.receive_allocations
-                += store::allocations_seen() - opened;
+        if (idle != nullptr) {
+            idle->receive_allocations += store::allocations_seen() - opened;
         }
     }
 };
@@ -103,9 +103,11 @@ Object *SyncPipeline::api() const {
     return gd::instance_from_id(api_id);
 }
 
-void SyncPipeline::set_core(Object *p_core) {
+void SyncPipeline::set_core(Object *p_core, const session::Books *p_books) {
     NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_core);
+    NETW_BUG_COND(plane != nullptr && p_books == nullptr);
     core_id = gd::instance_id(plane);
+    books = plane != nullptr ? p_books : nullptr;
     hears_entity_live = plane != nullptr;
 }
 
@@ -141,7 +143,7 @@ ReplicationSend *SyncPipeline::row_send() {
     NetwMultiplayer *plane = core();
     if (!row_sender_armed && plane != nullptr) {
         row_sender_armed = true;
-        row_sender.watch_store(&plane->store());
+        row_sender.watch_store(books->store);
     }
     return &row_sender;
 }
@@ -154,7 +156,7 @@ store::Landing SyncPipeline::decode_row(
     bool p_windowed
 ) {
     NetwMultiplayer *plane = core();
-    const int64_t route = plane->get_liveness_core()->route_of(p_entity);
+    const int64_t route = books->liveness->route_of(p_entity);
     NETW_ZONE_LEAF_F(
         "Row decode",
         colors::CODEC,
@@ -163,7 +165,7 @@ store::Landing SyncPipeline::decode_row(
         static_cast<long long>(route)
     );
     NETW_ZONE_VALUE(p_payload.size());
-    const store::Landing landed = plane->store().receive(
+    const store::Landing landed = books->store->receive(
         p_at,
         int(p_sender),
         p_payload,
@@ -224,7 +226,7 @@ void SyncPipeline::register_derived(Node *p_node) {
 
 PropertySet *SyncPipeline::set_of(uint64_t p_set) const {
     NetwMultiplayer *plane = core();
-    return plane != nullptr ? plane->property_set_book().get(p_set) : nullptr;
+    return plane != nullptr ? books->sets->get(p_set) : nullptr;
 }
 
 Error SyncPipeline::register_property_set(Node *p_node, uint64_t p_set) {
@@ -234,7 +236,7 @@ Error SyncPipeline::register_property_set(Node *p_node, uint64_t p_set) {
     }
     NETW_ZONE_NC("SyncPipeline register property set", colors::WIRE);
     NETW_ZONE_VALUE(bindings.size());
-    repl::BindingBook &book = core()->property_binding_book();
+    repl::BindingBook &book = *books->bindings;
     PropertyBinding *held = nullptr;
     if (const LocalVector<uint64_t> *same = node_bindings(p_node)) {
         for (uint32_t at = 0; at < same->size(); ++at) {
@@ -431,7 +433,7 @@ PropertyBindingPtr SyncPipeline::derived_binding(
 
 repl::BindingBook *SyncPipeline::binding_book() const {
     NetwMultiplayer *plane = core();
-    return plane != nullptr ? &plane->property_binding_book() : nullptr;
+    return plane != nullptr ? books->bindings : nullptr;
 }
 
 PropertyBinding *SyncPipeline::live(uint64_t p_binding) const {
@@ -591,7 +593,7 @@ void SyncPipeline::watch_tree() {
     }
     tree_watched = true;
     NetwMultiplayer::tree_watch_removals(plane);
-    plane->store().residents.watch(true);
+    books->store->residents.watch(true);
     for (uint32_t at = 0; at < bindings.size(); ++at) {
         Node *node = live(bindings[at])->node();
         if (node == nullptr || !node->is_inside_tree()) {
@@ -690,8 +692,8 @@ void SyncPipeline::retire(uint64_t p_binding) {
     if (plane == nullptr) {
         return;
     }
-    plane->store().remove_owner(p_binding);
-    plane->property_binding_book().retire(p_binding);
+    books->store->remove_owner(p_binding);
+    books->bindings->retire(p_binding);
 }
 
 void SyncPipeline::remove_binding(uint32_t p_at) {
@@ -719,11 +721,11 @@ void SyncPipeline::remove_binding(uint32_t p_at) {
 void SyncPipeline::clear_bindings() {
     NetwMultiplayer *plane = core();
     if (plane != nullptr) {
-        plane->store().clear();
+        books->store->clear();
         for (const uint64_t held : bindings) {
-            plane->property_binding_book().retire(held);
+            books->bindings->retire(held);
         }
-        plane->property_binding_book().clear_nodes();
+        books->bindings->clear_nodes();
     }
     for (const uint64_t entity_key : binding_entities) {
         NetwEntity *entity = entity_key != 0
@@ -824,7 +826,7 @@ void SyncPipeline::bind_declaration(const PropertyBindingPtr &p_binding) {
         capture_declaration_key(p_binding);
     }
     const RID rid = entity->get_rid_handle();
-    int64_t route = plane->get_liveness_core()->route_of(rid);
+    int64_t route = books->liveness->route_of(rid);
     if (route <= 0) {
         route = entity->get_route();
     }
@@ -1246,7 +1248,7 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
 
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
-            plane->profiler_outgoing_subject(),
+            *books->profiler_outgoing,
             plane->profiler_member(
                 int64_t(frame[StringName("route")]),
                 set->get_channel(),
@@ -1345,7 +1347,7 @@ void SyncPipeline::send_signal(
 
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
-            plane->profiler_outgoing_subject(),
+            *books->profiler_outgoing,
             plane->profiler_member(
                 int64_t(frame[StringName("route")]),
                 channel_signal,
@@ -1491,8 +1493,8 @@ void SyncPipeline::close_datagram() {
     if (plane == nullptr) {
         return;
     }
-    store::World &world = plane->store();
-    NetwPredictionEngine *const predictor = plane->get_prediction_engine();
+    store::World &world = *books->store;
+    NetwPredictionEngine *const predictor = books->prediction;
     for (const HeldDelivery &held : due) {
         const store::RowAddress at = world.row_of(held.binding, 0);
         if (!at.valid()) {
@@ -1555,7 +1557,7 @@ void SyncPipeline::apply_row(
         return;
     }
 #if defined(NETW_TESTS)
-    const ReceiveAllocations counted(plane);
+    const ReceiveAllocations counted(books->idle);
 #endif
     const int64_t route = plane->liveness_route_of(p_entity.ptr());
     if (!plane->is_host() && p_sender == SERVER_PEER && p_ordinal >= 0
@@ -1616,7 +1618,7 @@ void SyncPipeline::apply_row(
     const bool known = book.names(int(p_sender), named.token, addressed);
     const bool names_this_lane = known && addressed.route == route
         && addressed.ordinal == uint8_t(p_ordinal);
-    store::World &world = plane->store();
+    store::World &world = *books->store;
     const store::RowAddress at
         = world.row_of(binding->id, p_lane == LANE_RETAINED ? 1 : 0);
     if (!names_this_lane || !at.valid()) {
@@ -1724,7 +1726,7 @@ void SyncPipeline::apply_row(
     binding->settle_arrival();
     const uint32_t slot = table.slots[at.row];
     const int64_t predicted = retained ? -1 : world.predict_of(slot);
-    NetwPredictionEngine *const predictor = plane->get_prediction_engine();
+    NetwPredictionEngine *const predictor = books->prediction;
     const predict::Listener listener = predicted < 0
         ? predict::Listener::NONE
         : predictor->listener_for(predicted, world.ref_of(slot), binding);
@@ -1756,7 +1758,7 @@ void SyncPipeline::apply_row(
     );
     sync_model->note_row_applied();
 #if defined(NETW_TESTS)
-    plane->idle_work.received_rows += 1;
+    books->idle->received_rows += 1;
 #endif
     const store::RowAddress landed_at
         = world.row_of(binding->id, p_lane == LANE_RETAINED ? 1 : 0);
@@ -1824,13 +1826,13 @@ void SyncPipeline::feed_derived_interpolation(
     if (node == nullptr || !p_at.valid()) {
         return;
     }
-    const store::Table &table = plane->store().table(p_at.table);
+    const store::Table &table = books->store->table(p_at.table);
     const bool authoring
         = p_binding->get_set()->get_stamp() != PropertySet::STAMP_NONE
         && table.family != store::Family::RETAINED;
     int64_t tick = table.received_ticks[p_at.row];
     if (!authoring) {
-        const ClockEngine &clock = plane->clock_engine();
+        const ClockEngine &clock = *books->clock;
         tick = clock.get_configured() ? clock.get_tick() : 0;
     }
     const uint64_t owner = p_binding->id;
@@ -1905,8 +1907,8 @@ void SyncPipeline::clear_session() {
     row_sender_armed = false;
     NetwMultiplayer *plane = core();
     if (plane != nullptr) {
-        plane->store().clear_peers();
-        plane->get_prediction_engine()->release_bindings();
+        books->store->clear_peers();
+        books->prediction->release_bindings();
     }
 }
 
@@ -1938,7 +1940,7 @@ void SyncPipeline::clear_peer(int64_t p_peer_id) {
     }
     NetwMultiplayer *plane = core();
     if (plane != nullptr) {
-        plane->store().forget_sender(int(p_peer_id));
+        books->store->forget_sender(int(p_peer_id));
     }
 }
 
@@ -2029,7 +2031,7 @@ void SyncPipeline::handle_property_sync(
         return;
     }
 
-    NETW_NETWORK_PROFILE(plane->profiler().name_arrival(plane->profiler_member(
+    NETW_NETWORK_PROFILE(books->profiler->name_arrival(plane->profiler_member(
         plane->liveness_route_of(p_entity.ptr()),
         channel_property,
         p_comp_node,
@@ -2158,7 +2160,7 @@ void SyncPipeline::handle_signal(
         return;
     }
 
-    NETW_NETWORK_PROFILE(plane->profiler().name_arrival(plane->profiler_member(
+    NETW_NETWORK_PROFILE(books->profiler->name_arrival(plane->profiler_member(
         plane->liveness_route_of(p_entity.ptr()),
         channel_signal,
         p_comp_node,
@@ -2276,7 +2278,7 @@ int64_t SyncPipeline::receive_tick() const {
     if (plane == nullptr) {
         return 0;
     }
-    const ClockEngine &clock = plane->clock_engine();
+    const ClockEngine &clock = *books->clock;
     if (clock.get_configured()) {
         return clock.get_tick();
     }

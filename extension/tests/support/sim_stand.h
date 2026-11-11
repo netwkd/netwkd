@@ -5,6 +5,7 @@
 #include "godot/multiplayer.hpp"
 #include "godot/node.hpp"
 #include "godot/scene_tree.hpp"
+#include "internals.h"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -157,7 +158,7 @@ public:
             config->set("tickrate", p_tickrate);
             config->set("display_offset", p_display_offset);
             api->clock_initialize(config);
-            api->clock_engine().set_manual_tick(true);
+            Internals::clock_engine(api).set_manual_tick(true);
             godot::Array types;
             types.push_back(int(godot::Variant::STRING));
             godot::Array quantizers;
@@ -185,7 +186,7 @@ public:
     void step_ticks(int p_ticks) {
         for (int tick = 0; tick < p_ticks; ++tick) {
             for (const godot::Ref<netw::NetwMultiplayer> &api : apis) {
-                api->clock_engine().force_step(1);
+                Internals::clock_engine(api).force_step(1);
             }
             link->advance_time(1000.0 / double(tickrate));
             for (const godot::Ref<netw::NetwMultiplayer> &api : apis) {

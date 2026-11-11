@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/loopback_rig.h"
@@ -19,7 +20,7 @@ using netw::NetwDespawnOpts;
 using netw::NetwEntity;
 
 int64_t rewind_slot(netw::NetwMultiplayer *p_api, const RID &p_entity) {
-    return p_api->get_lagcomp_core()->timeline_slot_of(
+    return Internals::get_lagcomp_core(p_api)->timeline_slot_of(
         p_api->entity_get_view(p_entity)
     );
 }
@@ -63,7 +64,7 @@ TEST_CASE(
 
     const int64_t history = rewind_slot(api, entity);
     REQUIRE(history >= 0);
-    api->get_lagcomp_core()
+    Internals::get_lagcomp_core(api)
         ->timeline_record(history, SEEDED_TICK, at(SEEDED_X));
 
     Ref<NetwDespawnOpts> opts;
@@ -120,7 +121,7 @@ TEST_CASE(
     const Ref<NetwEntity> wrapper = NetwEntity::of(body);
     const int64_t history = rewind_slot(api, entity);
     REQUIRE(history >= 0);
-    api->get_lagcomp_core()
+    Internals::get_lagcomp_core(api)
         ->timeline_record(history, SEEDED_TICK, at(SEEDED_X));
 
     rig.server()->lagcomp_timeline_undeclare(entity);

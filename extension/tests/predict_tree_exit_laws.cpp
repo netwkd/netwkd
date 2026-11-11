@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/fault_log.h"
@@ -8,8 +9,8 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/predict/engine.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 namespace TestNetwPredictTreeExitLaws {
 
@@ -58,27 +59,31 @@ struct ExitRig {
 
     int64_t slot(int p_side) const {
         Node *held = owner(p_side);
-        return held != nullptr ? api(p_side)->get_prediction_engine()->slot_of(
-                                     netw::NetwEntity::of(held)
-                                 )
+        return held != nullptr ? Internals::get_prediction_engine(api(p_side))
+                                     ->slot_of(netw::NetwEntity::of(held))
                                : int64_t(-1);
     }
 
     BookSizes books(int p_side) const {
         netw::NetwMultiplayer *session = api(p_side);
         BookSizes sizes;
-        sizes.slots_open = session->get_prediction_engine()->open_count();
-        sizes.store_slots = int64_t(session->store().live_slot_count());
-        sizes.bindings = int64_t(session->property_binding_book().count());
-        sizes.derived_sets
-            = int64_t(session->sync_pipeline()
-                          ->counters()[StringName("derived_sets_active")]);
+        sizes.slots_open
+            = Internals::get_prediction_engine(session)->open_count();
+        sizes.store_slots
+            = int64_t(Internals::store(session).live_slot_count());
+        sizes.bindings
+            = int64_t(Internals::property_binding_book(session).count());
+        sizes.derived_sets = int64_t(
+            Internals::sync_pipeline(session)
+                ->counters()[StringName("derived_sets_active")]
+        );
         return sizes;
     }
 
     int64_t sync_counter(int p_side, const char *p_name) const {
         return int64_t(
-            api(p_side)->sync_pipeline()->counters()[StringName(p_name)]
+            Internals::sync_pipeline(api(p_side))
+                ->counters()[StringName(p_name)]
         );
     }
 

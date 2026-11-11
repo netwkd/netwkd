@@ -13,6 +13,10 @@ namespace netw {
 class NetwMultiplayer;
 } // namespace netw
 
+namespace netw::session {
+struct Books;
+} // namespace netw::session
+
 namespace netw::persist {
 
 struct BoundColumn {
@@ -54,13 +58,17 @@ class Bindings {
     godot::HashSet<uint64_t> refused;
     godot::LocalVector<godot::RID> order;
     NetwMultiplayer *session = nullptr;
+    const netw::session::Books *books = nullptr;
 
     void forget(const godot::RID &p_binding);
 
 public:
     ~Bindings();
 
-    void bind(NetwMultiplayer *p_session);
+    void bind(
+        NetwMultiplayer *p_session,
+        const netw::session::Books *p_books
+    );
 
     godot::RID compile(godot::Node *p_root);
     godot::RID find(godot::Node *p_root) const;

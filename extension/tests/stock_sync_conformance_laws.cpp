@@ -4,7 +4,7 @@
 
 #include "netw/api/entity.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_compat.hpp"
+#include "netw/repl/sync_compat.hpp"
 
 #include "support/fault_log.h"
 #include "support/minted_script.h"

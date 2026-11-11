@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -11,6 +12,7 @@ namespace TestNetwSceneReleaseNoticeLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 RID mount(const Ref<NetwMultiplayer> &p_core, Node *p_parent) {
     Node *container = memnew(Node);
@@ -18,7 +20,7 @@ RID mount(const Ref<NetwMultiplayer> &p_core, Node *p_parent) {
     Node *level = memnew(Node);
     level->set_name("Arena");
     container->add_child(level);
-    const RID handle = p_core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(p_core)->entity_create();
     Ref<netw::NetwEntity> wrapper;
     wrapper.instantiate();
     netw::NetwEntityRecord *const record = wrapper->get_record();
@@ -26,7 +28,7 @@ RID mount(const Ref<NetwMultiplayer> &p_core, Node *p_parent) {
     record->set_declares_scene(true);
     REQUIRE(p_core->liveness_bind(
         handle,
-        p_core->get_liveness_core()->reserve_route(),
+        Internals::get_liveness_core(p_core)->reserve_route(),
         wrapper,
         record,
         container

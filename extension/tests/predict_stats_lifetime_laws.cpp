@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -15,6 +16,7 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPredictionEngine;
 using netw::NetwPredictStats;
+using netw_test::Internals;
 
 String facts_off_their_fallback(const Dictionary &p_read) {
     String differing;
@@ -36,7 +38,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    NetwPredictionEngine *pool = core->get_prediction_engine();
+    NetwPredictionEngine *pool = Internals::get_prediction_engine(core);
 
     Node *body = memnew(Node);
     body->set_name("Predicted");
@@ -62,7 +64,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    NetwPredictionEngine *pool = core->get_prediction_engine();
+    NetwPredictionEngine *pool = Internals::get_prediction_engine(core);
 
     Node *body = memnew(Node);
     body->set_name("Departed");

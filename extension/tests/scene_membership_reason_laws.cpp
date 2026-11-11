@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -16,6 +17,7 @@ namespace TestNetwSceneMembershipReasonLaws {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::SceneMembership;
+using netw_test::Internals;
 
 constexpr int64_t ONE = 11;
 constexpr int64_t TWO = 12;
@@ -84,11 +86,11 @@ Declared declare_scene(
     made.owner->set_name(p_stem);
     p_parent->add_child(made.owner);
     made.wrapper.instantiate();
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     netw::NetwEntityRecord *record = made.wrapper->get_record();
     record->adopt_handle(made.handle);
     record->set_declares_scene(true);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         made.handle,
         route,
@@ -264,9 +266,9 @@ TEST_CASE(
     Node *root = memnew(Node);
     const Declared arena = declare_scene(core, root, "Arena");
     const StringName owned = core->scene_layer_id(arena.handle);
-    core->get_scene_core()
+    Internals::get_scene_core(core)
         ->scene_enter(arena.handle, StringName("Arena"), false);
-    REQUIRE(core->get_scene_core()->is_live(arena.handle));
+    REQUIRE(Internals::get_scene_core(core)->is_live(arena.handle));
 
     const RID layer = core->interest_layer_create(owned);
     REQUIRE(layer.is_valid());

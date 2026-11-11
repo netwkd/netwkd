@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -5,10 +6,10 @@
 #include "godot/spatial_node.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/schema_core.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/repl/property_set.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 namespace TestNetwBindingBookLaws {
 
@@ -22,6 +23,7 @@ using netw::repl::PropertyBinding;
 using netw::repl::PropertyColumn;
 using netw::repl::PropertySet;
 using netw::repl::SetBook;
+using netw_test::Internals;
 
 uint64_t sealed_pose(SetBook &r_sets) {
     const uint64_t declared = r_sets.create();
@@ -84,26 +86,27 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    SyncPipeline *pipeline = session->sync_pipeline();
+    SyncPipeline *pipeline = Internals::sync_pipeline(session);
     REQUIRE(pipeline != nullptr);
-    BindingBook &book = session->property_binding_book();
-    NetwPredictionEngine *pool = session->get_prediction_engine();
+    BindingBook &book = Internals::property_binding_book(session);
+    NetwPredictionEngine *pool = Internals::get_prediction_engine(session);
     Node3D *node = memnew(Node3D);
 
-    const uint64_t declared = sealed_pose(session->property_set_book());
+    const uint64_t declared
+        = sealed_pose(Internals::property_set_book(session));
     REQUIRE(int(pipeline->register_property_set(node, declared)) == int(OK));
     PropertyBinding *held
         = pipeline->derived_binding(node, PropertySet::RECORD_STATE);
     REQUIRE(held != nullptr);
     const uint64_t id = held->id;
-    const bool admitted = session->store().row_of(id, 0).valid();
+    const bool admitted = Internals::store(session).row_of(id, 0).valid();
     CHECK(admitted);
     const int64_t slot = pool->open();
     REQUIRE(slot >= 0);
     pool->bind_property_sets(slot, held, nullptr);
 
     pipeline->unregister_derived(node);
-    const bool off_the_store = !session->store().row_of(id, 0).valid();
+    const bool off_the_store = !Internals::store(session).row_of(id, 0).valid();
     CHECK(off_the_store);
     const bool off_the_pipeline
         = pipeline->derived_binding(node, PropertySet::RECORD_STATE) == nullptr;
@@ -127,13 +130,14 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    SyncPipeline *pipeline = session->sync_pipeline();
+    SyncPipeline *pipeline = Internals::sync_pipeline(session);
     REQUIRE(pipeline != nullptr);
-    NetwPredictionEngine *pool = session->get_prediction_engine();
+    NetwPredictionEngine *pool = Internals::get_prediction_engine(session);
     Node3D *first = memnew(Node3D);
     Node3D *second = memnew(Node3D);
 
-    const uint64_t declared = sealed_pose(session->property_set_book());
+    const uint64_t declared
+        = sealed_pose(Internals::property_set_book(session));
     REQUIRE(int(pipeline->register_property_set(first, declared)) == int(OK));
     REQUIRE(int(pipeline->register_property_set(second, declared)) == int(OK));
     const int64_t named = pool->open();
@@ -149,17 +153,17 @@ TEST_CASE(
         pipeline->derived_binding(second, PropertySet::RECORD_STATE)
     );
     NETW_CHECK_EQ(
-        int64_t(session->property_binding_book().count()),
+        int64_t(Internals::property_binding_book(session).count()),
         int64_t(2)
     );
 
     session->clear_session_state();
     NETW_CHECK_EQ(
-        int64_t(session->property_binding_book().retired_count()),
+        int64_t(Internals::property_binding_book(session).retired_count()),
         int64_t(0)
     );
     NETW_CHECK_EQ(
-        int64_t(session->property_binding_book().count()),
+        int64_t(Internals::property_binding_book(session).count()),
         int64_t(0)
     );
     const bool named_gone = pool->state_binding_of(named) == nullptr;

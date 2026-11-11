@@ -1,5 +1,6 @@
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -13,6 +14,7 @@
 #include "netw/predict/engine.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestPredictLateSpawnFrameLaws {
 
@@ -103,9 +105,8 @@ class LateSpawnScenario final : public netw_test::FrameScenario {
         if (node == nullptr) {
             return moved;
         }
-        moved.slot = stand->session(p_side)->get_prediction_engine()->slot_of(
-            NetwEntity::of(node)
-        );
+        moved.slot = Internals::get_prediction_engine(stand->session(p_side))
+                         ->slot_of(NetwEntity::of(node));
         moved.beat = int64_t(node->get("beat"));
         moved.first = int64_t(node->get("first_moved"));
         moved.last = int64_t(node->get("last_moved"));

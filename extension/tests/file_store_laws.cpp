@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/file_access.hpp"
@@ -33,6 +34,7 @@ using netw::NetwSchema;
 using netw::SchemaCore;
 using netw::SchemaRecord;
 using netw::persist::Databases;
+using netw_test::Internals;
 using netw::persist::FileConnection;
 using netw::persist::FileStore;
 using netw::persist::Kind;
@@ -59,7 +61,7 @@ struct World {
     explicit World(const char *p_name) {
         root = scratch_root(p_name);
         session.instantiate();
-        plane = session->get_databases();
+        plane = Internals::get_databases(session);
         database = plane->create("saves");
         schema = session->schema_create("players");
         session

@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -14,6 +15,7 @@ namespace TestNetwSceneWatchVerbLaws {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> peered_core() {
     Ref<NetwMultiplayer> core;
@@ -56,11 +58,11 @@ Declared declare_scene(
     level->set_name(p_stem);
     made.owner->add_child(level);
     made.wrapper.instantiate();
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     made.record = made.wrapper->get_record();
     made.record->adopt_handle(made.handle);
     made.record->set_declares_scene(true);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         made.handle,
         route,
@@ -157,7 +159,7 @@ TEST_CASE(
     Ref<NetwMultiplayer> core = peered_core();
     const CallLog seen;
     core->set_interest_flush(seen.callable("flush"));
-    core->get_channel_book()->register_protocol(
+    Internals::get_channel_book(core)->register_protocol(
         declared_channel_id("SESSION_SCENE_RELEASED"),
         seen.callable("released")
     );

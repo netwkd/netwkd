@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -12,6 +13,7 @@
 #include "netw/store/world.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwStorePeers {
 
@@ -489,11 +491,12 @@ TEST_CASE(
     const PackedInt64Array routes = session->liveness_claim_routes(1);
     REQUIRE(routes.size() == 1);
     const int64_t route = routes[0];
-    World &world = session->store();
+    World &world = Internals::store(session);
     const uint32_t slot
         = world.enter(route, session->liveness_route_epoch(route)).slot;
     const RID layer = session->interest_layer_create(StringName("sight"));
-    const RID entity = session->get_liveness_core()->rid_from_route(int(route));
+    const RID entity
+        = Internals::get_liveness_core(session)->rid_from_route(int(route));
 
     const Error added = session->interest_layer_add_entity(layer, entity);
     session->store_refresh();

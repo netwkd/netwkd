@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/predict_rows.h"
 
@@ -60,7 +61,7 @@ Ref<NetwEntity> seat_player(LoopbackRig &p_rig, Node *p_parent) {
 }
 
 int64_t rewind_slot(NetwMultiplayer *p_core, const Ref<NetwEntity> &p_entity) {
-    NetwLagCompCore *registry = p_core->get_lagcomp_core();
+    NetwLagCompCore *registry = Internals::get_lagcomp_core(p_core);
     REQUIRE(registry != nullptr);
     return registry->timeline_slot_of(p_entity);
 }
@@ -78,7 +79,7 @@ TEST_CASE(
 
     NetwMultiplayer *core = rig.server();
     REQUIRE(core != nullptr);
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     REQUIRE(pool != nullptr);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
@@ -137,7 +138,7 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
 
     NetwMultiplayer *core = rig.server();
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 
@@ -180,7 +181,7 @@ TEST_CASE(
     );
 
     NetwMultiplayer *core = flow_core(rig.server());
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     REQUIRE(pool != nullptr);
     NETW_CHECK_EQ(
         int(core->predict_declare(seated->get_rid_handle())),

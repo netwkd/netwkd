@@ -45,8 +45,6 @@
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
-#include "netw/api/sync_compat.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/auth_protocol.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
@@ -58,6 +56,8 @@
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
+#include "netw/repl/sync_compat.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/scene_loads.hpp"
 #include "netw/script/model.hpp"
 #include "netw/session/frames.hpp"
@@ -144,9 +144,27 @@ NetwMultiplayer::NetwMultiplayer() {
     );
     scene_core.instantiate();
     display_book.instantiate();
-    prediction_engine.bind_session(this);
+    books.clock = &clock;
+    books.store = &store_world;
+    books.sets = &set_book;
+    books.bindings = &binding_book;
+    books.liveness = liveness_core.ptr();
+    books.channels = &channel_book;
+    books.prediction = &prediction_engine;
+    books.runner = &predict_runner;
+    books.sims = &sim_rows;
+    books.slot_engines = &predict_engines;
+    books.schemas = &schema_core;
+#if defined(DEBUG_ENABLED)
+    books.profiler = &network_profiler;
+    books.profiler_outgoing = &profiler_outgoing;
+#endif
+#if defined(NETW_TESTS)
+    books.idle = &idle_work;
+#endif
+    prediction_engine.bind_session(this, &books);
     lagcomp_core.seat_world(&store_world);
-    predict_runner.seat_core(this);
+    predict_runner.seat_core(this, &books);
     sim_rows.seed_with(
         [](void *p_context, sim::Row &r_row) {
             static_cast<NetwMultiplayer *>(p_context)->sim_seed(r_row);
@@ -263,7 +281,7 @@ NetwMultiplayer::NetwMultiplayer() {
 
     ReplicationCore *plane = memnew(ReplicationCore);
     replication_owner = plane;
-    plane->install(this);
+    plane->install(this, &books);
     plane->get_sync_model()->attach_book(&binding_book);
 
     scene_install();
@@ -3440,6 +3458,22 @@ session_decl::Book &NetwMultiplayer::declaration_book() {
     return declaration_slots;
 }
 
+void NetwMultiplayer::declarations_install_from(Node *p_scope) {
+    declaration_slots.install_from(this, p_scope);
+}
+
+void NetwMultiplayer::declarations_withdraw(
+    ObjectID p_scope,
+    session_decl::Kind p_kind,
+    uint64_t p_generation
+) {
+    declaration_slots.withdraw(p_scope, p_kind, p_generation);
+}
+
+FaultBook::Admit NetwMultiplayer::fault_admit(const FaultKey &p_key) {
+    return faults.admit(p_key, clock_get_tick());
+}
+
 PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
     r_answered = true;
     const Ref<NetwServerInfo> base = NetwServerInfo::from_session(this);
@@ -4808,6 +4842,10 @@ Ref<NetwLivenessCore> NetwMultiplayer::get_liveness_core() const {
 
 Ref<NetwSceneCore> NetwMultiplayer::get_scene_core() const {
     return scene_core;
+}
+
+bool NetwMultiplayer::scene_is_live(const RID &p_scene) const {
+    return scene_core->is_live(p_scene);
 }
 
 JoinRoster &NetwMultiplayer::join_book() {

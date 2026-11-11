@@ -38,7 +38,7 @@ void NetwMultiplayer::diag_poll() {
     if (prediction_rings != nullptr) {
         NETW_ZONE_NC("Prediction rings sample", colors::PREDICTION);
         diag_gather(prediction_rings->sources);
-        prediction_rings->sample(*this);
+        prediction_rings->sample(books, *this);
         NETW_ZONE_VALUE(prediction_rings->rows().size());
         diag::draw_ring_rows(prediction_rings->rows(), diag_drawing);
     }
@@ -46,7 +46,7 @@ void NetwMultiplayer::diag_poll() {
         {
             NETW_ZONE_NC("Interpolation view sample", colors::INTERP);
             diag_gather(interpolation_view->sources);
-            interpolation_view->sample(*this);
+            interpolation_view->sample(books);
             NETW_ZONE_VALUE(interpolation_view->rows().size());
         }
         NETW_ZONE_NC("Interpolation view draw", colors::INTERP);

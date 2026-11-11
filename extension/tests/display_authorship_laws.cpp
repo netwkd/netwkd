@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -19,11 +20,11 @@
 #include "netw/api/member_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/property_config.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/display/book.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/property_set_builder.hpp"
 #include "netw/repl/property_set.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 namespace TestNetwDisplayAuthorshipLaws {
 
@@ -36,6 +37,7 @@ using netw::NetwMultiplayer;
 using netw::NetwPropertyConfig;
 using netw::repl::PropertySet;
 using netw::repl::SetBook;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -136,11 +138,13 @@ class AuthorshipRun {
         body->add_child(visual);
         const Ref<NetwEntity> entity = NetwEntity::ensure(body);
         entity->get_display()->set_visual_root(NodePath("Visual"));
-        const uint64_t set = declare_stream(p_core->property_set_book(), body);
+        const uint64_t set
+            = declare_stream(Internals::property_set_book(p_core), body);
         entity->set_controller(p_controller);
         p_branch->add_child(body);
         NETW_CHECK_EQ(
-            int(p_core->sync_pipeline()->register_property_set(body, set)),
+            int(Internals::sync_pipeline(p_core)
+                    ->register_property_set(body, set)),
             int(OK)
         );
         p_core->liveness_bind_route(SUBJECT_ROUTE, entity.ptr());
@@ -386,14 +390,14 @@ RigidBody2D *a_state_body(NetwMultiplayer *p_core, Node *p_branch, double p_x) {
     Dictionary configs;
     configs[StringName("position")] = config;
     const uint64_t set = netw_test::sealed_set(
-        p_core->property_set_book(),
+        Internals::property_set_book(p_core),
         configs,
         PropertySet::RECORD_STATE
     );
     REQUIRE(set != SetBook::NONE);
     p_branch->add_child(body);
     NETW_CHECK_EQ(
-        int(p_core->sync_pipeline()->register_property_set(body, set)),
+        int(Internals::sync_pipeline(p_core)->register_property_set(body, set)),
         int(OK)
     );
     p_core->liveness_bind_route(SUBJECT_ROUTE, entity.ptr());

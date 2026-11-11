@@ -1,6 +1,7 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
-#include "netw/api/sync_pipeline.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 
 #if defined(NETW_TIER_HOSTED)
 
@@ -32,7 +33,7 @@ TEST_CASE("[Networked][DeclaredProbe] treeless state reaches encoding") {
     api->property_set_seal(state);
     NETW_CHECK_EQ(int(api->entity_add_property_set(entity, state, 0)), int(OK));
 
-    netw::SyncPipeline *pipeline = api->sync_pipeline();
+    netw::SyncPipeline *pipeline = Internals::sync_pipeline(api);
     REQUIRE(pipeline != nullptr);
     const Dictionary before = pipeline->counters();
 

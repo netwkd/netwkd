@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/fault_log.h"
@@ -10,6 +11,7 @@ namespace TestNetwSessionWhenLive {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> hosting() {
     Ref<NetwMultiplayer> session;
@@ -78,17 +80,17 @@ TEST_CASE(
     Ref<NetwMultiplayer> session;
     session.instantiate();
     session->session_set_role(NetwMultiplayer::ROLE_CLIENT);
-    session->clock_engine().set_configured(true);
-    const int tickrate = session->clock_engine().get_tickrate();
+    Internals::clock_engine(session).set_configured(true);
+    const int tickrate = Internals::clock_engine(session).get_tickrate();
 
     session->liveness_when_live(7, Callable(), 0, Callable());
     session->clock_ingest_pong(0.05, 840, 0.0, false);
-    REQUIRE(session->clock_engine().get_tick() > tickrate);
+    REQUIRE(Internals::clock_engine(session).get_tick() > tickrate);
     session->liveness_poll_now();
     NETW_CHECK_EQ(session->liveness_pending_live_count(), 1);
 
     const netw_test::FaultWatch faults;
-    session->clock_engine().force_step(tickrate);
+    Internals::clock_engine(session).force_step(tickrate);
     session->liveness_poll_now();
     NETW_CHECK_EQ(session->liveness_pending_live_count(), 0);
     NETW_CHECK_EQ(faults.warnings_containing("[NW1021]"), 1);

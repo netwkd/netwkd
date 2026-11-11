@@ -4,8 +4,8 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_stats.hpp"
 #include "netw/api/prediction.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/property_set_builder.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/script/model.hpp"
 #include "netw/wire/registry.hpp"
 
@@ -30,6 +30,7 @@
 #include "netw/predict/tick_work.hpp"
 #include "netw/profile.hpp"
 #include "netw/project.hpp"
+#include "netw/session/books.hpp"
 #include "netw/stage.hpp"
 #include "netw/store/port.hpp"
 
@@ -3072,7 +3073,7 @@ void NetwPredictionEngine::bind_store(
     if (row == nullptr || host == nullptr) {
         return;
     }
-    store::World &world = host->store();
+    store::World &world = *books->store;
     if (row->store != p_ref) {
         unbind_store(p_slot);
     }
@@ -3094,7 +3095,7 @@ void NetwPredictionEngine::unbind_store(int64_t p_slot) {
     if (host == nullptr) {
         return;
     }
-    store::World &world = host->store();
+    store::World &world = *books->store;
     if (world.holds(held) && world.predict_of(held.slot) == p_slot) {
         world.bind_predict(held.slot, -1);
     }
@@ -3233,7 +3234,7 @@ bool NetwPredictionEngine::reconfigure_from(
     const Ref<NetwEntity> seated = owner_entity(p_slot);
     const RID entity = seated.is_valid() ? seated->get_rid_handle() : RID();
     const sim::Row *standing
-        = host != nullptr ? host->sim_row_of(entity) : nullptr;
+        = host != nullptr ? books->sims->row_of(entity) : nullptr;
     const bool declared
         = standing != nullptr && standing->choice.declared(true);
     const bool selected = standing != nullptr
@@ -5424,7 +5425,7 @@ void NetwPredictionEngine::refresh_simulation_gate(
     const bool solver = handle != nullptr
         && handle->get_archetype()
             == int(NetwPrediction::ARCHETYPE_SOLVER_BODY);
-    const sim::Row *row = host->sim_row_of(entity);
+    const sim::Row *row = books->sims->row_of(entity);
     const bool leads = row != nullptr && sim::leads(row->mode);
     host->simulation_gate_set(entity, !p_force_release && solver && leads);
 }
@@ -8881,7 +8882,7 @@ void NetwPredictionEngine::refresh_selection(
     const TypedArray<NetwEntity> promoted
         = host->sim_select(owner, admitted, drive_frontier(p_slot));
     if (p_joint) {
-        const sim::Row *standing = host->sim_row_of(subject);
+        const sim::Row *standing = books->sims->row_of(subject);
         sim::Selection joint;
         if (standing != nullptr) {
             joint.owner_order_key = standing->selection.owner_order_key;
@@ -9588,10 +9589,14 @@ int NetwPredictionEngine::journal_capacity(int64_t p_slot) const {
     return row != nullptr ? row->journal.capacity_limit() : 0;
 }
 
-void NetwPredictionEngine::bind_session(NetwMultiplayer *p_core) {
+void NetwPredictionEngine::bind_session(
+    NetwMultiplayer *p_core,
+    const session::Books *p_books
+) {
+    NETW_BUG_COND(p_core != nullptr && p_books == nullptr);
     core_id = gd::instance_id(p_core);
-    binding_book
-        = p_core != nullptr ? &p_core->property_binding_book() : nullptr;
+    books = p_core != nullptr ? p_books : nullptr;
+    binding_book = books != nullptr ? books->bindings : nullptr;
 }
 
 void NetwPredictionEngine::attach_bindings(repl::BindingBook *p_book) {
@@ -9938,7 +9943,7 @@ void declare_parts(
 
 int64_t NetwPredictionEngine::current_tick() const {
     NetwMultiplayer *host = core();
-    return host != nullptr ? host->clock_engine().get_tick() : -1;
+    return host != nullptr ? books->clock->get_tick() : -1;
 }
 
 void NetwPredictionEngine::report_quantum_declaration() {
@@ -11325,7 +11330,7 @@ Dictionary NetwPredictionEngine::reachability_report_of(int64_t p_slot) const {
     const Ref<NetwEntity> seated = owner_entity(p_slot);
     NetwMultiplayer *host = core();
     const sim::Row *standing = host != nullptr && seated.is_valid()
-        ? host->sim_row_of(seated->get_rid_handle())
+        ? books->sims->row_of(seated->get_rid_handle())
         : nullptr;
     int claim = 0;
     if (standing != nullptr && standing->choice.declared(true)) {
@@ -12342,7 +12347,7 @@ void NetwPredictionEngine::read_parts(
     if (host == nullptr) {
         return;
     }
-    const store::World &world = host->store();
+    const store::World &world = *books->store;
     const uint32_t fields
         = std::min(uint32_t(p_row.wiring.codec.count()), r_row.values.size());
     for (const predict::StatePart &part : p_row.parts) {

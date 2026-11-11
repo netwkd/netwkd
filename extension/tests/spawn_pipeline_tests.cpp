@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -12,9 +13,10 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::spawn::Park;
 using netw::spawn::Pipeline;
+using netw_test::Internals;
 
 Pipeline *fresh(const Ref<NetwMultiplayer> &p_core) {
-    Pipeline *pipeline = p_core->spawn_plane();
+    Pipeline *pipeline = Internals::spawn_plane(p_core);
     pipeline->set_channels(11, 12, 13, 14);
     return pipeline;
 }
@@ -62,7 +64,7 @@ TEST_CASE(
 
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Pipeline *pipeline = core->spawn_plane();
+    Pipeline *pipeline = Internals::spawn_plane(core);
     pipeline->set_channels(0, 0, 0, 0);
 
     PackedByteArray payload;
@@ -151,7 +153,7 @@ struct ParkedRelease {
 
     ParkedRelease() {
         core.instantiate();
-        pipeline = core->spawn_plane();
+        pipeline = Internals::spawn_plane(core);
     }
 
     PackedByteArray frame() const {

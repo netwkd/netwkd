@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
@@ -19,6 +20,7 @@
 #include "netw/sim/row.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwClaimsCostFrameLaws {
 
@@ -262,7 +264,7 @@ class CostScenario final : public netw_test::FrameScenario {
                     seen.claimed += 1;
                 }
                 const int64_t route = session->liveness_route_of(entity.ptr());
-                netw::store::World &world = session->store();
+                netw::store::World &world = Internals::store(session);
                 for (uint32_t at = 0; at < world.table_count(); ++at) {
                     const netw::store::Table &table = world.table(at);
                     for (uint32_t row = 0; row < table.row_count(); ++row) {

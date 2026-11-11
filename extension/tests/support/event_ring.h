@@ -3,7 +3,7 @@
 #include "netw_test.h"
 
 #include "godot/variant.hpp"
-#include "netw/api/event_plane.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace netw_test {
 

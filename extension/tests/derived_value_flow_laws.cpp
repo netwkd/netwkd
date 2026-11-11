@@ -12,7 +12,7 @@
 #include "support/netw_cells.h"
 #include "support/value_flow_stand.h"
 
-#include "netw/api/event_plane.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestDerivedValueFlowLaws {
 

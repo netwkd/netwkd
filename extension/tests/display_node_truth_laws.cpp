@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/minted_script.h"
@@ -42,6 +43,7 @@ using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
 using netw_test::LoopbackRig;
+using netw_test::Internals;
 
 constexpr int TICKRATE = 30;
 constexpr int REMOTE_PEER = 2;
@@ -154,7 +156,10 @@ public:
         NetwNativeTests::display_pump_runtime(
             core(),
             NetwNativeTests::display_runtime_of(core(), p_entity),
-            netw::display::capture_timing(&core()->clock_engine(), p_delta)
+            netw::display::capture_timing(
+                &Internals::clock_engine(core()),
+                p_delta
+            )
         );
     }
 
@@ -894,7 +899,7 @@ TEST_CASE(
     netw::display::Runtime *runtime
         = NetwNativeTests::display_runtime_of(bench.core(), subject.rid());
     REQUIRE(runtime != nullptr);
-    netw::ClockEngine &clock = bench.core()->clock_engine();
+    netw::ClockEngine &clock = Internals::clock_engine(bench.core());
 
     const int RATES[] = {15, 60};
     for (const int rate : RATES) {

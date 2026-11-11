@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/netw_call_log.h"
@@ -29,6 +30,7 @@ using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
+using netw_test::Internals;
 
 const char *SENSOR_KEY = "ground";
 
@@ -429,7 +431,8 @@ public:
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         REQUIRE(handle.is_valid());
         policy = handle->resolved_recovery_policy();
-        netw::NetwPredictionEngine *pool = session->get_prediction_engine();
+        netw::NetwPredictionEngine *pool
+            = Internals::get_prediction_engine(session);
         REQUIRE(pool != nullptr);
         const int64_t slot = pool->slot_register(wrapper);
         REQUIRE(slot >= 0);
@@ -539,7 +542,8 @@ void check_auto_resolution(bool p_rigid) {
     );
     NETW_CHECK_EQ(int(handle->resolved_recovery_policy()), expected);
 
-    netw::NetwPredictionEngine *pool = session->get_prediction_engine();
+    netw::NetwPredictionEngine *pool
+        = Internals::get_prediction_engine(session);
     REQUIRE(pool != nullptr);
     const int64_t slot = pool->slot_register(wrapper);
     REQUIRE(slot >= 0);

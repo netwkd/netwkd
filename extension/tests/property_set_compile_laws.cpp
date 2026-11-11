@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/declared_nodes.h"
@@ -22,6 +23,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::repl::PropertyColumn;
 using netw::repl::PropertySet;
+using netw_test::Internals;
 namespace property_set_builder = netw::property_set_builder;
 using netw_test::law_broken;
 using netw_test::law_held;
@@ -109,7 +111,7 @@ public:
                 node
             )
         );
-        const netw::repl::SetBook &sets = session->property_set_book();
+        const netw::repl::SetBook &sets = Internals::property_set_book(session);
         const PropertySet *flat = sets.get(
             property_set_builder::from_script(
                 script,

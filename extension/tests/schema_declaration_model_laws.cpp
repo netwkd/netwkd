@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -12,6 +13,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwQuantizeScalar;
 using netw::NetwSchema;
+using netw_test::Internals;
 namespace schema_model = netw::schema_model;
 using netw::SchemaCore;
 
@@ -257,7 +259,7 @@ TEST_CASE(
     if (!table.is_valid()) {
         return;
     }
-    CHECK(core->store_arrays().is_reliable(table));
+    CHECK(Internals::store_arrays(core).is_reliable(table));
 }
 
 TEST_CASE(

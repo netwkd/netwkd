@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/minted_script.h"
@@ -16,6 +17,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw_test::FlowPair;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
@@ -76,12 +78,12 @@ TEST_CASE(
     const int64_t remote = role_of(client, rid);
     NETW_CHECK_EQ(remote, int64_t(NetwMultiplayer::DISPLAY_ROLE_REMOTE));
 
-    const NetwMultiplayer::IdleWork opened = client->idle_work;
+    const NetwMultiplayer::IdleWork opened = Internals::idle_work(client);
     author_ticks(rig, pair, STEADY);
     const int64_t received
-        = client->idle_work.received_rows - opened.received_rows;
+        = Internals::idle_work(client).received_rows - opened.received_rows;
     const int64_t resolves
-        = client->idle_work.role_resolves - opened.role_resolves;
+        = Internals::idle_work(client).role_resolves - opened.role_resolves;
     NETW_CHECK_GT(received, int64_t(STEADY / 2));
     NETW_CHECK_EQ(resolves, int64_t(0));
     NETW_CHECK_EQ(role_of(client, rid), remote);

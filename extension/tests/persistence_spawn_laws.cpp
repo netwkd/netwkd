@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -31,6 +32,7 @@
 namespace TestPersistenceSpawn {
 
 using namespace godot;
+using netw_test::Internals;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw::NetwQuantize;
@@ -74,9 +76,9 @@ struct World {
         schema->vector2("where", Ref<NetwQuantize>(), 1);
         schema->f64("spin", Ref<NetwQuantize>(), 1);
 
-        database = session->get_databases()->create("saves");
+        database = Internals::get_databases(session)->create("saves");
         connection = MemoryConnection::opened(p_store, "slot1");
-        session->get_databases()
+        Internals::get_databases(session)
             ->open(database, "slot1", NetwPromise::resolved(connection));
 
         arena = memnew(Node);
@@ -316,7 +318,8 @@ TEST_CASE(
     World world("sl7");
     world.bind_both();
     world.store(Vector2(9, 9));
-    world.session->session_plane().set_role(netw::SessionCore::ROLE_CLIENT);
+    Internals::session_plane(world.session)
+        .set_role(netw::SessionCore::ROLE_CLIENT);
     world.spawned();
 
     CHECK_FALSE(world.session->persist_enroll(world.root));
@@ -423,9 +426,9 @@ struct Saved {
         server = rig.server();
         script = netw_test::minted_script(SAVED_SOURCE);
         REQUIRE(script.is_valid());
-        database = server->get_databases()->create("saves");
+        database = Internals::get_databases(server)->create("saves");
         connection = MemoryConnection::opened(p_store, "slot1");
-        server->get_databases()
+        Internals::get_databases(server)
             ->open(database, "slot1", NetwPromise::resolved(connection));
         const Callable build
             = callable_mp_static(&build_saved).bind(script, p_loads_at_spawn);

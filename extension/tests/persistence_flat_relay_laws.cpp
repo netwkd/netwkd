@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -21,6 +22,7 @@
 namespace TestPersistenceFlatRelay {
 
 using namespace godot;
+using netw_test::Internals;
 using netw::NetwDatabase;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
@@ -51,15 +53,15 @@ TEST_CASE(
     schema->replicated(false);
     schema->vector2("where", Ref<NetwQuantize>(), 1);
 
-    const RID one = session->get_databases()->create("saves_one");
-    const RID two = session->get_databases()->create("saves_two");
+    const RID one = Internals::get_databases(session)->create("saves_one");
+    const RID two = Internals::get_databases(session)->create("saves_two");
     const Ref<MemoryConnection> connection_one
         = MemoryConnection::opened("px1a", "slot1");
     const Ref<MemoryConnection> connection_two
         = MemoryConnection::opened("px1b", "slot1");
-    session->get_databases()
+    Internals::get_databases(session)
         ->open(one, "slot1", NetwPromise::resolved(connection_one));
-    session->get_databases()
+    Internals::get_databases(session)
         ->open(two, "slot1", NetwPromise::resolved(connection_two));
 
     const Ref<NetwDatabase> handle_one = session->database_handle(one);
@@ -108,10 +110,10 @@ TEST_CASE(
     schema->replicated(false);
     schema->vector2("where", Ref<NetwQuantize>(), 1);
 
-    const RID database = session->get_databases()->create("saves");
+    const RID database = Internals::get_databases(session)->create("saves");
     const Ref<MemoryConnection> connection
         = MemoryConnection::opened("px2", "slot1");
-    session->get_databases()
+    Internals::get_databases(session)
         ->open(database, "slot1", NetwPromise::resolved(connection));
 
     Node2D *root_a = memnew(Node2D);
@@ -218,10 +220,10 @@ TEST_CASE(
     viewport->set_api(session);
     netw::gd::scene_root()->add_child(viewport);
 
-    const RID database = session->get_databases()->create("saves");
+    const RID database = Internals::get_databases(session)->create("saves");
     const Ref<MemoryConnection> connection
         = MemoryConnection::opened("px4", "slot1");
-    session->get_databases()
+    Internals::get_databases(session)
         ->open(database, "slot1", NetwPromise::resolved(connection));
 
     Node2D *root = memnew(Node2D);
@@ -285,8 +287,9 @@ TEST_CASE(
     );
     Ref<NetwMultiplayer> reader;
     reader.instantiate();
-    const RID reader_database = reader->get_databases()->create("saves");
-    reader->get_databases()->open(
+    const RID reader_database
+        = Internals::get_databases(reader)->create("saves");
+    Internals::get_databases(reader)->open(
         reader_database,
         "slot1",
         NetwPromise::resolved(MemoryConnection::opened("px4", "slot1"))

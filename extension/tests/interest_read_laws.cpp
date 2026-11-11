@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/entity.hpp"
@@ -13,9 +14,10 @@ namespace TestNetwInterestReads {
 using namespace godot;
 using netw::NetwInterestLayer;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 RID entity_of(const Ref<NetwMultiplayer> &p_core) {
-    return p_core->get_liveness_core()->entity_create();
+    return Internals::get_liveness_core(p_core)->entity_create();
 }
 
 TEST_CASE(

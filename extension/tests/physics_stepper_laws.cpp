@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -114,7 +115,7 @@ struct SteppedSpace {
 
 SteppedSpace step_one_space(NetwMultiplayer *p_core, int p_members) {
     SteppedSpace out;
-    NetwPredictionEngine *const pool = p_core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(p_core);
     REQUIRE(pool != nullptr);
     const godot::TypedArray<NetwEntity> seated
         = p_core->predict_stepped_entities();
@@ -152,7 +153,7 @@ SteppedSpace step_one_space(NetwMultiplayer *p_core, int p_members) {
 
 SteppedOwner step_the_island(NetwMultiplayer *p_core) {
     SteppedOwner out;
-    NetwPredictionEngine *const pool = p_core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(p_core);
     REQUIRE(pool != nullptr);
     const godot::TypedArray<NetwEntity> held
         = p_core->predict_stepped_entities();
@@ -245,7 +246,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     SteppedOwner owner = step_the_island(predictor);
     REQUIRE(owner.slot >= 0);
 
@@ -347,7 +349,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     REQUIRE(pool != nullptr);
     SteppedSpace one = step_one_space(predictor, 1);
     const bool one_stands_in_it = one.members.size() == 1;
@@ -459,7 +462,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     SteppedOwner owner = step_the_island(predictor);
     REQUIRE(owner.slot >= 0);
 
@@ -467,7 +471,8 @@ TEST_CASE(
     const FlowPair pair = stand_flow_pair(rig, BYSTANDER, "Bystander");
     const Ref<NetwEntity> bystander = NetwEntity::of(pair.mirror(0));
     netw::sim::Declaration &declared
-        = predictor->sim_row(bystander->get_rid_handle()).declaration;
+        = Internals::sim_row(predictor, bystander->get_rid_handle())
+              .declaration;
     declared.bodies.push_back(godot::NodePath("Body"));
     declared.replicas = netw::sim::Replicas::ACTIVE;
     predictor->sim_settle_body(bystander);
@@ -525,7 +530,8 @@ TEST_CASE(
     const FlowPair pair = stand_flow_pair(rig, BYSTANDER, "Bystander");
     const Ref<NetwEntity> bystander = NetwEntity::of(pair.mirror(0));
     netw::sim::Declaration &declared
-        = predictor->sim_row(bystander->get_rid_handle()).declaration;
+        = Internals::sim_row(predictor, bystander->get_rid_handle())
+              .declaration;
     declared.bodies.push_back(godot::NodePath("Body"));
     declared.replicas = netw::sim::Replicas::ACTIVE;
     predictor->sim_settle_body(bystander);

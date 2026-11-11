@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -17,7 +18,7 @@ constexpr int MINTED_EACH = 1000;
 constexpr int BLOCK = NetwMultiplayer::ROUTE_LEASE_BLOCK;
 
 Ref<NetwLivenessCore> book_of(NetwMultiplayer *p_api) {
-    return p_api->get_liveness_core();
+    return Internals::get_liveness_core(p_api);
 }
 
 int mint_and_spend(LoopbackRig &p_rig, int p_client, int &r_unspent) {

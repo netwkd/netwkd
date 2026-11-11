@@ -2,6 +2,7 @@
 #include "support/netw_test.h"
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/netw_call_log.h"
 #include "support/predict_rows.h"
@@ -95,13 +96,13 @@ struct ActionRig {
 
     int64_t authority_rewind_slot() const {
         netw::NetwMultiplayer *api = rig.server();
-        return api->get_lagcomp_core()->timeline_slot_of(
+        return Internals::get_lagcomp_core(api)->timeline_slot_of(
             api->entity_get_view(rig.entity_of("P"))
         );
     }
 
     bool authority_recorded(int64_t p_tick) const {
-        return rig.server()->get_lagcomp_core()->timeline_recorded_at(
+        return Internals::get_lagcomp_core(rig.server())->timeline_recorded_at(
             authority_rewind_slot(),
             p_tick
         );
@@ -480,7 +481,7 @@ struct ClientAction {
         clock.instantiate();
         clock->set("tickrate", 24);
         REQUIRE(int(rig.server()->clock_initialize(clock)) == int(OK));
-        rig.server()->clock_engine().set_manual_tick(true);
+        Internals::clock_engine(rig.server()).set_manual_tick(true);
         authority->arm_action(rig.server());
         rig.server()->config_settle();
         REQUIRE(rig.server()->lagcomp_is_configured());
@@ -507,7 +508,7 @@ struct ClientAction {
     void fire(int p_view_tick) const {
         owner->fire(p_view_tick, IMMEDIATE);
         if (session()->clock_is_configured()) {
-            session()->clock_engine().set_manual_tick(true);
+            Internals::clock_engine(session()).set_manual_tick(true);
         }
     }
 };

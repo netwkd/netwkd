@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -9,12 +10,12 @@
 
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/property_config.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/api/tests.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/display/history.hpp"
 #include "netw/display/runtime.hpp"
 #include "netw/property_set_builder.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/script/model.hpp"
 #include "netw/store/world.hpp"
 
@@ -26,6 +27,7 @@ using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
+using netw_test::Internals;
 
 enum Plant {
     PLANT_NONE,
@@ -93,15 +95,14 @@ class AuthoringRun {
             )
                   ->state();
         const uint64_t set = netw_test::sealed_set(
-            core->property_set_book(),
+            Internals::property_set_book(core),
             configs,
             netw::repl::PropertySet::RECORD_STATE
         );
         REQUIRE(set != netw::repl::SetBook::NONE);
         NETW_CHECK_EQ(
-            int(
-                core->sync_pipeline()->register_property_set(subject.body, set)
-            ),
+            int(Internals::sync_pipeline(core)
+                    ->register_property_set(subject.body, set)),
             int(OK)
         );
         core->display_mark_dirty(entity, netw::display::DIRT_RUNTIME);
@@ -114,7 +115,7 @@ class AuthoringRun {
         REQUIRE(
             core->display_table_of(subject.body, position, owner, lane, column)
         );
-        netw::store::World &world = core->store();
+        netw::store::World &world = Internals::store(core);
         const netw::store::RowAddress at = world.row_of(owner, lane);
         REQUIRE(at.valid());
         netw::store::Table &table = world.table(at.table);
@@ -126,7 +127,7 @@ class AuthoringRun {
         for (int64_t authored = 0; authored < declared.authored_ticks;
              ++authored) {
             const int64_t received = authored + declared.delay_ticks;
-            core->clock_engine().set_tick(int(received));
+            Internals::clock_engine(core).set_tick(int(received));
             const int64_t keyed = plant_is(PLANT_THE_RECEIVE_TICK_IS_THE_KEY)
                 ? received
                 : authored;

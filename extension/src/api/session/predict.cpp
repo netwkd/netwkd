@@ -32,7 +32,6 @@
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
@@ -40,6 +39,7 @@
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/script/model.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/stage.hpp"
@@ -1458,7 +1458,7 @@ void NetwMultiplayer::register_prediction(const Ref<NetwEntity> &p_entity) {
     if (handle.is_valid()) {
         handle->bind_engine(engine);
     }
-    engine->attach(this, p_entity);
+    engine->attach(this, p_entity, &books);
 }
 
 void NetwMultiplayer::unregister_prediction(const Ref<NetwEntity> &p_entity) {

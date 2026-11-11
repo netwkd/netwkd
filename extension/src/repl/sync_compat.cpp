@@ -1,4 +1,4 @@
-#include "netw/api/sync_compat.hpp"
+#include "netw/repl/sync_compat.hpp"
 
 #include <algorithm>
 
@@ -6,7 +6,6 @@
 #include "godot/resource.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/time.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
@@ -16,6 +15,8 @@
 #include "netw/profile.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/script/model.hpp"
+#include "netw/session/books.hpp"
+#include "netw/session/event_plane.hpp"
 #include "netw/spawn/record.hpp"
 #include "netw/store/validate.hpp"
 #include "netw/subsystems.hpp"
@@ -89,46 +90,12 @@ NetwMultiplayer *SyncCompat::core() const {
     return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
 }
 
-void SyncCompat::set_core(Object *p_core) {
+void SyncCompat::set_core(Object *p_core, const session::Books *p_books) {
     NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_core);
+    NETW_BUG_COND(plane != nullptr && p_books == nullptr);
     core_id = gd::instance_id(plane);
+    books = plane != nullptr ? p_books : nullptr;
     hears_entity_live = plane != nullptr;
-}
-
-SyncCompat *NetwMultiplayer::sync_adapter() const {
-    ReplicationCore *plane = get_replication_plane();
-    return plane != nullptr ? plane->get_sync_compat() : nullptr;
-}
-
-void NetwMultiplayer::sync_compat_entity_live(
-    int64_t p_route,
-    const Ref<NetwEntity> &p_entity
-) {
-    NETW_ZONE_NC("Compat entity live", colors::WIRE);
-    if (SyncCompat *adapter = sync_adapter()) {
-        adapter->on_entity_live(p_route, p_entity);
-    }
-}
-
-void NetwMultiplayer::sync_compat_visibility_changed(
-    int64_t p_peer,
-    Node *p_root
-) {
-    if (SyncCompat *adapter = sync_adapter()) {
-        adapter->on_sync_visibility_changed(p_peer, p_root);
-    }
-}
-
-void NetwMultiplayer::sync_compat_config_changed() {
-    if (SyncCompat *adapter = sync_adapter()) {
-        adapter->on_config_changed();
-    }
-}
-
-void NetwMultiplayer::sync_compat_node_removed(Node *p_node) {
-    if (SyncCompat *adapter = sync_adapter()) {
-        adapter->on_node_removed(p_node);
-    }
 }
 
 void SyncCompat::set_sync_model(NetwSyncModel *p_model) {
@@ -566,7 +533,7 @@ void SyncCompat::capture_declaration(Consumed *p_row) {
         return;
     }
     const RID rid = entity->get_rid_handle();
-    const int64_t route = plane->get_liveness_core()->route_of(rid);
+    const int64_t route = books->liveness->route_of(rid);
     set_route(p_row, route > 0 ? route : entity->get_route());
     p_row->entity = rid;
     p_row->ordinal_revision = UINT64_MAX;
@@ -824,9 +791,8 @@ PackedInt32Array SyncCompat::recipients_for(
     int count = 0;
     const spawn::Record *record = spawn_book->spawned_of(p_route);
     if (record != nullptr) {
-        const RID rid
-            = plane->get_liveness_core()->rid_from_route(int(p_route));
-        if (plane->get_liveness_core()->state_of(rid)
+        const RID rid = books->liveness->rid_from_route(int(p_route));
+        if (books->liveness->state_of(rid)
             != NetwLivenessCore::STATE_LIVE) {
             return out;
         }
@@ -943,7 +909,7 @@ void SyncCompat::pump() {
                 row->last_sync_usec = now;
                 NETW_NETWORK_PROFILE(
                     wire::ProfileSubjectScope observation(
-                        plane->profiler_outgoing_subject(),
+                        *books->profiler_outgoing,
                         plane->profiler_synchronizer(
                             route,
                             row->sync,
@@ -1017,7 +983,7 @@ void SyncCompat::send_deltas(
     const int64_t ordinal = ordinal_of(p_row);
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
-            plane->profiler_outgoing_subject(),
+            *books->profiler_outgoing,
             plane->profiler_synchronizer(
                 p_route,
                 p_row->sync,
@@ -1080,7 +1046,7 @@ bool SyncCompat::decode_row(
     r_values = decoded.values;
     const Error verdict = valid ? OK : ERR_INVALID_DATA;
     NetwMultiplayer *plane = core();
-    const int64_t route = plane->get_liveness_core()->route_of(p_entity);
+    const int64_t route = books->liveness->route_of(p_entity);
     plane->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
     return valid;
 }
@@ -1179,7 +1145,7 @@ void SyncCompat::handle_sync(
         return;
     }
     refresh_row(row);
-    NETW_NETWORK_PROFILE(plane->profiler().name_arrival(
+    NETW_NETWORK_PROFILE(books->profiler->name_arrival(
         plane->profiler_synchronizer(route, row->sync, row->root, row->config)
     ));
     validate_schema(row, route);
@@ -1258,7 +1224,7 @@ void SyncCompat::handle_sync_delta(
         return;
     }
     refresh_row(row);
-    NETW_NETWORK_PROFILE(plane->profiler().name_arrival(
+    NETW_NETWORK_PROFILE(books->profiler->name_arrival(
         plane->profiler_synchronizer(route, row->sync, row->root, row->config)
     ));
     validate_schema(row, route);
@@ -1398,7 +1364,7 @@ void SyncCompat::feed_interpolation(Consumed *p_row) {
     if (!p_row->feed_any) {
         return;
     }
-    const ClockEngine &clock = plane->clock_engine();
+    const ClockEngine &clock = *books->clock;
     const int64_t tick = clock.get_configured() ? clock.get_tick() : 0;
     for (uint32_t at = 0; at < p_row->feed_nodes.size(); ++at) {
         Node *node = Object::cast_to<Node>(

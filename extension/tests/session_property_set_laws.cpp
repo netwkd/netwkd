@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -10,6 +11,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::repl::PropertyColumn;
 using netw::repl::PropertySet;
+using netw_test::Internals;
 
 bool same_rid(const RID &p_a, const RID &p_b) {
     return p_a == p_b;
@@ -162,7 +164,7 @@ TEST_CASE(
         PropertySet::RETAINED
     );
 
-    const PropertySet *held = world.session->property_set_of(set);
+    const PropertySet *held = Internals::property_set_of(world.session, set);
     REQUIRE(held != nullptr);
     const PropertyColumn &column = held->columns[uint32_t(field)];
     NETW_CHECK_EQ(column.lane, PropertySet::RETAINED);

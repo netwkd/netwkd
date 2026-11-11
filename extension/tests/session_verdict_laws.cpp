@@ -7,8 +7,8 @@
 #include "godot/spatial_node.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/session/event_plane.hpp"
 #include "netw/wire/registry.hpp"
 
 namespace TestNetwSessionVerdictLaws {

@@ -17,6 +17,10 @@ class NetwEntity;
 class NetwMultiplayer;
 class NetwPredictionEngine;
 
+namespace session {
+struct Books;
+} // namespace session
+
 namespace predict {
 struct Wiring;
 } // namespace predict
@@ -110,7 +114,7 @@ public:
 
     godot::LocalVector<RingSource> sources;
 
-    void sample(NetwMultiplayer &p_session);
+    void sample(const session::Books &p_books, NetwMultiplayer &p_session);
     const godot::LocalVector<RingRow> &rows() const {
         return sampled;
     }
@@ -156,6 +160,7 @@ private:
     uint64_t generation = 0;
 
     void read(
+        const session::Books &p_books,
         NetwMultiplayer &p_session,
         NetwPredictionEngine &p_pool,
         const Candidate &p_candidate,

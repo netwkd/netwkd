@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -28,6 +29,7 @@
 namespace TestPersistenceLifecycle {
 
 using namespace godot;
+using netw_test::Internals;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw::NetwQuantize;
@@ -80,9 +82,9 @@ struct World {
         account->set_name("hero");
         schema = players_schema();
 
-        database = session->get_databases()->create("saves");
+        database = Internals::get_databases(session)->create("saves");
         connection = MemoryConnection::opened(p_store, "slot1");
-        session->get_databases()
+        Internals::get_databases(session)
             ->open(database, "slot1", NetwPromise::resolved(connection));
 
         root = p_root != nullptr ? p_root : memnew(Node2D);
@@ -158,8 +160,8 @@ struct World {
     }
 
     void authority_away_and_back() {
-        session->session_plane().set_role(SessionCore::ROLE_CLIENT);
-        session->session_plane().set_role(SessionCore::ROLE_NONE);
+        Internals::session_plane(session).set_role(SessionCore::ROLE_CLIENT);
+        Internals::session_plane(session).set_role(SessionCore::ROLE_NONE);
     }
 };
 
@@ -366,7 +368,7 @@ void reopen_saves() {
         return;
     }
     world->session->database_close(world->database);
-    world->session->get_databases()->open(
+    Internals::get_databases(world->session)->open(
         world->database,
         "slot1",
         NetwPromise::resolved(MemoryConnection::opened(world->store, "slot1"))
@@ -451,9 +453,9 @@ struct Leaving {
         schema->replicated(false);
         schema->vector2("where", Ref<NetwQuantize>(), 1);
 
-        database = server->get_databases()->create("saves");
+        database = Internals::get_databases(server)->create("saves");
         connection = MemoryConnection::opened("lc8", "slot1");
-        server->get_databases()
+        Internals::get_databases(server)
             ->open(database, "slot1", NetwPromise::resolved(connection));
         root = memnew(Node2D);
         netw::Netw::configure_persistence(root)
@@ -538,9 +540,9 @@ struct Departing {
         schema = NetwSchema::create("players");
         schema->replicated(false);
         schema->f64("spin", Ref<NetwQuantize>(), 1);
-        database = server->get_databases()->create("saves");
+        database = Internals::get_databases(server)->create("saves");
         connection = MemoryConnection::opened("lc9", "slot1");
-        server->get_databases()
+        Internals::get_databases(server)
             ->open(database, "slot1", NetwPromise::resolved(connection));
         Node *body = pair.authored;
         netw::Netw::configure_persistence(body)

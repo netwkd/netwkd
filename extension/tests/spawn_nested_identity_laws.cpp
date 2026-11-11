@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/level_spawn.h"
 #include "support/loopback_rig.h"
 
@@ -617,7 +618,7 @@ struct UnconnectedPair {
             clock.instantiate();
             clock->set_tickrate(30);
             apis[at]->clock_initialize(clock);
-            apis[at]->clock_engine().set_manual_tick(true);
+            Internals::clock_engine(apis[at]).set_manual_tick(true);
             mounts[at] = memnew(Node);
             mounts[at]->set_name(vformat("Unconnected%d", at));
             scene->add_child(mounts[at]);
@@ -650,7 +651,7 @@ struct UnconnectedPair {
     void pump(int p_ticks) {
         for (int tick = 0; tick < p_ticks; ++tick) {
             for (int at = 0; at < count; ++at) {
-                apis[at]->clock_engine().force_step(1);
+                Internals::clock_engine(apis[at]).force_step(1);
             }
             link->advance_time(1000.0 / 30.0);
             for (int at = 0; at < count; ++at) {
@@ -746,13 +747,13 @@ TEST_CASE(
         NETW_CHECK_EQ(seat_route, host_route);
         CHECK(seat_name == host_name);
         const Dictionary counted
-            = Dictionary(pair.apis[1]->spawn_plane()->counters());
+            = Dictionary(Internals::spawn_plane(pair.apis[1])->counters());
         NETW_CHECK_EQ(
             int64_t(counted[StringName("drops_spawn_duplicate")]),
             int64_t(0)
         );
         NETW_CHECK_EQ(
-            int64_t(pair.apis[1]->get_liveness_core()->route_count()),
+            int64_t(Internals::get_liveness_core(pair.apis[1])->route_count()),
             int64_t(1)
         );
         NETW_CHECK_EQ(
@@ -970,7 +971,7 @@ TEST_CASE(
     peers.pump(6);
 
     const Dictionary sent
-        = Dictionary(peers.apis[0]->spawn_plane()->counters());
+        = Dictionary(Internals::spawn_plane(peers.apis[0])->counters());
     NETW_CHECK_EQ(int64_t(sent[StringName("spawn_book_spawned")]), int64_t(0));
     NETW_CHECK_EQ(route_of(seated), int64_t(0));
     NETW_CHECK_EQ(route_of(crate_in(seated)), int64_t(0));

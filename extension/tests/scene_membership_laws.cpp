@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -12,6 +13,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwSceneCore;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 struct Placed {
     Ref<netw::NetwEntity> wrapper;
@@ -29,11 +31,11 @@ Placed place(
     made.owner = memnew(Node);
     p_parent->add_child(made.owner);
     made.wrapper.instantiate();
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     made.record = made.wrapper->get_record();
     made.record->adopt_handle(made.handle);
     made.record->set_declares_scene(p_declares_scene);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         made.handle,
         route,
@@ -57,7 +59,7 @@ TEST_CASE(
     const Placed arena = place(core, root, true);
     const Placed pawn = place(core, arena.owner, false);
     const Placed prop = place(core, arena.owner, false);
-    const Ref<NetwSceneCore> scenes = core->get_scene_core();
+    const Ref<NetwSceneCore> scenes = Internals::get_scene_core(core);
     const CallLog heard;
     scenes->observe(
         arena.handle,
@@ -105,7 +107,7 @@ TEST_CASE(
     Node *root = memnew(Node);
     const Placed arena = place(core, root, true);
     const Placed loose = place(core, root, false);
-    const Ref<NetwSceneCore> scenes = core->get_scene_core();
+    const Ref<NetwSceneCore> scenes = Internals::get_scene_core(core);
     const CallLog heard;
     scenes->observe(
         arena.handle,
@@ -150,7 +152,7 @@ TEST_CASE(
     const Placed arena = place(core, root, true);
     const Placed annex = place(core, root, true);
     const Placed pawn = place(core, arena.owner, false);
-    const Ref<NetwSceneCore> scenes = core->get_scene_core();
+    const Ref<NetwSceneCore> scenes = Internals::get_scene_core(core);
     const CallLog heard;
     scenes->observe(
         arena.handle,

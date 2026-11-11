@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/multiplayer.hpp"
@@ -20,6 +21,7 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwSceneCore;
 using netw::StretchViewportContainer;
+using netw_test::Internals;
 
 struct Wrapped {
     Ref<NetwEntity> wrapper;
@@ -31,12 +33,12 @@ struct Wrapped {
 Ref<NetwEntity> bind(const Ref<NetwMultiplayer> &p_core, Node *p_node) {
     Ref<NetwEntity> wrapper;
     wrapper.instantiate();
-    const RID handle = p_core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(p_core)->entity_create();
     wrapper->set_rid_handle(handle);
     wrapper->stamp_multiplayer(p_core);
     REQUIRE(p_core->liveness_bind(
         handle,
-        p_core->get_liveness_core()->reserve_route(),
+        Internals::get_liveness_core(p_core)->reserve_route(),
         wrapper,
         wrapper->get_record(),
         p_node
@@ -62,7 +64,7 @@ Wrapped wrapped(
     );
     p_parent->add_child(NetwMultiplayer::scene_wrap_world(made.root));
     made.view = NetwMultiplayer::scene_view_of(made.root);
-    p_core->get_scene_core()->scene_enter(made.handle, p_stem, true);
+    Internals::get_scene_core(p_core)->scene_enter(made.handle, p_stem, true);
     return made;
 }
 

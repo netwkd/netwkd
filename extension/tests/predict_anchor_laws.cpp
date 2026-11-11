@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/predict_rows.h"
 
@@ -84,7 +85,7 @@ TEST_CASE(
 
     NetwMultiplayer *core = rig.server();
     REQUIRE(core != nullptr);
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     REQUIRE(pool != nullptr);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
@@ -140,7 +141,7 @@ TEST_CASE(
 
     NetwMultiplayer *core = rig.server();
     REQUIRE(core != nullptr);
-    NetwPredictionEngine *const pool = core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(core);
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
 

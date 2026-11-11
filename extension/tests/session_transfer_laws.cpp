@@ -29,6 +29,7 @@
 #include "netw/spawn/pipeline.hpp"
 #include "netw/wire/registry.hpp"
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/stock_stand.h"
 
@@ -43,6 +44,7 @@ using netw::NetwPlayer;
 using netw::NetwPromise;
 using netw::NetwSession;
 using netw::sim::Mode;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::Recorder;
 
@@ -108,7 +110,7 @@ Node *build_body(const Variant &p_name) {
 }
 
 void cycle_online(NetwMultiplayer *p_api) {
-    netw::SessionCore &core = p_api->session_plane();
+    netw::SessionCore &core = Internals::session_plane(p_api);
     core.transition(netw::SessionCore::STATE_DISCONNECTING);
     core.transition(netw::SessionCore::STATE_OFFLINE);
     core.transition(netw::SessionCore::STATE_CONNECTING);
@@ -980,7 +982,7 @@ TEST_CASE(
     const RID mirrored = handle_at(table, route, survivor);
     REQUIRE(mirrored.is_valid());
     NETW_REQUIRE_EQ(int(joint->predict_declare(mirrored)), int(OK));
-    netw::NetwPredictionEngine *pool = joint->get_prediction_engine();
+    netw::NetwPredictionEngine *pool = Internals::get_prediction_engine(joint);
     Node *body = present(table.body_at(route, survivor));
     const int64_t slot = pool->slot_of(NetwEntity::of(body));
     REQUIRE(slot >= 0);
@@ -1076,9 +1078,9 @@ TEST_CASE(
 
     NetwMultiplayer *host = table.seat(successor);
     const RID scene = handle_at(table, level, successor);
-    NETW_CHECK_EQ(host->membership_book().entities_in(1, scene), 1);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(1, scene), 1);
     NETW_CHECK_EQ(
-        host->membership_book().entities_in(survivor_label, scene),
+        Internals::membership_book(host).entities_in(survivor_label, scene),
         1
     );
     NETW_CHECK_EQ(
@@ -1146,10 +1148,10 @@ TEST_CASE(
         = netw::NetwSchema::create("transfer_saves");
     schema->replicated(false);
     schema->f64("score", Ref<netw::NetwQuantize>(), 1);
-    const RID database = server->get_databases()->create("saves");
+    const RID database = Internals::get_databases(server)->create("saves");
     const Ref<netw::persist::MemoryConnection> connection
         = netw::persist::MemoryConnection::opened("transfer", "slot1");
-    server->get_databases()
+    Internals::get_databases(server)
         ->open(database, "slot1", NetwPromise::resolved(connection));
     connection->defer(true);
     Dictionary values;
@@ -1506,7 +1508,8 @@ TEST_CASE(
     table.arena->add_child(served);
     table.rig.pump(SETTLE_PUMPS);
     const int route = int(server->entity_get_route(entity));
-    const Ref<netw::NetwLivenessCore> lives = server->get_liveness_core();
+    const Ref<netw::NetwLivenessCore> lives
+        = Internals::get_liveness_core(server);
     const RID life = lives->rid_from_route(route);
     lives->set_state(life, netw::NetwLivenessCore::STATE_DEAD);
     NETW_REQUIRE_EQ(int(lives->bind_route(life, route)), 1);
@@ -1913,8 +1916,10 @@ TEST_CASE(
 
     NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));
     table.rig.pump(SETTLE_PUMPS);
-    const netw::ClockEngine &held = table.seat(survivor)->clock_engine();
-    const netw::ClockEngine &serving = table.seat(successor)->clock_engine();
+    const netw::ClockEngine &held
+        = Internals::clock_engine(table.seat(survivor));
+    const netw::ClockEngine &serving
+        = Internals::clock_engine(table.seat(successor));
     const int stopped = held.get_tick();
     const int serving_from = serving.get_tick();
     table.rig.step_ticks(5);
@@ -2449,7 +2454,10 @@ void modes_disagree(bool p_server_keeps) {
             NETW_CHECK_EQ(int(alive(table, int(served[which]), at)), 1);
         }
         NETW_CHECK_EQ(int(alive(table, orphan, at)), 0);
-        NETW_CHECK_EQ(int(table.seat(at)->clock_engine().is_held()), 0);
+        NETW_CHECK_EQ(
+            int(Internals::clock_engine(table.seat(at)).is_held()),
+            0
+        );
     }
 }
 
@@ -2603,7 +2611,7 @@ TEST_CASE(
     const int silent = (successor + 1) % CLIENTS;
     const int honest = (successor + 2) % CLIENTS;
     const int shared = table.spawn_body("Shared", -2, 0);
-    table.seat(silent)->resync_tamper = &withhold_last;
+    Internals::resync_tamper(table.seat(silent)) = &withhold_last;
     netw_test::FaultWatch faults;
 
     NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));
@@ -2642,7 +2650,7 @@ void report_refused(Tamper p_tamper) {
     const int liar = (successor + 1) % CLIENTS;
     const int honest = (successor + 2) % CLIENTS;
     const int shared = table.spawn_body("Shared", -2, 0);
-    table.seat(liar)->resync_tamper = p_tamper;
+    Internals::resync_tamper(table.seat(liar)) = p_tamper;
     netw_test::FaultWatch faults;
 
     NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));

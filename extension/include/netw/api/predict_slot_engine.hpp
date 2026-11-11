@@ -12,6 +12,10 @@
 #include "netw/predict/slot_verdicts.hpp"
 #include "netw/repl/property_binding.hpp"
 
+namespace netw::session {
+struct Books;
+} // namespace netw::session
+
 namespace netw {
 
 class NetwMultiplayer;
@@ -29,6 +33,7 @@ class NetwPredictSlotEngine {
     };
 
     godot::ObjectID core_id;
+    const session::Books *books = nullptr;
     NetwPredictionEngine *pool = nullptr;
     int64_t seat = -1;
     godot::Ref<NetwEntity> entity;
@@ -239,7 +244,11 @@ class NetwPredictSlotEngine {
     );
 
 public:
-    void attach(godot::Object *p_iface, const godot::Ref<NetwEntity> &p_entity);
+    void attach(
+        godot::Object *p_iface,
+        const godot::Ref<NetwEntity> &p_entity,
+        const session::Books *p_books
+    );
     void release();
 
     void receive_command_frame(const godot::PackedByteArray &p_payload);

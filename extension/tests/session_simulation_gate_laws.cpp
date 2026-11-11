@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/engine.hpp"
@@ -12,6 +13,7 @@ namespace TestNetwSessionSimulationGate {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> hosting() {
     Ref<NetwMultiplayer> session;
@@ -201,8 +203,8 @@ TEST_CASE(
     NETW_CHECK_EQ(session->get_frame_counter(), 2);
     NETW_CHECK_EQ(session->receive_tick(), 2);
 
-    session->clock_engine().set_configured(true);
-    session->clock_engine().set_tick(41);
+    Internals::clock_engine(session).set_configured(true);
+    Internals::clock_engine(session).set_tick(41);
 
     NETW_CHECK_EQ(session->receive_tick(), 41);
     NETW_CHECK_EQ(session->get_frame_counter(), 2);
@@ -251,7 +253,7 @@ TEST_CASE(
     REQUIRE(physics_rate > 2);
 
     Ref<NetwMultiplayer> aligned_session = hosting();
-    aligned_session->clock_engine().set_tickrate(physics_rate);
+    Internals::clock_engine(aligned_session).set_tickrate(physics_rate);
     Node3D *aligned_body = memnew(Node3D);
     netw::gd::scene_root()->add_child(aligned_body);
     const RID aligned_entity = seated(aligned_session, 46, aligned_body);
@@ -261,7 +263,8 @@ TEST_CASE(
 
     const int mismatched_tickrate = physics_rate - 1;
     Ref<NetwMultiplayer> mismatched_session = hosting();
-    mismatched_session->clock_engine().set_tickrate(mismatched_tickrate);
+    Internals::clock_engine(mismatched_session)
+        .set_tickrate(mismatched_tickrate);
     Node3D *first_body = memnew(Node3D);
     netw::gd::scene_root()->add_child(first_body);
     const RID first_entity = seated(mismatched_session, 47, first_body);

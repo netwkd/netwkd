@@ -17,6 +17,7 @@
 #include "netw/diag/hints.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/predict/wiring.hpp"
+#include "netw/session/books.hpp"
 #include "netw/store/table.hpp"
 #include "netw/store/world.hpp"
 
@@ -249,12 +250,15 @@ void draw_ring_rows(const LocalVector<RingRow> &p_rows, Drawing &r_drawing) {
     }
 }
 
-void PredictionRings::sample(NetwMultiplayer &p_session) {
+void PredictionRings::sample(
+    const session::Books &p_books,
+    NetwMultiplayer &p_session
+) {
     ++generation;
     sampled.clear();
     cameras.clear();
     candidates.clear();
-    NetwPredictionEngine *pool = p_session.get_prediction_engine();
+    NetwPredictionEngine *pool = p_books.prediction;
     if (pool == nullptr) {
         forget_departed();
         return;
@@ -285,18 +289,19 @@ void PredictionRings::sample(NetwMultiplayer &p_session) {
         candidates.push_back(made);
     }
     keep_nearest_per_world(candidates, ENTITY_CAP);
-    const ClockEngine &clock = p_session.clock_engine();
+    const ClockEngine &clock = *p_books.clock;
     const Clock now{
         clock.get_tick(),
         1.0 / double(MAX(1, clock.get_tickrate())),
     };
     for (const Candidate &each : candidates) {
-        read(p_session, *pool, each, now);
+        read(p_books, p_session, *pool, each, now);
     }
     forget_departed();
 }
 
 void PredictionRings::read(
+    const session::Books &p_books,
     NetwMultiplayer &p_session,
     NetwPredictionEngine &p_pool,
     const Candidate &p_candidate,
@@ -390,10 +395,10 @@ void PredictionRings::read(
             );
         }
         const store::RowAddress at = entry.has_store
-            ? p_session.store().row_of(entry.store_owner, entry.store_lane)
+            ? p_books.store->row_of(entry.store_owner, entry.store_lane)
             : store::RowAddress();
         if (at.valid()) {
-            const store::Table &table = p_session.store().table(at.table);
+            const store::Table &table = p_books.store->table(at.table);
             Vector3 server;
             if (table.sources[at.row] == uint8_t(store::Source::REMOTE)
                 && point_of(

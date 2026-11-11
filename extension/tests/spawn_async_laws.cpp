@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -16,6 +17,7 @@
 #include "netw/spawn/pipeline.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestSpawnAsyncLaws {
 
@@ -135,7 +137,7 @@ const Row ROWS[] = {
 };
 
 int booked(NetwMultiplayer *p_api) {
-    netw::spawn::Book *book = p_api->spawn_plane()->get_spawn_book();
+    netw::spawn::Book *book = Internals::spawn_plane(p_api)->get_spawn_book();
     return book->armed_count() + book->spawned_count();
 }
 
@@ -300,9 +302,8 @@ TEST_CASE(
         const int viewer = late ? B : A;
         NetwMultiplayer *server = stand.sim.session(SERVER);
         for (const int client : {A, B}) {
-            stand.sim.session(client)->spawn_plane()->set_park_timeout_seconds(
-                SHORT_PARK_DEADLINE
-            );
+            Internals::spawn_plane(stand.sim.session(client))
+                ->set_park_timeout_seconds(SHORT_PARK_DEADLINE);
         }
 
         Node *made = spawn_made(stand);
@@ -416,7 +417,7 @@ TEST_CASE(
 
         const int route = int(NetwEntity::of(spawn_made(stand))->get_route());
         stand.sim.step_ticks(4);
-        REQUIRE(client->spawn_plane()->get_park().has(route));
+        REQUIRE(Internals::spawn_plane(client)->get_park().has(route));
 
         if (String(failure.outcome) == "host freed") {
             stand.client_host->get_parent()->remove_child(stand.client_host);
@@ -426,7 +427,7 @@ TEST_CASE(
         }
         stand.sim.step_ticks(4);
 
-        CHECK_FALSE(client->spawn_plane()->get_park().has(route));
+        CHECK_FALSE(Internals::spawn_plane(client)->get_park().has(route));
         CHECK(stand.made_on(A) == nullptr);
     }
 }
@@ -442,9 +443,8 @@ TEST_CASE(
             ->call(StringName("client_builds_wait"), on_client, scripts.made);
         Stand stand;
         for (const int peer : {SERVER, A}) {
-            stand.sim.session(peer)->spawn_plane()->set_park_timeout_seconds(
-                SHORT_PARK_DEADLINE
-            );
+            Internals::spawn_plane(stand.sim.session(peer))
+                ->set_park_timeout_seconds(SHORT_PARK_DEADLINE);
         }
         netw_test::FaultWatch faults;
         faults.expect_warning(

@@ -213,6 +213,18 @@ Constants
 
 
 
+.. _class_NetwRegimePeer_constant_EXIT_LIBRARY:
+
+.. rst-class:: classref-constant
+
+**EXIT_LIBRARY** = ``7`` :ref:`🔗<class_NetwRegimePeer_constant_EXIT_LIBRARY>`
+
+.. container:: contribute
+
+	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+
+
+
 .. _class_NetwRegimePeer_constant_WATCHDOG_MARGIN:
 
 .. rst-class:: classref-constant

@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -7,6 +8,7 @@ namespace TestNetwSessionRouteClaim {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 bool differ(int64_t p_a, int64_t p_b) {
     return p_a != p_b;
@@ -117,19 +119,25 @@ TEST_CASE(
     Ref<NetwMultiplayer> session = hosting();
     const PackedInt64Array claimed = session->liveness_claim_routes(2);
 
-    NETW_CHECK_EQ(session->store_arrays().lifecycle_removals().size(), 0);
+    NETW_CHECK_EQ(
+        Internals::store_arrays(session).lifecycle_removals().size(),
+        0
+    );
     NETW_CHECK_EQ(session->liveness_release_routes(claimed), OK);
 
     const PackedInt64Array queued
-        = session->store_arrays().lifecycle_removals();
+        = Internals::store_arrays(session).lifecycle_removals();
     NETW_CHECK_EQ(queued.size(), claimed.size());
     NETW_CHECK_EQ(queued[0], claimed[0]);
     NETW_CHECK_EQ(queued[1], claimed[1]);
 
     SUBCASE("and a release of nothing queues nothing") {
-        session->store_arrays().take_lifecycle_removals();
+        Internals::store_arrays(session).take_lifecycle_removals();
         NETW_CHECK_EQ(session->liveness_release_routes(PackedInt64Array()), OK);
-        NETW_CHECK_EQ(session->store_arrays().lifecycle_removals().size(), 0);
+        NETW_CHECK_EQ(
+            Internals::store_arrays(session).lifecycle_removals().size(),
+            0
+        );
     }
 
     SUBCASE("and a client's refused release queues nothing") {
@@ -140,7 +148,10 @@ TEST_CASE(
         client->session_set_role(NetwMultiplayer::ROLE_CLIENT);
         const PackedInt64Array asked = session->liveness_claim_routes(1);
         NETW_CHECK_EQ(client->liveness_release_routes(asked), ERR_UNCONFIGURED);
-        NETW_CHECK_EQ(client->store_arrays().lifecycle_removals().size(), 0);
+        NETW_CHECK_EQ(
+            Internals::store_arrays(client).lifecycle_removals().size(),
+            0
+        );
     }
 }
 

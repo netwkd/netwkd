@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -7,11 +8,12 @@ namespace TestNetwSessionFrameTiming {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> clocked(int p_rate) {
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    session->clock_engine().set_tickrate(p_rate);
+    Internals::clock_engine(session).set_tickrate(p_rate);
     return session;
 }
 

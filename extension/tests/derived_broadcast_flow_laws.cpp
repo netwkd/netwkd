@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -17,6 +18,7 @@ using netw::repl::PropertySet;
 using netw_test::authored_value;
 using netw_test::FlowCapture;
 using netw_test::FlowPair;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -92,7 +94,8 @@ int64_t stat_of(godot::Object *p_core, const char *p_name) {
 }
 
 int64_t source_of(godot::Object *p_core, godot::Node *p_node) {
-    const netw::store::World &world = netw_test::flow_core(p_core)->store();
+    const netw::store::World &world
+        = Internals::store(netw_test::flow_core(p_core));
     const uint64_t node = uint64_t(p_node->get_instance_id());
     for (uint32_t at = 0; at < world.table_count(); ++at) {
         const netw::store::Table &table = world.table(at);
@@ -182,7 +185,9 @@ public:
         netw::NetwMultiplayer *observing
             = netw::NetwEntity::session_core_for(pair.authored);
         seen.observer_holds_timeline = observing != nullptr
-            && observing->get_lagcomp_core()->timeline_slot_of(observer) >= 0;
+            && Internals::get_lagcomp_core(observing)->timeline_slot_of(
+                   observer
+               ) >= 0;
 
         if (!plant_is(PLANT_THE_LINK_GOES_DARK)) {
             rig.conditions(

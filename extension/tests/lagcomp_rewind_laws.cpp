@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -56,7 +57,7 @@ TEST_CASE(
     REQUIRE(run.regime_reached());
 
     NetwMultiplayer *server = rig.server();
-    NetwLagCompCore *history = server->get_lagcomp_core();
+    NetwLagCompCore *history = Internals::get_lagcomp_core(server);
     const godot::RID entity = rig.entity_of(StringName("P"));
     const Ref<godot::RefCounted> seated = server->entity_get_view(entity);
     REQUIRE(seated.is_valid());
@@ -93,7 +94,7 @@ TEST_CASE(
 
     NetwMultiplayer *server = rig.server();
     REQUIRE(server != nullptr);
-    NetwLagCompCore *history = server->get_lagcomp_core();
+    NetwLagCompCore *history = Internals::get_lagcomp_core(server);
     const godot::RID entity = rig.entity_of(StringName("P"));
     const Ref<godot::RefCounted> seated = server->entity_get_view(entity);
     REQUIRE(seated.is_valid());

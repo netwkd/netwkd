@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -29,6 +30,7 @@ namespace TestNetwSimInstallLaws {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 using netw::repl::PropertyBindingPtr;
 using netw::repl::PropertySet;
 using netw::sim::InstallStats;
@@ -124,7 +126,7 @@ struct Stand {
 
     void activate(int p_client, Restore p_restore) {
         NetwMultiplayer *session = core(p_client);
-        netw::sim::Row &row = session->sim_row(rid(p_client));
+        netw::sim::Row &row = Internals::sim_row(session, rid(p_client));
         row.declaration.bodies.push_back(NodePath("Body"));
         row.declaration.replicas = netw::sim::Replicas::ACTIVE;
         row.declaration.restore = p_restore;
@@ -137,7 +139,7 @@ struct Stand {
             session->display_pump_entity(
                 rid(p_client),
                 netw::display::capture_timing(
-                    &session->clock_engine(),
+                    &Internals::clock_engine(session),
                     FRAME_DELTA
                 )
             );
@@ -157,7 +159,7 @@ struct Stand {
         NetwMultiplayer *session = core(p_client);
         const int64_t route
             = session->liveness_route_of(NetwEntity::of(copy(p_client)).ptr());
-        netw::store::World &world = session->store();
+        netw::store::World &world = Internals::store(session);
         int held = 0;
         for (uint32_t at = 0; at < world.table_count(); ++at) {
             const netw::store::Table &table = world.table(at);
@@ -212,7 +214,12 @@ TEST_CASE(
     NETW_CHECK_EQ(int(row->mode), int(Mode::ACTIVE));
     NETW_CHECK_EQ(int(row->bodies.applied), int(Mode::ACTIVE));
     CHECK_FALSE(stand.body(0)->is_freeze_enabled());
-    CHECK(bool(stand.core(0)->predict_engine_for(stand.rid(0)) == nullptr));
+    CHECK(
+        bool(
+            Internals::predict_engine_for(stand.core(0), stand.rid(0))
+            == nullptr
+        )
+    );
     NETW_CHECK_GT(row->installs.stats.installed, int64_t(0));
     const double newest = stand.held(-1).x;
     const double installed = stand.held(0).x;
@@ -377,7 +384,7 @@ netw::predict::Arrival simulated_arrival(
     int64_t p_tick,
     bool p_whole
 ) {
-    netw::store::World &world = p_core->store();
+    netw::store::World &world = Internals::store(p_core);
     const netw::store::RowAddress at = world.row_of(p_binding->id, 0);
     REQUIRE(at.valid());
     netw::store::Table &table = world.table(at.table);
@@ -401,7 +408,7 @@ TEST_CASE(
     const Ref<NetwEntity> seated = NetwEntity::of(stand.copy(0));
     REQUIRE(seated.is_valid());
     netw::NetwPredictionEngine *const pool
-        = stand.core(0)->get_prediction_engine();
+        = Internals::get_prediction_engine(stand.core(0));
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
     pool->adopt_declaration(
@@ -472,7 +479,7 @@ TEST_CASE(
     REQUIRE(binding != nullptr);
     NetwMultiplayer *client = stand.core(0);
     const int64_t now = netw_test::clock_tick(stand.rig, 0);
-    const double step = client->clock_engine().ticktime();
+    const double step = Internals::clock_engine(client).ticktime();
 
     netw::sim::Sample sample;
     sample.binding = binding->id;
@@ -527,7 +534,7 @@ TEST_CASE(
     Stand stand(1, STATE_SOURCE);
     NetwMultiplayer *session = stand.core(0);
     const RID copy = stand.rid(0);
-    netw::sim::Row &seated = session->sim_row(copy);
+    netw::sim::Row &seated = Internals::sim_row(session, copy);
     seated.declaration.bodies.push_back(NodePath("Body"));
     seated.facts.predicted = true;
     seated.mode = Mode::PROXY;
@@ -536,7 +543,7 @@ TEST_CASE(
     REQUIRE(stand.held(0).x > 0.0);
 
     stand.copy(0)->set(StringName(FIELD), Vector2(-500.0, 0.0));
-    session->sim_row(copy).mode = Mode::ACTIVE;
+    Internals::sim_row(session, copy).mode = Mode::ACTIVE;
     session->sim_settle_body(NetwEntity::of(stand.copy(0)));
     NETW_CHECK_EQ(
         int(session->sim_row_of(copy)->bodies.applied),

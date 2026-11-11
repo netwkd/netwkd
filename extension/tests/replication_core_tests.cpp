@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -11,6 +12,7 @@ namespace TestReplicationCore {
 
 using namespace godot;
 using netw::ReplicationCore;
+using netw_test::Internals;
 
 struct Stand {
     Ref<netw::NetwMultiplayer> session;
@@ -185,7 +187,7 @@ TEST_CASE(
         = registry.find_channel_by_name(StringName("CALL"));
     REQUIRE(call != nullptr);
 
-    NETW_CHECK_EQ(session->get_rpc_park()->size(), 0);
+    NETW_CHECK_EQ(Internals::get_rpc_park(session)->size(), 0);
 
     plane->dispatch(
         9,
@@ -198,7 +200,7 @@ TEST_CASE(
         -1
     );
 
-    NETW_CHECK_EQ(session->get_rpc_park()->size(), 1);
+    NETW_CHECK_EQ(Internals::get_rpc_park(session)->size(), 1);
 
     plane->dispatch(
         9,
@@ -211,7 +213,7 @@ TEST_CASE(
         -1
     );
 
-    NETW_CHECK_EQ(session->get_rpc_park()->size(), 1);
+    NETW_CHECK_EQ(Internals::get_rpc_park(session)->size(), 1);
 }
 
 TEST_CASE(

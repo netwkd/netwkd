@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -7,8 +8,8 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/schema_core.hpp"
-#include "netw/api/sync_model.hpp"
 #include "netw/repl/property_binding.hpp"
+#include "netw/repl/sync_model.hpp"
 #include "netw/replication_send.hpp"
 #include "support/netw_call_log.h"
 
@@ -25,6 +26,7 @@ using netw::repl::PropertyBindingPtr;
 using netw::repl::PropertyColumn;
 using netw::repl::PropertySet;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 const int64_t SYNC_ROW = 39;
 
@@ -47,16 +49,16 @@ PropertyBindingPtr a_binding(
     Node *p_node,
     int64_t p_route
 ) {
-    netw::repl::SetBook &sets = p_core->property_set_book();
+    netw::repl::SetBook &sets = Internals::property_set_book(p_core);
     const PropertyBindingPtr binding
-        = p_core->property_binding_book().create(a_set(sets), p_node);
+        = Internals::property_binding_book(p_core).create(a_set(sets), p_node);
     binding->order_key = StringName(".");
     binding->route = p_route;
     return binding;
 }
 
 bool sends_nothing(const Ref<NetwMultiplayer> &p_core) {
-    netw::store::World &world = p_core->store();
+    netw::store::World &world = Internals::store(p_core);
     for (uint32_t index = 0; index < world.table_count(); ++index) {
         const netw::store::Table &table = world.table(index);
         for (uint32_t peer = 0; peer < table.peers.size(); ++peer) {
@@ -73,7 +75,7 @@ NetwSyncModel a_model(
     const PropertyBindingPtr &p_binding
 ) {
     NetwSyncModel model;
-    model.attach_book(&p_core->property_binding_book());
+    model.attach_book(&Internals::property_binding_book(p_core));
     model.declare(
         p_binding->get_route(),
         int64_t(NetwSyncModel::KIND_DERIVED),

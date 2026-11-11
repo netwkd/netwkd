@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -11,6 +12,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwStoreReceive {
 
@@ -113,7 +115,7 @@ class ReceiveScenario final : public netw_test::FrameScenario {
 
     void read() {
         ReceiveEvidence &seen = receive_evidence();
-        const NetwMultiplayer::IdleWork &now = client()->idle_work;
+        const NetwMultiplayer::IdleWork &now = Internals::idle_work(client());
         seen.received = now.received_rows - opened.received_rows;
         seen.allocations = now.receive_allocations - opened.receive_allocations;
     }
@@ -137,9 +139,9 @@ public:
             return false;
         }
         if (frame == SETTLE_FRAMES) {
-            client()->store().validate_every = 0;
+            Internals::store(client()).validate_every = 0;
             probe.arm();
-            opened = client()->idle_work;
+            opened = Internals::idle_work(client());
         }
         if (frame == SETTLE_FRAMES + WINDOW) {
             probe.disarm();

@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -13,6 +14,7 @@ namespace TestNetwSessionRelayChannel {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 Ref<NetwMultiplayer> hosting() {
     Ref<NetwMultiplayer> session;
@@ -63,19 +65,19 @@ TEST_CASE(
     const Callable handler = callable_mp_static(&take_nothing);
 
     session->rpc_channel_register(99, handler, false);
-    CHECK_FALSE(holds_channel(session->get_channel_book(), 99));
+    CHECK_FALSE(holds_channel(Internals::get_channel_book(session), 99));
 
     session->rpc_channel_register(255, handler, false);
-    CHECK_FALSE(holds_channel(session->get_channel_book(), 255));
+    CHECK_FALSE(holds_channel(Internals::get_channel_book(session), 255));
 
     SUBCASE("a channel inside the range is taken") {
         session->rpc_channel_register(100, handler, false);
-        CHECK(holds_channel(session->get_channel_book(), 100));
+        CHECK(holds_channel(Internals::get_channel_book(session), 100));
     }
 
     SUBCASE("an invalid handler registers nothing") {
         session->rpc_channel_register(101, Callable(), false);
-        CHECK_FALSE(holds_channel(session->get_channel_book(), 101));
+        CHECK_FALSE(holds_channel(Internals::get_channel_book(session), 101));
     }
 }
 
@@ -92,12 +94,12 @@ TEST_CASE(
     session->set_lagcomp_configured(true);
     CHECK(session->lagcomp_is_configured());
 
-    const int before = session->max_future_action_ticks;
+    const int before = Internals::max_future_action_ticks(session);
     NETW_CHECK_EQ(
         int(session->lagcomp_initialize(-1, 12)),
         int(ERR_INVALID_PARAMETER)
     );
-    NETW_CHECK_EQ(session->max_future_action_ticks, before);
+    NETW_CHECK_EQ(Internals::max_future_action_ticks(session), before);
 }
 
 TEST_CASE(
@@ -111,10 +113,11 @@ TEST_CASE(
 
     Ref<netw::NetwEntity> wrapper;
     wrapper.instantiate();
-    const RID handle = session->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(session)->entity_create();
     netw::NetwEntityRecord *const record = wrapper->get_record();
     record->adopt_handle(handle);
-    const int64_t route = session->get_liveness_core()->reserve_route();
+    const int64_t route
+        = Internals::get_liveness_core(session)->reserve_route();
     REQUIRE(session->liveness_bind(handle, route, wrapper, record, owner));
     session->interest_sync_live_peers();
     const int64_t host = MultiplayerPeer::TARGET_PEER_SERVER;

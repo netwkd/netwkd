@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_reset.h"
 #include "support/netw_test.h"
@@ -19,6 +20,7 @@ using namespace godot;
 namespace TestNetwDisplayHeadlessFrameLaws {
 
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *CUBE_ID = "display_headless_cube";
 
@@ -82,7 +84,7 @@ class HeadlessScenario final : public netw_test::FrameScenario {
         int64_t total = 0;
         for (int index = 0; index < CUBES; ++index) {
             const netw::display::Runtime *runtime
-                = client->get_display_book()->runtime_of(
+                = Internals::get_display_book(client)->runtime_of(
                     client->entity_from_route(routes[index])
                 );
             if (runtime == nullptr) {

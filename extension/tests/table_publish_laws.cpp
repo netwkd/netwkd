@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_recorder.h"
 #include "support/netw_test.h"
 
@@ -12,6 +13,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::SchemaCore;
 using netw::store::Arrays;
+using netw_test::Internals;
 using netw_test::Recorder;
 
 struct Stand {
@@ -216,7 +218,7 @@ TEST_CASE(
     "boundary, and several commits in one tick collapse to the last"
 ) {
     Stand stand;
-    Arrays &plane = stand.core->store_arrays();
+    Arrays &plane = Internals::store_arrays(stand.core);
     NETW_CHECK_EQ(plane.dirty_tables().size(), 0);
 
     NETW_CHECK_EQ(stand.publish(int64s({1}), points(1), int32s({1})), OK);
@@ -248,7 +250,7 @@ TEST_CASE(
     stand.core->table_announce_intake();
     NETW_CHECK_EQ(recorder.count(StringName("received")), 0);
 
-    Arrays &plane = stand.core->store_arrays();
+    Arrays &plane = Internals::store_arrays(stand.core);
     const TypedArray<PackedByteArray> frames
         = plane.encode_owed(stand.table, 7, 1200);
     NETW_CHECK_ORDER(frames.size(), 0, >);

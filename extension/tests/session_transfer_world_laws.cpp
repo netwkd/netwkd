@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/netw_cells.h"
 
@@ -30,6 +31,7 @@ using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
 using netw_test::LoopbackRig;
+using netw_test::Internals;
 
 constexpr int CLIENTS = 3;
 constexpr int SEATS = CLIENTS + 1;
@@ -154,7 +156,7 @@ struct Session {
         config->set("tickrate", TICKRATE);
         config->set("display_offset", DISPLAY_OFFSET);
         seat(p_at)->clock_initialize(config);
-        seat(p_at)->clock_engine().set_manual_tick(true);
+        Internals::clock_engine(seat(p_at)).set_manual_tick(true);
     }
 
     NetwMultiplayer *seat(int p_at) const {
@@ -571,7 +573,7 @@ class WorldRun {
             return;
         }
         netw::NetwPredictionEngine *pool
-            = session.seat(successor)->get_prediction_engine();
+            = Internals::get_prediction_engine(session.seat(successor));
         const int64_t slot = pool->slot_of(entity);
         const int64_t cursor = pool->next_input_tick_of(slot);
         if (cursor < 0) {
@@ -585,7 +587,8 @@ class WorldRun {
     void settle(Exit p_exit) {
         for (int tick = 0; tick < SETTLE_TICKS; ++tick) {
             steer_and_step();
-            const bool held = session.seat(holder)->clock_engine().is_held();
+            const bool held
+                = Internals::clock_engine(session.seat(holder)).is_held();
             if (evidence.readmitted < 0 && !held
                 && session.body_at(runner, holder) != nullptr) {
                 evidence.readmitted = tick;

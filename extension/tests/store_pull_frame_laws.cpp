@@ -1,5 +1,6 @@
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -18,6 +19,7 @@
 #include "netw/store/world.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwStorePull {
 
@@ -164,12 +166,13 @@ protected:
     }
 
     Table &table_of(int p_index) const {
-        const RowAddress at = row_of_node(server()->store(), cube(p_index));
-        return server()->store().table(at.table);
+        const RowAddress at
+            = row_of_node(Internals::store(server()), cube(p_index));
+        return Internals::store(server()).table(at.table);
     }
 
     uint32_t row_at(int p_index) const {
-        return row_of_node(server()->store(), cube(p_index)).row;
+        return row_of_node(Internals::store(server()), cube(p_index)).row;
     }
 
     bool open_stand(const char *p_source, int p_cubes = CUBES) {
@@ -220,7 +223,7 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
 
     void read_window() {
         PullEvidence &seen = pull_evidence();
-        const World::PullWork &now = server()->store().work;
+        const World::PullWork &now = Internals::store(server()).work;
         seen.window_ticks = WINDOW_FRAMES;
         seen.window_rows = now.rows - opened.rows;
         seen.window_rested = now.rested - opened.rested;
@@ -242,8 +245,8 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
             = netw::store::validation_audit::ledger();
         faults_before = book.faults;
         first_before = book.first;
-        server()->store().validate_every = 1;
-        server()->store().misses.clear();
+        Internals::store(server()).validate_every = 1;
+        Internals::store(server()).misses.clear();
         RigidBody3D *held = cube(4);
         PhysicsServer3D *physics = PhysicsServer3D::get_singleton();
         Transform3D moved = held->get_global_transform();
@@ -262,7 +265,7 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
 
     void read_misses() {
         PullEvidence &seen = pull_evidence();
-        World &world = server()->store();
+        World &world = Internals::store(server());
         const int64_t route = table_of(4).routes[row_at(4)];
         seen.misses = int(world.misses.size());
         seen.miss_named = !world.misses.is_empty();
@@ -294,7 +297,7 @@ public:
         }
         PullEvidence &seen = pull_evidence();
         if (frame == SETTLE_FRAMES) {
-            opened = server()->store().work;
+            opened = Internals::store(server()).work;
         }
         if (frame == SCRIPT_AT) {
             read_window();
@@ -307,7 +310,7 @@ public:
                 && int64_t(tinted.read_value(row_at(1), tint)) == TINT;
             cube(2)->set_mass(MASS);
         }
-        const int64_t body_before = server()->store().work.body;
+        const int64_t body_before = Internals::store(server()).work.body;
         if (frame == WAKE_AT) {
             seen.engine_pulled = changed_now(2);
             cube(3)->set_linear_velocity(NUDGE);
@@ -327,7 +330,8 @@ public:
         }
         stand->step_ticks(1);
         if (frame == WAKE_AT) {
-            seen.woken_body = server()->store().work.body - body_before;
+            seen.woken_body
+                = Internals::store(server()).work.body - body_before;
             seen.woken_read = changed_now(3)
                 && (table_of(3).flags[row_at(3)] & Table::RESTED) == 0;
         }
@@ -374,7 +378,7 @@ class AllocScenario final : public netw_test::FrameScenario, PullStand {
 
     void read() {
         AllocEvidence &seen = alloc_evidence();
-        const World::PullWork &now = server()->store().work;
+        const World::PullWork &now = Internals::store(server()).work;
         seen.pulls = now.pulls - opened.pulls;
         seen.rested = now.rested - opened.rested;
         seen.read = now.rows - opened.rows;
@@ -397,9 +401,9 @@ public:
             return false;
         }
         if (frame == SETTLE_FRAMES) {
-            server()->store().validate_every = 0;
+            Internals::store(server()).validate_every = 0;
             probe.arm();
-            opened = server()->store().work;
+            opened = Internals::store(server()).work;
             seen_opened = netw::store::allocations_seen();
         }
         if (frame == SETTLE_FRAMES + ALLOC_WINDOW) {
@@ -501,7 +505,7 @@ class SendAllocScenario final : public netw_test::FrameScenario {
 
     void read() {
         SendAllocEvidence &seen = send_alloc_evidence(arm);
-        const NetwMultiplayer::IdleWork &now = server()->idle_work;
+        const NetwMultiplayer::IdleWork &now = Internals::idle_work(server());
         seen.in_frames = now.frame_allocations - opened.frame_allocations;
         seen.in_carrier = now.carrier_allocations - opened.carrier_allocations;
         seen.in_display = now.display_allocations - opened.display_allocations;
@@ -540,9 +544,9 @@ public:
             return false;
         }
         if (frame == SETTLE_FRAMES) {
-            server()->store().validate_every = 0;
+            Internals::store(server()).validate_every = 0;
             probe.arm();
-            opened = server()->idle_work;
+            opened = Internals::idle_work(server());
         }
         if (frame == SETTLE_FRAMES + SEND_WINDOW) {
             probe.disarm();

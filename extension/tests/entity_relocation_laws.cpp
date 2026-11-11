@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/carrier.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/value_flow_stand.h"
 
@@ -66,7 +67,7 @@ struct Travelled {
     }
 
     NetwLagCompCore *rewind() const {
-        return core()->get_lagcomp_core();
+        return Internals::get_lagcomp_core(core());
     }
 
     int64_t rewind_slot() const {

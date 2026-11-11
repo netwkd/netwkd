@@ -12,6 +12,7 @@ namespace TestWireCaptureFile {
 
 using namespace godot;
 using netw_test::adopt_into_memory;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::MemoryCapture;
 using netw_test::read_memory;
@@ -137,18 +138,20 @@ TEST_CASE(
     rig.step_ticks(10);
 
     const MemoryCapture server
-        = read_memory(rig.server()->capture_writer().memory());
+        = read_memory(Internals::capture_writer(rig.server()).memory());
     NETW_CHECK_EQ(int64_t(server.header.get("peer", -1)), int64_t(1));
     NETW_CHECK_EQ(server.trailing_bits < 8, true);
     NETW_CHECK_EQ(
         int64_t(server.records.size()),
-        rig.server()->capture_writer().record_count()
+        Internals::capture_writer(rig.server()).record_count()
     );
 
     for (int index = 0; index < rig.count(); ++index) {
         const int64_t id = rig.peer_id(index);
         const MemoryCapture client
-            = read_memory(rig.client(index)->capture_writer().memory());
+            = read_memory(
+                Internals::capture_writer(rig.client(index)).memory()
+            );
         NETW_CHECK_EQ(int64_t(client.header.get("peer", -1)), id);
         NETW_CHECK_EQ(client.trailing_bits < 8, true);
 

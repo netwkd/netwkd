@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -16,6 +17,7 @@
 #include "netw/sim/row.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwSimBeachBallFrameLaws {
 
@@ -208,7 +210,7 @@ class BeachBallScenario final : public netw_test::FrameScenario {
             session->display_pump_entity(
                 NetwEntity::of(ball_at(client))->get_rid_handle(),
                 netw::display::capture_timing(
-                    &session->clock_engine(),
+                    &Internals::clock_engine(session),
                     1.0 / double(TICKRATE)
                 )
             );

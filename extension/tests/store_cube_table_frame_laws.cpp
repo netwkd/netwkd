@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -15,6 +16,7 @@
 #include "netw/store/world.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwStoreCubeTable {
 
@@ -108,7 +110,7 @@ class CubeTableScenario final : public netw_test::FrameScenario {
 
     void read() {
         CubeEvidence &seen = cube_evidence();
-        const World &world = server()->store();
+        const World &world = Internals::store(server());
         seen.tables = int(world.table_count());
         if (world.table_count() != 1) {
             return;
@@ -118,7 +120,7 @@ class CubeTableScenario final : public netw_test::FrameScenario {
         seen.family = int(table.family);
         if (table.row_count() == 1) {
             const int64_t route
-                = server()->get_liveness_core()->route_of(cubes[0]);
+                = Internals::get_liveness_core(server())->route_of(cubes[0]);
             seen.placed = route > 0 && world.route_of(table.slots[0]) == route;
         }
         for (int at = 0; at < table.schema.column_count(); ++at) {

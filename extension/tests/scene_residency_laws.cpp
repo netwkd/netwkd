@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -18,6 +19,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw_test::CallLog;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 Node *build_avatar(const Variant &p_marker) {
@@ -125,7 +127,7 @@ TEST_CASE(
 
     CHECK(host->scene_subscribes(arena, peer));
     CHECK_FALSE(host->scene_watches(arena, peer));
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 1);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 1);
 
     const int furniture
         = spawn_into(rig, level, Ref<netw::NetwPlayer>(), "furniture");
@@ -155,18 +157,18 @@ TEST_CASE(
     Node *second_node = rig.route_node(second);
     REQUIRE(first_node != nullptr);
     REQUIRE(second_node != nullptr);
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 2);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 2);
 
     first_node->get_parent()->remove_child(first_node);
     rig.pump(8);
 
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 1);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 1);
     CHECK(host->scene_subscribes(arena, peer));
 
     second_node->get_parent()->remove_child(second_node);
     rig.pump(8);
 
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 0);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 0);
     CHECK_FALSE(host->scene_subscribes(arena, peer));
 
     memdelete(first_node);
@@ -204,7 +206,7 @@ TEST_CASE(
     NETW_CHECK_EQ(edges_for(seen, annex, true), 0);
     CHECK(host->scene_subscribes(arena, peer));
     CHECK_FALSE(host->scene_subscribes(annex, peer));
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 1);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 1);
 }
 
 TEST_CASE(
@@ -269,7 +271,7 @@ TEST_CASE(
 
     CHECK(host->scene_watches(arena, peer));
     CHECK(host->scene_subscribes(arena, peer));
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 0);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 0);
     CHECK(host->scene_subscribes(annex, peer));
 }
 
@@ -301,7 +303,7 @@ TEST_CASE(
     rig.pump(8);
 
     CHECK_FALSE(host->scene_subscribes(arena, peer));
-    NETW_CHECK_EQ(host->membership_book().subscriptions_of(peer), 0);
+    NETW_CHECK_EQ(Internals::membership_book(host).subscriptions_of(peer), 0);
 
     avatar->reparent(level_of(rig, arena));
     rig.pump(8);
@@ -330,7 +332,7 @@ TEST_CASE(
     rig.pump(8);
 
     CHECK_FALSE(host->scene_subscribes(arena, peer));
-    NETW_CHECK_EQ(host->membership_book().entities_in(peer, arena), 0);
+    NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 0);
 }
 
 TEST_CASE(

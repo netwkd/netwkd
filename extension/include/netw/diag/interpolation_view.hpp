@@ -13,7 +13,9 @@
 
 namespace netw {
 
-class NetwMultiplayer;
+namespace session {
+struct Books;
+} // namespace session
 
 namespace display {
 class Channel;
@@ -154,7 +156,7 @@ public:
     uint64_t part_walks = 0;
 #endif
 
-    void sample(NetwMultiplayer &p_session);
+    void sample(const session::Books &p_books);
     const godot::LocalVector<TimelineRow> &rows() const {
         return sampled;
     }
@@ -234,15 +236,15 @@ private:
     void resolve_heading(
         Seen &r_entry,
         const display::Channel &p_pose,
-        NetwMultiplayer &p_session
+        const session::Books &p_books
     );
     void read(
-        NetwMultiplayer &p_session,
+        const session::Books &p_books,
         const Candidate &p_candidate,
         const Now &p_now
     );
     void read_remote(
-        NetwMultiplayer &p_session,
+        const session::Books &p_books,
         Seen &r_entry,
         display::Runtime &p_runtime,
         godot::Node *p_frame,
@@ -250,7 +252,7 @@ private:
         const Now &p_now
     );
     void read_forecast(
-        NetwMultiplayer &p_session,
+        const session::Books &p_books,
         Seen &r_entry,
         display::Runtime &p_runtime,
         godot::Node *p_frame,
@@ -258,7 +260,7 @@ private:
         const Now &p_now
     );
     void hold_marks(
-        NetwMultiplayer &p_session,
+        const session::Books &p_books,
         const Seen &p_entry,
         godot::Node *p_frame,
         uint32_t p_count,

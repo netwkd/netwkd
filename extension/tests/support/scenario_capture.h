@@ -2,6 +2,7 @@
 
 #include "netw_test.h"
 
+#include "internals.h"
 #include "loopback_rig.h"
 #include "scenario_run.h"
 #include "scenario_text.h"
@@ -75,9 +76,11 @@ inline godot::LocalVector<godot::PackedByteArray> capture_scenario(
     ScenarioRun::session(rig, scenario);
 
     godot::LocalVector<godot::PackedByteArray> worlds;
-    worlds.push_back(rig.server()->capture_writer().memory());
+    worlds.push_back(Internals::capture_writer(rig.server()).memory());
     for (int index = 0; index < rig.count(); ++index) {
-        worlds.push_back(rig.client(index)->capture_writer().memory());
+        worlds.push_back(
+            Internals::capture_writer(rig.client(index)).memory()
+        );
     }
     return worlds;
 }

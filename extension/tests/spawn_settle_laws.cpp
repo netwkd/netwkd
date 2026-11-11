@@ -6,10 +6,10 @@
 
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/interest_layer.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/liveness_core.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestSpawnSettleLaws {
 

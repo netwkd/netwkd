@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -12,6 +13,7 @@
 #include "support/loopback_rig.h"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwPredictBindingReplaceLaws {
 
@@ -112,7 +114,9 @@ TEST_CASE(
     CHECK(fields.has(StringName("position")));
     CHECK_FALSE(fields.has(StringName("lean")));
     NETW_CHECK_EQ(
-        int64_t(rig.client(0)->property_binding_book().retired_count()),
+        int64_t(
+            Internals::property_binding_book(rig.client(0)).retired_count()
+        ),
         int64_t(0)
     );
 }
@@ -163,7 +167,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(frames_sent(rig), at_clear);
     NETW_CHECK_EQ(
-        int64_t(rig.client(0)->property_binding_book().count()),
+        int64_t(Internals::property_binding_book(rig.client(0)).count()),
         int64_t(0)
     );
 }

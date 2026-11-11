@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/multiplayer.hpp"
@@ -18,6 +19,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw_test::CallLog;
 using netw_test::LoopbackRig;
+using netw_test::Internals;
 
 struct TreeUnpausedAfter {
     ~TreeUnpausedAfter() {
@@ -50,11 +52,11 @@ void server_says_paused(NetwMultiplayer *p_core, bool p_paused) {
 }
 
 int64_t ticks_over_frames(NetwMultiplayer *p_core, int p_frames) {
-    const int64_t before = p_core->clock_engine().get_ticks_run();
+    const int64_t before = Internals::clock_engine(p_core).get_ticks_run();
     for (int frame = 0; frame < p_frames; ++frame) {
         p_core->clock_on_physics_frame();
     }
-    return p_core->clock_engine().get_ticks_run() - before;
+    return Internals::clock_engine(p_core).get_ticks_run() - before;
 }
 
 TEST_CASE(
@@ -177,7 +179,7 @@ TEST_CASE(
     Ref<netw::NetwClockConfig> clock;
     clock.instantiate();
     NETW_REQUIRE_EQ(rig.server()->clock_initialize(clock), OK);
-    rig.server()->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(rig.server()).set_manual_tick(true);
     rig.join(-1, StringName("host"));
 
     rig.server()->session_pause(String());

@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/level_spawn.h"
 #include "support/mesh_stand.h"
 
@@ -22,12 +23,12 @@
 #include "netw/api/property_config.hpp"
 #include "netw/api/scene.hpp"
 #include "netw/api/session.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/call_args.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/entity/control.hpp"
 #include "netw/object_port.hpp"
 #include "netw/property_set_builder.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/script/model.hpp"
 #include "netw/session/frames.hpp"
 #include "netw/wire/registry.hpp"
@@ -140,7 +141,7 @@ void arm_clock(NetwMultiplayer *p_session) {
     config.instantiate();
     config->set("tickrate", TICKRATE);
     NETW_CHECK_EQ(int(p_session->clock_initialize(config)), int(OK));
-    p_session->clock_engine().set_manual_tick(true);
+    Internals::clock_engine(p_session).set_manual_tick(true);
 }
 
 Node *mount_under_root(const char *p_name) {
@@ -163,7 +164,7 @@ RID first_scene(NetwMultiplayer *p_session) {
 void declare_state_stream(NetwMultiplayer *p_core, Node *p_node) {
     const Dictionary configs
         = netw::script::model::get_node_property_configs(p_node);
-    netw::repl::SetBook &sets = p_core->property_set_book();
+    netw::repl::SetBook &sets = Internals::property_set_book(p_core);
     const uint64_t declared = sets.create();
     PropertySet *set = sets.get(declared);
     REQUIRE(
@@ -176,7 +177,8 @@ void declare_state_stream(NetwMultiplayer *p_core, Node *p_node) {
     set->compile_against(p_node);
     NETW_CHECK_EQ(int(set->get_sealed()), 1);
     NETW_CHECK_EQ(
-        int(p_core->sync_pipeline()->register_property_set(p_node, declared)),
+        int(Internals::sync_pipeline(p_core)
+                ->register_property_set(p_node, declared)),
         int(OK)
     );
     p_core->display_mark_dirty(

@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -22,6 +23,7 @@ namespace TestNetwSimInstallFrameLaws {
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::sim::Mode;
+using netw_test::Internals;
 
 constexpr const char *BODY = R"(extends Node3D
 
@@ -183,7 +185,8 @@ class InstallScenario final : public netw_test::FrameScenario {
     void declare(int p_kind, int p_client) {
         NetwMultiplayer *session = stand->session(p_client);
         const Ref<NetwEntity> entity = entity_at(p_kind, p_client);
-        netw::sim::Row &row = session->sim_row(entity->get_rid_handle());
+        netw::sim::Row &row
+            = Internals::sim_row(session, entity->get_rid_handle());
         row.declaration.bodies.push_back(NodePath("Sphere"));
         if (p_client != KIND_AUTHOR[p_kind]) {
             row.declaration.replicas = netw::sim::Replicas::ACTIVE;
@@ -533,7 +536,8 @@ class RestScenario final : public netw_test::FrameScenario {
         NetwMultiplayer *session = stand->session(p_client);
         const Ref<NetwEntity> entity
             = NetwEntity::of(stand->node_at(p_client, route));
-        netw::sim::Row &row = session->sim_row(entity->get_rid_handle());
+        netw::sim::Row &row
+            = Internals::sim_row(session, entity->get_rid_handle());
         row.declaration.bodies.push_back(NodePath("Box"));
         if (p_client >= 0) {
             row.declaration.replicas = netw::sim::Replicas::ACTIVE;

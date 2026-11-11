@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -12,6 +13,7 @@
 #include "netw/store/world.hpp"
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwStoreInterest {
 
@@ -97,12 +99,12 @@ protected:
     }
 
     int64_t route_of(int p_index) const {
-        return server()->get_liveness_core()->route_of(marks[p_index]);
+        return Internals::get_liveness_core(server())->route_of(marks[p_index]);
     }
 
     Seen seen_by_client(int p_index) const {
         Seen out;
-        const World &world = server()->store();
+        const World &world = Internals::store(server());
         const RowAddress at = row_of_node(world, mark(p_index));
         const uint32_t peer = world.peer_of(client_id());
         if (!at.valid() || peer == Table::NO_SLOT) {
@@ -119,7 +121,7 @@ protected:
     }
 
     int admitted_to_client() const {
-        const World &world = server()->store();
+        const World &world = Internals::store(server());
         const uint32_t peer = world.peer_of(client_id());
         if (peer == Table::NO_SLOT) {
             return 0;
@@ -214,7 +216,7 @@ class AdmitScenario final : public netw_test::FrameScenario, MarkStand {
         seen.dead_before = seen_by_client(2);
         server()->interest_layer_remove_viewer(layer(), client_id());
         server()->lifecycle_withdraw_author(route_of(1), client_id());
-        server()->get_liveness_core()->hide_route(int(route_of(2)));
+        Internals::get_liveness_core(server())->hide_route(int(route_of(2)));
     }
 
     void read_withdrawn() {
@@ -294,7 +296,7 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
     }
 
     void snapshot() {
-        opened = server()->store().interest_work;
+        opened = Internals::store(server()).interest_work;
         marks_opened = server()->interest_plane().mark_visits;
     }
 
@@ -307,7 +309,8 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
 
     void joined() {
         CrowdEvidence &seen = crowd_evidence();
-        const World::InterestWork &now = server()->store().interest_work;
+        const World::InterestWork &now
+            = Internals::store(server()).interest_work;
         seen.join_evaluations = now.evaluations - opened.evaluations;
         seen.join_writes = now.writes - opened.writes;
         seen.join_marks = server()->interest_plane().mark_visits - marks_opened;
@@ -317,7 +320,8 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
 
     void settled() {
         CrowdEvidence &seen = crowd_evidence();
-        const World::InterestWork &now = server()->store().interest_work;
+        const World::InterestWork &now
+            = Internals::store(server()).interest_work;
         seen.steady_evaluations = now.evaluations - opened.evaluations;
         seen.steady_writes = now.writes - opened.writes;
     }

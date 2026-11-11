@@ -16,6 +16,8 @@
 #include "netw/script/model.hpp"
 #include "netw/session_core.hpp"
 
+#include "support/internals.h"
+
 #if defined(NETW_TIER_HOSTED)
 #include "support/minted_script.h"
 #endif
@@ -29,6 +31,7 @@ using netw::NetwPromise;
 using netw::NetwPropertyConfig;
 using netw::SessionCore;
 using netw::persist::MemoryConnection;
+using netw_test::Internals;
 namespace model = netw::script::model;
 namespace schema_model = netw::schema_model;
 
@@ -49,9 +52,9 @@ struct World {
         account = memnew(Node);
         account->set_name("hero");
 
-        database = session->get_databases()->create("saves");
+        database = Internals::get_databases(session)->create("saves");
         connection = MemoryConnection::opened(p_store, "slot1");
-        session->get_databases()
+        Internals::get_databases(session)
             ->open(database, "slot1", NetwPromise::resolved(connection));
 
         root = memnew(Node2D);
@@ -110,7 +113,7 @@ struct World {
     }
 
     void become_replica() {
-        session->session_plane().set_role(SessionCore::ROLE_CLIENT);
+        Internals::session_plane(session).set_role(SessionCore::ROLE_CLIENT);
     }
 };
 

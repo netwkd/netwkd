@@ -62,6 +62,7 @@ const EXIT_CONNECT := 3
 const EXIT_READY := 4
 const EXIT_GESTURE := 5
 const EXIT_CONDITION := 6
+const EXIT_LIBRARY := 7
 
 # Seconds granted beyond the run itself for connect, spawn, and quiesce
 # before the watchdog declares the child wedged. A capture that gathers its
@@ -128,6 +129,7 @@ var quiesce := 1.0
 var expect := ""
 
 var _completed := false
+var _test_classes := ClassDB.class_exists(&"NetwNativeTests")
 var _throttle: NetwRegimeThrottle
 var _cadence_samples: Array[Dictionary] = []
 # Cadence counters at gesture start, so the condition block measures the
@@ -164,6 +166,14 @@ func configure_from_args() -> void:
 ## watchdog is armed first, so no failure mode leaves a silent orphan.
 func run() -> void:
 	_arm_watchdog.call_deferred()
+	if not _test_classes:
+		push_error(
+			"The regime %s loaded a library without NetwNativeTests, so it " % role
+			+ "cannot measure attribution. Build the library with "
+			+ "scons -C extension netw_tests=yes.",
+		)
+		_finish(EXIT_LIBRARY, "library_without_test_classes")
+		return
 	if _throttle == null and not throttle_spec.is_empty():
 		_throttle = NetwRegimeThrottle.new()
 		_throttle.phases = NetwRegimeThrottle.parse(throttle_spec)
@@ -282,7 +292,7 @@ func _sample_cadence_loop() -> void:
 # the session already despawned keeps its previous snapshot, which is its
 # final state.
 func _snapshot_entities() -> void:
-	if not summary_handles.is_valid():
+	if not summary_handles.is_valid() or not _test_classes:
 		return
 	var handles: Dictionary = summary_handles.call()
 	for id: Variant in handles:
@@ -317,14 +327,15 @@ func _write_summary(exit_kind: String) -> void:
 		"condition": _condition_report(),
 		"clock": _clock_report(),
 		"entities": _entity_snapshots,
-		"attribution": ClassDB.class_call_static(
-			&"NetwNativeTests",
-			&"attribution_snapshot",
-			api,
-		) if api else { },
 		"stats": api.stats_snapshot() if api else { },
 		"instrument_cost": { "tap": api.predict_get_tap_cost() },
 	}
+	if api and _test_classes:
+		summary["attribution"] = ClassDB.class_call_static(
+			&"NetwNativeTests",
+			&"attribution_snapshot",
+			api,
+		)
 	var file := FileAccess.open(
 		artifact_dir.path_join("summary.json"),
 		FileAccess.WRITE,
@@ -355,6 +366,7 @@ func _condition_report() -> Dictionary:
 		"poll_hz_mean": polls / wall if wall > 0.0 else 0.0,
 		"physics_hz_p10": _percentile(physics_rates, 0.1),
 		"poll_hz_p10": _percentile(poll_rates, 0.1),
+		"test_classes": _test_classes,
 	}
 	if _throttle:
 		out["throttle"] = _throttle.report()

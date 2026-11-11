@@ -25,8 +25,11 @@
 #include "netw/wire/registry.hpp"
 #include "support/entity_facets.h"
 #include "support/entity_record_box.h"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 #include "support/netw_recorder.h"
+
+using netw_test::Internals;
 
 namespace TestNetwMultiplayer {
 
@@ -102,12 +105,19 @@ TEST_CASE(
     Ref<NetwMultiplayer> core;
     core.instantiate();
 
-    NETW_CHECK_EQ(core->get_liveness_core().is_valid(), true);
-    NETW_CHECK_EQ(core->get_scene_core().is_valid(), true);
+    NETW_CHECK_EQ(Internals::get_liveness_core(core).is_valid(), true);
+    NETW_CHECK_EQ(Internals::get_scene_core(core).is_valid(), true);
 
-    NETW_CHECK_EQ(&core->clock_engine() == &core->clock_engine(), true);
+    NETW_CHECK_EQ(
+        &Internals::clock_engine(core) == &Internals::clock_engine(core),
+        true
+    );
 
-    NETW_CHECK_EQ(core->get_liveness_core() == core->get_liveness_core(), true);
+    NETW_CHECK_EQ(
+        Internals::get_liveness_core(core)
+            == Internals::get_liveness_core(core),
+        true
+    );
     NETW_CHECK_EQ(&core->interest_plane() == &core->interest_plane(), true);
 }
 
@@ -118,12 +128,22 @@ TEST_CASE("[Networked][Multiplayer][Hosted] two sessions share no core") {
     second.instantiate();
 
     NETW_CHECK_EQ(
-        first->get_liveness_core() == second->get_liveness_core(),
+        Internals::get_liveness_core(first)
+            == Internals::get_liveness_core(second),
         false
     );
-    NETW_CHECK_EQ(&first->session_plane() == &second->session_plane(), false);
-    NETW_CHECK_EQ(&first->clock_engine() == &second->clock_engine(), false);
-    NETW_CHECK_EQ(first->get_scene_core() == second->get_scene_core(), false);
+    NETW_CHECK_EQ(
+        &Internals::session_plane(first) == &Internals::session_plane(second),
+        false
+    );
+    NETW_CHECK_EQ(
+        &Internals::clock_engine(first) == &Internals::clock_engine(second),
+        false
+    );
+    NETW_CHECK_EQ(
+        Internals::get_scene_core(first) == Internals::get_scene_core(second),
+        false
+    );
     NETW_CHECK_EQ(&first->interest_plane() == &second->interest_plane(), false);
 }
 
@@ -220,8 +240,9 @@ TEST_CASE(
     NETW_CHECK_EQ(core->session_get_role(), netw::SessionCore::ROLE_NONE);
     NETW_CHECK_EQ(core->is_online(), false);
 
-    core->session_plane().transition(netw::SessionCore::STATE_CONNECTING);
-    core->session_plane().transition(netw::SessionCore::STATE_ONLINE);
+    Internals::session_plane(core)
+        .transition(netw::SessionCore::STATE_CONNECTING);
+    Internals::session_plane(core).transition(netw::SessionCore::STATE_ONLINE);
 
     NETW_CHECK_EQ(core->session_get_state(), netw::SessionCore::STATE_ONLINE);
     NETW_CHECK_EQ(core->is_online(), true);
@@ -231,15 +252,17 @@ TEST_CASE("[Networked][Multiplayer][Hosted] a listen server is both faces") {
     Ref<NetwMultiplayer> core;
     core.instantiate();
 
-    core->session_plane().set_role(netw::SessionCore::ROLE_CLIENT);
+    Internals::session_plane(core).set_role(netw::SessionCore::ROLE_CLIENT);
     NETW_CHECK_EQ(core->is_host(), false);
     NETW_CHECK_EQ(core->is_local_client(), true);
 
-    core->session_plane().set_role(netw::SessionCore::ROLE_DEDICATED_SERVER);
+    Internals::session_plane(core)
+        .set_role(netw::SessionCore::ROLE_DEDICATED_SERVER);
     NETW_CHECK_EQ(core->is_host(), true);
     NETW_CHECK_EQ(core->is_local_client(), false);
 
-    core->session_plane().set_role(netw::SessionCore::ROLE_LISTEN_SERVER);
+    Internals::session_plane(core)
+        .set_role(netw::SessionCore::ROLE_LISTEN_SERVER);
     NETW_CHECK_EQ(core->is_host(), true);
     NETW_CHECK_EQ(core->is_local_client(), true);
 }
@@ -263,14 +286,15 @@ TEST_CASE(
     NETW_CHECK_EQ(core->is_host(), true);
     NETW_CHECK_EQ(core->is_online(), false);
 
-    core->session_plane().set_role(netw::SessionCore::ROLE_CLIENT);
+    Internals::session_plane(core).set_role(netw::SessionCore::ROLE_CLIENT);
     NETW_CHECK_EQ(core->is_host(), false);
 
-    core->session_plane().transition(netw::SessionCore::STATE_CONNECTING);
-    core->session_plane().transition(netw::SessionCore::STATE_ONLINE);
+    Internals::session_plane(core)
+        .transition(netw::SessionCore::STATE_CONNECTING);
+    Internals::session_plane(core).transition(netw::SessionCore::STATE_ONLINE);
     NETW_CHECK_EQ(core->is_host(), false);
 
-    core->session_plane().clear();
+    Internals::session_plane(core).clear();
     NETW_CHECK_EQ(core->session_get_state(), netw::SessionCore::STATE_OFFLINE);
     NETW_CHECK_EQ(core->is_host(), true);
 }
@@ -640,7 +664,7 @@ TEST_CASE(
     core->schema_add_column(schema, "hp", NetwMultiplayer::COLUMN_F32, 1);
     core->schema_seal(schema);
     const RID table = core->table_create(schema);
-    core->clock_engine().set_tick(41);
+    Internals::clock_engine(core).set_tick(41);
 
     PackedInt64Array routes;
     routes.push_back(7);
@@ -668,7 +692,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->clock_engine().set_tick(10);
+    Internals::clock_engine(core).set_tick(10);
 
     core->lagcomp_effect_arm("act", Callable(), 5);
     NETW_CHECK_EQ(core->lagcomp_effect_pending("act"), true);
@@ -684,7 +708,7 @@ TEST_CASE(
 TEST_CASE("[Networked][Multiplayer][Hosted] a zero wait takes the default") {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->clock_engine().set_tick(0);
+    Internals::clock_engine(core).set_tick(0);
 
     core->lagcomp_effect_arm("act", Callable(), 0);
 
@@ -1070,7 +1094,7 @@ constexpr double ONE_TICK_AT_EXACT_BINARY_RATE = 0.125;
 Ref<NetwMultiplayer> clocked_core() {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->clock_engine().set_tickrate(EXACT_BINARY_TICKRATE);
+    Internals::clock_engine(core).set_tickrate(EXACT_BINARY_TICKRATE);
     return core;
 }
 
@@ -1083,7 +1107,7 @@ TEST_CASE(
     Recorder watched(first->get_clock().ptr(), {"ticked"});
     Recorder quiet(second->get_clock().ptr(), {"ticked"});
 
-    first->clock_engine().physics_step(ONE_TICK_AT_EXACT_BINARY_RATE);
+    Internals::clock_engine(first).physics_step(ONE_TICK_AT_EXACT_BINARY_RATE);
 
     NETW_CHECK_EQ(watched.count("ticked"), 1);
     NETW_CHECK_EQ(quiet.count("ticked"), 0);
@@ -1291,9 +1315,9 @@ TEST_CASE(
     core.instantiate();
     Recorder session(core->get_session().ptr(), session_edges());
 
-    core->session_plane().transition(SessionCore::STATE_CONNECTING);
-    core->session_plane().transition(SessionCore::STATE_ONLINE);
-    core->session_plane().transition(SessionCore::STATE_DISCONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_CONNECTING);
+    Internals::session_plane(core).transition(SessionCore::STATE_ONLINE);
+    Internals::session_plane(core).transition(SessionCore::STATE_DISCONNECTING);
 
     const bool bracketed = session.order()
         == Vector<StringName>({
@@ -1542,7 +1566,7 @@ TEST_CASE(
         ERR_UNAUTHORIZED
     );
 
-    const Dictionary counters = core->store_arrays().counters();
+    const Dictionary counters = Internals::store_arrays(core).counters();
     NETW_CHECK_EQ(int64_t(counters["drops_table_bad_sender"]), 1);
 }
 
@@ -1575,11 +1599,11 @@ TEST_CASE(
     Ref<NetwMultiplayer> core;
     core.instantiate();
 
-    const RID unknown = core->get_liveness_core()->entity_create();
+    const RID unknown = Internals::get_liveness_core(core)->entity_create();
     NETW_CHECK_EQ(core->spawn_declare(unknown), ERR_DOES_NOT_EXIST);
 
-    const RID entity = core->get_liveness_core()->entity_create();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const RID entity = Internals::get_liveness_core(core)->entity_create();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     Ref<netw::NetwEntity> wrapper;
     wrapper.instantiate();
     netw::NetwEntityRecord *const record = wrapper->get_record();
@@ -1814,8 +1838,9 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core = session_at_peer_one();
     Recorder session(core->get_session().ptr(), {"exiting"});
-    core->session_plane().transition(netw::SessionCore::STATE_CONNECTING);
-    core->session_plane().transition(netw::SessionCore::STATE_ONLINE);
+    Internals::session_plane(core)
+        .transition(netw::SessionCore::STATE_CONNECTING);
+    Internals::session_plane(core).transition(netw::SessionCore::STATE_ONLINE);
     const int64_t kicked = control_channel("SESSION_KICKED");
     const int64_t shutdown = control_channel("SESSION_SHUTDOWN");
 
@@ -1827,7 +1852,8 @@ TEST_CASE(
         core->session_publish_control(kicked, SERVER, reason_frame("rude")),
         true
     );
-    core->session_plane().transition(netw::SessionCore::STATE_DISCONNECTING);
+    Internals::session_plane(core)
+        .transition(netw::SessionCore::STATE_DISCONNECTING);
 
     NETW_REQUIRE_EQ(session.count("exiting"), 1);
     NETW_CHECK_EQ(
@@ -1994,8 +2020,8 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const RID entity = core->get_liveness_core()->entity_create();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const RID entity = Internals::get_liveness_core(core)->entity_create();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     Ref<netw::NetwEntity> wrapper = an_identity_only_wrapper();
     netw::NetwEntity *raw = wrapper.ptr();
     netw_test::RecordBox seated;
@@ -2016,8 +2042,8 @@ TEST_CASE(
 TEST_CASE("[Networked][Multiplayer][Hosted] a route's life is three edges") {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const RID entity = core->get_liveness_core()->entity_create();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const RID entity = Internals::get_liveness_core(core)->entity_create();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     netw_test::RecordBox seated;
     const Ref<netw::NetwEntity> wrapper = an_identity_only_wrapper();
 
@@ -2058,8 +2084,8 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const RID entity = core->get_liveness_core()->entity_create();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const RID entity = Internals::get_liveness_core(core)->entity_create();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     Ref<netw::NetwEntity> wrapper = an_identity_only_wrapper();
     netw::NetwEntity *raw = wrapper.ptr();
     netw_test::RecordBox seated;
@@ -2077,7 +2103,7 @@ TEST_CASE(
     NETW_CHECK_EQ(core->entity_get_view(entity).is_valid(), false);
     NETW_CHECK_EQ(core->wrapper_for_id(entity.get_id()).ptr(), raw);
     NETW_CHECK_EQ(
-        int(core->get_liveness_core()->state_of(entity)),
+        int(Internals::get_liveness_core(core)->state_of(entity)),
         int(NetwLivenessCore::STATE_DEAD)
     );
 
@@ -2094,9 +2120,9 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const RID first = core->get_liveness_core()->entity_create();
-    const RID second = core->get_liveness_core()->entity_create();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const RID first = Internals::get_liveness_core(core)->entity_create();
+    const RID second = Internals::get_liveness_core(core)->entity_create();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     netw_test::RecordBox seated;
     netw_test::RecordBox arriving;
     const Ref<netw::NetwEntity> standing = an_identity_only_wrapper();
@@ -2131,12 +2157,12 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     Ref<RefCounted> first = an_identity_only_wrapper();
     netw_test::RecordBox held_seat;
     netw::NetwEntityRecord *const held
         = a_record_holding_peer_and_route(held_seat, 0);
-    core->get_liveness_core()->adopt(held->get_handle());
+    Internals::get_liveness_core(core)->adopt(held->get_handle());
 
     NETW_CHECK_EQ(core->liveness_adopt_route(route, first, held, nullptr), OK);
 
@@ -2181,20 +2207,20 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    const int64_t route = core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(core)->reserve_route();
     Ref<RefCounted> died = an_identity_only_wrapper();
     netw_test::RecordBox record_seat;
     netw::NetwEntityRecord *const record
         = a_record_holding_peer_and_route(record_seat, 0);
     const RID standing = record->get_handle();
-    core->get_liveness_core()->adopt(standing);
+    Internals::get_liveness_core(core)->adopt(standing);
     REQUIRE(core->liveness_adopt_route(route, died, record, nullptr) == OK);
     core->liveness_retire(route);
     REQUIRE(
-        core->get_liveness_core()->state_of(standing)
+        Internals::get_liveness_core(core)->state_of(standing)
         == NetwLivenessCore::STATE_DEAD
     );
-    const int before = core->get_liveness_core()->epoch_of(standing);
+    const int before = Internals::get_liveness_core(core)->epoch_of(standing);
 
     Ref<RefCounted> revived = an_identity_only_wrapper();
     netw_test::RecordBox arriving_seat;
@@ -2207,10 +2233,13 @@ TEST_CASE(
 
     CHECK(arriving->get_handle() == standing);
     NETW_CHECK_EQ(
-        core->get_liveness_core()->state_of(standing),
+        Internals::get_liveness_core(core)->state_of(standing),
         NetwLivenessCore::STATE_LIVE
     );
-    NETW_CHECK_EQ(core->get_liveness_core()->epoch_of(standing), before + 1);
+    NETW_CHECK_EQ(
+        Internals::get_liveness_core(core)->epoch_of(standing),
+        before + 1
+    );
     NETW_CHECK_EQ(core->wrapper_for_route(route).ptr(), revived.ptr());
 
     SUBCASE(
@@ -2224,8 +2253,9 @@ TEST_CASE(
         netw_test::RecordBox mine_seat;
         netw::NetwEntityRecord *const mine
             = a_record_holding_peer_and_route(mine_seat, 0);
-        const int64_t other = core->get_liveness_core()->reserve_route();
-        core->get_liveness_core()->adopt(mine->get_handle());
+        const int64_t other
+            = Internals::get_liveness_core(core)->reserve_route();
+        Internals::get_liveness_core(core)->adopt(mine->get_handle());
         REQUIRE(core->liveness_adopt_route(other, known, mine, nullptr) == OK);
 
         NETW_CHECK_EQ(
@@ -2374,12 +2404,12 @@ Bound bind_under(
         p_parent->add_child(out.owner);
     }
     out.wrapper.instantiate();
-    out.handle = p_core->get_liveness_core()->entity_create();
+    out.handle = Internals::get_liveness_core(p_core)->entity_create();
     out.record = out.wrapper->get_record();
     out.record->adopt_handle(out.handle);
     out.record->set_declares_scene(p_declares_scene);
     out.record->set_peer_id(p_peer_id);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     p_core
         ->liveness_bind(out.handle, route, out.wrapper, out.record, out.owner);
     if (p_marked) {
@@ -2485,7 +2515,7 @@ TEST_CASE(
     Recorder session(core->get_session().ptr(), {"scene_ready"});
 
     core->scene_publish_live(
-        core->get_liveness_core()->route_of(inside.handle),
+        Internals::get_liveness_core(core)->route_of(inside.handle),
         container.handle
     );
 
@@ -2892,7 +2922,7 @@ TEST_CASE(
     Ref<netw::NetwEntity> entity;
     entity.instantiate();
     entity->attach_to(root);
-    const RID handle = core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(core)->entity_create();
     REQUIRE(entity->get_record() != nullptr);
     entity->get_record()->adopt_handle(handle);
 
@@ -2922,7 +2952,7 @@ TEST_CASE(
     Ref<netw::NetwEntity> entity;
     entity.instantiate();
     entity->set_owner(owner);
-    const RID handle = core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(core)->entity_create();
     entity->get_record()->adopt_handle(handle);
     core->wrapper_adopt(handle, entity, owner);
 
@@ -2957,14 +2987,15 @@ TEST_CASE(
     Ref<netw::NetwEntity> parent;
     parent.instantiate();
     parent->attach_to(root);
-    const RID parent_handle = core->get_liveness_core()->entity_create();
+    const RID parent_handle
+        = Internals::get_liveness_core(core)->entity_create();
     parent->get_record()->adopt_handle(parent_handle);
     REQUIRE(core->entity_of(root) == parent_handle);
 
     Ref<netw::NetwEntity> leaf;
     leaf.instantiate();
     leaf->attach_to(child);
-    const RID leaf_handle = core->get_liveness_core()->entity_create();
+    const RID leaf_handle = Internals::get_liveness_core(core)->entity_create();
     leaf->get_record()->adopt_handle(leaf_handle);
     REQUIRE(core->entity_of(child) == leaf_handle);
 
@@ -3017,7 +3048,7 @@ TEST_CASE(
     entity.instantiate();
     entity->attach_to(root);
     entity->set_owner(child);
-    const RID handle = core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(core)->entity_create();
     entity->get_record()->adopt_handle(handle);
 
     core->interest_sync_record(entity.ptr());
@@ -3046,18 +3077,19 @@ TEST_CASE(
     Ref<netw::NetwEntity> scene;
     scene.instantiate();
     scene->attach_to(arena);
-    const RID handle = core->get_liveness_core()->entity_create();
+    const RID handle = Internals::get_liveness_core(core)->entity_create();
     scene->get_record()->adopt_handle(handle);
     REQUIRE(core->entity_of(arena) == handle);
 
     CHECK(core->scene_layer_id(handle) == StringName("scene:Arena"));
 
-    REQUIRE(core->get_liveness_core()->bind_route(handle, 7));
+    REQUIRE(Internals::get_liveness_core(core)->bind_route(handle, 7));
     CHECK(core->scene_layer_id(handle) == StringName("scene:Arena#7"));
 
     Ref<netw::NetwEntity> bare;
     bare.instantiate();
-    const RID hollow_handle = core->get_liveness_core()->entity_create();
+    const RID hollow_handle
+        = Internals::get_liveness_core(core)->entity_create();
     bare->get_record()->adopt_handle(hollow_handle);
     REQUIRE(core->wrapper_owner(hollow_handle) == nullptr);
 
@@ -3082,7 +3114,7 @@ TEST_CASE(
     Ref<netw::NetwEntity> entity;
     entity.instantiate();
     entity->set_owner(arena);
-    const RID scene = core->get_liveness_core()->entity_create();
+    const RID scene = Internals::get_liveness_core(core)->entity_create();
     entity->get_record()->adopt_handle(scene);
     core->wrapper_adopt(scene, entity, arena);
 

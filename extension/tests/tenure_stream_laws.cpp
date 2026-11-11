@@ -14,7 +14,7 @@
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_pipeline.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/replication_send.hpp"
 #include "netw/wire/control_record.hpp"
 #include "netw/wire/stream_book.hpp"

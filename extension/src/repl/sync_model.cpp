@@ -1,4 +1,4 @@
-#include "netw/api/sync_model.hpp"
+#include "netw/repl/sync_model.hpp"
 
 #include "godot/node.hpp"
 #include "netw/colors.hpp"

@@ -1,4 +1,4 @@
-#include "netw/api/predict_runner.hpp"
+#include "netw/predict/runner.hpp"
 
 #include <algorithm>
 
@@ -11,6 +11,7 @@
 #include "netw/log.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/profile.hpp"
+#include "netw/session/books.hpp"
 #include "netw/subsystems.hpp"
 
 using namespace godot;
@@ -26,8 +27,13 @@ struct OrderRow {
 
 } // namespace
 
-void NetwPredictRunner::seat_core(NetwMultiplayer *p_core) {
+void NetwPredictRunner::seat_core(
+    NetwMultiplayer *p_core,
+    const session::Books *p_books
+) {
+    NETW_BUG_COND(p_core != nullptr && p_books == nullptr);
     core_id = gd::instance_id(p_core);
+    books = p_core != nullptr ? p_books : nullptr;
 }
 
 NetwMultiplayer *NetwPredictRunner::core() const {
@@ -69,7 +75,7 @@ bool NetwPredictRunner::resolve_pool_order() {
     if (service == nullptr) {
         return false;
     }
-    NetwPredictionEngine *const pool = service->get_prediction_engine();
+    NetwPredictionEngine *const pool = books->prediction;
     if (pool == nullptr) {
         return false;
     }
@@ -157,7 +163,7 @@ const LocalVector<NetwPredictSlotEngine *> &NetwPredictRunner::phase(
         );
         return sorted;
     }
-    NetwPredictionEngine *const pool = service->get_prediction_engine();
+    NetwPredictionEngine *const pool = books->prediction;
     if (pool == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,

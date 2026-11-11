@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -19,6 +20,7 @@ using netw::NetwMultiplayer;
 using netw::spawn::Book;
 using netw::spawn::Record;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 const int64_t REPARENT_CHANNEL = 16;
 
@@ -229,7 +231,8 @@ TEST_CASE(
     world.core->spawn_handle_reparent_frame(frame, SERVER);
     NETW_CHECK_EQ(
         int64_t(
-            world.core->spawn_plane()->counters()[StringName("spawn_deferrals")]
+            Internals::spawn_plane(world.core)
+                ->counters()[StringName("spawn_deferrals")]
         ),
         int64_t(1)
     );
@@ -300,8 +303,10 @@ TEST_CASE(
         int64_t(FIRST_MOVE + 1)
     );
     NETW_CHECK_EQ(
-        int64_t(world.core->spawn_plane()
-                    ->counters()[StringName("drops_reparent_stale")]),
+        int64_t(
+            Internals::spawn_plane(world.core)
+                ->counters()[StringName("drops_reparent_stale")]
+        ),
         int64_t(1)
     );
 }

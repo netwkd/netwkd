@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/declared_nodes.h"
@@ -21,6 +22,7 @@ using netw::NetwMultiplayer;
 using netw::repl::PropertySet;
 using netw::store::World;
 using netw_test::FlowPair;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
@@ -55,7 +57,7 @@ TEST_CASE(
     for (int at = 0; at < WARM_TICKS; ++at) {
         author_next(rig, pair);
     }
-    World &world = client->store();
+    World &world = Internals::store(client);
     const World::ReceiveWork received = world.receive_work;
     const World::PushWork pushed = world.push_work;
     netw_test::AllocProbe probe;

@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/node.hpp"
@@ -18,6 +19,7 @@ using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw_test::CallLog;
+using netw_test::Internals;
 
 struct DeclaredScene {
     Node *root = nullptr;
@@ -34,10 +36,10 @@ DeclaredScene declare_scene(
     made.root->set_name(p_stem);
     made.entity.instantiate();
     made.entity->attach_to(made.root);
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     made.entity->get_record()->adopt_handle(made.handle);
     made.entity->get_record()->set_route(
-        p_core->get_liveness_core()->reserve_route()
+        Internals::get_liveness_core(p_core)->reserve_route()
     );
     REQUIRE(p_core->entity_of(made.root) == made.handle);
     REQUIRE(p_core->scene_route_of(made.handle) > 0);
@@ -60,11 +62,11 @@ Placed place(
     made.owner = memnew(Node);
     p_parent->add_child(made.owner);
     made.wrapper.instantiate();
-    made.handle = p_core->get_liveness_core()->entity_create();
+    made.handle = Internals::get_liveness_core(p_core)->entity_create();
     made.record = made.wrapper->get_record();
     made.record->adopt_handle(made.handle);
     made.record->set_declares_scene(p_declares_scene);
-    const int64_t route = p_core->get_liveness_core()->reserve_route();
+    const int64_t route = Internals::get_liveness_core(p_core)->reserve_route();
     REQUIRE(p_core->liveness_bind(
         made.handle,
         route,
@@ -162,7 +164,7 @@ TEST_CASE(
     const CallLog seen;
     const DeclaredScene arena = declare_scene(core, "Arena");
     const DeclaredScene annex = declare_scene(core, "Annex");
-    core->get_channel_book()->register_protocol(
+    Internals::get_channel_book(core)->register_protocol(
         declared_channel_id("SESSION_SCENE_RELEASED"),
         seen.callable("released")
     );
@@ -215,7 +217,7 @@ TEST_CASE(
     const Placed arena = place(core, root, true);
     const Placed pawn = place(core, root, false);
 
-    const RID bodiless = core->get_liveness_core()->entity_create();
+    const RID bodiless = Internals::get_liveness_core(core)->entity_create();
     expected_faults.expect_error(
         vformat("*Entity %d'*[NW0041]*", int(bodiless.get_id())),
         1

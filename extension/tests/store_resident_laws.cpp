@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -15,6 +16,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 using namespace godot;
+using netw_test::Internals;
 
 namespace TestNetwStoreResidentLaws {
 
@@ -55,7 +57,7 @@ struct Bench {
             StringName("node_removed"),
             callable_mp(session.ptr(), &NetwMultiplayer::sync_note_node_removed)
         );
-        World &world = session->store();
+        World &world = Internals::store(session);
         world.residents.watch(true);
         table
             = world.table_for(1, netw::store::Family::VOLATILE, pose_schema());
@@ -67,7 +69,7 @@ struct Bench {
     }
 
     World &world() const {
-        return session->store();
+        return Internals::store(session);
     }
 
     const netw::store::NodeCell &cell() const {

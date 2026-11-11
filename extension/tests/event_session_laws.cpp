@@ -1,13 +1,14 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/event_ring.h"
 #include "support/netw_cells.h"
 
 #include "godot/variant.hpp"
-#include "netw/api/event_plane.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/schema_core.hpp"
 #include "netw/carrier_frame.hpp"
+#include "netw/session/event_plane.hpp"
 
 namespace TestNetwEventSessionLaws {
 
@@ -21,6 +22,7 @@ using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
+using netw_test::Internals;
 
 constexpr int64_t GATE_ROUTE = 5;
 constexpr int64_t ACK_PEER = 4;
@@ -124,7 +126,7 @@ class SessionRun {
     void drive(bool p_armed, Evidence &r_evidence) {
         Ref<NetwMultiplayer> core;
         core.instantiate();
-        core->clock_engine().set_tick(COMMIT_TICK);
+        Internals::clock_engine(core).set_tick(COMMIT_TICK);
         if (p_armed) {
             core->event_arm(
                 NetwMultiplayer::EVENT_GROUP_GATE
@@ -198,7 +200,7 @@ class SessionRun {
             core->table_write_column(table, 0, hp);
             for (int index = 0; index < declared.commits; index++) {
                 if (plant_is(PLANT_COMMIT_BEHIND_THE_SESSION)) {
-                    core->store_arrays().commit(table, COMMIT_TICK);
+                    Internals::store_arrays(core).commit(table, COMMIT_TICK);
                 } else {
                     core->table_commit(table);
                 }
@@ -428,7 +430,7 @@ TEST_CASE(
     const int overflow = 5;
     const int recorded = int(EventPlane::ROW_CAPACITY) + overflow;
     for (int tick = 0; tick < recorded; tick++) {
-        core->clock_engine().set_tick(tick);
+        Internals::clock_engine(core).set_tick(tick);
         core->count_verdict(ERR_INVALID_DATA, GATE_ROUTE);
     }
 
@@ -493,7 +495,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    core->clock_engine().set_tick(COMMIT_TICK);
+    Internals::clock_engine(core).set_tick(COMMIT_TICK);
     core->event_arm(
         NetwMultiplayer::EVENT_GROUP_GATE | NetwMultiplayer::EVENT_GROUP_CARRIER
     );

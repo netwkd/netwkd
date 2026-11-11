@@ -26,7 +26,8 @@
 #include "netw/api/join_request.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/api/sync_pipeline.hpp"
+#include "netw/repl/sync_compat.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/game_call.hpp"
@@ -312,6 +313,18 @@ Error NetwMultiplayer::receive_carrier(
 SyncPipeline *NetwMultiplayer::sync_pipeline() const {
     ReplicationCore *plane = get_replication_plane();
     return plane != nullptr ? plane->get_sync_pipeline() : nullptr;
+}
+
+void NetwMultiplayer::sync_register_derived(Node *p_node) {
+    if (SyncPipeline *pipeline = sync_pipeline()) {
+        pipeline->register_derived(p_node);
+    }
+}
+
+void NetwMultiplayer::sync_unregister_derived(Node *p_node) {
+    if (SyncPipeline *pipeline = sync_pipeline()) {
+        pipeline->unregister_derived(p_node);
+    }
 }
 
 void NetwMultiplayer::sync_pipeline_on_entity_live(
@@ -1843,6 +1856,16 @@ void NetwMultiplayer::table_set_param(
     }
 }
 
+Variant NetwMultiplayer::table_get_param(
+    const RID &p_table,
+    TableParam p_param
+) const {
+    if (p_param == TABLE_PARAM_RELIABLE) {
+        return store_world.arrays.is_reliable(p_table);
+    }
+    return Variant();
+}
+
 RID NetwMultiplayer::table_find(const StringName &p_name) const {
     const RID *bound = table_by_name.getptr(p_name);
     return bound ? *bound : RID();
@@ -2642,6 +2665,42 @@ void NetwMultiplayer::event_record(
 
 void NetwMultiplayer::lagcomp_effect_sweep(int64_t p_tick) {
     effects.sweep(p_tick);
+}
+
+SyncCompat *NetwMultiplayer::sync_adapter() const {
+    ReplicationCore *plane = get_replication_plane();
+    return plane != nullptr ? plane->get_sync_compat() : nullptr;
+}
+
+void NetwMultiplayer::sync_compat_entity_live(
+    int64_t p_route,
+    const Ref<NetwEntity> &p_entity
+) {
+    NETW_ZONE_NC("Compat entity live", colors::WIRE);
+    if (SyncCompat *adapter = sync_adapter()) {
+        adapter->on_entity_live(p_route, p_entity);
+    }
+}
+
+void NetwMultiplayer::sync_compat_visibility_changed(
+    int64_t p_peer,
+    Node *p_root
+) {
+    if (SyncCompat *adapter = sync_adapter()) {
+        adapter->on_sync_visibility_changed(p_peer, p_root);
+    }
+}
+
+void NetwMultiplayer::sync_compat_config_changed() {
+    if (SyncCompat *adapter = sync_adapter()) {
+        adapter->on_config_changed();
+    }
+}
+
+void NetwMultiplayer::sync_compat_node_removed(Node *p_node) {
+    if (SyncCompat *adapter = sync_adapter()) {
+        adapter->on_node_removed(p_node);
+    }
 }
 
 } // namespace netw

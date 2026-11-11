@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -11,9 +12,9 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/simulation.hpp"
-#include "netw/api/sync_pipeline.hpp"
 #include "netw/display/book.hpp"
 #include "netw/display/runtime.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/sim/row.hpp"
 
 using namespace godot;
@@ -22,6 +23,7 @@ namespace TestNetwSimIdleFrameLaws {
 
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *IDLE_ID = "sim_idle_cube";
 constexpr const char *STEPPED_ID = "sim_idle_stepped";
@@ -138,7 +140,7 @@ class IdleScenario final : public netw_test::FrameScenario {
     }
 
     int64_t unmoved_rows() const {
-        const netw::store::World &world = server()->store();
+        const netw::store::World &world = Internals::store(server());
         int64_t local = 0;
         for (uint32_t at = 0; at < world.table_count(); ++at) {
             const netw::store::Table &table = world.table(at);
@@ -209,7 +211,7 @@ class IdleScenario final : public netw_test::FrameScenario {
 
     void read() {
         IdleEvidence &seen = idle_evidence();
-        const NetwMultiplayer::IdleWork &now = server()->idle_work;
+        const NetwMultiplayer::IdleWork &now = Internals::idle_work(server());
         seen.runs = now.runs - opened.runs;
         seen.walked = now.walked - opened.walked;
         seen.announced = now.announced - opened.announced;
@@ -221,12 +223,15 @@ class IdleScenario final : public netw_test::FrameScenario {
         seen.sourced = now.sourced - opened.sourced;
         seen.pumped = now.pumped - opened.pumped;
         seen.recorders = now.recorders - opened.recorders;
-        seen.pruned = server()->sync_pipeline()->prune_visits - prune_opened;
-        const netw::store::World::PullWork &pulled = server()->store().work;
+        seen.pruned
+            = Internals::sync_pipeline(server())->prune_visits - prune_opened;
+        const netw::store::World::PullWork &pulled
+            = Internals::store(server()).work;
         seen.pulls = pulled.pulls - pull_opened.pulls;
         seen.visits = pulled.visits - pull_opened.visits;
         seen.swept = pulled.swept - pull_opened.swept;
-        const Ref<netw::display::Book> book = server()->get_display_book();
+        const Ref<netw::display::Book> book
+            = Internals::get_display_book(server());
         for (const RID &cube : cubes) {
             const netw::sim::Row *row = server()->sim_row_of(cube);
             if (row != nullptr && row->bodies.recorded) {
@@ -247,7 +252,7 @@ class IdleScenario final : public netw_test::FrameScenario {
 
     int64_t newest_of_first() const {
         const netw::display::Runtime *runtime
-            = server()->get_display_book()->runtime_of(cubes[0]);
+            = Internals::get_display_book(server())->runtime_of(cubes[0]);
         if (runtime == nullptr || runtime->channels().is_empty()) {
             return -1;
         }
@@ -281,19 +286,19 @@ public:
             return false;
         }
         if (frame == SETTLE_FRAMES) {
-            opened = server()->idle_work;
-            pull_opened = server()->store().work;
-            prune_opened = server()->sync_pipeline()->prune_visits;
+            opened = Internals::idle_work(server());
+            pull_opened = Internals::store(server()).work;
+            prune_opened = Internals::sync_pipeline(server())->prune_visits;
         }
         if (frame == SETTLE_FRAMES + WINDOW_FRAMES) {
             read();
             wake_first();
-            opened = server()->idle_work;
+            opened = Internals::idle_work(server());
         }
         if (frame == SETTLE_FRAMES + WINDOW_FRAMES + WAKE_FRAMES) {
             idle_evidence().woken_tick = newest_of_first();
             idle_evidence().woken_contacted
-                = server()->idle_work.contacted - opened.contacted;
+                = Internals::idle_work(server()).contacted - opened.contacted;
             move_authority();
         }
         if (moved_at >= 0 && idle_evidence().moved_seen_frame < 0
@@ -562,7 +567,7 @@ class ScriptWakeScenario final : public netw_test::FrameScenario {
         seen.slept = true;
         seen.target_before = entity_at(1)->get_controller();
         woke_at = frame;
-        contacted = server()->idle_work.contacted;
+        contacted = Internals::idle_work(server()).contacted;
         RigidBody3D *thrown = body_at(0);
         thrown->set_sleeping(false);
         thrown->set_linear_velocity(WAKE_THROW);
@@ -572,7 +577,7 @@ class ScriptWakeScenario final : public netw_test::FrameScenario {
         ScriptWakeEvidence &seen = script_wake_evidence();
         const int since = frame - woke_at;
         if (seen.walked_frame < 0
-            && server()->idle_work.contacted > contacted) {
+            && Internals::idle_work(server()).contacted > contacted) {
             seen.walked_frame = since;
         }
         if (seen.claimed_frame < 0

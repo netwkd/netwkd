@@ -13,13 +13,17 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/member_config.hpp"
-#include "netw/api/sync_model.hpp"
 #include "netw/predict/arrival.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/repl/property_set.hpp"
+#include "netw/repl/sync_model.hpp"
 #include "netw/replication_send.hpp"
 #include "netw/store/world.hpp"
 #include "netw/sync_progress.hpp"
+
+namespace netw::session {
+struct Books;
+} // namespace netw::session
 
 namespace netw {
 
@@ -30,6 +34,7 @@ class SyncPipeline {
 
 private:
     godot::ObjectID core_id;
+    const session::Books *books = nullptr;
     bool hears_entity_live = false;
     godot::ObjectID api_id;
     NetwSyncModel *sync_model = nullptr;
@@ -139,7 +144,6 @@ private:
 
     NetwMultiplayer *core() const;
     godot::Object *api() const;
-    ReplicationSend *row_send();
 
 #if defined(NETW_TESTS)
 public:
@@ -226,7 +230,8 @@ public:
     int64_t prune_visits = 0;
 
     void note_node_removed(godot::Node *p_node);
-    void set_core(godot::Object *p_core);
+    ReplicationSend *row_send();
+    void set_core(godot::Object *p_core, const session::Books *p_books);
     void set_api(godot::Object *p_api);
     void set_sync_model(NetwSyncModel *p_model);
     void set_channels(

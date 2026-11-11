@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -16,6 +17,7 @@ namespace TestSpawnerWrapReadyLaws {
 
 using namespace godot;
 using netw_test::LoopbackRig;
+using netw_test::Internals;
 
 constexpr int TICKRATE = 30;
 
@@ -109,10 +111,10 @@ TEST_CASE(
     rig.branch(0)->add_child(spawner);
     rig.step_ticks(2);
 
-    const int before = client->get_liveness_core()->reserve_route();
+    const int before = Internals::get_liveness_core(client)->reserve_route();
     Node *made = spawner->spawn("refused");
     rig.step_ticks(4);
-    const int after = client->get_liveness_core()->reserve_route();
+    const int after = Internals::get_liveness_core(client)->reserve_route();
 
     NETW_CHECK_EQ(after, before + 1);
     if (made != nullptr) {

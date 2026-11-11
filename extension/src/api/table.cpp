@@ -112,7 +112,9 @@ bool NetwTable::get_reliable() const {
     if (api == nullptr) {
         return false;
     }
-    return api->store_arrays().is_reliable(table);
+    return bool(
+        api->table_get_param(table, NetwMultiplayer::TABLE_PARAM_RELIABLE)
+    );
 }
 
 Error NetwTable::write_routes(const PackedInt64Array &p_routes) {

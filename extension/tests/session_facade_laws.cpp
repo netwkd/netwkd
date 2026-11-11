@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "netw/api/netw_multiplayer.hpp"
@@ -6,6 +7,7 @@ namespace TestNetwSessionFacade {
 
 using namespace godot;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 bool same_row(const RID &p_a, const RID &p_b) {
     return p_a == p_b;
@@ -36,11 +38,11 @@ TEST_CASE(
     SUBCASE("the session and its liveness core answer the same row") {
         NETW_CHECK_EQ(
             session->entity_get_state(entity),
-            session->get_liveness_core()->state_of(entity)
+            Internals::get_liveness_core(session)->state_of(entity)
         );
         NETW_CHECK_EQ(
             session->entity_get_epoch(entity),
-            session->get_liveness_core()->epoch_of(entity)
+            Internals::get_liveness_core(session)->epoch_of(entity)
         );
     }
 

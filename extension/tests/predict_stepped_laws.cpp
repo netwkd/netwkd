@@ -1,4 +1,5 @@
 #include "netw/script/model.hpp"
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/netw_test.h"
 
@@ -79,7 +80,7 @@ JointOwner joint_owner(NetwMultiplayer *p_core) {
     if (p_core == nullptr) {
         return out;
     }
-    NetwPredictionEngine *const pool = p_core->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(p_core);
     if (pool == nullptr) {
         return out;
     }
@@ -133,7 +134,7 @@ TEST_CASE(
 
     NetwMultiplayer *const server = rig.server();
     REQUIRE(server != nullptr);
-    NetwPredictionEngine *const pool = server->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(server);
     REQUIRE(pool != nullptr);
 
     const JointOwner owner = joint_owner(server);
@@ -209,7 +210,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     REQUIRE(pool != nullptr);
 
     const JointOwner owner = joint_owner(predictor);
@@ -252,7 +254,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     REQUIRE(pool != nullptr);
 
     const JointOwner owner = joint_owner(predictor);
@@ -302,7 +305,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     REQUIRE(pool != nullptr);
     const JointOwner owner = joint_owner(predictor);
     REQUIRE_MESSAGE(owner.slot >= 0, "the predictor seated no JOINT owner");
@@ -354,7 +358,8 @@ TEST_CASE(
 
     NetwMultiplayer *const predictor = rig.client(0);
     REQUIRE(predictor != nullptr);
-    NetwPredictionEngine *const pool = predictor->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(predictor);
     REQUIRE(pool != nullptr);
     const JointOwner owner = joint_owner(predictor);
     REQUIRE_MESSAGE(owner.slot >= 0, "the predictor seated no JOINT owner");
@@ -453,7 +458,8 @@ SteppedRun consumed_stepped(bool p_owner_stepped) {
     godot::Node *consumed_body = stepped_body(rig.server(), consumer, true);
     godot::Node *owned_body
         = stepped_body(rig.client(0), owner, p_owner_stepped);
-    NetwPredictionEngine *const pool = rig.server()->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(rig.server());
     const int64_t slot = pool->slot_of(consumer->get_entity());
     const auto step = [&](int p_frames) {
         for (int frame = 0; frame < p_frames; ++frame) {
@@ -587,7 +593,8 @@ DriftRun drifted(bool p_nudged) {
     REQUIRE(owner.is_valid());
     godot::Node2D *authority = drifting_body(rig.server(), consumer);
     godot::Node2D *predicted = drifting_body(rig.client(0), owner);
-    NetwPredictionEngine *const pool = rig.client(0)->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(rig.client(0));
     const int64_t slot = pool->slot_of(owner->get_entity());
     const auto frames = [&](int p_frames) {
         for (int frame = 0; frame < p_frames; ++frame) {
@@ -762,7 +769,8 @@ BallRun drifted_ball(bool p_nudged) {
     const Ref<DriftStepper> predicted
         = drifting_pair(rig.client(0), owner, replica);
     owner->get_entity()->get_owner()->set("motion", godot::Vector2(1.0, 0.0));
-    NetwPredictionEngine *const pool = rig.client(0)->get_prediction_engine();
+    NetwPredictionEngine *const pool
+        = Internals::get_prediction_engine(rig.client(0));
     const int64_t slot = pool->slot_of(owner->get_entity());
     for (int frame = 0; frame < DRIFT_SETTLE_FRAMES; ++frame) {
         rig.step_frame(1);
@@ -836,7 +844,7 @@ struct PairedRun {
 
 int64_t consume_offset(NetwMultiplayer *p_server, int64_t p_slot) {
     return p_server->clock_get_tick()
-        - p_server->get_prediction_engine()->ack_of(p_slot);
+        - Internals::get_prediction_engine(p_server)->ack_of(p_slot);
 }
 
 double spacing(const Ref<DriftStepper> &p_stepper) {
@@ -858,9 +866,8 @@ PairedRun paired_by_world_tick(int p_dry_frames) {
     authority->drift = godot::Vector2(0.0, 0.5);
     predicted->drift = godot::Vector2(0.0, 0.5);
     owner->get_entity()->get_owner()->set("motion", godot::Vector2(1.0, 0.0));
-    const int64_t consumed = rig.server()->get_prediction_engine()->slot_of(
-        consumer->get_entity()
-    );
+    const int64_t consumed = Internals::get_prediction_engine(rig.server())
+                                 ->slot_of(consumer->get_entity());
     for (int frame = 0; frame < DRIFT_SETTLE_FRAMES; ++frame) {
         rig.step_frame(1);
     }
@@ -961,7 +968,7 @@ DrawnRun drawn_through_a_pass() {
     godot::Node2D *visual = chased_visual(client, owner);
     godot::Node2D *authority = drifting_body(rig.server(), consumer);
     godot::Node2D *predicted = drifting_body(client, owner);
-    NetwPredictionEngine *const pool = client->get_prediction_engine();
+    NetwPredictionEngine *const pool = Internals::get_prediction_engine(client);
     const int64_t slot = pool->slot_of(owner->get_entity());
     netw::display::Runtime *const drawing
         = netw::NetwNativeTests::display_runtime_of(
@@ -978,7 +985,7 @@ DrawnRun drawn_through_a_pass() {
                 client,
                 drawing,
                 netw::display::capture_timing(
-                    &client->clock_engine(),
+                    &Internals::clock_engine(client),
                     1.0 / 60.0
                 )
             );

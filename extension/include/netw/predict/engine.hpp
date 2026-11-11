@@ -18,6 +18,10 @@
 #include "netw/sim/resolve.hpp"
 #include "netw/slot_ids.hpp"
 
+namespace netw::session {
+struct Books;
+} // namespace netw::session
+
 namespace netw {
 
 using table::SchemaRecord;
@@ -184,6 +188,7 @@ class NetwPredictionEngine {
     godot::HashMap<uint64_t, int64_t> slot_by_entity;
     godot::HashMap<int64_t, godot::Ref<godot::RefCounted>> entity_by_slot;
     godot::ObjectID core_id;
+    const session::Books *books = nullptr;
     bool journal_readers = false;
     bool owner_evidence = owner_evidence_from_environment();
     SlotIds ids;
@@ -1967,7 +1972,7 @@ public:
     uint32_t book_depth(int64_t p_slot) const;
     int journal_capacity(int64_t p_slot) const;
 
-    void bind_session(NetwMultiplayer *p_core);
+    void bind_session(NetwMultiplayer *p_core, const session::Books *p_books);
     void attach_bindings(repl::BindingBook *p_book);
     repl::PropertyBinding *binding_by_id(uint64_t p_id) const;
 
