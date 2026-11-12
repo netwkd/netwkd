@@ -92,6 +92,27 @@ Ref<NetwEntity> entity_above(Node *p_node) {
     return Ref<NetwEntity>();
 }
 
+void collect_despawning_parts(
+    Node *p_node,
+    LocalVector<Ref<NetwEntity>> &r_parts
+) {
+    for (int at = 0; at < p_node->get_child_count(); ++at) {
+        Node *child = p_node->get_child(at);
+        const Ref<NetwEntity> part = tree::entity_object_at(child) != nullptr
+            ? NetwEntity::of(child)
+            : Ref<NetwEntity>();
+        if (part.is_valid() && part->get_route() > 0
+            && part->get_on_parent_despawn()
+                == NetwEntity::PARENT_DESPAWN_DETACH) {
+            continue;
+        }
+        collect_despawning_parts(child, r_parts);
+        if (part.is_valid()) {
+            r_parts.push_back(part);
+        }
+    }
+}
+
 Ref<NetwEntity> part_target(Node *p_node) {
     if (p_node->get_owner() == nullptr
         || !p_node->get_scene_file_path().is_empty()) {
@@ -2341,12 +2362,32 @@ void NetwEntity::despawn(const Ref<NetwDespawnOpts> &p_opts) {
     NetwMultiplayer *api = session_core();
     if (api != nullptr && !api->is_host()) {
         api->entity_settle_captured(this);
+        if (api->lifecycle_withhold_despawn(this, opts)) {
+            return;
+        }
     }
+    despawn_here(opts);
+}
+
+void NetwEntity::despawn_here(const Ref<NetwDespawnOpts> &p_opts) {
+    const Ref<NetwDespawnOpts> opts = p_opts;
+    NetwMultiplayer *api = session_core();
     Node *owner = get_owner();
     const Ref<NetwEntity> keep(this);
     const ObjectID captured_owner = owner_id;
     const ObjectID captured_session = session_id;
     const RID captured_handle = get_rid_handle();
+    if (api != nullptr && owner != nullptr
+        && entity::stage_can_begin_despawn(get_stage())) {
+        LocalVector<Ref<NetwEntity>> parts;
+        collect_despawning_parts(owner, parts);
+        for (const Ref<NetwEntity> &part : parts) {
+            part->record->set_despawn_reason(opts->get_reason());
+            if (part->get_owner() != nullptr) {
+                part->emit_signal(SIG_DESPAWNING, opts->get_reason());
+            }
+        }
+    }
     if (!record->begin_despawn(this, owner, opts)) {
         return;
     }
@@ -2362,7 +2403,6 @@ void NetwEntity::despawn(const Ref<NetwDespawnOpts> &p_opts) {
     }
     if (api != nullptr) {
         api->spawn_detach_before_despawn(this);
-        api->lifecycle_send_despawn(this);
         api->persist_depart(
             api->get_bindings()->find(owner),
             opts->get_flush_save()

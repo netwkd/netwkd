@@ -331,7 +331,8 @@ LawVerdict client_cannot_save(const World &) {
     const Ref<NetwPromise> saving = replica->save();
     const Ref<NetwPromise> loading = replica->load();
     stand.rig.pump(2);
-    if (!saving->get_is_failed() || !loading->get_is_failed()) {
+    if (answer(saving) != ERR_UNAUTHORIZED
+        || answer(loading) != ERR_UNAUTHORIZED) {
         return law_broken(
             "the client's save answered %d and its load %d",
             answer(saving),
@@ -433,7 +434,8 @@ const Row SAVING[] = {
      "the promise fails with ERR_UNAVAILABLE and the entity stays dirty",
      &uncertain_write},
     {"a client saving and loading its view of the entity",
-     "both fail, and neither the record nor the view changes",
+     "both fail with ERR_UNAUTHORIZED, and neither the record nor the view "
+     "changes",
      &client_cannot_save},
     {"an entity changed and then despawned",
      "the values it held as it left are stored",

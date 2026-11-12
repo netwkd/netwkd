@@ -741,7 +741,7 @@ Ref<NetwMemberConfig> Netw::configure_spawn(const Callable &p_callable) {
         return Ref<NetwMemberConfig>();
     }
     const StringName method = p_callable.get_method();
-    decl_sites::record(NETW_SITE_HANDLER, nullptr, method);
+    decl_sites::record_handler(p_callable);
     const Ref<NetwMemberConfig> existing
         = netw::script::model::get_spawn_config(script, method);
     if (existing.is_valid()) {

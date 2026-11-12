@@ -283,6 +283,8 @@ Array Delta::to_array() const {
     out.push_back(hides);
     out.push_back(layer_shows);
     out.push_back(layer_hides);
+    out.push_back(layer_enters);
+    out.push_back(layer_exits);
     out.push_back(stats.to_array());
     return out;
 }
@@ -1405,6 +1407,8 @@ Delta Engine::recompute() {
     LocalVector<Transition> hides;
     LocalVector<LayerTransition> layer_show_rows;
     LocalVector<LayerTransition> layer_hide_rows;
+    LocalVector<LayerTransition> layer_enter_rows;
+    LocalVector<LayerTransition> layer_exit_rows;
 
     {
         NETW_ZONE_NC("interest::Engine entity fold", colors::INTEREST);
@@ -1485,6 +1489,15 @@ Delta Engine::recompute() {
                     layer_show_rows,
                     layer_hide_rows
                 );
+                append_layer_transition_bits(
+                    id,
+                    key,
+                    BitSet::intersect(before, old_row),
+                    BitSet::intersect(after, desired),
+                    order,
+                    layer_enter_rows,
+                    layer_exit_rows
+                );
             }
         }
     }
@@ -1535,6 +1548,15 @@ Delta Engine::recompute() {
                     layer_show_rows,
                     layer_hide_rows
                 );
+                append_layer_transition_bits(
+                    id,
+                    key,
+                    BitSet::intersect(before, old_row),
+                    PackedInt64Array(),
+                    order,
+                    layer_enter_rows,
+                    layer_exit_rows
+                );
             }
             delta.removed_keys.push_back(key);
         }
@@ -1572,22 +1594,24 @@ Delta Engine::recompute() {
                 return String(left.layer) < String(right.layer);
             };
         };
-        stable_sort(layer_show_rows, layer_less(false));
-        stable_sort(layer_hide_rows, layer_less(true));
-        for (uint32_t index = 0; index < layer_show_rows.size(); ++index) {
-            Array row;
-            row.push_back(layer_show_rows[index].layer);
-            row.push_back(layer_show_rows[index].key);
-            row.push_back(layer_show_rows[index].bit);
-            delta.layer_shows.push_back(row);
-        }
-        for (uint32_t index = 0; index < layer_hide_rows.size(); ++index) {
-            Array row;
-            row.push_back(layer_hide_rows[index].layer);
-            row.push_back(layer_hide_rows[index].key);
-            row.push_back(layer_hide_rows[index].bit);
-            delta.layer_hides.push_back(row);
-        }
+        const auto publish = [&layer_less](
+                                 LocalVector<LayerTransition> &p_rows,
+                                 bool p_deeper_first,
+                                 Array &p_out
+                             ) {
+            stable_sort(p_rows, layer_less(p_deeper_first));
+            for (uint32_t index = 0; index < p_rows.size(); ++index) {
+                Array row;
+                row.push_back(p_rows[index].layer);
+                row.push_back(p_rows[index].key);
+                row.push_back(p_rows[index].bit);
+                p_out.push_back(row);
+            }
+        };
+        publish(layer_show_rows, false, delta.layer_shows);
+        publish(layer_hide_rows, true, delta.layer_hides);
+        publish(layer_enter_rows, false, delta.layer_enters);
+        publish(layer_exit_rows, true, delta.layer_exits);
     }
 
     {

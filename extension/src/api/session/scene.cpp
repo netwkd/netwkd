@@ -104,6 +104,11 @@ RID NetwMultiplayer::scene_report_entity_edge(
         NETW_ZONE_NC("scene edge scene of", colors::SCENE);
         scene = scene_of(p_subject);
     }
+    const RID *announced
+        = announced_scene_of_entity.getptr(p_subject.get_id());
+    if (!p_present && announced != nullptr) {
+        scene = *announced;
+    }
     if (!scene.is_valid() || scene == p_subject) {
         return RID();
     }
@@ -477,9 +482,14 @@ RID NetwMultiplayer::scene_presented() const {
 }
 
 void NetwMultiplayer::scene_on_session_reclaimed() {
-    const TypedArray<Node> live = scene_live_nodes();
-    for (int at = 0; at < live.size(); ++at) {
-        Node *scene_node = Object::cast_to<Node>(live[at]);
+    const TypedArray<Node> held = scene_live_nodes();
+    LocalVector<ObjectID> live;
+    live.reserve(held.size());
+    for (int at = 0; at < held.size(); ++at) {
+        live.push_back(gd::instance_id(Object::cast_to<Node>(held[at])));
+    }
+    for (const ObjectID id : live) {
+        Node *scene_node = Object::cast_to<Node>(gd::object_of(id));
         if (scene_node == nullptr) {
             continue;
         }
@@ -586,8 +596,16 @@ void NetwMultiplayer::scene_forget(Object *p_container) {
 
 void NetwMultiplayer::scene_free_layer(const RID &p_scene) {
     const RID layer = interest_layer_find(scene_layer_id(p_scene));
-    if (layer.is_valid()) {
-        interest_layer_free(layer);
+    if (!layer.is_valid()) {
+        return;
+    }
+    const PackedInt32Array viewers = scene_get_peers(p_scene);
+    interest_layer_free(layer);
+    if (!scene_viewer_edge.is_valid()) {
+        return;
+    }
+    for (int at = 0; at < viewers.size(); ++at) {
+        scene_viewer_edge.call(p_scene, int64_t(viewers[at]), false);
     }
 }
 
@@ -598,14 +616,13 @@ void NetwMultiplayer::announce_entity_edge(
     bool p_is_player
 ) {
     const uint64_t entity_id = p_entity.get_id();
-    const uint64_t *announced = announced_scene_of_entity.getptr(entity_id);
-    const bool was_present
-        = announced != nullptr && *announced == p_scene.get_id();
+    const RID *announced = announced_scene_of_entity.getptr(entity_id);
+    const bool was_present = announced != nullptr && *announced == p_scene;
     if (p_present && was_present) {
         return;
     }
     if (p_present) {
-        announced_scene_of_entity.insert(entity_id, p_scene.get_id());
+        announced_scene_of_entity.insert(entity_id, p_scene);
     } else if (was_present) {
         announced_scene_of_entity.erase(entity_id);
     }
@@ -878,10 +895,12 @@ bool NetwMultiplayer::scene_collect_viewers(
     LocalVector<uint64_t> &r_members
 ) const {
     const PackedInt64Array held = scene_membership.members_of(p_scene);
+    const int64_t route = scene_route_of(p_scene);
     r_members.clear();
     for (int at = 0; at < held.size(); ++at) {
         const PlayerRow *row = player_row(held[at]);
-        if (row == nullptr || row->incarnation == 0) {
+        if (row == nullptr || row->incarnation == 0
+            || spawn_failed_for(route, held[at])) {
             continue;
         }
         r_members.push_back(uint64_t(row->incarnation));
@@ -1375,28 +1394,36 @@ void NetwMultiplayer::guard_then(
         p_answered.call();
         return;
     }
-    const Callable spent
-        = callable_mp(this, &NetwMultiplayer::guard_spend_frame).bind(p_guard);
-    reparent_guards.arm(p_guard, tree, p_frames, p_answered, spent);
-    connect_once(Signal(tree, SIG_PHYSICS_FRAME), spent);
+    reparent_guards.arm(p_guard, tree, p_frames, p_answered);
+    connect_once(
+        Signal(tree, SIG_PHYSICS_FRAME),
+        callable_mp(this, &NetwMultiplayer::guard_spend_frame)
+    );
 }
 
-void NetwMultiplayer::guard_spend_frame(RID p_guard) {
+void NetwMultiplayer::guard_spend_frame() {
     NETW_ZONE_NC("NetwMultiplayer guard_spend_frame", colors::SCENE);
-    if (!reparent_guards.spend(p_guard)) {
-        return;
+    LocalVector<RID> spent;
+    reparent_guards.spend_frame(spent);
+    for (const RID &guard : spent) {
+        const Callable answered = reparent_guards.take_answer(guard);
+        if (!answered.is_valid()) {
+            continue;
+        }
+        guard_close_window(guard);
+        answered.call();
     }
-    const Callable answered = reparent_guards.take_answer(p_guard);
-    guard_close_window(p_guard);
-    answered.call();
 }
 
 void NetwMultiplayer::guard_close_window(const RID &p_guard) {
     SceneTree *tree
         = Object::cast_to<SceneTree>(reparent_guards.window_tree(p_guard));
-    const Callable spent = reparent_guards.close_window(p_guard);
-    if (tree != nullptr && spent.is_valid()) {
-        disconnect_once(Signal(tree, SIG_PHYSICS_FRAME), spent);
+    reparent_guards.close_window(p_guard);
+    if (tree != nullptr && !reparent_guards.any_window_open()) {
+        disconnect_once(
+            Signal(tree, SIG_PHYSICS_FRAME),
+            callable_mp(this, &NetwMultiplayer::guard_spend_frame)
+        );
     }
 }
 
@@ -1516,19 +1543,25 @@ void NetwMultiplayer::guard_hush_release(int64_t p_id) {
     }
     hush->tree = gd::instance_id(tree);
     hush->frames = GUARD_WINDOW_FRAMES;
-    hush->spent
-        = callable_mp(this, &NetwMultiplayer::guard_hush_spend).bind(p_id);
-    connect_once(Signal(tree, SIG_PHYSICS_FRAME), hush->spent);
+    connect_once(
+        Signal(tree, SIG_PHYSICS_FRAME),
+        callable_mp(this, &NetwMultiplayer::guard_hush_spend)
+    );
 }
 
-void NetwMultiplayer::guard_hush_spend(int64_t p_id) {
-    AreaHush *hush = area_hushes.getptr(p_id);
-    if (hush == nullptr) {
-        return;
+void NetwMultiplayer::guard_hush_spend() {
+    LocalVector<int64_t> spent;
+    for (KeyValue<int64_t, AreaHush> &held : area_hushes) {
+        if (!held.value.tree.is_valid()) {
+            continue;
+        }
+        held.value.frames -= 1;
+        if (held.value.frames <= 0) {
+            spent.push_back(held.key);
+        }
     }
-    hush->frames -= 1;
-    if (hush->frames <= 0) {
-        guard_hush_end(p_id);
+    for (const int64_t id : spent) {
+        guard_hush_end(id);
     }
 }
 
@@ -1538,11 +1571,18 @@ void NetwMultiplayer::guard_hush_end(int64_t p_id, bool p_replay) {
         return;
     }
     SceneTree *tree = Object::cast_to<SceneTree>(gd::object_of(hush->tree));
-    if (tree != nullptr) {
-        disconnect_once(Signal(tree, SIG_PHYSICS_FRAME), hush->spent);
-    }
     const LocalVector<ObjectID> areas(hush->areas);
     area_hushes.erase(p_id);
+    bool counting = false;
+    for (const KeyValue<int64_t, AreaHush> &held : area_hushes) {
+        counting = counting || held.value.tree.is_valid();
+    }
+    if (tree != nullptr && !counting) {
+        disconnect_once(
+            Signal(tree, SIG_PHYSICS_FRAME),
+            callable_mp(this, &NetwMultiplayer::guard_hush_spend)
+        );
+    }
     for (const ObjectID area : areas) {
         HushedArea *held = hushed_areas.getptr(uint64_t(area));
         if (held == nullptr) {

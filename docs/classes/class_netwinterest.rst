@@ -75,7 +75,7 @@ Signals
 
 **interest_entered**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterest_signal_interest_entered>`
 
-Emitted on the server when ``peer_id`` starts seeing this entity.
+Emitted on the server when ``peer_id`` starts seeing this entity. It is emitted once however many layers show the entity, and only once ``peer_id`` also sees the :ref:`NetwEntity<class_NetwEntity>` above it.
 
 .. rst-class:: classref-item-separator
 
@@ -87,7 +87,7 @@ Emitted on the server when ``peer_id`` starts seeing this entity.
 
 **interest_exited**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterest_signal_interest_exited>`
 
-Emitted on the server when ``peer_id`` stops seeing this entity.
+Emitted on the server when ``peer_id`` stops seeing this entity, also when it stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it.
 
 .. rst-class:: classref-item-separator
 
@@ -188,7 +188,7 @@ Returns the :ref:`NetwEntity.interest<class_NetwEntity_property_interest>` of ``
 
 :ref:`NetwInterest<class_NetwInterest>` **on_enter**\ (\ callback\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwInterest_method_on_enter>`
 
-Calls ``callback`` as ``callback(layer_id, peer_id)`` when a peer starts seeing the entity through ``layer_id``. An empty ``layer_id`` means every layer joined so far.
+Calls ``callback`` as ``callback(layer_id, peer_id)`` when ``layer_id`` shows the entity to a peer, once that peer also sees the :ref:`NetwEntity<class_NetwEntity>` above it. An empty ``layer_id`` means every layer joined so far.
 
 .. rst-class:: classref-item-separator
 
@@ -200,7 +200,7 @@ Calls ``callback`` as ``callback(layer_id, peer_id)`` when a peer starts seeing 
 
 :ref:`NetwInterest<class_NetwInterest>` **on_leave**\ (\ callback\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwInterest_method_on_leave>`
 
-Calls ``callback`` as ``callback(layer_id, peer_id)`` when a peer stops seeing the entity through ``layer_id``. An empty ``layer_id`` means every layer joined so far.
+Calls ``callback`` as ``callback(layer_id, peer_id)`` when ``layer_id`` stops showing the entity to a peer, also when that peer stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it. An empty ``layer_id`` means every layer joined so far.
 
 .. rst-class:: classref-item-separator
 

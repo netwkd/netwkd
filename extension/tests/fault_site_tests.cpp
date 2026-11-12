@@ -18,6 +18,7 @@ using godot::String;
 using netw::FaultValues;
 
 const char *FIXTURE = "res://tests/native/fault_site_fixture.gd";
+const char *TWIN = "res://tests/native/fault_site_twin.gd";
 
 struct SiteRow {
     const char *site;
@@ -78,6 +79,26 @@ TEST_CASE("[Networked][Faults] a fault lands on the line a game wrote") {
         NETW_CHECK_EQ(landed, 1);
     }
 
+    const godot::Ref<godot::Script> twin_script = netw::gd::load_script(TWIN);
+    REQUIRE(twin_script.is_valid());
+    Object *twin = twin_script->call("new");
+    REQUIRE(twin != nullptr);
+    netw_test::FaultWatch watch;
+    netw::fault::raise(
+        nullptr,
+        NETW_FAULT_SPAWN_RETURN,
+        {String("make")},
+        uint64_t(twin->get_instance_id())
+    );
+    int landed = 0;
+    for (const netw_test::FaultLine &line : watch.log->recorded()) {
+        landed += 1;
+        NETW_CHECK_EQ(line.file == String(TWIN), true);
+        NETW_CHECK_EQ(line.line, 5);
+    }
+    NETW_CHECK_EQ(landed, 1);
+
+    twin->call("free");
     fixture->call("free");
 }
 

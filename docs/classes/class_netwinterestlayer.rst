@@ -38,6 +38,8 @@ The server adds :ref:`entities<class_NetwInterestLayer_property_entities>` and :
 
 An entity inside a multiplayer scene is only visible to peers in that scene, whatever other layers say.
 
+A :ref:`NetwEntity<class_NetwEntity>` under another entity is only visible to peers that also see the entity above it, whatever its own layers say.
+
 .. rst-class:: classref-reftable-group
 
 Properties
@@ -145,7 +147,7 @@ Emitted when ``entity`` is removed from the layer.
 
 **interest_entered**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterestLayer_signal_interest_entered>`
 
-Emitted on the server when ``peer_id`` starts seeing ``entity`` through this layer.
+Emitted on the server when this layer shows ``entity`` to ``peer_id``, once ``peer_id`` also sees the :ref:`NetwEntity<class_NetwEntity>` above it.
 
 .. rst-class:: classref-item-separator
 
@@ -157,7 +159,7 @@ Emitted on the server when ``peer_id`` starts seeing ``entity`` through this lay
 
 **interest_exited**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterestLayer_signal_interest_exited>`
 
-Emitted on the server when ``peer_id`` stops seeing ``entity`` through this layer.
+Emitted on the server when this layer stops showing ``entity`` to ``peer_id``, also when ``peer_id`` stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it.
 
 .. rst-class:: classref-item-separator
 
@@ -405,7 +407,7 @@ The name of the layer.
 - |void| **set_monitor**\ (\ value\: :godot:`Callable`\ )
 - :godot:`Callable` **get_monitor**\ (\ )
 
-Called when a peer starts or stops seeing an entity through this layer. On a client, the peer is always this one.
+Called whenever this layer emits :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>`, :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>` or :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`. On a client, the peer is always this one.
 
 ::
 
@@ -486,7 +488,7 @@ Adds ``peer_id`` to :ref:`viewers<class_NetwInterestLayer_property_viewers>`. Re
 
 |void| **apply_server_transition**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`, visible\: :godot:`bool`\ ) :ref:`🔗<class_NetwInterestLayer_method_apply_server_transition>`
 
-Emits :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>` or :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>`, then the entity's own signals and callbacks. The session calls it. Calling it yourself emits a change that did not happen.
+Emits :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>` or :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>`, then the entity's own callbacks. The session calls it. Calling it yourself emits a change that did not happen.
 
 \ **Server Only.**
 

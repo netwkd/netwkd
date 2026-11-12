@@ -180,9 +180,7 @@ An unreliable packet is dropped. A reliable one arrives late, as if it was sent 
 - |void| **set_seed**\ (\ value\: :godot:`int`\ )
 - :godot:`int` **get_seed**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The random seed for loss, duplication, reordering, jitter and stalls, so the same seed drops and delays the same packets every run.
 
 .. rst-class:: classref-item-separator
 

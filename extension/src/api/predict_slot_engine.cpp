@@ -2186,8 +2186,14 @@ void NetwPredictSlotEngine::consume_frame_step(
     pool->set_ack_advanced(slot, ack() != previous_ack);
     const PropertyBindingPtr state = state_binding();
     if (state != nullptr) {
-        state->set_authored_tick(p_timing.get_tick());
-        state->set_reconcile_ack(ack_advanced() ? ack() : -1);
+        const int64_t tick = p_timing.get_tick();
+        const bool same_tick = state->get_authored_tick() == tick;
+        state->set_authored_tick(tick);
+        if (ack_advanced()) {
+            state->set_reconcile_ack(ack());
+        } else if (!same_tick) {
+            state->set_reconcile_ack(-1);
+        }
     } else {
         NETW_TRACE(
             sys::PREDICTION,

@@ -14,7 +14,7 @@
 		[method volatile], [method retained], [method epsilon] and [method persisted] apply to one property. [method on_change], [method heartbeat], [method windowed], [method audience] and [method masked] apply to every property of the same kind on the script. Give them consistent values.
 		[method NetwMemberConfig.interpolate] smooths received values. It returns a [NetwMemberConfig], so chain it after the methods of this class.
 		[b]Rigid bodies[/b]
-		When the [NetwEntity] root is a [RigidBody3D] or a [RigidBody2D], [code]position[/code], [code]quaternion[/code] ([code]rotation[/code] in 2D), [code]linear_velocity[/code], [code]angular_velocity[/code] and [code]sleeping[/code] read and write the body's physics state. [code]position[/code] stays relative to the parent. While [member RigidBody3D.freeze] is on, position and rotation use the node transform.
+		When the [NetwEntity] root is a [RigidBody3D] or a [RigidBody2D], [code]position[/code], [code]quaternion[/code] ([code]rotation[/code] in 2D), [code]linear_velocity[/code], [code]angular_velocity[/code] and [code]sleeping[/code] read and write the body's physics state. [code]position[/code] stays relative to the parent. While [member RigidBody3D.freeze] is on, position and rotation use the node transform. A write to a body that stays asleep reaches peers within 30 ticks.
 		[codeblock]
 		func _init() -&gt; void:
 		    Netw.configure_property(self, &amp;"position").state()
@@ -35,7 +35,7 @@
 		<method name="broadcast">
 			<return type="NetwPropertyConfig" />
 			<description>
-				The controlling peer owns the value and every peer sees it, with no server check. Use it for cosmetic values such as an aim direction. The server keeps no history of it.
+				The controlling peer owns the value and every peer sees it, with no server check. Use it for cosmetic values such as an aim direction. The server keeps no history of it. When a client controls the entity, or the entity is kept for a dropped player who controlled it, a spawn carries the value, so a controller that receives the node again starts from the value the server holds.
 				[codeblock]
 				func _init() -&gt; void:
 				    Netw.configure_property(self, &amp;"aim_dir").broadcast()

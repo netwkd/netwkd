@@ -161,9 +161,10 @@ class World {
         uint32_t p_row,
         int64_t p_tick,
         bool p_validating,
-        bool p_gated
+        bool p_gated,
+        bool p_swept
     );
-    void sweep(Table &p_table);
+    uint32_t sweep(Table &p_table, bool p_wake);
     void audit_quiet(Table &p_table, int64_t p_tick);
     void check_codes(
         Table &p_table,

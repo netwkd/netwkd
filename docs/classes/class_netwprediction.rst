@@ -30,6 +30,8 @@ Reached by :ref:`NetwEntity.prediction<class_NetwEntity_property_prediction>`. T
 
 \ Only an entity with a :ref:`NetwPropertyConfig.state()<class_NetwPropertyConfig_method_state>` property is predicted, because that state is what gets compared and restored. Per-property tolerances are set with :ref:`NetwPropertyConfig<class_NetwPropertyConfig>`. The schedule and the simulation mode are on :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation>`.
 
+An entity keeps predicting through :ref:`Netw.reparent()<class_Netw_method_reparent>`, and one taken out of the tree with :godot:`Node.remove_child() <Node#class_Node_method_remove_child>` and added back later predicts again.
+
 Values set on a :godot:`MultiplayerSynchronizer` in the scene act as defaults, and values set in code override them.
 
 \ **Settings**\ 

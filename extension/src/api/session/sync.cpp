@@ -889,11 +889,11 @@ void NetwMultiplayer::row_control_apply(
                 p_send->control_scheduler().queue(p_peer, answer);
                 return;
             }
-            if (liveness_route_state(p_record.route) == ENTITY_STATE_UNKNOWN) {
-                return;
-            }
-            if (uint64_t(liveness_route_epoch(p_record.route))
-                != p_record.epoch) {
+            const bool unspawned
+                = liveness_route_state(p_record.route) == ENTITY_STATE_UNKNOWN;
+            if (!unspawned
+                && uint64_t(liveness_route_epoch(p_record.route))
+                    != p_record.epoch) {
                 return;
             }
             wire::ParkedOpen asked;
@@ -906,6 +906,10 @@ void NetwMultiplayer::row_control_apply(
             asked.anchor = p_record.anchor;
             asked.anchor_author = p_record.anchor_author;
             asked.parked_at_ms = session_elapsed_ms();
+            if (unspawned) {
+                p_send->reader_book().park(asked);
+                return;
+            }
             seat_or_park(
                 p_send,
                 plane->get_sync_model(),

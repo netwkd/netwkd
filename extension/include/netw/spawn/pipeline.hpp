@@ -484,9 +484,7 @@ public:
     Book *get_spawn_book() {
         return &spawn_book;
     }
-    bool books_node(godot::Node *p_node) const {
-        return spawn_book.books_node(p_node);
-    }
+    bool books_node(godot::Node *p_node) const;
     bool spawner_produced(int64_t p_route) {
         return spawner_compat != nullptr
             && spawner_compat->get_roster().produced(p_route);

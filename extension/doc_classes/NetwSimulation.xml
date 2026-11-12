@@ -153,7 +153,7 @@
 			Copies whose state comes from another peer are [constant MODE_PROXY], unless a selection makes them active.
 		</constant>
 		<constant name="REPLICAS_ACTIVE" value="1" enum="Replicas">
-			Copies whose state comes from another peer are [constant MODE_ACTIVE].
+			Copies whose state comes from another peer are [constant MODE_ACTIVE]. A sample that matches the copy is not written, so a resting copy can sleep.
 		</constant>
 		<constant name="RESTORE_EXACT" value="0" enum="Restore">
 			A sample lands when it arrives, as it was sent.
@@ -162,7 +162,7 @@
 			A sample lands when it arrives, carried forward by its age along the property its interpolation projects by, for at most [member max_restore_ticks].
 		</constant>
 		<constant name="RESTORE_BUFFERED" value="2" enum="Restore">
-			A sample is held until the clock's display tick reaches it, then lands as it was sent.
+			A sample is held until the clock's display tick reaches it, then lands as it was sent. A copy that turns [constant MODE_ACTIVE] starts from the sample at the display tick.
 		</constant>
 	</constants>
 </class>

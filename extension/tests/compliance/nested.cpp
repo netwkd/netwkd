@@ -112,7 +112,7 @@ NETW_FRAME_SCENARIO(WorldFrames, scrapped_frames, &scrapped, 16);
 
 TEST_CASE(
     "[Networked][Compliance][Frame] N2 despawning a parent despawns its "
-    "children first on every peer"
+    "children first on every peer, and every peer hears despawning for each"
 ) {
     const Seen &seen = scrapped_frames.seen();
     for (int peer = SERVER; peer <= LATE; ++peer) {
@@ -120,27 +120,43 @@ TEST_CASE(
             NETW_HOLDS(absent(seen, peer, part, SCRAPPED + 2));
         }
     }
-    NETW_HOLDS(hears(seen, SERVER, "Car", "despawning", ONCE));
-    for (int client = 0; client < 2; ++client) {
+    for (int peer = SERVER; peer < LATE; ++peer) {
         for (const char *part : PARTS) {
-            NETW_HOLDS(hears(seen, client, part, "despawning", ONCE));
+            NETW_HOLDS(hears(seen, peer, part, "despawning", ONCE));
+            NETW_HOLDS(hears_with(
+                seen,
+                peer,
+                part,
+                "despawning",
+                Array::make("scrapped")
+            ));
         }
-        NETW_HOLDS(before(seen, client, "Jack", "Wheel"));
-        NETW_HOLDS(before(seen, client, "Hubcap", "Wheel"));
-        NETW_HOLDS(before(seen, client, "Wheel", "Car"));
+        NETW_HOLDS(before(seen, peer, "Jack", "Wheel"));
+        NETW_HOLDS(before(seen, peer, "Hubcap", "Wheel"));
+        NETW_HOLDS(before(seen, peer, "Wheel", "Car"));
     }
     NETW_HOLDS(quiet(seen));
 }
 
 constexpr const char *SHOWROOM = R"(
-class Car extends Node3D:
-	func _init() -> void:
-		Netw.configure_entity(self).interest.join(&"cars")
+class Part extends Node3D:
+	signal layer_entered(layer_id: StringName, peer_id: int)
+	signal layer_exited(layer_id: StringName, peer_id: int)
+
+	func park(layer_id: StringName) -> void:
+		Netw.configure_entity(self).interest.join(layer_id) \
+				.on_enter(func(id, peer): layer_entered.emit(id, peer)) \
+				.on_leave(func(id, peer): layer_exited.emit(id, peer))
 
 
-class Wheel extends Node3D:
+class Car extends Part:
 	func _init() -> void:
-		Netw.configure_entity(self).interest.join(&"wheels")
+		park(&"cars")
+
+
+class Wheel extends Part:
+	func _init() -> void:
+		park(&"wheels")
 )";
 
 Step viewer(const char *p_layer, int p_client, bool p_admitted) {
@@ -163,9 +179,27 @@ Step viewer(const char *p_layer, int p_client, bool p_admitted) {
 constexpr int EARLY = 0;
 constexpr int SHUT_OUT = 1;
 
+constexpr const char *HEARD[][2] = {
+    {"Car", "interest_entered"},
+    {"Car", "interest_exited"},
+    {"Car", "layer_entered"},
+    {"Car", "layer_exited"},
+    {"cars", "interest_entered"},
+    {"cars", "interest_exited"},
+    {"Wheel", "interest_entered"},
+    {"Wheel", "interest_exited"},
+    {"Wheel", "layer_entered"},
+    {"Wheel", "layer_exited"},
+    {"wheels", "interest_entered"},
+    {"wheels", "interest_exited"},
+};
+
 World showroom() {
-    return World(SHOWROOM, 2)
-        .at(1, spawn("Car", "Car"))
+    World world(SHOWROOM, 2);
+    for (const auto &row : HEARD) {
+        world.hear(row[0], row[1]);
+    }
+    return world.at(1, spawn("Car", "Car"))
         .at(1, spawn("Wheel", "Wheel", "Car"))
         .at(1, viewer("cars", EARLY, true))
         .at(1, viewer("wheels", EARLY, true))
@@ -175,9 +209,19 @@ World showroom() {
         .at(14, viewer("wheels", SHUT_OUT, false));
 }
 
+struct Change {
+    const char *node;
+    const char *layer;
+    bool entered;
+    int from;
+    int to;
+    int times;
+};
+
 TEST_CASE(
     "[Networked][Compliance] N4 a child is never visible to a peer that "
-    "cannot see its parent, whatever order visibility changes in"
+    "cannot see its parent, whatever order visibility changes in, and the "
+    "server hears each peer start and stop seeing it once"
 ) {
     const Seen seen = showroom().run(18);
     NETW_HOLDS(reads(seen, EARLY, "Wheel", "parent", "Level/Car", 4));
@@ -189,6 +233,42 @@ TEST_CASE(
     NETW_HOLDS(reads(seen, SHUT_OUT, "Car", "parent", "Level"));
     NETW_HOLDS(absent(seen, SHUT_OUT, "Wheel", 15));
     NETW_HOLDS(quiet(seen));
+    const Change changes[] = {
+        {"Car", "cars", true, 1, 5, ONCE},
+        {"Wheel", "wheels", true, 1, 5, ONCE},
+        {"Car", "cars", true, 6, 9, ONCE},
+        {"Wheel", "wheels", true, 6, 9, ONCE},
+        {"Car", "cars", true, 10, 18, NEVER},
+        {"Wheel", "wheels", true, 10, 18, NEVER},
+        {"Car", "cars", false, 1, 9, NEVER},
+        {"Wheel", "wheels", false, 1, 9, NEVER},
+        {"Car", "cars", false, 10, 13, ONCE},
+        {"Wheel", "wheels", false, 10, 13, ONCE},
+        {"Car", "cars", false, 14, 18, NEVER},
+        {"Wheel", "wheels", false, 14, 18, ONCE},
+    };
+    for (const Change &change : changes) {
+        const char *edge
+            = change.entered ? "interest_entered" : "interest_exited";
+        const char *callback
+            = change.entered ? "layer_entered" : "layer_exited";
+        const char *heard[][2] = {
+            {change.node, edge},
+            {change.layer, edge},
+            {change.node, callback},
+        };
+        for (const auto &row : heard) {
+            NETW_HOLDS(hears(
+                seen,
+                SERVER,
+                row[0],
+                row[1],
+                change.times,
+                change.from,
+                change.to
+            ));
+        }
+    }
 }
 
 } // namespace ComplianceNested

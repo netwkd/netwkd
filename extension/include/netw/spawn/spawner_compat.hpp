@@ -48,6 +48,7 @@ public:
 
     void register_spawner(godot::Object *p_spawner);
     void wrap_spawner(godot::Object *p_spawner);
+    void wrap_enrolled();
     godot::Node *wrapped_spawn(
         const godot::Variant &p_data,
         const godot::Callable &p_original

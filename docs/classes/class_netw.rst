@@ -540,6 +540,8 @@ Removes the node :ref:`spawn()<class_Netw_method_spawn>` or :ref:`spawn_player()
 
 \ Despawning the root of a :ref:`NetwScene<class_NetwScene>` removes the scene at once, with everything in it.
 
+When players move to a new :ref:`NetwScene<class_NetwScene>`, a client never holds the old and the new one together, whether the old root is despawned before or after the new one is spawned.
+
 See :ref:`NetwDespawnOpts<class_NetwDespawnOpts>` for ``opts``. Returns :godot:`@GlobalScope.ERR_DOES_NOT_EXIST <@GlobalScope#class_@GlobalScope_constant_ERR_DOES_NOT_EXIST>` for a node that was not spawned, and :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>` outside a session.
 
 A client can call it when its player is the :ref:`NetwEntity.controller<class_NetwEntity_property_controller>` and :ref:`NetwEntity.lifecycle<class_NetwEntity_property_lifecycle>` is :ref:`NetwEntity.LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>`. The node is removed on that client at once, and comes back if the server refuses.
@@ -620,7 +622,7 @@ Joins the game as ``username``. The arguments after ``username`` are passed to t
 
 :ref:`NetwPromise<class_NetwPromise>` **reparent**\ (\ node\: :godot:`Node`, new_parent\: :godot:`Node`\ ) |static| :ref:`🔗<class_Netw_method_reparent>`
 
-Moves ``node`` under ``new_parent`` like :godot:`Node.reparent() <Node#class_Node_method_reparent>`. The promise resolves once the server has moved it. Other peers move it after.
+Moves ``node`` under ``new_parent`` like :godot:`Node.reparent() <Node#class_Node_method_reparent>`. The promise resolves once the server has moved it. Other peers move it after. Every peer keeps the node's global transform across the move.
 
 ::
 
@@ -1021,7 +1023,7 @@ Like :ref:`spawn()<class_Netw_method_spawn>`, and writes :ref:`NetwEntity.player
         NetwEntity.of(avatar).player = who
         return avatar
 
-\ Returns ``null`` and spawns nothing when the session does not hold ``player``. The node is despawned when ``player`` leaves. With :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>`, other peers receive it once its save is loaded.
+\ Returns ``null`` and spawns nothing when the session does not hold ``player``. The node keeps the name ``fn`` gave it, and :ref:`NetwEntity.name<class_NetwEntity_property_name>` is the player's :ref:`NetwPlayer.username<class_NetwPlayer_property_username>`. The node is despawned when ``player`` leaves. With :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>`, other peers receive it once its save is loaded.
 
 \ **Server Only.**
 
@@ -1035,7 +1037,7 @@ Like :ref:`spawn()<class_Netw_method_spawn>`, and writes :ref:`NetwEntity.player
 
 |void| **sync_property**\ (\ node\: :godot:`Node`, property\: :godot:`StringName`\ ) |static| :ref:`🔗<class_Netw_method_sync_property>`
 
-Sends the current value of ``property`` to the other peers. Use it for a property that changes rarely.
+Sends the current value of ``property`` once, to the peers connected now. A peer that joins later does not receive it, so declare state a late joiner needs with :ref:`configure_property()<class_Netw_method_configure_property>`.
 
 ::
 

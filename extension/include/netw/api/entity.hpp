@@ -341,6 +341,7 @@ public:
     void arm(const godot::Ref<NetwMultiplayer> &p_api);
 
     void despawn(const godot::Ref<NetwDespawnOpts> &p_opts);
+    void despawn_here(const godot::Ref<NetwDespawnOpts> &p_opts);
 
     void register_component(godot::Node *p_component);
     godot::NodePath relative_path(

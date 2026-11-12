@@ -253,7 +253,7 @@
 				    if relay.promoted:
 				        server_relabelled.emit(relay.successor_was, relay.former_now)
 				[/codeblock]
-				When the server moves, players who have left lose their return window, and their kept entities despawn. The new server reads each [member NetwPlayer.account] again from the [LobbyDirectory] serving the session when it names one, and the old server keeps only its own.
+				When the server moves, players who have left lose their return window, and their kept entities despawn. An entity the server spawns or despawns in the frame it calls this method is on no peer afterwards. The new server reads each [member NetwPlayer.account] again from the [LobbyDirectory] serving the session when it names one, and the old server keeps only its own.
 				[codeblock lang=text]
 				Error
 				┠╴ERR_UNAUTHORIZED        called on a client

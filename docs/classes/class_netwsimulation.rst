@@ -256,7 +256,7 @@ Copies whose state comes from another peer are :ref:`MODE_PROXY<class_NetwSimula
 
 :ref:`Replicas<enum_NetwSimulation_Replicas>` **REPLICAS_ACTIVE** = ``1``
 
-Copies whose state comes from another peer are :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`.
+Copies whose state comes from another peer are :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`. A sample that matches the copy is not written, so a resting copy can sleep.
 
 .. rst-class:: classref-item-separator
 
@@ -290,7 +290,7 @@ A sample lands when it arrives, carried forward by its age along the property it
 
 :ref:`Restore<enum_NetwSimulation_Restore>` **RESTORE_BUFFERED** = ``2``
 
-A sample is held until the clock's display tick reaches it, then lands as it was sent.
+A sample is held until the clock's display tick reaches it, then lands as it was sent. A copy that turns :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` starts from the sample at the display tick.
 
 .. rst-class:: classref-section-separator
 

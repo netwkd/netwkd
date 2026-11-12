@@ -116,6 +116,7 @@ public:
     bool has_recipient(int peer) const;
     bool mark_failed(int peer);
     bool has_failed(int peer) const;
+    void forget_peer(int peer);
     godot::PackedInt32Array recipients() const;
     const godot::LocalVector<int32_t> &recipient_list() const {
         return recipient_peers;

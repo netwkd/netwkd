@@ -386,6 +386,7 @@ bool NetwEntityRecord::begin_despawn(
         opts.instantiate();
     }
     despawning_opts = opts;
+    despawn_reason = opts->get_reason();
     const int64_t from = stage;
     transition(int64_t(entity::Stage::DESPAWNING));
     if (!publish_stage(p_wrapper, from)) {
@@ -454,6 +455,7 @@ void NetwEntityRecord::readmit() {
     entity::release(handle);
     handle = entity::mint();
     despawning_opts = Ref<NetwDespawnOpts>();
+    despawn_reason = StringName();
     projected_follower = 0;
 }
 

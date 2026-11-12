@@ -661,6 +661,7 @@ private:
     int64_t standalone_acks_out = 0;
     int64_t frame_counter = 0;
     int64_t last_poll_usec = 0;
+    int64_t last_display_frame = -1;
     DatagramSeqBook seq_book;
     NetwCarrierBuffers carrier;
     wire::AttributionBook attribution;
@@ -722,6 +723,13 @@ private:
     };
     godot::HashMap<int64_t, godot::LocalVector<DetachedAhead>>
         lifecycle_detached_ahead;
+    struct WithheldDespawn {
+        godot::Ref<NetwEntity> entity;
+        godot::ObjectID parent;
+        int index = 0;
+        godot::Ref<NetwDespawnOpts> opts;
+    };
+    godot::HashMap<int64_t, WithheldDespawn> lifecycle_withheld;
     uint8_t scene_released_channel = 0;
     uint8_t spawn_failed_channel = 0;
     uint8_t scene_viewers_channel = 0;
@@ -768,7 +776,7 @@ private:
         godot::Ref<NetwScene> scene;
     };
     godot::LocalVector<Announcement> announcements;
-    godot::HashMap<uint64_t, uint64_t> announced_scene_of_entity;
+    godot::HashMap<uint64_t, godot::RID> announced_scene_of_entity;
     int step_depth = 0;
     void announce_entity_edge(
         const godot::RID &p_scene,
@@ -846,6 +854,7 @@ private:
         godot::Ref<NetwPromise> promise;
         godot::LocalVector<DepartedResidency> residencies;
         bool scene_pending = false;
+        bool withheld = false;
         godot::ObjectID scene_outer;
     };
     godot::HashMap<uint64_t, EntityDeparture> entity_departures;
@@ -908,7 +917,6 @@ private:
     struct AreaHush {
         godot::LocalVector<godot::ObjectID> areas;
         godot::ObjectID tree;
-        godot::Callable spent;
         int frames = 0;
     };
     struct HushedArea {
@@ -1441,7 +1449,10 @@ public:
         const godot::Array &p_values,
         int64_t p_tick
     );
-    void store_reinstall(repl::PropertyBinding *p_binding);
+    void store_reinstall(
+        repl::PropertyBinding *p_binding,
+        int64_t p_display = -1
+    );
     void store_retain(repl::PropertyBinding *p_binding);
     godot::Error store_write_entity(
         repl::PropertyBinding *p_binding,
@@ -1614,7 +1625,7 @@ public:
         const godot::PackedByteArray &p_payload,
         int p_sender
     );
-    bool spawn_failed_for(int64_t p_route, int64_t p_peer);
+    bool spawn_failed_for(int64_t p_route, int64_t p_peer) const;
     godot::Ref<NetwEntity> spawn_arm_identity(
         spawn::Record *p_record,
         godot::Node *p_node,
@@ -1772,8 +1783,16 @@ public:
         const godot::String &p_reason
     );
     void lifecycle_withdraw_author(int64_t p_route, int64_t p_author);
-    void lifecycle_reserve(int64_t p_route, int64_t p_author);
-    void lifecycle_send_despawn(NetwEntity *p_entity);
+    bool lifecycle_withhold_despawn(
+        NetwEntity *p_entity,
+        const godot::Ref<NetwDespawnOpts> &p_opts
+    );
+    void lifecycle_answer_withheld(
+        int64_t p_route,
+        bool p_accepted,
+        const godot::String &p_reason
+    );
+    bool lifecycle_forget_withheld(int64_t p_route);
     void lifecycle_detach_ahead(NetwEntity *p_dying);
     void lifecycle_restore_detached(int64_t p_route);
     bool lifecycle_note_detached_anchor(
@@ -2236,7 +2255,7 @@ public:
         int64_t p_peer,
         const godot::RID &p_entity
     );
-    void sim_install_newest(const godot::Ref<NetwEntity> &p_entity);
+    void sim_reinstall(const godot::Ref<NetwEntity> &p_entity);
     void sim_release_body(const godot::RID &p_entity, bool p_restore);
     void sim_hold_poses(
         const godot::RID &p_space,
@@ -3109,6 +3128,7 @@ public:
     int64_t get_standalone_acks_out() const;
 
     double poll_delta(int64_t p_now_usec);
+    double display_delta();
 
     void advance_frame();
     int64_t get_frame_counter() const;
@@ -4823,7 +4843,7 @@ public:
     godot::RID guard_hold(godot::Node *p_body);
     int64_t guard_hush_areas(godot::Node *p_body);
     void guard_hush_release(int64_t p_id);
-    void guard_hush_spend(int64_t p_id);
+    void guard_hush_spend();
     void guard_hush_end(int64_t p_id, bool p_replay = true);
     void guard_hush_sweep();
     void guard_then(
@@ -4831,7 +4851,7 @@ public:
         int p_frames,
         const godot::Callable &p_answered
     );
-    void guard_spend_frame(godot::RID p_guard);
+    void guard_spend_frame();
     void guard_close_window(const godot::RID &p_guard);
     void guard_let_go(const godot::RID &p_guard);
 
@@ -4952,6 +4972,7 @@ public:
     void player_expire_kept(int64_t p_now_msec);
     void player_despawn_kept();
     bool player_kept_despawns(uint64_t p_id) const;
+    bool player_kept_controlled(uint64_t p_id) const;
     void player_tell_kept(int64_t p_peer);
     void player_hear_kept(uint64_t p_id, bool p_kept);
     void player_despawn_heard_kept();

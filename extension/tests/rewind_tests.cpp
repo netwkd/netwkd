@@ -261,6 +261,33 @@ LawVerdict reads_the_past(const World &) {
     return law_held();
 }
 
+LawVerdict second_shot_reads_the_past(const World &) {
+    Range range(SHOOTER);
+    const Variant first = range.body->call(
+        StringName("shoot"),
+        range.entities,
+        range.past
+    );
+    for (int tick = TICKS + 1; tick <= TICKS + 3; ++tick) {
+        range.body->call(StringName("move"), tick);
+        range.rig.step_ticks(1);
+    }
+    const Variant second = range.body->call(
+        StringName("shoot"),
+        range.entities,
+        range.past
+    );
+    if (double(first) >= double(TICKS)
+        || Math::abs(double(second) - double(first)) > 0.0001) {
+        return law_broken(
+            "the first shot read %f and the second %f",
+            double(first),
+            double(second)
+        );
+    }
+    return law_held();
+}
+
 LawVerdict before_history(const World &) {
     Range range(SHOOTER);
     const int64_t ran = int64_t(range.body->call(
@@ -417,6 +444,9 @@ const Row ROWS[] = {
     {"a lambda that reads a state property five ticks ago",
      "it returns the value of that tick, and the present is put back",
      &reads_the_past},
+    {"a second shot at the same tick after the target moved on",
+     "it reads what the first shot read",
+     &second_shot_reads_the_past},
     {"a rewind to a tick before the entity's first recording",
      "the body runs once and reads the present",
      &before_history},

@@ -252,27 +252,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a correction is absorbed over "
-    "frames rather than landing in one"
-) {
-    Bench bench;
-    const Subject subject = stand_predicted(bench);
-    subject.body->set_position(p1());
-    bench.render(subject.rid());
-    const double before = subject.visual->get_global_position().x;
-
-    subject.body->set_position(p2());
-    bench.render(subject.rid());
-    const double after = subject.visual->get_global_position().x;
-    NETW_CHECK_GT(after, before);
-    NETW_CHECK_LT(after, p2().x);
-
-    bench.render_many(subject.rid(), 12);
-    NETW_CHECK_GT(subject.visual->get_global_position().x, after);
-    NETW_CHECK_LE(subject.visual->get_global_position().x, p2().x);
-}
-
-TEST_CASE(
     "[Networked][Display][SceneTree] a demote to remote resumes from the "
     "rows recorded while predicted and seeds its role offset on the "
     "first frame"

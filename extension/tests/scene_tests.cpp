@@ -14,6 +14,7 @@ var shelf := {}
 var changes := ""
 var cleared := ""
 var carried: NetwPromise
+var dropped: NetwPromise
 
 var here: String:
 	get:
@@ -31,6 +32,10 @@ var listed: String:
 var carry_code: int:
 	get:
 		return carried.code if carried and carried.is_settled else -1
+
+var drop_code: int:
+	get:
+		return dropped.code if dropped and dropped.is_settled else -1
 
 var shelved: String:
 	get:
@@ -114,6 +119,12 @@ func _on_scene_changed(from: NetwScene, to: NetwScene) -> void:
 
 func carry(called: String, level: String) -> void:
 	carried = Netw.reparent(at(called), at(level))
+
+
+func drop(called: String, level: String) -> void:
+	var body := at(called)
+	dropped = Netw.reparent(body, at(level))
+	body.free()
 
 
 func close(called: String) -> void:
@@ -236,6 +247,7 @@ World halls() {
         .watch("Level", "changes")
         .watch("Level", "cleared")
         .watch("Level", "carry_code")
+        .watch("Level", "drop_code")
         .watch("Level", "shelved")
         .watch("Toy", "scene_label")
         .watch("Toy", "same")
@@ -267,6 +279,7 @@ World halls() {
         {"ana", "Annex"},
         {"ana", "Lobby"},
         {"ana", "Vault"},
+        {"ana", "Den"},
         {"bo", "Yard"},
         {"bo", "Pit"},
         {"bo", "Cell"},
@@ -283,11 +296,13 @@ World halls() {
         .at(OPEN + 1, level("seat", Array::make("bo", "Bo", "Lobby")))
         .at(OPEN + 1, spawn("Toy", "Toy", "Yard"))
         .at(OPEN + 1, spawn("Cart", "Cart", "Yard"))
+        .at(OPEN + 1, spawn("Cart", "Wagon", "Yard"))
         .at(OPEN + 1, spawn("Toy", "Bell", "Lobby"))
         .at(OPEN + 1, level("crate"))
         .at(OPEN + 4, level("seat", Array::make("cy", "Cy", "Den")))
         .at(WALK, reparent("Ana", "Annex"))
         .at(CARRY, level("carry", Array::make("Cart", "Lobby")))
+        .at(CARRY, level("drop", Array::make("Wagon", "Lobby")))
         .at(MOVE, level("move", Array::make("Lobby", "Shelf")))
         .at(MOVE, reparent("Yard", "Shelf"))
         .at(MOVE, level("move", Array::make("AnnexView", "Shelf")))
@@ -363,8 +378,10 @@ TEST_CASE(
     NETW_HOLDS(absent(seen, CY, "Bell", 1));
     NETW_HOLDS(absent(seen, ANA, "Crate", 1));
     NETW_HOLDS(reads(seen, BO, "Crate", "parent", "Level"));
-    NETW_HOLDS(reads(seen, SERVER, "Lobby", "viewers", "ana,bo", SEATED));
     NETW_HOLDS(reads(seen, SERVER, "Lobby", "gone", 1, SEATED));
+    for (const int peer : {SERVER, ANA, BO}) {
+        NETW_HOLDS(reads(seen, peer, "Lobby", "viewers", "ana,bo", SEATED));
+    }
     for (const int peer : {ANA, BO}) {
         NETW_HOLDS(reads(seen, peer, "Bell", "parent", "Level/Lobby", SEATED));
     }
@@ -428,7 +445,8 @@ TEST_CASE(
     const Seen &seen = halls_frames.seen();
     const char *open = "Annex,Arena,Cell,Lobby,Pit";
     NETW_HOLDS(reads(seen, SERVER, "Level", "listed", open, SHELVE + 1));
-    NETW_HOLDS(reads(seen, SERVER, "Level", "shelved", "Den 1"));
+    NETW_HOLDS(reads(seen, SERVER, "Den", "viewers", "ana,cy", SHELVE - 1));
+    NETW_HOLDS(reads(seen, SERVER, "Level", "shelved", "Den 2"));
     NETW_HOLDS(absent(seen, CY, "Den", SHELVE + 3));
     for (const int peer : {SERVER, BO}) {
         NETW_HOLDS(absent(seen, peer, "Pit", SCRAP + 2));
@@ -469,10 +487,18 @@ TEST_CASE(
 TEST_CASE(
     "[Networked][Scene][Frame] SC7 a body moved into another level with "
     "Netw.reparent lands there on every peer holding both, and its promise "
-    "answers OK"
+    "answers OK, or ERR_UNAVAILABLE when the body is freed on the way"
 ) {
     const Seen &seen = halls_frames.seen();
     NETW_HOLDS(reads(seen, SERVER, "Level", "carry_code", int(OK), MOVED));
+    NETW_HOLDS(reads(
+        seen,
+        SERVER,
+        "Level",
+        "drop_code",
+        int(ERR_UNAVAILABLE),
+        MOVED
+    ));
     for (const int peer : {SERVER, ANA, BO}) {
         NETW_HOLDS(
             reads(seen, peer, "Cart", "parent", "Level/Shelf/Lobby", MOVED)

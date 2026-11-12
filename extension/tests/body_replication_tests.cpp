@@ -123,6 +123,7 @@ World yard() {
     return World(YARD, 2)
         .watch("Still", "sleeping")
         .watch("Placed", "sleeping")
+        .watch("Tile", "sleeping")
         .watch("Still", "tint")
         .watch("Heavy", "mass")
         .watch("Placed", "position")
@@ -142,12 +143,12 @@ World yard() {
         .at(1, spawn("Platform", "Platform"))
         .at(1, spawn("Cube", "Sled"))
         .at(BOARD, reparent("Sled", "Platform"))
-        .at(BOARD, set("Tile", "position", PLACED_2D))
         .at(PLACE, set("Sled", "position", LOCAL))
         .at(WRITE, set("Still", "tint", 7))
         .at(WRITE, set("Heavy", "mass", 3.5))
         .at(WRITE, set("Placed", "position", PLACED))
-        .at(WRITE, set("Crate", "position", PLACED));
+        .at(WRITE, set("Crate", "position", PLACED))
+        .at(WRITE, set("Tile", "position", PLACED_2D));
 }
 
 NETW_FRAME_SCENARIO(WorldFrames, yard_frames, &yard, END);
@@ -159,10 +160,12 @@ TEST_CASE(
     const Seen &seen = yard_frames.seen();
     NETW_HOLDS(reads(seen, SERVER, "Still", "sleeping", true, ASLEEP));
     NETW_HOLDS(reads(seen, SERVER, "Placed", "sleeping", true, ASLEEP));
+    NETW_HOLDS(reads(seen, SERVER, "Tile", "sleeping", true, ASLEEP));
     for (const int peer : {0, 1}) {
         NETW_HOLDS(reads(seen, peer, "Still", "tint", 7));
         NETW_HOLDS(reads(seen, peer, "Heavy", "mass", 3.5));
         NETW_HOLDS(close(seen, peer, "Placed", "position", PLACED));
+        NETW_HOLDS(close(seen, peer, "Tile", "position", PLACED_2D));
     }
     NETW_HOLDS(quiet(seen));
 }

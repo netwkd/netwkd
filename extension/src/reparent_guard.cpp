@@ -67,8 +67,7 @@ void ReparentGuard::arm(
     const RID &p_guard,
     Object *p_tree,
     int p_frames,
-    const Callable &p_answered,
-    const Callable &p_frame_callback
+    const Callable &p_answered
 ) {
     Hold *hold = holds.get_or_null(p_guard);
     if (hold == nullptr) {
@@ -77,21 +76,27 @@ void ReparentGuard::arm(
     hold->tree = gd::instance_id(p_tree);
     hold->frames = p_frames;
     hold->answered = p_answered;
-    hold->frame_callback = p_frame_callback;
 }
 
-bool ReparentGuard::spend(const RID &p_guard) {
-    Hold *hold = holds.get_or_null(p_guard);
-    if (hold == nullptr) {
-        return false;
+void ReparentGuard::spend_frame(LocalVector<RID> &r_spent) {
+    LocalVector<RID> owned;
+    owned.resize(holds.get_rid_count());
+    holds.fill_owned_buffer(owned.ptr());
+    for (const RID &guard : owned) {
+        Hold *hold = holds.get_or_null(guard);
+        if (hold == nullptr || !hold->tree.is_valid()) {
+            continue;
+        }
+        hold->frames -= 1;
+        if (hold->frames <= 0) {
+            r_spent.push_back(guard);
+        }
     }
-    hold->frames -= 1;
-    return hold->frames <= 0;
 }
 
 Callable ReparentGuard::take_answer(const RID &p_guard) {
     Hold *hold = holds.get_or_null(p_guard);
-    if (hold == nullptr) {
+    if (hold == nullptr || hold->frames > 0) {
         return Callable();
     }
     const Callable answered = hold->answered;
@@ -99,17 +104,27 @@ Callable ReparentGuard::take_answer(const RID &p_guard) {
     return answered;
 }
 
-Callable ReparentGuard::close_window(const RID &p_guard) {
+void ReparentGuard::close_window(const RID &p_guard) {
     Hold *hold = holds.get_or_null(p_guard);
     if (hold == nullptr) {
-        return Callable();
+        return;
     }
-    const Callable spent = hold->frame_callback;
     hold->tree = ObjectID();
     hold->frames = 0;
     hold->answered = Callable();
-    hold->frame_callback = Callable();
-    return spent;
+}
+
+bool ReparentGuard::any_window_open() const {
+    LocalVector<RID> owned;
+    owned.resize(holds.get_rid_count());
+    holds.fill_owned_buffer(owned.ptr());
+    for (const RID &guard : owned) {
+        const Hold *hold = holds.get_or_null(guard);
+        if (hold != nullptr && hold->tree.is_valid()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 Object *ReparentGuard::window_tree(const RID &p_guard) const {

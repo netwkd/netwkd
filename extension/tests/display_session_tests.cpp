@@ -112,7 +112,6 @@ class Walker extends Node3D:
 		var entity := Netw.configure_entity(self)
 		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
 		entity.display.visual_root = ^"Eye"
-		entity.display.live_mode = NetwDisplay.LIVE_MODE_BRACKETED
 		var glide := NetwInterpolate.new().lerp().smooth(0.0)
 		Netw.configure_property(self, &"position").state().interpolate(glide)
 		Netw.configure_property(self, &"motion").input()
@@ -326,6 +325,45 @@ LawVerdict glides(
     return law_held();
 }
 
+LawVerdict trails(
+    const Seen &p_seen,
+    int p_peer,
+    const char *p_name,
+    int p_from,
+    int p_to,
+    double p_lag,
+    double p_most
+) {
+    for (int tick = p_from; tick <= p_to; ++tick) {
+        if (p_seen.sight(p_peer, p_name, tick - 1) == nullptr
+            || p_seen.sight(p_peer, p_name, tick) == nullptr) {
+            return missing(p_peer, p_name, tick);
+        }
+        const double was = fact(p_seen, p_peer, p_name, "drawn", tick - 1);
+        const double drawn = fact(p_seen, p_peer, p_name, "drawn", tick);
+        const double behind = fact(p_seen, p_peer, p_name, "x", tick) - drawn;
+        if (drawn - was < -1e-3 || drawn - was > p_most) {
+            return law_broken(
+                "%s moved '%s' drawn %f further at tick %d",
+                who(p_peer).c_str(),
+                p_name,
+                drawn - was,
+                tick
+            );
+        }
+        if (behind < -1e-3 || behind > p_lag) {
+            return law_broken(
+                "%s holds '%s' drawn %f behind its body at tick %d",
+                who(p_peer).c_str(),
+                p_name,
+                behind,
+                tick
+            );
+        }
+    }
+    return law_held();
+}
+
 LawVerdict lands(
     const Seen &p_seen,
     int p_peer,
@@ -439,11 +477,12 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Display][Frame] DS4 the client that steers a predicted "
-    "body draws its own prediction on every frame while the server's "
-    "snapshots run late"
+    "body draws a short way behind its own prediction while the server's "
+    "snapshots run late, and absorbs a correction over frames"
 ) {
     const Seen &seen = street_frames.seen();
-    NETW_HOLDS(glides(seen, FAR, "Walker", WALK + 30, BUMP - 1, 0.35));
+    NETW_HOLDS(trails(seen, FAR, "Walker", WALK + 10, BUMP - 1, 0.15, 0.1));
+    NETW_HOLDS(trails(seen, FAR, "Walker", BUMP, SETTLE, 2.2, 0.3));
     const double drawn = fact(seen, FAR, "Walker", "drawn", END);
     const double x = fact(seen, FAR, "Walker", "x", END);
     CHECK(Math::abs(drawn - x) < 1e-3);
@@ -513,8 +552,10 @@ TEST_CASE(
     "written, and is written again on the frame the body wakes"
 ) {
     const Seen &seen = street_frames.seen();
-    NETW_HOLDS(reads(seen, NEAR, "Crate", "sleeping", true, WALK + 30));
-    NETW_HOLDS(keeps(seen, NEAR, "Crate", "writes", WALK + 30, NUDGE));
+    for (int client : {NEAR, FAR}) {
+        NETW_HOLDS(reads(seen, client, "Crate", "sleeping", true, WALK + 30));
+        NETW_HOLDS(keeps(seen, client, "Crate", "writes", WALK + 30, NUDGE));
+    }
     NETW_HOLDS(keeps(seen, SERVER, "Crate", "writes", WALK + 30, END));
     NETW_HOLDS(changes(seen, NEAR, "Crate", "offset", NUDGE, NUDGE + 3));
 }

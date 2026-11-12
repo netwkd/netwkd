@@ -104,7 +104,7 @@ void NetwMultiplayer::sim_settle_body(const Ref<NetwEntity> &p_entity) {
     }
     if (sim::transition(row.bodies, mode)
         && (!seated || mode == sim::Mode::ACTIVE)) {
-        sim_install_newest(p_entity);
+        sim_reinstall(p_entity);
     }
     if (!seated) {
         sim_announce(entity);
@@ -138,18 +138,22 @@ void NetwMultiplayer::sim_on_body_control(
     sim_settle_body_of(p_entity);
 }
 
-void NetwMultiplayer::sim_install_newest(const Ref<NetwEntity> &p_entity) {
+void NetwMultiplayer::sim_reinstall(const Ref<NetwEntity> &p_entity) {
     ReplicationCore *plane = get_replication_plane();
     if (plane == nullptr || p_entity.is_null()) {
         return;
     }
+    const sim::Row *row = sim_rows.row_of(p_entity->get_rid_handle());
+    const bool buffered = row != nullptr && row->mode == sim::Mode::ACTIVE
+        && row->declaration.restore == sim::Restore::BUFFERED;
+    const int64_t display = buffered ? sim_display_tick() : -1;
     const int64_t live = liveness_route_of(p_entity.ptr());
     const int64_t route = live > 0 ? live : p_entity->get_route();
     const LocalVector<repl::PropertyBindingPtr> bindings
         = plane->derived_group(route);
     for (const repl::PropertyBindingPtr &binding : bindings) {
         if (binding != nullptr) {
-            store_reinstall(binding);
+            store_reinstall(binding, display);
         }
     }
 }

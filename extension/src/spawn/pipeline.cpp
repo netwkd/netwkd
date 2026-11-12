@@ -1174,6 +1174,15 @@ bool Pipeline::is_booked(int64_t p_route) const {
         || spawn_book.is_recv(p_route);
 }
 
+bool Pipeline::books_node(Node *p_node) const {
+    if (spawn_book.books_node(p_node)) {
+        return true;
+    }
+    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
+    return entity.is_valid() && entity->get_owner() == p_node
+        && spawn_book.is_recv(entity->get_route());
+}
+
 void Pipeline::publish_nested(Node *p_node) {
     const Ref<NetwEntity> entity = NetwEntity::of(p_node);
     if (entity.is_null() || p_node == nullptr || !p_node->is_inside_tree()) {
@@ -1553,6 +1562,14 @@ TypedArray<Dictionary> Pipeline::collect_spawn_state(Node *p_root) {
     if (p_root == nullptr) {
         return out;
     }
+    const Ref<NetwEntity> root = NetwEntity::of(p_root);
+    NetwMultiplayer *plane = core();
+    const bool client_steers = root.is_valid()
+        && (root->get_controller() != SERVER_PEER
+            || (plane != nullptr
+                && plane->player_kept_controlled(
+                    root->get_rid_handle().get_id()
+                )));
     LocalVector<Node *> stack;
     stack.push_back(p_root);
     while (!stack.is_empty()) {
@@ -1564,8 +1581,12 @@ TypedArray<Dictionary> Pipeline::collect_spawn_state(Node *p_root) {
         for (int at = 0; at < names.size(); ++at) {
             const StringName prop = names[at];
             const Ref<NetwPropertyConfig> cfg = configs[prop];
-            if (cfg.is_null() || !cfg->get_is_spawn_state()
-                || !gd::has_property(node, prop)) {
+            if (cfg.is_null() || !gd::has_property(node, prop)) {
+                continue;
+            }
+            const bool rides = cfg->get_is_spawn_state()
+                || (client_steers && cfg->get_in_broadcast_set());
+            if (!rides) {
                 continue;
             }
             Dictionary row;
@@ -2163,7 +2184,9 @@ void Pipeline::refuse_controller_spawn(
         return;
     }
     wire::WriteStream stream;
-    if (!plane->verb_head_write(stream, p_route) || !stream.align_verify()) {
+    String unspoken;
+    if (!plane->verb_head_write(stream, p_route)
+        || !wire::string_field(stream, unspoken) || !stream.align_verify()) {
         return;
     }
     plane->lifecycle_send_to(
@@ -2792,8 +2815,10 @@ void Pipeline::handle_despawn_frame(
     wire::ReadStream reader(p_payload);
     int64_t route = 0;
     int64_t epoch = 0;
+    String reason;
     if (!NetwMultiplayer::verb_head_read(reader, route, epoch)
-        || !reader.align_verify() || reader.bits_remaining() != 0) {
+        || !wire::string_field(reader, reason) || !reader.align_verify()
+        || reader.bits_remaining() != 0) {
         frame_read(false, route, p_sender);
         return;
     }
@@ -2817,8 +2842,14 @@ void Pipeline::handle_despawn_frame(
         drops_despawn_unknown += 1;
         return;
     }
+    const bool withheld = plane->lifecycle_forget_withheld(route);
     const double linger = run_despawn_hook(entity->get_owner());
-    entity->_remote_despawn(StringName("despawn"), linger);
+    entity->_remote_despawn(StringName(reason), linger);
+    if (withheld) {
+        free_despawned(route);
+        plane->entity_settle_captured(entity.ptr());
+        return;
+    }
     if (linger > 0.0) {
         double rate = CLOCKLESS_TICKRATE;
         const ClockEngine &clock = *books->clock;
@@ -2862,9 +2893,13 @@ void Pipeline::release_received() {
         if (entity.is_null() || entity->get_owner() == nullptr) {
             continue;
         }
+        const bool withheld = plane->lifecycle_forget_withheld(route);
         run_despawn_hook(entity->get_owner());
         entity->_remote_despawn(StringName("despawn"), 0.0);
         free_despawned(route);
+        if (withheld) {
+            plane->entity_settle_captured(entity.ptr());
+        }
     }
 }
 

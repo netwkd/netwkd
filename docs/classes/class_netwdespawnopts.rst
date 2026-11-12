@@ -147,7 +147,7 @@ Seconds a lingering entity can still be rewound before it is freed. Ignored unle
 - |void| **set_reason**\ (\ value\: :godot:`StringName`\ )
 - :godot:`StringName` **get_reason**\ (\ )
 
-Passed to :ref:`NetwEntity.despawning<class_NetwEntity_signal_despawning>` so a game can react to the cause, such as ``&"peer_disconnected"``, ``&"killed"`` or ``&"timeout"``.
+Passed to :ref:`NetwEntity.despawning<class_NetwEntity_signal_despawning>` so a game can react to the cause, such as ``&"peer_disconnected"``, ``&"killed"`` or ``&"timeout"``. Every peer hears the reason the server passed.
 
 .. rst-class:: classref-section-separator
 

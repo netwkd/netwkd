@@ -15,7 +15,6 @@ class ReparentGuard {
         godot::ObjectID body;
         godot::ObjectID tree;
         godot::Callable answered;
-        godot::Callable frame_callback;
         int64_t prior_layer = 0;
         int64_t prior_mask = 0;
         int prior_mode = godot::Node::PROCESS_MODE_INHERIT;
@@ -41,13 +40,13 @@ public:
         const godot::RID &p_guard,
         godot::Object *p_tree,
         int p_frames,
-        const godot::Callable &p_answered,
-        const godot::Callable &p_frame_callback
+        const godot::Callable &p_answered
     );
-    bool spend(const godot::RID &p_guard);
+    void spend_frame(godot::LocalVector<godot::RID> &r_spent);
     godot::Callable take_answer(const godot::RID &p_guard);
-    godot::Callable close_window(const godot::RID &p_guard);
+    void close_window(const godot::RID &p_guard);
     godot::Object *window_tree(const godot::RID &p_guard) const;
+    bool any_window_open() const;
 
     void resume_processing(const godot::RID &p_guard);
     void release(const godot::RID &p_guard);

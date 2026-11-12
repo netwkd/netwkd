@@ -593,8 +593,7 @@ TEST_CASE(
     NETW_HOLDS(reads(seen, SERVER, "Car", "mode", ACTIVE_COPY, INSTALLING));
     NETW_HOLDS(reads(seen, SERVER, "Car", "thawed", true, INSTALLING));
     NETW_HOLDS(reads(seen, SERVER, "Car", "speed", 3000, INSTALLING));
-    NETW_HOLDS(glides(seen, SERVER, "Car", "x", ACTIVE, ACTIVE + 3, STEP));
-    NETW_HOLDS(glides(seen, SERVER, "Car", "x", INSTALLING, END, STEP));
+    NETW_HOLDS(glides(seen, SERVER, "Car", "x", ACTIVE, END, STEP));
     for (int peer : {DRIVER, RIDER}) {
         NETW_HOLDS(reads(seen, peer, "Ball", "mode", ACTIVE_COPY, FLYING));
     }

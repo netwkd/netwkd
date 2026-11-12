@@ -180,6 +180,7 @@ public:
 NETW_FRAME_SCENARIO(PhantomScenario, phantom_scenario);
 
 constexpr double HUSH_X = -20000.0;
+constexpr double TWIN_Y = 1000.0;
 constexpr int HUSH_WATCH_FRAMES = 4;
 constexpr int HUSH_LEAVE_FRAMES = 3;
 
@@ -206,6 +207,7 @@ struct HushEvidence {
     bool overlapping_after = false;
     bool arrived = false;
     int exits_after_leaving = 0;
+    int twin_exits = 0;
 };
 
 HushEvidence &hush_evidence(int p_row) {
@@ -222,6 +224,8 @@ class AreaHushScenario final : public netw_test::FrameScenario {
     Node2D *dock = nullptr;
     Area2D *area = nullptr;
     CharacterBody2D *body = nullptr;
+    Node2D *twin = nullptr;
+    CharacterBody2D *twin_body = nullptr;
     netw_test::CallLog *signals = nullptr;
     int enters_before = 0;
     int exits_before = 0;
@@ -278,20 +282,42 @@ class AreaHushScenario final : public netw_test::FrameScenario {
         if (shape == HUSH_LEVEL) {
             netw::NetwEntity::of(mover)->set_declares_scene(true);
         }
+        if (shape == HUSH_CHILD_AREA) {
+            twin = memnew(Node2D);
+            twin->set_name("Twin");
+            twin->set_position(Vector2(0.0, real_t(TWIN_Y)));
+            stage->add_child(twin);
+            seat_area(twin)->connect(
+                StringName("body_exited"),
+                signals->callable(StringName("twin_exited"))
+            );
+            Node2D *berth = memnew(Node2D);
+            berth->set_position(Vector2(0.0, real_t(TWIN_Y)));
+            stage->add_child(berth);
+            twin_body = seat_body(berth);
+            seat(twin);
+        }
         seat(dock);
+    }
+
+    void carry(Node2D *p_node) {
+        if (row % HUSH_CARRIES == HUSH_SERVER_CARRY) {
+            core->scene_move_entity(
+                netw::NetwEntity::of(p_node)->get_rid_handle(),
+                netw::NetwEntity::of(dock)->get_rid_handle()
+            );
+        } else {
+            core->spawn_reparent_node(p_node, dock, Callable());
+        }
     }
 
     void move() {
         enters_before = heard("entered");
         exits_before = heard("exited");
         hush_evidence(row).settled_enters = enters_before;
-        if (row % HUSH_CARRIES == HUSH_SERVER_CARRY) {
-            core->scene_move_entity(
-                netw::NetwEntity::of(mover)->get_rid_handle(),
-                netw::NetwEntity::of(dock)->get_rid_handle()
-            );
-        } else {
-            core->spawn_reparent_node(mover, dock, Callable());
+        carry(mover);
+        if (twin != nullptr) {
+            carry(twin);
         }
     }
 
@@ -303,6 +329,9 @@ class AreaHushScenario final : public netw_test::FrameScenario {
             = area->get_overlapping_bodies().has(Variant(body));
         evidence.arrived = mover->get_parent() == dock;
         body->set_position(Vector2(real_t(AWAY_X), 0.0));
+        if (twin_body != nullptr) {
+            twin_body->set_position(Vector2(real_t(AWAY_X), 0.0));
+        }
     }
 
     void close() {
@@ -310,6 +339,7 @@ class AreaHushScenario final : public netw_test::FrameScenario {
         evidence.driven = true;
         evidence.exits_after_leaving
             = heard("exited") - exits_before - evidence.exits_in_window;
+        evidence.twin_exits = heard("twin_exited");
         core->scene_dispose();
         netw::gd::scene_root()->remove_child(stage);
         memdelete(stage);
@@ -318,6 +348,8 @@ class AreaHushScenario final : public netw_test::FrameScenario {
         dock = nullptr;
         area = nullptr;
         body = nullptr;
+        twin = nullptr;
+        twin_body = nullptr;
         delete signals;
         signals = nullptr;
         core.unref();
@@ -378,7 +410,8 @@ TEST_CASE(
 TEST_CASE(
     "[Networked][Scene][Frame] LH1 an entity moved in place by the server's "
     "carry or a client's carry fires no area enter or exit, keeps the "
-    "overlap, and the area reports a real exit after the move"
+    "overlap, and the area reports a real exit after the move, also when "
+    "two entities are carried in one frame"
 ) {
     for (int row = 0; row < HUSH_ROWS; ++row) {
         const int shape = row / HUSH_CARRIES;
@@ -393,6 +426,9 @@ TEST_CASE(
         NETW_CHECK_EQ(evidence.enters_in_window, 0);
         CHECK(evidence.overlapping_after);
         NETW_CHECK_EQ(evidence.exits_after_leaving, 1);
+        if (shape == HUSH_CHILD_AREA) {
+            NETW_CHECK_EQ(evidence.twin_exits, 1);
+        }
     }
 }
 

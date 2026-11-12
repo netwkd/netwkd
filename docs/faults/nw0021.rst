@@ -34,3 +34,12 @@ should call it.
 
     func _init() -> void:
         Netw.configure_rpc(self.apply_stun).controller()
+
+A method with no such declaration takes its policy from its ``@rpc``
+annotation, and ``@rpc("any_peer")`` lets every peer call it.
+
+.. code-block:: gdscript
+
+    @rpc("any_peer", "call_remote", "reliable")
+    func apply_stun(attacker: Node) -> void:
+        pass

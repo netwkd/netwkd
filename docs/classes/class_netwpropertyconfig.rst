@@ -34,7 +34,7 @@ Description
 
 \ **Rigid bodies**\ 
 
-When the :ref:`NetwEntity<class_NetwEntity>` root is a :godot:`RigidBody3D` or a :godot:`RigidBody2D`, ``position``, ``quaternion`` (``rotation`` in 2D), ``linear_velocity``, ``angular_velocity`` and ``sleeping`` read and write the body's physics state. ``position`` stays relative to the parent. While :godot:`RigidBody3D.freeze <RigidBody3D#class_RigidBody3D_property_freeze>` is on, position and rotation use the node transform.
+When the :ref:`NetwEntity<class_NetwEntity>` root is a :godot:`RigidBody3D` or a :godot:`RigidBody2D`, ``position``, ``quaternion`` (``rotation`` in 2D), ``linear_velocity``, ``angular_velocity`` and ``sleeping`` read and write the body's physics state. ``position`` stays relative to the parent. While :godot:`RigidBody3D.freeze <RigidBody3D#class_RigidBody3D_property_freeze>` is on, position and rotation use the node transform. A write to a body that stays asleep reaches peers within 30 ticks.
 
 ::
 
@@ -623,7 +623,7 @@ Sends the :ref:`state()<class_NetwPropertyConfig_method_state>` properties of th
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **broadcast**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_broadcast>`
 
-The controlling peer owns the value and every peer sees it, with no server check. Use it for cosmetic values such as an aim direction. The server keeps no history of it.
+The controlling peer owns the value and every peer sees it, with no server check. Use it for cosmetic values such as an aim direction. The server keeps no history of it. When a client controls the entity, or the entity is kept for a dropped player who controlled it, a spawn carries the value, so a controller that receives the node again starts from the value the server holds.
 
 ::
 

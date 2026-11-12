@@ -58,6 +58,7 @@ public:
     bool drop_spawned(int64_t route);
     godot::PackedInt64Array spawned_routes() const;
     int spawned_count() const;
+    void forget_peer(int64_t peer);
 
     godot::PackedInt64Array ancestry_order() const;
 

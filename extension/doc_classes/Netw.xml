@@ -655,7 +655,7 @@
 				    NetwEntity.of(avatar).player = who
 				    return avatar
 				[/codeblock]
-				Returns [code]null[/code] and spawns nothing when the session does not hold [param player]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
+				Returns [code]null[/code] and spawns nothing when the session does not hold [param player]. The node keeps the name [param fn] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
 				[b]Server Only.[/b]
 			</description>
 		</method>
@@ -664,7 +664,7 @@
 			<param index="0" name="node" type="Node" />
 			<param index="1" name="property" type="StringName" />
 			<description>
-				Sends the current value of [param property] to the other peers. Use it for a property that changes rarely.
+				Sends the current value of [param property] once, to the peers connected now. A peer that joins later does not receive it, so declare state a late joiner needs with [method configure_property].
 				[codeblock]
 				func refuel() -&gt; void:
 				    fuel = 100.0

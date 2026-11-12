@@ -25,29 +25,7 @@ using repl::PropertySet;
 
 namespace {
 
-constexpr double UNQUANTIZED_EPSILON = 0.0001;
 constexpr double NEGLIGIBLE_DELTA = 0.000001;
-
-double epsilon_of(
-    const PropertyBinding *p_binding,
-    const StringName &p_key,
-    const Variant &p_value
-) {
-    const double declared = p_binding->epsilon_override_of(p_key);
-    if (declared >= 0.0) {
-        return declared;
-    }
-    const PropertyColumn *field = p_binding->field_of(p_key);
-    const Ref<NetwQuantize> quantizer
-        = field != nullptr ? field->get_quantizer() : Ref<NetwQuantize>();
-    if (quantizer.is_null()) {
-        return UNQUANTIZED_EPSILON;
-    }
-    return std::max(
-        UNQUANTIZED_EPSILON,
-        2.0 * quantizer->max_error(p_value.get_type())
-    );
-}
 
 Array projected(
     const PropertyBinding *p_binding,
@@ -189,22 +167,6 @@ bool NetwMultiplayer::sim_write_install_row(
     Node *node = p_binding != nullptr ? p_binding->node() : nullptr;
     if (node == nullptr || p_keys.size() != p_values.size()) {
         return false;
-    }
-    sim::Row *row = sim_rows.find(p_entity);
-    if (row != nullptr && sim::asleep(row->bodies)) {
-        bool same = true;
-        for (uint32_t at = 0; at < p_keys.size() && same; ++at) {
-            const double error = predict::value_error(
-                port_get(node, p_keys[at]),
-                p_values[at],
-                false
-            );
-            same = error <= epsilon_of(p_binding, p_keys[at], p_values[at]);
-        }
-        if (same) {
-            row->installs.stats.skipped += 1;
-            return false;
-        }
     }
     r_moved_keys.clear();
     r_moved.clear();

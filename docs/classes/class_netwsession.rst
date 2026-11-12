@@ -900,7 +900,7 @@ Measured connection quality to ``peer``, and what this peer's byte budget sends 
 
 |void| **pause**\ (\ reason\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwSession_method_pause>`
 
-Pauses the :godot:`SceneTree` on every peer, which emits :ref:`paused_changed<class_NetwSession_signal_paused_changed>` with ``reason``. A player who joins while paused joins paused.
+Pauses the :godot:`SceneTree` on every peer, which emits :ref:`paused_changed<class_NetwSession_signal_paused_changed>` with ``reason``. A player who joins while paused joins paused. A session that ends while paused unpauses the :godot:`SceneTree` it paused.
 
 \ **Server Only.**
 
@@ -1079,7 +1079,7 @@ Asks the :godot:`MultiplayerPeer` to make ``peer_id`` the server and this peer a
         if relay.promoted:
             server_relabelled.emit(relay.successor_was, relay.former_now)
 
-\ When the server moves, players who have left lose their return window, and their kept entities despawn. The new server reads each :ref:`NetwPlayer.account<class_NetwPlayer_property_account>` again from the :ref:`LobbyDirectory<class_LobbyDirectory>` serving the session when it names one, and the old server keeps only its own.
+\ When the server moves, players who have left lose their return window, and their kept entities despawn. An entity the server spawns or despawns in the frame it calls this method is on no peer afterwards. The new server reads each :ref:`NetwPlayer.account<class_NetwPlayer_property_account>` again from the :ref:`LobbyDirectory<class_LobbyDirectory>` serving the session when it names one, and the old server keeps only its own.
 
 .. code:: text
 

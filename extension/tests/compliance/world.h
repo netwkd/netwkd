@@ -12,6 +12,7 @@
 
 #include "netw/api/context.hpp"
 #include "netw/api/entity_options.hpp"
+#include "netw/api/interest.hpp"
 #include "netw/api/nodes/multiplayer_viewport.hpp"
 #include "netw/api/session.hpp"
 
@@ -293,12 +294,23 @@ struct Live {
             return session(p_peer)->get_session().ptr();
         }
         godot::Node *node = find(p_peer, p_name);
-        if (node == nullptr || node->has_signal(p_signal)) {
+        if (node == nullptr) {
+            return session(p_peer)->interest_layer_named(p_name).ptr();
+        }
+        if (node->has_signal(p_signal)) {
             return node;
         }
         const godot::Ref<netw::NetwEntity> held = netw::NetwEntity::of(node);
-        return held.is_valid() && held->has_signal(p_signal) ? held.ptr()
-                                                             : nullptr;
+        if (held.is_null()) {
+            return nullptr;
+        }
+        if (held->has_signal(p_signal)) {
+            return held.ptr();
+        }
+        const godot::Ref<netw::NetwInterest> interest = held->get_interest();
+        return interest.is_valid() && interest->has_signal(p_signal)
+            ? interest.ptr()
+            : nullptr;
     }
 };
 

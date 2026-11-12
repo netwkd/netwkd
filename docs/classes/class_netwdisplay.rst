@@ -402,7 +402,7 @@ How an entity this peer simulates is drawn under :ref:`DISPLAY_ROLE_PREDICTED<cl
 - |void| **set_live_smooth_time**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_live_smooth_time**\ (\ )
 
-Smoothing time in seconds for :ref:`LIVE_MODE_CHASE<class_NetwDisplay_constant_LIVE_MODE_CHASE>`. ``0`` uses one tick.
+Smoothing time in seconds for :ref:`LIVE_MODE_CHASE<class_NetwDisplay_constant_LIVE_MODE_CHASE>`. ``0`` uses one tick. It counts the process frame time, so :godot:`Engine.time_scale <Engine#class_Engine_property_time_scale>` slows it too.
 
 .. rst-class:: classref-item-separator
 

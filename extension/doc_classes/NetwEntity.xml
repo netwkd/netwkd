@@ -87,6 +87,7 @@
 			<description>
 				Frees [member root] after emitting [signal despawning] and saving its [member persistence]. Entities under it despawn too, unless their [member on_parent_despawn] is [constant PARENT_DESPAWN_DETACH].
 				Values a client sent before it learned of the despawn are dropped without an error, and never reach an entity spawned later.
+				On a client, [member root] leaves the tree at once and [signal despawning] is emitted when the server accepts.
 				[codeblock]
 				entity.despawn()
 
@@ -244,7 +245,7 @@
 		<signal name="despawning">
 			<param index="0" name="reason" type="StringName" />
 			<description>
-				Emitted right before [method despawn] frees the entity, with its [param reason], while [member root] can still be read. Freeing [member root] directly does not emit it.
+				Emitted right before [method despawn] frees the entity, with its [param reason], while [member root] can still be read. Freeing [member root] directly does not emit it. Every entity that goes with a despawned parent emits it too, on every peer, before its parent does.
 			</description>
 		</signal>
 		<signal name="hidden">
@@ -256,7 +257,7 @@
 		<signal name="lifecycle_refused">
 			<param index="0" name="request" type="NetwLifecycleRequest" />
 			<description>
-				Emitted on the peer whose spawn, despawn or move of this entity the server refused, before the change is undone. [member NetwLifecycleRequest.reason] is what the server passed to [method NetwLifecycleRequest.deny], or empty when the server refused for another reason.
+				Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused spawn or move is undone after it, and a refused despawn puts the same [member root] back before it. [member NetwLifecycleRequest.reason] is what the server passed to [method NetwLifecycleRequest.deny], or empty when the server refused for another reason.
 			</description>
 		</signal>
 		<signal name="lifecycle_requested">

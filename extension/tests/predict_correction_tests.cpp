@@ -99,28 +99,36 @@ constexpr int BUMPED = 20;
 constexpr int NUDGED = 30;
 constexpr int NUDGE = 5000;
 
-World relay() {
-    World world = World(RELAY, 1)
-                      .paced(60)
-                      .watch("Kid", "gap")
-                      .watch("Kid", "bumped")
-                      .at(1, spawn("Kid", "Kid"))
-                      .at(1, spawn("Warner", "Warner"))
-                      .at(1, control("Kid", DRIVER))
-                      .at(2, impair(DRIVER, polls(6)))
-                      .at(BUMPED, call("Kid", "bump"));
+World sleds(World p_world) {
     for (const char *name : {"Sled", "Ruled"}) {
-        world.watch(name, "lift")
+        p_world.watch(name, "lift")
             .watch(name, "corrections")
             .at(1, spawn(name, name))
             .at(1, control(name, DRIVER))
             .at(8, on(DRIVER, set(name, "motion", 1.0)))
             .at(NUDGED, call(name, "nudge"));
     }
-    return world;
+    return p_world;
+}
+
+World relay() {
+    return sleds(World(RELAY, 1)
+                     .paced(60)
+                     .watch("Kid", "gap")
+                     .watch("Kid", "bumped")
+                     .at(1, spawn("Kid", "Kid"))
+                     .at(1, spawn("Warner", "Warner"))
+                     .at(1, control("Kid", DRIVER))
+                     .at(2, impair(DRIVER, polls(6)))
+                     .at(BUMPED, call("Kid", "bump")));
+}
+
+World swift() {
+    return sleds(World(RELAY, 1).paced(60));
 }
 
 NETW_FRAME_SCENARIO(WorldFrames, relay_frames, &relay, NUDGED + 60);
+NETW_FRAME_SCENARIO(WorldFrames, swift_frames, &swift, NUDGED + 60);
 
 LawVerdict never_above(
     const Seen &p_seen,
@@ -175,14 +183,15 @@ TEST_CASE(
 TEST_CASE(
     "[Networked][Predict][Frame] C2 one server change to a moving frame "
     "body costs one correction, never overshoots, and the client then equals "
-    "the server"
+    "the server, over a slow link and over none"
 ) {
-    const Seen &seen = relay_frames.seen();
-    for (const char *name : {"Sled", "Ruled"}) {
-        NETW_HOLDS(reads(seen, SERVER, name, "lift", NUDGE));
-        NETW_HOLDS(reads(seen, DRIVER, name, "lift", NUDGE));
-        NETW_HOLDS(reads(seen, DRIVER, name, "corrections", 1));
-        NETW_HOLDS(never_above(seen, DRIVER, name, "lift", NUDGE));
+    for (const Seen *seen : {&relay_frames.seen(), &swift_frames.seen()}) {
+        for (const char *name : {"Sled", "Ruled"}) {
+            NETW_HOLDS(reads(*seen, SERVER, name, "lift", NUDGE));
+            NETW_HOLDS(reads(*seen, DRIVER, name, "lift", NUDGE));
+            NETW_HOLDS(reads(*seen, DRIVER, name, "corrections", 1));
+            NETW_HOLDS(never_above(*seen, DRIVER, name, "lift", NUDGE));
+        }
     }
 }
 

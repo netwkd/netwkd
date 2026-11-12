@@ -663,16 +663,14 @@ struct Stage {
 
     void author_despawns(int p_route) {
         NetwMultiplayer *author = rig.client(0);
-        Node *freed = at(p_route, 0);
-        REQUIRE(freed != nullptr);
+        REQUIRE(at(p_route, 0) != nullptr);
         NETW_REQUIRE_EQ(
             author->entity_despawn(
                 author->entity_from_route(p_route),
-                Ref<netw::NetwDespawnOpts>()
+                netw::NetwDespawnOpts::create(StringName("scrapped"))
             ),
             OK
         );
-        freed->get_parent()->remove_child(freed);
     }
 };
 
@@ -955,9 +953,9 @@ LawVerdict client_despawns(const World &) {
             );
     }
 
+    Node *mine = stage.at(served.crate, 0);
     stage.author_despawns(served.crate);
-    stage.rig.pump(1);
-    if (stage.holds(served.crate, 0)) {
+    if (mine->is_inside_tree()) {
         return law_broken("the author still holds what it despawned");
     }
     stage.rig.step_ticks(SETTLE_TICKS);
@@ -971,6 +969,10 @@ LawVerdict client_despawns(const World &) {
                 side,
                 despawning[side + 1].count("despawning")
             );
+        }
+        if (despawning[side + 1].args("despawning")
+            != Array::make(StringName("scrapped"))) {
+            return law_broken("peer %d heard another reason", side);
         }
     }
     return law_held();
@@ -998,8 +1000,8 @@ LawVerdict refused_despawn_serves_back(const World &) {
     stage.rig.step_ticks(SETTLE_TICKS);
 
     Node *back = stage.at(served.crate, 0);
-    if (back == nullptr || back == written) {
-        return law_broken("the author did not get the crate back");
+    if (back == nullptr || back != written) {
+        return law_broken("the author did not get the same crate back");
     }
     if (int64_t(back->get(StringName("hp"))) != 5) {
         return law_broken("the crate came back without the server's hp");
@@ -1007,7 +1009,7 @@ LawVerdict refused_despawn_serves_back(const World &) {
     if (!stage.under(served.crate, 0, stage.named_on(0, "Shelf"))) {
         return law_broken("the crate came back away from the server's place");
     }
-    if (served.spawned.count("spawned") - built != 1) {
+    if (served.spawned.count("spawned") - built != 0) {
         return law_broken(
             "ready fired %d times",
             served.spawned.count("spawned") - built
@@ -1446,11 +1448,12 @@ const Row ROWS[] = {
      "client never does",
      &spawn_under_a_hidden_parent},
     {"a client despawns the crate it controls",
-     "it is gone on every peer and each hears despawning once",
+     "it is gone on every peer and each hears despawning once with the "
+     "client's reason",
      &client_despawns},
     {"a client despawns while the server moves the crate",
-     "the despawn is refused and the author gets the crate back with the "
-     "server's values and place, the observer untouched",
+     "the despawn is refused and the author gets the same crate back with "
+     "the server's values and place, the observer untouched",
      &refused_despawn_serves_back},
     {"a client despawns a parent with detaching children",
      "the children stay under the grandparent where they stood and the "

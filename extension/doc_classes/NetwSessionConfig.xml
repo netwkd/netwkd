@@ -91,6 +91,7 @@
 		</member>
 		<member name="return_window_seconds" type="float" setter="set_return_window_seconds" getter="get_return_window_seconds">
 			How many seconds the server keeps the entities of a player with an [member NetwPlayer.account] after it drops or calls [method NetwSession.step_away], or [code]0[/code] to despawn them when it leaves.
+			The server controls them while they are kept. A later join with the same [member NetwPlayer.account] gets the same entities back, owned and controlled as before, and a join with another account gets none of them, even on the same peer id. That join still receives them as any other peer does. A spawn for the player in the frame it drops is not kept.
 		</member>
 		<member name="server_info" type="NetwServerInfo" setter="set_server_info" getter="get_server_info">
 			What this server shows in server browsers. The player count and [member NetwServerInfo.app_id] are filled in automatically. Copied when applied.

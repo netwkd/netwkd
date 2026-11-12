@@ -814,7 +814,9 @@ void NetwMultiplayer::session_receive_resync(
                 head.route = route;
                 head.epoch = row.epoch;
                 wire::WriteStream stream;
+                String unspoken;
                 if (spawn::VerbHead::wire.run(stream, head)
+                    && wire::string_field(stream, unspoken)
                     && stream.align_verify()) {
                     attribution_note_subject(int64_t(route));
                     send_to(

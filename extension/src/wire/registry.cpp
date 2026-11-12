@@ -275,7 +275,7 @@ WireRegistry WireRegistry::create_default() {
         Delivery::FITTED,
         Direction::EITHER,
         PayloadContract::PLANNED,
-        1
+        2
     );
     reg_c(
         16,

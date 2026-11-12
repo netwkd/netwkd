@@ -220,6 +220,8 @@ TEST_CASE(
         NETW_HOLDS(reads(seen, peer, "Arena", "tally", "2 2 1 1 0"));
         NETW_HOLDS(reads(seen, peer, "Annex", "tally", "2 1 1 1 0"));
     }
+    NETW_HOLDS(reads(seen, DEE, "Arena", "tally", "2 1 1 0 0", SECOND - 1));
+    NETW_HOLDS(reads(seen, DEE, "Arena", "tally", "2 2 1 1 0"));
 }
 
 TEST_CASE(

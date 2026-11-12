@@ -47,6 +47,7 @@
 		<member name="reorder_chance" type="float" setter="set_reorder_chance" getter="get_reorder_chance" default="0.0">
 		</member>
 		<member name="seed" type="int" setter="set_seed" getter="get_seed" default="0">
+			The random seed for loss, duplication, reordering, jitter and stalls, so the same seed drops and delays the same packets every run.
 		</member>
 		<member name="stall_chance" type="float" setter="set_stall_chance" getter="get_stall_chance" default="0.0">
 			The link holds every packet for [member stall_ms].

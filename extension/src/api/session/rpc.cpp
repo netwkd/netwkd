@@ -2013,10 +2013,16 @@ void NetwMultiplayer::rpc_handle_call(
             String(method),
             String(p_comp_node->get_name())
         );
+        const bool policy_from_rpc_annotation
+            = options.is_null() || !options->is_policy_declared();
         fault::raise(
             this,
             NETW_FAULT_RPC_REFUSED,
-            {String(method), String(p_comp_node->get_name()), String(), p_sender},
+            {String(method),
+             String(p_comp_node->get_name()),
+             String(),
+             p_sender,
+             int64_t(policy_from_rpc_annotation)},
             gd::instance_id(p_comp_node)
         );
         refuse(ERR_UNAUTHORIZED, detail);

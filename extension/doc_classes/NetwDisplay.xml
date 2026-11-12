@@ -77,7 +77,7 @@
 			How an entity this peer simulates is drawn under [constant DISPLAY_ROLE_PREDICTED], in [constant NetwSimulation.MODE_PREDICT] or [constant NetwSimulation.MODE_ACTIVE].
 		</member>
 		<member name="live_smooth_time" type="float" setter="set_live_smooth_time" getter="get_live_smooth_time">
-			Smoothing time in seconds for [constant LIVE_MODE_CHASE]. [code]0[/code] uses one tick.
+			Smoothing time in seconds for [constant LIVE_MODE_CHASE]. [code]0[/code] uses one tick. It counts the process frame time, so [member Engine.time_scale] slows it too.
 		</member>
 		<member name="max_forecast_ticks" type="int" setter="set_max_forecast_ticks" getter="get_max_forecast_ticks">
 			How many ticks [constant TIMELINE_MODE_FORECAST] may guess ahead before it stops.

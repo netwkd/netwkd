@@ -28,6 +28,14 @@ bool resources_held(const Table &p_table, Object *p_node) {
     return true;
 }
 
+uint32_t sweep_share(uint32_t p_count) {
+    return (p_count + World::SWEEP_TICKS - 1) / World::SWEEP_TICKS;
+}
+
+bool in_sweep(uint32_t p_row, uint32_t p_from, uint32_t p_count) {
+    return (p_row + p_count - p_from) % p_count < sweep_share(p_count);
+}
+
 } // namespace
 
 const NodeCell &World::resident(Table &p_table, uint32_t p_row) {
@@ -251,13 +259,15 @@ void World::pull_rows(Table &p_table, int64_t p_tick, bool p_validating) {
     Table &table = p_table;
     const bool whole_body
         = table.body_columns > 0 && table.body_columns == table.columns.size();
+    const uint32_t count = table.row_count();
+    const uint32_t from = sweep(table, whole_body);
     if (!whole_body) {
-        for (uint32_t row = 0; row < table.row_count(); ++row) {
-            pull_row(table, row, p_tick, p_validating, false);
+        for (uint32_t row = 0; row < count; ++row) {
+            const bool swept = in_sweep(row, from, count);
+            pull_row(table, row, p_tick, p_validating, false, swept);
         }
         return;
     }
-    sweep(table);
     visiting.clear();
     for (uint32_t word = 0; word < table.working.words.size(); ++word) {
         uint64_t bits = table.working.words[word];
@@ -267,29 +277,40 @@ void World::pull_rows(Table &p_table, int64_t p_tick, bool p_validating) {
         }
     }
     for (uint32_t at = 0; at < visiting.size(); ++at) {
-        pull_row(table, visiting[at], p_tick, p_validating, true);
+        const uint32_t row = visiting[at];
+        const bool swept = in_sweep(row, from, count);
+        pull_row(table, row, p_tick, p_validating, true, swept);
     }
     if (p_validating) {
         audit_quiet(table, p_tick);
     }
 }
 
-void World::sweep(Table &p_table) {
+uint32_t World::sweep(Table &p_table, bool p_wake) {
     const uint32_t count = p_table.row_count();
     if (count == 0) {
-        return;
+        return 0;
     }
-    const uint32_t share = (count + SWEEP_TICKS - 1) / SWEEP_TICKS;
+    if (p_table.sweep_at >= count) {
+        p_table.sweep_at = 0;
+    }
+    const uint32_t from = p_table.sweep_at;
+    const uint32_t share = sweep_share(count);
     for (uint32_t at = 0; at < share; ++at) {
         if (p_table.sweep_at >= count) {
             p_table.sweep_at = 0;
         }
-        p_table.working.set(p_table.sweep_at, true);
+        if (p_wake) {
+            p_table.working.set(p_table.sweep_at, true);
+        }
         p_table.sweep_at += 1;
     }
 #if defined(NETW_TESTS)
-    work.swept += int64_t(share);
+    if (p_wake) {
+        work.swept += int64_t(share);
+    }
 #endif
+    return from;
 }
 
 void World::pull_row(
@@ -297,7 +318,8 @@ void World::pull_row(
     uint32_t p_row,
     int64_t p_tick,
     bool p_validating,
-    bool p_gated
+    bool p_gated,
+    bool p_swept
 ) {
     Table &table = p_table;
     const uint32_t row = p_row;
@@ -346,16 +368,20 @@ void World::pull_row(
         return;
     }
     BodyState body;
-    bool fresh_body = true;
+    bool resting = false;
     if (table.body_columns > 0) {
         body_probe(cell, body);
         const bool slept
             = (flags & Table::RESTED) != 0 && (flags & Table::PULLED) != 0;
         follow_rest(table, row, body);
-        fresh_body = !(body.rests() && slept);
+        resting = body.rests() && slept;
     }
+    const bool fresh_body = p_swept || !resting;
     const bool whole_body
         = table.body_columns > 0 && table.body_columns == table.columns.size();
+    if (resting && p_gated && watched.has(table.nodes[row])) {
+        table.working.set(row, false);
+    }
     if (!fresh_body) {
 #if defined(NETW_TESTS)
         work.rested += 1;
@@ -364,9 +390,6 @@ void World::pull_row(
             flags &= ~uint8_t(Table::DIRTY | Table::UNGATHERED);
             if (validating) {
                 check_codes(table, row, node, body, p_tick, "rested");
-            }
-            if (p_gated && watched.has(table.nodes[row])) {
-                table.working.set(row, false);
             }
             return;
         }

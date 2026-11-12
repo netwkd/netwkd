@@ -89,6 +89,7 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
              + String("' under a MultiplayerSpawner")},
             uint64_t(gd::instance_id(p_node))
         );
+        p_node->queue_free();
         return ERR_UNAUTHORIZED;
     }
 
@@ -142,13 +143,23 @@ void SpawnerCompat::wrap_when_ready(
     if (!p_spawner->is_inside_tree() || gd::node_ready(p_spawner)) {
         return;
     }
+    Node *scene = p_spawner->get_owner();
+    Node *waiter
+        = scene != nullptr && !gd::node_ready(scene) ? scene : p_spawner;
     const Callable armed
         = callable_mp(p_plane, &NetwMultiplayer::spawner_wrap_when_ready)
               .bind(p_spawner);
-    if (p_spawner->is_connected(SIG_READY, armed)) {
+    if (waiter->is_connected(SIG_READY, armed)) {
         return;
     }
-    p_spawner->connect(SIG_READY, armed, Object::CONNECT_ONE_SHOT);
+    waiter->connect(SIG_READY, armed, Object::CONNECT_ONE_SHOT);
+}
+
+void SpawnerCompat::wrap_enrolled() {
+    const LocalVector<Object *> live = roster.live();
+    for (Object *spawner : live) {
+        wrap_spawner(spawner);
+    }
 }
 
 void SpawnerCompat::wrap_spawner(Object *p_spawner) {
@@ -267,15 +278,13 @@ void SpawnerCompat::emit_despawned(int64_t p_route, Node *p_node) {
 }
 
 void SpawnerCompat::on_session_entered() {
-    Node *root = session_root();
-    if (root == nullptr) {
-        return;
-    }
-    const TypedArray<Node> found
-        = root->find_children("*", "MultiplayerSpawner", true, false);
-    for (int at = 0; at < found.size(); ++at) {
-        const Variant entry = found[at];
-        register_spawner(gd::live_object(entry));
+    if (Node *root = session_root()) {
+        const TypedArray<Node> found
+            = root->find_children("*", "MultiplayerSpawner", true, false);
+        for (int at = 0; at < found.size(); ++at) {
+            const Variant entry = found[at];
+            register_spawner(gd::live_object(entry));
+        }
     }
     SceneTree *tree = gd::scene_tree();
     if (tree == nullptr) {

@@ -180,6 +180,8 @@ The role this peer takes when it hosts, which becomes :ref:`NetwMultiplayer.role
 
 How many seconds the server keeps the entities of a player with an :ref:`NetwPlayer.account<class_NetwPlayer_property_account>` after it drops or calls :ref:`NetwSession.step_away()<class_NetwSession_method_step_away>`, or ``0`` to despawn them when it leaves.
 
+The server controls them while they are kept. A later join with the same :ref:`NetwPlayer.account<class_NetwPlayer_property_account>` gets the same entities back, owned and controlled as before, and a join with another account gets none of them, even on the same peer id. That join still receives them as any other peer does. A spawn for the player in the frame it drops is not kept.
+
 .. rst-class:: classref-item-separator
 
 ----

@@ -725,9 +725,18 @@ public:
 
     void deliver_despawn(int p_client, int p_route, int p_epoch = 0) {
         netw::spawn::Pipeline *pipeline = spawn_plane(p_client);
-        if (pipeline != nullptr) {
-            pipeline->handle_despawn_frame(verb_head(p_route, p_epoch), 1);
+        if (pipeline == nullptr) {
+            return;
         }
+        netw::wire::WriteStream stream;
+        uint64_t route = uint64_t(p_route);
+        uint64_t epoch = uint64_t(p_epoch);
+        godot::String reason;
+        stream.varuint(route, 5);
+        stream.varuint(epoch, 3);
+        netw::wire::string_field(stream, reason);
+        stream.align_verify();
+        pipeline->handle_despawn_frame(stream.to_bytes(), 1);
     }
 
     void deliver_spawn(int p_client, const godot::PackedByteArray &p_frame) {

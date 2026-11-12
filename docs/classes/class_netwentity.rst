@@ -53,7 +53,9 @@ A root declares itself in ``_init``. :ref:`Netw.spawn()<class_Netw_method_spawn>
     func _ready() -> void:
         NetwEntity.of(self).despawning.connect(_on_despawning)
 
-\ A node placed in a scene by hand can set its own :ref:`name<class_NetwEntity_property_name>`. A spawned copy receives it with the spawn.
+\ A root placed in a scene goes online with no call, and each peer's copy of that scene, a late joiner's too, holds the same entity with the server's values.
+
+A node placed in a scene by hand can set its own :ref:`name<class_NetwEntity_property_name>`. A spawned copy receives it with the spawn.
 
 ::
 
@@ -209,7 +211,7 @@ Emitted once the entity has been freed, by :ref:`despawn()<class_NetwEntity_meth
 
 **despawning**\ (\ reason\: :godot:`StringName`\ ) :ref:`🔗<class_NetwEntity_signal_despawning>`
 
-Emitted right before :ref:`despawn()<class_NetwEntity_method_despawn>` frees the entity, with its ``reason``, while :ref:`root<class_NetwEntity_property_root>` can still be read. Freeing :ref:`root<class_NetwEntity_property_root>` directly does not emit it.
+Emitted right before :ref:`despawn()<class_NetwEntity_method_despawn>` frees the entity, with its ``reason``, while :ref:`root<class_NetwEntity_property_root>` can still be read. Freeing :ref:`root<class_NetwEntity_property_root>` directly does not emit it. Every entity that goes with a despawned parent emits it too, on every peer, before its parent does.
 
 .. rst-class:: classref-item-separator
 
@@ -235,7 +237,7 @@ Neither :ref:`despawning<class_NetwEntity_signal_despawning>` nor :ref:`despawne
 
 **lifecycle_refused**\ (\ request\: :ref:`NetwLifecycleRequest<class_NetwLifecycleRequest>`\ ) :ref:`🔗<class_NetwEntity_signal_lifecycle_refused>`
 
-Emitted on the peer whose spawn, despawn or move of this entity the server refused, before the change is undone. :ref:`NetwLifecycleRequest.reason<class_NetwLifecycleRequest_property_reason>` is what the server passed to :ref:`NetwLifecycleRequest.deny()<class_NetwLifecycleRequest_method_deny>`, or empty when the server refused for another reason.
+Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused spawn or move is undone after it, and a refused despawn puts the same :ref:`root<class_NetwEntity_property_root>` back before it. :ref:`NetwLifecycleRequest.reason<class_NetwLifecycleRequest_property_reason>` is what the server passed to :ref:`NetwLifecycleRequest.deny()<class_NetwLifecycleRequest_method_deny>`, or empty when the server refused for another reason.
 
 .. rst-class:: classref-item-separator
 
@@ -903,6 +905,8 @@ Asks the server to make the local player the :ref:`controller<class_NetwEntity_p
 
 \ Under :ref:`TRANSFER_IMMEDIATE<class_NetwEntity_constant_TRANSFER_IMMEDIATE>` this peer runs the node before the decision. A refusal restores the controller's latest values.
 
+The server emits :ref:`control_requested<class_NetwEntity_signal_control_requested>` for one peer's claims in the order that peer made them, whichever entities they name.
+
 ::
 
     entity.claim_control(NetwEntity.HOLD_SOFT) \
@@ -922,6 +926,10 @@ Asks the server to make the local player the :ref:`controller<class_NetwEntity_p
 |void| **despawn**\ (\ opts\: :ref:`NetwDespawnOpts<class_NetwDespawnOpts>` = null\ ) :ref:`🔗<class_NetwEntity_method_despawn>`
 
 Frees :ref:`root<class_NetwEntity_property_root>` after emitting :ref:`despawning<class_NetwEntity_signal_despawning>` and saving its :ref:`persistence<class_NetwEntity_property_persistence>`. Entities under it despawn too, unless their :ref:`on_parent_despawn<class_NetwEntity_property_on_parent_despawn>` is :ref:`PARENT_DESPAWN_DETACH<class_NetwEntity_constant_PARENT_DESPAWN_DETACH>`.
+
+Values a client sent before it learned of the despawn are dropped without an error, and never reach an entity spawned later.
+
+On a client, :ref:`root<class_NetwEntity_property_root>` leaves the tree at once and :ref:`despawning<class_NetwEntity_signal_despawning>` is emitted when the server accepts.
 
 ::
 

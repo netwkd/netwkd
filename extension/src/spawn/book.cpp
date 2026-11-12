@@ -130,6 +130,12 @@ int Book::spawned_count() const {
     return int(spawned.size());
 }
 
+void Book::forget_peer(int64_t peer) {
+    for (KeyValue<int64_t, Record> &held : spawned) {
+        held.value.forget_peer(int(peer));
+    }
+}
+
 PackedInt64Array Book::ancestry_order() const {
     PackedInt64Array routes;
     Dictionary parents;

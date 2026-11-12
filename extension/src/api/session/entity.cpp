@@ -1483,6 +1483,13 @@ void NetwMultiplayer::liveness_clear_session() {
     for (const Ref<NetwEntity> &entity : predicted) {
         unregister_prediction(entity);
     }
+    for (const KeyValue<int64_t, WithheldDespawn> &row : lifecycle_withheld) {
+        Node *owner = row.value.entity->get_owner();
+        if (owner != nullptr && !owner->is_queued_for_deletion()) {
+            owner->queue_free();
+        }
+    }
+    lifecycle_withheld.clear();
     entity_departures.clear();
     entity_generation += 1;
     liveness_core->clear();
@@ -1528,6 +1535,7 @@ void NetwMultiplayer::entity_capture_exit(Object *p_wrapper) {
     row.owner_id = gd::instance_id(entity->get_owner());
     row.generation = entity_generation;
     row.route = liveness_route_of(p_wrapper);
+    row.withheld = row.withheld || lifecycle_withheld.has(row.route);
     row.terminal
         = row.terminal || !entity::stage_can_begin_despawn(entity->get_stage());
     row.hidden = row.hidden
@@ -1629,7 +1637,7 @@ void NetwMultiplayer::entity_settle_departure(int64_t p_instance) {
     const Ref<NetwMultiplayer> keep(this);
     const uint64_t instance = uint64_t(p_instance);
     EntityDeparture *standing = entity_departures.getptr(instance);
-    if (standing == nullptr) {
+    if (standing == nullptr || lifecycle_withheld.has(standing->route)) {
         return;
     }
     const EntityDeparture row = *standing;
@@ -1646,9 +1654,14 @@ void NetwMultiplayer::entity_settle_departure(int64_t p_instance) {
             outcome == entity::Outcome::MOVE
         );
     }
+    const Node *owner = Object::cast_to<Node>(gd::object_of(row.owner_id));
+    const bool returned = row.withheld && owner != nullptr
+        && gd::instance_id(owner->get_parent()) == row.parent_id;
     switch (outcome) {
         case entity::Outcome::MOVE:
-            entity_commit_move(row);
+            if (!returned) {
+                entity_commit_move(row);
+            }
             break;
         case entity::Outcome::DEATH:
             entity_commit_death(row);
@@ -2087,23 +2100,17 @@ Ref<NetwEntity> NetwMultiplayer::spawn_arm_identity(
         const StringName claimed = represented.is_valid()
             ? represented->get_username()
             : StringName();
-        if (claimed != StringName()) {
-            entity->set_name(claimed);
-            if (!p_node->is_inside_tree()) {
-                p_node->set_name(String(claimed));
-            }
-        } else {
-            entity->set_name(
-                spawn::Book::default_entity_id(p_record, p_node, route)
-            );
-            const String seated = String(p_node->get_name());
-            if (!p_node->is_inside_tree()
-                && (seated.is_empty()
-                    || seated != seated.validate_node_name())) {
-                const String identity
-                    = String(entity->get_name()).validate_node_name();
-                p_node->set_name(identity);
-            }
+        entity->set_name(
+            claimed != StringName()
+                ? claimed
+                : spawn::Book::default_entity_id(p_record, p_node, route)
+        );
+        const String seated = String(p_node->get_name());
+        if (!p_node->is_inside_tree()
+            && (seated.is_empty() || seated != seated.validate_node_name())) {
+            const String identity
+                = String(entity->get_name()).validate_node_name();
+            p_node->set_name(identity);
         }
     }
     if (!is_host()) {
@@ -2731,8 +2738,13 @@ bool NetwMultiplayer::spawn_despawn_route(
         if (p_connected.is_empty()) {
             continue;
         }
+        const Ref<NetwEntity> dying = wrapper_for_route(doomed);
+        String reason = dying.is_valid()
+            ? String(dying->get_record()->get_despawn_reason())
+            : String();
         wire::WriteStream stream;
-        if (!verb_head_write(stream, doomed) || !stream.align_verify()) {
+        if (!verb_head_write(stream, doomed)
+            || !wire::string_field(stream, reason) || !stream.align_verify()) {
             continue;
         }
         const PackedByteArray payload = stream.to_bytes();
@@ -2844,7 +2856,10 @@ void NetwMultiplayer::spawn_receive_failed_frame(
     }
 }
 
-bool NetwMultiplayer::spawn_failed_for(int64_t p_route, int64_t p_peer) {
+bool NetwMultiplayer::spawn_failed_for(
+    int64_t p_route,
+    int64_t p_peer
+) const {
     spawn::Pipeline *spawns = spawn_plane();
     const spawn::Record *record = spawns != nullptr && p_route > 0
         ? spawns->get_spawn_book()->spawned_of(p_route)

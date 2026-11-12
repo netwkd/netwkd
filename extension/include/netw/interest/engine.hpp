@@ -80,6 +80,8 @@ public:
     godot::Array hides;
     godot::Array layer_shows;
     godot::Array layer_hides;
+    godot::Array layer_enters;
+    godot::Array layer_exits;
     godot::PackedInt64Array removed_keys;
     Stats stats;
 
@@ -118,6 +120,12 @@ public:
     }
     godot::Array get_layer_hides() const {
         return layer_hides;
+    }
+    godot::Array get_layer_enters() const {
+        return layer_enters;
+    }
+    godot::Array get_layer_exits() const {
+        return layer_exits;
     }
     godot::PackedInt64Array get_removed_keys() const {
         return removed_keys;

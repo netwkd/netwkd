@@ -154,15 +154,21 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.name,
                     v.owner
                 ),
-                v.detail.is_empty()
+                !v.detail.is_empty() ? vformat("Call it from %s.", v.detail)
+                    : v.a != 0
                     ? vformat(
+                          "Mark '%s' with @rpc(\"any_peer\") if peer %d "
+                          "should call it.",
+                          v.name,
+                          v.peer
+                      )
+                    : vformat(
                           "Call {NetwMemberConfig.any_peer} or "
                           "{NetwMemberConfig.controller} on '%s' if peer %d "
                           "should call it.",
                           v.name,
                           v.peer
                       )
-                    : vformat("Call it from %s.", v.detail)
             };
         case NETW_FAULT_SPAWN_NOT_PLACED:
             return {

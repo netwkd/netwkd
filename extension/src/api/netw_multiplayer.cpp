@@ -756,6 +756,11 @@ bool NetwMultiplayer::player_kept_despawns(uint64_t p_id) const {
     return kept != nullptr && kept->despawns;
 }
 
+bool NetwMultiplayer::player_kept_controlled(uint64_t p_id) const {
+    const KeptEntity *kept = kept_entities.getptr(p_id);
+    return kept != nullptr && kept->controlled;
+}
+
 void NetwMultiplayer::player_tell_kept(int64_t p_peer) {
     if (!is_host()) {
         return;
@@ -1917,6 +1922,9 @@ void NetwMultiplayer::session_settle_peer_loss(int64_t p_peer) {
 
     interest_peer_disconnected(p_peer);
     entity_settle_peer_departure(p_peer);
+    if (spawn::Pipeline *spawns = spawn_plane()) {
+        spawns->get_spawn_book()->forget_peer(p_peer);
+    }
     halt_forget_peer(p_peer);
 
     event_record(EventPlane::PEER_LEFT, RID(), 0, p_peer);
@@ -3998,7 +4006,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
     if (plane != nullptr) {
         plane->on_poll();
     }
-    sink_verdict(display_pump(frame_delta), 0);
+    sink_verdict(display_pump(display_delta()), 0);
     --step_depth;
     announce_flush();
     NETW_HINTS(diag_poll());
@@ -5247,6 +5255,19 @@ double NetwMultiplayer::poll_delta(int64_t p_now_usec) {
     }
     last_poll_usec = p_now_usec;
     return previous <= 0 ? 0.0 : double(p_now_usec - previous) / 1000000.0;
+}
+
+double NetwMultiplayer::display_delta() {
+    const int64_t frame
+        = int64_t(Engine::get_singleton()->get_process_frames());
+    const int64_t previous = last_display_frame;
+    if (previous == frame) {
+        return 0.0;
+    }
+    last_display_frame = frame;
+    const Node *root = gd::scene_root();
+    return previous < 0 || root == nullptr ? 0.0
+                                           : root->get_process_delta_time();
 }
 
 int64_t NetwMultiplayer::get_frame_counter() const {

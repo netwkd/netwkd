@@ -46,6 +46,14 @@ Ref<NetwPromise> unknown_binding() {
     );
 }
 
+Ref<NetwPromise> not_the_server() {
+    return NetwPromise::rejected(
+        ERR_UNAUTHORIZED,
+        "only the server loads and saves a record, and its values reach this "
+        "peer by replication"
+    );
+}
+
 Ref<NetwPromise> unbound_entity() {
     return NetwPromise::rejected(
         ERR_UNCONFIGURED,
@@ -583,6 +591,9 @@ StringName NetwMultiplayer::persist_get_record_id_binding(
 }
 
 Ref<NetwPromise> NetwMultiplayer::persist_load(const RID &p_entity) {
+    if (!is_host()) {
+        return not_the_server();
+    }
     const RID binding = persist_binding_of_entity(p_entity);
     if (!binding.is_valid()) {
         return unbound_entity();
@@ -591,6 +602,9 @@ Ref<NetwPromise> NetwMultiplayer::persist_load(const RID &p_entity) {
 }
 
 Ref<NetwPromise> NetwMultiplayer::persist_save(const RID &p_entity) {
+    if (!is_host()) {
+        return not_the_server();
+    }
     const RID binding = persist_binding_of_entity(p_entity);
     if (!binding.is_valid()) {
         return unbound_entity();

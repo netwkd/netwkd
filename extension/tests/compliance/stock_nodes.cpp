@@ -133,14 +133,17 @@ World slipway() {
     return World("worlds/slipway.tscn", 2)
         .watch("Red", "label")
         .watch("Blue", "label")
+        .watch("Gold", "label")
+        .watch("Green", "label")
         .hear("Spawner", "spawned")
         .hear("Spawner", "despawned")
-        .at(1, call("Level", "moor"))
-        .at(3, call("Level", "launch", Array::make("red")))
+        .at(1, call("Level", "launch", Array::make("red")))
         .at(3, call("Level", "launch", Array::make("blue")))
+        .at(4, call("Level", "moor"))
         .at(6,
             on(FIRST,
                call("Level", "seize_and_launch", Array::make("green"))))
+        .at(8, call("Level", "launch", Array::make("gold")))
         .at(10, call("Level", "sink", Array::make("Blue")));
 }
 
@@ -157,9 +160,11 @@ TEST_CASE(
         NETW_HOLDS(reads(seen, peer, "Red", "parent", "Level/Dock"));
         NETW_HOLDS(reads(seen, peer, "Blue", "label", "blue", 9));
         NETW_HOLDS(absent(seen, peer, "Blue", 11));
+        NETW_HOLDS(reads(seen, peer, "Gold", "label", "gold"));
+        NETW_HOLDS(absent(seen, peer, "Green", 8));
     }
     for (const int client : {FIRST, SECOND}) {
-        NETW_HOLDS(hears(seen, client, "Spawner", "spawned", 3));
+        NETW_HOLDS(hears(seen, client, "Spawner", "spawned", 4));
         NETW_HOLDS(hears(seen, client, "Spawner", "despawned", ONCE));
     }
     NETW_HOLDS(absent(seen, SERVER, "Green", 1));
@@ -227,6 +232,7 @@ TEST_CASE(
     for (const String &fault : seen.faults) {
         CHECK(fault.contains("'order'"));
         CHECK(fault.contains("[NW0021]"));
+        CHECK(fault.contains("@rpc(\"any_peer\")"));
     }
     NETW_HOLDS(golden(seen, "G9"));
 }

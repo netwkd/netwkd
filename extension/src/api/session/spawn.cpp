@@ -264,6 +264,7 @@ void NetwMultiplayer::spawner_node_added(Node *p_node) {
 void NetwMultiplayer::spawner_wrap_when_ready(Node *p_spawner) {
     if (spawn::SpawnerCompat *adapter = spawner_adapter()) {
         adapter->wrap_spawner(p_spawner);
+        adapter->wrap_enrolled();
     }
 }
 

@@ -33,16 +33,17 @@ func open() -> void:
 		add_child(Netw.spawn(make_scene, "Hall", level))
 	$Arena.add_child(Netw.spawn(make_scene, "Crate", "Prize"))
 	$Lobby.add_child(Netw.spawn(make_scene, "Crate", "Bench"))
+	$Lobby.add_child(Netw.spawn(make_scene, "Hall", "Den"))
+	$Lobby/Den.add_child(Netw.spawn(make_scene, "Crate", "Rug"))
 
 
 func seat(username: String, called: String, level: String) -> void:
 	var pawn := Netw.spawn_player(named(username), make_scene, "Crate", called)
-	pawn.name = called
 	find_child(level, false, false).add_child(pawn)
 
 
 func admit(username: String, level: String) -> void:
-	Netw.scene(find_child(level, false, false)).watch(named(username))
+	Netw.scene(find_child(level, true, false)).watch(named(username))
 
 
 func named(username: String) -> NetwPlayer:
@@ -75,20 +76,24 @@ World halls() {
         .at(OPEN, call("Level", "open"))
         .at(OPEN, call("Level", "seat", Array::make("ana", "Ana", "Arena")))
         .at(OPEN, call("Level", "admit", Array::make("bo", "Lobby")))
+        .at(OPEN, call("Level", "admit", Array::make("bo", "Den")))
         .at(MOVE, reparent("Ana", "Lobby"));
 }
 
 TEST_CASE(
     "[Networked][Compliance] I1 a level's content reaches only the players "
-    "in it or watching it"
+    "in it or watching it, and a session ending over nested levels frees them"
 ) {
     const Seen seen = halls().run(MOVE + 4);
-    for (const char *held : {"Arena", "Prize", "Lobby", "Bench", "Ana"}) {
+    for (const char *held :
+         {"Arena", "Prize", "Lobby", "Bench", "Den", "Rug", "Ana"}) {
         NETW_HOLDS(absent(seen, OUTSIDER, held, 1));
     }
     NETW_HOLDS(reads(seen, PLAYER, "Prize", "parent", "Level/Arena", MOVE - 1));
     NETW_HOLDS(missing(seen, PLAYER, "Bench", 1, MOVE - 1));
     NETW_HOLDS(reads(seen, WATCHER, "Bench", "parent", "Level/Lobby"));
+    NETW_HOLDS(reads(seen, WATCHER, "Rug", "parent", "Level/Lobby/Den"));
+    NETW_HOLDS(missing(seen, PLAYER, "Rug", 1, MOVE - 1));
     NETW_HOLDS(absent(seen, WATCHER, "Arena", 1));
     NETW_HOLDS(absent(seen, WATCHER, "Prize", 1));
     NETW_HOLDS(missing(seen, WATCHER, "Ana", 1, MOVE - 1));
@@ -98,6 +103,9 @@ TEST_CASE(
     NETW_HOLDS(absent(seen, PLAYER, "Prize", MOVE + 2));
     NETW_HOLDS(reads(seen, PLAYER, "Bench", "parent", "Level/Lobby"));
     NETW_HOLDS(quiet(seen));
+    const Seen closed
+        = World(HALLS, 1).at(OPEN, call("Level", "open")).run(MOVE);
+    NETW_HOLDS(quiet(closed));
 }
 
 constexpr const char *BUOYS = R"(

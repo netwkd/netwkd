@@ -331,6 +331,14 @@ bool Record::has_failed(int peer) const {
     return failed_peers.find(int32_t(peer)) >= 0;
 }
 
+void Record::forget_peer(int peer) {
+    remove_recipient(peer);
+    const int64_t failed = failed_peers.find(int32_t(peer));
+    if (failed >= 0) {
+        failed_peers.remove_at(uint32_t(failed));
+    }
+}
+
 PackedInt32Array Record::recipients() const {
     PackedInt32Array out;
     out.resize(int64_t(recipient_peers.size()));

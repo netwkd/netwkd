@@ -53,6 +53,7 @@ private:
     };
     godot::LocalVector<MintedPart> parts;
     godot::Ref<NetwDespawnOpts> despawning_opts;
+    godot::StringName despawn_reason;
     interest::Facet *interest_facet = nullptr;
     NetwCompTable comp_table;
     godot::LocalVector<godot::ObjectID> comp_registered;
@@ -194,6 +195,14 @@ public:
 
     godot::Ref<NetwDespawnOpts> get_active_despawn_opts() const {
         return despawning_opts;
+    }
+
+    const godot::StringName &get_despawn_reason() const {
+        return despawn_reason;
+    }
+
+    void set_despawn_reason(const godot::StringName &p_reason) {
+        despawn_reason = p_reason;
     }
 
     bool finish_teardown(godot::Object *p_wrapper);

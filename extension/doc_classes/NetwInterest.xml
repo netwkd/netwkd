@@ -59,7 +59,7 @@
 			<param index="0" name="callback" type="Callable" />
 			<param index="1" name="layer_id" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when a peer starts seeing the entity through [param layer_id]. An empty [param layer_id] means every layer joined so far.
+				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when [param layer_id] shows the entity to a peer, once that peer also sees the [NetwEntity] above it. An empty [param layer_id] means every layer joined so far.
 			</description>
 		</method>
 		<method name="on_leave">
@@ -67,7 +67,7 @@
 			<param index="0" name="callback" type="Callable" />
 			<param index="1" name="layer_id" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when a peer stops seeing the entity through [param layer_id]. An empty [param layer_id] means every layer joined so far.
+				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when [param layer_id] stops showing the entity to a peer, also when that peer stops seeing the [NetwEntity] above it. An empty [param layer_id] means every layer joined so far.
 			</description>
 		</method>
 		<method name="on_leave_policy">
@@ -93,13 +93,13 @@
 		<signal name="interest_entered">
 			<param index="0" name="peer_id" type="int" />
 			<description>
-				Emitted on the server when [param peer_id] starts seeing this entity.
+				Emitted on the server when [param peer_id] starts seeing this entity. It is emitted once however many layers show the entity, and only once [param peer_id] also sees the [NetwEntity] above it.
 			</description>
 		</signal>
 		<signal name="interest_exited">
 			<param index="0" name="peer_id" type="int" />
 			<description>
-				Emitted on the server when [param peer_id] stops seeing this entity.
+				Emitted on the server when [param peer_id] stops seeing this entity, also when it stops seeing the [NetwEntity] above it.
 			</description>
 		</signal>
 		<signal name="observer_entered">

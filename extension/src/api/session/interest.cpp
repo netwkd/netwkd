@@ -566,7 +566,6 @@ void NetwMultiplayer::interest_layer_transition(
     int64_t p_peer_id,
     bool p_visible
 ) {
-    p_layer->apply_server_transition(p_entity, p_peer_id, p_visible);
     const int64_t slot = p_entity->get_rid_handle().get_id();
     const StringName layer_id = p_layer->get_layer_id();
     if (p_visible) {
@@ -581,10 +580,12 @@ void NetwMultiplayer::interest_layer_transition(
 
 void NetwMultiplayer::interest_apply_delta(const interest::Delta &p_delta) {
     NETW_ZONE_NC("NetwMultiplayer interest apply delta", colors::INTEREST);
-    for (int pass = 0; pass < 2; ++pass) {
-        const bool visible = pass == 1;
-        const Array rows
-            = visible ? p_delta.get_layer_shows() : p_delta.get_layer_hides();
+    for (int pass = 0; pass < 4; ++pass) {
+        const bool visible = pass % 2 == 1;
+        const bool held = pass >= 2;
+        const Array rows = held
+            ? (visible ? p_delta.get_layer_enters() : p_delta.get_layer_exits())
+            : (visible ? p_delta.get_layer_shows() : p_delta.get_layer_hides());
         for (int at = 0; at < rows.size(); ++at) {
             const Array row = rows[at];
             const StringName layer_id = row[0];
@@ -597,18 +598,35 @@ void NetwMultiplayer::interest_apply_delta(const interest::Delta &p_delta) {
             if (layer.is_null() || entity.is_null() || peer_id == 0) {
                 continue;
             }
+            if (held) {
+                layer->apply_server_transition(entity, peer_id, visible);
+                continue;
+            }
             interest_layer_transition(layer, entity, peer_id, visible);
         }
     }
-    const Array shows = p_delta.get_shows();
-    for (int at = 0; at < shows.size(); ++at) {
-        const Array row = shows[at];
-        const int64_t slot = int64_t(row[0]);
-        if (wrapper_for_id(slot).is_valid()) {
-            interest_leave_engine.release(
-                slot,
-                interest_engine.peer_of_bit(int(row[1]))
+    for (int pass = 0; pass < 2; ++pass) {
+        const bool visible = pass == 1;
+        const Array rows = visible ? p_delta.get_shows() : p_delta.get_hides();
+        const StringName edge = visible ? StringName("interest_entered")
+                                        : StringName("interest_exited");
+        for (int at = 0; at < rows.size(); ++at) {
+            const Array row = rows[at];
+            const int64_t slot = int64_t(row[0]);
+            const Ref<NetwEntity> entity = Ref<NetwEntity>(
+                Object::cast_to<NetwEntity>(wrapper_for_id(slot).ptr())
             );
+            if (entity.is_null()) {
+                continue;
+            }
+            const int64_t peer_id = interest_engine.peer_of_bit(int(row[1]));
+            if (visible) {
+                interest_leave_engine.release(slot, peer_id);
+            }
+            const Ref<NetwInterest> facet = entity->held_interest();
+            if (facet.is_valid() && peer_id != 0) {
+                facet->emit_signal(edge, peer_id);
+            }
         }
     }
 }

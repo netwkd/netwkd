@@ -73,9 +73,7 @@ TEST_CASE(
         NETW_HOLDS(reads(seen, SERVER, "Kart", "controller", "client 1"));
         NETW_HOLDS(reads(seen, SERVER, "Cart", "controller", "the server"));
         NETW_HOLDS(reads(seen, SERVER, "Crate", "authority", "the server"));
-        if (exit.mode == netw::NetwSession::TRANSFER_CONTINUE) {
-            NETW_HOLDS(reads(seen, SERVER, "Kart", "position", driven));
-        }
+        NETW_HOLDS(reads(seen, SERVER, "Kart", "position", driven));
         NETW_HOLDS(hears(seen, SERVER, "Session", "server_transferred", ONCE));
         for (const int client : {WATCHER, DRIVER, HEIR}) {
             NETW_HOLDS(agrees(seen, client, MOVE - 1));

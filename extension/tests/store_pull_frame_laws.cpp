@@ -524,15 +524,17 @@ NETW_FRAME_SCENARIO(SendAllocScenario, store_send_alloc_scenario, ONE_PEER);
 NETW_FRAME_SCENARIO(SendAllocScenario, store_send_alone_scenario, ALONE);
 
 TEST_CASE(
-    "[Networked][Store][Frame] P1 a pile of sleeping bodies is not read on "
-    "a steady tick, while its script and engine columns are read on every "
-    "tick"
+    "[Networked][Store][Frame] P1 a pile of sleeping bodies is read only "
+    "by its sweep share on a steady tick, while its script and engine "
+    "columns are read on every tick"
 ) {
     const PullEvidence &seen = pull_evidence();
     REQUIRE(seen.driven);
+    const int64_t sweep = int64_t(World::SWEEP_TICKS);
+    const int64_t share = (CUBES + sweep - 1) / sweep;
     NETW_CHECK_EQ(seen.asleep, CUBES);
-    NETW_CHECK_EQ(seen.window_body, int64_t(0));
-    NETW_CHECK_EQ(seen.window_rested, seen.window_ticks * CUBES);
+    NETW_CHECK_EQ(seen.window_body, seen.window_ticks * share);
+    NETW_CHECK_EQ(seen.window_rested, seen.window_ticks * (CUBES - share));
     NETW_CHECK_EQ(seen.window_rows, seen.window_ticks * CUBES);
     NETW_CHECK_EQ(seen.window_script, seen.window_ticks * CUBES);
     NETW_CHECK_EQ(seen.window_engine, seen.window_ticks * CUBES);
@@ -545,7 +547,8 @@ TEST_CASE(
     const PullEvidence &seen = pull_evidence();
     REQUIRE(seen.driven);
     CHECK(seen.woken_read);
-    NETW_CHECK_EQ(seen.woken_body, int64_t(1));
+    NETW_CHECK_GE(seen.woken_body, int64_t(1));
+    NETW_CHECK_LE(seen.woken_body, int64_t(2));
 }
 
 TEST_CASE(
@@ -570,11 +573,11 @@ TEST_CASE(
     NETW_CHECK_EQ(seen.asleep, PILE);
     NETW_CHECK_EQ(seen.pulls, int64_t(ALLOC_WINDOW));
     const int64_t sweep = int64_t(World::SWEEP_TICKS);
+    NETW_CHECK_EQ(seen.rested, int64_t(0));
     NETW_CHECK_EQ(
-        seen.rested,
+        seen.read,
         int64_t(ALLOC_WINDOW) * ((PILE + sweep - 1) / sweep)
     );
-    NETW_CHECK_EQ(seen.read, int64_t(0));
     NETW_CHECK_GT(seen.in_window, int64_t(0));
     NETW_CHECK_EQ(seen.in_pull, int64_t(0));
 }

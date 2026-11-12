@@ -34,6 +34,38 @@ bool declares(
     return false;
 }
 
+int column_type_at(const predict::FieldCodec &p_codec, int p_at) {
+    const table::SchemaColumn *column = p_codec.schema.at(p_at);
+    return column != nullptr ? column->type : -1;
+}
+
+bool compiles_to(
+    const predict::FieldCodec &p_source,
+    const LocalVector<StringName> &p_declared,
+    const predict::FieldCodec &p_compiled
+) {
+    int matched = 0;
+    for (int at = 0; at < p_source.count(); ++at) {
+        const StringName &key = p_source.keys[uint32_t(at)];
+        if (!declares(p_declared, key)) {
+            continue;
+        }
+        if (matched >= p_compiled.count()) {
+            return false;
+        }
+        const uint32_t mine = uint32_t(matched);
+        if (p_compiled.keys[mine] != key
+            || p_compiled.quantizers[mine] != p_source.quantizers[uint32_t(at)]
+            || p_compiled.types[mine] != p_source.types[uint32_t(at)]
+            || column_type_at(p_compiled, matched)
+                != column_type_at(p_source, at)) {
+            return false;
+        }
+        matched += 1;
+    }
+    return matched == p_compiled.count();
+}
+
 } // namespace
 
 void LagBook::set_window(int64_t p_samples) {
@@ -51,18 +83,20 @@ void LagBook::compile(
     const predict::FieldCodec &p_source,
     const LocalVector<StringName> &p_declared
 ) {
+    if (compiled && compiles_to(p_source, p_declared, codec)) {
+        return;
+    }
     codec.clear();
     for (int at = 0; at < p_source.count(); ++at) {
         const StringName &key = p_source.keys[uint32_t(at)];
         if (!declares(p_declared, key)) {
             continue;
         }
-        const table::SchemaColumn *column = p_source.schema.at(at);
         codec.append(
             key,
             p_source.quantizers[uint32_t(at)],
             p_source.types[uint32_t(at)],
-            column != nullptr ? column->type : -1
+            column_type_at(p_source, at)
         );
     }
     codec.seal();

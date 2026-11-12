@@ -276,7 +276,7 @@ constexpr int BO = 2;
 
 World moments() {
     World world = World(MOMENTS, 1).at(1, join("ana")).at(2, join("bo"));
-    for (const char *name : {"Plain", "ana", "bo", "Hasty"}) {
+    for (const char *name : {"Plain", "Held", "Steered", "Hasty"}) {
         world.watch(name, "steady").watch(name, "readied");
     }
     return world.at(4, call("Level", "spawn_all"));
@@ -290,14 +290,14 @@ TEST_CASE(
 ) {
     const Seen &seen = moments_frames.seen();
     for (const int peer : {SERVER, 0, ANA, BO}) {
-        for (const char *name : {"Plain", "ana", "bo", "Hasty"}) {
+        for (const char *name : {"Plain", "Held", "Steered", "Hasty"}) {
             NETW_HOLDS(reads(seen, peer, name, "steady", true));
             NETW_HOLDS(reads(seen, peer, name, "readied", 41));
         }
         NETW_HOLDS(reads(seen, peer, "Plain", "controller", "the server"));
-        NETW_HOLDS(reads(seen, peer, "ana", "controller", who(ANA).c_str()));
-        NETW_HOLDS(reads(seen, peer, "ana", "authority", "the server"));
-        NETW_HOLDS(reads(seen, peer, "bo", "authority", who(BO).c_str()));
+        NETW_HOLDS(reads(seen, peer, "Held", "controller", who(ANA).c_str()));
+        NETW_HOLDS(reads(seen, peer, "Held", "authority", "the server"));
+        NETW_HOLDS(reads(seen, peer, "Steered", "authority", who(BO).c_str()));
         NETW_HOLDS(reads(seen, peer, "Hasty", "authority", "the server"));
     }
     NETW_HOLDS(quiet(seen));

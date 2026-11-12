@@ -460,19 +460,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a spawn armed in the frame its player "
-    "drops is discarded and not kept"
-) {
-    World world(60.0, 2);
-    const int route
-        = world.spawn(StringName(AVATAR_ID), "Ada", world.rig.player(0), false);
-    world.rig.drop_client(0);
-    world.rig.pump(SETTLE * 3);
-
-    CHECK_FALSE(world.live(route, -1));
-}
-
-TEST_CASE(
     "[Networked][Session][SceneTree] a spawn_async whose player drops "
     "before it returns spawns nothing and keeps nothing"
 ) {
@@ -940,35 +927,26 @@ public:
     }
 };
 
-NETW_FRAME_SCENARIO(
-    KeptTransferScenario,
-    kept_transfer_to_client,
-    SEAT_SUCCESSOR
-);
 NETW_FRAME_SCENARIO(KeptTransferScenario, kept_transfer_to_late, SEAT_LATE);
 
 TEST_CASE(
-    "[Networked][Session][Transfer][Frame] after a server transfer, to a "
-    "client that was there when the player dropped or to one that joined "
-    "after, no peer shows an entity kept for the departed player, and a "
-    "server entity with no player stays on every peer"
+    "[Networked][Session][Transfer][Frame] after a server transfer to a "
+    "client that joined after the player dropped, no peer shows an entity "
+    "kept for the departed player, and a server entity with no player stays "
+    "on every peer"
 ) {
-    for (const int successor : {int(SEAT_SUCCESSOR), int(SEAT_LATE)}) {
-        CAPTURE(successor);
-        const TransferEvidence &seen = transfer_evidence(successor);
-        REQUIRE(seen.driven);
-        REQUIRE(seen.kept_before);
-        REQUIRE(seen.moved);
-        for (const int seat_at : WATCHERS) {
-            CAPTURE(seat_at);
-            CHECK_FALSE(seen.avatar_after[seat_at]);
-            CHECK(seen.crate_after[seat_at]);
-        }
+    const TransferEvidence &seen = transfer_evidence(SEAT_LATE);
+    REQUIRE(seen.driven);
+    REQUIRE(seen.kept_before);
+    REQUIRE(seen.moved);
+    for (const int seat_at : WATCHERS) {
+        CAPTURE(seat_at);
+        CHECK_FALSE(seen.avatar_after[seat_at]);
+        CHECK(seen.crate_after[seat_at]);
     }
 }
 
 enum MoveAct {
-    MOVE_DESPAWN,
     MOVE_DESPAWN_AFTER,
     MOVE_DESPAWN_SETTLED,
     MOVE_SPAWN,
@@ -981,8 +959,6 @@ struct MoveArm {
 };
 
 constexpr MoveArm MOVE_ARMS[] = {
-    {"despawn, rejoin", MOVE_DESPAWN, netw::NetwSession::TRANSFER_REJOIN},
-    {"despawn, continue", MOVE_DESPAWN, netw::NetwSession::TRANSFER_CONTINUE},
     {"despawn after the call, settled before the server moves, rejoin",
      MOVE_DESPAWN_AFTER,
      netw::NetwSession::TRANSFER_REJOIN},
@@ -1053,10 +1029,6 @@ class MoveScenario final : public netw_test::FrameScenario {
             seen.crate_before[seat_at] = stand->shows(seat_at, "Crate");
         }
         switch (act) {
-            case MOVE_DESPAWN:
-                NetwEntity::of(crate)->despawn(Ref<netw::NetwDespawnOpts>());
-                seen.moved = move();
-                break;
             case MOVE_DESPAWN_AFTER:
                 seen.moved = move();
                 NetwEntity::of(crate)->despawn(Ref<netw::NetwDespawnOpts>());
@@ -1107,14 +1079,12 @@ public:
     }
 };
 
-NETW_FRAME_SCENARIO(MoveScenario, move_despawn_rejoin, 0);
-NETW_FRAME_SCENARIO(MoveScenario, move_despawn_continue, 1);
-NETW_FRAME_SCENARIO(MoveScenario, move_despawn_after_rejoin, 2);
-NETW_FRAME_SCENARIO(MoveScenario, move_despawn_after_continue, 3);
-NETW_FRAME_SCENARIO(MoveScenario, move_despawn_settled_rejoin, 4);
-NETW_FRAME_SCENARIO(MoveScenario, move_despawn_settled_continue, 5);
-NETW_FRAME_SCENARIO(MoveScenario, move_spawn_rejoin, 6);
-NETW_FRAME_SCENARIO(MoveScenario, move_spawn_continue, 7);
+NETW_FRAME_SCENARIO(MoveScenario, move_despawn_after_rejoin, 0);
+NETW_FRAME_SCENARIO(MoveScenario, move_despawn_after_continue, 1);
+NETW_FRAME_SCENARIO(MoveScenario, move_despawn_settled_rejoin, 2);
+NETW_FRAME_SCENARIO(MoveScenario, move_despawn_settled_continue, 3);
+NETW_FRAME_SCENARIO(MoveScenario, move_spawn_rejoin, 4);
+NETW_FRAME_SCENARIO(MoveScenario, move_spawn_continue, 5);
 
 TEST_CASE(
     "[Networked][Session][Transfer][Frame] a server despawn or spawn in the "

@@ -36,7 +36,7 @@
 			Seconds a lingering entity can still be rewound before it is freed. Ignored unless [member linger] is [code]true[/code].
 		</member>
 		<member name="reason" type="StringName" setter="set_reason" getter="get_reason" default="&amp;&quot;&quot;">
-			Passed to [signal NetwEntity.despawning] so a game can react to the cause, such as [code]&amp;"peer_disconnected"[/code], [code]&amp;"killed"[/code] or [code]&amp;"timeout"[/code].
+			Passed to [signal NetwEntity.despawning] so a game can react to the cause, such as [code]&amp;"peer_disconnected"[/code], [code]&amp;"killed"[/code] or [code]&amp;"timeout"[/code]. Every peer hears the reason the server passed.
 		</member>
 	</members>
 </class>

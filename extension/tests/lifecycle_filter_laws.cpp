@@ -199,8 +199,7 @@ public:
 
     void author_despawns() {
         NetwMultiplayer *author = rig.client(0);
-        Node *freed = rig.route_node(crate, 0);
-        REQUIRE(freed != nullptr);
+        REQUIRE(rig.route_node(crate, 0) != nullptr);
         NETW_REQUIRE_EQ(
             author->entity_despawn(
                 author->entity_from_route(crate),
@@ -208,7 +207,6 @@ public:
             ),
             OK
         );
-        freed->get_parent()->remove_child(freed);
     }
 
     bool heard_once(

@@ -191,7 +191,7 @@ bool NetwMultiplayer::sim_push(
         return false;
     }
     PropertyBinding *binding = binding_book.live(table.owners[p_at.row]);
-    if (sim::asleep(row->bodies) && store_rests(p_at, p_age, node, binding)) {
+    if (store_rests(p_at, p_age, node, binding)) {
         row->installs.stats.skipped += 1;
         return false;
     }
@@ -445,16 +445,26 @@ void NetwMultiplayer::store_retain(PropertyBinding *p_binding) {
     }
 }
 
-void NetwMultiplayer::store_reinstall(PropertyBinding *p_binding) {
+void NetwMultiplayer::store_reinstall(
+    PropertyBinding *p_binding,
+    int64_t p_display
+) {
     if (p_binding == nullptr || !p_binding->write_gate) {
         return;
     }
     const uint64_t owner = p_binding->id;
     for (uint32_t lane = 0; lane < 2; ++lane) {
         const store::RowAddress at = store_world.row_of(owner, lane);
-        if (at.valid() && store_world.table(at.table).holds_values(at.row)) {
-            store_push(at, -1, EVERY_COLUMN, nullptr);
+        if (!at.valid()) {
+            continue;
         }
+        const store::Table &table = store_world.table(at.table);
+        if (!table.holds_values(at.row)) {
+            continue;
+        }
+        const int age
+            = p_display >= 0 ? table.history_at(at.row, p_display) : -1;
+        store_push(at, age, EVERY_COLUMN, nullptr);
     }
 }
 
