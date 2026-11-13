@@ -25,19 +25,7 @@ public:
         ISOLATION_OWN_WORLD = 1,
     };
 
-    enum Event {
-        EVENT_PLAYER = 0,
-        EVENT_PLAYER_ENTITY = 1,
-        EVENT_ENTITY = 2,
-    };
-
 private:
-    struct Row {
-        int32_t event = 0;
-        godot::RID scene;
-        godot::LocalVector<godot::Callable> callbacks;
-    };
-
     struct LiveRow {
         godot::RID scene;
         godot::StringName stem;
@@ -45,37 +33,12 @@ private:
         godot::LocalVector<int64_t> parked;
     };
 
-    godot::LocalVector<Row> rows;
     godot::LocalVector<LiveRow> live;
     godot::HashMap<godot::StringName, godot::RID> named;
 
-    Row *row_for(int event, const godot::RID &scene);
     void promote_survivors();
 
 public:
-    void observe(
-        const godot::RID &scene,
-        int event,
-        const godot::Callable &callback
-    );
-
-    void unobserve(
-        const godot::RID &scene,
-        int event,
-        const godot::Callable &callback
-    );
-
-    int dispatch(
-        const godot::RID &scene,
-        int event,
-        bool present,
-        const godot::Variant &subject
-    );
-
-    int observer_count(const godot::RID &scene, int event) const;
-
-    void forget_scene(const godot::RID &scene);
-
     void scene_enter(
         const godot::RID &scene,
         const godot::StringName &stem,
@@ -107,6 +70,5 @@ public:
 
 } // namespace netw
 
-VARIANT_ENUM_CAST(netw::NetwSceneCore::Event);
 VARIANT_ENUM_CAST(netw::NetwSceneCore::Isolation);
 VARIANT_ENUM_CAST(netw::NetwSceneCore::Move);

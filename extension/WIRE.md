@@ -141,7 +141,6 @@ id   name                    kind    rel fresh del agg direction  payload
 31   SESSION_SHUTDOWN        session R   -     fit -   srv -> cli planned
 32   SESSION_SCENE_RELEASED  session R   -     fit -   srv -> cli planned
 33   SESSION_KICK_REQUEST    session R   -     fit -   cli -> srv planned
-34   SESSION_LEAVE_REQUEST   session R   -     fit -   cli -> srv planned
 35   PREDICT_COMMAND         routed  U   fresh fit -   own -> srv planned
 36   PREDICT_ACK             routed  U   fresh fit -   srv -> own planned
 37   PREDICT_RELAY           routed  U   fresh fit -   srv -> cli planned
@@ -191,7 +190,9 @@ OPEN fields and the RESET that names only a token of section 10, and for the
 parked lanes and binding floors of section 7, LIFECYCLE_DECISION declares 2
 for the author of the revision it names and the denial string a refusal
 carries, PREDICT_COMMAND and PREDICT_RELAY declare 1 for the repeated row bit
-and PREDICT_ACK declares 1 for the compact record of section 20, and every
+and PREDICT_ACK declares 1 for the compact record of section 20,
+INTEREST_AWARENESS declares 1 for the edge of section 15,
+SESSION_KICK_REQUEST declares 1 for the player id of section 16, and every
 other revision is 0.
 
 Ids 0, 1 and 7 were claimed by formats older than v8 and stay reserved, so an
@@ -855,20 +856,17 @@ decision moved the revision past it.
 INTEREST_AWARENESS
 [count varuint 2]
 per edge
-  [observer_scoped bool1]   0 layer, 1 observer
   [route varuint 5]
   [layer_id string]
-  [observer varuint 5]
   [entered bool1]           0 exit, 1 enter
 [align_verify]
 ```
 
-A layer edge concerns every peer watching the route and its `observer` is 0.
-An observer edge names the one peer that gained or lost awareness.
+An edge tells the peer it is sent to that it started or stopped seeing the
+route through `layer_id`.
 
-A route of 0, an empty `layer_id`, an observer edge naming peer 0 and a layer
-edge naming any peer are each refused, and the refusal takes the whole frame
-rather than the edge.
+A route of 0 and an empty `layer_id` are each refused, and the refusal takes
+the whole frame rather than the edge.
 
 ---
 
@@ -976,8 +974,7 @@ SESSION_PAUSE          [reason string]
 SESSION_UNPAUSE        (no payload)
 SESSION_KICKED         [reason string]
 SESSION_SHUTDOWN       [reason string]
-SESSION_LEAVE_REQUEST  [reason string]
-SESSION_KICK_REQUEST   [peer svarint 5][reason string]
+SESSION_KICK_REQUEST   [player varuint 5][reason string]
 SESSION_LEAVE          [returning bool1]
 SESSION_PLAYER_LEFT    [player_id varuint 5][reason int_range 0..3]
 SESSION_SPAWN_FAILED   [route varuint 5][reason string]
@@ -985,6 +982,10 @@ SESSION_SPAWN_FAILED   [route varuint 5][reason string]
 
 A reason is a string a game wrote and a player reads, bounded by the 1023 byte
 string cap.
+
+SESSION_KICK_REQUEST names its target by player id, which survives a server
+transfer. The server raises `NetwSession.kick_requested` at its next flush,
+and drops the request when the sender's player or the target has left by then.
 
 A client that leaves sends SESSION_LEAVE and waits for the server to close its
 connection, giving up after 2 seconds. `returning` is set by

@@ -25,23 +25,36 @@ bool ordinal_names_one(int value, int limit, const char *what) {
 
 } // namespace
 
-Dirt Decl::set_param(int param, const Variant &value) {
+Dirt dirt_of(int param) {
+    switch (param) {
+        case PARAM_ROLE:
+        case PARAM_LIVE_MODE:
+            return DIRT_ROLE;
+        case PARAM_VISUAL_ROOT:
+        case PARAM_LIVE_SMOOTH_TIME:
+            return DIRT_RUNTIME;
+        default:
+            return DIRT_NONE;
+    }
+}
+
+Error Decl::set_param(int param, const Variant &value) {
     switch (param) {
         case PARAM_ROLE: {
             const int ordinal = int(value);
             if (!ordinal_names_one(ordinal, ROLE_MAX, "role")) {
-                return DIRT_NONE;
+                return ERR_INVALID_PARAMETER;
             }
             display_role = ordinal;
-            return DIRT_ROLE;
+            return OK;
         }
         case PARAM_LIVE_MODE: {
             const int ordinal = int(value);
             if (!ordinal_names_one(ordinal, LIVE_MODE_MAX, "live mode")) {
-                return DIRT_NONE;
+                return ERR_INVALID_PARAMETER;
             }
             live_mode = ordinal;
-            return DIRT_ROLE;
+            return OK;
         }
         case PARAM_TIMELINE_MODE: {
             const int ordinal = int(value);
@@ -50,10 +63,10 @@ Dirt Decl::set_param(int param, const Variant &value) {
                     TIMELINE_MODE_MAX,
                     "timeline mode"
                 )) {
-                return DIRT_NONE;
+                return ERR_INVALID_PARAMETER;
             }
             timeline_mode = ordinal;
-            return DIRT_NONE;
+            return OK;
         }
         case PARAM_VISUAL_ROOT: {
             const Variant::Type type = value.get_type();
@@ -66,32 +79,32 @@ Dirt Decl::set_param(int param, const Variant &value) {
                      String("a ") + Variant::get_type_name(type),
                      String("a NodePath")}
                 );
-                return DIRT_NONE;
+                return ERR_INVALID_PARAMETER;
             }
             visual_root = value.operator NodePath();
-            return DIRT_RUNTIME;
+            return OK;
         }
         case PARAM_LIVE_SMOOTH_TIME:
             live_smooth_time = double(value);
-            return DIRT_RUNTIME;
+            return OK;
         case PARAM_CHASE_GLIDE_TIME:
             chase_glide_time = double(value);
-            return DIRT_NONE;
+            return OK;
         case PARAM_MAX_FORECAST_TICKS:
             max_forecast_ticks = int(value);
-            return DIRT_NONE;
+            return OK;
         case PARAM_SMART_DILATION:
             enable_smart_dilation = bool(value);
-            return DIRT_NONE;
+            return OK;
         case PARAM_LAG_ADAPT_RATE:
             lag_adapt_rate = double(value);
-            return DIRT_NONE;
+            return OK;
         case PARAM_FLOOR_SMOOTHING:
             floor_smoothing = double(value);
-            return DIRT_NONE;
+            return OK;
         case PARAM_TRACE_INTERVAL:
             trace_interval = int(value);
-            return DIRT_NONE;
+            return OK;
         default:
             break;
     }
@@ -102,7 +115,7 @@ Dirt Decl::set_param(int param, const Variant &value) {
          String("the setting ") + String::num_int64(param),
          String("a setting that exists")}
     );
-    return DIRT_NONE;
+    return ERR_INVALID_PARAMETER;
 }
 
 Variant Decl::get_param(int param) const {

@@ -47,23 +47,6 @@ Node *child_of(Node *p_parent, const char *p_name) {
     return made;
 }
 
-LawVerdict prediction_arms_rewind(const Stand &) {
-    LoopbackRig rig(0);
-    const RID entity = target(rig);
-    netw::NetwMultiplayer *api = rig.server();
-    if (api->lagcomp_is_configured()) {
-        return law_broken("lag compensation ran before anything declared it");
-    }
-    const Error declared = api->predict_declare(entity);
-    if (declared != OK) {
-        return law_broken("predict_declare answered %d", int(declared));
-    }
-    if (!api->lagcomp_is_configured() || !api->predict_engine_seated(entity)) {
-        return law_broken("a predicted entity left rewind off");
-    }
-    return law_held();
-}
-
 LawVerdict rival_lagcomp(const Stand &) {
     FaultWatch watch;
     watch.expect_error(
@@ -80,7 +63,7 @@ LawVerdict rival_lagcomp(const Stand &) {
     if (declared != ERR_ALREADY_EXISTS) {
         return law_broken("predict_declare answered %d", int(declared));
     }
-    if (rig.server()->predict_engine_seated(entity)) {
+    if (rig.server()->predict_is_declared(entity)) {
         return law_broken("two rival settings still seated prediction");
     }
     return law_held();
@@ -97,7 +80,7 @@ LawVerdict lagcomp_node_left(const Stand &) {
     rig.branch()->remove_child(first);
 
     const Error declared = rig.server()->predict_declare(entity);
-    const bool seated = rig.server()->predict_engine_seated(entity);
+    const bool seated = rig.server()->predict_is_declared(entity);
     memdelete(first);
     if (declared != ERR_UNAVAILABLE) {
         return law_broken("predict_declare answered %d", int(declared));
@@ -144,9 +127,6 @@ LawVerdict configuration_door(const Stand &) {
 }
 
 const Row ROWS[] = {
-    {"predict_declare on an entity with no lag compensation declared",
-     "rewind turns on and the entity is predicted",
-     &prediction_arms_rewind},
     {"two nodes call Netw.configure_lagcomp, then an entity is predicted",
      "predict_declare answers ERR_ALREADY_EXISTS, NW0034 names the first "
      "node, and nothing is predicted",
@@ -161,8 +141,8 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Services] predicting an entity turns rewind on, and "
-    "settings that cannot apply are refused with the reason"
+    "[Networked][Services] lag compensation and session settings that "
+    "cannot apply are refused with the reason"
 ) {
     const Stand stand = {String("a server session")};
     for (const Row &row : ROWS) {

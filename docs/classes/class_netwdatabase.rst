@@ -43,15 +43,15 @@ Properties
 .. table::
    :widths: auto
 
-   +----------------------------------------------------------+-------------------------------------------------------+
-   | :godot:`bool`                                            | :ref:`is_valid<class_NetwDatabase_property_is_valid>` |
-   +----------------------------------------------------------+-------------------------------------------------------+
-   | :godot:`StringName`                                      | :ref:`name<class_NetwDatabase_property_name>`         |
-   +----------------------------------------------------------+-------------------------------------------------------+
-   | :godot:`StringName`                                      | :ref:`slot<class_NetwDatabase_property_slot>`         |
-   +----------------------------------------------------------+-------------------------------------------------------+
-   | :ref:`DatabaseState<enum_NetwMultiplayer_DatabaseState>` | :ref:`state<class_NetwDatabase_property_state>`       |
-   +----------------------------------------------------------+-------------------------------------------------------+
+   +---------------------------------------+-------------------------------------------------------+
+   | :godot:`bool`                         | :ref:`is_valid<class_NetwDatabase_property_is_valid>` |
+   +---------------------------------------+-------------------------------------------------------+
+   | :godot:`StringName`                   | :ref:`name<class_NetwDatabase_property_name>`         |
+   +---------------------------------------+-------------------------------------------------------+
+   | :godot:`StringName`                   | :ref:`slot<class_NetwDatabase_property_slot>`         |
+   +---------------------------------------+-------------------------------------------------------+
+   | :ref:`State<enum_NetwDatabase_State>` | :ref:`state<class_NetwDatabase_property_state>`       |
+   +---------------------------------------+-------------------------------------------------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -102,6 +102,8 @@ Signals
 
 Emitted when an :ref:`NetwEntity<class_NetwEntity>` fails to load or save its record. ``error`` is one of the codes :ref:`NetwPersistence.load()<class_NetwPersistence_method_load>` and :ref:`NetwPersistence.save()<class_NetwPersistence_method_save>` list, and ``detail`` names the record and what went wrong.
 
+A failure while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends, after the :ref:`NetwPromise<class_NetwPromise>` from :ref:`NetwPersistence.load()<class_NetwPersistence_method_load>` or :ref:`NetwPersistence.save()<class_NetwPersistence_method_save>` has failed. :ref:`NetwSession.save_entities()<class_NetwSession_method_save_entities>` writes one batch per database, so a failed batch can be reported before its :ref:`NetwPromise<class_NetwPromise>` settles.
+
 ::
 
     func _ready() -> void:
@@ -109,6 +111,53 @@ Emitted when an :ref:`NetwEntity<class_NetwEntity>` fails to load or save its re
 
     func show_save_error(_error: Error, detail: String) -> void:
         status.text = detail
+
+.. rst-class:: classref-section-separator
+
+----
+
+.. rst-class:: classref-descriptions-group
+
+Enumerations
+------------
+
+.. _enum_NetwDatabase_State:
+
+.. rst-class:: classref-enumeration
+
+enum **State**: :ref:`🔗<enum_NetwDatabase_State>`
+
+.. _class_NetwDatabase_constant_STATE_CLOSED:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`State<enum_NetwDatabase_State>` **STATE_CLOSED** = ``0``
+
+No slot is open.
+
+.. _class_NetwDatabase_constant_STATE_OPENING:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`State<enum_NetwDatabase_State>` **STATE_OPENING** = ``1``
+
+:ref:`open()<class_NetwDatabase_method_open>` has not finished.
+
+.. _class_NetwDatabase_constant_STATE_OPEN:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`State<enum_NetwDatabase_State>` **STATE_OPEN** = ``2``
+
+A slot is open.
+
+.. _class_NetwDatabase_constant_STATE_CLOSING:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`State<enum_NetwDatabase_State>` **STATE_CLOSING** = ``3``
+
+:ref:`close()<class_NetwDatabase_method_close>` is waiting for pending operations.
 
 .. rst-class:: classref-section-separator
 
@@ -171,11 +220,11 @@ The open slot, or empty when this database is not open.
 
 .. rst-class:: classref-property
 
-:ref:`DatabaseState<enum_NetwMultiplayer_DatabaseState>` **state** :ref:`🔗<class_NetwDatabase_property_state>`
+:ref:`State<enum_NetwDatabase_State>` **state** :ref:`🔗<class_NetwDatabase_property_state>`
 
 .. rst-class:: classref-property-setget
 
-- :ref:`DatabaseState<enum_NetwMultiplayer_DatabaseState>` **get_state**\ (\ )
+- :ref:`State<enum_NetwDatabase_State>` **get_state**\ (\ )
 
 The state of the connection to the :ref:`NetwDatabaseBackend<class_NetwDatabaseBackend>`.
 

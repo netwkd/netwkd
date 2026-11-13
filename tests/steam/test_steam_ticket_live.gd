@@ -41,7 +41,7 @@ func before_test() -> void:
 	host = await EnetTestSupport.start_host(self, host_gate, WAIT_MS / 1000.0)
 	Netw.configure_admission(host_gate.admit).accept(SteamTicket.new())
 	client = EnetTestSupport.make_client_tree(self, host.port)
-	client.api.inner.auth_timeout = WAIT_MS / 1000.0
+	client.api.auth_timeout = WAIT_MS / 1000.0
 	client_gate = Gate.new()
 	client.add_child(client_gate)
 
@@ -59,10 +59,10 @@ func join() -> NetwJoinRequest:
 	client.api.multiplayer_peer = peer
 
 	var started := Time.get_ticks_msec()
-	while client.api.local_player == null \
+	while client.api.player_get_local() == 0 \
 			and Time.get_ticks_msec() - started < WAIT_MS:
 		await get_tree().process_frame
-	assert_object(client.api.local_player).is_not_null()
+	assert_object(Netw.session(client).local_player).is_not_null()
 	assert_int(host_gate.requests.size()).is_equal(asked + 1)
 	return host_gate.requests.back()
 
@@ -80,7 +80,7 @@ func test_a_ticket_proves_the_steam_account_over_enet_on_every_join(
 	assert_str(request.name_of(own)).is_equal(steam.getPersonaName())
 	assert_bool(request.is_bound(own)).is_false()
 	assert_object(request.session).is_same(Netw.session(host.tree))
-	assert_str(client.api.local_player.account).is_equal(own)
+	assert_str(Netw.session(client).local_player.account).is_equal(own)
 
 	await Netw.session(client).leave().wait()
 	var again := await join()
@@ -96,4 +96,4 @@ func test_a_ticket_claimed_for_another_steam_id_proves_nothing(
 	var request := await join()
 
 	assert_array(request.accounts).is_empty()
-	assert_str(client.api.local_player.account).is_empty()
+	assert_str(Netw.session(client).local_player.account).is_empty()

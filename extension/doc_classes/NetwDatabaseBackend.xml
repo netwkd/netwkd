@@ -10,7 +10,7 @@
 
 		@export var root := "user://saves"
 
-		func _open(session: Object, slot: StringName) -&gt; NetwPromise:
+		func _open(session: NetwSession, slot: StringName) -&gt; NetwPromise:
 		    return NetwPromise.resolved(MyConnection.new(root, slot))
 		[/codeblock]
 		A method left unimplemented rejects with [constant @GlobalScope.ERR_UNAVAILABLE]. The records themselves are read and written by the [NetwDatabaseConnection] that [method _open] returns.
@@ -20,30 +20,30 @@
 	<methods>
 		<method name="_delete_slot" qualifiers="virtual">
 			<return type="NetwPromise" />
-			<param index="0" name="session" type="Object" />
+			<param index="0" name="session" type="NetwSession" />
 			<param index="1" name="slot" type="StringName" />
 			<description>
-				Removes [param slot] and resolves an [enum @GlobalScope.Error], which [method NetwDatabase.delete_slot] gives. Resolve an error when the slot could not be fully removed. [param session] is the [NetwMultiplayer] asking.
+				Removes [param slot] and resolves an [enum @GlobalScope.Error], which [method NetwDatabase.delete_slot] gives. Resolve an error when the slot could not be fully removed. [param session] is the session asking, the same [NetwSession] that [method Netw.session] answers, or [code]null[/code] when a game calls [method delete_slot] with none.
 			</description>
 		</method>
 		<method name="_list_slots" qualifiers="virtual">
 			<return type="NetwPromise" />
-			<param index="0" name="session" type="Object" />
+			<param index="0" name="session" type="NetwSession" />
 			<description>
-				Resolves a [PackedStringArray] of every slot in storage, including ones written by earlier runs. [method NetwDatabase.list_slots] gives it. [param session] is the [NetwMultiplayer] asking.
+				Resolves a [PackedStringArray] of every slot in storage, including ones written by earlier runs. [method NetwDatabase.list_slots] gives it. [param session] is the session asking, the same [NetwSession] that [method Netw.session] answers, or [code]null[/code] when a game calls [method list_slots] with none.
 			</description>
 		</method>
 		<method name="_open" qualifiers="virtual">
 			<return type="NetwPromise" />
-			<param index="0" name="session" type="Object" />
+			<param index="0" name="session" type="NetwSession" />
 			<param index="1" name="slot" type="StringName" />
 			<description>
-				Resolves a new [NetwDatabaseConnection] for [param slot], or rejects with an error. [param session] is the [NetwMultiplayer] opening the slot.
+				Resolves a new [NetwDatabaseConnection] for [param slot], or rejects with an error. [param session] is the session opening the slot, the same [NetwSession] that [method Netw.session] answers, or [code]null[/code] when a game calls [method open] with none.
 			</description>
 		</method>
 		<method name="delete_slot">
 			<return type="NetwPromise" />
-			<param index="0" name="session" type="Object" />
+			<param index="0" name="session" type="NetwSession" />
 			<param index="1" name="slot" type="StringName" />
 			<description>
 				Removes [param slot] through [method _delete_slot], or through the backend's own storage when no script overrides it. [param session] may be [code]null[/code] when no session is asking.
@@ -51,14 +51,14 @@
 		</method>
 		<method name="list_slots">
 			<return type="NetwPromise" />
-			<param index="0" name="session" type="Object" />
+			<param index="0" name="session" type="NetwSession" />
 			<description>
 				Resolves every slot in storage through [method _list_slots], or through the backend's own storage when no script overrides it.
 			</description>
 		</method>
 		<method name="open">
 			<return type="NetwPromise" />
-			<param index="0" name="session" type="Object" />
+			<param index="0" name="session" type="NetwSession" />
 			<param index="1" name="slot" type="StringName" />
 			<description>
 				Resolves a [NetwDatabaseConnection] for [param slot] through [method _open], or through the backend's own storage when no script overrides it.

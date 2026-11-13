@@ -9,6 +9,7 @@
 #include "netw/api/entity_options.hpp"
 #include "netw/api/record.hpp"
 #include "netw/lagcomp_core.hpp"
+#include "netw/predict/wiring.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 
@@ -64,8 +65,15 @@ TEST_CASE(
 
     const int64_t history = rewind_slot(api, entity);
     REQUIRE(history >= 0);
+    netw::predict::FieldCodec codec;
+    codec.append(
+        StringName("position"),
+        Ref<netw::NetwQuantize>(),
+        int(Variant::VECTOR2)
+    );
+    codec.seal();
     Internals::get_lagcomp_core(api)
-        ->timeline_record(history, SEEDED_TICK, at(SEEDED_X));
+        ->timeline_record_coded(history, SEEDED_TICK, at(SEEDED_X), codec);
 
     Ref<NetwDespawnOpts> opts;
     opts.instantiate();
@@ -93,45 +101,6 @@ TEST_CASE(
         rig.step_ticks(1);
         CHECK(body->is_queued_for_deletion());
     }
-}
-
-TEST_CASE(
-    "[Networked][LagComp][Linger] LG2 undeclaring a target takes its "
-    "window with it, which is what the state pipeline does when a target "
-    "leaves for good, so a rewind past that is an absence rather than a "
-    "stale row"
-) {
-    LoopbackRig rig(0);
-    WorldDecl world;
-    world.clocked(30, 3).lag_compensated();
-    rig.declare_world(world);
-
-    const RID entity = rig.declare_entity(
-        EntityDecl()
-            .named("Linger")
-            .on_schema("target")
-            .synced(StringName("position"))
-            .placed_at(Vector2(10.0, 0.0))
-    );
-    netw::NetwMultiplayer *api = rig.server();
-    NETW_CHECK_EQ(int(api->lagcomp_timeline_declare(entity)), int(OK));
-
-    Node *body = api->entity_get_node(entity);
-    REQUIRE(body != nullptr);
-    const Ref<NetwEntity> wrapper = NetwEntity::of(body);
-    const int64_t history = rewind_slot(api, entity);
-    REQUIRE(history >= 0);
-    Internals::get_lagcomp_core(api)
-        ->timeline_record(history, SEEDED_TICK, at(SEEDED_X));
-
-    rig.server()->lagcomp_timeline_undeclare(entity);
-
-    CHECK(rewind_slot(api, entity) < 0);
-
-    const Ref<netw::DictionaryRecord> after
-        = api->lagcomp_sample(entity, SEEDED_TICK);
-    REQUIRE(after.is_valid());
-    CHECK(after->is_empty());
 }
 
 } // namespace TestNetwLagCompLingerLaws

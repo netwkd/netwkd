@@ -71,8 +71,8 @@ public sealed class Netw : NetwRefCounted
 
     /// <summary>
     /// Returns the <see cref="Node.Multiplayer"/> of <paramref name="node"/> as
-    /// a <see cref="NetwMultiplayer"/>, for advanced use. A node that is in no
-    /// tree returns <c>null</c>.
+    /// a <see cref="NetwMultiplayer"/>, for advanced use. A <c>null</c> node,
+    /// or a node that is in no tree, returns <c>null</c>.
     /// </summary>
     public static NetwMultiplayer Of(Node node)
     {
@@ -585,10 +585,11 @@ public sealed class Netw : NetwRefCounted
         NetwApi.MethodBind("Netw", "configure_entity", 1743742259UL);
 
     /// <summary>
-    /// Declares <paramref name="node"/> as a <see cref="NetwEntity"/> before it
-    /// enters the tree. A node that a scene places inside another entity needs
-    /// its own scene to be a separate entity, and declaring it without one
-    /// raises a warning.
+    /// Configures the <see cref="NetwEntity"/> that <see cref="NetwEntity.Of"/>
+    /// answers for <paramref name="node"/> once it enters the tree. A node that
+    /// a scene places under another entity is part of that entity and sets its
+    /// options, unless the node is the root of an instanced scene or the
+    /// nearest entity above it is a <see cref="Netw.ConfigureScene"/> root.
     /// </summary>
     public static NetwEntity ConfigureEntity(Node node)
     {
@@ -1102,8 +1103,10 @@ public sealed class Netw : NetwRefCounted
         NetwApi.MethodBind("Netw", "sync_property", 1494684691UL);
 
     /// <summary>
-    /// Sends the current value of <paramref name="property"/> to the other
-    /// peers. Use it for a property that changes rarely.
+    /// Sends the current value of <paramref name="property"/> once, to the
+    /// peers connected now. A peer that joins later does not receive it, so
+    /// declare state a late joiner needs with
+    /// <see cref="Netw.ConfigureProperty"/>.
     /// <code>
     /// func refuel() -&gt; void:
     ///     fuel = 100.0
@@ -1327,7 +1330,10 @@ public sealed class Netw : NetwRefCounted
     /// </code>
     /// <para>
     /// Returns <c>null</c> and spawns nothing when the session does not hold
-    /// <paramref name="player"/>. The node is despawned when
+    /// <paramref name="player"/>, and raises an error unless that player left
+    /// the session. The node keeps the name <paramref name="fn"/> gave it, and
+    /// <see cref="NetwEntity.Name"/> is the player's
+    /// <see cref="NetwPlayer.UserName"/>. The node is despawned when
     /// <paramref name="player"/> leaves. With
     /// <see cref="NetwPersistenceConfig.LoadOnSpawn"/>, other peers receive it
     /// once its save is loaded. <b>Server Only.</b>
@@ -1472,7 +1478,10 @@ public sealed class Netw : NetwRefCounted
     /// </code>
     /// <para>
     /// Despawning the root of a <see cref="NetwScene"/> removes the scene at
-    /// once, with everything in it. See <see cref="NetwDespawnOpts"/> for
+    /// once, with everything in it. When players move to a new
+    /// <see cref="NetwScene"/>, a client never holds the old and the new one
+    /// together, whether the old root is despawned before or after the new one
+    /// is spawned. See <see cref="NetwDespawnOpts"/> for
     /// <paramref name="opts"/>. Returns <c>@GlobalScope.ERR_DOES_NOT_EXIST</c>
     /// for a node that was not spawned, and <c>@GlobalScope.ERR_UNAVAILABLE</c>
     /// outside a session. A client can call it when its player is the
@@ -1502,7 +1511,8 @@ public sealed class Netw : NetwRefCounted
     /// <summary>
     /// Moves <paramref name="node"/> under <paramref name="newParent"/> like
     /// <see cref="Node.Reparent"/>. The promise resolves once the server has
-    /// moved it. Other peers move it after.
+    /// moved it. Other peers move it after. Every peer keeps the node's global
+    /// transform across the move.
     /// <code>
     /// await Netw.reparent(avatar, level2.get_node(^"Players")).wait()
     /// </code>

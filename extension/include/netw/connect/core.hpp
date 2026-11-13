@@ -31,7 +31,7 @@ std::optional<JoinRequest> request_of(
 
 class ConnectCore {
 public:
-    ConnectCore() = default;
+    ConnectCore();
     ~ConnectCore();
 
     void bind_session(NetwMultiplayer *p_session);
@@ -45,12 +45,8 @@ public:
         const godot::Callable &p_completed
     );
     void cancel_peer_creation(const godot::RID &p_ticket);
+    void free_creation(const godot::RID &p_ticket);
 
-    godot::Ref<NetwPromise> join(
-        const godot::RID &p_transport,
-        const godot::String &p_address,
-        const godot::Dictionary &p_settings
-    );
     godot::Ref<NetwPromise> join_target(
         const godot::RID &p_target,
         const godot::Dictionary &p_settings
@@ -98,20 +94,13 @@ public:
     void target_remove(const godot::RID &p_target);
     bool target_is_available(const godot::RID &p_target) const;
     void probe_target(const godot::RID &p_target);
-    void on_directory_delivered(
-        const godot::Ref<godot::MultiplayerPeer> &p_peer,
-        int64_t p_directory
-    );
-    void on_directory_failed(
-        int64_t p_error,
-        const godot::String &p_message,
-        int64_t p_directory
-    );
-    void on_directory_listed(
-        const godot::PackedStringArray &p_addresses,
-        const godot::PackedStringArray &p_names,
-        const godot::Array &p_infos,
-        int64_t p_directory
+    godot::RID directory_ticket(int64_t p_directory) const;
+    godot::StringName directory_peer_class(int64_t p_directory) const;
+    void complete(
+        const godot::RID &p_ticket,
+        godot::Error p_error,
+        const godot::Variant &p_result,
+        const godot::String &p_message
     );
     godot::RID invite(
         const godot::RID &p_transport,
@@ -119,17 +108,16 @@ public:
         const godot::String &p_from_name
     );
     void publish_targets(
-        const godot::StringName &p_peer_class,
+        const godot::RID &p_transport,
         godot::ObjectID p_source,
-        const godot::PackedStringArray &p_addresses,
-        const godot::PackedStringArray &p_names,
-        const godot::Array &p_infos
+        const godot::TypedArray<godot::Dictionary> &p_targets
     );
     void forget_directory(godot::ObjectID p_directory);
     void watch_directory(godot::Object *p_directory);
 
     godot::String join_address() const;
     godot::String endpoint_address() const;
+    godot::RID current_target();
     void advertise(const godot::String &p_address, int64_t p_max_players);
     int64_t advertised_max_players() const;
     godot::Dictionary diagnostics(int64_t p_peer_id) const;
@@ -172,6 +160,13 @@ public:
     }
 
 private:
+    static void assign_created(
+        const godot::Ref<godot::MultiplayerPeer> &p_peer,
+        int64_t p_error,
+        const godot::String &p_message,
+        uint64_t p_session
+    );
+
     struct Browser {
         Transport *transport = nullptr;
         double next_list = 0.0;
@@ -198,6 +193,7 @@ private:
     bool browsing = false;
     double probe_interval = 10.0;
 
+    mutable godot::RID_Owner<Creation> tickets;
     godot::LocalVector<godot::RID> creations;
     godot::LocalVector<godot::RID> starts;
     godot::RID answering_offer;
@@ -244,9 +240,12 @@ private:
     );
     void tick_attempt(double p_delta);
     void announce_join_address();
-    void release_live();
+    godot::RID release_live();
+    void forget_target(const godot::RID &p_target);
     bool live_online() const;
 
+    godot::RID mint_creation(const Creation &p_seed);
+    Creation *creation_of(const godot::RID &p_ticket) const;
     godot::RID mint_ticket_for(
         Transport *p_made,
         int p_mode,
@@ -266,6 +265,7 @@ private:
     Transport *make_transport(const TransportSlot &p_slot) const;
     Transport *make_creator(const godot::StringName &p_peer_class) const;
     Transport *transport_of_directory(int64_t p_directory) const;
+    Transport *transport_of_ticket(const godot::RID &p_ticket) const;
     ProbeHooks probe_hooks() const;
     godot::Ref<NetwPromise> probe_row(const godot::RID &p_target);
     Transport *transport_of_target(

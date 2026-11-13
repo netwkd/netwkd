@@ -159,7 +159,7 @@ struct Browser {
 
 LawVerdict caller_rows_kept(const Stand &) {
     Browser browser;
-    browser.add(String("kept-1"));
+    const RID kept = browser.add(String("kept-1"))->get_rid();
     browser.add(String("kept-2"));
     browser.directory->rows.push_back(String("lobby-a"));
     browser.directory->rows.push_back(String("lobby-b"));
@@ -167,6 +167,9 @@ LawVerdict caller_rows_kept(const Stand &) {
     browser.connection->set_browsing(true);
     browser.poll();
     const String listed = browser.order();
+    const StringName lobby("StubLobbyPeer");
+    const Ref<NetwEndpoint> gone
+        = browser.connection->find(lobby, String("lobby-a"));
     browser.api->service_unregister(browser.directory, nullptr);
     browser.poll();
     const String left = browser.order();
@@ -177,6 +180,19 @@ LawVerdict caller_rows_kept(const Stand &) {
     browser.api->service_register(browser.directory, nullptr);
     if (left != String("kept-1 kept-2")) {
         return law_broken("then the list read %s", left.utf8().get_data());
+    }
+    if (gone.is_null() || gone->get_is_listed()
+        || gone->get_peer_class() != lobby
+        || gone->get_address() != String("lobby-a")) {
+        return law_broken("a removed lobby lost its peer class or address");
+    }
+    Browser other;
+    const Variant read = other.api->endpoint_get_param(
+        kept,
+        NetwMultiplayer::ENDPOINT_PARAM_ADDRESS
+    );
+    if (read.get_type() != Variant::NIL) {
+        return law_broken("another session read this session's row");
     }
     return law_held();
 }
@@ -309,7 +325,9 @@ LawVerdict websocket_url(const Stand &) {
 
 const Row ROWS[] = {
     {"two rows the player added, then a directory lists two and leaves",
-     "the player's rows list first and stay when the directory leaves",
+     "the player's rows list first and stay when the directory leaves, "
+     "a removed lobby keeps its peer class and address, and another "
+     "session reads nothing from a row",
      &caller_rows_kept},
     {"a host of arena-v3 browsing lobbies and a probed server of arena-v2",
      "rows of another build read incompatible and this build's read online",

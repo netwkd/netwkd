@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
@@ -27,6 +28,7 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPlayer;
 using netw_test::FaultWatch;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawVerdict;
@@ -135,7 +137,7 @@ Node *spawn_named(NetwMultiplayer *p_server, const char *p_name) {
     const RID spawned = p_server->spawn_registered(
         StringName("named"),
         one_string(p_name),
-        nullptr
+        0
     );
     return p_server->entity_get_node(spawned);
 }
@@ -195,7 +197,7 @@ LawVerdict part_reads_player(bool p_declares) {
         one_string("pawn"),
         string_type(),
         nullptr,
-        Variant(player)
+        player->get_id()
     );
     part_declares = false;
 
@@ -310,11 +312,13 @@ LawVerdict placed_entity_missing(const Stand &) {
 
     NetwMultiplayer *server = rig.server();
     NetwMultiplayer *client = rig.client(CLIENT);
-    const int64_t route = server->entity_get_route(server->entity_of(hosted));
+    const int64_t route
+        = server->entity_get_route(Internals::entity_of(server, hosted));
     if (route <= 0) {
         return law_broken("the server's level holds no route");
     }
-    if (client->entity_get_route(client->entity_of(seated)) != route) {
+    if (client->entity_get_route(Internals::entity_of(client, seated))
+        != route) {
         return law_broken("the client's level did not bind");
     }
     return law_held();
@@ -381,7 +385,7 @@ Node *spawn_waiting(LoopbackRig &p_rig, Node *p_arena) {
     const RID made = server->spawn_registered(
         StringName(WAITING_ID),
         one_string("Waited"),
-        nullptr
+        0
     );
     Node *node = made.is_valid() ? server->entity_get_node(made) : nullptr;
     if (node != nullptr) {
@@ -431,7 +435,7 @@ LawVerdict waiting_build(const Stand &p_stand) {
     if (spawned != nullptr) {
         NetwMultiplayer *server = rig.server();
         const int64_t route
-            = server->entity_get_route(server->entity_of(spawned));
+            = server->entity_get_route(Internals::entity_of(server, spawned));
         if (rig.route_node(int(route), CLIENT) != nullptr) {
             return law_broken("the client kept a node it waited for");
         }

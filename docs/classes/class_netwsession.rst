@@ -35,6 +35,8 @@ Reached with :ref:`Netw.session()<class_Netw_method_session>` from any :godot:`N
 
 \ There is one handle per session, so it is safe to keep it across an await.
 
+Signals reported when a :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick ends arrive in the order the changes happened, so a kick or a pause made inside one of their handlers is reported after that handler returns.
+
 Connecting is done as you would normally do with :godot:`SceneMultiplayer`, by assigning :godot:`MultiplayerAPI.multiplayer_peer <MultiplayerAPI#class_MultiplayerAPI_property_multiplayer_peer>`. :ref:`connection<class_NetwSession_property_connection>` finds servers and joins or hosts one, and :ref:`Netw.prepare_join()<class_Netw_method_prepare_join>` names the player who joins.
 
 \ **Moving the server**\ 
@@ -46,7 +48,7 @@ On a peer that can, closing the server's window moves the server. The server cal
 ::
 
     func hand_over(successor: NetwPlayer) -> void:
-        if session.transfer_server(successor.peer_id) == OK:
+        if session.transfer_server(successor) == OK:
             await session.server_transferred
         await session.leave().wait()
 
@@ -130,7 +132,7 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPlayer<class_NetwPlayer>`                   | :ref:`player_of<class_NetwSession_method_player_of>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                               |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                                                | :ref:`register_service<class_NetwSession_method_register_service>`\ (\ service\: :godot:`Object`, type\: :godot:`Object` = null\ )                                                    |
+   | |void|                                                | :ref:`register_service<class_NetwSession_method_register_service>`\ (\ service\: :godot:`Node`, type\: :godot:`Object` = null\ )                                                      |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`request_kick<class_NetwSession_method_request_kick>`\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :godot:`String` = ""\ )                                         |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -148,11 +150,11 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwTable<class_NetwTable>`                     | :ref:`table<class_NetwSession_method_table>`\ (\ name\: :godot:`StringName`\ ) |const|                                                                                                |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`transfer_server<class_NetwSession_method_transfer_server>`\ (\ peer_id\: :godot:`int`\ )                                                                                        |
+   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`transfer_server<class_NetwSession_method_transfer_server>`\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`\ )                                                                  |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`unpause<class_NetwSession_method_unpause>`\ (\ )                                                                                                                                |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                                                | :ref:`unregister_service<class_NetwSession_method_unregister_service>`\ (\ service\: :godot:`Object`, type\: :godot:`Object` = null\ )                                                |
+   | |void|                                                | :ref:`unregister_service<class_NetwSession_method_unregister_service>`\ (\ service\: :godot:`Node`, type\: :godot:`Object` = null\ )                                                  |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -170,7 +172,7 @@ Signals
 
 **entered**\ (\ ) :ref:`🔗<class_NetwSession_signal_entered>`
 
-Emitted when this peer is online. A client goes online once the server admits its player, so :ref:`player_joined<class_NetwSession_signal_player_joined>` for each player already present and then :ref:`local_joined<class_NetwSession_signal_local_joined>` follow in the same frame.
+Emitted when this peer is online. A client goes online once the server admits its player, so :ref:`player_joined<class_NetwSession_signal_player_joined>` for each player already present and then :ref:`local_joined<class_NetwSession_signal_local_joined>` follow in the same frame. A peer that goes online while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs emits it when that poll ends.
 
 .. rst-class:: classref-item-separator
 
@@ -194,7 +196,7 @@ Emitted after the session is cleaned up, with the same ``reason`` and ``detail``
 
 **exiting**\ (\ reason\: :ref:`ExitReason<enum_NetwSession_ExitReason>`, detail\: :godot:`String`\ ) :ref:`🔗<class_NetwSession_signal_exiting>`
 
-Emitted before the session is cleaned up, so :ref:`players<class_NetwSession_property_players>` and :ref:`scenes<class_NetwSession_property_scenes>` can still be read. ``detail`` is the message the server gave, if any.
+Emitted before the session is cleaned up, so :ref:`players<class_NetwSession_property_players>` and :ref:`scenes<class_NetwSession_property_scenes>` can still be read. ``detail`` is the message the server gave, if any. Every signal the session still owed from the same poll or :ref:`NetwClock<class_NetwClock>` tick is emitted before it.
 
 .. rst-class:: classref-item-separator
 
@@ -206,7 +208,7 @@ Emitted before the session is cleaned up, so :ref:`players<class_NetwSession_pro
 
 **join_failed**\ (\ code\: :godot:`Error <@GlobalScope#enum_@globalscope_Error>`, reason\: :godot:`String`\ ) :ref:`🔗<class_NetwSession_signal_join_failed>`
 
-This peer's join was refused with ``code`` and the ``reason`` the server gave. :ref:`local_player<class_NetwSession_property_local_player>` stays ``null``. A client refused while connecting closes its peer and never goes online, so neither :ref:`entered<class_NetwSession_signal_entered>` nor :ref:`exited<class_NetwSession_signal_exited>` fires.
+This peer's join was refused with ``code`` and the ``reason`` the server gave. :ref:`local_player<class_NetwSession_property_local_player>` stays ``null``. A client refused while connecting closes its peer and never goes online, so neither :ref:`entered<class_NetwSession_signal_entered>` nor :ref:`exited<class_NetwSession_signal_exited>` fires. A refusal heard while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is emitted when that poll ends.
 
 Networked refuses with three codes, and any other ``code`` is the one the admission handler or a :ref:`NetwAccountProvider<class_NetwAccountProvider>` returned.
 
@@ -226,7 +228,7 @@ Networked refuses with three codes, and any other ``code`` is the one the admiss
 
 **kick_requested**\ (\ requester\: :ref:`NetwPlayer<class_NetwPlayer>`, target\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :godot:`String`\ ) :ref:`🔗<class_NetwSession_signal_kick_requested>`
 
-Emitted on the server when ``requester`` asks to kick ``target`` with :ref:`request_kick()<class_NetwSession_method_request_kick>`. :ref:`kick()<class_NetwSession_method_kick>` performs it.
+Emitted on the server when ``requester`` asks to kick ``target`` with :ref:`request_kick()<class_NetwSession_method_request_kick>`. :ref:`kick()<class_NetwSession_method_kick>` performs it. A request read while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -238,7 +240,7 @@ Emitted on the server when ``requester`` asks to kick ``target`` with :ref:`requ
 
 **local_joined**\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`\ ) :ref:`🔗<class_NetwSession_signal_local_joined>`
 
-The :ref:`NetwPlayer<class_NetwPlayer>` of this peer has joined. :ref:`local_player<class_NetwSession_property_local_player>` is set from here on.
+The :ref:`NetwPlayer<class_NetwPlayer>` of this peer has joined. :ref:`local_player<class_NetwSession_property_local_player>` is set from here on. It is emitted before :ref:`player_joined<class_NetwSession_signal_player_joined>` for the same player, at the same point in the frame.
 
 .. rst-class:: classref-item-separator
 
@@ -250,7 +252,7 @@ The :ref:`NetwPlayer<class_NetwPlayer>` of this peer has joined. :ref:`local_pla
 
 **paused_changed**\ (\ paused\: :godot:`bool`, reason\: :godot:`String`\ ) :ref:`🔗<class_NetwSession_signal_paused_changed>`
 
-Emitted when :ref:`paused<class_NetwSession_property_paused>` changes. ``reason`` is what the server passed to :ref:`pause()<class_NetwSession_method_pause>`. A session that ends while paused emits it with ``false``.
+Emitted when :ref:`paused<class_NetwSession_property_paused>` changes. ``reason`` is what the server passed to :ref:`pause()<class_NetwSession_method_pause>`. A session that ends while paused emits it with ``false``. A change made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is emitted when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -262,7 +264,7 @@ Emitted when :ref:`paused<class_NetwSession_property_paused>` changes. ``reason`
 
 **player_joined**\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`\ ) :ref:`🔗<class_NetwSession_signal_player_joined>`
 
-A :ref:`NetwPlayer<class_NetwPlayer>` has joined, including this peer's own.
+A :ref:`NetwPlayer<class_NetwPlayer>` has joined, including this peer's own. A player admitted while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -274,7 +276,7 @@ A :ref:`NetwPlayer<class_NetwPlayer>` has joined, including this peer's own.
 
 **player_left**\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :ref:`LeaveReason<enum_NetwPlayer_LeaveReason>`\ ) :ref:`🔗<class_NetwSession_signal_player_left>`
 
-A :ref:`NetwPlayer<class_NetwPlayer>` has left for ``reason``. :ref:`NetwPlayer.is_active<class_NetwPlayer_property_is_active>` is already ``false``.
+A :ref:`NetwPlayer<class_NetwPlayer>` has left for ``reason``. :ref:`NetwPlayer.is_active<class_NetwPlayer_property_is_active>` is already ``false``, and every property of ``player`` reads empty once the handlers return. A player who leaves while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -286,7 +288,7 @@ A :ref:`NetwPlayer<class_NetwPlayer>` has left for ``reason``. :ref:`NetwPlayer.
 
 **scene_ready**\ (\ scene\: :ref:`NetwScene<class_NetwScene>`\ ) :ref:`🔗<class_NetwSession_signal_scene_ready>`
 
-Emitted after the root of ``scene`` is ready, so the whole scene can be accessed.
+Emitted after the root of ``scene`` is ready, so the whole scene can be accessed. A scene that becomes ready while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 ::
 
@@ -303,7 +305,7 @@ Emitted after the root of ``scene`` is ready, so the whole scene can be accessed
 
 **scene_removed**\ (\ scene\: :ref:`NetwScene<class_NetwScene>`\ ) :ref:`🔗<class_NetwSession_signal_scene_removed>`
 
-Emitted after ``scene`` leaves :ref:`scenes<class_NetwSession_property_scenes>`.
+Emitted after ``scene`` leaves :ref:`scenes<class_NetwSession_property_scenes>`. A scene removed while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -317,7 +319,7 @@ Emitted after ``scene`` leaves :ref:`scenes<class_NetwSession_property_scenes>`.
 
 Emitted on every peer once the peer that was ``successor_was`` has become the server at id ``1``, and the old server, if it stayed, has become ``former_now``.
 
-\ ``former_now`` is ``0`` when the old server is gone, and its player leaves after this signal.
+\ ``former_now`` is ``0`` when the old server is gone, and its player leaves after this signal. It is emitted when the :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` that moved the server ends.
 
 
 .. tabs::
@@ -360,7 +362,7 @@ What each client keeps of its world follows its own :ref:`NetwSessionConfig.tran
 
 **state_changed**\ (\ state\: :ref:`State<enum_NetwSession_State>`\ ) :ref:`🔗<class_NetwSession_signal_state_changed>`
 
-Emitted when :ref:`state<class_NetwSession_property_state>` changes. A server transfer does not change it.
+Emitted when :ref:`state<class_NetwSession_property_state>` changes. A server transfer does not change it. A change made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is emitted when that poll ends, so :ref:`state<class_NetwSession_property_state>` can already read a later state.
 
 .. rst-class:: classref-section-separator
 
@@ -666,7 +668,7 @@ Whether the server has paused the session with :ref:`pause()<class_NetwSession_m
 
 - :godot:`Array`\[:ref:`NetwPlayer<class_NetwPlayer>`\] **get_players**\ (\ )
 
-Every :ref:`NetwPlayer<class_NetwPlayer>` whose join was accepted and who has not left, sorted by peer id. A leaving player is already gone from it when :ref:`player_left<class_NetwSession_signal_player_left>` is emitted, while :ref:`NetwMultiplayer.connected_players<class_NetwMultiplayer_property_connected_players>` still holds that player then.
+Every :ref:`NetwPlayer<class_NetwPlayer>` whose join was accepted and who has not left, sorted by peer id. A leaving player is already gone from it when :ref:`player_left<class_NetwSession_signal_player_left>` is emitted.
 
 .. rst-class:: classref-item-separator
 
@@ -845,7 +847,7 @@ The :ref:`NetwInterestLayer<class_NetwInterestLayer>` called ``name``, created o
 
 :godot:`Error <@GlobalScope#enum_@globalscope_Error>` **kick**\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`, reason\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwSession_method_kick>`
 
-Removes ``player`` from the session and disconnects their peer with ``reason``. The server's own player cannot be kicked, use :ref:`leave()<class_NetwSession_method_leave>` instead.
+Removes ``player`` from the session and disconnects their peer with ``reason``. The server's own player cannot be kicked. Use :ref:`leave()<class_NetwSession_method_leave>` to end the session.
 
 \ **Server Only.**
 
@@ -924,7 +926,7 @@ The :ref:`NetwPlayer<class_NetwPlayer>` of ``peer``, ``null`` when there is none
 
 .. rst-class:: classref-method
 
-|void| **register_service**\ (\ service\: :godot:`Object`, type\: :godot:`Object` = null\ ) :ref:`🔗<class_NetwSession_method_register_service>`
+|void| **register_service**\ (\ service\: :godot:`Node`, type\: :godot:`Object` = null\ ) :ref:`🔗<class_NetwSession_method_register_service>`
 
 Registers ``service`` so :ref:`service()<class_NetwSession_method_service>` returns it. ``type`` defaults to the script of ``service``. A :ref:`NetwService<class_NetwService>` registers itself.
 
@@ -1061,9 +1063,9 @@ The table of the schema declared as ``name`` with :ref:`Netw.configure_schema()<
 
 .. rst-class:: classref-method
 
-:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **transfer_server**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwSession_method_transfer_server>`
+:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **transfer_server**\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`\ ) :ref:`🔗<class_NetwSession_method_transfer_server>`
 
-Asks the :godot:`MultiplayerPeer` to make ``peer_id`` the server and this peer a client under a new id. :ref:`server_transferred<class_NetwSession_signal_server_transferred>` follows on every peer. A peer supports this when it declares a ``server_relabelled`` signal and a ``transfer_server`` method. It emits the signal once :godot:`MultiplayerPeer.get_unique_id() <MultiplayerPeer#class_MultiplayerPeer_method_get_unique_id>` already answers the new id. A peer with only the signal can still promote a client when the server is lost.
+Asks the :godot:`MultiplayerPeer` to make the peer of ``player`` the server and this peer a client under a new id. :ref:`server_transferred<class_NetwSession_signal_server_transferred>` follows on every peer. A peer supports this when it declares a ``server_relabelled`` signal and a ``transfer_server`` method, which receives the player's :ref:`NetwPlayer.peer_id<class_NetwPlayer_property_peer_id>`. It emits the signal once :godot:`MultiplayerPeer.get_unique_id() <MultiplayerPeer#class_MultiplayerPeer_method_get_unique_id>` already answers the new id. A peer with only the signal can still promote a client when the server is lost.
 
 ::
 
@@ -1086,7 +1088,7 @@ Asks the :godot:`MultiplayerPeer` to make ``peer_id`` the server and this peer a
     Error
     ┠╴ERR_UNAUTHORIZED        called on a client
     ┠╴ERR_UNAVAILABLE         the transport cannot move the server
-    ┠╴ERR_INVALID_PARAMETER   peer_id is not a connected client
+    ┠╴ERR_INVALID_PARAMETER   player is not a connected client's player
     ┖╴ERR_BUSY                a database still has writes to settle
 
 \ **Server Only.**
@@ -1113,7 +1115,7 @@ Unpauses every peer that :ref:`pause()<class_NetwSession_method_pause>` paused.
 
 .. rst-class:: classref-method
 
-|void| **unregister_service**\ (\ service\: :godot:`Object`, type\: :godot:`Object` = null\ ) :ref:`🔗<class_NetwSession_method_unregister_service>`
+|void| **unregister_service**\ (\ service\: :godot:`Node`, type\: :godot:`Object` = null\ ) :ref:`🔗<class_NetwSession_method_unregister_service>`
 
 Undoes :ref:`register_service()<class_NetwSession_method_register_service>`.
 

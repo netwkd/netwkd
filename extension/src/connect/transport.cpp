@@ -21,7 +21,7 @@ void Transport::report(
     double p_ratio
 ) {
     if (session != nullptr) {
-        session->connect_plane().on_progress(armed_ticket, p_message, p_ratio);
+        session->transport_report_progress(armed_ticket, p_message, p_ratio);
     }
 }
 
@@ -106,17 +106,6 @@ Dictionary Transport::client_settings() const {
 
 void Transport::probe(const String &p_address) {
     fail(ERR_UNAVAILABLE, "this transport does not probe");
-}
-
-void Transport::publish_targets(
-    const PackedStringArray &p_addresses,
-    const PackedStringArray &p_names,
-    const Array &p_infos
-) {
-    if (session == nullptr) {
-        return;
-    }
-    session->discovery_publish(peer_class(), p_addresses, p_names, p_infos);
 }
 
 void Transport::arm(const RID &p_ticket, const Ref<NetwPromise> &p_outcome) {

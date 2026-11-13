@@ -32,7 +32,7 @@ Data travels as columns in one message. :ref:`NetwSchema<class_NetwSchema>` decl
 
 \ There is one **NetwTable** per table. Connect :ref:`received<class_NetwTable_signal_received>` once and keep the result in a variable. A peer that joins later receives the committed rows and emits :ref:`received<class_NetwTable_signal_received>` without waiting for the next commit.
 
-Each row is identified by a route. Row indices change when rows are added or removed, and routes do not.
+Each row is identified by a route from :ref:`claim_routes()<class_NetwTable_method_claim_routes>`. Row indices change when rows are added or removed, and routes do not.
 
 \ **Writing**\ 
 
@@ -112,6 +112,8 @@ Methods
    :widths: auto
 
    +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`PackedInt64Array`                             | :ref:`claim_routes<class_NetwTable_method_claim_routes>`\ (\ count\: :godot:`int`\ )                                                                            |
+   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`commit<class_NetwTable_method_commit>`\ (\ )                                                                                                              |
    +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                 | :ref:`load<class_NetwTable_method_load>`\ (\ database\: :ref:`NetwDatabase<class_NetwDatabase>`, key\: :godot:`StringName`\ )                                   |
@@ -125,6 +127,8 @@ Methods
    | :godot:`PackedInt64Array`                             | :ref:`read_deaths<class_NetwTable_method_read_deaths>`\ (\ ) |const|                                                                                            |
    +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`PackedInt64Array`                             | :ref:`read_routes<class_NetwTable_method_read_routes>`\ (\ ) |const|                                                                                            |
+   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`release_routes<class_NetwTable_method_release_routes>`\ (\ routes\: :godot:`PackedInt64Array`\ )                                                          |
    +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`int`                                          | :ref:`row_of<class_NetwTable_method_row_of>`\ (\ route\: :godot:`int`\ ) |const|                                                                                |
    +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -152,7 +156,7 @@ Signals
 
 **received**\ (\ tick\: :godot:`int`\ ) :ref:`🔗<class_NetwTable_signal_received>`
 
-Emitted when this table is committed locally or receives data from a peer. ``tick`` is the tick of the commit.
+Emitted when this table is committed locally or receives data from a peer. ``tick`` is the tick of the commit. A commit made or data received while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-section-separator
 
@@ -264,6 +268,20 @@ A hash of this table's schema, sent with its data so peers can detect a schema m
 
 Method Descriptions
 -------------------
+
+.. _class_NetwTable_method_claim_routes:
+
+.. rst-class:: classref-method
+
+:godot:`PackedInt64Array` **claim_routes**\ (\ count\: :godot:`int`\ ) :ref:`🔗<class_NetwTable_method_claim_routes>`
+
+Creates ``count`` routes for new rows. Each route is unique in the session, and :ref:`release_routes()<class_NetwTable_method_release_routes>` gives it back. Returns an empty array on a client.
+
+\ **Server Only.**
+
+.. rst-class:: classref-item-separator
+
+----
 
 .. _class_NetwTable_method_commit:
 
@@ -378,6 +396,27 @@ The routes removed by the latest update.
 :godot:`PackedInt64Array` **read_routes**\ (\ ) |const| :ref:`🔗<class_NetwTable_method_read_routes>`
 
 The routes stored in this table, in row order.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwTable_method_release_routes:
+
+.. rst-class:: classref-method
+
+:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **release_routes**\ (\ routes\: :godot:`PackedInt64Array`\ ) :ref:`🔗<class_NetwTable_method_release_routes>`
+
+Releases ``routes`` from :ref:`claim_routes()<class_NetwTable_method_claim_routes>`. Their rows leave every table that holds them, and every peer is told. A released route is never reused.
+
+.. code:: text
+
+    Error
+    ┠╴OK                  the routes were released
+    ┠╴ERR_DOES_NOT_EXIST  the session this handle names is gone
+    ┖╴ERR_UNCONFIGURED    called on a client
+
+\ **Server Only.**
 
 .. rst-class:: classref-item-separator
 

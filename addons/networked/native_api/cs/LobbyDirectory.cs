@@ -574,9 +574,10 @@ public class LobbyDirectory : NetwService
         NetwApi.MethodBind("LobbyDirectory", "invite", 3186203200UL);
 
     /// <summary>
-    /// Calls <see cref="NetwConnection.Invite"/> for this directory's
-    /// <see cref="MultiplayerPeer"/> class and emits
-    /// <see cref="NetwConnection.Invited"/>.
+    /// Calls <see cref="NetwMultiplayer.EndpointInvite"/> with the transport
+    /// for this directory's <see cref="MultiplayerPeer"/> class, which emits
+    /// <see cref="NetwConnection.Invited"/> unless the session is already on
+    /// that server.
     /// </summary>
     public void Invite(string address, string fromName)
     {

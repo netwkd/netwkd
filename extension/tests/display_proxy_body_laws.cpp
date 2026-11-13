@@ -7,6 +7,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_cells.h"
 #include "support/value_flow_stand.h"
 
@@ -92,7 +93,8 @@ public:
         netw::display::Runtime *runtime
             = NetwNativeTests::display_runtime_of(client, rid);
         REQUIRE(runtime != nullptr);
-        const netw::sim::Row *row = client->sim_row_of(rid);
+        const netw::sim::Row *row
+            = netw_test::Internals::sim_row_of(client, rid);
         seen.mode = row != nullptr ? int64_t(row->mode) : -1;
         seen.pump = runtime->get_pump_mode();
         seen.frozen = body->is_freeze_enabled();

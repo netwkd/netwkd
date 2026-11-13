@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 #include "support/netw_test.h"
 
@@ -28,7 +29,8 @@ struct Stand {
 
     Stand() {
         core.instantiate();
-        compat = core->get_replication_plane()->get_spawner_compat();
+        compat = netw_test::Internals::replication_plane(core)
+                     ->get_spawner_compat();
         spawner = memnew(MultiplayerSpawner);
         spawner->set_spawn_function(callable_mp_static(&build_probe));
     }

@@ -524,7 +524,8 @@ int64_t columns_adopted(const char *p_name) {
     Ref<NetwMultiplayer> session;
     session.instantiate();
     const RID schema = session->schema_find_or_adopt(StringName(p_name));
-    return schema.is_valid() ? session->schema_get_column_count(schema) : -1;
+    return schema.is_valid() ? session->get_schema_core()->column_count(schema)
+                             : -1;
 }
 
 LawVerdict schema_order_is_address(const World &) {
@@ -581,7 +582,7 @@ LawVerdict schema_late_column_refused(const World &) {
     if (late != -1) {
         return law_broken("a late column answers %d", late);
     }
-    if (session->schema_get_column_count(adopted) != 1) {
+    if (session->get_schema_core()->column_count(adopted) != 1) {
         return law_broken("the live session holds a late column");
     }
     session.unref();
@@ -1322,7 +1323,7 @@ struct Stand {
             netw::gd::array_of(String(p_name)),
             netw::gd::array_of(int(Variant::STRING)),
             arena,
-            Variant(),
+            0,
             p_pump
         );
     }

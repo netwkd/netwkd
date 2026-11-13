@@ -106,17 +106,15 @@ void ScriptTransport::make_peer(
     const String &p_address,
     const Dictionary &p_settings
 ) {
-    if (seam.is_null()) {
+    if (seam.is_null()
+        || !seam->make_peer(
+            armed_ticket,
+            NetwMultiplayer::TransportMode(p_mode),
+            p_address,
+            p_settings
+        )) {
         fail(ERR_UNCONFIGURED, "this transport cannot create a peer");
-        return;
     }
-    seam->arm(armed_ticket, outcome);
-    seam->make_peer(
-        armed_ticket,
-        NetwMultiplayer::TransportMode(p_mode),
-        p_address,
-        p_settings
-    );
 }
 
 void ScriptTransport::cancel_peer_creation() {
@@ -127,12 +125,9 @@ void ScriptTransport::cancel_peer_creation() {
 }
 
 void ScriptTransport::probe(const String &p_address) {
-    if (seam.is_null()) {
+    if (seam.is_null() || !seam->probe(armed_ticket, p_address)) {
         Transport::probe(p_address);
-        return;
     }
-    seam->arm(armed_ticket, outcome);
-    seam->probe(armed_ticket, p_address);
 }
 
 Ref<MultiplayerPeer> ScriptTransport::make_probe_peer(const String &p_address) {

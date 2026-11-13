@@ -15,7 +15,7 @@ namespace Networked;
 /// <code>
 /// var api := Netw.of(self)
 /// api.entity_despawn(NetwEntity.of(self).rid)
-/// api.scene_watch(Netw.scene(self).rid, peer_id)
+/// api.scene_watch(Netw.scene(self).rid, player.id)
 /// </code>
 /// <para>
 /// Each method prefix matches the class that wraps it.
@@ -24,12 +24,11 @@ namespace Networked;
 /// - <c>session_*</c> and <c>stats_*</c>: <see cref="NetwSession"/>
 /// - <c>clock_*</c>: <see cref="NetwClock"/>
 /// - <c>predict_*</c>: <see cref="NetwPrediction"/>
-/// - <c>entity_*</c>, <c>liveness_*</c>, and <c>spawn_*</c>:
-/// <see cref="NetwEntity"/>
-/// - <c>table_*</c>: <see cref="NetwTable"/>
+/// - <c>entity_*</c> and <c>spawn_*</c>: <see cref="NetwEntity"/>
+/// - <c>table_*</c> and <c>liveness_*</c>: <see cref="NetwTable"/>
 /// - <c>schema_*</c>: <see cref="NetwSchema"/>
 /// - <c>lagcomp_*</c>: <see cref="NetwAction"/>
-/// - <c>peer_*</c>: <see cref="NetwPlayer"/>
+/// - <c>player_*</c> and <c>peer_*</c>: <see cref="NetwPlayer"/>
 /// - <c>display_*</c>: <see cref="NetwDisplay"/>
 /// - <c>endpoint_*</c>: <see cref="NetwConnection"/>
 /// - <c>transport_*</c>: <see cref="NetwTransport"/>
@@ -37,6 +36,11 @@ namespace Networked;
 /// - <c>service_*</c>: <see cref="NetwService"/>
 /// - <c>database_*</c> and <c>persist_*</c>: <see cref="NetwDatabase"/> and
 /// <see cref="NetwPersistence"/>
+/// The <c>player_*</c> methods take or return a player id, which the session
+/// gives each player when its join is accepted. The id stays the same across a
+/// server transfer. Another session, such as one under a second
+/// <see cref="MultiplayerViewport"/>, gives out its own ids, so the same number
+/// names a different player there or none.
 /// </para>
 /// </remarks>
 public sealed class NetwMultiplayer : NetwRefCounted
@@ -108,13 +112,15 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         InterestExit = 17,
         /// <summary>
-        /// A peer started seeing an entity, along with
-        /// <see cref="NetwInterest.ObserverEntered"/>.
+        /// A peer started seeing an entity through a layer. It is recorded
+        /// wherever <see cref="NetwInterest.ObserverEntered"/> is emitted, even
+        /// when nothing is connected to that signal.
         /// </summary>
         ObserverEntered = 18,
         /// <summary>
-        /// A peer stopped seeing an entity, along with
-        /// <see cref="NetwInterest.ObserverExited"/>.
+        /// A peer stopped seeing an entity through a layer. It is recorded
+        /// wherever <see cref="NetwInterest.ObserverExited"/> is emitted, even
+        /// when nothing is connected to that signal.
         /// </summary>
         ObserverLeft = 19,
         /// <summary>
@@ -323,25 +329,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Reliable = 0,
     }
 
-    public enum RecordKind : long
-    {
-        /// <summary>
-        /// State the server owns and sends to everyone, such as a position. It
-        /// is kept for rewinding.
-        /// </summary>
-        State = 1,
-        /// <summary>
-        /// Input a client sends to the server only, such as movement keys. It
-        /// is kept for rewinding.
-        /// </summary>
-        Input = 2,
-        /// <summary>
-        /// Cosmetic values sent to everyone and not kept, such as an aim
-        /// direction.
-        /// </summary>
-        Broadcast = 3,
-    }
-
     public enum EntityState : long
     {
         /// <summary>
@@ -366,6 +353,63 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// become visible again. See <see cref="NetwEntity.Hidden"/>.
         /// </summary>
         Absent = 4,
+    }
+
+    public enum EntityParam : long
+    {
+        /// <summary>
+        /// The entity's <see cref="NetwEntity.AuthorityEnum"/>. Can only be set
+        /// before the node enters the tree. See
+        /// <see cref="NetwEntity.Authority"/>.
+        /// </summary>
+        Authority = 0,
+        /// <summary>
+        /// The entity's <see cref="NetwEntity.TransferEnum"/>. See
+        /// <see cref="NetwEntity.Transfer"/>.
+        /// </summary>
+        Transfer = 1,
+        /// <summary>
+        /// The entity's <see cref="NetwEntity.DisconnectRule"/>. See
+        /// <see cref="NetwEntity.OnControllerDisconnect"/>.
+        /// </summary>
+        OnControllerDisconnect = 2,
+        /// <summary>
+        /// The entity's <see cref="NetwEntity.ParentDespawnRule"/>. See
+        /// <see cref="NetwEntity.OnParentDespawn"/>.
+        /// </summary>
+        OnParentDespawn = 3,
+        /// <summary>
+        /// The <see cref="NetwEntity.HoldEnum"/> of the entity's controller. It
+        /// can only be read, and
+        /// <see cref="NetwMultiplayer.EntityRequestControl"/> changes it. See
+        /// <see cref="NetwEntity.Hold"/>.
+        /// </summary>
+        Hold = 4,
+        /// <summary>
+        /// [float] weight above zero. See
+        /// <see cref="NetwEntity.ReplicationPriority"/>.
+        /// </summary>
+        ReplicationPriority = 5,
+    }
+
+    public enum ControlState : long
+    {
+        /// <summary>
+        /// No request or release from this peer is waiting, and the controller
+        /// holds the entity with <see cref="NetwEntity.HoldEnum.None"/>.
+        /// </summary>
+        Settled = 0,
+        /// <summary>
+        /// A request or release from this peer is waiting for the server's
+        /// decision. See <see cref="NetwEntity.IsControlPending"/>.
+        /// </summary>
+        Pending = 1,
+        /// <summary>
+        /// No request or release from this peer is waiting, and the controller
+        /// holds the entity with <see cref="NetwEntity.HoldEnum.Soft"/> or
+        /// <see cref="NetwEntity.HoldEnum.Exclusive"/>.
+        /// </summary>
+        Held = 2,
     }
 
     public enum LayerParam : long
@@ -445,8 +489,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         Address = 1,
         /// <summary>
-        /// The name shown in a server browser. The only property
-        /// <see cref="NetwMultiplayer.EndpointSetParam"/> can change.
+        /// The name shown in a server browser. Read-only.
         /// </summary>
         DisplayName = 2,
         /// <summary>
@@ -454,6 +497,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// endpoint, or <c>""</c> when the game added it. Read-only.
         /// </summary>
         Source = 3,
+        /// <summary>
+        /// The sender's display name while
+        /// <see cref="NetwMultiplayer.EndpointFlags.Invited"/> is set, or
+        /// <c>""</c>. Read-only.
+        /// </summary>
+        InvitedBy = 4,
     }
 
     public enum EndpointState : long
@@ -492,6 +541,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// <see cref="NetwMultiplayer.EndpointFlags.Caller"/>.
         /// </summary>
         Observed = 4,
+        /// <summary>
+        /// An invitation from <see cref="NetwMultiplayer.EndpointInvite"/> is
+        /// pending, even one with no sender name. Cleared when joining this
+        /// endpoint reaches <see cref="NetwSession.StateEnum.Online"/>.
+        /// </summary>
+        Invited = 8,
     }
 
     public enum SceneParam : long
@@ -566,9 +621,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         JitterWindow = 10,
         /// <summary>
-        /// [float] seconds of jitter under which
-        /// <see cref="NetwMultiplayer.ClockIngestPong"/> reports
-        /// <c>is_stable</c>.
+        /// [float] seconds of jitter under which the clock counts the
+        /// connection as stable.
         /// </summary>
         JitterStabilityThreshold = 11,
         /// <summary>
@@ -579,6 +633,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// <summary>
         /// [bool]. When <c>true</c>, ticks only run through
         /// <see cref="NetwMultiplayer.ClockStep"/>.
+        /// <see cref="NetwClock.ManualTick"/> sets it.
         /// </summary>
         ManualTick = 14,
         /// <summary>
@@ -745,107 +800,30 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// [int] ticks. <see cref="NetwSimulation.MaxRestoreTicks"/>.
         /// </summary>
         MaxRestoreTicks = 4,
+        /// <summary>
+        /// [bool]. <see cref="NetwSimulation.ClaimOnContact"/>.
+        /// </summary>
+        ClaimOnContact = 5,
+        /// <summary>
+        /// [float] seconds. <see cref="NetwSimulation.ReleaseOnRest"/>.
+        /// </summary>
+        ReleaseOnRest = 6,
     }
 
-    public enum ColumnType : long
+    public enum SimPick : long
     {
         /// <summary>
-        /// 32-bit float.
+        /// Selects the entity or layer.
         /// </summary>
-        F32 = 0,
+        Chosen = 0,
         /// <summary>
-        /// 64-bit float.
+        /// Drops a selection made with
+        /// <see cref="NetwMultiplayer.SimPick.Chosen"/>. In
+        /// <see cref="NetwMultiplayer.SimulationSelectLayer"/> it clears every
+        /// layer pick whatever the layer, and also turns off the default
+        /// every-layer selection of a predicted entity.
         /// </summary>
-        F64 = 1,
-        /// <summary>
-        /// 8-bit signed integer.
-        /// </summary>
-        I8 = 2,
-        /// <summary>
-        /// 8-bit unsigned integer.
-        /// </summary>
-        U8 = 3,
-        /// <summary>
-        /// 16-bit signed integer.
-        /// </summary>
-        I16 = 4,
-        /// <summary>
-        /// 16-bit unsigned integer.
-        /// </summary>
-        U16 = 5,
-        /// <summary>
-        /// 32-bit integer.
-        /// </summary>
-        I32 = 6,
-        /// <summary>
-        /// 64-bit integer.
-        /// </summary>
-        I64 = 7,
-        /// <summary>
-        /// [bool], sent as one bit.
-        /// </summary>
-        Bool = 8,
-        /// <summary>
-        /// <see cref="Vector2"/>.
-        /// </summary>
-        Vector2 = 9,
-        /// <summary>
-        /// <see cref="Vector3"/>.
-        /// </summary>
-        Vector3 = 10,
-        /// <summary>
-        /// <see cref="Vector4"/>.
-        /// </summary>
-        Vector4 = 11,
-        /// <summary>
-        /// <see cref="Color"/>.
-        /// </summary>
-        Color = 12,
-        /// <summary>
-        /// <see cref="Quaternion"/>, sent compressed.
-        /// </summary>
-        Quaternion = 13,
-        /// <summary>
-        /// An entity route. Use <see cref="NetwMultiplayer.EntityFromRoute"/>
-        /// to get the entity.
-        /// </summary>
-        Entity = 14,
-        /// <summary>
-        /// Any <see cref="Variant"/>, such as a
-        /// <see cref="Godot.Collections.Dictionary"/>. Not allowed in tables.
-        /// </summary>
-        Variant = 15,
-        /// <summary>
-        /// <see cref="string"/>. Not allowed in tables.
-        /// </summary>
-        String = 16,
-    }
-
-    public enum DatabaseState : long
-    {
-        /// <summary>
-        /// No slot is open.
-        /// </summary>
-        Closed = 0,
-        /// <summary>
-        /// <see cref="NetwMultiplayer.DatabaseOpen"/> has not finished.
-        /// </summary>
-        Opening = 1,
-        /// <summary>
-        /// A slot is open.
-        /// </summary>
-        Open = 2,
-        /// <summary>
-        /// <see cref="NetwMultiplayer.DatabaseClose"/> is waiting for pending
-        /// operations.
-        /// </summary>
-        Closing = 3,
-        /// <summary>
-        /// The storage is unavailable, and
-        /// <see cref="NetwMultiplayer.DatabaseOpen"/> fails with
-        /// <c>@GlobalScope.ERR_CANT_ACQUIRE_RESOURCE</c>.
-        /// </summary>
-        Faulted = 4,
+        Forget = 1,
     }
 
     public enum Stat : long
@@ -1022,8 +1000,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         StandaloneAcksOut = 39,
         /// <summary>
-        /// Gauge. Callbacks from <see cref="NetwMultiplayer.LivenessWhenLive"/>
-        /// still waiting.
+        /// Gauge. Packets waiting for the entity they name to spawn on this
+        /// peer.
         /// </summary>
         PendingLive = 40,
         /// <summary>
@@ -1274,7 +1252,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
         AttributionDroppedOut = 96,
         /// <summary>
         /// Counter. Property updates delayed because the bandwidth limit in
-        /// <see cref="NetwMultiplayer.PeerLinkStats"/> was reached.
+        /// <see cref="NetwMultiplayer.PeerGetLinkStats"/> was reached.
         /// </summary>
         RowFramesDeferred = 97,
         /// <summary>
@@ -1291,8 +1269,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
     public const long EventRowWidth = 8;
 
     /// <summary>
-    /// Same as <see cref="SceneMultiplayer.PeerAuthenticating"/>, from
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// Same as <see cref="SceneMultiplayer.PeerAuthenticating"/>.
     /// </summary>
     public event Action<long> PeerAuthenticating
     {
@@ -1308,8 +1285,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     /// <summary>
-    /// Same as <see cref="SceneMultiplayer.PeerAuthenticationFailed"/>, from
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// Same as <see cref="SceneMultiplayer.PeerAuthenticationFailed"/>.
     /// </summary>
     public event Action<long> PeerAuthenticationFailed
     {
@@ -1343,246 +1319,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         remove => DisconnectBridge("peer_packet", value);
     }
 
-    private static readonly IntPtr _bindRpcGetRelaySender =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "rpc_get_relay_sender",
-            3905245786UL);
-
-    /// <summary>
-    /// The peer that sent the RPC being run, like
-    /// <see cref="MultiplayerApi.GetRemoteSenderId"/>.
-    /// </summary>
-    public long RelaySender
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindRpcGetRelaySender,
-                Checked,
-                ref answered);
-            return answered;
-        }
-    }
-
-    private static readonly IntPtr _bindSessionGetInner =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_get_inner",
-            2497093383UL);
-
-    private static readonly IntPtr _bindSessionSetInner =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_set_inner",
-            1616192133UL);
-
-    /// <summary>
-    /// The <see cref="SceneMultiplayer"/> this session wraps. It owns the
-    /// <see cref="MultiplayerPeer"/>, the connection and authentication. Never
-    /// <c>null</c>.
-    /// </summary>
-    public SceneMultiplayer Inner
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindSessionGetInner, Checked, ref answered);
-            SceneMultiplayer result =
-                (SceneMultiplayer)VariantUtils.ConvertToGodotObject(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            IntPtr slot0 = value?.NativeInstance ?? IntPtr.Zero;
-            long discarded = default;
-            NetwThunks.Ptrcall1_IntPtr_Long(
-                _bindSessionSetInner,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindSessionRoot =
-        NetwApi.MethodBind("NetwMultiplayer", "session_root", 3160264692UL);
-
-    /// <summary>
-    /// The node at <see cref="NetwMultiplayer.RootPath"/>, which is the root
-    /// window or a <see cref="MultiplayerViewport"/>.
-    /// <see cref="NetwMultiplayer.SessionSetRoot"/> can change how it is found.
-    /// </summary>
-    public Node Root
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindSessionRoot, Checked, ref answered);
-            Node result = (Node)VariantUtils.ConvertToGodotObject(answered);
-            answered.Dispose();
-            return result;
-        }
-    }
-
-    private static readonly IntPtr _bindSessionGetState =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_get_state",
-            1135084573UL);
-
-    /// <summary>
-    /// Same as <see cref="NetwSession.State"/>.
-    /// </summary>
-    public NetwSession.StateEnum State
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindSessionGetState,
-                Checked,
-                ref answered);
-            return (NetwSession.StateEnum)answered;
-        }
-    }
-
-    private static readonly IntPtr _bindSessionGetRole =
-        NetwApi.MethodBind("NetwMultiplayer", "session_get_role", 3770310992UL);
-
-    /// <summary>
-    /// What this peer is in the session. <c>MultiplayerAPI.is_server</c> and
-    /// <see cref="NetwMultiplayer.IsLocalClient"/> are usually what a game
-    /// wants.
-    /// - <see cref="NetwSession.RoleEnum.None"/> no session
-    /// - <see cref="NetwSession.RoleEnum.Client"/> a client
-    /// - <see cref="NetwSession.RoleEnum.DedicatedServer"/> a server with no
-    /// player
-    /// - <see cref="NetwSession.RoleEnum.ListenServer"/> a server that also
-    /// plays
-    /// </summary>
-    public NetwSession.RoleEnum Role
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindSessionGetRole,
-                Checked,
-                ref answered);
-            return (NetwSession.RoleEnum)answered;
-        }
-    }
-
-    private static readonly IntPtr _bindGetIsOnline =
-        NetwApi.MethodBind("NetwMultiplayer", "get_is_online", 36873697UL);
-
-    /// <summary>
-    /// <c>true</c> when <see cref="NetwMultiplayer.State"/> is
-    /// <see cref="NetwSession.StateEnum.Online"/>.
-    /// </summary>
-    public bool IsOnline
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(_bindGetIsOnline, Checked, ref answered);
-            return answered != 0;
-        }
-    }
-
-    private static readonly IntPtr _bindGetIsLocalClient =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "get_is_local_client",
-            36873697UL);
-
-    /// <summary>
-    /// <c>true</c> when this peer has its own player, which is at
-    /// <see cref="NetwSession.RoleEnum.Client"/> and
-    /// <see cref="NetwSession.RoleEnum.ListenServer"/>. It reads the same for
-    /// every entity, so ask <see cref="NetwEntity.IsControlledLocally"/>
-    /// whether an entity is this player's.
-    /// </summary>
-    public bool IsLocalClient
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(
-                _bindGetIsLocalClient,
-                Checked,
-                ref answered);
-            return answered != 0;
-        }
-    }
-
-    private static readonly IntPtr _bindPlayerJoinedAll =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "player_joined_all",
-            2915620761UL);
-
-    /// <summary>
-    /// Every player whose join was accepted. A connected peer that has not
-    /// joined is not here.
-    /// </summary>
-    public NetwPlayer[] Players
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindPlayerJoinedAll, Checked, ref answered);
-            NetwPlayer[] result =
-                NetwApi.Elements(
-                    VariantUtils.ConvertToArray(answered),
-                    NetwPlayer.From);
-            answered.Dispose();
-            return result;
-        }
-    }
-
-    private static readonly IntPtr _bindPlayerAll =
-        NetwApi.MethodBind("NetwMultiplayer", "player_all", 3995934104UL);
-
-    /// <summary>
-    /// Every player, sorted by peer id. Same as
-    /// <see cref="NetwMultiplayer.Players"/>, except that a player who is
-    /// leaving stays here a little longer.
-    /// </summary>
-    public NetwPlayer[] ConnectedPlayers
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindPlayerAll, Checked, ref answered);
-            NetwPlayer[] result =
-                NetwApi.Elements(
-                    VariantUtils.ConvertToArray(answered),
-                    NetwPlayer.From);
-            answered.Dispose();
-            return result;
-        }
-    }
-
-    private static readonly IntPtr _bindPlayerLocal =
-        NetwApi.MethodBind("NetwMultiplayer", "player_local", 3183676423UL);
-
-    /// <summary>
-    /// The accepted <see cref="NetwPlayer"/> for this peer, or <c>null</c>
-    /// before its join is accepted.
-    /// </summary>
-    public NetwPlayer LocalPlayer
-    {
-        get
-        {
-            IntPtr answered = default;
-            NetwThunks.Ptrcall0_IntPtr(_bindPlayerLocal, Checked, ref answered);
-            return NetwPlayer.Adopt(answered);
-        }
-    }
-
     private static readonly IntPtr _bindGetRootPath =
         NetwApi.MethodBind("NetwMultiplayer", "get_root_path", 4075236667UL);
 
@@ -1590,10 +1326,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind("NetwMultiplayer", "set_root_path", 1348162250UL);
 
     /// <summary>
-    /// Same as <see cref="SceneMultiplayer.RootPath"/>, applied to
-    /// <see cref="NetwMultiplayer.Inner"/>. It starts at <c>/root</c>, the path
-    /// <c>SceneTree.set_multiplayer</c> gives a session that covers the whole
-    /// tree.
+    /// Same as <see cref="SceneMultiplayer.RootPath"/>. It starts at
+    /// <c>/root</c>, the path <c>SceneTree.set_multiplayer</c> gives a session
+    /// that covers the whole tree.
     /// </summary>
     public NodePath RootPath
     {
@@ -1628,8 +1363,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
             2586408642UL);
 
     /// <summary>
-    /// Same as <c>SceneMultiplayer.allow_object_decoding</c>, applied to
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// Same as <c>SceneMultiplayer.allow_object_decoding</c>.
     /// </summary>
     public bool AllowObjectDecoding
     {
@@ -1744,8 +1478,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
             2586408642UL);
 
     /// <summary>
-    /// Same as <c>SceneMultiplayer.server_relay</c>, applied to
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// Same as <c>SceneMultiplayer.server_relay</c>.
     /// </summary>
     public bool ServerRelay
     {
@@ -1822,8 +1555,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
             1286410249UL);
 
     /// <summary>
-    /// Same as <c>SceneMultiplayer.max_delta_packet_size</c>, applied to
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// Same as <c>SceneMultiplayer.max_delta_packet_size</c>.
     /// </summary>
     public int MaxDeltaPacketSize
     {
@@ -1845,35 +1577,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
                 Checked,
                 in slot0,
                 ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindScenePlayerEntitiesAll =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "scene_player_entities_all",
-            2915620761UL);
-
-    /// <summary>
-    /// Every entity spawned for a player with <see cref="Netw.SpawnPlayer"/>,
-    /// in every scene. Entities in different scenes can share a
-    /// <see cref="NetwEntity.Name"/>.
-    /// </summary>
-    public NetwEntity[] PlayerEntities
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(
-                _bindScenePlayerEntitiesAll,
-                Checked,
-                ref answered);
-            NetwEntity[] result =
-                NetwApi.Elements(
-                    VariantUtils.ConvertToArray(answered),
-                    NetwEntity.From);
-            answered.Dispose();
-            return result;
         }
     }
 
@@ -1922,303 +1625,25 @@ public sealed class NetwMultiplayer : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindPredictFlushTap =
+    private static readonly IntPtr _bindEntityGetRecipients =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "predict_flush_tap",
-            3218959716UL);
-
-    /// <summary>
-    /// Writes the buffered prediction log to disk now. It is also written every
-    /// second.
-    /// </summary>
-    public void PredictFlushTap()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindPredictFlushTap, Checked, ref discarded);
-    }
-
-    private static readonly IntPtr _bindPredictGetTapCost =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_get_tap_cost",
-            3102165223UL);
-
-    /// <summary>
-    /// Returns what the prediction log has cost so far, or an empty
-    /// <see cref="Godot.Collections.Dictionary"/> when it is off.
-    /// <code>
-    /// Dictionary
-    /// ┠╴bytes            int     bytes written
-    /// ┠╴lines            int     lines written
-    /// ┠╴drains           int     how many times it was written out
-    /// ┖╴mean_drain_usec  float   average time of one write, in microseconds
-    /// </code>
-    /// </summary>
-    public Godot.Collections.Dictionary PredictGetTapCost()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindPredictGetTapCost, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSessionFlushDeferred =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_flush_deferred",
-            3218959716UL);
-
-    /// <summary>
-    /// Runs every call queued with <see cref="NetwMultiplayer.SessionDefer"/>
-    /// until none are left. This is where the session reacts to nodes added,
-    /// moved or freed. The session calls it every frame. Call it to see the
-    /// result of tree changes before then. Do not call it from
-    /// <see cref="Node.TreeEntered"/> or <see cref="Node.TreeExiting"/>, since
-    /// a <see cref="Node.Reparent"/> may be half done. An error is pushed if
-    /// calls keep queueing themselves forever.
-    /// </summary>
-    public void SessionFlushDeferred()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(
-            _bindSessionFlushDeferred,
-            Checked,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindInterestLayer =
-        NetwApi.MethodBind("NetwMultiplayer", "interest_layer", 3960022815UL);
-
-    /// <summary>
-    /// Returns the layer called <paramref name="name"/>, creating it on first
-    /// use. Returns <c>null</c> for a layer that belongs to a scene.
-    /// </summary>
-    public NetwInterestLayer InterestLayer(StringName name)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(name);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindInterestLayer, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        NetwInterestLayer result =
-            NetwInterestLayer.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestLayerNamed =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_layer_named",
-            2491803521UL);
-
-    /// <summary>
-    /// Returns the layer called <paramref name="name"/>, or <c>null</c>. Does
-    /// not create it. A layer that belongs to a scene returns <c>null</c>, so
-    /// use <see cref="Netw.Scene"/> for it.
-    /// </summary>
-    public NetwInterestLayer InterestLayerNamed(StringName name)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(name);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindInterestLayerNamed,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        NetwInterestLayer result =
-            NetwInterestLayer.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestLayers =
-        NetwApi.MethodBind("NetwMultiplayer", "interest_layers", 3995934104UL);
-
-    /// <summary>
-    /// Returns every <see cref="NetwInterestLayer"/> in this session, in no
-    /// particular order.
-    /// </summary>
-    public Godot.Collections.Array InterestLayers()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindInterestLayers, Checked, ref answered);
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestPlayerSees =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_player_sees",
-            2487528652UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when the player <paramref name="peerId"/> can see
-    /// <paramref name="entity"/>. A host player follows the same rules as a
-    /// client. A client can only ask about itself.
-    /// </summary>
-    public bool InterestPlayerSees(long peerId, NetwEntity entity)
-    {
-        long slot0 = peerId;
-        IntPtr slot1 = entity?.Native ?? IntPtr.Zero;
-        byte answered = default;
-        NetwThunks.Ptrcall2_Long_IntPtr_Byte(
-            _bindInterestPlayerSees,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindInterestResolvedLayerIds =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_resolved_layer_ids",
-            2392259741UL);
-
-    /// <summary>
-    /// Returns the sorted names of every layer <paramref name="entity"/> is in.
-    /// </summary>
-    public Godot.Collections.Array InterestResolvedLayerIds(NetwEntity entity)
-    {
-        godot_variant slot0 =
-            VariantUtils.CreateFromGodotObjectPtr(
-                entity?.Native ?? IntPtr.Zero);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindInterestResolvedLayerIds,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestSharedEntities =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_shared_entities",
-            968556977UL);
-
-    /// <summary>
-    /// Returns every other entity that shares the layer
-    /// <paramref name="layerId"/> with <paramref name="entity"/>, sorted by
-    /// <see cref="NetwEntity.Name"/>. An empty <paramref name="layerId"/>
-    /// checks every layer of <paramref name="entity"/>.
-    /// </summary>
-    public NetwEntity[] InterestSharedEntities(
-        NetwEntity entity,
-        StringName layerId = null)
-    {
-        layerId ??= new StringName("");
-        godot_variant slot0 =
-            VariantUtils.CreateFromGodotObjectPtr(
-                entity?.Native ?? IntPtr.Zero);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindInterestSharedEntities,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        NetwEntity[] result =
-            NetwApi.Elements(
-                VariantUtils.ConvertToArray(answered),
-                NetwEntity.From);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestMonitorSnapshot =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_monitor_snapshot",
-            2382534195UL);
-
-    /// <summary>
-    /// Returns counts across every layer in this session.
-    /// <code>
-    /// Dictionary
-    /// ┠╴layers                 int  number of layers
-    /// ┠╴entities_filtered      int  entities in at least one layer
-    /// ┠╴visible_edges          int  (entity, peer) pairs that can see each other
-    /// ┠╴dirty_entities         int  entities with pending changes
-    /// ┠╴relay_backlog          int  pending visibility updates to send
-    /// ┠╴transitions_total      int  enters plus leaves since startup
-    /// ┖╴vanished_dirty_skips   int  pending entities that left before applying
-    /// </code>
-    /// </summary>
-    public Godot.Collections.Dictionary InterestMonitorSnapshot()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindInterestMonitorSnapshot, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestWireAdmits =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_wire_admits",
-            2487528652UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when updates for <paramref name="entity"/> are sent
-    /// to <paramref name="peerId"/>. Always <c>true</c> for the server and for
-    /// the controller of <paramref name="entity"/>, and
-    /// <see cref="NetwMultiplayer.InterestPlayerSees"/> for everyone else.
-    /// </summary>
-    public bool InterestWireAdmits(long peerId, NetwEntity entity)
-    {
-        long slot0 = peerId;
-        IntPtr slot1 = entity?.Native ?? IntPtr.Zero;
-        byte answered = default;
-        NetwThunks.Ptrcall2_Long_IntPtr_Byte(
-            _bindInterestWireAdmits,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindRpcGetRecipients =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "rpc_get_recipients",
-            3431469892UL);
+            "entity_get_recipients",
+            426342219UL);
 
     /// <summary>
     /// Returns the peers an RPC on <paramref name="entity"/> is sent to, which
     /// is every connected peer except this one. Offline, it returns <c>[1]</c>.
-    /// Use <see cref="NetwMultiplayer.InterestPlayerSees"/> to ask who can see
-    /// the entity.
+    /// Returns an empty array when <paramref name="entity"/> is not in this
+    /// session. Use <see cref="NetwMultiplayer.InterestIsVisible"/> to ask who
+    /// can see the entity.
     /// </summary>
-    public int[] RpcGetRecipients(NetwEntity entity)
+    public int[] EntityGetRecipients(Rid entity)
     {
-        godot_variant slot0 =
-            VariantUtils.CreateFromGodotObjectPtr(
-                entity?.Native ?? IntPtr.Zero);
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant answered = default;
         NetwThunks.Call1(
-            _bindRpcGetRecipients,
+            _bindEntityGetRecipients,
             Checked,
             in slot0,
             ref answered);
@@ -2256,7 +1681,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <summary>
     /// Calls <paramref name="callable"/> with <paramref name="args"/> as an RPC
     /// on <paramref name="peer"/>, or on every peer from
-    /// <see cref="NetwMultiplayer.RpcGetRecipients"/> when
+    /// <see cref="NetwMultiplayer.EntityGetRecipients"/> when
     /// <paramref name="peer"/> is <c>0</c>. The node must belong to an entity,
     /// and the method must be an RPC. A <see cref="NetwEntity"/> in
     /// <paramref name="args"/> arrives as the receiver's own
@@ -2369,48 +1794,20 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindLagcompMetrics =
-        NetwApi.MethodBind("NetwMultiplayer", "lagcomp_metrics", 3102165223UL);
+    private static readonly IntPtr _bindSessionGetStats =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_get_stats",
+            2382534195UL);
 
     /// <summary>
-    /// Returns lag compensation counters. Totals count from startup.
-    /// <code>
-    /// Dictionary
-    /// ┠╴entities          int         entities simulated this tick
-    /// ┠╴timelines         int         rewindable entities recorded this tick
-    /// ┠╴corrections       int         total corrections
-    /// ┠╴installs          int         total server states written onto simulated entities
-    /// ┠╴max_replay_depth  int         most ticks replayed at once
-    /// ┠╴consumed          int         total inputs the server used
-    /// ┠╴missing           int         total input ticks that never arrived
-    /// ┠╴folded            int         physics frames merged into an existing input
-    /// ┠╴joint             Dictionary  totals for bodies simulated together
-    /// ┠╴pending_actions   int         actions waiting to run
-    /// ┠╴effects_armed     int         effects waiting to be confirmed or denied
-    /// ┖╴gate_fallbacks    int         actions that ran without all their state
-    /// </code>
+    /// Returns every <see cref="NetwMultiplayer.Stat"/> value, keyed by the
+    /// lowercase constant name, such as <c>sent_bytes</c>.
     /// </summary>
-    public Godot.Collections.Dictionary LagcompMetrics()
+    public Godot.Collections.Dictionary SessionGetStats()
     {
         godot_variant answered = default;
-        NetwThunks.Call0(_bindLagcompMetrics, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindStatsSnapshot =
-        NetwApi.MethodBind("NetwMultiplayer", "stats_snapshot", 2382534195UL);
-
-    /// <summary>
-    /// Every <see cref="NetwMultiplayer.Stat"/> value, keyed by the lowercase
-    /// constant name, such as <c>sent_bytes</c>.
-    /// </summary>
-    public Godot.Collections.Dictionary StatsSnapshot()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindStatsSnapshot, Checked, ref answered);
+        NetwThunks.Call0(_bindSessionGetStats, Checked, ref answered);
         Godot.Collections.Dictionary result =
             VariantUtils.ConvertToDictionary(answered);
         answered.Dispose();
@@ -2440,67 +1837,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return answered;
     }
 
-    private static readonly IntPtr _bindSceneObserve =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_observe", 798455615UL);
-
-    /// <summary>
-    /// Calls <paramref name="callback"/> when <paramref name="event"/> happens
-    /// on <paramref name="scene"/>. Adding the same callback twice has no
-    /// effect. Return <c>true</c> from <paramref name="callback"/> to stop
-    /// receiving events. <see cref="NetwMultiplayer.SceneUnobserve"/> removes
-    /// it.
-    /// </summary>
-    public void SceneObserve(
-        Rid scene,
-        NetwScene.SceneEvent @event,
-        Callable callback)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(scene);
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)@event);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindSceneObserve,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindSceneUnobserve =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_unobserve", 798455615UL);
-
-    /// <summary>
-    /// Removes a <paramref name="callback"/> added with
-    /// <see cref="NetwMultiplayer.SceneObserve"/>.
-    /// </summary>
-    public void SceneUnobserve(
-        Rid scene,
-        NetwScene.SceneEvent @event,
-        Callable callback)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(scene);
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)@event);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindSceneUnobserve,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        answered.Dispose();
-    }
-
     private static readonly IntPtr _bindInterestLayerFind =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -2524,29 +1860,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Rid result = VariantUtils.ConvertToRid(answered);
         answered.Dispose();
         return result;
-    }
-
-    private static readonly IntPtr _bindInterestLayerView =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_layer_view",
-            2895416763UL);
-
-    /// <summary>
-    /// Returns <paramref name="layer"/> as a <see cref="NetwInterestLayer"/>,
-    /// or <c>null</c>. A layer that belongs to a scene returns <c>null</c>, so
-    /// use <see cref="Netw.Scene"/> for it.
-    /// </summary>
-    public NetwInterestLayer InterestLayerView(Rid layer)
-    {
-        Rid slot0 = layer;
-        IntPtr answered = default;
-        NetwThunks.Ptrcall1_Rid_IntPtr(
-            _bindInterestLayerView,
-            Checked,
-            in slot0,
-            ref answered);
-        return NetwInterestLayer.Adopt(answered);
     }
 
     private static readonly IntPtr _bindInterestLayerSetMonitorCallback =
@@ -2600,21 +1913,92 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindSessionSetRoot =
-        NetwApi.MethodBind("NetwMultiplayer", "session_set_root", 1611583062UL);
+    private static readonly IntPtr _bindSessionGetState =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_get_state",
+            1135084573UL);
 
     /// <summary>
-    /// Sets the function <see cref="NetwMultiplayer.Root"/> calls to find its
-    /// node. <paramref name="reader"/> takes no arguments and returns a
-    /// <see cref="Node"/>.
+    /// Returns the <see cref="NetwSession.StateEnum"/> the session is in, the
+    /// same as <see cref="NetwSession.State"/>.
     /// </summary>
-    public void SessionSetRoot(Callable reader)
+    public NetwSession.StateEnum SessionGetState()
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(reader);
+        long answered = default;
+        NetwThunks.Ptrcall0_Long(_bindSessionGetState, Checked, ref answered);
+        return (NetwSession.StateEnum)answered;
+    }
+
+    private static readonly IntPtr _bindSessionGetRole =
+        NetwApi.MethodBind("NetwMultiplayer", "session_get_role", 3770310992UL);
+
+    /// <summary>
+    /// Returns the <see cref="NetwSession.RoleEnum"/> of this peer.
+    /// <c>MultiplayerAPI.is_server</c> and
+    /// <see cref="NetwMultiplayer.SessionIsLocalClient"/> are usually what a
+    /// game wants.
+    /// </summary>
+    public NetwSession.RoleEnum SessionGetRole()
+    {
+        long answered = default;
+        NetwThunks.Ptrcall0_Long(_bindSessionGetRole, Checked, ref answered);
+        return (NetwSession.RoleEnum)answered;
+    }
+
+    private static readonly IntPtr _bindSessionIsOnline =
+        NetwApi.MethodBind("NetwMultiplayer", "session_is_online", 36873697UL);
+
+    /// <summary>
+    /// Returns <c>true</c> while the session is at
+    /// <see cref="NetwSession.StateEnum.Online"/>, the same as
+    /// <see cref="NetwSession.IsOnline"/>.
+    /// </summary>
+    public bool SessionIsOnline()
+    {
+        byte answered = default;
+        NetwThunks.Ptrcall0_Byte(_bindSessionIsOnline, Checked, ref answered);
+        return answered != 0;
+    }
+
+    private static readonly IntPtr _bindSessionIsLocalClient =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_is_local_client",
+            36873697UL);
+
+    /// <summary>
+    /// Returns <c>true</c> when this peer has its own player, at
+    /// <see cref="NetwSession.RoleEnum.Client"/> and
+    /// <see cref="NetwSession.RoleEnum.ListenServer"/>. Ask
+    /// <see cref="NetwEntity.IsControlledLocally"/> whether an entity is this
+    /// player's.
+    /// </summary>
+    public bool SessionIsLocalClient()
+    {
+        byte answered = default;
+        NetwThunks.Ptrcall0_Byte(
+            _bindSessionIsLocalClient,
+            Checked,
+            ref answered);
+        return answered != 0;
+    }
+
+    private static readonly IntPtr _bindSessionGetRoot =
+        NetwApi.MethodBind("NetwMultiplayer", "session_get_root", 3160264692UL);
+
+    /// <summary>
+    /// Returns the node the session runs under, at
+    /// <see cref="NetwMultiplayer.RootPath"/>. It is the root window or a
+    /// <see cref="MultiplayerViewport"/>.
+    /// </summary>
+    public Node SessionGetRoot()
+    {
         godot_variant answered = default;
-        NetwThunks.Call1(_bindSessionSetRoot, Checked, in slot0, ref answered);
-        slot0.Dispose();
+        NetwThunks.Call0(_bindSessionGetRoot, Checked, ref answered);
+        Node result = (Node)VariantUtils.ConvertToGodotObject(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindClear =
@@ -2622,8 +2006,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Clears the replication state of the wrapped
-    /// <see cref="NetwMultiplayer.Inner"/> <see cref="SceneMultiplayer"/>.
-    /// Players, services and entities are kept.
+    /// <see cref="SceneMultiplayer"/>. Players, services and entities are kept.
     /// </summary>
     public void Clear()
     {
@@ -2660,6 +2043,39 @@ public sealed class NetwMultiplayer : NetwRefCounted
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindEndpointAdd,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        Rid result = VariantUtils.ConvertToRid(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindEndpointInvite =
+        NetwApi.MethodBind("NetwMultiplayer", "endpoint_invite", 2360598648UL);
+
+    /// <summary>
+    /// The flat form of <see cref="NetwConnection.Invite"/>. Returns the
+    /// invited endpoint, or an invalid <see cref="Rid"/> when
+    /// <paramref name="transport"/> is unknown or <paramref name="address"/> is
+    /// empty.
+    /// </summary>
+    public Rid EndpointInvite(
+        Rid transport,
+        string address,
+        string fromName = "")
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(transport);
+        godot_variant slot1 = VariantUtils.CreateFromString(address);
+        godot_variant slot2 = VariantUtils.CreateFromString(fromName);
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindEndpointInvite,
             Checked,
             in slot0,
             in slot1,
@@ -2732,6 +2148,30 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
+    private static readonly IntPtr _bindEndpointGetCurrent =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "endpoint_get_current",
+            529393457UL);
+
+    /// <summary>
+    /// Returns the endpoint this peer is connected through, its own on a host,
+    /// or an invalid <see cref="Rid"/> before
+    /// <see cref="NetwSession.StateEnum.Online"/>. It is also invalid when the
+    /// assigned peer supplies no address, or when the peer's transport was
+    /// removed with <see cref="NetwMultiplayer.TransportUnregister"/> while
+    /// online. It is the listed endpoint at that address when there is one, and
+    /// otherwise an endpoint <see cref="NetwMultiplayer.EndpointList"/> does
+    /// not return and <see cref="NetwMultiplayer.EndpointProbe"/> does not
+    /// probe. The flat form of <see cref="NetwConnection.CurrentEndpoint"/>.
+    /// </summary>
+    public Rid EndpointGetCurrent()
+    {
+        Rid answered = default;
+        NetwThunks.Ptrcall0_Rid(_bindEndpointGetCurrent, Checked, ref answered);
+        return answered;
+    }
+
     private static readonly IntPtr _bindEndpointGetParam =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -2758,47 +2198,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         Variant result = Variant.CreateCopyingBorrowed(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindEndpointSetParam =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "endpoint_set_param",
-            931495360UL);
-
-    /// <summary>
-    /// Changes one property of <paramref name="endpoint"/> and emits
-    /// <see cref="NetwEndpoint.Changed"/>. Only
-    /// <see cref="NetwMultiplayer.EndpointParam.DisplayName"/> can be changed.
-    /// <code>
-    /// Error
-    /// ┠╴OK                     the property changed
-    /// ┠╴ERR_DOES_NOT_EXIST     the endpoint does not exist
-    /// ┖╴ERR_INVALID_PARAMETER  param names anything but ENDPOINT_PARAM_DISPLAY_NAME
-    /// </code>
-    /// </summary>
-    public Error EndpointSetParam(
-        Rid endpoint,
-        NetwMultiplayer.EndpointParam param,
-        Variant value)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(endpoint);
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)param);
-        godot_variant slot2 = value.CopyNativeVariant();
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindEndpointSetParam,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
     }
@@ -3015,41 +2414,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
             Checked,
             in slot0,
             ref discarded);
-    }
-
-    private static readonly IntPtr _bindTransportJoin =
-        NetwApi.MethodBind("NetwMultiplayer", "transport_join", 2399309796UL);
-
-    /// <summary>
-    /// Joins <paramref name="address"/> through <paramref name="transport"/>,
-    /// as <see cref="NetwConnection.Join"/> joins a listed row.
-    /// </summary>
-    public NetwPromise TransportJoin(
-        Rid transport,
-        string address,
-        Godot.Collections.Dictionary settings = null)
-    {
-        settings ??= new Godot.Collections.Dictionary();
-        godot_variant slot0 = VariantUtils.CreateFromRid(transport);
-        godot_variant slot1 = VariantUtils.CreateFromString(address);
-        godot_variant slot2 = VariantUtils.CreateFromDictionary(settings);
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindTransportJoin,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        NetwPromise result =
-            NetwPromise.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
     }
 
     private static readonly IntPtr _bindEndpointJoin =
@@ -3289,6 +2653,29 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
+    private static readonly IntPtr _bindTransportFindScript =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_find_script",
+            472080789UL);
+
+    /// <summary>
+    /// Returns the transport <see cref="NetwMultiplayer.TransportRegister"/>
+    /// registered for the <see cref="NetwTransport"/> script
+    /// <paramref name="type"/>, or an invalid <see cref="Rid"/>.
+    /// </summary>
+    public Rid TransportFindScript(Script type)
+    {
+        IntPtr slot0 = type?.NativeInstance ?? IntPtr.Zero;
+        Rid answered = default;
+        NetwThunks.Ptrcall1_IntPtr_Rid(
+            _bindTransportFindScript,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
     private static readonly IntPtr _bindTransportGetParam =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -3327,24 +2714,215 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindPeerJoinAddress =
+    private static readonly IntPtr _bindTransportGetJoinAddress =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "peer_join_address",
+            "transport_get_join_address",
             2841200299UL);
 
     /// <summary>
-    /// The address other players use to join this session, such as a host and
-    /// port for <see cref="ENetMultiplayerPeer"/> or a lobby id. Empty when
-    /// there is none.
+    /// The flat form of reading <see cref="NetwConnection.JoinAddress"/>.
     /// </summary>
-    public string PeerJoinAddress()
+    public string TransportGetJoinAddress()
     {
         godot_variant answered = default;
-        NetwThunks.Call0(_bindPeerJoinAddress, Checked, ref answered);
+        NetwThunks.Call0(_bindTransportGetJoinAddress, Checked, ref answered);
         string result = VariantUtils.ConvertToString(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindTransportSetJoinAddress =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_set_join_address",
+            166001499UL);
+
+    /// <summary>
+    /// The flat form of setting <see cref="NetwConnection.JoinAddress"/>. Every
+    /// admitted client receives the new address.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the address changed
+    /// ┠╴ERR_UNAVAILABLE        the session is not online, or this peer is not the server
+    /// ┖╴ERR_INVALID_PARAMETER  address is longer than 1023 bytes of UTF-8
+    /// </code>
+    /// <para>
+    /// <b>Server Only.</b>
+    /// </para>
+    /// </summary>
+    public Error TransportSetJoinAddress(string address)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromString(address);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindTransportSetJoinAddress,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindTransportGetMaxPlayers =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_get_max_players",
+            3905245786UL);
+
+    /// <summary>
+    /// The flat form of <see cref="NetwConnection.MaxPlayers"/>.
+    /// </summary>
+    public long TransportGetMaxPlayers()
+    {
+        long answered = default;
+        NetwThunks.Ptrcall0_Long(
+            _bindTransportGetMaxPlayers,
+            Checked,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindTransportGetPeerDiagnostics =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_get_peer_diagnostics",
+            3554694381UL);
+
+    /// <summary>
+    /// The flat form of <see cref="NetwConnection.Diagnostics"/>.
+    /// </summary>
+    public Godot.Collections.Dictionary TransportGetPeerDiagnostics(long peer)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindTransportGetPeerDiagnostics,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        Godot.Collections.Dictionary result =
+            VariantUtils.ConvertToDictionary(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindTransportReportProgress =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_report_progress",
+            1826688236UL);
+
+    /// <summary>
+    /// Reports progress on the request <paramref name="ticket"/> through
+    /// <see cref="NetwConnection.Progressed"/>, while it is the host or join in
+    /// progress. <see cref="NetwTransport.Report"/> calls it.
+    /// </summary>
+    public void TransportReportProgress(
+        Rid ticket,
+        string message,
+        double ratio = -1.0)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(ticket);
+        godot_variant slot1 = VariantUtils.CreateFromString(message);
+        godot_variant slot2 = VariantUtils.CreateFromFloat(ratio);
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindTransportReportProgress,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindTransportComplete =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_complete",
+            1720734847UL);
+
+    /// <summary>
+    /// Settles the request <paramref name="ticket"/> that a transport is
+    /// working on. <see cref="NetwTransport.Deliver"/>,
+    /// <see cref="NetwTransport.DeliverProbe"/> and
+    /// <see cref="NetwTransport.Fail"/> call it. A ticket that is already
+    /// settled, cancelled or from another session settles nothing.
+    /// <code>
+    /// error OK, a MultiplayerPeer    the peer is the result of the request
+    /// error OK, a NetwServerInfo     the server info is the result of a probe
+    /// error OK, any other result     a peer request fails, a probe finds no server
+    /// any other error                the request fails with error and message
+    /// </code>
+    /// </summary>
+    public void TransportComplete(
+        Rid ticket,
+        Error error,
+        Variant result = default,
+        string message = "")
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(ticket);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)error);
+        godot_variant slot2 = result.CopyNativeVariant();
+        godot_variant slot3 = VariantUtils.CreateFromString(message);
+        godot_variant answered = default;
+        NetwThunks.Call4(
+            _bindTransportComplete,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            in slot3,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        slot3.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindTransportPublishTargets =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "transport_publish_targets",
+            684822712UL);
+
+    /// <summary>
+    /// Lists <paramref name="targets"/> as the <see cref="NetwEndpoint"/> rows
+    /// of <paramref name="transport"/>, and removes the rows it listed before
+    /// that <paramref name="targets"/> leaves out.
+    /// <see cref="NetwTransport.PublishTargets"/> calls it.
+    /// <code>
+    /// Array[Dictionary]
+    /// ┖╴target
+    ///   ┠╴address       String          the address a player joins
+    ///   ┠╴display_name  String          what a server browser draws in the row
+    ///   ┖╴info          NetwServerInfo  what the server advertises, or null
+    /// </code>
+    /// </summary>
+    public void TransportPublishTargets(
+        Rid transport,
+        Godot.Collections.Array targets)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(transport);
+        godot_variant slot1 = VariantUtils.CreateFromArray(targets);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindTransportPublishTargets,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        answered.Dispose();
     }
 
     private static readonly IntPtr _bindSessionGetJoinSchema =
@@ -3419,79 +2997,176 @@ public sealed class NetwMultiplayer : NetwRefCounted
             ref discarded);
     }
 
-    private static readonly IntPtr _bindSessionGetAuthoredRole =
+    private static readonly IntPtr _bindSessionGetServerInfo =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "session_get_authored_role",
-            3770310992UL);
+            "session_get_server_info",
+            3880981058UL);
 
     /// <summary>
-    /// The role the game asked for in
-    /// <see cref="NetwSessionConfig.DesiredRole"/>.
-    /// <see cref="NetwMultiplayer.Role"/> is the role the session actually has.
+    /// Returns a copy of <see cref="NetwSessionConfig.ServerInfo"/> with
+    /// <see cref="NetwServerInfo.Players"/>, <see cref="NetwServerInfo.AppId"/>
+    /// and <see cref="NetwServerInfo.IsLocalListener"/> filled in from the
+    /// session. A server browser receives it after
+    /// <see cref="Netw.ConfigureServerInfo"/> changes it.
     /// </summary>
-    public NetwSession.RoleEnum SessionGetAuthoredRole()
+    public NetwServerInfo SessionGetServerInfo()
     {
-        long answered = default;
-        NetwThunks.Ptrcall0_Long(
-            _bindSessionGetAuthoredRole,
+        IntPtr answered = default;
+        NetwThunks.Ptrcall0_IntPtr(
+            _bindSessionGetServerInfo,
             Checked,
             ref answered);
-        return (NetwSession.RoleEnum)answered;
+        return NetwServerInfo.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindSendTo =
-        NetwApi.MethodBind("NetwMultiplayer", "send_to", 618020292UL);
+    private static readonly IntPtr _bindSessionGetAppId =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_get_app_id",
+            2002593661UL);
 
     /// <summary>
-    /// Sends <paramref name="payload"/> on <paramref name="channel"/> to
-    /// <paramref name="peer"/>, about the entity at <paramref name="route"/>. A
-    /// payload for this peer is handled locally. When a clock runs, some
-    /// channels wait and send together at the next tick.
+    /// Returns <see cref="NetwSessionConfig.AppId"/>, the id that names this
+    /// game and build.
+    /// </summary>
+    public StringName SessionGetAppId()
+    {
+        godot_variant answered = default;
+        NetwThunks.Call0(_bindSessionGetAppId, Checked, ref answered);
+        StringName result = VariantUtils.ConvertToStringName(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindSessionStepAway =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_step_away",
+            1931563502UL);
+
+    /// <summary>
+    /// Leaves like <see cref="NetwMultiplayer.SessionLeave"/>, and the server
+    /// keeps this peer's entities for
+    /// <see cref="NetwSessionConfig.ReturnWindowSeconds"/>. See
+    /// <see cref="NetwSession.StepAway"/>.
+    /// </summary>
+    public NetwPromise SessionStepAway()
+    {
+        IntPtr answered = default;
+        NetwThunks.Ptrcall0_IntPtr(_bindSessionStepAway, Checked, ref answered);
+        return NetwPromise.Adopt(answered);
+    }
+
+    private static readonly IntPtr _bindSessionTransferServer =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_transfer_server",
+            844576869UL);
+
+    /// <summary>
+    /// Makes the peer of the player whose id is <paramref name="player"/> the
+    /// server. See <see cref="NetwSession.TransferServer"/> for what the
+    /// <see cref="MultiplayerPeer"/> must support. <b>Server Only.</b>
+    /// </summary>
+    public Error SessionTransferServer(long player)
+    {
+        long slot0 = player;
+        long answered = default;
+        NetwThunks.Ptrcall1_Long_Long(
+            _bindSessionTransferServer,
+            Checked,
+            in slot0,
+            ref answered);
+        return (Error)answered;
+    }
+
+    private static readonly IntPtr _bindSessionPause =
+        NetwApi.MethodBind("NetwMultiplayer", "session_pause", 3005725572UL);
+
+    /// <summary>
+    /// Pauses the session on every peer with <paramref name="reason"/>. See
+    /// <see cref="NetwSession.Pause"/>. <b>Server Only.</b>
+    /// </summary>
+    public void SessionPause(string reason = "")
+    {
+        godot_variant slot0 = VariantUtils.CreateFromString(reason);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindSessionPause, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindSessionUnpause =
+        NetwApi.MethodBind("NetwMultiplayer", "session_unpause", 3218959716UL);
+
+    /// <summary>
+    /// Unpauses every peer that <see cref="NetwMultiplayer.SessionPause"/>
+    /// paused. <b>Server Only.</b>
+    /// </summary>
+    public void SessionUnpause()
+    {
+        long discarded = default;
+        NetwThunks.Ptrcall0_Long(_bindSessionUnpause, Checked, ref discarded);
+    }
+
+    private static readonly IntPtr _bindSessionIsPaused =
+        NetwApi.MethodBind("NetwMultiplayer", "session_is_paused", 36873697UL);
+
+    /// <summary>
+    /// Returns <c>true</c> while the server has paused the session with
+    /// <see cref="NetwMultiplayer.SessionPause"/>.
+    /// </summary>
+    public bool SessionIsPaused()
+    {
+        byte answered = default;
+        NetwThunks.Ptrcall0_Byte(_bindSessionIsPaused, Checked, ref answered);
+        return answered != 0;
+    }
+
+    private static readonly IntPtr _bindRpcSend =
+        NetwApi.MethodBind("NetwMultiplayer", "rpc_send", 2246501651UL);
+
+    /// <summary>
+    /// Sends <paramref name="payload"/> to <paramref name="peer"/> on
+    /// <paramref name="channel"/>, which must be between 100 and 254. A
+    /// <paramref name="peer"/> of <c>0</c> sends to every peer. The handler
+    /// from <see cref="NetwMultiplayer.RpcChannelRegister"/> receives it. With
+    /// <paramref name="batched"/>, it is sent at the end of the frame together
+    /// with other data, in fewer packets. <see cref="NetwChannel.Send"/> calls
+    /// this.
     /// <code>
     /// Error
     /// ┠╴OK                     the payload was sent or queued
-    /// ┠╴ERR_INVALID_PARAMETER  route is negative
+    /// ┠╴ERR_INVALID_PARAMETER  channel is outside 100 to 254
     /// ┖╴ERR_UNCONFIGURED       the session cannot send yet
     /// </code>
     /// </summary>
-    public Error SendTo(
+    public Error RpcSend(
         long peer,
-        long route,
         long channel,
         byte[] payload,
-        bool reliable,
-        long comp = 0,
-        string path = "",
+        bool reliable = true,
         bool batched = false)
     {
-        IntPtr pack = NetwThunks.ArgsNew(8);
+        IntPtr pack = NetwThunks.ArgsNew(5);
         godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)route);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)channel);
         NetwThunks.ArgsSet(pack, 1, in slot1);
         slot1.Dispose();
-        godot_variant slot2 = VariantUtils.CreateFromInt((long)channel);
+        godot_variant slot2 = VariantUtils.CreateFromPackedByteArray(payload);
         NetwThunks.ArgsSet(pack, 2, in slot2);
         slot2.Dispose();
-        godot_variant slot3 = VariantUtils.CreateFromPackedByteArray(payload);
+        godot_variant slot3 = VariantUtils.CreateFromBool(reliable);
         NetwThunks.ArgsSet(pack, 3, in slot3);
         slot3.Dispose();
-        godot_variant slot4 = VariantUtils.CreateFromBool(reliable);
+        godot_variant slot4 = VariantUtils.CreateFromBool(batched);
         NetwThunks.ArgsSet(pack, 4, in slot4);
         slot4.Dispose();
-        godot_variant slot5 = VariantUtils.CreateFromInt((long)comp);
-        NetwThunks.ArgsSet(pack, 5, in slot5);
-        slot5.Dispose();
-        godot_variant slot6 = VariantUtils.CreateFromString(path);
-        NetwThunks.ArgsSet(pack, 6, in slot6);
-        slot6.Dispose();
-        godot_variant slot7 = VariantUtils.CreateFromBool(batched);
-        NetwThunks.ArgsSet(pack, 7, in slot7);
-        slot7.Dispose();
         godot_variant answered = default;
-        NetwThunks.CallPack(_bindSendTo, Checked, pack, 8, ref answered);
+        NetwThunks.CallPack(_bindRpcSend, Checked, pack, 5, ref answered);
         NetwThunks.ArgsFree(pack);
         Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
@@ -3499,11 +3174,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindDatabaseFind =
-        NetwApi.MethodBind("NetwMultiplayer", "database_find", 1480417841UL);
+        NetwApi.MethodBind("NetwMultiplayer", "database_find", 4037519912UL);
 
     /// <summary>
     /// The database declared as <paramref name="name"/>, or an invalid
-    /// <see cref="Rid"/> when none is.
+    /// <see cref="Rid"/> when none is. A database declared on a node is found
+    /// from the <c>Node._ready</c> of that node's children.
     /// </summary>
     public Rid DatabaseFind(StringName name)
     {
@@ -3783,8 +3459,15 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Applies <paramref name="operations"/> in order, see
-    /// <see cref="NetwWriteBatch.Submit"/> for the result. Build
-    /// <paramref name="operations"/> with <see cref="NetwWriteBatch"/>.
+    /// <see cref="NetwWriteBatch.Submit"/> for the result.
+    /// <see cref="NetwWriteBatch"/> builds <paramref name="operations"/>.
+    /// <code>
+    /// Array[Dictionary]
+    /// ┖╴operation
+    ///   ┠╴kind       String      "replace" or "erase"
+    ///   ┠╴address    Dictionary  the record's address
+    ///   ┖╴envelope   Dictionary  the sealed record, replace only
+    /// </code>
     /// </summary>
     public NetwPromise DatabaseSubmit(
         Rid database,
@@ -3886,17 +3569,38 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
+    private static readonly IntPtr _bindDatabaseGetName =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "database_get_name",
+            3765571616UL);
+
+    /// <summary>
+    /// The name <paramref name="database"/> was declared with in
+    /// <see cref="Netw.ConfigureDatabase"/>, or empty when it does not exist.
+    /// </summary>
+    public StringName DatabaseGetName(Rid database)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(database);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindDatabaseGetName, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        StringName result = VariantUtils.ConvertToStringName(answered);
+        answered.Dispose();
+        return result;
+    }
+
     private static readonly IntPtr _bindDatabaseGetState =
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "database_get_state",
-            4206958988UL);
+            632179672UL);
 
     /// <summary>
-    /// Whether <paramref name="database"/> is closed, opening, open, closing or
-    /// faulted, as a <see cref="NetwMultiplayer.DatabaseState"/>.
+    /// Whether <paramref name="database"/> is closed, opening, open or closing,
+    /// as a <see cref="NetwDatabase.StateEnum"/>.
     /// </summary>
-    public NetwMultiplayer.DatabaseState DatabaseGetState(Rid database)
+    public NetwDatabase.StateEnum DatabaseGetState(Rid database)
     {
         Rid slot0 = database;
         long answered = default;
@@ -3905,7 +3609,29 @@ public sealed class NetwMultiplayer : NetwRefCounted
             Checked,
             in slot0,
             ref answered);
-        return (NetwMultiplayer.DatabaseState)answered;
+        return (NetwDatabase.StateEnum)answered;
+    }
+
+    private static readonly IntPtr _bindDatabaseIsValid =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "database_is_valid",
+            4155700596UL);
+
+    /// <summary>
+    /// Returns <c>true</c> while <paramref name="database"/> exists in this
+    /// session.
+    /// </summary>
+    public bool DatabaseIsValid(Rid database)
+    {
+        Rid slot0 = database;
+        byte answered = default;
+        NetwThunks.Ptrcall1_Rid_Byte(
+            _bindDatabaseIsValid,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered != 0;
     }
 
     private static readonly IntPtr _bindPersistLoad =
@@ -3990,6 +3716,52 @@ public sealed class NetwMultiplayer : NetwRefCounted
         StringName result = VariantUtils.ConvertToStringName(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindPersistGetDatabase =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "persist_get_database",
+            3814569979UL);
+
+    /// <summary>
+    /// The database <paramref name="entity"/> is saved to, or an invalid
+    /// <see cref="Rid"/> when it is not persistent. See
+    /// <see cref="NetwPersistence.Database"/>.
+    /// </summary>
+    public Rid PersistGetDatabase(Rid entity)
+    {
+        Rid slot0 = entity;
+        Rid answered = default;
+        NetwThunks.Ptrcall1_Rid_Rid(
+            _bindPersistGetDatabase,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindPersistGetSchema =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "persist_get_schema",
+            3814569979UL);
+
+    /// <summary>
+    /// The schema <paramref name="entity"/> is saved with, or an invalid
+    /// <see cref="Rid"/> when it is not persistent. See
+    /// <see cref="NetwPersistence.Schema"/>.
+    /// </summary>
+    public Rid PersistGetSchema(Rid entity)
+    {
+        Rid slot0 = entity;
+        Rid answered = default;
+        NetwThunks.Ptrcall1_Rid_Rid(
+            _bindPersistGetSchema,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
     }
 
     private static readonly IntPtr _bindPersistFlushAll =
@@ -4084,8 +3856,11 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindPeerLinkStats =
-        NetwApi.MethodBind("NetwMultiplayer", "peer_link_stats", 3485342025UL);
+    private static readonly IntPtr _bindPeerGetLinkStats =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "peer_get_link_stats",
+            3485342025UL);
 
     /// <summary>
     /// Returns measured connection quality to <paramref name="peer"/>, and what
@@ -4112,11 +3887,15 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// and retained properties and RPCs still go.
     /// </para>
     /// </summary>
-    public Godot.Collections.Dictionary PeerLinkStats(long peer)
+    public Godot.Collections.Dictionary PeerGetLinkStats(long peer)
     {
         godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
         godot_variant answered = default;
-        NetwThunks.Call1(_bindPeerLinkStats, Checked, in slot0, ref answered);
+        NetwThunks.Call1(
+            _bindPeerGetLinkStats,
+            Checked,
+            in slot0,
+            ref answered);
         slot0.Dispose();
         Godot.Collections.Dictionary result =
             VariantUtils.ConvertToDictionary(answered);
@@ -4124,208 +3903,52 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindSessionFlushTick =
+    private static readonly IntPtr _bindPeerSetBandwidth =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "session_flush_tick",
-            844576869UL);
+            "peer_set_bandwidth",
+            3937882851UL);
 
     /// <summary>
-    /// Sends everything for <paramref name="tick"/>. The session calls it at
-    /// the end of every tick. Call it only when driving ticks without the
-    /// clock. Returns the error of
-    /// <see cref="NetwMultiplayer.InterestFlushNow"/> when that fails.
+    /// Sets how many kilobits a second this peer may send to
+    /// <paramref name="peer"/>. <c>0</c> returns it to
+    /// <see cref="NetwSessionConfig.BandwidthKbps"/>. See
+    /// <see cref="NetwSession.SetPeerBandwidth"/>.
     /// </summary>
-    public Error SessionFlushTick(long tick)
-    {
-        long slot0 = tick;
-        long answered = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindSessionFlushTick,
-            Checked,
-            in slot0,
-            ref answered);
-        return (Error)answered;
-    }
-
-    private static readonly IntPtr _bindPeerAck =
-        NetwApi.MethodBind("NetwMultiplayer", "peer_ack", 923996154UL);
-
-    /// <summary>
-    /// The newest packet sequence <paramref name="peer"/> acknowledged, or
-    /// <c>-1</c> when none.
-    /// </summary>
-    public long PeerAck(long peer)
+    public void PeerSetBandwidth(long peer, long kbps)
     {
         long slot0 = peer;
-        long answered = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindPeerAck,
+        long slot1 = kbps;
+        long discarded = default;
+        NetwThunks.Ptrcall2_Long_Long_Long(
+            _bindPeerSetBandwidth,
+            Checked,
+            in slot0,
+            in slot1,
+            ref discarded);
+    }
+
+    private static readonly IntPtr _bindSchemaDeclare =
+        NetwApi.MethodBind("NetwMultiplayer", "schema_declare", 3434307707UL);
+
+    /// <summary>
+    /// Registers <paramref name="schema"/> under its name and returns the
+    /// schema this session holds for that name. When a schema with that name is
+    /// already registered, that one is kept. Returns an invalid
+    /// <see cref="Rid"/> for a null <paramref name="schema"/> or one with an
+    /// empty <see cref="NetwSchema.SchemaName"/>. It creates no
+    /// <see cref="NetwTable"/>.
+    /// </summary>
+    public Rid SchemaDeclare(NetwSchema schema)
+    {
+        IntPtr slot0 = schema?.Native ?? IntPtr.Zero;
+        Rid answered = default;
+        NetwThunks.Ptrcall1_IntPtr_Rid(
+            _bindSchemaDeclare,
             Checked,
             in slot0,
             ref answered);
         return answered;
-    }
-
-    private static readonly IntPtr _bindSessionDefer =
-        NetwApi.MethodBind("NetwMultiplayer", "session_defer", 1605840294UL);
-
-    /// <summary>
-    /// Queues <paramref name="fn"/> to run at the next
-    /// <see cref="NetwMultiplayer.SessionFlushDeferred"/>. A
-    /// <paramref name="key"/> already queued moves to the back and runs once.
-    /// Calls queued while flushing run in the same flush.
-    /// </summary>
-    public void SessionDefer(Callable fn, StringName key = null)
-    {
-        key ??= new StringName("");
-        godot_variant slot0 = VariantUtils.CreateFromCallable(fn);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(key);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindSessionDefer,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindSessionCancelDeferred =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_cancel_deferred",
-            3304788590UL);
-
-    /// <summary>
-    /// Removes the call queued under <paramref name="key"/> by
-    /// <see cref="NetwMultiplayer.SessionDefer"/>.
-    /// </summary>
-    public void SessionCancelDeferred(StringName key)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindSessionCancelDeferred,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindSchemaCreate =
-        NetwApi.MethodBind("NetwMultiplayer", "schema_create", 4037519912UL);
-
-    /// <summary>
-    /// Returns the schema called <paramref name="name"/>, creating it if
-    /// needed. Calling it again lets the columns be declared again, as after a
-    /// script reload.
-    /// </summary>
-    public Rid SchemaCreate(StringName name)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(name);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindSchemaCreate, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        Rid result = VariantUtils.ConvertToRid(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSchemaAddColumn =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_add_column",
-            3365520481UL);
-
-    /// <summary>
-    /// Adds the column <paramref name="key"/> to <paramref name="schema"/> and
-    /// returns its index. <paramref name="stride"/> is how many values each row
-    /// holds. Returns <c>-1</c> for a duplicate key, an invalid type or stride,
-    /// or a sealed schema.
-    /// </summary>
-    public int SchemaAddColumn(
-        Rid schema,
-        StringName key,
-        NetwMultiplayer.ColumnType type,
-        int stride = 1)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(schema);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(key);
-        godot_variant slot2 = VariantUtils.CreateFromInt((long)type);
-        godot_variant slot3 = VariantUtils.CreateFromInt((long)stride);
-        godot_variant answered = default;
-        NetwThunks.Call4(
-            _bindSchemaAddColumn,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            in slot3,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        slot3.Dispose();
-        int result = VariantUtils.ConvertToInt32(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSchemaSetColumnQuantizer =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_set_column_quantizer",
-            3107393093UL);
-
-    /// <summary>
-    /// Compresses <paramref name="column"/> with <paramref name="quantizer"/>.
-    /// Has no effect after <see cref="NetwMultiplayer.SchemaSeal"/>.
-    /// </summary>
-    public void SchemaSetColumnQuantizer(
-        Rid schema,
-        int column,
-        NetwQuantize quantizer)
-    {
-        Rid slot0 = schema;
-        int slot1 = column;
-        IntPtr slot2 = quantizer?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall3_Rid_Int_IntPtr_Long(
-            _bindSchemaSetColumnQuantizer,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindSchemaSeal =
-        NetwApi.MethodBind("NetwMultiplayer", "schema_seal", 813180755UL);
-
-    /// <summary>
-    /// Locks the columns of <paramref name="schema"/>.
-    /// <code>
-    /// Error
-    /// ┠╴OK                       the schema is sealed
-    /// ┠╴ERR_DOES_NOT_EXIST       the schema does not exist
-    /// ┠╴ERR_INVALID_DECLARATION  the schema has too many columns
-    /// ┖╴ERR_UNCONFIGURED         the columns differ from the last time it was sealed
-    /// </code>
-    /// </summary>
-    public Error SchemaSeal(Rid schema)
-    {
-        Rid slot0 = schema;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindSchemaSeal,
-            Checked,
-            in slot0,
-            ref answered);
-        return (Error)answered;
     }
 
     private static readonly IntPtr _bindSchemaFind =
@@ -4333,40 +3956,15 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Returns the schema called <paramref name="name"/>, or an invalid
-    /// <see cref="Rid"/>. See <see cref="NetwMultiplayer.SchemaFindOrAdopt"/>.
+    /// <see cref="Rid"/>. A <see cref="NetwSchema"/> declared after the session
+    /// started is found once <see cref="NetwMultiplayer.SchemaDeclare"/>
+    /// registers it.
     /// </summary>
     public Rid SchemaFind(StringName name)
     {
         godot_variant slot0 = VariantUtils.CreateFromStringName(name);
         godot_variant answered = default;
         NetwThunks.Call1(_bindSchemaFind, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        Rid result = VariantUtils.ConvertToRid(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSchemaFindOrAdopt =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_find_or_adopt",
-            4037519912UL);
-
-    /// <summary>
-    /// Like <see cref="NetwMultiplayer.SchemaFind"/>, and also finds a
-    /// <see cref="NetwSchema"/> declared after the session started, for example
-    /// in a <c>static var</c>. Returns an invalid <see cref="Rid"/> when none
-    /// exists.
-    /// </summary>
-    public Rid SchemaFindOrAdopt(StringName name)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(name);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindSchemaFindOrAdopt,
-            Checked,
-            in slot0,
-            ref answered);
         slot0.Dispose();
         Rid result = VariantUtils.ConvertToRid(answered);
         answered.Dispose();
@@ -4380,10 +3978,10 @@ public sealed class NetwMultiplayer : NetwRefCounted
             4037519912UL);
 
     /// <summary>
-    /// Like <see cref="NetwMultiplayer.TableFind"/>, and also creates the table
-    /// for a <see cref="NetwSchema"/> declared after the session started.
-    /// Declare every schema before going online, so all peers number their
-    /// tables the same way.
+    /// Returns the table for the schema called <paramref name="name"/>,
+    /// creating it for a <see cref="NetwSchema"/> declared after the session
+    /// started, or an invalid <see cref="Rid"/>. Declare every schema before
+    /// going online, so all peers number their tables the same way.
     /// </summary>
     public Rid TableFindOrAdopt(StringName name)
     {
@@ -4417,122 +4015,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindSchemaGetHash =
-        NetwApi.MethodBind("NetwMultiplayer", "schema_get_hash", 2198884583UL);
-
-    /// <summary>
-    /// A hash of the columns of <paramref name="schema"/>, or <c>0</c> before
-    /// <see cref="NetwMultiplayer.SchemaSeal"/>.
-    /// </summary>
-    public int SchemaGetHash(Rid schema)
-    {
-        Rid slot0 = schema;
-        int answered = default;
-        NetwThunks.Ptrcall1_Rid_Int(
-            _bindSchemaGetHash,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindSchemaGetColumnCount =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_get_column_count",
-            2198884583UL);
-
-    /// <summary>
-    /// The number of columns in <paramref name="schema"/>, or <c>0</c>.
-    /// </summary>
-    public int SchemaGetColumnCount(Rid schema)
-    {
-        Rid slot0 = schema;
-        int answered = default;
-        NetwThunks.Ptrcall1_Rid_Int(
-            _bindSchemaGetColumnCount,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindSchemaGetColumnKey =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_get_column_key",
-            2467134399UL);
-
-    /// <summary>
-    /// The key of <paramref name="column"/>, or empty.
-    /// </summary>
-    public StringName SchemaGetColumnKey(Rid schema, int column)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(schema);
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)column);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindSchemaGetColumnKey,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        StringName result = VariantUtils.ConvertToStringName(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSchemaGetColumnType =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_get_column_type",
-            3966936118UL);
-
-    /// <summary>
-    /// The type of <paramref name="column"/>, or <c>-1</c>.
-    /// </summary>
-    public NetwMultiplayer.ColumnType SchemaGetColumnType(
-        Rid schema,
-        int column)
-    {
-        Rid slot0 = schema;
-        int slot1 = column;
-        long answered = default;
-        NetwThunks.Ptrcall2_Rid_Int_Long(
-            _bindSchemaGetColumnType,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return (NetwMultiplayer.ColumnType)answered;
-    }
-
-    private static readonly IntPtr _bindSchemaGetColumnStride =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "schema_get_column_stride",
-            1120910005UL);
-
-    /// <summary>
-    /// How many values each row holds in <paramref name="column"/>, or
-    /// <c>0</c>.
-    /// </summary>
-    public int SchemaGetColumnStride(Rid schema, int column)
-    {
-        Rid slot0 = schema;
-        int slot1 = column;
-        int answered = default;
-        NetwThunks.Ptrcall2_Rid_Int_Int(
-            _bindSchemaGetColumnStride,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered;
-    }
-
     private static readonly IntPtr _bindLagcompEffectArm =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -4543,7 +4025,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// Starts a predicted effect <paramref name="key"/>.
     /// <paramref name="revert"/> runs if the server denies it or does not
     /// confirm it within <paramref name="timeoutTicks"/>. <c>0</c> uses the
-    /// default timeout.
+    /// default timeout. <paramref name="revert"/> runs at the same moment as
+    /// the callbacks of <see cref="NetwMultiplayer.LagcompEffectWatch"/>.
     /// </summary>
     public void LagcompEffectArm(
         StringName key,
@@ -4575,8 +4058,17 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Calls <paramref name="confirmed"/> or <paramref name="denied"/> when the
-    /// effect <paramref name="key"/> resolves. Returns <c>false</c> when the
-    /// effect is not pending.
+    /// effect <paramref name="key"/> resolves. When
+    /// <see cref="NetwMultiplayer.LagcompActionDeny"/>,<see cref="NetwActionContext.Deny"/>,
+    /// <see cref="NetwMultiplayer.LagcompActionRequest"/>,
+    /// <see cref="NetwAction.Request"/> or an assignment of
+    /// <see cref="MultiplayerApi.MultiplayerPeer"/> resolves it outside a poll
+    /// and a network tick, they run as that call returns. When a host's own
+    /// <see cref="NetwMultiplayer.LagcompActionRequest"/> runs its handler at
+    /// once, a <see cref="NetwActionContext.Deny"/> inside that handler runs
+    /// them as the request returns. Otherwise they run when the poll or the run
+    /// of network ticks in progress ends, or at the end of the next one.
+    /// Returns <c>false</c> when the effect is not pending.
     /// </summary>
     public bool LagcompEffectWatch(
         StringName key,
@@ -4597,79 +4089,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
-        bool result = VariantUtils.ConvertToBool(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindLagcompEffectAdopt =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "lagcomp_effect_adopt",
-            3304788590UL);
-
-    /// <summary>
-    /// Confirms the effect <paramref name="key"/> and calls the
-    /// <c>confirmed</c> callbacks from
-    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/>.
-    /// </summary>
-    public void LagcompEffectAdopt(StringName key)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindLagcompEffectAdopt,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindLagcompEffectDiscard =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "lagcomp_effect_discard",
-            3304788590UL);
-
-    /// <summary>
-    /// Denies the effect <paramref name="key"/>, runs its revert, and calls the
-    /// <c>denied</c> callbacks from
-    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/>.
-    /// </summary>
-    public void LagcompEffectDiscard(StringName key)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindLagcompEffectDiscard,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindLagcompEffectPending =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "lagcomp_effect_pending",
-            2619796661UL);
-
-    /// <summary>
-    /// Returns <c>true</c> while the effect <paramref name="key"/> waits to be
-    /// confirmed or denied.
-    /// </summary>
-    public bool LagcompEffectPending(StringName key)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindLagcompEffectPending,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
         bool result = VariantUtils.ConvertToBool(answered);
         answered.Dispose();
         return result;
@@ -4759,25 +4178,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindTableCreate =
-        NetwApi.MethodBind("NetwMultiplayer", "table_create", 41030802UL);
-
-    /// <summary>
-    /// Returns the table for <paramref name="schema"/>, creating it if needed.
-    /// <paramref name="schema"/> must be sealed.
-    /// </summary>
-    public Rid TableCreate(Rid schema)
-    {
-        Rid slot0 = schema;
-        Rid answered = default;
-        NetwThunks.Ptrcall1_Rid_Rid(
-            _bindTableCreate,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
     private static readonly IntPtr _bindTableGetSchema =
         NetwApi.MethodBind("NetwMultiplayer", "table_get_schema", 3814569979UL);
 
@@ -4797,12 +4197,18 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindTableSetParam =
-        NetwApi.MethodBind("NetwMultiplayer", "table_set_param", 92433046UL);
+        NetwApi.MethodBind("NetwMultiplayer", "table_set_param", 3503132243UL);
 
     /// <summary>
     /// Changes one setting of <paramref name="table"/>.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the setting changed
+    /// ┠╴ERR_DOES_NOT_EXIST     table is not in this session
+    /// ┖╴ERR_INVALID_PARAMETER  param is unknown
+    /// </code>
     /// </summary>
-    public void TableSetParam(
+    public Error TableSetParam(
         Rid table,
         NetwMultiplayer.TableParam param,
         Variant value)
@@ -4821,23 +4227,104 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
-    private static readonly IntPtr _bindTableFind =
-        NetwApi.MethodBind("NetwMultiplayer", "table_find", 1480417841UL);
+    private static readonly IntPtr _bindTableGetParam =
+        NetwApi.MethodBind("NetwMultiplayer", "table_get_param", 2225173149UL);
 
     /// <summary>
-    /// Returns the table for the schema called <paramref name="name"/>, or an
-    /// invalid <see cref="Rid"/>.
+    /// Returns one setting of <paramref name="table"/>, or <c>null</c> when
+    /// <paramref name="param"/> is unknown.
     /// </summary>
-    public Rid TableFind(StringName name)
+    public Variant TableGetParam(Rid table, NetwMultiplayer.TableParam param)
     {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(name);
+        godot_variant slot0 = VariantUtils.CreateFromRid(table);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)param);
         godot_variant answered = default;
-        NetwThunks.Call1(_bindTableFind, Checked, in slot0, ref answered);
+        NetwThunks.Call2(
+            _bindTableGetParam,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
         slot0.Dispose();
-        Rid result = VariantUtils.ConvertToRid(answered);
+        slot1.Dispose();
+        Variant result = Variant.CreateCopyingBorrowed(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindTableClaimRoutes =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "table_claim_routes",
+            4122523554UL);
+
+    /// <summary>
+    /// Creates <paramref name="count"/> routes to address rows of
+    /// <paramref name="table"/>. Each route is unique in the session, including
+    /// the routes <see cref="NetwMultiplayer.TableLoad"/> gives its rows.
+    /// Release them with <see cref="NetwMultiplayer.TableReleaseRoutes"/>.
+    /// Returns an empty array on a client or when <paramref name="table"/> is
+    /// not in this session. <b>Server Only.</b>
+    /// </summary>
+    public long[] TableClaimRoutes(Rid table, int count)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(table);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)count);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindTableClaimRoutes,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        long[] result =
+            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindTableReleaseRoutes =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "table_release_routes",
+            548145242UL);
+
+    /// <summary>
+    /// Releases <paramref name="routes"/> from
+    /// <see cref="NetwMultiplayer.TableClaimRoutes"/>. Their rows leave every
+    /// table that holds them, not only <paramref name="table"/>, and every peer
+    /// is told. A released route is never reused.
+    /// <code>
+    /// Error
+    /// ┠╴OK                  the routes were released
+    /// ┠╴ERR_DOES_NOT_EXIST  table is not in this session
+    /// ┖╴ERR_UNCONFIGURED    called on a client
+    /// </code>
+    /// <para>
+    /// <b>Server Only.</b>
+    /// </para>
+    /// </summary>
+    public Error TableReleaseRoutes(Rid table, long[] routes)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(table);
+        godot_variant slot1 = VariantUtils.CreateFromPackedInt64Array(routes);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindTableReleaseRoutes,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
     }
@@ -5111,13 +4598,13 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindServiceRegister =
-        NetwApi.MethodBind("NetwMultiplayer", "service_register", 3865847899UL);
+        NetwApi.MethodBind("NetwMultiplayer", "service_register", 1529864246UL);
 
     /// <summary>
     /// Registers <paramref name="service"/> as <paramref name="type"/>, or as
     /// its own script when <c>null</c>. Registering it again has no effect.
     /// </summary>
-    public void ServiceRegister(GodotObject service, GodotObject type = null)
+    public void ServiceRegister(Node service, GodotObject type = null)
     {
         IntPtr slot0 = service?.NativeInstance ?? IntPtr.Zero;
         IntPtr slot1 = type?.NativeInstance ?? IntPtr.Zero;
@@ -5134,14 +4621,14 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "service_unregister",
-            3865847899UL);
+            1529864246UL);
 
     /// <summary>
     /// Reverses <see cref="NetwMultiplayer.ServiceRegister"/>, if
     /// <paramref name="type"/> is still registered to
     /// <paramref name="service"/>.
     /// </summary>
-    public void ServiceUnregister(GodotObject service, GodotObject type = null)
+    public void ServiceUnregister(Node service, GodotObject type = null)
     {
         IntPtr slot0 = service?.NativeInstance ?? IntPtr.Zero;
         IntPtr slot1 = type?.NativeInstance ?? IntPtr.Zero;
@@ -5155,114 +4642,39 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindServiceGet =
-        NetwApi.MethodBind("NetwMultiplayer", "service_get", 2628037931UL);
+        NetwApi.MethodBind("NetwMultiplayer", "service_get", 3917214228UL);
 
     /// <summary>
-    /// Returns the service registered as <paramref name="type"/>, a script or a
-    /// class, or <c>null</c>. A freed service returns <c>null</c>.
+    /// Returns the service <see cref="Node"/> registered as
+    /// <paramref name="type"/>, a script or a class, or <c>null</c>. A freed
+    /// service returns <c>null</c>.
     /// </summary>
-    public Variant ServiceGet(GodotObject type)
+    public Node ServiceGet(GodotObject type)
     {
         godot_variant slot0 = VariantUtils.CreateFromGodotObject(type);
         godot_variant answered = default;
         NetwThunks.Call1(_bindServiceGet, Checked, in slot0, ref answered);
         slot0.Dispose();
-        Variant result = Variant.CreateCopyingBorrowed(answered);
+        Node result = (Node)VariantUtils.ConvertToGodotObject(answered);
         answered.Dispose();
         return result;
     }
 
-    private static readonly IntPtr _bindServiceGetAll =
-        NetwApi.MethodBind("NetwMultiplayer", "service_get_all", 4289618246UL);
+    private static readonly IntPtr _bindSessionOf =
+        NetwApi.MethodBind("NetwMultiplayer", "session_of", 870154628UL);
 
     /// <summary>
-    /// Every service whose script is or extends <paramref name="base"/>, in
-    /// registration order.
+    /// Returns the session <paramref name="node"/> is in, or <c>null</c> when
+    /// it is outside the tree. A <c>null</c> <paramref name="node"/> returns
+    /// the only running session, or reports an error and returns <c>null</c>
+    /// when there is not exactly one.
     /// </summary>
-    public Godot.Collections.Array ServiceGetAll(GodotObject @base)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromGodotObject(@base);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindServiceGetAll, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindServiceClear =
-        NetwApi.MethodBind("NetwMultiplayer", "service_clear", 3218959716UL);
-
-    /// <summary>
-    /// Removes every service without emitting signals.
-    /// </summary>
-    public void ServiceClear()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindServiceClear, Checked, ref discarded);
-    }
-
-    private static readonly IntPtr _bindSessionIsActive =
-        NetwApi.MethodBind("NetwMultiplayer", "session_is_active", 36873697UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when <see cref="SceneTree.GetMultiplayer"/> returns
-    /// this session for its root path.
-    /// </summary>
-    public bool SessionIsActive()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(_bindSessionIsActive, Checked, ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindSessionGetAll =
-        NetwApi.MethodBind("NetwMultiplayer", "session_get_all", 2915620761UL);
-
-    /// <summary>
-    /// Every session that exists, in the order they were created.
-    /// </summary>
-    public static Godot.Collections.Array SessionGetAll()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindSessionGetAll, IntPtr.Zero, ref answered);
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindOf =
-        NetwApi.MethodBind("NetwMultiplayer", "of", 1655423507UL);
-
-    /// <summary>
-    /// Returns the session <paramref name="node"/> belongs to, or <c>null</c>
-    /// when it is outside the tree.
-    /// </summary>
-    public static MultiplayerApi Of(Node node)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromGodotObject(node);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindOf, IntPtr.Zero, in slot0, ref answered);
-        slot0.Dispose();
-        MultiplayerApi result =
-            (MultiplayerApi)VariantUtils.ConvertToGodotObject(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindCoreOf =
-        NetwApi.MethodBind("NetwMultiplayer", "core_of", 850293890UL);
-
-    /// <summary>
-    /// Returns the <see cref="NetwMultiplayer"/> that <paramref name="node"/>
-    /// belongs to.
-    /// </summary>
-    public static NetwMultiplayer CoreOf(Node node)
+    public static NetwMultiplayer SessionOf(Node node = null)
     {
         IntPtr slot0 = node?.NativeInstance ?? IntPtr.Zero;
         IntPtr answered = default;
         NetwThunks.Ptrcall1_IntPtr_IntPtr(
-            _bindCoreOf,
+            _bindSessionOf,
             IntPtr.Zero,
             in slot0,
             ref answered);
@@ -5311,21 +4723,24 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindSpawnRegistered =
-        NetwApi.MethodBind("NetwMultiplayer", "spawn_registered", 2695025156UL);
+        NetwApi.MethodBind("NetwMultiplayer", "spawn_registered", 327980170UL);
 
     /// <summary>
     /// Spawns by calling the function registered as <paramref name="id"/> with
-    /// <paramref name="args"/> on every peer. Returns the local entity.
+    /// <paramref name="args"/> on every peer. Returns the local entity, or an
+    /// empty <see cref="Rid"/> when nothing spawned. A nonzero
+    /// <paramref name="player"/> is the id of the player the entity belongs to,
+    /// as in <see cref="NetwMultiplayer.SpawnCall"/>.
     /// </summary>
     public Rid SpawnRegistered(
         StringName id,
         Godot.Collections.Array args = null,
-        GodotObject owner = null)
+        long player = 0)
     {
         args ??= new Godot.Collections.Array();
         godot_variant slot0 = VariantUtils.CreateFromStringName(id);
         godot_variant slot1 = VariantUtils.CreateFromArray(args);
-        godot_variant slot2 = VariantUtils.CreateFromGodotObject(owner);
+        godot_variant slot2 = VariantUtils.CreateFromInt((long)player);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindSpawnRegistered,
@@ -5342,21 +4757,347 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindEntityAdopt =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_adopt", 2691240898UL);
+    private static readonly IntPtr _bindSpawnCall =
+        NetwApi.MethodBind("NetwMultiplayer", "spawn_call", 1420328058UL);
 
     /// <summary>
-    /// Replicates a node that is already in the scene tree, and returns its
-    /// entity. Returns an invalid <see cref="Rid"/> on failure. Use
-    /// <see cref="NetwMultiplayer.SpawnRegistered"/> for a node that is not in
-    /// the tree yet.
+    /// Calls <paramref name="function"/> with <paramref name="args"/> on every
+    /// peer, and returns the entity it made here, or an empty <see cref="Rid"/>
+    /// when nothing spawned. A nonzero <paramref name="player"/> is the id of
+    /// the player the entity belongs to, and the entity despawns with that
+    /// player. An id the session does not hold spawns nothing, and raises an
+    /// error unless that player left the session. <see cref="Netw.Spawn"/> and
+    /// <see cref="Netw.SpawnPlayer"/> call this and describe the rules.
     /// </summary>
-    public Rid EntityAdopt(GodotObject root)
+    public Rid SpawnCall(
+        Callable function,
+        Godot.Collections.Array args = null,
+        long player = 0)
     {
-        IntPtr slot0 = root?.NativeInstance ?? IntPtr.Zero;
+        args ??= new Godot.Collections.Array();
+        godot_variant slot0 = VariantUtils.CreateFromCallable(function);
+        godot_variant slot1 = VariantUtils.CreateFromArray(args);
+        godot_variant slot2 = VariantUtils.CreateFromInt((long)player);
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindSpawnCall,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        Rid result = VariantUtils.ConvertToRid(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindSpawnCallAsync =
+        NetwApi.MethodBind("NetwMultiplayer", "spawn_call_async", 4232134898UL);
+
+    /// <summary>
+    /// Like <see cref="NetwMultiplayer.SpawnCall"/>, and
+    /// <paramref name="function"/> may await. The <see cref="NetwPromise"/>
+    /// settles with the node once <paramref name="function"/> returns on this
+    /// peer. <see cref="Netw.SpawnAsync"/> calls this. <b>Server Only.</b>
+    /// </summary>
+    public NetwPromise SpawnCallAsync(
+        Callable function,
+        Godot.Collections.Array args = null)
+    {
+        args ??= new Godot.Collections.Array();
+        godot_variant slot0 = VariantUtils.CreateFromCallable(function);
+        godot_variant slot1 = VariantUtils.CreateFromArray(args);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindSpawnCallAsync,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        NetwPromise result =
+            NetwPromise.Adopt(
+                NetwApi.Retained(
+                    VariantUtils.ConvertToGodotObjectPtr(answered)));
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindSyncSendProperty =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "sync_send_property",
+            1163060692UL);
+
+    /// <summary>
+    /// Sends the current value of <paramref name="property"/> on
+    /// <paramref name="node"/>, a node of <paramref name="entity"/>, once to
+    /// the peers connected now. <see cref="Netw.SyncProperty"/> calls this and
+    /// describes who may send.
+    /// </summary>
+    public void SyncSendProperty(Rid entity, Node node, StringName property)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant slot1 = VariantUtils.CreateFromGodotObject(node);
+        godot_variant slot2 = VariantUtils.CreateFromStringName(property);
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindSyncSendProperty,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindSyncSendSignal =
+        NetwApi.MethodBind("NetwMultiplayer", "sync_send_signal", 2814544561UL);
+
+    /// <summary>
+    /// Emits <paramref name="signal"/> on <paramref name="node"/>, a node of
+    /// <paramref name="entity"/>, with <paramref name="args"/> on every peer.
+    /// <see cref="Netw.EmitEntitySignal"/> calls this.
+    /// </summary>
+    public void SyncSendSignal(
+        Rid entity,
+        Node node,
+        StringName signal,
+        Godot.Collections.Array args = null)
+    {
+        args ??= new Godot.Collections.Array();
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant slot1 = VariantUtils.CreateFromGodotObject(node);
+        godot_variant slot2 = VariantUtils.CreateFromStringName(signal);
+        godot_variant slot3 = VariantUtils.CreateFromArray(args);
+        godot_variant answered = default;
+        NetwThunks.Call4(
+            _bindSyncSendSignal,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            in slot3,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        slot3.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindEntityAttach =
+        NetwApi.MethodBind("NetwMultiplayer", "entity_attach", 1279089384UL);
+
+    /// <summary>
+    /// Makes <paramref name="node"/> an entity of this session and returns its
+    /// <see cref="Rid"/>, the <see cref="NetwEntity.Rid"/> of its
+    /// <see cref="NetwEntity"/>. A node that already is an entity returns its
+    /// <see cref="Rid"/>. Returns an invalid <see cref="Rid"/> when
+    /// <paramref name="node"/> is null or belongs to another session.
+    /// </summary>
+    public Rid EntityAttach(Node node)
+    {
+        IntPtr slot0 = node?.NativeInstance ?? IntPtr.Zero;
         Rid answered = default;
         NetwThunks.Ptrcall1_IntPtr_Rid(
-            _bindEntityAdopt,
+            _bindEntityAttach,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindPlayerList =
+        NetwApi.MethodBind("NetwMultiplayer", "player_list", 235988956UL);
+
+    /// <summary>
+    /// Returns the id of every player whose join was accepted. A connected peer
+    /// that has not joined is not here.
+    /// </summary>
+    public long[] PlayerList()
+    {
+        godot_variant answered = default;
+        NetwThunks.Call0(_bindPlayerList, Checked, ref answered);
+        long[] result =
+            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPlayerGetLocal =
+        NetwApi.MethodBind("NetwMultiplayer", "player_get_local", 2455072627UL);
+
+    /// <summary>
+    /// Returns the id of this peer's player, or <c>0</c> on a dedicated server
+    /// and before its join is accepted.
+    /// </summary>
+    public long PlayerGetLocal()
+    {
+        long answered = default;
+        NetwThunks.Ptrcall0_Long(_bindPlayerGetLocal, Checked, ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindPlayerFindAccount =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "player_find_account",
+            1321353865UL);
+
+    /// <summary>
+    /// Returns the id of the player signed in as <paramref name="account"/>, or
+    /// <c>0</c> when no player is.
+    /// </summary>
+    public long PlayerFindAccount(string account)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromString(account);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindPlayerFindAccount,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        long result = VariantUtils.ConvertToInt64(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPlayerGetPeer =
+        NetwApi.MethodBind("NetwMultiplayer", "player_get_peer", 923996154UL);
+
+    /// <summary>
+    /// Returns the peer <paramref name="player"/> is connected through, or
+    /// <c>0</c> for an unknown id.
+    /// </summary>
+    public long PlayerGetPeer(long player)
+    {
+        long slot0 = player;
+        long answered = default;
+        NetwThunks.Ptrcall1_Long_Long(
+            _bindPlayerGetPeer,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindPlayerIsActive =
+        NetwApi.MethodBind("NetwMultiplayer", "player_is_active", 1116898809UL);
+
+    /// <summary>
+    /// Returns <c>true</c> while <paramref name="player"/> is in the session,
+    /// the same as <see cref="NetwPlayer.IsActive"/>.
+    /// </summary>
+    public bool PlayerIsActive(long player)
+    {
+        long slot0 = player;
+        byte answered = default;
+        NetwThunks.Ptrcall1_Long_Byte(
+            _bindPlayerIsActive,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered != 0;
+    }
+
+    private static readonly IntPtr _bindPlayerGetUserName =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "player_get_username",
+            659327637UL);
+
+    /// <summary>
+    /// Returns the name <paramref name="player"/> joined with, the same as
+    /// <see cref="NetwPlayer.UserName"/>.
+    /// </summary>
+    public StringName PlayerGetUserName(long player)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)player);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindPlayerGetUserName,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        StringName result = VariantUtils.ConvertToStringName(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPlayerGetAccount =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "player_get_account",
+            844755477UL);
+
+    /// <summary>
+    /// Returns the account the player whose id is <paramref name="player"/>
+    /// signed in with, the same as <see cref="NetwPlayer.Account"/>.
+    /// </summary>
+    public string PlayerGetAccount(long player)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)player);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindPlayerGetAccount,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        string result = VariantUtils.ConvertToString(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPlayerGetAccountName =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "player_get_account_name",
+            844755477UL);
+
+    /// <summary>
+    /// Returns the display name of the account of <paramref name="player"/>,
+    /// the same as <see cref="NetwPlayer.AccountName"/>.
+    /// </summary>
+    public string PlayerGetAccountName(long player)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)player);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindPlayerGetAccountName,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        string result = VariantUtils.ConvertToString(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPlayerGetScene =
+        NetwApi.MethodBind("NetwMultiplayer", "player_get_scene", 937000113UL);
+
+    /// <summary>
+    /// Returns the <see cref="Rid"/> of the <see cref="NetwScene"/>
+    /// <paramref name="player"/> is in, or an empty <see cref="Rid"/> when the
+    /// player is in none or has left.
+    /// </summary>
+    public Rid PlayerGetScene(long player)
+    {
+        long slot0 = player;
+        Rid answered = default;
+        NetwThunks.Ptrcall1_Long_Rid(
+            _bindPlayerGetScene,
             Checked,
             in slot0,
             ref answered);
@@ -5370,12 +5111,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
             1171824711UL);
 
     /// <summary>
-    /// Every entity spawned for the player of <paramref name="peer"/> with
+    /// Returns every entity spawned for <paramref name="player"/> with
     /// <see cref="Netw.SpawnPlayer"/>, in no particular order.
     /// </summary>
-    public NetwEntity[] PlayerGetEntities(long peer)
+    public Godot.Collections.Array PlayerGetEntities(long player)
     {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)player);
         godot_variant answered = default;
         NetwThunks.Call1(
             _bindPlayerGetEntities,
@@ -5383,216 +5124,35 @@ public sealed class NetwMultiplayer : NetwRefCounted
             in slot0,
             ref answered);
         slot0.Dispose();
-        NetwEntity[] result =
-            NetwApi.Elements(
-                VariantUtils.ConvertToArray(answered),
-                NetwEntity.From);
+        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
         answered.Dispose();
         return result;
-    }
-
-    private static readonly IntPtr _bindPropertyPath =
-        NetwApi.MethodBind("NetwMultiplayer", "property_path", 747537165UL);
-
-    /// <summary>
-    /// Returns the path to <paramref name="property"/> of
-    /// <paramref name="source"/>, relative to <paramref name="base"/>, such as
-    /// <c>"Body:position"</c>. Empty when either node is freed.
-    /// </summary>
-    public static NodePath PropertyPath(
-        GodotObject source,
-        StringName property,
-        GodotObject @base)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromGodotObject(source);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(property);
-        godot_variant slot2 = VariantUtils.CreateFromGodotObject(@base);
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindPropertyPath,
-            IntPtr.Zero,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        NodePath result = VariantUtils.ConvertToNodePath(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindEntityGetView =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_get_view", 3389907229UL);
-
-    /// <summary>
-    /// Returns the <see cref="NetwEntity"/> of <paramref name="entity"/>, or
-    /// <c>null</c> once it is despawned.
-    /// </summary>
-    public NetwEntity EntityGetView(Rid entity)
-    {
-        Rid slot0 = entity;
-        IntPtr answered = default;
-        NetwThunks.Ptrcall1_Rid_IntPtr(
-            _bindEntityGetView,
-            Checked,
-            in slot0,
-            ref answered);
-        return NetwEntity.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindLivenessReserveRoute =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_reserve_route",
-            2455072627UL);
-
-    /// <summary>
-    /// Returns a new route without attaching anything to it. Routes are never
-    /// reused.
-    /// </summary>
-    public long LivenessReserveRoute()
-    {
-        long answered = default;
-        NetwThunks.Ptrcall0_Long(
-            _bindLivenessReserveRoute,
-            Checked,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLivenessAllocateRoute =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_allocate_route",
-            3429307534UL);
-
-    /// <summary>
-    /// Returns the route bound to <paramref name="wrapper"/>. Reserves and
-    /// binds a route when needed. Repeated calls for one entity return the same
-    /// route.
-    /// </summary>
-    public long LivenessAllocateRoute(GodotObject wrapper)
-    {
-        IntPtr slot0 = wrapper?.NativeInstance ?? IntPtr.Zero;
-        long answered = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindLivenessAllocateRoute,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLivenessBindRoute =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_bind_route",
-            1068914454UL);
-
-    /// <summary>
-    /// Gives <paramref name="route"/> to <paramref name="wrapper"/>.
-    /// </summary>
-    public bool LivenessBindRoute(long route, GodotObject wrapper)
-    {
-        long slot0 = route;
-        IntPtr slot1 = wrapper?.NativeInstance ?? IntPtr.Zero;
-        byte answered = default;
-        NetwThunks.Ptrcall2_Long_IntPtr_Byte(
-            _bindLivenessBindRoute,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindLivenessRouteOf =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_route_of",
-            1107568780UL);
-
-    /// <summary>
-    /// The route bound to <paramref name="wrapper"/>, or <c>0</c>.
-    /// </summary>
-    public long LivenessRouteOf(GodotObject wrapper)
-    {
-        IntPtr slot0 = wrapper?.NativeInstance ?? IntPtr.Zero;
-        long answered = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindLivenessRouteOf,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLivenessRouteState =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_route_state",
-            2454407899UL);
-
-    /// <summary>
-    /// The <see cref="NetwMultiplayer.EntityState"/> of
-    /// <paramref name="route"/>.
-    /// </summary>
-    public NetwMultiplayer.EntityState LivenessRouteState(long route)
-    {
-        long slot0 = route;
-        long answered = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindLivenessRouteState,
-            Checked,
-            in slot0,
-            ref answered);
-        return (NetwMultiplayer.EntityState)answered;
-    }
-
-    private static readonly IntPtr _bindEntityOf =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_of", 2691240898UL);
-
-    /// <summary>
-    /// Returns the entity of <paramref name="node"/> or of its closest ancestor
-    /// that has one.
-    /// </summary>
-    public Rid EntityOf(GodotObject node)
-    {
-        IntPtr slot0 = node?.NativeInstance ?? IntPtr.Zero;
-        Rid answered = default;
-        NetwThunks.Ptrcall1_IntPtr_Rid(
-            _bindEntityOf,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
     }
 
     private static readonly IntPtr _bindSceneWatch =
         NetwApi.MethodBind("NetwMultiplayer", "scene_watch", 3804025326UL);
 
     /// <summary>
-    /// Replicates <paramref name="scene"/> to <paramref name="peer"/> until
-    /// <see cref="NetwMultiplayer.SceneUnwatch"/>, without moving any of its
-    /// player entities. Applies immediately.
+    /// Replicates <paramref name="scene"/> to the player with id
+    /// <paramref name="player"/> until
+    /// <see cref="NetwMultiplayer.SceneUnwatch"/>, without moving any of their
+    /// entities. Applies immediately.
     /// <code>
     /// Error
-    /// ┠╴OK                     the peer receives the scene
+    /// ┠╴OK                     the player receives the scene
     /// ┠╴ERR_UNAUTHORIZED       called on a client
-    /// ┠╴ERR_INVALID_PARAMETER  peer is 0
+    /// ┠╴ERR_INVALID_PARAMETER  the session holds no player with this id
     /// ┠╴ERR_DOES_NOT_EXIST     the scene has no node
-    /// ┖╴ERR_UNAVAILABLE        the peer still does not receive it
+    /// ┖╴ERR_UNAVAILABLE        the player still does not receive it
     /// </code>
     /// <para>
     /// <b>Server Only.</b>
     /// </para>
     /// </summary>
-    public Error SceneWatch(Rid scene, long peer)
+    public Error SceneWatch(Rid scene, long player)
     {
         Rid slot0 = scene;
-        long slot1 = peer;
+        long slot1 = player;
         long answered = default;
         NetwThunks.Ptrcall2_Rid_Long_Long(
             _bindSceneWatch,
@@ -5604,41 +5164,56 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindSceneUnwatch =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_unwatch", 2965260855UL);
+        NetwApi.MethodBind("NetwMultiplayer", "scene_unwatch", 3804025326UL);
 
     /// <summary>
-    /// Reverses <see cref="NetwMultiplayer.SceneWatch"/>. A peer with an entity
-    /// spawned for it in the scene keeps receiving it. Returns <c>false</c>
-    /// when the scene does not exist. <b>Server Only.</b>
+    /// Reverses <see cref="NetwMultiplayer.SceneWatch"/> for the player with id
+    /// <paramref name="player"/>. A player with an entity in the scene keeps
+    /// receiving it.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the watch is withdrawn, or there was none
+    /// ┠╴ERR_UNAUTHORIZED       called on a client
+    /// ┠╴ERR_INVALID_PARAMETER  the session holds no player with this id
+    /// ┖╴ERR_DOES_NOT_EXIST     the scene has no node
+    /// </code>
+    /// <para>
+    /// <b>Server Only.</b>
+    /// </para>
     /// </summary>
-    public bool SceneUnwatch(Rid scene, long peer)
+    public Error SceneUnwatch(Rid scene, long player)
     {
         Rid slot0 = scene;
-        long slot1 = peer;
-        byte answered = default;
-        NetwThunks.Ptrcall2_Rid_Long_Byte(
+        long slot1 = player;
+        long answered = default;
+        NetwThunks.Ptrcall2_Rid_Long_Long(
             _bindSceneUnwatch,
             Checked,
             in slot0,
             in slot1,
             ref answered);
-        return answered != 0;
+        return (Error)answered;
     }
 
-    private static readonly IntPtr _bindSceneSubscribes =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_subscribes", 3120086654UL);
+    private static readonly IntPtr _bindSceneIsWatching =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "scene_is_watching",
+            3120086654UL);
 
     /// <summary>
-    /// Returns <c>true</c> when <paramref name="peer"/> receives
-    /// <paramref name="scene"/>, for any reason.
+    /// Returns <c>true</c> when the player with id <paramref name="player"/>
+    /// receives <paramref name="scene"/>, either through
+    /// <see cref="NetwMultiplayer.SceneWatch"/> or because one of their
+    /// entities is in it.
     /// </summary>
-    public bool SceneSubscribes(Rid scene, long peer)
+    public bool SceneIsWatching(Rid scene, long player)
     {
         Rid slot0 = scene;
-        long slot1 = peer;
+        long slot1 = player;
         byte answered = default;
         NetwThunks.Ptrcall2_Rid_Long_Byte(
-            _bindSceneSubscribes,
+            _bindSceneIsWatching,
             Checked,
             in slot0,
             in slot1,
@@ -5646,91 +5221,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindSceneIsDeclared =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "scene_is_declared",
-            4155700596UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when <paramref name="entity"/> is a multiplayer
-    /// scene.
-    /// </summary>
-    public bool SceneIsDeclared(Rid entity)
-    {
-        Rid slot0 = entity;
-        byte answered = default;
-        NetwThunks.Ptrcall1_Rid_Byte(
-            _bindSceneIsDeclared,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindLivenessGetEntities =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_get_entities",
-            3995934104UL);
-
-    /// <summary>
-    /// Every live <see cref="NetwEntity"/> on this peer, sorted by route.
-    /// </summary>
-    public NetwEntity[] LivenessGetEntities()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindLivenessGetEntities, Checked, ref answered);
-        NetwEntity[] result =
-            NetwApi.Elements(
-                VariantUtils.ConvertToArray(answered),
-                NetwEntity.From);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindLivenessPendingLiveCount =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_pending_live_count",
-            3905245786UL);
-
-    /// <summary>
-    /// How many <see cref="NetwMultiplayer.LivenessWhenLive"/> callbacks are
-    /// still waiting.
-    /// </summary>
-    public long LivenessPendingLiveCount()
-    {
-        long answered = default;
-        NetwThunks.Ptrcall0_Long(
-            _bindLivenessPendingLiveCount,
-            Checked,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLivenessPollNow =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_poll_now",
-            3218959716UL);
-
-    /// <summary>
-    /// Times out the <see cref="NetwMultiplayer.LivenessWhenLive"/> callbacks
-    /// whose deadline has passed.
-    /// </summary>
-    public void LivenessPollNow()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindLivenessPollNow, Checked, ref discarded);
-    }
-
     private static readonly IntPtr _bindPlayerKick =
-        NetwApi.MethodBind("NetwMultiplayer", "player_kick", 1232915396UL);
+        NetwApi.MethodBind("NetwMultiplayer", "player_kick", 613140348UL);
 
     /// <summary>
-    /// Removes <paramref name="player"/> from the session and disconnects their
-    /// peer with <paramref name="reason"/>.
+    /// Removes the player whose id is <paramref name="player"/> from the
+    /// session and disconnects their peer with <paramref name="reason"/>.
     /// <code>
     /// Error
     /// ┠╴OK                      the player was kicked
@@ -5741,11 +5237,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <b>Server Only.</b>
     /// </para>
     /// </summary>
-    public Error PlayerKick(NetwPlayer player, string reason = "")
+    public Error PlayerKick(long player, string reason = "")
     {
-        godot_variant slot0 =
-            VariantUtils.CreateFromGodotObjectPtr(
-                player?.Native ?? IntPtr.Zero);
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)player);
         godot_variant slot1 = VariantUtils.CreateFromString(reason);
         godot_variant answered = default;
         NetwThunks.Call2(
@@ -5759,6 +5253,34 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindPlayerRequestKick =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "player_request_kick",
+            3576329613UL);
+
+    /// <summary>
+    /// Asks the server to kick the player whose id is
+    /// <paramref name="player"/>. The server receives
+    /// <see cref="NetwSession.KickRequested"/> and decides. <b>Player
+    /// request.</b>
+    /// </summary>
+    public void PlayerRequestKick(long player, string reason = "")
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)player);
+        godot_variant slot1 = VariantUtils.CreateFromString(reason);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindPlayerRequestKick,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        answered.Dispose();
     }
 
     private static readonly IntPtr _bindSessionPrepareJoin =
@@ -5862,7 +5384,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Deletes <paramref name="layer"/> with its viewers, entities, settings
-    /// and callbacks.
+    /// and callbacks. A layer that belongs to a scene is left as it is, and an
+    /// error is pushed.
     /// </summary>
     public void InterestLayerFree(Rid layer)
     {
@@ -5883,12 +5406,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Lets <paramref name="peer"/> see every entity in
-    /// <paramref name="layer"/>. Applies at the end of the frame, or at
-    /// <see cref="NetwMultiplayer.InterestFlushNow"/>.
+    /// <paramref name="layer"/>. Applies at the end of the frame.
     /// <code>
     /// Error
     /// ┠╴OK                  the peer will be added
     /// ┠╴ERR_DOES_NOT_EXIST  layer does not exist
+    /// ┠╴ERR_LOCKED          layer belongs to a scene
     /// ┖╴ERR_INVALID_DATA    peer is 0
     /// </code>
     /// </summary>
@@ -5910,25 +5433,33 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "interest_layer_remove_viewer",
-            3411492887UL);
+            3804025326UL);
 
     /// <summary>
     /// Stops <paramref name="peer"/> from seeing <paramref name="layer"/>.
     /// Entities it still sees through another layer stay. The layer's
     /// <see cref="NetwInterestLayer.LeavePolicy"/> decides what happens to the
     /// rest.
+    /// <code>
+    /// Error
+    /// ┠╴OK                  the peer will be removed, or did not view the layer
+    /// ┠╴ERR_DOES_NOT_EXIST  layer does not exist
+    /// ┠╴ERR_LOCKED          layer belongs to a scene
+    /// ┖╴ERR_INVALID_DATA    peer is 0
+    /// </code>
     /// </summary>
-    public void InterestLayerRemoveViewer(Rid layer, long peer)
+    public Error InterestLayerRemoveViewer(Rid layer, long peer)
     {
         Rid slot0 = layer;
         long slot1 = peer;
-        long discarded = default;
+        long answered = default;
         NetwThunks.Ptrcall2_Rid_Long_Long(
             _bindInterestLayerRemoveViewer,
             Checked,
             in slot0,
             in slot1,
-            ref discarded);
+            ref answered);
+        return (Error)answered;
     }
 
     private static readonly IntPtr _bindInterestLayerAddEntity =
@@ -5939,12 +5470,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Adds <paramref name="entity"/> to <paramref name="layer"/>, so every
-    /// viewer of the layer sees it. Applies at the end of the frame, or at
-    /// <see cref="NetwMultiplayer.InterestFlushNow"/>.
+    /// viewer of the layer sees it. Applies at the end of the frame.
     /// <code>
     /// Error
     /// ┠╴OK                  the entity will be added
     /// ┠╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+    /// ┠╴ERR_LOCKED          layer belongs to a scene
     /// ┠╴ERR_UNAUTHORIZED    called on a client
     /// ┖╴ERR_UNAVAILABLE     the layer rejected the entity
     /// </code>
@@ -5971,12 +5502,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Removes <paramref name="entity"/> from <paramref name="layer"/>, so its
-    /// viewers stop seeing it. Applies at the end of the frame, or at
-    /// <see cref="NetwMultiplayer.InterestFlushNow"/>.
+    /// viewers stop seeing it. Applies at the end of the frame.
     /// <code>
     /// Error
     /// ┠╴OK                  the entity will be removed, or was not in the layer
     /// ┠╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+    /// ┠╴ERR_LOCKED          layer belongs to a scene
     /// ┖╴ERR_UNAUTHORIZED    called on a client
     /// </code>
     /// </summary>
@@ -5998,12 +5529,19 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "interest_layer_set_param",
-            1432239415UL);
+            2879557255UL);
 
     /// <summary>
     /// Changes one setting of <paramref name="layer"/>.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the setting changed
+    /// ┠╴ERR_DOES_NOT_EXIST     layer is not in this session
+    /// ┠╴ERR_LOCKED             layer belongs to a scene
+    /// ┖╴ERR_INVALID_PARAMETER  param is unknown, or value is not one of its constants
+    /// </code>
     /// </summary>
-    public void InterestLayerSetParam(
+    public Error InterestLayerSetParam(
         Rid layer,
         NetwMultiplayer.LayerParam param,
         Variant value)
@@ -6022,7 +5560,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindInterestLayerSetDriverCallback =
@@ -6037,7 +5577,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <see cref="Rid"/> and returns the <see cref="Rid"/> of every entity in
     /// it. An empty <see cref="Callable"/> removes it.
     /// <see cref="NetwInterestLayer.Driver"/> is the same with objects, and
-    /// setting one replaces the other.
+    /// setting one replaces the other. A layer that belongs to a scene takes no
+    /// callback, and an error is pushed.
     /// </summary>
     public void InterestLayerSetDriverCallback(Rid layer, Callable callback)
     {
@@ -6055,98 +5596,260 @@ public sealed class NetwMultiplayer : NetwRefCounted
         answered.Dispose();
     }
 
-    private static readonly IntPtr _bindInterestFlushNow =
+    private static readonly IntPtr _bindInterestLayerGetName =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "interest_flush_now",
-            166280745UL);
+            "interest_layer_get_name",
+            3765571616UL);
 
     /// <summary>
-    /// Applies pending layer changes now, where they would otherwise apply at
-    /// the end of the frame.
+    /// Returns the name <paramref name="layer"/> was created with.
+    /// </summary>
+    public StringName InterestLayerGetName(Rid layer)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(layer);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindInterestLayerGetName,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        StringName result = VariantUtils.ConvertToStringName(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindInterestLayerGetParam =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "interest_layer_get_param",
+            3147784737UL);
+
+    /// <summary>
+    /// Returns the value of <paramref name="param"/> for
+    /// <paramref name="layer"/>.
+    /// </summary>
+    public Variant InterestLayerGetParam(
+        Rid layer,
+        NetwMultiplayer.LayerParam param)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(layer);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)param);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindInterestLayerGetParam,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        Variant result = Variant.CreateCopyingBorrowed(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindInterestLayerGetViewers =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "interest_layer_get_viewers",
+            788230395UL);
+
+    /// <summary>
+    /// Returns the peers that view <paramref name="layer"/>.
+    /// </summary>
+    public int[] InterestLayerGetViewers(Rid layer)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(layer);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindInterestLayerGetViewers,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        int[] result =
+            VariantUtils.ConvertAsPackedInt32ArrayToSystemArray(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindInterestLayerHasViewer =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "interest_layer_has_viewer",
+            3120086654UL);
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="peer"/> views
+    /// <paramref name="layer"/>.
+    /// </summary>
+    public bool InterestLayerHasViewer(Rid layer, long peer)
+    {
+        Rid slot0 = layer;
+        long slot1 = peer;
+        byte answered = default;
+        NetwThunks.Ptrcall2_Rid_Long_Byte(
+            _bindInterestLayerHasViewer,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return answered != 0;
+    }
+
+    private static readonly IntPtr _bindInterestLayerGetEntities =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "interest_layer_get_entities",
+            2670461153UL);
+
+    /// <summary>
+    /// Returns the entities in <paramref name="layer"/>. On a client, only the
+    /// ones it sees.
+    /// </summary>
+    public Godot.Collections.Array InterestLayerGetEntities(Rid layer)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(layer);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindInterestLayerGetEntities,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindInterestLayerHasEntity =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "interest_layer_has_entity",
+            2511602627UL);
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="entity"/> is in
+    /// <paramref name="layer"/>.
+    /// </summary>
+    public bool InterestLayerHasEntity(Rid layer, Rid entity)
+    {
+        Rid slot0 = layer;
+        Rid slot1 = entity;
+        byte answered = default;
+        NetwThunks.Ptrcall2_Rid_Rid_Byte(
+            _bindInterestLayerHasEntity,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return answered != 0;
+    }
+
+    private static readonly IntPtr _bindInterestLayerGetStats =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "interest_layer_get_stats",
+            1882737106UL);
+
+    /// <summary>
+    /// Returns the visibility counters of <paramref name="layer"/>.
     /// <code>
-    /// layer.add_viewer(peer)
-    /// api.interest_flush_now()
-    /// assert(api.interest_admits(entity, peer))
-    /// </code>
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the changes were applied
-    /// ┠╴ERR_INVALID_DATA    a driver callback did not return an Array
-    /// ┖╴ERR_DOES_NOT_EXIST  a driver callback returned an unknown entity
+    /// Dictionary
+    /// ┠╴viewers            int   number of viewers
+    /// ┠╴entities           int   number of entities
+    /// ┠╴visible_edges      int   (entity, peer) pairs that can see each other
+    /// ┖╴transitions_total  int   shows plus hides since the layer was created
     /// </code>
     /// </summary>
-    public Error InterestFlushNow()
+    public Godot.Collections.Dictionary InterestLayerGetStats(Rid layer)
     {
-        long answered = default;
-        NetwThunks.Ptrcall0_Long(_bindInterestFlushNow, Checked, ref answered);
-        return (Error)answered;
+        godot_variant slot0 = VariantUtils.CreateFromRid(layer);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindInterestLayerGetStats,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        Godot.Collections.Dictionary result =
+            VariantUtils.ConvertToDictionary(answered);
+        answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindInterestJoin =
-        NetwApi.MethodBind("NetwMultiplayer", "interest_join", 4040482693UL);
+        NetwApi.MethodBind("NetwMultiplayer", "interest_join", 3181288260UL);
 
     /// <summary>
-    /// Adds <paramref name="entity"/> to the layer <paramref name="layerId"/>.
-    /// Can be called before the node enters the tree.
+    /// Adds <paramref name="entity"/> to <paramref name="layer"/> from the
+    /// entity's side.
+    /// <code>
+    /// Error
+    /// ┠╴OK                  the entity will be added, or is already in the layer
+    /// ┖╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+    /// </code>
     /// </summary>
-    public void InterestJoin(Rid entity, StringName layerId)
+    public Error InterestJoin(Rid entity, Rid layer)
     {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
-        godot_variant answered = default;
-        NetwThunks.Call2(
+        Rid slot0 = entity;
+        Rid slot1 = layer;
+        long answered = default;
+        NetwThunks.Ptrcall2_Rid_Rid_Long(
             _bindInterestJoin,
             Checked,
             in slot0,
             in slot1,
             ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
+        return (Error)answered;
     }
 
     private static readonly IntPtr _bindInterestLeave =
-        NetwApi.MethodBind("NetwMultiplayer", "interest_leave", 4040482693UL);
+        NetwApi.MethodBind("NetwMultiplayer", "interest_leave", 3181288260UL);
 
     /// <summary>
-    /// Removes <paramref name="entity"/> from the layer
-    /// <paramref name="layerId"/>.
+    /// Removes <paramref name="entity"/> from <paramref name="layer"/> from the
+    /// entity's side.
+    /// <code>
+    /// Error
+    /// ┠╴OK                  the entity will be removed, or was not in the layer
+    /// ┖╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+    /// </code>
     /// </summary>
-    public void InterestLeave(Rid entity, StringName layerId)
+    public Error InterestLeave(Rid entity, Rid layer)
     {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
-        godot_variant answered = default;
-        NetwThunks.Call2(
+        Rid slot0 = entity;
+        Rid slot1 = layer;
+        long answered = default;
+        NetwThunks.Ptrcall2_Rid_Rid_Long(
             _bindInterestLeave,
             Checked,
             in slot0,
             in slot1,
             ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
+        return (Error)answered;
     }
 
     private static readonly IntPtr _bindInterestOnEnter =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_on_enter",
-            2720850369UL);
+        NetwApi.MethodBind("NetwMultiplayer", "interest_on_enter", 529374791UL);
 
     /// <summary>
     /// Calls <paramref name="callback"/> as <c>callback(layer_id, peer_id)</c>
     /// when a peer starts seeing <paramref name="entity"/> through
-    /// <paramref name="layerId"/>.
+    /// <paramref name="layer"/>, where <c>layer_id</c> is the layer's name.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the callback was added
+    /// ┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+    /// ┖╴ERR_INVALID_PARAMETER  callback is not valid
+    /// </code>
     /// </summary>
-    public void InterestOnEnter(
-        Rid entity,
-        StringName layerId,
-        Callable callback)
+    public Error InterestOnEnter(Rid entity, Rid layer, Callable callback)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
+        godot_variant slot1 = VariantUtils.CreateFromRid(layer);
         godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
         godot_variant answered = default;
         NetwThunks.Call3(
@@ -6159,27 +5862,29 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindInterestOnLeave =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "interest_on_leave",
-            2720850369UL);
+        NetwApi.MethodBind("NetwMultiplayer", "interest_on_leave", 529374791UL);
 
     /// <summary>
     /// Calls <paramref name="callback"/> as <c>callback(layer_id, peer_id)</c>
     /// when a peer stops seeing <paramref name="entity"/> through
-    /// <paramref name="layerId"/>.
+    /// <paramref name="layer"/>, where <c>layer_id</c> is the layer's name.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the callback was added
+    /// ┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+    /// ┖╴ERR_INVALID_PARAMETER  callback is not valid
+    /// </code>
     /// </summary>
-    public void InterestOnLeave(
-        Rid entity,
-        StringName layerId,
-        Callable callback)
+    public Error InterestOnLeave(Rid entity, Rid layer, Callable callback)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
+        godot_variant slot1 = VariantUtils.CreateFromRid(layer);
         godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
         godot_variant answered = default;
         NetwThunks.Call3(
@@ -6192,30 +5897,39 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindInterestOnLeavePolicy =
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "interest_on_leave_policy",
-            884919661UL);
+            483171619UL);
 
     /// <summary>
     /// Sets the <see cref="NetwInterestLayer.LeavePolicy"/> for
-    /// <paramref name="entity"/> on <paramref name="layerId"/>.
+    /// <paramref name="entity"/> on <paramref name="layer"/>.
     /// <see cref="NetwInterestLayer.LeavePolicy.Custom"/> requires
-    /// <paramref name="customCallback"/>, called with <c>(peer_id,
-    /// layer_id)</c> on the server. Other policies reject a callback.
+    /// <paramref name="customCallback"/>, called on the server with
+    /// <c>(peer_id, layer_id)</c>, where <c>layer_id</c> is the layer's name.
+    /// Other policies reject a callback.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the policy was set
+    /// ┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+    /// ┖╴ERR_INVALID_PARAMETER  policy is unknown, or custom_callback does not match it
+    /// </code>
     /// </summary>
-    public void InterestOnLeavePolicy(
+    public Error InterestOnLeavePolicy(
         Rid entity,
-        StringName layerId,
+        Rid layer,
         NetwInterestLayer.LeavePolicy policy,
         Callable customCallback = default)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
+        godot_variant slot1 = VariantUtils.CreateFromRid(layer);
         godot_variant slot2 = VariantUtils.CreateFromInt((long)policy);
         godot_variant slot3 = VariantUtils.CreateFromCallable(customCallback);
         godot_variant answered = default;
@@ -6231,30 +5945,38 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot1.Dispose();
         slot2.Dispose();
         slot3.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindInterestOnPerceptionPolicy =
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "interest_on_perception_policy",
-            557506269UL);
+            101321083UL);
 
     /// <summary>
     /// Sets what this peer does with <paramref name="entity"/> when its
-    /// visibility through <paramref name="layerId"/> changes.
+    /// visibility through <paramref name="layer"/> changes.
     /// <see cref="NetwInterestLayer.PerceptionPolicy.Custom"/> requires
     /// <paramref name="customCallback"/>, called as <c>custom_callback(visible,
-    /// peer_id, layer_id)</c>.
+    /// peer_id, layer_id)</c>, where <c>layer_id</c> is the layer's name.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the policy was set
+    /// ┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+    /// ┖╴ERR_INVALID_PARAMETER  policy is unknown, or custom_callback does not match it
+    /// </code>
     /// </summary>
-    public void InterestOnPerceptionPolicy(
+    public Error InterestOnPerceptionPolicy(
         Rid entity,
-        StringName layerId,
+        Rid layer,
         NetwInterestLayer.PerceptionPolicy policy,
         Callable customCallback = default)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
+        godot_variant slot1 = VariantUtils.CreateFromRid(layer);
         godot_variant slot2 = VariantUtils.CreateFromInt((long)policy);
         godot_variant slot3 = VariantUtils.CreateFromCallable(customCallback);
         godot_variant answered = default;
@@ -6270,7 +5992,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot1.Dispose();
         slot2.Dispose();
         slot3.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindPredictStepperInstall =
@@ -6306,61 +6030,22 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return (Error)answered;
     }
 
-    private static readonly IntPtr _bindInterestAdmits =
-        NetwApi.MethodBind("NetwMultiplayer", "interest_admits", 2965260855UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when <paramref name="peer"/> can see
-    /// <paramref name="entity"/>. Returns <c>false</c> when either is unknown.
-    /// </summary>
-    public bool InterestAdmits(Rid entity, long peer)
-    {
-        Rid slot0 = entity;
-        long slot1 = peer;
-        byte answered = default;
-        NetwThunks.Ptrcall2_Rid_Long_Byte(
-            _bindInterestAdmits,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindInterestGetRow =
-        NetwApi.MethodBind("NetwMultiplayer", "interest_get_row", 1637577313UL);
-
-    /// <summary>
-    /// Returns a bitset with one bit per peer that can see
-    /// <paramref name="entity"/>. Empty when the entity is unknown.
-    /// </summary>
-    public long[] InterestGetRow(Rid entity)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindInterestGetRow, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        long[] result =
-            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindInterestGetMembership =
+    private static readonly IntPtr _bindInterestGetLayers =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "interest_get_membership",
+            "interest_get_layers",
             2670461153UL);
 
     /// <summary>
-    /// Returns every layer <paramref name="entity"/> is in.
+    /// Returns every existing layer <paramref name="entity"/> is in. It creates
+    /// no layer.
     /// </summary>
-    public Godot.Collections.Array InterestGetMembership(Rid entity)
+    public Godot.Collections.Array InterestGetLayers(Rid entity)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant answered = default;
         NetwThunks.Call1(
-            _bindInterestGetMembership,
+            _bindInterestGetLayers,
             Checked,
             in slot0,
             ref answered);
@@ -6370,22 +6055,28 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindLagcompIsConfigured =
+    private static readonly IntPtr _bindInterestIsVisible =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "lagcomp_is_configured",
-            36873697UL);
+            "interest_is_visible",
+            2965260855UL);
 
     /// <summary>
-    /// Returns <c>true</c> when a <see cref="NetwLagCompensationConfig"/> was
-    /// applied. Without one, rewinding does nothing.
+    /// Returns <c>true</c> when updates for <paramref name="entity"/> are sent
+    /// to <paramref name="peer"/>. That is always so for the server, for the
+    /// controller of <paramref name="entity"/> and for an entity in no layer. A
+    /// client answers for itself.
     /// </summary>
-    public bool LagcompIsConfigured()
+    public bool InterestIsVisible(Rid entity, long peer)
     {
+        Rid slot0 = entity;
+        long slot1 = peer;
         byte answered = default;
-        NetwThunks.Ptrcall0_Byte(
-            _bindLagcompIsConfigured,
+        NetwThunks.Ptrcall2_Rid_Long_Byte(
+            _bindInterestIsVisible,
             Checked,
+            in slot0,
+            in slot1,
             ref answered);
         return answered != 0;
     }
@@ -6401,7 +6092,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// sender)</c> for every packet on <paramref name="channel"/>, which must
     /// be between 100 and 254. When <paramref name="deferWhenUnknown"/> is
     /// <c>true</c>, a packet for an entity that is not spawned yet waits for
-    /// it.
+    /// it. A later registration on the same <paramref name="channel"/> replaces
+    /// this one, including one from <see cref="NetwChannel.Register"/>.
     /// </summary>
     public void RpcChannelRegister(
         long channel,
@@ -6423,33 +6115,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot1.Dispose();
         slot2.Dispose();
         answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindEntityBindNode =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_bind_node", 2237155014UL);
-
-    /// <summary>
-    /// Makes <paramref name="node"/> the node of <paramref name="entity"/>.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the node was bound, or already was
-    /// ┠╴ERR_DOES_NOT_EXIST  entity does not exist
-    /// ┠╴ERR_INVALID_DATA    node is null, or entity has no route yet
-    /// ┖╴ERR_ALREADY_EXISTS  a different node is already bound
-    /// </code>
-    /// </summary>
-    public Error EntityBindNode(Rid entity, Node node)
-    {
-        Rid slot0 = entity;
-        IntPtr slot1 = node?.NativeInstance ?? IntPtr.Zero;
-        long answered = default;
-        NetwThunks.Ptrcall2_Rid_IntPtr_Long(
-            _bindEntityBindNode,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return (Error)answered;
     }
 
     private static readonly IntPtr _bindLagcompRewind =
@@ -6508,117 +6173,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
             in slot1,
             ref answered);
         return DictionaryRecord.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindEntityCreate =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_create", 529393457UL);
-
-    /// <summary>
-    /// Creates an empty entity. Give it a route with
-    /// <see cref="NetwMultiplayer.EntityAdmit"/> or
-    /// <see cref="NetwMultiplayer.EntityBindRoute"/>.
-    /// </summary>
-    public Rid EntityCreate()
-    {
-        Rid answered = default;
-        NetwThunks.Ptrcall0_Rid(_bindEntityCreate, Checked, ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLivenessWhenLive =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_when_live",
-            3847793847UL);
-
-    /// <summary>
-    /// Calls <paramref name="callback"/> once <paramref name="route"/> has an
-    /// entity. Calls <paramref name="onTimeout"/> instead after
-    /// <paramref name="timeoutTicks"/>. <c>0</c> waits one second.
-    /// </summary>
-    public void LivenessWhenLive(
-        long route,
-        Callable callback,
-        long timeoutTicks = 0,
-        Callable onTimeout = default)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)route);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
-        godot_variant slot2 = VariantUtils.CreateFromInt((long)timeoutTicks);
-        godot_variant slot3 = VariantUtils.CreateFromCallable(onTimeout);
-        godot_variant answered = default;
-        NetwThunks.Call4(
-            _bindLivenessWhenLive,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            in slot3,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        slot3.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindLivenessClaimRoutes =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_claim_routes",
-            2865087369UL);
-
-    /// <summary>
-    /// Creates <paramref name="count"/> routes with no node attached, for
-    /// example to address table rows. Release them with
-    /// <see cref="NetwMultiplayer.LivenessReleaseRoutes"/>. Returns an empty
-    /// array on a client. <b>Server Only.</b>
-    /// </summary>
-    public long[] LivenessClaimRoutes(int count)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)count);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindLivenessClaimRoutes,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        long[] result =
-            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindLivenessReleaseRoutes =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_release_routes",
-            820105581UL);
-
-    /// <summary>
-    /// Releases <paramref name="routes"/> from
-    /// <see cref="NetwMultiplayer.LivenessClaimRoutes"/>, removes their table
-    /// rows, and tells every peer. A released route is never reused.
-    /// <code>
-    /// Error
-    /// ┠╴OK                the routes were released
-    /// ┖╴ERR_UNCONFIGURED  called on a client
-    /// </code>
-    /// </summary>
-    public Error LivenessReleaseRoutes(long[] routes)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromPackedInt64Array(routes);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindLivenessReleaseRoutes,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        Error result = (Error)VariantUtils.ConvertToInt64(answered);
-        answered.Dispose();
-        return result;
     }
 
     private static readonly IntPtr _bindEntityDespawn =
@@ -6743,12 +6297,18 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "predict_set_param",
-            2998497692UL);
+            3533261882UL);
 
     /// <summary>
     /// Changes one prediction setting of <paramref name="entity"/>.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the setting changed
+    /// ┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+    /// ┖╴ERR_INVALID_PARAMETER  param is unknown
+    /// </code>
     /// </summary>
-    public void PredictSetParam(
+    public Error PredictSetParam(
         Rid entity,
         NetwMultiplayer.PredictParam param,
         Variant value)
@@ -6767,7 +6327,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindPredictGetParam =
@@ -6933,16 +6495,163 @@ public sealed class NetwMultiplayer : NetwRefCounted
         answered.Dispose();
     }
 
+    private static readonly IntPtr _bindPredictGetSensor =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "predict_get_sensor",
+            1812703535UL);
+
+    /// <summary>
+    /// Returns the value the sensor <paramref name="name"/> of
+    /// <paramref name="entity"/> sampled before the current step, or
+    /// <paramref name="default"/> when nothing sampled it.
+    /// </summary>
+    public Variant PredictGetSensor(
+        Rid entity,
+        StringName name,
+        Variant @default = default)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant slot1 = VariantUtils.CreateFromStringName(name);
+        godot_variant slot2 = @default.CopyNativeVariant();
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindPredictGetSensor,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        Variant result = Variant.CreateCopyingBorrowed(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPredictNotifyContact =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "predict_notify_contact",
+            2722037293UL);
+
+    /// <summary>
+    /// Holds off small corrections of <paramref name="entity"/> for
+    /// <see cref="NetwPrediction.CollisionCooldownTicks"/>. Call it on the
+    /// controlling client when the predicted body collides.
+    /// </summary>
+    public void PredictNotifyContact(Rid entity)
+    {
+        Rid slot0 = entity;
+        long discarded = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindPredictNotifyContact,
+            Checked,
+            in slot0,
+            ref discarded);
+    }
+
+    private static readonly IntPtr _bindPredictGetReachability =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "predict_get_reachability",
+            3192676292UL);
+
+    /// <summary>
+    /// Returns, property by property, whether the prediction settings of
+    /// <paramref name="entity"/> take effect, or an empty
+    /// <see cref="Godot.Collections.Dictionary"/> before it is predicted. A
+    /// row's <c>class</c> names a
+    /// <see cref="NetwPropertyConfig.PropertyClassEnum"/> value.
+    /// <code>
+    /// Dictionary
+    /// ┠╴entity      StringName  the entity's name
+    /// ┠╴schedule    StringName  TICK or FRAME
+    /// ┠╴breach      Dictionary
+    /// ┃ ┠╴response     StringName  DEMOTE or PREDICT_THROUGH
+    /// ┃ ┖╴declared_by  StringName  what set the breach response
+    /// ┠╴domain      Dictionary
+    /// ┃ ┠╴island                StringName  exact, approximate or none
+    /// ┃ ┖╴contact_window_ticks  int         ticks a contact holds corrections off
+    /// ┠╴transport   bool        true when a correction path callback is set
+    /// ┠╴fields      Dictionary  one row per state property, keyed by its name
+    /// ┃ ┖╴row
+    /// ┃   ┠╴class                 StringName         the property class
+    /// ┃   ┠╴triggers              bool               whether it can force a correction alone
+    /// ┃   ┠╴tolerance             float              the divergence epsilon in force
+    /// ┃   ┠╴tolerance_declared    bool               true when the property set its own
+    /// ┃   ┠╴teleport_at           float              the teleport distance in force
+    /// ┃   ┠╴teleport_at_declared  bool               true when the property set its own
+    /// ┃   ┠╴in_tier               bool               whether it is in the tier being compared
+    /// ┃   ┠╴operators             PackedStringArray  what may write it during a recovery
+    /// ┃   ┖╴forward_model         Dictionary         kind, live and why
+    /// ┖╴findings    Array       one entry per problem found in the settings
+    ///   ┖╴finding
+    ///     ┠╴code      StringName         which check found it, such as unobserved
+    ///     ┠╴severity  StringName         debug, warning or error
+    ///     ┠╴fields    PackedStringArray  the state properties it applies to
+    ///     ┖╴message   String             what is wrong and how to fix it
+    /// </code>
+    /// </summary>
+    public Godot.Collections.Dictionary PredictGetReachability(Rid entity)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindPredictGetReachability,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        Godot.Collections.Dictionary result =
+            VariantUtils.ConvertToDictionary(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindPredictGetRecoveryPolicy =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "predict_get_recovery_policy",
+            3901936362UL);
+
+    /// <summary>
+    /// Returns the <see cref="NetwPrediction.RecoveryPolicyEnum"/> that
+    /// <paramref name="entity"/> actually uses, with
+    /// <see cref="NetwPrediction.RecoveryPolicyEnum.Auto"/> resolved from its
+    /// body and schedule.
+    /// </summary>
+    public NetwPrediction.RecoveryPolicyEnum PredictGetRecoveryPolicy(
+        Rid entity)
+    {
+        Rid slot0 = entity;
+        long answered = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindPredictGetRecoveryPolicy,
+            Checked,
+            in slot0,
+            ref answered);
+        return (NetwPrediction.RecoveryPolicyEnum)answered;
+    }
+
     private static readonly IntPtr _bindSimulationSetParam =
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "simulation_set_param",
-            40310611UL);
+            1003789742UL);
 
     /// <summary>
     /// Changes one simulation setting of <paramref name="entity"/>.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the setting changed
+    /// ┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+    /// ┠╴ERR_LOCKED             bodies changed after the entity entered the tree
+    /// ┖╴ERR_INVALID_PARAMETER  param is unknown
+    /// </code>
     /// </summary>
-    public void SimulationSetParam(
+    public Error SimulationSetParam(
         Rid entity,
         NetwMultiplayer.SimulationParam param,
         Variant value)
@@ -6961,7 +6670,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindSimulationGetParam =
@@ -7041,147 +6752,186 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return (NetwSimulation.ModeEnum)answered;
     }
 
-    private static readonly IntPtr _bindPeerForget =
-        NetwApi.MethodBind("NetwMultiplayer", "peer_forget", 1286410249UL);
+    private static readonly IntPtr _bindSimulationSelect =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "simulation_select",
+            3013041894UL);
 
     /// <summary>
-    /// Forgets everything about <paramref name="peer"/>, including its
-    /// <see cref="NetwPlayer"/>. It does not disconnect it. Use
-    /// <see cref="NetwMultiplayer.DisconnectPeer"/> for that.
+    /// Names <paramref name="other"/> as a body <paramref name="entity"/>
+    /// simulates with <see cref="NetwMultiplayer.SimPick.Chosen"/>, or drops
+    /// that name with <see cref="NetwMultiplayer.SimPick.Forget"/>. Both
+    /// entities must be live in the same scene to choose. The choice is kept
+    /// until it is forgotten, and
+    /// <see cref="NetwMultiplayer.SimulationGetSelected"/> shows what it
+    /// selects.
     /// </summary>
-    public void PeerForget(long peer)
-    {
-        long slot0 = peer;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindPeerForget,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindPeerGetPlayer =
-        NetwApi.MethodBind("NetwMultiplayer", "peer_get_player", 3794790081UL);
-
-    /// <summary>
-    /// Returns the <see cref="NetwPlayer"/> of <paramref name="peer"/>, or
-    /// <c>null</c> until its join is accepted.
-    /// </summary>
-    public NetwPlayer PeerGetPlayer(long peer)
-    {
-        long slot0 = peer;
-        IntPtr answered = default;
-        NetwThunks.Ptrcall1_Long_IntPtr(
-            _bindPeerGetPlayer,
-            Checked,
-            in slot0,
-            ref answered);
-        return NetwPlayer.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindDisplayDeclare =
-        NetwApi.MethodBind("NetwMultiplayer", "display_declare", 40307367UL);
-
-    /// <summary>
-    /// Interpolates the property <paramref name="track"/> of
-    /// <paramref name="entity"/> with <paramref name="spec"/>.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the track was declared
-    /// ┠╴ERR_DOES_NOT_EXIST  entity is not registered
-    /// ┠╴ERR_INVALID_DATA    track is empty, or spec is null
-    /// ┖╴ERR_UNAVAILABLE     comp names no live node on entity
-    /// </code>
-    /// </summary>
-    public Error DisplayDeclare(
+    public Error SimulationSelect(
         Rid entity,
-        long comp,
-        StringName track,
-        NetwInterpolate spec)
+        Rid other,
+        NetwMultiplayer.SimPick pick)
     {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)comp);
-        godot_variant slot2 = VariantUtils.CreateFromStringName(track);
-        godot_variant slot3 =
-            VariantUtils.CreateFromGodotObjectPtr(spec?.Native ?? IntPtr.Zero);
-        godot_variant answered = default;
-        NetwThunks.Call4(
-            _bindDisplayDeclare,
+        Rid slot0 = entity;
+        Rid slot1 = other;
+        long slot2 = (long)pick;
+        long answered = default;
+        NetwThunks.Ptrcall3_Rid_Rid_Long_Long(
+            _bindSimulationSelect,
             Checked,
             in slot0,
             in slot1,
             in slot2,
-            in slot3,
+            ref answered);
+        return (Error)answered;
+    }
+
+    private static readonly IntPtr _bindSimulationSelectLayer =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "simulation_select_layer",
+            3013041894UL);
+
+    /// <summary>
+    /// With <see cref="NetwMultiplayer.SimPick.Chosen"/>,
+    /// <paramref name="entity"/> simulates every entity it shares
+    /// <paramref name="layer"/> with, or every layer it is in when
+    /// <paramref name="layer"/> is an empty <see cref="Rid"/>. With
+    /// <see cref="NetwMultiplayer.SimPick.Forget"/>, <paramref name="layer"/>
+    /// is ignored and every layer pick is cleared. For a predicted entity, this
+    /// also turns off the default selection of every layer it is in, even
+    /// though that default was never made with
+    /// <see cref="NetwMultiplayer.SimPick.Chosen"/>. Entities named with
+    /// <see cref="NetwMultiplayer.SimulationSelect"/> stay selected. Returns
+    /// <c>@GlobalScope.ERR_INVALID_PARAMETER</c> when <paramref name="entity"/>
+    /// is not live or <paramref name="layer"/> is not in this session.
+    /// </summary>
+    public Error SimulationSelectLayer(
+        Rid entity,
+        Rid layer,
+        NetwMultiplayer.SimPick pick)
+    {
+        Rid slot0 = entity;
+        Rid slot1 = layer;
+        long slot2 = (long)pick;
+        long answered = default;
+        NetwThunks.Ptrcall3_Rid_Rid_Long_Long(
+            _bindSimulationSelectLayer,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        return (Error)answered;
+    }
+
+    private static readonly IntPtr _bindSimulationGetSelected =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "simulation_get_selected",
+            2670461153UL);
+
+    /// <summary>
+    /// Returns the entities <paramref name="entity"/> simulates on this peer
+    /// right now, the same set as <see cref="NetwSimulation.Selected"/>.
+    /// </summary>
+    public Godot.Collections.Array SimulationGetSelected(Rid entity)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindSimulationGetSelected,
+            Checked,
+            in slot0,
             ref answered);
         slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        slot3.Dispose();
-        Error result = (Error)VariantUtils.ConvertToInt64(answered);
+        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
         answered.Dispose();
         return result;
     }
 
-    private static readonly IntPtr _bindPredictGetStepper =
-        NetwApi.MethodBind("NetwMultiplayer", "predict_get_stepper", 2020269UL);
+    private static readonly IntPtr _bindSimulationGetSchedule =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "simulation_get_schedule",
+            3712230158UL);
 
     /// <summary>
-    /// Returns the <see cref="NetwPhysicsStepper"/> installed on the physics
-    /// <paramref name="space"/>, or <c>null</c>. Without one,
-    /// <see cref="NetwSimulation.ScheduleEnum.Stepped"/> runs as
-    /// <see cref="NetwSimulation.ScheduleEnum.Frame"/>.
+    /// Returns the schedule <paramref name="entity"/> runs on here, with
+    /// <see cref="NetwSimulation.ScheduleEnum.Auto"/> resolved to the schedule
+    /// it picked.
     /// </summary>
-    public NetwPhysicsStepper PredictGetStepper(Rid space)
+    public NetwSimulation.ScheduleEnum SimulationGetSchedule(Rid entity)
     {
-        Rid slot0 = space;
-        IntPtr answered = default;
-        NetwThunks.Ptrcall1_Rid_IntPtr(
-            _bindPredictGetStepper,
+        Rid slot0 = entity;
+        long answered = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindSimulationGetSchedule,
             Checked,
             in slot0,
             ref answered);
-        return NetwPhysicsStepper.Adopt(answered);
+        return (NetwSimulation.ScheduleEnum)answered;
     }
 
-    private static readonly IntPtr _bindPredictEngineSeated =
+    private static readonly IntPtr _bindPeerGetPlayer =
+        NetwApi.MethodBind("NetwMultiplayer", "peer_get_player", 923996154UL);
+
+    /// <summary>
+    /// Returns the id of the player connected through <paramref name="peer"/>,
+    /// or <c>0</c> until its join is accepted.
+    /// </summary>
+    public long PeerGetPlayer(long peer)
+    {
+        long slot0 = peer;
+        long answered = default;
+        NetwThunks.Ptrcall1_Long_Long(
+            _bindPeerGetPlayer,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindPredictIsDeclared =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "predict_engine_seated",
+            "predict_is_declared",
             4155700596UL);
 
     /// <summary>
-    /// Returns <c>true</c> when this peer predicts <paramref name="entity"/>.
-    /// Entities controlled by other peers usually return <c>false</c>.
+    /// Returns <c>true</c> while <paramref name="entity"/> is declared with
+    /// <see cref="NetwMultiplayer.PredictDeclare"/>, whichever peer controls
+    /// it.
     /// </summary>
-    public bool PredictEngineSeated(Rid entity)
+    public bool PredictIsDeclared(Rid entity)
     {
         Rid slot0 = entity;
         byte answered = default;
         NetwThunks.Ptrcall1_Rid_Byte(
-            _bindPredictEngineSeated,
+            _bindPredictIsDeclared,
             Checked,
             in slot0,
             ref answered);
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindLagcompDenyAction =
+    private static readonly IntPtr _bindLagcompActionDeny =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "lagcomp_deny_action",
+            "lagcomp_action_deny",
             3780747571UL);
 
     /// <summary>
     /// Rejects the action <paramref name="key"/> from
     /// <paramref name="requester"/>, which undoes its local effect.
     /// </summary>
-    public void LagcompDenyAction(long requester, StringName key)
+    public void LagcompActionDeny(long requester, StringName key)
     {
         godot_variant slot0 = VariantUtils.CreateFromInt((long)requester);
         godot_variant slot1 = VariantUtils.CreateFromStringName(key);
         godot_variant answered = default;
         NetwThunks.Call2(
-            _bindLagcompDenyAction,
+            _bindLagcompActionDeny,
             Checked,
             in slot0,
             in slot1,
@@ -7189,20 +6939,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindClockGetConfig =
-        NetwApi.MethodBind("NetwMultiplayer", "clock_get_config", 2958530652UL);
-
-    /// <summary>
-    /// Returns a copy of the current clock settings. Changing the copy has no
-    /// effect.
-    /// </summary>
-    public NetwClockConfig ClockGetConfig()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindClockGetConfig, Checked, ref answered);
-        return NetwClockConfig.Adopt(answered);
     }
 
     private static readonly IntPtr _bindClockGetParam =
@@ -7466,9 +7202,13 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind("NetwMultiplayer", "clock_step", 1286410249UL);
 
     /// <summary>
-    /// Runs <paramref name="count"/> ticks immediately. It does not open a tick
-    /// loop, so wrap it in <see cref="NetwMultiplayer.ClockTickLoop"/> when
-    /// predicted entities must run.
+    /// Runs one physics frame of the clock with <paramref name="count"/> ticks
+    /// in it, now. A <paramref name="count"/> of <c>0</c> runs the frame's
+    /// prediction and sends with no tick.
+    /// <see cref="NetwScene.EntityEntered"/>,
+    /// <see cref="NetwScene.EntityExited"/> and the callbacks of
+    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/> for its ticks run just
+    /// before it returns. <see cref="NetwClock.Step"/> calls it.
     /// </summary>
     public void ClockStep(long count)
     {
@@ -7476,49 +7216,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         long discarded = default;
         NetwThunks.Ptrcall1_Long_Long(
             _bindClockStep,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindClockPhysicsStep =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "clock_physics_step",
-            373806689UL);
-
-    /// <summary>
-    /// Advances the clock by <paramref name="delta"/> seconds and runs every
-    /// tick that completes. The session calls it every physics frame unless
-    /// <see cref="NetwMultiplayer.ClockParam.ManualTick"/> is set. A frame
-    /// longer than <see cref="NetwMultiplayer.ClockParam.StallThreshold"/> is
-    /// skipped, and no frame runs more than
-    /// <see cref="NetwMultiplayer.ClockParam.MaxTicksPerFrame"/> ticks.
-    /// </summary>
-    public void ClockPhysicsStep(double delta)
-    {
-        double slot0 = delta;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Double_Long(
-            _bindClockPhysicsStep,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindClockTickLoop =
-        NetwApi.MethodBind("NetwMultiplayer", "clock_tick_loop", 2586408642UL);
-
-    /// <summary>
-    /// Opens a tick loop when <paramref name="open"/> is <c>true</c>, and
-    /// closes it otherwise. Predicted entities only run between the two.
-    /// </summary>
-    public void ClockTickLoop(bool open)
-    {
-        byte slot0 = open ? (byte)1 : (byte)0;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Byte_Long(
-            _bindClockTickLoop,
             Checked,
             in slot0,
             ref discarded);
@@ -7548,96 +7245,21 @@ public sealed class NetwMultiplayer : NetwRefCounted
             ref discarded);
     }
 
-    private static readonly IntPtr _bindClockSetSynchronized =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "clock_set_synchronized",
-            2586408642UL);
-
-    /// <summary>
-    /// Sets <see cref="NetwMultiplayer.ClockIsSynchronized"/>. Set it to
-    /// <c>false</c> to resynchronize from scratch on the next ping.
-    /// </summary>
-    public void ClockSetSynchronized(bool value)
-    {
-        byte slot0 = value ? (byte)1 : (byte)0;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Byte_Long(
-            _bindClockSetSynchronized,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindClockIngestPong =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "clock_ingest_pong",
-            3254742392UL);
-
-    /// <summary>
-    /// Adjusts the local tick toward the server's using one round-trip
-    /// <paramref name="sample"/>, in seconds.
-    /// <see cref="NetwClock.SyncModeEnum.Snap"/> corrects at once, and
-    /// <see cref="NetwClock.SyncModeEnum.Stretch"/> corrects a little each
-    /// frame until the difference passes
-    /// <see cref="NetwMultiplayer.ClockParam.PanicSnapThreshold"/>. Returns a
-    /// <see cref="Godot.Collections.Dictionary"/> describing the adjustment.
-    /// <code>
-    /// Dictionary
-    /// ┠╴rtt_raw                     float   this sample's round trip, in seconds
-    /// ┠╴rtt_avg                     float   the running average round trip
-    /// ┠╴rtt_jitter                  float   the running jitter estimate
-    /// ┠╴diff                        int     ticks the calibration moved this peer
-    /// ┠╴tick                        int     the tick after calibrating
-    /// ┠╴display_offset              float   the offset the display is running
-    /// ┠╴recommended_display_offset  float   the offset this sample recommends
-    /// ┠╴is_stable                   bool    whether jitter is under threshold
-    /// ┖╴is_synchronized             bool    whether a calibration has ever landed
-    /// </code>
-    /// </summary>
-    public Godot.Collections.Dictionary ClockIngestPong(
-        double sample,
-        long serverTickAtPong,
-        double serverTickPhase,
-        bool applyLead)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromFloat(sample);
-        godot_variant slot1 =
-            VariantUtils.CreateFromInt((long)serverTickAtPong);
-        godot_variant slot2 = VariantUtils.CreateFromFloat(serverTickPhase);
-        godot_variant slot3 = VariantUtils.CreateFromBool(applyLead);
-        godot_variant answered = default;
-        NetwThunks.Call4(
-            _bindClockIngestPong,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            in slot3,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        slot3.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindDisplaySetParam =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "display_set_param",
-            1231002506UL);
+        NetwApi.MethodBind("NetwMultiplayer", "display_set_param", 16302597UL);
 
     /// <summary>
     /// Changes one display setting of <paramref name="entity"/>.
     /// <see cref="NetwMultiplayer.DisplayParam.VisualRoot"/> takes a
     /// <see cref="NodePath"/>.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the setting changed
+    /// ┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+    /// ┖╴ERR_INVALID_PARAMETER  param is unknown, or value is refused
+    /// </code>
     /// </summary>
-    public void DisplaySetParam(
+    public Error DisplaySetParam(
         Rid entity,
         NetwMultiplayer.DisplayParam param,
         Variant value)
@@ -7656,32 +7278,9 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindDisplaySetTargetItem =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "display_set_target_item",
-            395945892UL);
-
-    /// <summary>
-    /// Displays <paramref name="entity"/> on a <see cref="RenderingServer"/>
-    /// canvas item or instance <paramref name="item"/> in place of a node. An
-    /// invalid <see cref="Rid"/> clears it. Clears
-    /// <see cref="NetwMultiplayer.DisplaySetCallback"/>.
-    /// </summary>
-    public void DisplaySetTargetItem(Rid entity, Rid item)
-    {
-        Rid slot0 = entity;
-        Rid slot1 = item;
-        long discarded = default;
-        NetwThunks.Ptrcall2_Rid_Rid_Long(
-            _bindDisplaySetTargetItem,
-            Checked,
-            in slot0,
-            in slot1,
-            ref discarded);
+        return result;
     }
 
     private static readonly IntPtr _bindDisplaySetCallback =
@@ -7691,10 +7290,17 @@ public sealed class NetwMultiplayer : NetwRefCounted
             3379118538UL);
 
     /// <summary>
-    /// Calls <paramref name="callback"/> as <c>callback(entity, track,
-    /// value)</c> for every displayed value, in place of writing the node. An
-    /// empty <see cref="Callable"/> clears it. Clears
+    /// Calls <paramref name="callback"/> with every interpolated value of
+    /// <paramref name="entity"/> in place of writing its node. An empty
+    /// <see cref="Callable"/> clears it, and setting it clears
     /// <see cref="NetwMultiplayer.DisplaySetTargetItem"/>.
+    /// <code>
+    /// func _ready() -&gt; void:
+    ///     Netw.of(self).display_set_callback(NetwEntity.of(self).rid, _on_drawn)
+    ///
+    /// func _on_drawn(entity: RID, track: StringName, value: Variant) -&gt; void:
+    ///     marker.position = value
+    /// </code>
     /// </summary>
     public void DisplaySetCallback(Rid entity, Callable callback)
     {
@@ -7710,6 +7316,34 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot0.Dispose();
         slot1.Dispose();
         answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindDisplaySetTargetItem =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "display_set_target_item",
+            395945892UL);
+
+    /// <summary>
+    /// Draws <paramref name="entity"/> on a <see cref="RenderingServer"/>
+    /// canvas item or instance <paramref name="item"/> in place of writing its
+    /// node. An interpolated <see cref="Transform2D"/> goes to the canvas item
+    /// and a <see cref="Transform3D"/> to the instance, so the entity
+    /// interpolates its <c>transform</c>. An invalid <see cref="Rid"/> clears
+    /// it, and setting it clears
+    /// <see cref="NetwMultiplayer.DisplaySetCallback"/>.
+    /// </summary>
+    public void DisplaySetTargetItem(Rid entity, Rid item)
+    {
+        Rid slot0 = entity;
+        Rid slot1 = item;
+        long discarded = default;
+        NetwThunks.Ptrcall2_Rid_Rid_Long(
+            _bindDisplaySetTargetItem,
+            Checked,
+            in slot0,
+            in slot1,
+            ref discarded);
     }
 
     private static readonly IntPtr _bindDisplayGetParam =
@@ -7760,58 +7394,23 @@ public sealed class NetwMultiplayer : NetwRefCounted
             ref discarded);
     }
 
-    private static readonly IntPtr _bindDisplaySnap =
-        NetwApi.MethodBind("NetwMultiplayer", "display_snap", 3477296213UL);
+    private static readonly IntPtr _bindDisplayGetTick =
+        NetwApi.MethodBind("NetwMultiplayer", "display_get_tick", 3917799429UL);
 
     /// <summary>
-    /// Sets <paramref name="track"/> on <paramref name="entity"/> to
-    /// <paramref name="value"/> without interpolating.
+    /// Returns the tick <paramref name="entity"/> is displayed at, or <c>-1</c>
+    /// when it is not interpolated.
     /// </summary>
-    public void DisplaySnap(Rid entity, StringName track, Variant value)
+    public long DisplayGetTick(Rid entity)
     {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(track);
-        godot_variant slot2 = value.CopyNativeVariant();
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindDisplaySnap,
+        Rid slot0 = entity;
+        long answered = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindDisplayGetTick,
             Checked,
             in slot0,
-            in slot1,
-            in slot2,
             ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindDisplayGetValue =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "display_get_value",
-            1540283631UL);
-
-    /// <summary>
-    /// The last displayed value of <paramref name="track"/> on
-    /// <paramref name="entity"/>, or <c>null</c> when there is none.
-    /// </summary>
-    public Variant DisplayGetValue(Rid entity, StringName track)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(track);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindDisplayGetValue,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        Variant result = Variant.CreateCopyingBorrowed(answered);
-        answered.Dispose();
-        return result;
+        return answered;
     }
 
     private static readonly IntPtr _bindDisplayGetTrackStat =
@@ -7847,66 +7446,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Variant result = Variant.CreateCopyingBorrowed(answered);
         answered.Dispose();
         return result;
-    }
-
-    private static readonly IntPtr _bindSceneDeclare =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_declare", 813180755UL);
-
-    /// <summary>
-    /// Makes <paramref name="entity"/> a multiplayer scene that replicates its
-    /// nodes to the players in it. Call it before
-    /// <see cref="NetwMultiplayer.EntityBindNode"/>. A client can only declare
-    /// an entity that has a route from the server.
-    /// <see cref="NetwMultiplayer.SceneUndeclare"/> reverses it.
-    /// <code>
-    /// var mirror := api.entity_create()
-    /// api.entity_bind_route(mirror, route) # the server's route
-    /// api.scene_declare(mirror)
-    /// </code>
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the entity is a scene
-    /// ┠╴ERR_UNAUTHORIZED    called on a client without the entity's route
-    /// ┠╴ERR_DOES_NOT_EXIST  the entity does not exist
-    /// ┖╴ERR_UNCONFIGURED    the entity already has a node
-    /// </code>
-    /// </summary>
-    public Error SceneDeclare(Rid entity)
-    {
-        Rid slot0 = entity;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindSceneDeclare,
-            Checked,
-            in slot0,
-            ref answered);
-        return (Error)answered;
-    }
-
-    private static readonly IntPtr _bindSceneUndeclare =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_undeclare", 813180755UL);
-
-    /// <summary>
-    /// Reverses <see cref="NetwMultiplayer.SceneDeclare"/>, with the same
-    /// rules.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the entity is no longer a scene
-    /// ┠╴ERR_UNAUTHORIZED    called on a client without the entity's route
-    /// ┠╴ERR_DOES_NOT_EXIST  the entity does not exist
-    /// ┖╴ERR_UNCONFIGURED    the entity already has a node
-    /// </code>
-    /// </summary>
-    public Error SceneUndeclare(Rid entity)
-    {
-        Rid slot0 = entity;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindSceneUndeclare,
-            Checked,
-            in slot0,
-            ref answered);
-        return (Error)answered;
     }
 
     private static readonly IntPtr _bindSceneSetParam =
@@ -7976,9 +7515,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Returns the newest scene whose root node is named
-    /// <paramref name="stem"/>, or an invalid <see cref="Rid"/>. Use
-    /// <see cref="NetwMultiplayer.SceneFindAll"/> when several copies may
-    /// exist.
+    /// <paramref name="stem"/>, or an invalid <see cref="Rid"/>.
     /// </summary>
     public Rid SceneFind(StringName stem)
     {
@@ -7987,23 +7524,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwThunks.Call1(_bindSceneFind, Checked, in slot0, ref answered);
         slot0.Dispose();
         Rid result = VariantUtils.ConvertToRid(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSceneFindAll =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_find_all", 689397652UL);
-
-    /// <summary>
-    /// Returns every scene whose root node is named <paramref name="stem"/>.
-    /// </summary>
-    public Godot.Collections.Array SceneFindAll(StringName stem)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(stem);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindSceneFindAll, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
         answered.Dispose();
         return result;
     }
@@ -8023,21 +7543,60 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindSceneGetNode =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_get_node", 2902689211UL);
+    private static readonly IntPtr _bindSceneGetRoot =
+        NetwApi.MethodBind("NetwMultiplayer", "scene_get_root", 2902689211UL);
 
     /// <summary>
-    /// Returns the root node of <paramref name="scene"/>, or <c>null</c>.
+    /// Returns the node <paramref name="scene"/> was declared on, or
+    /// <c>null</c>.
     /// </summary>
-    public Node SceneGetNode(Rid scene)
+    public Node SceneGetRoot(Rid scene)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(scene);
         godot_variant answered = default;
-        NetwThunks.Call1(_bindSceneGetNode, Checked, in slot0, ref answered);
+        NetwThunks.Call1(_bindSceneGetRoot, Checked, in slot0, ref answered);
         slot0.Dispose();
         Node result = (Node)VariantUtils.ConvertToGodotObject(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindSceneGetWorld =
+        NetwApi.MethodBind("NetwMultiplayer", "scene_get_world", 2902689211UL);
+
+    /// <summary>
+    /// Returns the <see cref="SubViewport"/> that gives
+    /// <paramref name="scene"/> its own world, or <c>null</c> when the scene
+    /// shares the game's world. See <see cref="NetwSceneConfig.Isolated"/>.
+    /// </summary>
+    public Node SceneGetWorld(Rid scene)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(scene);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindSceneGetWorld, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        Node result = (Node)VariantUtils.ConvertToGodotObject(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindSceneIsLive =
+        NetwApi.MethodBind("NetwMultiplayer", "scene_is_live", 4155700596UL);
+
+    /// <summary>
+    /// Returns <c>true</c> from the moment the root of <paramref name="scene"/>
+    /// enters the tree until the scene is removed.
+    /// </summary>
+    public bool SceneIsLive(Rid scene)
+    {
+        Rid slot0 = scene;
+        byte answered = default;
+        NetwThunks.Ptrcall1_Rid_Byte(
+            _bindSceneIsLive,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered != 0;
     }
 
     private static readonly IntPtr _bindSceneGetLabel =
@@ -8090,12 +7649,10 @@ public sealed class NetwMultiplayer : NetwRefCounted
             2670461153UL);
 
     /// <summary>
-    /// The entities in <paramref name="scene"/> spawned for a player with
-    /// <see cref="Netw.SpawnPlayer"/>.
-    /// <see cref="NetwMultiplayer.PlayerEntities"/> contains them from every
-    /// live scene.
+    /// Returns the entities in <paramref name="scene"/> spawned for a player
+    /// with <see cref="Netw.SpawnPlayer"/>.
     /// </summary>
-    public NetwEntity[] SceneGetPlayerEntities(Rid scene)
+    public Godot.Collections.Array SceneGetPlayerEntities(Rid scene)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(scene);
         godot_variant answered = default;
@@ -8105,10 +7662,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
             in slot0,
             ref answered);
         slot0.Dispose();
-        NetwEntity[] result =
-            NetwApi.Elements(
-                VariantUtils.ConvertToArray(answered),
-                NetwEntity.From);
+        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
         answered.Dispose();
         return result;
     }
@@ -8117,21 +7671,20 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "scene_get_viewers",
-            2670461153UL);
+            1637577313UL);
 
     /// <summary>
-    /// Returns the players who see <paramref name="scene"/>.
+    /// Returns the <see cref="NetwPlayer.Id"/> of every player who sees
+    /// <paramref name="scene"/>.
     /// </summary>
-    public NetwPlayer[] SceneGetViewers(Rid scene)
+    public long[] SceneGetViewers(Rid scene)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(scene);
         godot_variant answered = default;
         NetwThunks.Call1(_bindSceneGetViewers, Checked, in slot0, ref answered);
         slot0.Dispose();
-        NetwPlayer[] result =
-            NetwApi.Elements(
-                VariantUtils.ConvertToArray(answered),
-                NetwPlayer.From);
+        long[] result =
+            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
         answered.Dispose();
         return result;
     }
@@ -8146,7 +7699,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// Returns the entities in <paramref name="scene"/> spawned for this peer's
     /// player.
     /// </summary>
-    public NetwEntity[] SceneGetLocalPlayerEntities(Rid scene)
+    public Godot.Collections.Array SceneGetLocalPlayerEntities(Rid scene)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(scene);
         godot_variant answered = default;
@@ -8156,202 +7709,33 @@ public sealed class NetwMultiplayer : NetwRefCounted
             in slot0,
             ref answered);
         slot0.Dispose();
-        NetwEntity[] result =
-            NetwApi.Elements(
-                VariantUtils.ConvertToArray(answered),
-                NetwEntity.From);
+        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
         answered.Dispose();
         return result;
     }
 
-    private static readonly IntPtr _bindSceneGetLayer =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_get_layer", 41030802UL);
-
-    /// <summary>
-    /// Returns the <see cref="NetwInterestLayer"/> that decides who sees
-    /// <paramref name="scene"/>.
-    /// </summary>
-    public Rid SceneGetLayer(Rid scene)
-    {
-        Rid slot0 = scene;
-        Rid answered = default;
-        NetwThunks.Ptrcall1_Rid_Rid(
-            _bindSceneGetLayer,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindScenePresented =
-        NetwApi.MethodBind("NetwMultiplayer", "scene_presented", 2944877500UL);
-
-    /// <summary>
-    /// Returns the scene this peer displays, or an invalid <see cref="Rid"/>.
-    /// See <see cref="NetwPlayer.Scene"/>.
-    /// </summary>
-    public Rid ScenePresented()
-    {
-        Rid answered = default;
-        NetwThunks.Ptrcall0_Rid(_bindScenePresented, Checked, ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindEntityAddPropertySet =
+    private static readonly IntPtr _bindLagcompActionKey =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "entity_add_property_set",
-            2869704585UL);
-
-    /// <summary>
-    /// Synchronizes the properties in <paramref name="set"/> on the node
-    /// <paramref name="comp"/> of <paramref name="entity"/>. <c>0</c> is the
-    /// entity's root node. Create <paramref name="set"/> with
-    /// <see cref="NetwMultiplayer.PropertySetCreate"/> and seal it with
-    /// <see cref="NetwMultiplayer.PropertySetSeal"/> first.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the set was attached
-    /// ┠╴ERR_DOES_NOT_EXIST  entity or set does not exist
-    /// ┠╴ERR_INVALID_DATA    the set is not sealed
-    /// ┠╴ERR_UNAVAILABLE     comp is not a node of this entity
-    /// ┖╴ERR_UNCONFIGURED    property synchronization is unavailable
-    /// </code>
-    /// </summary>
-    public Error EntityAddPropertySet(Rid entity, Rid set, long comp)
-    {
-        Rid slot0 = entity;
-        Rid slot1 = set;
-        long slot2 = comp;
-        long answered = default;
-        NetwThunks.Ptrcall3_Rid_Rid_Long_Long(
-            _bindEntityAddPropertySet,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        return (Error)answered;
-    }
-
-    private static readonly IntPtr _bindPropertySetCreate =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "property_set_create",
-            1271211370UL);
-
-    /// <summary>
-    /// Creates an empty set of synchronized properties for
-    /// <paramref name="schema"/>. Add properties with
-    /// <see cref="NetwMultiplayer.PropertySetAddColumn"/>, then call
-    /// <see cref="NetwMultiplayer.PropertySetSeal"/>. Returns an invalid
-    /// <see cref="Rid"/> when <paramref name="schema"/> is unknown or has an
-    /// array column.
-    /// </summary>
-    public Rid PropertySetCreate(Rid schema, NetwMultiplayer.RecordKind record)
-    {
-        Rid slot0 = schema;
-        long slot1 = (long)record;
-        Rid answered = default;
-        NetwThunks.Ptrcall2_Rid_Long_Rid(
-            _bindPropertySetCreate,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindPropertySetAddColumn =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "property_set_add_column",
-            2722015314UL);
-
-    /// <summary>
-    /// Adds the schema's <paramref name="column"/> to <paramref name="set"/>
-    /// and returns its index. Returns <c>-1</c> when the set is sealed, the
-    /// column is unknown, or already added.
-    /// </summary>
-    public int PropertySetAddColumn(Rid set, int column)
-    {
-        Rid slot0 = set;
-        int slot1 = column;
-        int answered = default;
-        NetwThunks.Ptrcall2_Rid_Int_Int(
-            _bindPropertySetAddColumn,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindPropertySetSeal =
-        NetwApi.MethodBind("NetwMultiplayer", "property_set_seal", 813180755UL);
-
-    /// <summary>
-    /// Locks <paramref name="set"/> so no more properties can be added.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the set was sealed
-    /// ┖╴ERR_DOES_NOT_EXIST  the set does not exist
-    /// </code>
-    /// </summary>
-    public Error PropertySetSeal(Rid set)
-    {
-        Rid slot0 = set;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindPropertySetSeal,
-            Checked,
-            in slot0,
-            ref answered);
-        return (Error)answered;
-    }
-
-    private static readonly IntPtr _bindPropertySetGetWireHash =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "property_set_get_wire_hash",
-            2198884583UL);
-
-    /// <summary>
-    /// A hash of the properties of <paramref name="set"/> and their order. Two
-    /// peers with the same hash read each other's packets correctly. Returns
-    /// <c>0</c> for an unknown set.
-    /// </summary>
-    public long PropertySetGetWireHash(Rid set)
-    {
-        Rid slot0 = set;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindPropertySetGetWireHash,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLagcompEffectKey =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "lagcomp_effect_key",
+            "lagcomp_action_key",
             4102288666UL);
 
     /// <summary>
-    /// Returns the key of the effect <paramref name="entity"/> started on
-    /// <paramref name="tick"/>. <paramref name="slot"/> tells apart two effects
-    /// on the same tick.
+    /// Returns the key of the action <paramref name="entity"/> requests for
+    /// <paramref name="viewTick"/>. <paramref name="slot"/> tells apart two
+    /// actions of <paramref name="entity"/> on the same tick. The key is passed
+    /// to <see cref="NetwMultiplayer.LagcompEffectArm"/>,
+    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/> and
+    /// <see cref="NetwMultiplayer.LagcompActionRequest"/>.
     /// </summary>
-    public StringName LagcompEffectKey(Rid entity, long tick, long slot = 0)
+    public StringName LagcompActionKey(Rid entity, long viewTick, long slot = 0)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)tick);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)viewTick);
         godot_variant slot2 = VariantUtils.CreateFromInt((long)slot);
         godot_variant answered = default;
         NetwThunks.Call3(
-            _bindLagcompEffectKey,
+            _bindLagcompActionKey,
             Checked,
             in slot0,
             in slot1,
@@ -8361,6 +7745,69 @@ public sealed class NetwMultiplayer : NetwRefCounted
         slot1.Dispose();
         slot2.Dispose();
         StringName result = VariantUtils.ConvertToStringName(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindLagcompActionRequest =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "lagcomp_action_request",
+            3353655088UL);
+
+    /// <summary>
+    /// Sends <paramref name="method"/> with <paramref name="args"/> to the
+    /// server, which calls it on the node at <paramref name="target"/>, a path
+    /// from the session's root node, as the world was at
+    /// <paramref name="viewTick"/>. <paramref name="timing"/> picks when the
+    /// server runs it. On a server, a host or an offline session the action
+    /// runs and resolves <paramref name="key"/> before this returns, so
+    /// <see cref="NetwMultiplayer.LagcompEffectArm"/> and
+    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/> are called for
+    /// <paramref name="key"/> first. Returns <c>@GlobalScope.ERR_BUSY</c> while
+    /// the session applies its settings.
+    /// <code>
+    /// var key := api.lagcomp_action_key(entity, tick)
+    /// api.lagcomp_effect_arm(key, revert)
+    /// api.lagcomp_effect_watch(key, confirmed, denied)
+    /// api.lagcomp_action_request(key, target, &amp;"fire", tick, [aim])
+    /// </code>
+    /// <para>
+    /// <b>Player request.</b>
+    /// </para>
+    /// </summary>
+    public Error LagcompActionRequest(StringName key, NodePath target, StringName method, long viewTick, Godot.Collections.Array args =
+        null, NetwAction.TimingModeEnum timing = (NetwAction.TimingModeEnum)2)
+    {
+        args ??= new Godot.Collections.Array();
+        IntPtr pack = NetwThunks.ArgsNew(6);
+        godot_variant slot0 = VariantUtils.CreateFromStringName(key);
+        NetwThunks.ArgsSet(pack, 0, in slot0);
+        slot0.Dispose();
+        godot_variant slot1 = VariantUtils.CreateFromNodePath(target);
+        NetwThunks.ArgsSet(pack, 1, in slot1);
+        slot1.Dispose();
+        godot_variant slot2 = VariantUtils.CreateFromStringName(method);
+        NetwThunks.ArgsSet(pack, 2, in slot2);
+        slot2.Dispose();
+        godot_variant slot3 = VariantUtils.CreateFromInt((long)viewTick);
+        NetwThunks.ArgsSet(pack, 3, in slot3);
+        slot3.Dispose();
+        godot_variant slot4 = VariantUtils.CreateFromArray(args);
+        NetwThunks.ArgsSet(pack, 4, in slot4);
+        slot4.Dispose();
+        godot_variant slot5 = VariantUtils.CreateFromInt((long)timing);
+        NetwThunks.ArgsSet(pack, 5, in slot5);
+        slot5.Dispose();
+        godot_variant answered = default;
+        NetwThunks.CallPack(
+            _bindLagcompActionRequest,
+            Checked,
+            pack,
+            6,
+            ref answered);
+        NetwThunks.ArgsFree(pack);
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
     }
@@ -8411,56 +7858,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
             Checked,
             in slot0,
             ref discarded);
-    }
-
-    private static readonly IntPtr _bindEntityAdmit =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_admit", 3917799429UL);
-
-    /// <summary>
-    /// Gives <paramref name="entity"/> a new route, the id peers use to address
-    /// it, and returns it. An entity that has one returns the same route.
-    /// Returns <c>0</c> on a client or for an unknown entity.
-    /// </summary>
-    public long EntityAdmit(Rid entity)
-    {
-        Rid slot0 = entity;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindEntityAdmit,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindEntityBindRoute =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "entity_bind_route",
-            3804025326UL);
-
-    /// <summary>
-    /// Gives <paramref name="entity"/> a route received from another peer.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the route was assigned
-    /// ┠╴ERR_DOES_NOT_EXIST  entity does not exist
-    /// ┠╴ERR_INVALID_DATA    route is not positive
-    /// ┖╴ERR_ALREADY_IN_USE  another entity has this route
-    /// </code>
-    /// </summary>
-    public Error EntityBindRoute(Rid entity, long route)
-    {
-        Rid slot0 = entity;
-        long slot1 = route;
-        long answered = default;
-        NetwThunks.Ptrcall2_Rid_Long_Long(
-            _bindEntityBindRoute,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        return (Error)answered;
     }
 
     private static readonly IntPtr _bindEntityGetRoute =
@@ -8518,96 +7915,280 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return answered;
     }
 
-    private static readonly IntPtr _bindEntityGetPeer =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_get_peer", 2198884583UL);
+    private static readonly IntPtr _bindEntityGetScene =
+        NetwApi.MethodBind("NetwMultiplayer", "entity_get_scene", 3814569979UL);
 
     /// <summary>
-    /// Returns the peer that controls <paramref name="entity"/>, or <c>0</c>.
+    /// Returns the scene <paramref name="entity"/> is in, the closest entity at
+    /// or above it that is a <see cref="NetwScene"/>, or an invalid
+    /// <see cref="Rid"/>.
     /// </summary>
-    public long EntityGetPeer(Rid entity)
+    public Rid EntityGetScene(Rid entity)
     {
         Rid slot0 = entity;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindEntityGetPeer,
+        Rid answered = default;
+        NetwThunks.Ptrcall1_Rid_Rid(
+            _bindEntityGetScene,
             Checked,
             in slot0,
             ref answered);
         return answered;
     }
 
-    private static readonly IntPtr _bindEntityCall =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_call", 2382481510UL);
+    private static readonly IntPtr _bindEntityReparent =
+        NetwApi.MethodBind("NetwMultiplayer", "entity_reparent", 83496114UL);
 
     /// <summary>
-    /// Calls <paramref name="method"/> as an RPC on the node
-    /// <paramref name="comp"/> of <paramref name="entity"/>.
-    /// <paramref name="peer"/> <c>0</c> sends it to every peer
-    /// <see cref="NetwMultiplayer.RpcCall"/> would. The method needs an
-    /// <c>@rpc</c> annotation or a <see cref="Netw.ConfigureRpc"/> declaration.
-    /// <code>
-    /// Error
-    /// ┠╴OK                  the call was sent
-    /// ┠╴ERR_DOES_NOT_EXIST  the node or the method does not exist
-    /// ┠╴ERR_UNAVAILABLE     the node is not ready on this peer yet
-    /// ┖╴ERR_UNCONFIGURED    the method is not an RPC
-    /// </code>
+    /// Moves the node of <paramref name="entity"/> under
+    /// <paramref name="parent"/> on every peer, as <see cref="Netw.Reparent"/>
+    /// does. The <see cref="NetwPromise"/> fails with
+    /// <c>@GlobalScope.ERR_UNAVAILABLE</c> when <paramref name="entity"/> is
+    /// not in this session or <paramref name="parent"/> is null.
     /// </summary>
-    public Error EntityCall(
-        Rid entity,
-        long comp,
-        StringName method,
-        Godot.Collections.Array args,
-        long peer)
+    public NetwPromise EntityReparent(Rid entity, Node parent)
     {
-        IntPtr pack = NetwThunks.ArgsNew(5);
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        NetwThunks.ArgsSet(pack, 0, in slot0);
-        slot0.Dispose();
-        godot_variant slot1 = VariantUtils.CreateFromInt((long)comp);
-        NetwThunks.ArgsSet(pack, 1, in slot1);
-        slot1.Dispose();
-        godot_variant slot2 = VariantUtils.CreateFromStringName(method);
-        NetwThunks.ArgsSet(pack, 2, in slot2);
-        slot2.Dispose();
-        godot_variant slot3 = VariantUtils.CreateFromArray(args);
-        NetwThunks.ArgsSet(pack, 3, in slot3);
-        slot3.Dispose();
-        godot_variant slot4 = VariantUtils.CreateFromInt((long)peer);
-        NetwThunks.ArgsSet(pack, 4, in slot4);
-        slot4.Dispose();
-        godot_variant answered = default;
-        NetwThunks.CallPack(_bindEntityCall, Checked, pack, 5, ref answered);
-        NetwThunks.ArgsFree(pack);
-        Error result = (Error)VariantUtils.ConvertToInt64(answered);
-        answered.Dispose();
-        return result;
+        Rid slot0 = entity;
+        IntPtr slot1 = parent?.NativeInstance ?? IntPtr.Zero;
+        IntPtr answered = default;
+        NetwThunks.Ptrcall2_Rid_IntPtr_IntPtr(
+            _bindEntityReparent,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return NetwPromise.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindEntityGrantControl =
+    private static readonly IntPtr _bindEntityGetController =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "entity_grant_control",
+            "entity_get_controller",
+            2198884583UL);
+
+    /// <summary>
+    /// Returns the peer that controls <paramref name="entity"/>, <c>1</c> when
+    /// the server does, or <c>0</c> when <paramref name="entity"/> is not in
+    /// this session. <see cref="NetwEntity.Controller"/> answers the same
+    /// control as a <see cref="NetwPlayer"/>.
+    /// </summary>
+    public long EntityGetController(Rid entity)
+    {
+        Rid slot0 = entity;
+        long answered = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindEntityGetController,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindEntityGetPlayer =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "entity_get_player",
+            2198884583UL);
+
+    /// <summary>
+    /// Returns the id of the player <paramref name="entity"/> represents, or
+    /// <c>0</c> when it represents none. The player is set with
+    /// <see cref="NetwEntity.Player"/>.
+    /// </summary>
+    public long EntityGetPlayer(Rid entity)
+    {
+        Rid slot0 = entity;
+        long answered = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindEntityGetPlayer,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
+    }
+
+    private static readonly IntPtr _bindEntitySetController =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "entity_set_controller",
             3804025326UL);
 
     /// <summary>
     /// Gives control of <paramref name="entity"/> to <paramref name="peer"/>.
-    /// Returns <c>@GlobalScope.ERR_UNAUTHORIZED</c> on a client, or
-    /// <c>@GlobalScope.ERR_DOES_NOT_EXIST</c> when <paramref name="entity"/>
-    /// has no bound node.
+    /// Peer <c>1</c> is the host's player. Given before the host's player
+    /// joins, the entity stays with the server until it joins, and on a
+    /// dedicated server it stays with the server, which controls nothing
+    /// locally. The hold resets to <see cref="NetwEntity.HoldEnum.None"/>.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     control moved
+    /// ┠╴ERR_DOES_NOT_EXIST     the entity is not in this session
+    /// ┠╴ERR_INVALID_PARAMETER  peer is not a peer id
+    /// ┠╴ERR_UNCONFIGURED       the entity is not spawned yet
+    /// ┖╴ERR_UNAUTHORIZED       called on a client
+    /// </code>
+    /// <para>
+    /// <b>Server Only.</b>
+    /// </para>
     /// </summary>
-    public Error EntityGrantControl(Rid entity, long peer)
+    public Error EntitySetController(Rid entity, long peer)
     {
         Rid slot0 = entity;
         long slot1 = peer;
         long answered = default;
         NetwThunks.Ptrcall2_Rid_Long_Long(
-            _bindEntityGrantControl,
+            _bindEntitySetController,
             Checked,
             in slot0,
             in slot1,
             ref answered);
         return (Error)answered;
+    }
+
+    private static readonly IntPtr _bindEntityRequestControl =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "entity_request_control",
+            3350550044UL);
+
+    /// <summary>
+    /// Asks the server to make this peer the controller of
+    /// <paramref name="entity"/> with <paramref name="hold"/>. It works as
+    /// <see cref="NetwEntity.ClaimControl"/> does, and the
+    /// <see cref="NetwPromise"/> fails with
+    /// <c>@GlobalScope.ERR_DOES_NOT_EXIST</c> when <paramref name="entity"/> is
+    /// not in this session. <b>Player request.</b>
+    /// </summary>
+    public NetwPromise EntityRequestControl(Rid entity, NetwEntity.HoldEnum hold =
+        (NetwEntity.HoldEnum)2)
+    {
+        Rid slot0 = entity;
+        long slot1 = (long)hold;
+        IntPtr answered = default;
+        NetwThunks.Ptrcall2_Rid_Long_IntPtr(
+            _bindEntityRequestControl,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return NetwPromise.Adopt(answered);
+    }
+
+    private static readonly IntPtr _bindEntityReleaseControl =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "entity_release_control",
+            3886770574UL);
+
+    /// <summary>
+    /// Hands control of <paramref name="entity"/> to
+    /// <paramref name="successor"/>, a peer id, or <c>0</c> for the server.
+    /// Peer <c>1</c> is the host's player, as in
+    /// <see cref="NetwMultiplayer.EntitySetController"/>. It works as
+    /// <see cref="NetwEntity.ReleaseControl"/> does, and the
+    /// <see cref="NetwPromise"/> fails with
+    /// <c>@GlobalScope.ERR_DOES_NOT_EXIST</c> when <paramref name="entity"/> is
+    /// not in this session. <b>Player request.</b>
+    /// </summary>
+    public NetwPromise EntityReleaseControl(Rid entity, long successor = 0)
+    {
+        Rid slot0 = entity;
+        long slot1 = successor;
+        IntPtr answered = default;
+        NetwThunks.Ptrcall2_Rid_Long_IntPtr(
+            _bindEntityReleaseControl,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return NetwPromise.Adopt(answered);
+    }
+
+    private static readonly IntPtr _bindEntityGetControlState =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "entity_get_control_state",
+            741395729UL);
+
+    /// <summary>
+    /// Returns the <see cref="NetwMultiplayer.ControlState"/> of
+    /// <paramref name="entity"/>, or
+    /// <see cref="NetwMultiplayer.ControlState.Settled"/> when
+    /// <paramref name="entity"/> is not in this session.
+    /// </summary>
+    public NetwMultiplayer.ControlState EntityGetControlState(Rid entity)
+    {
+        Rid slot0 = entity;
+        long answered = default;
+        NetwThunks.Ptrcall1_Rid_Long(
+            _bindEntityGetControlState,
+            Checked,
+            in slot0,
+            ref answered);
+        return (NetwMultiplayer.ControlState)answered;
+    }
+
+    private static readonly IntPtr _bindEntityGetParam =
+        NetwApi.MethodBind("NetwMultiplayer", "entity_get_param", 1127580351UL);
+
+    /// <summary>
+    /// Returns one setting of <paramref name="entity"/>, or <c>null</c> when
+    /// <paramref name="entity"/> is not in this session.
+    /// </summary>
+    public Variant EntityGetParam(Rid entity, NetwMultiplayer.EntityParam param)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)param);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindEntityGetParam,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        Variant result = Variant.CreateCopyingBorrowed(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindEntitySetParam =
+        NetwApi.MethodBind("NetwMultiplayer", "entity_set_param", 2748362199UL);
+
+    /// <summary>
+    /// Changes one setting of <paramref name="entity"/>. A refused value is
+    /// reported and the setting keeps its value.
+    /// <code>
+    /// Error
+    /// ┠╴OK                     the setting changed
+    /// ┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+    /// ┠╴ERR_LOCKED             authority cannot change once the node is in the tree
+    /// ┠╴ERR_UNAVAILABLE        param is ENTITY_PARAM_HOLD, or a late TRANSFER_IMMEDIATE without AUTHORITY_CONTROLLER
+    /// ┖╴ERR_INVALID_PARAMETER  param is unknown, or value is refused
+    /// </code>
+    /// </summary>
+    public Error EntitySetParam(
+        Rid entity,
+        NetwMultiplayer.EntityParam param,
+        Variant value)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)param);
+        godot_variant slot2 = value.CopyNativeVariant();
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindEntitySetParam,
+            Checked,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
+        answered.Dispose();
+        return result;
     }
 
     private static readonly IntPtr _bindEntityGetState =
@@ -8630,70 +8211,13 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return (NetwMultiplayer.EntityState)answered;
     }
 
-    private static readonly IntPtr _bindEntityGetEpoch =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_get_epoch", 2198884583UL);
-
-    /// <summary>
-    /// How many times the route of <paramref name="entity"/> has been reused by
-    /// a new entity.
-    /// </summary>
-    public int EntityGetEpoch(Rid entity)
-    {
-        Rid slot0 = entity;
-        int answered = default;
-        NetwThunks.Ptrcall1_Rid_Int(
-            _bindEntityGetEpoch,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindEntityFromRoute =
-        NetwApi.MethodBind("NetwMultiplayer", "entity_from_route", 495598643UL);
-
-    /// <summary>
-    /// Returns the entity at <paramref name="route"/>, or an invalid
-    /// <see cref="Rid"/>.
-    /// </summary>
-    public Rid EntityFromRoute(int route)
-    {
-        int slot0 = route;
-        Rid answered = default;
-        NetwThunks.Ptrcall1_Int_Rid(
-            _bindEntityFromRoute,
-            Checked,
-            in slot0,
-            ref answered);
-        return answered;
-    }
-
-    private static readonly IntPtr _bindLivenessGetRoutes =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "liveness_get_routes",
-            1930428628UL);
-
-    /// <summary>
-    /// Every live route on this peer, in no particular order.
-    /// </summary>
-    public int[] LivenessGetRoutes()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindLivenessGetRoutes, Checked, ref answered);
-        int[] result =
-            VariantUtils.ConvertAsPackedInt32ArrayToSystemArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
     private static readonly IntPtr _bindSendAuth =
         NetwApi.MethodBind("NetwMultiplayer", "send_auth", 506032537UL);
 
     /// <summary>
     /// Same as <c>SceneMultiplayer.send_auth</c>. Returns
-    /// <c>@GlobalScope.ERR_UNCONFIGURED</c> when there is no
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// <c>@GlobalScope.ERR_UNCONFIGURED</c> when there is no wrapped
+    /// <see cref="SceneMultiplayer"/>.
     /// </summary>
     public Error SendAuth(long id, byte[] data)
     {
@@ -8721,7 +8245,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <see cref="NetwMultiplayer.AuthCallback"/> when the game's own check of
     /// <paramref name="id"/> passes. The peer connects once its join is
     /// admitted. Returns <c>@GlobalScope.ERR_UNCONFIGURED</c> when there is no
-    /// <see cref="NetwMultiplayer.Inner"/>.
+    /// wrapped <see cref="SceneMultiplayer"/>.
     /// </summary>
     public Error CompleteAuth(long id)
     {
@@ -8759,7 +8283,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Same as <c>SceneMultiplayer.disconnect_peer</c>.
-    /// <see cref="NetwMultiplayer.PeerKick"/> also tells the peer why.
+    /// <see cref="NetwSession.Kick"/> also tells the peer why.
     /// </summary>
     public void DisconnectPeer(long id)
     {
@@ -8787,8 +8311,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// </code>
     /// <para>
     /// <paramref name="bucketType"/> must create a <see cref="RefCounted"/>.
-    /// Returns <c>null</c> for an unknown peer.
-    /// <see cref="NetwMultiplayer.PeerForget"/> deletes the bucket.
+    /// Returns <c>null</c> for an unknown peer. The bucket goes when the peer
+    /// leaves.
     /// </para>
     /// </summary>
     public Variant PeerGetBucket(long peer, Variant bucketType)
@@ -8807,143 +8331,5 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Variant result = Variant.CreateCopyingBorrowed(answered);
         answered.Dispose();
         return result;
-    }
-
-    private static readonly IntPtr _bindPeerHasBucket =
-        NetwApi.MethodBind("NetwMultiplayer", "peer_has_bucket", 3324900195UL);
-
-    /// <summary>
-    /// Returns <c>true</c> when <paramref name="peer"/> has a
-    /// <paramref name="bucketType"/> bucket. Does not create one.
-    /// </summary>
-    public bool PeerHasBucket(long peer, Variant bucketType)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
-        godot_variant slot1 = bucketType.CopyNativeVariant();
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindPeerHasBucket,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        bool result = VariantUtils.ConvertToBool(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSessionSetState =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_set_state",
-            3094329231UL);
-
-    /// <summary>
-    /// Sets <see cref="NetwMultiplayer.State"/> without checking the change is
-    /// allowed. Prefer <see cref="NetwMultiplayer.SessionTransition"/>.
-    /// <see cref="NetwSession.StateEnum.Creating"/> is refused with an error.
-    /// </summary>
-    public void SessionSetState(NetwSession.StateEnum state)
-    {
-        long slot0 = (long)state;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindSessionSetState,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindSessionSetRole =
-        NetwApi.MethodBind("NetwMultiplayer", "session_set_role", 3036761731UL);
-
-    /// <summary>
-    /// Sets <see cref="NetwMultiplayer.Role"/>, which also sets
-    /// <see cref="NetwMultiplayer.IsLocalClient"/>. The session sets it when a
-    /// peer is assigned.
-    /// </summary>
-    public void SessionSetRole(NetwSession.RoleEnum role)
-    {
-        long slot0 = (long)role;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindSessionSetRole,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindSessionTransition =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_transition",
-            3094329231UL);
-
-    /// <summary>
-    /// Changes <see cref="NetwMultiplayer.State"/>. A change that is not
-    /// allowed, or <see cref="NetwSession.StateEnum.Creating"/>, pushes an
-    /// error and does nothing.
-    /// </summary>
-    public void SessionTransition(NetwSession.StateEnum state)
-    {
-        long slot0 = (long)state;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Long_Long(
-            _bindSessionTransition,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindPeerKick =
-        NetwApi.MethodBind("NetwMultiplayer", "peer_kick", 3576329613UL);
-
-    /// <summary>
-    /// Disconnects <paramref name="peerId"/>. When <paramref name="reason"/> is
-    /// not empty, that peer receives it first. Does nothing on a client.
-    /// </summary>
-    public void PeerKick(long peerId, string reason = "")
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
-        godot_variant slot1 = VariantUtils.CreateFromString(reason);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindPeerKick,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindPeerRequestKick =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "peer_request_kick",
-            3576329613UL);
-
-    /// <summary>
-    /// Asks the server to kick <paramref name="peerId"/>. The server receives
-    /// <see cref="NetwSession.KickRequested"/> and decides. <b>Player
-    /// request.</b>
-    /// </summary>
-    public void PeerRequestKick(long peerId, string reason = "")
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
-        godot_variant slot1 = VariantUtils.CreateFromString(reason);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindPeerRequestKick,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
     }
 }

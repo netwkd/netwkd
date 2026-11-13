@@ -59,13 +59,13 @@ inline godot::Node *spawn_level(
                    : netw::NetwSceneCore::ISOLATION_NONE
     ));
     const godot::RID entity
-        = p_server->spawn_registered(level_constructor(), args, nullptr);
+        = p_server->spawn_registered(level_constructor(), args, 0);
     godot::Node *level = p_server->entity_get_node(entity);
     if (level == nullptr) {
         return nullptr;
     }
     godot::Node *parent
-        = p_parent != nullptr ? p_parent : p_server->session_root();
+        = p_parent != nullptr ? p_parent : p_server->session_get_root();
     if (parent != nullptr) {
         parent->add_child(netw::NetwMultiplayer::scene_outer_of(level));
     }

@@ -18,6 +18,7 @@
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
+#include "netw/predict/decl.hpp"
 #include "netw/predict/runner.hpp"
 #include "netw/predict/tick_work.hpp"
 #include "netw/prediction_core.hpp"
@@ -62,11 +63,6 @@ const PackedStringArray &no_participants() {
 
 const StringName &field_native_core() {
     static const StringName name("_native_core");
-    return name;
-}
-
-const StringName &signal_control_changed() {
-    static const StringName name("control_changed");
     return name;
 }
 
@@ -270,8 +266,9 @@ int64_t NetwPredictSlotEngine::schedule() const {
     if (seated >= 0) {
         return seated;
     }
-    return handle.is_valid() ? handle->get_schedule()
-                             : int(NetwSimulation::SCHEDULE_TICK);
+    return handle.is_valid()
+        ? NetwMultiplayer::predict_schedule_of(entity.ptr())
+        : int(NetwSimulation::SCHEDULE_TICK);
 }
 
 int64_t NetwPredictSlotEngine::ack() const {
@@ -287,7 +284,7 @@ int64_t NetwPredictSlotEngine::route() const {
     if (seated == nullptr || entity.is_null()) {
         return -1;
     }
-    return seated->liveness_route_of(entity.ptr());
+    return books->liveness->route_of(entity->get_rid_handle());
 }
 
 void NetwPredictSlotEngine::attach(
@@ -322,23 +319,19 @@ void NetwPredictSlotEngine::attach(
     seat = pool != nullptr ? pool->slot_of(p_entity) : -1;
     entity = p_entity;
     handle = p_entity->get_prediction();
-    if (pool == nullptr || handle.is_null()) {
+    NetwEntityRecord *record
+        = NetwMultiplayer::find_record(seated, p_entity.ptr());
+    decl = record != nullptr ? &record->predict_declaration() : nullptr;
+    if (pool == nullptr || handle.is_null() || decl == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,
             "Prediction attached to group %d with handle %d.",
             int(pool != nullptr),
-            int(handle.is_valid())
+            int(handle.is_valid() && decl != nullptr)
         );
         return;
     }
-    handle->fact_book()->bind_slot(pool, p_entity);
-    fallback_at_sink
-        = callable_mp(handle.ptr(), &NetwPrediction::seat_fallback_at);
-    const Callable on_control
-        = callable_mp(handle.ptr(), &NetwPrediction::seat_control_changed);
-    if (!p_entity->is_connected(signal_control_changed(), on_control)) {
-        p_entity->connect(signal_control_changed(), on_control);
-    }
+    decl->facts.bind_slot(pool, p_entity);
     rewire_on(resolved_declaration());
 }
 
@@ -366,15 +359,8 @@ void NetwPredictSlotEngine::release() {
     }
     pool->unbind_owner(native_slot());
     pool->set_parts(native_slot(), LocalVector<predict::StatePart>());
-    pool->seat_arrivals(native_slot(), feed, ObjectID());
-    if (entity.is_null()) {
-        return;
-    }
-    const Callable on_control
-        = callable_mp(handle.ptr(), &NetwPrediction::seat_control_changed);
-    if (entity->is_connected(signal_control_changed(), on_control)) {
-        entity->disconnect(signal_control_changed(), on_control);
-    }
+    pool->seat_arrivals(native_slot(), feed, nullptr);
+    follows_control = false;
 }
 
 void NetwPredictSlotEngine::refresh_simulation_gate(bool p_force_release) {
@@ -521,8 +507,7 @@ void NetwPredictSlotEngine::prepare_island(int p_schedule) {
     }
     pool->refresh_selection(
         native_slot(),
-        role() == NetwPrediction::ROLE_PREDICT,
-        callable_mp(handle.ptr(), &NetwPrediction::seat_reconcile_mode)
+        role() == NetwPrediction::ROLE_PREDICT
     );
 }
 
@@ -618,8 +603,8 @@ bool NetwPredictSlotEngine::defer_operator_for_witness(
         p_recv_tick,
         p_basis,
         p_payload,
-        handle->get_correction_path_clear().is_valid(),
-        handle->resolved_recovery_policy()
+        decl->correction_path.is_valid(),
+        NetwMultiplayer::predict_resolve_recovery(entity.ptr())
             == NetwPrediction::RECOVERY_POLICY_OBSERVE
     );
     if (verdict == NetwPredictionEngine::DEFER_DISPLACED) {
@@ -644,13 +629,6 @@ void NetwPredictSlotEngine::retry_deferred_operator(int64_t p_basis) {
     on_state(recv_tick, p_basis, nullptr, &held);
 }
 
-void NetwPredictSlotEngine::enter_fallback_at(
-    int64_t p_transition,
-    int p_attribution
-) {
-    enter_fallback(p_transition, p_attribution, false);
-}
-
 void NetwPredictSlotEngine::enter_fallback(
     int64_t p_transition,
     int p_attribution,
@@ -671,7 +649,9 @@ void NetwPredictSlotEngine::enter_fallback(
     }
     sync_episode();
     pool->announce_episode(slot, EventPlane::EPISODE_FALLBACK);
-    rewire_on(resolved_declaration());
+    if (pool->is_open(slot)) {
+        rewire_on(resolved_declaration());
+    }
 }
 
 void NetwPredictSlotEngine::on_quarantine_state_frame(
@@ -743,7 +723,7 @@ void NetwPredictSlotEngine::finish_reseed_alignment(
         p_payload,
         witness_sample(),
         island_participant_ids(),
-        callable_mp(handle.ptr(), &NetwPrediction::seat_breach)
+        this
     );
 }
 
@@ -816,10 +796,9 @@ void NetwPredictSlotEngine::receive_ack_frame(
         p_payload,
         pool->tape_epoch_of(slot),
         core_seated() != nullptr,
-        callable_mp(handle.ptr(), &NetwPrediction::seat_quarantine_witness),
-        callable_mp(handle.ptr(), &NetwPrediction::seat_deferred_operator_retry)
+        this
     );
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     const int64_t receipt = counts[NetwPredictionEngine::ACK_RUN_RECEIPT];
     if (receipt == NetwPredictionEngine::ACK_RECEIPT_UNDECODED) {
         stats->set_int_fact(
@@ -887,7 +866,7 @@ int64_t NetwPredictSlotEngine::recorded_transition() const {
         && role() == NetwPrediction::ROLE_CONSUME) {
         return ack();
     }
-    return handle->fact_book()->get_int_fact(
+    return decl->facts.get_int_fact(
         NetwPredictStats::FACT_LAST_DRIVE_LABEL
     );
 }
@@ -928,29 +907,22 @@ bool NetwPredictSlotEngine::has_consumed_state_tick(
 }
 
 int NetwPredictSlotEngine::declared_correction() const {
-    return handle.is_valid()
-        ? predict::correction_for_recovery_policy(handle->get_recovery_policy())
+    return decl != nullptr
+        ? predict::correction_for_recovery_policy(decl->recovery_policy)
         : int(CorrectionMode::AUTO);
 }
 
 int NetwPredictSlotEngine::resolve_correction() const {
-    if (handle.is_null()) {
+    if (decl == nullptr) {
         return int(CorrectionMode::REPLAY);
     }
     const int64_t slot = native_slot();
     if (core_seated() == nullptr || slot < 0) {
-        return handle->resolved_correction();
+        return predict::correction_for_recovery_policy(
+            NetwMultiplayer::predict_resolve_recovery(entity.ptr())
+        );
     }
     return pool->settle_correction(slot, declared_correction());
-}
-
-void NetwPredictSlotEngine::on_control_changed(
-    int64_t p_previous_peer,
-    int64_t p_peer
-) {
-    (void)p_previous_peer;
-    (void)p_peer;
-    rewire_on(resolved_declaration());
 }
 
 void NetwPredictSlotEngine::on_reparented() {
@@ -987,7 +959,7 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
         p_declaration.controlled_locally,
         input == nullptr
     );
-    pool->set_declared_epoch(slot, handle->get_epoch());
+    pool->set_declared_epoch(slot, decl->epoch);
 
     unregister_from_loop();
     held_recovery.held = false;
@@ -1003,7 +975,7 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
     );
     sync_episode();
     publish_topology_roster();
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     stats->set_int_fact(NetwPredictStats::FACT_COMMAND_QUEUE_DEPTH, 0);
     stats->set_int_fact(NetwPredictStats::FACT_ACK_CONFIRMED, -1);
     stats->set_int_fact(NetwPredictStats::FACT_TAPE_EPOCH, -1);
@@ -1031,13 +1003,13 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
             entity,
             state,
             input_binding(),
-            handle->get_schedule(),
+            NetwMultiplayer::predict_schedule_of(entity.ptr()),
             resolved_role,
             declared_correction(),
-            handle->get_snap_restore(),
-            handle->get_max_restore_ticks(),
+            NetwMultiplayer::sim_snap_restore_of(entity.ptr()),
+            NetwMultiplayer::sim_max_restore_ticks_of(entity.ptr()),
             pool_island(),
-            handle->get_witness_contacts().is_valid()
+            decl->witness.is_valid()
         );
         if (resolved >= 0) {
             set_correction_column(resolved);
@@ -1047,14 +1019,7 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
         reconfigure();
     }
     if (session != nullptr && p_declaration.controlled_locally) {
-        pool->validate_declaration(
-            slot,
-            state->get_set(),
-            callable_mp(
-                handle.ptr(),
-                &NetwPrediction::seat_reachability_findings
-            )
-        );
+        pool->validate_declaration(slot, state->get_set(), *this);
     }
     const predict::Feed feed
         = pool->role_feed(resolved_role, fallback_latched());
@@ -1066,7 +1031,7 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
     if (input != nullptr) {
         input->apply_input_feed(feed);
     }
-    pool->seat_arrivals(slot, feed, ObjectID(handle->get_instance_id()));
+    pool->seat_arrivals(slot, feed, this);
     if (session != nullptr) {
         session->display_mark_role_dirty(entity->get_rid_handle());
         session->sim_announce(entity->get_rid_handle());
@@ -1138,22 +1103,22 @@ sim::Mode NetwPredictSlotEngine::resolved_mode() const {
 }
 
 int NetwPredictSlotEngine::resolve_axes() {
-    const sim::Facts facts = pool->resolution_facts(native_slot(), handle);
+    const sim::Facts facts = pool->resolution_facts(native_slot(), decl);
     NetwMultiplayer *session = core_seated();
     if (session == nullptr || entity.is_null()) {
-        return pool->apply_mode(native_slot(), handle, sim::resolve(facts));
+        return pool->apply_mode(native_slot(), decl, sim::resolve(facts));
     }
     const RID seated = entity->get_rid_handle();
     const sim::Mode mode = session->sim_resolve(seated, facts);
     session->sim_settle_body(entity);
-    return pool->apply_mode(native_slot(), handle, mode);
+    return pool->apply_mode(native_slot(), decl, mode);
 }
 
 void NetwPredictSlotEngine::notify_contact() {
     pool->notify_contact(
         native_slot(),
-        handle->get_witness_contacts().is_valid(),
-        handle->get_collision_cooldown_ticks()
+        decl->witness.is_valid(),
+        decl->collision_cooldown_ticks
     );
 }
 
@@ -1360,7 +1325,7 @@ void NetwPredictSlotEngine::simulated_step(double p_delta, int64_t p_tick) {
         return;
     }
     run_command(*pool->command_of(slot), p_delta, p_tick, false);
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     stats->set_int_fact(
         NetwPredictStats::FACT_SUBSTITUTED,
         stats->get_int_fact(NetwPredictStats::FACT_SUBSTITUTED) + 1
@@ -1402,7 +1367,7 @@ bool NetwPredictSlotEngine::speculation_horizon_full() {
 
 void NetwPredictSlotEngine::publish_ack_age(int64_t p_age) {
     if (p_age >= 0) {
-        handle->set_ack_age_ticks(int(p_age));
+        decl->ack_age_ticks = int(p_age);
     }
 }
 
@@ -1497,7 +1462,7 @@ void NetwPredictSlotEngine::on_state(
             divergence,
             probation_before,
             episode_state_before,
-            fallback_at_sink
+            *this
         )
         != NetwPredictionEngine::SETTLE_PROCEED) {
         return;
@@ -1525,7 +1490,7 @@ void NetwPredictSlotEngine::on_state(
             payload,
             NetwPredictionEngine::JOINT_FLOOR_STATE
         );
-        NetwPredictStats::Book *stats = handle->fact_book();
+        NetwPredictStats::Book *stats = &decl->facts;
         stats->set_int_fact(
             NetwPredictStats::FACT_CORRECTIONS,
             stats->get_int_fact(NetwPredictStats::FACT_CORRECTIONS) + 1
@@ -1583,8 +1548,7 @@ void NetwPredictSlotEngine::recover(
             p_attribution,
             replays ? witness_sample() : no_sample(),
             replays ? island_participant_ids() : no_participants(),
-            replays ? callable_mp(handle.ptr(), &NetwPrediction::seat_breach)
-                    : Callable()
+            replays ? this : nullptr
         )) {
         return;
     }
@@ -1887,7 +1851,7 @@ void NetwPredictSlotEngine::run_joint_pass(
         );
     }
     const int64_t depth = present - p_floor_transition;
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     Dictionary joint_depth
         = stats->get_dict_fact(NetwPredictStats::FACT_JOINT_DEPTH);
     joint_depth[depth] = int64_t(joint_depth.get(depth, 0)) + 1;
@@ -1895,7 +1859,7 @@ void NetwPredictSlotEngine::run_joint_pass(
 }
 
 void NetwPredictSlotEngine::release_lingering(int64_t p_floor_transition) {
-    handle->fact_book()->set_int_fact(
+    decl->facts.set_int_fact(
         NetwPredictStats::FACT_LINGER_HELD,
         pool->release_lingering(native_slot(), p_floor_transition)
     );
@@ -2048,11 +2012,11 @@ void NetwPredictSlotEngine::consume_step(
     );
     const int64_t slot = native_slot();
     const int64_t previous_ack = ack();
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     if (pool->next_input_tick_of(slot) >= 0) {
         resync_if_stranded();
         const int depth = int(queued_span());
-        const int buffer = std::max(0, handle->get_consume_buffer_ticks());
+        const int buffer = std::max(0, decl->consume_buffer_ticks);
         int action = consume_action(depth, buffer);
         if (action == NetwPrediction::CONSUME_ACTION_REPLAY) {
             consume_primed = true;
@@ -2111,13 +2075,9 @@ void NetwPredictSlotEngine::consume_step(
             int(p_server_tick)
         );
     }
-    handle->set_ack_age_ticks(
-        lane_open() ? int(std::max(
-                          int64_t(0),
-                          pool->newest_authored_input(slot) - ack()
-                      ))
-                    : 0
-    );
+    decl->ack_age_ticks = lane_open()
+        ? int(std::max(int64_t(0), pool->newest_authored_input(slot) - ack()))
+        : 0;
     send_ack_frame();
 }
 
@@ -2132,10 +2092,10 @@ void NetwPredictSlotEngine::consume_frame_step(
     const int64_t slot = native_slot();
     const int64_t previous_ack = ack();
     pool->set_last_replayed_fresh(slot, false);
-    const int buffer = std::max(0, handle->get_replay_buffer_depth());
+    const int buffer = std::max(0, decl->replay_buffer_depth);
     pool->admit_missing_commands(slot, buffer);
     const int depth = replay_depth();
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     const int64_t drove_before
         = stats->get_int_fact(NetwPredictStats::FACT_DRIVE_SEQ);
     record_consume_cadence(depth);
@@ -2202,7 +2162,7 @@ void NetwPredictSlotEngine::consume_frame_step(
         );
     }
     refresh_tape_diagnostics();
-    handle->set_ack_age_ticks(replay_depth());
+    decl->ack_age_ticks = replay_depth();
     send_ack_frame();
 }
 
@@ -2211,7 +2171,7 @@ void NetwPredictSlotEngine::record_consume_cadence(int p_depth) {
     const int arrivals
         = std::min(pool->arrivals_this_frame_of(slot), ARRIVAL_BUCKET_MAX);
     pool->set_arrivals_this_frame(slot, 0);
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     PackedInt32Array arrival_buckets
         = stats->get_buckets_fact(NetwPredictStats::FACT_ARRIVALS);
     if (arrivals >= 0 && arrivals < arrival_buckets.size()) {
@@ -2234,7 +2194,7 @@ void NetwPredictSlotEngine::record_consume_cadence(int p_depth) {
 }
 
 void NetwPredictSlotEngine::bump_consume_shape(int64_t p_consumed) {
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     const String key
         = String::num_int64(p_consumed) + String(",")
         + String::num_int64(
@@ -2258,7 +2218,7 @@ void NetwPredictSlotEngine::resync_tape_if_stranded(int p_depth, int p_buffer) {
         native_slot(),
         p_depth,
         p_buffer,
-        handle->get_max_consume_lag_ticks()
+        decl->max_consume_lag_ticks
     );
 }
 
@@ -2273,8 +2233,8 @@ int NetwPredictSlotEngine::replay_depth() const {
 void NetwPredictSlotEngine::resync_if_stranded() {
     pool->resync_input_if_stranded(
         native_slot(),
-        handle->get_max_consume_lag_ticks(),
-        handle->get_consume_buffer_ticks()
+        decl->max_consume_lag_ticks,
+        decl->consume_buffer_ticks
     );
 }
 
@@ -2287,7 +2247,7 @@ void NetwPredictSlotEngine::consume_one(double p_delta) {
 }
 
 void NetwPredictSlotEngine::consume_backlog(double p_delta, int p_buffer) {
-    const int ceiling = handle->get_max_consume_per_tick();
+    const int ceiling = decl->max_consume_per_tick;
     for (int ran = 1; ran < ceiling; ++ran) {
         const int depth = int(queued_span());
         if (consume_action(depth, p_buffer)
@@ -2308,7 +2268,7 @@ void NetwPredictSlotEngine::mark_idle_drive(int64_t p_label, int p_kind) {
 void NetwPredictSlotEngine::adopt_tape_position(int64_t p_transition) {
     const int64_t slot = native_slot();
     pool->set_last_driven_entry_index(slot, p_transition);
-    NetwPredictStats::Book *stats = handle->fact_book();
+    NetwPredictStats::Book *stats = &decl->facts;
     stats->set_int_fact(
         NetwPredictStats::FACT_TAPE_EPOCH,
         pool->tape_epoch_of(slot)
@@ -2345,7 +2305,7 @@ void NetwPredictSlotEngine::run_command(
         return;
     }
     pool->apply_command(slot, p_command);
-    const Callable step = handle->get_simulate();
+    const Callable step = NetwMultiplayer::sim_step_of(entity.ptr());
     if (step.is_valid()) {
         Array arguments;
         arguments.push_back(p_delta);
@@ -2359,7 +2319,10 @@ void NetwPredictSlotEngine::run_command(
 
 void NetwPredictSlotEngine::push_simulate() {
     if (core_seated() != nullptr) {
-        pool->set_simulate(native_slot(), handle->get_simulate());
+        pool->set_simulate(
+            native_slot(),
+            NetwMultiplayer::sim_step_of(entity.ptr())
+        );
     }
 }
 
@@ -2374,7 +2337,7 @@ void NetwPredictSlotEngine::close_captured_row(int64_t p_transition) {
 }
 
 void NetwPredictSlotEngine::close_journal_row(int64_t p_transition) {
-    const bool witnessed = handle->get_witness_contacts().is_valid();
+    const bool witnessed = decl->witness.is_valid();
     const Dictionary solve = witnessed ? pool->seal_transition(
                                              native_slot(),
                                              p_transition,
@@ -2394,7 +2357,7 @@ void NetwPredictSlotEngine::close_journal_row(int64_t p_transition) {
 }
 
 Dictionary NetwPredictSlotEngine::witness_sample() const {
-    return pool->witness_sample(native_slot(), handle);
+    return pool->witness_sample(native_slot(), decl);
 }
 
 PackedStringArray NetwPredictSlotEngine::island_participant_ids() const {
@@ -2410,8 +2373,7 @@ void NetwPredictSlotEngine::maybe_demote_for_breach(
         p_transition,
         bool(p_solve.get(key_breach(), false)),
         int(p_solve.get(key_witness_fp(), 0)),
-        callable_mp(handle.ptr(), &NetwPrediction::seat_command_frame),
-        callable_mp(handle.ptr(), &NetwPrediction::seat_fallback)
+        *this
     );
 }
 
@@ -2433,8 +2395,8 @@ void NetwPredictSlotEngine::restore(
             p_basis,
             episode_owner->native_slot(),
             entity.is_valid() ? entity->get_name() : StringName(),
-            handle->get_ack_age_ticks(),
-            handle->get_divergence_epsilon(),
+            decl->ack_age_ticks,
+            decl->divergence_epsilon,
             p_evidence_free,
             p_pool_planned,
             p_entry
@@ -2462,8 +2424,8 @@ void NetwPredictSlotEngine::restore_row(
             p_basis,
             episode_owner->native_slot(),
             entity.is_valid() ? entity->get_name() : StringName(),
-            handle->get_ack_age_ticks(),
-            handle->get_divergence_epsilon(),
+            decl->ack_age_ticks,
+            decl->divergence_epsilon,
             false,
             false,
             p_entry

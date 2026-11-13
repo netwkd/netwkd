@@ -133,7 +133,7 @@ Signals
 
 **mode_changed**\ (\ previous\: :ref:`Mode<enum_NetwSimulation_Mode>`, mode\: :ref:`Mode<enum_NetwSimulation_Mode>`\ ) :ref:`🔗<class_NetwSimulation_signal_mode_changed>`
 
-Emitted when :ref:`mode<class_NetwSimulation_property_mode>` changes on this peer, after the body has switched to ``mode``.
+Emitted when :ref:`mode<class_NetwSimulation_property_mode>` changes on this peer, after the body has switched to ``mode``. A change made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-section-separator
 

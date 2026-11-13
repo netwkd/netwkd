@@ -82,6 +82,8 @@ Signals
 
 Emitted when a load finishes, including the one :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>` starts. ``found`` is ``false`` when no record was stored for :ref:`record_id<class_NetwPersistence_property_record_id>`.
 
+A load that finishes while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends, after the :ref:`NetwPromise<class_NetwPromise>` from :ref:`load()<class_NetwPersistence_method_load>` has settled.
+
 .. rst-class:: classref-item-separator
 
 ----
@@ -93,6 +95,8 @@ Emitted when a load finishes, including the one :ref:`NetwPersistenceConfig.load
 **saved**\ (\ ) :ref:`🔗<class_NetwPersistence_signal_saved>`
 
 Emitted when a save is stored.
+
+A save stored while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends, after the :ref:`NetwPromise<class_NetwPromise>` from :ref:`save()<class_NetwPersistence_method_save>` has settled.
 
 .. rst-class:: classref-section-separator
 

@@ -34,7 +34,7 @@ The server adds :ref:`entities<class_NetwInterestLayer_property_entities>` and :
         marker_of(entity.root).visible = visible
     )
 
-\ Changes apply at the end of the frame, or at :ref:`NetwMultiplayer.interest_flush_now()<class_NetwMultiplayer_method_interest_flush_now>`. On the server, use :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>` and :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>`. On a client, use :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`.
+\ Changes apply at the end of the frame. On the server, use :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>` and :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>`. On a client, use :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`.
 
 An entity inside a multiplayer scene is only visible to peers in that scene, whatever other layers say.
 
@@ -74,39 +74,27 @@ Methods
 .. table::
    :widths: auto
 
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`add_entity<class_NetwInterestLayer_method_add_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                                                                            |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`add_viewer<class_NetwInterestLayer_method_add_viewer>`\ (\ peer_id\: :godot:`int`\ )                                                                                                  |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|              | :ref:`apply_server_transition<class_NetwInterestLayer_method_apply_server_transition>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`, visible\: :godot:`bool`\ ) |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|              | :ref:`client_admit<class_NetwInterestLayer_method_client_admit>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                                                                        |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|              | :ref:`client_revoke<class_NetwInterestLayer_method_client_revoke>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                                                                      |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|              | :ref:`client_untrack_entity<class_NetwInterestLayer_method_client_untrack_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                                                      |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary` | :ref:`debug_dump<class_NetwInterestLayer_method_debug_dump>`\ (\ peer_id\: :godot:`int` = 0\ )                                                                                              |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`has_entity<class_NetwInterestLayer_method_has_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) |const|                                                                    |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`has_viewer<class_NetwInterestLayer_method_has_viewer>`\ (\ peer_id\: :godot:`int`\ ) |const|                                                                                          |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`is_visible_to<class_NetwInterestLayer_method_is_visible_to>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`\ )                                              |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary` | :ref:`monitor_snapshot<class_NetwInterestLayer_method_monitor_snapshot>`\ (\ ) |const|                                                                                                      |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`remove_entity<class_NetwInterestLayer_method_remove_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                                                                      |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`remove_viewer<class_NetwInterestLayer_method_remove_viewer>`\ (\ peer_id\: :godot:`int`\ )                                                                                            |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`set_policy<class_NetwInterestLayer_method_set_policy>`\ (\ value\: :ref:`LayerPolicy<enum_NetwInterestLayer_LayerPolicy>`\ )                                                          |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`       | :ref:`verdict_for<class_NetwInterestLayer_method_verdict_for>`\ (\ peer_id\: :godot:`int`\ ) |const|                                                                                        |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Array`      | :ref:`viewer_ids<class_NetwInterestLayer_method_viewer_ids>`\ (\ ) |const|                                                                                                                  |
-   +---------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`add_entity<class_NetwInterestLayer_method_add_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                               |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`add_viewer<class_NetwInterestLayer_method_add_viewer>`\ (\ peer_id\: :godot:`int`\ )                                                     |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`has_entity<class_NetwInterestLayer_method_has_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) |const|                       |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`has_viewer<class_NetwInterestLayer_method_has_viewer>`\ (\ peer_id\: :godot:`int`\ ) |const|                                             |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`is_visible_to<class_NetwInterestLayer_method_is_visible_to>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`\ ) |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Dictionary` | :ref:`monitor_snapshot<class_NetwInterestLayer_method_monitor_snapshot>`\ (\ ) |const|                                                         |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`remove_entity<class_NetwInterestLayer_method_remove_entity>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )                         |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`remove_viewer<class_NetwInterestLayer_method_remove_viewer>`\ (\ peer_id\: :godot:`int`\ )                                               |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`       | :ref:`set_policy<class_NetwInterestLayer_method_set_policy>`\ (\ value\: :ref:`LayerPolicy<enum_NetwInterestLayer_LayerPolicy>`\ )             |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Array`      | :ref:`viewer_ids<class_NetwInterestLayer_method_viewer_ids>`\ (\ ) |const|                                                                     |
+   +---------------------+------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -159,7 +147,7 @@ Emitted on the server when this layer shows ``entity`` to ``peer_id``, once ``pe
 
 **interest_exited**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterestLayer_signal_interest_exited>`
 
-Emitted on the server when this layer stops showing ``entity`` to ``peer_id``, also when ``peer_id`` stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it.
+Emitted on the server when this layer stops showing ``entity`` to ``peer_id``, also when ``peer_id`` stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it or the layer is freed. A session that ends does not emit it.
 
 .. rst-class:: classref-item-separator
 
@@ -387,7 +375,6 @@ The entities in the layer, as keys. On a client, only the ones it sees. Returns 
 
 .. rst-class:: classref-property-setget
 
-- |void| **set_layer_id**\ (\ value\: :godot:`StringName`\ )
 - :godot:`StringName` **get_layer_id**\ (\ )
 
 The name of the layer.
@@ -482,79 +469,6 @@ Adds ``peer_id`` to :ref:`viewers<class_NetwInterestLayer_property_viewers>`. Re
 
 ----
 
-.. _class_NetwInterestLayer_method_apply_server_transition:
-
-.. rst-class:: classref-method
-
-|void| **apply_server_transition**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`, visible\: :godot:`bool`\ ) :ref:`🔗<class_NetwInterestLayer_method_apply_server_transition>`
-
-Emits :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>` or :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>`, then the entity's own callbacks. The session calls it. Calling it yourself emits a change that did not happen.
-
-\ **Server Only.**
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwInterestLayer_method_client_admit:
-
-.. rst-class:: classref-method
-
-|void| **client_admit**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwInterestLayer_method_client_admit>`
-
-Marks ``entity`` as visible to this client and emits :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`. The session calls it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwInterestLayer_method_client_revoke:
-
-.. rst-class:: classref-method
-
-|void| **client_revoke**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwInterestLayer_method_client_revoke>`
-
-Marks ``entity`` as no longer visible to this client and emits :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`. The session calls it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwInterestLayer_method_client_untrack_entity:
-
-.. rst-class:: classref-method
-
-|void| **client_untrack_entity**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwInterestLayer_method_client_untrack_entity>`
-
-Removes ``entity`` on a client when it leaves the tree, emitting :ref:`entity_removed<class_NetwInterestLayer_signal_entity_removed>` and then :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`. The session calls it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwInterestLayer_method_debug_dump:
-
-.. rst-class:: classref-method
-
-:godot:`Dictionary` **debug_dump**\ (\ peer_id\: :godot:`int` = 0\ ) :ref:`🔗<class_NetwInterestLayer_method_debug_dump>`
-
-Returns the state of this layer and why ``peer_id`` can or cannot see it.
-
-.. code:: text
-
-    Dictionary
-    ┠╴layer_id     String   this layer
-    ┠╴policy       int      a LayerPolicy value
-    ┠╴viewers      Array    the viewer peer ids
-    ┠╴entities     int      number of entities
-    ┠╴peer_id      int      the peer asked about
-    ┠╴verdict      bool     what verdict_for returns for that peer
-    ┖╴explanation  String   the reason, for reading
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwInterestLayer_method_has_entity:
 
 .. rst-class:: classref-method
@@ -585,7 +499,7 @@ Returns ``true`` when ``peer_id`` is in :ref:`viewers<class_NetwInterestLayer_pr
 
 :godot:`bool` **is_visible_to**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`, peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterestLayer_method_is_visible_to>`
 
-Returns ``true`` when ``peer_id`` can see ``entity``, considering every layer. A client can only ask about itself.
+Returns ``true`` when updates for ``entity`` are sent to ``peer_id``, considering every layer. It answers as :ref:`NetwMultiplayer.interest_is_visible()<class_NetwMultiplayer_method_interest_is_visible>` does.
 
 .. rst-class:: classref-item-separator
 
@@ -644,18 +558,6 @@ Removes ``peer_id`` from :ref:`viewers<class_NetwInterestLayer_property_viewers>
 :godot:`bool` **set_policy**\ (\ value\: :ref:`LayerPolicy<enum_NetwInterestLayer_LayerPolicy>`\ ) :ref:`🔗<class_NetwInterestLayer_method_set_policy>`
 
 Sets :ref:`policy<class_NetwInterestLayer_property_policy>`. Returns ``false`` when it did not change.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwInterestLayer_method_verdict_for:
-
-.. rst-class:: classref-method
-
-:godot:`bool` **verdict_for**\ (\ peer_id\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwInterestLayer_method_verdict_for>`
-
-Returns whether this layer alone lets ``peer_id`` see its entities. Use :ref:`is_visible_to()<class_NetwInterestLayer_method_is_visible_to>` for the full answer.
 
 .. rst-class:: classref-item-separator
 

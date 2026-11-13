@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/declared_nodes.h"
@@ -33,7 +34,8 @@ struct Stand {
 
     Stand() {
         core.instantiate();
-        pipeline = core->get_replication_plane()->get_sync_pipeline();
+        pipeline = netw_test::Internals::replication_plane(core)
+                       ->get_sync_pipeline();
         pipeline->set_sync_model(&model);
         pipeline->set_channels(20, 21, 22, 43, 17, 18);
     }

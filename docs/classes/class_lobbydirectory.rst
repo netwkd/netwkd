@@ -607,7 +607,7 @@ Reports that the current request failed. ``message`` is shown to the player.
 
 |void| **invite**\ (\ address\: :godot:`String`, from_name\: :godot:`String`\ ) :ref:`🔗<class_LobbyDirectory_method_invite>`
 
-Calls :ref:`NetwConnection.invite()<class_NetwConnection_method_invite>` for this directory's :godot:`MultiplayerPeer` class and emits :ref:`NetwConnection.invited<class_NetwConnection_signal_invited>`.
+Calls :ref:`NetwMultiplayer.endpoint_invite()<class_NetwMultiplayer_method_endpoint_invite>` with the transport for this directory's :godot:`MultiplayerPeer` class, which emits :ref:`NetwConnection.invited<class_NetwConnection_signal_invited>` unless the session is already on that server.
 
 .. rst-class:: classref-item-separator
 

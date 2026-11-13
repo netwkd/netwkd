@@ -69,7 +69,7 @@ static func start_host(
 		if info_source != null:
 			tree.add_child(info_source)
 		if auth_timeout > 0.0:
-			tree.api.inner.auth_timeout = auth_timeout
+			tree.api.auth_timeout = auth_timeout
 		return { tree = tree, port = candidate }
 
 	push_error(
@@ -105,7 +105,7 @@ static func make_client_tree(
 ## The local player is prepared before the peer is assigned, so the session
 ## holds its hello and submits exactly one request once the connection is
 ## admitted. Returns [constant @GlobalScope.OK] when
-## [member NetwMultiplayer.local_player] arrives, the assignment refusal
+## [member NetwSession.local_player] arrives, the assignment refusal
 ## when the peer was refused, and [constant @GlobalScope.ERR_TIMEOUT] when the
 ## wait ran out.
 static func join_client(
@@ -125,14 +125,17 @@ static func join_client(
 	var api := tree.api
 	return await await_until(
 			tree,
-			func() -> bool: return api.local_player != null,
+			func() -> bool: return api.player_get_local() != 0,
 	)
 
 
 ## Waits until [param tree]'s session is online.
 static func await_online(tree: MultiplayerViewport) -> Error:
 	var api := tree.api
-	return await await_until(tree, func() -> bool: return api.is_online)
+	return await await_until(
+			tree,
+			func() -> bool: return api.session_is_online(),
+	)
 
 
 ## Yields frames under [param node] until [param condition] holds.

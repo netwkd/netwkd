@@ -45,8 +45,7 @@ MultiplayerSpawner *scripted_spawner(Node *p_arena) {
 }
 
 int64_t drops_of(LoopbackRig &p_rig) {
-    const Dictionary counters = p_rig.server()
-                                    ->get_replication_plane()
+    const Dictionary counters = Internals::replication_plane(p_rig.server())
                                     ->get_spawner_compat()
                                     ->counters();
     return int64_t(counters[StringName("drops_uncaptured_custom")]);

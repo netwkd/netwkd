@@ -327,7 +327,7 @@
 			<return type="NetwMultiplayer" />
 			<param index="0" name="node" type="Node" />
 			<description>
-				Returns the [member Node.multiplayer] of [param node] as a [NetwMultiplayer], for advanced use. A node that is in no tree returns [code]null[/code].
+				Returns the [member Node.multiplayer] of [param node] as a [NetwMultiplayer], for advanced use. A [code]null[/code] node, or a node that is in no tree, returns [code]null[/code].
 			</description>
 		</method>
 		<method name="prepare_join" qualifiers="vararg static">
@@ -655,7 +655,7 @@
 				    NetwEntity.of(avatar).player = who
 				    return avatar
 				[/codeblock]
-				Returns [code]null[/code] and spawns nothing when the session does not hold [param player]. The node keeps the name [param fn] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
+				Returns [code]null[/code] and spawns nothing when the session does not hold [param player], and raises an error unless that player left the session. The node keeps the name [param fn] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
 				[b]Server Only.[/b]
 			</description>
 		</method>

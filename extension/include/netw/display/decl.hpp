@@ -72,10 +72,12 @@ struct Decl {
     double max_arrival_lag = 24.0;
     bool enable_smart_dilation = true;
 
-    Dirt set_param(int param, const godot::Variant &value);
+    godot::Error set_param(int param, const godot::Variant &value);
     godot::Variant get_param(int param) const;
     int pump_for(int role) const;
 };
+
+Dirt dirt_of(int param);
 
 bool pump_is_predicted(int pump);
 bool pump_clears_history(int previous, int next);

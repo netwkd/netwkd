@@ -49,12 +49,10 @@ struct CarryRun {
         const Ref<netw::NetwEntity> entity
             = netw::NetwEntity::ensure(p_container);
         const RID handle = Internals::get_liveness_core(core)->entity_create();
-        entity->get_record()->adopt_handle(handle);
         core->liveness_bind(
             handle,
             Internals::get_liveness_core(core)->reserve_route(),
             entity,
-            entity->get_record(),
             p_container
         );
         p_container->set_meta(
@@ -74,7 +72,12 @@ struct CarryRun {
     CarryRun() {
         core.instantiate();
         root = memnew(Node);
+        root->set_name("CarryStand");
         netw::gd::scene_root()->add_child(root);
+        netw::gd::scene_tree()->set_multiplayer(
+            Ref<MultiplayerAPI>(core.ptr()),
+            root->get_path()
+        );
         Node *source = level_named("Source");
         target_handle = seat(level_named("Destination"));
         mover = memnew(CharacterBody2D);
@@ -95,6 +98,10 @@ struct CarryRun {
             drop_mover();
         }
         core->scene_dispose();
+        netw::gd::scene_tree()->set_multiplayer(
+            Ref<MultiplayerAPI>(),
+            root->get_path()
+        );
         core.unref();
         netw::gd::scene_root()->remove_child(root);
         memdelete(root);

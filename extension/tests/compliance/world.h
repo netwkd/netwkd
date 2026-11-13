@@ -459,8 +459,10 @@ inline Step heal(int p_client) {
 
 inline Step transfer(int p_client) {
     return [=](Live &p_live, int p_peer) {
-        p_live.session(p_peer)->get_session()->transfer_server(
-            p_live.rig.peer_id(p_live.index(p_client))
+        const godot::Ref<netw::NetwSession> session
+            = p_live.session(p_peer)->get_session();
+        session->transfer_server(
+            session->player_of(p_live.rig.peer_id(p_live.index(p_client)))
         );
     };
 }
@@ -506,7 +508,10 @@ class World {
                 const std::string key = std::string(tag.utf8().get_data())
                     + std::to_string(source->get_instance_id());
                 if (live->wired.insert(key).second) {
-                    source->connect(row.second, live->calls.callable(tag));
+                    source->connect(
+                        row.second,
+                        live->calls.reading(tag, &plain)
+                    );
                 }
             }
         }

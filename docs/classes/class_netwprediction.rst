@@ -179,7 +179,7 @@ Signals
 
 **divergence_detected**\ (\ entry\: :godot:`int`, attribution\: :ref:`Attribution<enum_NetwPrediction_Attribution>`\ ) :ref:`🔗<class_NetwPrediction_signal_divergence_detected>`
 
-Emitted when a predicted tick disagrees with the server, with what the disagreement is blamed on. It is emitted whether or not a correction follows.
+Emitted when a predicted tick disagrees with the server, with what the disagreement is blamed on. It is emitted whether or not a correction follows. It is emitted when the :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or :ref:`NetwClock<class_NetwClock>` tick that found it ends, so a handler reads the entity as that poll or tick left it.
 
 ::
 
@@ -199,7 +199,7 @@ Emitted when a predicted tick disagrees with the server, with what the disagreem
 
 **episode_changed**\ (\ change\: :ref:`EpisodeChange<enum_NetwPrediction_EpisodeChange>`, report\: :godot:`Dictionary`\ ) :ref:`🔗<class_NetwPrediction_signal_episode_changed>`
 
-Emitted when a misprediction episode opens, falls back or closes, as ``change`` says. An episode holds the corrections from one misprediction until the peers agree again. ``report`` is the whole episode so far.
+Emitted when a misprediction episode opens, falls back or closes, as ``change`` says. An episode holds the corrections from one misprediction until the peers agree again. ``report`` is the whole episode so far. It is emitted when the :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or :ref:`NetwClock<class_NetwClock>` tick that changed the episode ends, so a handler reads the entity as that poll or tick left it.
 
 .. code:: text
 
@@ -248,7 +248,7 @@ Emitted when a misprediction episode opens, falls back or closes, as ``change`` 
 
 **recovered**\ (\ entry\: :godot:`int`, deltas\: :godot:`Dictionary`, teleported\: :godot:`bool`, attribution\: :ref:`Attribution<enum_NetwPrediction_Attribution>`\ ) :ref:`🔗<class_NetwPrediction_signal_recovered>`
 
-Emitted after a correction moved the body. ``deltas`` holds how far each property moved, as ``after - before``, with angles taken the short way around. ``teleported`` is ``true`` when the correction was a teleport.
+Emitted after a correction moved the body. ``deltas`` holds how far each property moved, as ``after - before``, with angles taken the short way around. ``teleported`` is ``true`` when the correction was a teleport. It is emitted when the :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or :ref:`NetwClock<class_NetwClock>` tick that corrected the body ends, so a handler reads the body as that poll or tick left it.
 
 Under :ref:`NetwDisplay.LIVE_MODE_CHASE<class_NetwDisplay_constant_LIVE_MODE_CHASE>` the display already smooths the correction away.
 
@@ -268,7 +268,7 @@ Under :ref:`NetwDisplay.LIVE_MODE_CHASE<class_NetwDisplay_constant_LIVE_MODE_CHA
 
 **state_evaluated**\ (\ recv_tick\: :godot:`int`, ack\: :godot:`int`, divergence\: :godot:`float`, diverged\: :godot:`bool`\ ) :ref:`🔗<class_NetwPrediction_signal_state_evaluated>`
 
-Emitted on the controlling client each time server state arrives. ``divergence`` is the largest error of any property, including errors under :ref:`divergence_epsilon<class_NetwPrediction_property_divergence_epsilon>`. ``diverged`` is whether the error was large enough to act on, even when no correction was written. Connect to :ref:`recovered<class_NetwPrediction_signal_recovered>` to know when the body actually moved.
+Emitted on the controlling client each time server state arrives. ``divergence`` is the largest error of any property, including errors under :ref:`divergence_epsilon<class_NetwPrediction_property_divergence_epsilon>`. ``diverged`` is whether the error was large enough to act on, even when no correction was written. Connect to :ref:`recovered<class_NetwPrediction_signal_recovered>` to know when the body actually moved. It is emitted when the :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or :ref:`NetwClock<class_NetwClock>` tick that compared the state ends, so a handler reads the entity as that poll or tick left it.
 
 .. rst-class:: classref-section-separator
 
@@ -1522,6 +1522,8 @@ The entity this handle belongs to, or ``null`` once that entity is gone.
 :godot:`bool` **is_registered**\ (\ ) |const| :ref:`🔗<class_NetwPrediction_method_is_registered>`
 
 Whether the entity is being predicted, as opposed to only configured.
+
+It is already false when :ref:`NetwSimulation.mode_changed<class_NetwSimulation_signal_mode_changed>` reports :ref:`NetwSimulation.MODE_NONE<class_NetwSimulation_constant_MODE_NONE>` as the entity stops being predicted.
 
 .. rst-class:: classref-item-separator
 

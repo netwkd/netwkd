@@ -22,11 +22,16 @@ namespace Networked;
 /// <para>
 /// A player is not a peer. After the player leaves,
 /// <see cref="NetwPlayer.IsActive"/> is <c>false</c>, even if a new player
-/// connects with the same <see cref="NetwPlayer.PeerId"/>. Every join is a new
-/// player, including a join with an <see cref="NetwPlayer.Account"/> that
-/// joined before. A game that wants to recognise a returning player keys its
-/// own data by <see cref="NetwPlayer.Account"/> on the server, which is empty
-/// for a guest.
+/// connects with the same <see cref="NetwPlayer.PeerId"/>. Its
+/// <see cref="NetwPlayer.Id"/>, <see cref="NetwPlayer.PeerId"/>,
+/// <see cref="NetwPlayer.UserName"/>, <see cref="NetwPlayer.Account"/> and
+/// <see cref="NetwPlayer.AccountName"/> still read while
+/// <see cref="NetwSession.PlayerLeft"/> runs. After that, or once the session
+/// ends, every property reads empty, and <see cref="NetwPlayer.Id"/> reads
+/// <c>0</c>. Every join is a new player, including a join with an
+/// <see cref="NetwPlayer.Account"/> that joined before. A game that wants to
+/// recognise a returning player keys its own data by
+/// <see cref="NetwPlayer.Account"/> on the server, which is empty for a guest.
 /// <code>
 /// var scores := {}
 ///
@@ -82,7 +87,10 @@ public sealed class NetwPlayer : NetwRefCounted
 
     /// <summary>
     /// Emitted when <see cref="NetwPlayer.Scene"/> changes. Either may be
-    /// <c>null</c>. Only <see cref="NetwSession.LocalPlayer"/> emits it.
+    /// <c>null</c>. Only <see cref="NetwSession.LocalPlayer"/> emits it. A
+    /// change while <see cref="MultiplayerApi.Poll"/> or a
+    /// <see cref="NetwClock"/> tick runs is reported when that poll or tick
+    /// ends.
     /// <code>
     /// func _ready() -&gt; void:
     ///     Netw.session(self).local_joined.connect(on_local_joined)
@@ -107,6 +115,25 @@ public sealed class NetwPlayer : NetwRefCounted
             )
         );
         remove => DisconnectBridge("scene_changed", value);
+    }
+
+    private static readonly IntPtr _bindGetId =
+        NetwApi.MethodBind("NetwPlayer", "get_id", 3905245786UL);
+
+    /// <summary>
+    /// The player's id, which the <see cref="NetwMultiplayer"/> <c>player_*</c>
+    /// methods such as <see cref="NetwMultiplayer.PlayerGetPeer"/> take. It
+    /// stays the same across a server transfer, and reads <c>0</c> after
+    /// <see cref="NetwSession.PlayerLeft"/> has run or once the session ends.
+    /// </summary>
+    public long Id
+    {
+        get
+        {
+            long answered = default;
+            NetwThunks.Ptrcall0_Long(_bindGetId, Checked, ref answered);
+            return answered;
+        }
     }
 
     private static readonly IntPtr _bindGetPeerId =
@@ -148,9 +175,9 @@ public sealed class NetwPlayer : NetwRefCounted
 
     /// <summary>
     /// The username from <see cref="Netw.PrepareJoin"/>. It is empty for a peer
-    /// that never called <see cref="Netw.PrepareJoin"/>. It is kept after the
-    /// player leaves. Two players may join with the same name, unless
-    /// <see cref="Netw.ConfigureAdmission"/> refuses it.
+    /// that never called <see cref="Netw.PrepareJoin"/>. It still reads while
+    /// <see cref="NetwSession.PlayerLeft"/> runs. Two players may join with the
+    /// same name, unless <see cref="Netw.ConfigureAdmission"/> refuses it.
     /// </summary>
     public StringName UserName
     {
@@ -213,9 +240,9 @@ public sealed class NetwPlayer : NetwRefCounted
     /// <summary>
     /// The entities spawned for this player with
     /// <see cref="Netw.SpawnPlayer"/>, in no particular order. Empty for a
-    /// spectator. On the server a player who dropped or stepped away still
-    /// lists the entities kept for it, and a returning player lists them when
-    /// it joins.
+    /// spectator. On the server a player who dropped or stepped away lists the
+    /// entities kept for it while <see cref="NetwSession.PlayerLeft"/> runs,
+    /// and a returning player lists them when it joins.
     /// </summary>
     public NetwEntity[] Entities
     {

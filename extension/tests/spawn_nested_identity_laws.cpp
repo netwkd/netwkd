@@ -195,20 +195,20 @@ TEST_CASE(
     Node *level = netw_test::spawn_level(rig, path, true);
     REQUIRE(level != nullptr);
     rig.pump(6);
-    const RID scene = api->entity_of(level);
-    REQUIRE(api->scene_watch(scene, rig.peer_id(0)) == OK);
+    const RID scene = Internals::entity_of(api, level);
+    REQUIRE(api->scene_watch_peer(scene, rig.peer_id(0)) == OK);
     rig.pump(6);
 
     const int arena_route = spawn_arena(rig, level);
     const Nest host = read_nest(rig.route_node(arena_route));
     check_matches(host, read_nest(rig.route_node(arena_route, 0)));
 
-    REQUIRE(api->scene_unwatch(scene, rig.peer_id(0)));
+    REQUIRE(api->scene_unwatch_peer(scene, rig.peer_id(0)) == OK);
     rig.pump(10);
     const bool ball_left = rig.route_node(int(host.ball), 0) == nullptr;
     CHECK(ball_left);
 
-    REQUIRE(api->scene_watch(scene, rig.peer_id(0)) == OK);
+    REQUIRE(api->scene_watch_peer(scene, rig.peer_id(0)) == OK);
     rig.pump(10);
 
     Node *seat = rig.route_node(arena_route, 0);
@@ -633,7 +633,7 @@ TEST_CASE(
     const Array exiting = heard.args(StringName("exiting"));
     NETW_CHECK_EQ(int(exiting[0]), int(netw::NetwSession::KICKED));
     CHECK(String(exiting[1]).contains("'Crate'"));
-    CHECK_FALSE(pair.apis[1]->is_online());
+    CHECK_FALSE(pair.apis[1]->session_is_online());
 }
 
 TEST_CASE(
@@ -712,7 +712,8 @@ LevelSeat read_level_seat(
     const Ref<netw::NetwScene> scene = netw::Netw::scene(crate_in(p_level));
     seen.same_scene = scene.is_valid() && scene == netw::Netw::scene(p_level)
         && p_api->scene_list().size() == 1
-        && RID(p_api->scene_list()[0]) == p_api->entity_of(p_level);
+        && RID(p_api->scene_list()[0])
+            == Internals::entity_of(p_api, p_level);
     seen.crate_bound = route_of(crate_in(p_level)) > 0
         && route_of(crate_in(p_level)) == route_of(crate_in(p_hosted));
     const CanvasItem *crate = Object::cast_to<CanvasItem>(crate_in(p_level));
@@ -744,7 +745,7 @@ TEST_CASE(
 
     netw::NetwMultiplayer *host = peers.apis[0].ptr();
     CHECK(netw::gd::instance_from_id(host_placed) == hosted);
-    const RID opened = host->entity_of(hosted);
+    const RID opened = Internals::entity_of(host, hosted);
     REQUIRE(host->scene_list().size() == 1);
     CHECK(RID(host->scene_list()[0]) == opened);
     const Ref<netw::NetwScene> world = netw::Netw::scene(hosted);
@@ -752,7 +753,7 @@ TEST_CASE(
     CHECK(netw::Netw::scene(crate_in(hosted)) == world);
     Object::cast_to<CanvasItem>(crate_in(hosted))->set_visible(false);
     const int seat_peer = peers.apis[1]->get_unique_id();
-    NETW_CHECK_EQ(int(host->scene_watch(opened, seat_peer)), int(OK));
+    NETW_CHECK_EQ(int(host->scene_watch_peer(opened, seat_peer)), int(OK));
     peers.pump(12);
     REQUIRE(route_of(hosted) > 0);
     check_level_seat(
@@ -764,7 +765,7 @@ TEST_CASE(
     peers.pump(2);
     peers.connect(2);
     const int late_peer = peers.apis[2]->get_unique_id();
-    NETW_CHECK_EQ(int(host->scene_watch(opened, late_peer)), int(OK));
+    NETW_CHECK_EQ(int(host->scene_watch_peer(opened, late_peer)), int(OK));
     peers.pump(12);
     check_level_seat(
         read_level_seat(peers.apis[2].ptr(), joined, late_placed, hosted)
@@ -812,13 +813,13 @@ TEST_CASE(
     peers.connect(0);
     peers.connect(1);
     netw::NetwMultiplayer *host = peers.apis[0].ptr();
-    const RID opened = host->entity_of(hosted);
+    const RID opened = Internals::entity_of(host, hosted);
     const int seat_peer = peers.apis[1]->get_unique_id();
-    NETW_CHECK_EQ(int(host->scene_watch(opened, seat_peer)), int(OK));
+    NETW_CHECK_EQ(int(host->scene_watch_peer(opened, seat_peer)), int(OK));
     peers.pump(12);
     REQUIRE(route_of(seated) == route_of(hosted));
 
-    CHECK(host->scene_unwatch(opened, seat_peer));
+    CHECK(host->scene_unwatch_peer(opened, seat_peer) == OK);
     peers.pump(12);
     const bool kept_while_hidden
         = netw::gd::instance_from_id(seat_placed) == seated
@@ -828,7 +829,7 @@ TEST_CASE(
     CHECK_FALSE(host->scene_watches(opened, seat_peer));
 
     Object::cast_to<CanvasItem>(crate_in(hosted))->set_visible(false);
-    NETW_CHECK_EQ(int(host->scene_watch(opened, seat_peer)), int(OK));
+    NETW_CHECK_EQ(int(host->scene_watch_peer(opened, seat_peer)), int(OK));
     peers.pump(12);
     CHECK(host->scene_watches(opened, seat_peer));
     CHECK(netw::gd::instance_from_id(seat_crate) == crate_in(seated));

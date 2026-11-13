@@ -17,7 +17,7 @@
 		    marker_of(entity.root).visible = visible
 		)
 		[/codeblock]
-		Changes apply at the end of the frame, or at [method NetwMultiplayer.interest_flush_now]. On the server, use [signal interest_entered] and [signal interest_exited]. On a client, use [signal visibility_changed].
+		Changes apply at the end of the frame. On the server, use [signal interest_entered] and [signal interest_exited]. On a client, use [signal visibility_changed].
 		An entity inside a multiplayer scene is only visible to peers in that scene, whatever other layers say.
 		A [NetwEntity] under another entity is only visible to peers that also see the entity above it, whatever its own layers say.
 	</description>
@@ -39,54 +39,6 @@
 				Adds [param peer_id] to [member viewers]. Returns [code]false[/code] when it already was. [param peer_id] must not be [code]0[/code].
 			</description>
 		</method>
-		<method name="apply_server_transition">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<param index="1" name="peer_id" type="int" />
-			<param index="2" name="visible" type="bool" />
-			<description>
-				Emits [signal interest_entered] or [signal interest_exited], then the entity's own callbacks. The session calls it. Calling it yourself emits a change that did not happen.
-				[b]Server Only.[/b]
-			</description>
-		</method>
-		<method name="client_admit">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Marks [param entity] as visible to this client and emits [signal visibility_changed]. The session calls it.
-			</description>
-		</method>
-		<method name="client_revoke">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Marks [param entity] as no longer visible to this client and emits [signal visibility_changed]. The session calls it.
-			</description>
-		</method>
-		<method name="client_untrack_entity">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Removes [param entity] on a client when it leaves the tree, emitting [signal entity_removed] and then [signal visibility_changed]. The session calls it.
-			</description>
-		</method>
-		<method name="debug_dump">
-			<return type="Dictionary" />
-			<param index="0" name="peer_id" type="int" default="0" />
-			<description>
-				Returns the state of this layer and why [param peer_id] can or cannot see it.
-				[codeblock lang=text]
-				Dictionary
-				┠╴layer_id     String   this layer
-				┠╴policy       int      a LayerPolicy value
-				┠╴viewers      Array    the viewer peer ids
-				┠╴entities     int      number of entities
-				┠╴peer_id      int      the peer asked about
-				┠╴verdict      bool     what verdict_for returns for that peer
-				┖╴explanation  String   the reason, for reading
-				[/codeblock]
-			</description>
-		</method>
 		<method name="has_entity" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="entity" type="NetwEntity" />
@@ -106,7 +58,7 @@
 			<param index="0" name="entity" type="NetwEntity" />
 			<param index="1" name="peer_id" type="int" />
 			<description>
-				Returns [code]true[/code] when [param peer_id] can see [param entity], considering every layer. A client can only ask about itself.
+				Returns [code]true[/code] when updates for [param entity] are sent to [param peer_id], considering every layer. It answers as [method NetwMultiplayer.interest_is_visible] does.
 			</description>
 		</method>
 		<method name="monitor_snapshot" qualifiers="const">
@@ -144,13 +96,6 @@
 				Sets [member policy]. Returns [code]false[/code] when it did not change.
 			</description>
 		</method>
-		<method name="verdict_for" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="peer_id" type="int" />
-			<description>
-				Returns whether this layer alone lets [param peer_id] see its entities. Use [method is_visible_to] for the full answer.
-			</description>
-		</method>
 		<method name="viewer_ids" qualifiers="const">
 			<return type="Array" />
 			<description>
@@ -176,7 +121,7 @@
 		<member name="entities" type="Dictionary" setter="" getter="get_entities">
 			The entities in the layer, as keys. On a client, only the ones it sees. Returns a copy, so use [method add_entity] and [method remove_entity] to change it.
 		</member>
-		<member name="layer_id" type="StringName" setter="set_layer_id" getter="get_layer_id">
+		<member name="layer_id" type="StringName" setter="" getter="get_layer_id">
 			The name of the layer.
 		</member>
 		<member name="monitor" type="Callable" setter="set_monitor" getter="get_monitor">
@@ -217,7 +162,7 @@
 			<param index="0" name="entity" type="NetwEntity" />
 			<param index="1" name="peer_id" type="int" />
 			<description>
-				Emitted on the server when this layer stops showing [param entity] to [param peer_id], also when [param peer_id] stops seeing the [NetwEntity] above it.
+				Emitted on the server when this layer stops showing [param entity] to [param peer_id], also when [param peer_id] stops seeing the [NetwEntity] above it or the layer is freed. A session that ends does not emit it.
 			</description>
 		</signal>
 		<signal name="viewer_added">

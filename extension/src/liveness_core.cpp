@@ -15,12 +15,12 @@ namespace netw {
 namespace {
 
 const GameCall LIVE_CALLBACK
-    = {"The NetwMultiplayer.liveness_when_live callback",
+    = {"The callback waiting for a route",
        "func() -> void",
        0};
 
 const GameCall LIVE_TIMEOUT
-    = {"The NetwMultiplayer.liveness_when_live on_timeout",
+    = {"The timeout waiting for a route",
        "func() -> void",
        0};
 

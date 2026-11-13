@@ -250,11 +250,7 @@ Node *PropertyBinding::node() const {
 }
 
 NetwMultiplayer *PropertyBinding::core() const {
-    Node *held = node();
-    if (held == nullptr || !held->is_inside_tree()) {
-        return nullptr;
-    }
-    return NetwEntity::session_core_for(held);
+    return NetwMultiplayer::session_holding(node());
 }
 
 void PropertyBinding::apply_state_feed(const predict::Feed &p_feed) {

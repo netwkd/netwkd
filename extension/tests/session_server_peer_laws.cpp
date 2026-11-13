@@ -40,7 +40,7 @@ TEST_CASE(
     session->session_peer_assigned(true, 9);
 
     CHECK(
-        session->session_get_state()
+        session->session_get_stored_state()
         == NetwMultiplayer::SESSION_STATE_CONNECTING
     );
 }
@@ -71,7 +71,7 @@ TEST_CASE(
     NETW_CHECK_EQ(serverless_mesh_warnings(faults), 2);
     for (const int member : {2, 3}) {
         NETW_CHECK_EQ(
-            int(mesh.session_of(member)->session_get_state()),
+            int(mesh.session_of(member)->session_get_stored_state()),
             int(NetwMultiplayer::SESSION_STATE_CONNECTING)
         );
     }
@@ -97,7 +97,7 @@ TEST_CASE(
     NETW_CHECK_EQ(serverless_mesh_warnings(faults), 0);
     for (const int member : {2, 3}) {
         NETW_CHECK_EQ(
-            int(mesh.session_of(member)->session_get_state()),
+            int(mesh.session_of(member)->session_get_stored_state()),
             int(NetwMultiplayer::SESSION_STATE_CONNECTING)
         );
     }
@@ -108,7 +108,7 @@ TEST_CASE(
     NETW_CHECK_EQ(serverless_mesh_warnings(faults), 0);
     for (const int member : {2, 3}) {
         NETW_CHECK_EQ(
-            int(mesh.session_of(member)->session_get_state()),
+            int(mesh.session_of(member)->session_get_stored_state()),
             int(NetwMultiplayer::SESSION_STATE_ONLINE)
         );
     }

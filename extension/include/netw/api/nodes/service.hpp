@@ -15,8 +15,6 @@ namespace netw {
 class NetwService : public godot::Node {
     GDCLASS(NetwService, godot::Node)
 
-    static NetwMultiplayer *resolve_api(godot::Node *p_service);
-
     void enter_registry();
     void exit_registry();
 

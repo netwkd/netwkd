@@ -3,15 +3,62 @@
 #include <cstdint>
 
 #include "godot/rid.hpp"
+#include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/session/books.hpp"
 
 namespace netw_test {
 
 struct Internals {
+    static netw::NetwEntityRecord *record(const netw::NetwEntity *p_entity) {
+        return p_entity->get_record();
+    }
+
+    static void adopt_handle(
+        const godot::Ref<netw::NetwEntity> &p_entity,
+        const godot::RID &p_handle
+    ) {
+        if (p_entity->home != nullptr) {
+            p_entity->home->entity_rekey(p_entity.ptr(), p_handle);
+            return;
+        }
+        p_entity->draft->adopt_handle(p_handle);
+    }
+
     template <typename Session>
     static const netw::session::Books &books(const Session &p_session) {
         return p_session->books;
+    }
+
+    template <typename Session>
+    static netw::interest::Engine &interest_plane(const Session &p_session) {
+        return p_session->interest_plane();
+    }
+
+    template <typename Session>
+    static godot::RID entity_at(const Session &p_session, int64_t p_route) {
+        return p_session->books.liveness->rid_from_route(int(p_route));
+    }
+
+    template <typename Session>
+    static godot::RID entity_of(
+        const Session &p_session,
+        godot::Object *p_node
+    ) {
+        return p_session->entity_of(p_node);
+    }
+
+    template <typename Session>
+    static int64_t route_of(
+        const Session &p_session,
+        godot::Object *p_wrapper
+    ) {
+        return p_session->liveness_route_of(p_wrapper);
+    }
+
+    template <typename Session>
+    static decltype(auto) connect_plane(const Session &p_session) {
+        return (p_session->connect_plane());
     }
 
     template <typename Session>
@@ -107,6 +154,30 @@ struct Internals {
         return p_session->spawn_plane();
     }
 
+    static void control_record(netw::NetwEntity *p_entity, int64_t p_value) {
+        netw::NetwMultiplayer::control_record(p_entity, p_value);
+    }
+
+    static void control_seed(
+        netw::NetwEntity *p_entity,
+        uint64_t p_revision,
+        uint64_t p_tenure,
+        int64_t p_hold
+    ) {
+        netw::NetwMultiplayer::control_seed(
+            p_entity,
+            p_revision,
+            p_tenure,
+            p_hold
+        );
+    }
+
+    static const netw::sim::Decl *sim_find_declaration(
+        const netw::NetwEntity *p_entity
+    ) {
+        return netw::NetwMultiplayer::sim_find_declaration(p_entity);
+    }
+
     static netw::ReplicationSend *row_send_of(netw::ReplicationCore *p_plane) {
         return netw::NetwMultiplayer::row_send_of(p_plane);
     }
@@ -124,6 +195,19 @@ struct Internals {
     template <typename Session>
     static auto take_submitted_join(const Session &p_session) {
         return p_session->session_take_submitted_join_under_test();
+    }
+
+    template <typename Session>
+    static const netw::sim::Row *sim_row_of(
+        const Session &p_session,
+        const godot::RID &p_entity
+    ) {
+        return p_session->sim_row_of(p_entity);
+    }
+
+    template <typename Session>
+    static netw::ReplicationCore *replication_plane(const Session &p_session) {
+        return p_session->get_replication_plane();
     }
 
     template <typename Session>
@@ -194,6 +278,19 @@ struct Internals {
     template <typename Session>
     static decltype(auto) resync_tamper(const Session &p_session) {
         return (p_session->resync_tamper);
+    }
+
+    template <typename Session>
+    static godot::Ref<netw::NetwPlayer> seat_player(
+        const Session &p_session,
+        int64_t p_peer
+    ) {
+        netw::session::AcceptFrame accepted;
+        accepted.peer_id = p_peer;
+        accepted.player_id = uint64_t(p_session->player_mint_id());
+        p_session->player_ensure(accepted);
+        p_session->player_admit(p_peer);
+        return p_session->player_of(p_peer);
     }
 };
 

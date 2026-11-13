@@ -326,7 +326,7 @@ LawVerdict spawn_refused(PackedByteArray (*p_damage)(const PackedByteArray &)
         args,
         types,
         arena,
-        Variant(),
+        0,
         false
     );
     rig.pump(10);
@@ -610,7 +610,6 @@ const Declared TRANSCRIBED[] = {
     {"SESSION_SHUTDOWN", 31},
     {"SESSION_SCENE_RELEASED", 32},
     {"SESSION_KICK_REQUEST", 33},
-    {"SESSION_LEAVE_REQUEST", 34},
     {"PREDICT_COMMAND", 35},
     {"PREDICT_ACK", 36},
     {"PREDICT_RELAY", 37},

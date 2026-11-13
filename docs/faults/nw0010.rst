@@ -2,28 +2,32 @@
 
 .. _fault_nw0010:
 
-NW0010. Deferred calls kept queuing more deferred calls
-=======================================================
+NW0010. Handlers kept giving the session more work
+==================================================
 
-Reported as an error when the calls queued with
-:ref:`NetwMultiplayer.session_defer <class_NetwMultiplayer_method_session_defer>`
-still have calls waiting after the last pass the session allows.
+Reported as a warning when handlers the session called are still giving
+it more work after the last pass it allows in one update. The rest runs
+on its next update, so nothing is lost. It is reported once per session.
 
-The waiting calls were dropped. The log line names them.
-
-A deferred call that queues itself again never finishes.
-
-.. code-block:: gdscript
-
-    func refill() -> void:
-        multiplayer.session_defer(refill, &"refill")
-
-Queue the call again only while there is work left.
+A :ref:`NetwEntity.despawned <class_NetwEntity_signal_despawned>`
+handler that frees the next node of a chain hands the session one more
+node each pass, so a long chain takes several updates to finish.
 
 .. code-block:: gdscript
 
-    func refill() -> void:
-        if queue.is_empty():
-            return
-        queue.pop_front().apply()
-        multiplayer.session_defer(refill, &"refill")
+    func _on_despawned() -> void:
+        next_link.free()
+
+Free the next node with ``queue_free()``, or defer other work with
+``call_deferred()``, so it runs at the end of the frame.
+
+.. code-block:: gdscript
+
+    func _on_despawned() -> void:
+        next_link.queue_free()
+
+Any handler the session calls can keep it busy the same way, such as
+a :ref:`NetwEntity.reparented <class_NetwEntity_signal_reparented>`
+handler that moves the next entity, or a
+:ref:`Netw.request_all <class_Netw_method_request_all>` callback that
+calls ``request_all`` again.

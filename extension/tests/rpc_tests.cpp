@@ -13,6 +13,7 @@
 #include "godot/scene_tree.hpp"
 #include "godot/script.hpp"
 #include "godot/variant.hpp"
+#include "netw/api/channel.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/group_promise.hpp"
@@ -24,6 +25,7 @@ namespace TestRpc {
 
 using namespace godot;
 using netw::Netw;
+using netw::NetwChannel;
 using netw::NetwEntity;
 using netw::NetwGroupPromise;
 using netw::NetwMultiplayer;
@@ -283,7 +285,7 @@ LawVerdict call_local_declared(const World &) {
 LawVerdict controller_declared(const World &) {
     const FaultWatch faults;
     Star star(CONTROLLER_SINK);
-    star.rig.server()->entity_grant_control(star.at_hub, star.rig.peer_id(0));
+    star.rig.server()->entity_set_controller(star.at_hub, star.rig.peer_id(0));
     star.rig.pump(4);
 
     Netw::rpc_id(1, star.method(0, "note_call"), tagged(7));
@@ -651,7 +653,37 @@ LawVerdict mounted_declaration(const World &) {
     return law_held();
 }
 
+LawVerdict channel_delivers(const World &) {
+    LoopbackRig rig(1);
+    CallLog heard;
+    const Ref<NetwChannel> at_server = NetwChannel::over(120, rig.server());
+    const Ref<NetwChannel> at_client = NetwChannel::over(120, rig.client(0));
+    at_server->register_handler(heard.callable("server"));
+    at_client->register_handler(heard.callable("client"));
+
+    const PackedByteArray sent = String("gg").to_utf8_buffer();
+    at_client->send(1, sent, true, false);
+    rig.pump(6);
+
+    if (heard.count("server") != 1 || heard.count("client") != 0) {
+        return law_broken(
+            "the server heard it %d times and the client %d",
+            heard.count("server"),
+            heard.count("client")
+        );
+    }
+    const Array args = heard.args("server");
+    if (args.size() != 2 || int64_t(args[0]) != rig.peer_id(0)
+        || PackedByteArray(args[1]) != sent) {
+        return law_broken("the handler read %s", String(Variant(args)));
+    }
+    return law_held();
+}
+
 const Row ROWS[] = {
+    {"a payload a client sends on a NetwChannel the server registered",
+     "the server's handler runs once with the client's id and the payload",
+     &channel_delivers},
     {"an RPC declared call_local, called by the server",
      "it runs once on the server and once on every client, with no warning",
      &call_local_declared},
@@ -767,17 +799,6 @@ Variant via_rpc_request_call_group(Node *p_node) {
     );
 }
 
-Variant via_entity_call(Node *p_node) {
-    const Ref<NetwMultiplayer> session = Netw::of(p_node);
-    return int64_t(session->entity_call(
-        session->entity_of(p_node),
-        0,
-        StringName("note_call"),
-        one_tag(),
-        0
-    ));
-}
-
 Variant via_sync_property(Node *p_node) {
     Netw::sync_property(p_node, StringName("level"));
     return Variant();
@@ -790,26 +811,24 @@ Variant via_emit_entity_signal(Node *p_node) {
 
 struct Door {
     const char *label;
-    bool names_an_entity;
     bool answers;
     bool signal;
     Variant (*call)(Node *p_node);
 };
 
 const Door DOORS[] = {
-    {"Netw.rpc", false, false, false, &via_rpc},
-    {"Netw.rpc_id", false, false, false, &via_rpc_id},
-    {"Netw.rpc_controller", false, false, false, &via_rpc_controller},
-    {"Netw.request", false, true, false, &via_request},
-    {"Netw.request_id", false, true, false, &via_request_id},
-    {"Netw.request_all", false, true, false, &via_request_all},
-    {"Netw.request_controller", false, true, false, &via_request_controller},
-    {"rpc_call", false, false, false, &via_rpc_call},
-    {"rpc_request_call", false, true, false, &via_rpc_request_call},
-    {"rpc_request_call_group", false, true, false, &via_rpc_request_call_group},
-    {"entity_call", true, true, false, &via_entity_call},
-    {"Netw.sync_property", false, false, false, &via_sync_property},
-    {"Netw.emit_entity_signal", false, false, true, &via_emit_entity_signal},
+    {"Netw.rpc", false, false, &via_rpc},
+    {"Netw.rpc_id", false, false, &via_rpc_id},
+    {"Netw.rpc_controller", false, false, &via_rpc_controller},
+    {"Netw.request", true, false, &via_request},
+    {"Netw.request_id", true, false, &via_request_id},
+    {"Netw.request_all", true, false, &via_request_all},
+    {"Netw.request_controller", true, false, &via_request_controller},
+    {"rpc_call", false, false, &via_rpc_call},
+    {"rpc_request_call", true, false, &via_rpc_request_call},
+    {"rpc_request_call_group", true, false, &via_rpc_request_call_group},
+    {"Netw.sync_property", false, false, &via_sync_property},
+    {"Netw.emit_entity_signal", false, true, &via_emit_entity_signal},
 };
 
 struct Fault {
@@ -833,12 +852,6 @@ struct Answer {
 
 Answer answer_of(const Variant &p_answer) {
     Answer out;
-    if (p_answer.get_type() == Variant::INT) {
-        out.answered = true;
-        out.code = int64_t(p_answer);
-        out.failed = out.code != OK;
-        return out;
-    }
     Object *held = p_answer;
     NetwPromise *single = Object::cast_to<NetwPromise>(held);
     NetwGroupPromise *group = Object::cast_to<NetwGroupPromise>(held);
@@ -863,9 +876,6 @@ TEST_CASE(
         LoopbackRig rig(1);
         rig.mount();
         for (const Door &door : DOORS) {
-            if (door.names_an_entity && !fault.configured) {
-                continue;
-            }
             const String label = vformat("%s x %s", fault.label, door.label);
             NETW_FORMAT_TEXT(netw_cell_text, label.utf8().get_data());
             CAPTURE(netw_cell_text);

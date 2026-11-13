@@ -7,6 +7,7 @@
 #include "netw/repl/sync_compat.hpp"
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
 #include "support/stock_probes.h"
@@ -767,7 +768,7 @@ TEST_CASE(
 }
 
 netw::SyncCompat *compat_of(netw::NetwMultiplayer *p_api) {
-    return p_api->get_replication_plane()->get_sync_compat();
+    return netw_test::Internals::replication_plane(p_api)->get_sync_compat();
 }
 
 TEST_CASE(

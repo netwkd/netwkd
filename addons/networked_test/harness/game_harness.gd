@@ -124,10 +124,7 @@ func disconnect_runner(runner: NetwSceneRunner) -> void:
 		return
 	var timed_out := await _wait_until(
 		func() -> bool:
-			for player: NetwPlayer in host.tree.api.players:
-				if player.peer_id == peer_id:
-					return false
-			return true,
+			return host.tree.api.peer_get_player(peer_id) == 0,
 		"server to drop peer %d" % peer_id,
 	)
 	assert(not timed_out, "Timed out waiting for server to drop peer.")
@@ -426,10 +423,7 @@ func _wait_for_roster(runner: NetwSceneRunner) -> void:
 		return
 	var timed_out := await _wait_until(
 		func() -> bool:
-			for player: NetwPlayer in host.tree.api.players:
-				if player.peer_id == runner.peer_id:
-					return true
-			return false,
+			return host.tree.api.peer_get_player(runner.peer_id) != 0,
 		"server roster to admit %s" % runner.username,
 	)
 	assert(not timed_out, "Timed out waiting for server to admit peer.")

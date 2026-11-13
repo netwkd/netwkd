@@ -4,7 +4,6 @@
 
 #include "godot/utility.hpp"
 #include "netw/colors.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/peer_rename.hpp"
 #include "netw/profile.hpp"
@@ -14,30 +13,6 @@ using namespace godot;
 namespace netw::interest {
 
 namespace {
-
-bool named_layer(
-    NetwMultiplayer *host,
-    const StringName &id,
-    const char *verb
-) {
-    if (!id.is_empty()) {
-        return true;
-    }
-    fault::raise(
-        host,
-        NETW_FAULT_EMPTY_ARGUMENT,
-        {String(verb), String(), String("layer name")}
-    );
-    return false;
-}
-
-void bad_policy(NetwMultiplayer *host, const char *verb, int policy) {
-    fault::raise(
-        host,
-        NETW_FAULT_BAD_VALUE,
-        {String(verb), String::num_int64(policy), String("a policy constant")}
-    );
-}
 
 template <typename T, typename Less>
 void stable_sort(LocalVector<T> &values, Less less) {
@@ -454,15 +429,6 @@ void Engine::mark_entity_tree_dirty(int64_t root) {
     }
 }
 
-bool Engine::layer_admits_bit(const StringName &id, int bit) const {
-    const HashMap<StringName, Layer>::ConstIterator found = layers.find(id);
-    if (found == layers.end()) {
-        return false;
-    }
-    const bool viewer = BitSet::test(found->value.viewers, bit);
-    return found->value.policy == HIDE_FROM_OUTSIDERS ? viewer : !viewer;
-}
-
 Engine::Order Engine::order_of(int64_t key) const {
     const HashMap<int64_t, Record>::ConstIterator found = entities.find(key);
     if (found == entities.end()) {
@@ -479,13 +445,6 @@ void Engine::set_layer(
     const PackedInt64Array &viewers,
     int policy
 ) {
-    if (!named_layer(host, id, "{NetwMultiplayer.interest_layer}")) {
-        return;
-    }
-    if (policy != HIDE_FROM_OUTSIDERS && policy != HIDE_FROM_INSIDERS) {
-        bad_policy(host, "{NetwInterestLayer.set_policy}", policy);
-        return;
-    }
     const HashMap<StringName, Layer>::Iterator found = layers.find(id);
     if (found != layers.end() && found->value.policy == Policy(policy)
         && BitSet::equals(found->value.viewers, viewers)) {
@@ -511,9 +470,6 @@ void Engine::remove_layer(const StringName &id) {
 }
 
 void Engine::declare_layer(const StringName &id) {
-    if (!named_layer(host, id, "{NetwMultiplayer.interest_layer}")) {
-        return;
-    }
     ensure_layer(id);
 }
 
@@ -522,9 +478,6 @@ bool Engine::has_layer(const StringName &id) const {
 }
 
 bool Engine::layer_add_viewer(const StringName &id, int64_t peer_id) {
-    if (!named_layer(host, id, "{NetwInterestLayer.add_viewer}")) {
-        return false;
-    }
     const int bit = peer_bit_for(peer_id);
     if (bit < 0) {
         return false;
@@ -594,13 +547,6 @@ bool Engine::layer_has_viewer(const StringName &id, int64_t peer_id) const {
 }
 
 bool Engine::layer_set_policy(const StringName &id, int policy) {
-    if (!named_layer(host, id, "{NetwInterestLayer.set_policy}")) {
-        return false;
-    }
-    if (policy != HIDE_FROM_OUTSIDERS && policy != HIDE_FROM_INSIDERS) {
-        bad_policy(host, "{NetwInterestLayer.set_policy}", policy);
-        return false;
-    }
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.policy == Policy(policy)) {
@@ -614,21 +560,6 @@ bool Engine::layer_set_policy(const StringName &id, int policy) {
 }
 
 bool Engine::layer_set_leave_policy(const StringName &id, int policy) {
-    if (!named_layer(
-            host,
-            id,
-            "{NetwInterestLayer.set_default_leave_policy}"
-        )) {
-        return false;
-    }
-    if (policy < 0 || policy > Decl::LEAVE_CUSTOM) {
-        bad_policy(
-            host,
-            "{NetwInterestLayer.set_default_leave_policy}",
-            policy
-        );
-        return false;
-    }
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.leave_policy == policy) {
@@ -645,21 +576,6 @@ int Engine::layer_leave_policy(const StringName &id) const {
 }
 
 bool Engine::layer_set_perception_policy(const StringName &id, int policy) {
-    if (!named_layer(
-            host,
-            id,
-            "{NetwInterestLayer.set_default_perception_policy}"
-        )) {
-        return false;
-    }
-    if (policy < 0 || policy > Decl::PERCEPTION_CUSTOM) {
-        bad_policy(
-            host,
-            "{NetwInterestLayer.set_default_perception_policy}",
-            policy
-        );
-        return false;
-    }
     ensure_layer(id);
     Layer &layer = layers[id];
     if (layer.perception_policy == policy) {
@@ -681,32 +597,6 @@ int Engine::layer_policy(const StringName &id) const {
                                  : int(HIDE_FROM_OUTSIDERS);
 }
 
-bool Engine::layer_admits(const StringName &id, int64_t peer_id) const {
-    if (peer_id == 0) {
-        return false;
-    }
-    const int bit = peer_bit_of(peer_id);
-    if (bit < 0) {
-        return layer_policy(id) == HIDE_FROM_INSIDERS;
-    }
-    return layer_admits_bit(id, bit);
-}
-
-String Engine::layer_explain(const StringName &id, int64_t peer_id) const {
-    if (peer_id == 0) {
-        return "REJECT peer=0 (no peer context)";
-    }
-    const bool viewer = layer_has_viewer(id, peer_id);
-    const bool outsiders = layer_policy(id) == HIDE_FROM_OUTSIDERS;
-    return vformat(
-        "%s peer=%d %s viewers under %s",
-        layer_admits(id, peer_id) ? "ADMIT" : "REJECT",
-        peer_id,
-        viewer ? "in" : "not in",
-        outsiders ? "HIDE_FROM_OUTSIDERS" : "HIDE_FROM_INSIDERS"
-    );
-}
-
 PackedInt64Array Engine::layer_viewers(const StringName &id) const {
     PackedInt64Array out;
     const HashMap<StringName, Layer>::ConstIterator found = layers.find(id);
@@ -724,9 +614,6 @@ PackedInt64Array Engine::layer_viewers(const StringName &id) const {
 }
 
 bool Engine::roster_add(const StringName &id, int64_t key) {
-    if (!named_layer(host, id, "{NetwInterestLayer.add_entity}")) {
-        return false;
-    }
     NETW_BUG_COND_V(!is_key(key), false);
     ensure_layer(id);
     Layer &layer = layers[id];
@@ -759,30 +646,6 @@ bool Engine::roster_remove(const StringName &id, int64_t key) {
 bool Engine::roster_has(const StringName &id, int64_t key) const {
     const HashMap<StringName, Layer>::ConstIterator found = layers.find(id);
     return found != layers.end() && found->value.member_set.has(key);
-}
-
-bool Engine::set_exit_handler(int64_t key, const Callable &handler) {
-    if (exit_handlers.has(key)) {
-        return false;
-    }
-    exit_handlers.insert(key, handler);
-    return true;
-}
-
-Callable Engine::exit_handler(int64_t key) const {
-    const HashMap<int64_t, Callable>::ConstIterator found
-        = exit_handlers.find(key);
-    return found ? found->value : Callable();
-}
-
-Callable Engine::take_exit_handler(int64_t key) {
-    const HashMap<int64_t, Callable>::Iterator found = exit_handlers.find(key);
-    if (!found) {
-        return Callable();
-    }
-    const Callable handler = found->value;
-    exit_handlers.remove(found);
-    return handler;
 }
 
 StringName Engine::scene_membership(int64_t key) const {
@@ -988,9 +851,6 @@ void Engine::set_membership(int64_t key, const Array &layer_ids) {
 
 bool Engine::membership_add(int64_t key, const StringName &layer_id) {
     NETW_BUG_COND_V(!is_key(key), false);
-    if (!named_layer(host, layer_id, "{NetwInterest.join}")) {
-        return false;
-    }
     Record &record = record_for(key);
     if (contains(record.layers, layer_id)) {
         return false;
@@ -1749,47 +1609,6 @@ int Engine::layer_edge_count(const StringName &layer_id) const {
     return members * BitSet::popcount(row->value);
 }
 
-String Engine::explain(int64_t key, int bit) const {
-    if (!entities.has(key)) {
-        return "entity is not registered";
-    }
-    if (!BitSet::test(live_peers, bit)) {
-        return "peer bit is not live";
-    }
-    int64_t current = key;
-    while (current != 0) {
-        const HashMap<int64_t, Record>::ConstIterator found
-            = entities.find(current);
-        if (found == entities.end()) {
-            break;
-        }
-        const Record &record = found->value;
-        if (!record.intent_all && !BitSet::test(record.intent, bit)) {
-            return vformat(
-                "synchronizer intent denies at route %d",
-                record.route
-            );
-        }
-        if (!record.layers.is_empty()) {
-            bool admitted = false;
-            for (uint32_t index = 0; index < record.layers.size(); ++index) {
-                if (layer_admits_bit(record.layers[index], bit)) {
-                    admitted = true;
-                    break;
-                }
-            }
-            if (!admitted) {
-                return vformat(
-                    "layer composition denies at route %d",
-                    record.route
-                );
-            }
-        }
-        current = record.parent;
-    }
-    return "admitted";
-}
-
 int Engine::order_route_for(int64_t key) {
     NETW_BUG_COND_V(!is_key(key), 0);
     const HashMap<int64_t, int32_t>::ConstIterator found
@@ -1841,7 +1660,6 @@ void Engine::clear() {
     layers.clear();
     peer_bits.clear();
     bit_peers.clear();
-    exit_handlers.clear();
     scene_memberships.clear();
     fallback_routes.clear();
     next_fallback_route = 1;

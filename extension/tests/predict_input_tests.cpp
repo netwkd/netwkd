@@ -6,6 +6,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_stats.hpp"
 #include "netw/api/prediction.hpp"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
 
@@ -16,6 +17,7 @@ namespace TestPredictInput {
 using namespace godot;
 using netw::NetwMultiplayer;
 using netw::NetwPrediction;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -138,8 +140,7 @@ struct Walk {
         const RID entity = server->spawn_registered(
             StringName("walker"),
             args,
-            p_client_controls ? server->peer_get_player(rig.peer_id(0)).ptr()
-                              : nullptr
+            p_client_controls ? rig.player(0)->get_id() : 0
         );
         Node *node = server->entity_get_node(entity);
         if (node != nullptr && arena != nullptr) {
@@ -158,7 +159,7 @@ struct Walk {
 
     Node *walker(int p_at) const {
         NetwMultiplayer *api = seat(p_at);
-        return api->entity_get_node(api->entity_from_route(route));
+        return api->entity_get_node(Internals::entity_at(api, route));
     }
 
     Ref<NetwPrediction> prediction(int p_at) const {

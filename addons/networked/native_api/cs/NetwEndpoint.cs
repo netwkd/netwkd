@@ -72,7 +72,9 @@ public sealed class NetwEndpoint : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when server information or the invitation changes.
+    /// Emitted when server information or the invitation changes. A change made
+    /// while <see cref="MultiplayerApi.Poll"/> runs is emitted when that poll
+    /// ends.
     /// </summary>
     public event Action Changed
     {
@@ -85,6 +87,24 @@ public sealed class NetwEndpoint : NetwRefCounted
             )
         );
         remove => DisconnectBridge("changed", value);
+    }
+
+    private static readonly IntPtr _bindGetRid =
+        NetwApi.MethodBind("NetwEndpoint", "get_rid", 2944877500UL);
+
+    /// <summary>
+    /// The endpoint's <see cref="Rid"/>, for the <c>endpoint_*</c> methods of
+    /// <see cref="NetwMultiplayer"/> such as
+    /// <see cref="NetwMultiplayer.EndpointGetParam"/>.
+    /// </summary>
+    public Rid Rid
+    {
+        get
+        {
+            Rid answered = default;
+            NetwThunks.Ptrcall0_Rid(_bindGetRid, Checked, ref answered);
+            return answered;
+        }
     }
 
     private static readonly IntPtr _bindGetPeerClass =
@@ -198,9 +218,11 @@ public sealed class NetwEndpoint : NetwRefCounted
         NetwApi.MethodBind("NetwEndpoint", "get_is_listed", 36873697UL);
 
     /// <summary>
-    /// <c>false</c> once the row is removed. Only
-    /// <see cref="NetwEndpoint.PeerClass"/> and
-    /// <see cref="NetwEndpoint.Address"/> keep their values after that.
+    /// <c>true</c> while <see cref="NetwConnection.Endpoints"/> holds the row.
+    /// <c>false</c> once the row is removed, and for a
+    /// <see cref="NetwConnection.CurrentEndpoint"/> no row lists. Only
+    /// <see cref="NetwEndpoint.Rid"/>, <see cref="NetwEndpoint.PeerClass"/> and
+    /// <see cref="NetwEndpoint.Address"/> keep their values after removal.
     /// </summary>
     public bool IsListed
     {

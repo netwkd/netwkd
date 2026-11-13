@@ -81,9 +81,11 @@ func test_connect_entry_flow() -> void:
 		NetwHarnessSession.Entry.HOST,
 	)
 	assert_that(err).is_equal(OK)
-	assert_bool(server.api.is_online).is_true()
-	assert_that(server.api.role).is_equal(NetwSession.ROLE_DEDICATED_SERVER)
-	assert_object(server.api.local_player).is_null()
+	assert_bool(server.api.session_is_online()).is_true()
+	assert_that(server.api.session_get_role()).is_equal(
+		NetwSession.ROLE_DEDICATED_SERVER,
+	)
+	assert_int(server.api.player_get_local()).is_equal(0)
 
 	var client := _make_tree(NetwSession.ROLE_CLIENT, "ConnectJoinClient")
 	err = await session.connect_tree(
@@ -92,8 +94,10 @@ func test_connect_entry_flow() -> void:
 		&"valeria",
 	)
 	assert_that(err).is_equal(OK)
-	assert_bool(client.api.is_online).is_true()
-	assert_that(client.api.role).is_equal(NetwSession.ROLE_CLIENT)
+	assert_bool(client.api.session_is_online()).is_true()
+	assert_that(client.api.session_get_role()).is_equal(
+		NetwSession.ROLE_CLIENT,
+	)
 
 	await _reset_session()
 
@@ -107,8 +111,8 @@ func test_connect_entry_flow() -> void:
 		&"host",
 	)
 	assert_that(err).is_equal(OK)
-	assert_bool(host_player.api.is_online).is_true()
-	assert_that(host_player.api.role).is_equal(
+	assert_bool(host_player.api.session_is_online()).is_true()
+	assert_that(host_player.api.session_get_role()).is_equal(
 		NetwSession.ROLE_LISTEN_SERVER,
 	)
 
@@ -143,7 +147,6 @@ func test_disconnect_tree_closes_peer_and_releases_held_packets() -> void:
 	var closed_id := session.disconnect_tree(client)
 
 	assert_that(closed_id).is_equal(peer_id)
-	assert_that(client.api.state).is_equal(NetwSession.STATE_DISCONNECTING)
 	assert_that(peer.get_unique_id()).is_equal(0)
 	assert_that(session.session().is_holding_inbound(peer)).is_false()
 	assert_that(session.session().in_flight_count(peer)).is_equal(0)

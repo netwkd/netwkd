@@ -22,12 +22,17 @@ namespace netw::session {
 struct Books;
 } // namespace netw::session
 
+namespace netw::predict {
+struct Decl;
+} // namespace netw::predict
+
 namespace netw {
 
 using table::SchemaRecord;
 
 class NetwMultiplayer;
 class NetwPrediction;
+class NetwPredictSlotEngine;
 class NetwPredictStats;
 
 predict::EvidenceRow evidence_row(
@@ -232,6 +237,7 @@ class NetwPredictionEngine {
 
     godot::Ref<NetwEntity> owner_entity(int64_t p_slot) const;
     godot::Object *handle_of(int64_t p_slot) const;
+    predict::Decl *decl_of(int64_t p_slot) const;
     static int episode_change(int64_t p_event);
 
     void open_tenure(
@@ -368,7 +374,7 @@ public:
     void seat_arrivals(
         int64_t p_slot,
         const predict::Feed &p_feed,
-        godot::ObjectID p_seat
+        NetwPredictSlotEngine *p_seat
     );
     bool takes_arrival(int64_t p_slot, const store::EntityRef &p_ref) const;
     predict::Listener listener_for(
@@ -452,7 +458,6 @@ public:
         const godot::Callable &p_callable
     );
     bool is_angle_field(int64_t p_slot, const godot::StringName &p_key) const;
-    godot::Dictionary angle_fields_of(int64_t p_slot) const;
     bool is_causal_field(int64_t p_slot, const godot::StringName &p_key) const;
     bool is_trigger_excluded_field(
         int64_t p_slot,
@@ -468,7 +473,6 @@ public:
         const godot::Dictionary &p_payload
     ) const;
     godot::Dictionary projection_map(int64_t p_slot) const;
-    godot::Dictionary wiring_snapshot(int64_t p_slot) const;
 
     godot::Dictionary teleport_distances(int64_t p_slot) const;
     bool teleport_reached_of(
@@ -540,7 +544,7 @@ public:
     void set_has_previous_witness(int64_t p_slot, bool p_value);
     godot::Dictionary witness_sample(
         int64_t p_slot,
-        const godot::Ref<NetwPrediction> &p_handle
+        const predict::Decl *p_decl
     );
     godot::Dictionary normalize_witness_sample(
         int64_t p_slot,
@@ -649,7 +653,6 @@ public:
     void note_breach_source(int64_t p_slot, const godot::StringName &p_source);
     godot::StringName breach_source_of(int64_t p_slot) const;
 
-    void note_divergence(int64_t p_slot, const godot::Dictionary &p_by_field);
     void clear_divergence(int64_t p_slot);
     godot::Dictionary divergence_report(int64_t p_slot) const;
     double divergence_of(
@@ -942,17 +945,10 @@ public:
 
     sim::Facts resolution_facts(
         int64_t p_slot,
-        const godot::Ref<NetwPrediction> &p_handle
+        const predict::Decl *p_decl
     ) const;
-    int apply_mode(
-        int64_t p_slot,
-        const godot::Ref<NetwPrediction> &p_handle,
-        sim::Mode p_mode
-    );
-    int resolve_axes(
-        int64_t p_slot,
-        const godot::Ref<NetwPrediction> &p_handle
-    );
+    int apply_mode(int64_t p_slot, predict::Decl *p_decl, sim::Mode p_mode);
+    int resolve_axes(int64_t p_slot, predict::Decl *p_decl);
     int resolve_correction(int64_t p_slot, int p_declared) const;
     int settle_correction(int64_t p_slot, int p_declared);
     bool recovery_replays(int64_t p_slot) const;
@@ -973,7 +969,6 @@ public:
         const godot::PackedFloat64Array &p_field_errors,
         double p_fallback_epsilon
     ) const;
-    void record_episode_escalation(int64_t p_slot, int p_trigger_shape);
     void stamp_episode_write_delta(int64_t p_slot, int p_delta_fp);
     int record_episode_write(
         int64_t p_slot,
@@ -1024,8 +1019,7 @@ public:
         int64_t p_transition,
         bool p_breached,
         int p_witness_fingerprint,
-        const godot::Callable &p_send_command,
-        const godot::Callable &p_enter_fallback
+        NetwPredictSlotEngine &p_engine
     );
 
     bool witness_row_clean(
@@ -1223,7 +1217,7 @@ public:
         int64_t p_ack,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote
+        NetwPredictSlotEngine *p_demote
     );
     void finish_reseed_alignment(
         int64_t p_slot,
@@ -1232,7 +1226,7 @@ public:
         const predict::StateRow &p_payload,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote
+        NetwPredictSlotEngine *p_demote
     );
     bool carry_reseed(
         int64_t p_slot,
@@ -1254,14 +1248,14 @@ public:
         int64_t p_to,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote
+        NetwPredictSlotEngine *p_demote
     );
     int replay_authored_entries(
         int64_t p_slot,
         int64_t p_ack,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote
+        NetwPredictSlotEngine *p_demote
     );
     godot::Dictionary close_replayed_entry(
         int64_t p_slot,
@@ -1478,8 +1472,7 @@ public:
     godot::PackedInt64Array admit_ack_run(
         int64_t p_slot,
         const predict::AckFrame &p_frame,
-        const godot::Callable &p_quarantine_witness,
-        const godot::Callable &p_retry_operator
+        NetwPredictSlotEngine *p_engine
     );
 
     godot::PackedInt64Array receive_ack_frame(
@@ -1487,8 +1480,7 @@ public:
         const godot::PackedByteArray &p_payload,
         int64_t p_tape_epoch,
         bool p_confirm_reseed,
-        const godot::Callable &p_quarantine_witness,
-        const godot::Callable &p_retry_operator
+        NetwPredictSlotEngine *p_engine
     );
 
     predict::AckVerdict admit_ack_row(
@@ -1580,10 +1572,7 @@ public:
     };
 
     bool capture_canonical(int64_t p_slot, predict::StateRow &r_row);
-    godot::Dictionary recovery_before_of(int64_t p_slot) const;
     godot::Dictionary recovery_write_of(int64_t p_slot) const;
-    godot::Dictionary recovery_carried_of(int64_t p_slot) const;
-    godot::Dictionary recovery_tier_errors_of(int64_t p_slot) const;
     predict::WritePlan plan_recovery(
         int64_t p_slot,
         int64_t p_ack,
@@ -1617,11 +1606,6 @@ public:
         const predict::StateRow &p_payload,
         int p_ack_age_ticks,
         godot::LocalVector<double> &r_errors
-    );
-    bool apply_recovery_plan(
-        int64_t p_slot,
-        const RecoveryPlan &p_plan,
-        int64_t p_ack
     );
     bool apply_plan_rows(
         int64_t p_slot,
@@ -1691,11 +1675,7 @@ public:
     godot::TypedArray<NetwEntity> live_participants(int64_t p_slot);
     godot::PackedStringArray live_participant_ids(int64_t p_slot);
     void publish_topology_roster(int64_t p_slot);
-    void refresh_selection(
-        int64_t p_slot,
-        bool p_joint,
-        const godot::Callable &p_admit_reconcile
-    );
+    void refresh_selection(int64_t p_slot, bool p_joint);
     void publish_island_roster(int64_t p_slot);
     void clear_island_promotions(int64_t p_slot);
     void clear_joint_roster(int64_t p_slot);
@@ -1873,13 +1853,6 @@ public:
         double p_fallback_epsilon
     ) const;
 
-    int meter_of(
-        int64_t p_slot,
-        const godot::Dictionary &p_field_divergence,
-        int p_domain,
-        double p_fallback_epsilon
-    ) const;
-
     bool advanced_seed(
         int64_t p_slot,
         const predict::StateRow &p_payload,
@@ -1906,7 +1879,7 @@ public:
     void validate_declaration(
         int64_t p_slot,
         const repl::PropertySet *p_set,
-        const godot::Callable &p_emit_findings
+        NetwPredictSlotEngine &p_engine
     );
     godot::Dictionary reachability_report_of(int64_t p_slot) const;
 
@@ -1959,7 +1932,7 @@ public:
         double p_divergence,
         bool p_probation_before,
         int64_t p_episode_state_before,
-        const godot::Callable &p_enter_fallback
+        NetwPredictSlotEngine &p_engine
     );
 
     void journal_snapshot(
@@ -2268,7 +2241,7 @@ public:
         int p_attribution,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote
+        NetwPredictSlotEngine *p_demote
     );
     predict::Judged judge_state(
         int64_t p_slot,
@@ -2288,7 +2261,7 @@ public:
         const godot::Dictionary &p_correction_write,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote,
+        NetwPredictSlotEngine *p_demote,
         bool p_seated = false
     );
     void close_recovery_rows(
@@ -2299,7 +2272,7 @@ public:
         int64_t p_attribution,
         const godot::Dictionary &p_sample,
         const godot::PackedStringArray &p_participants,
-        const godot::Callable &p_demote,
+        NetwPredictSlotEngine *p_demote,
         bool p_seated
     );
     void note_replay_depth(int64_t p_slot, int p_depth);

@@ -9,13 +9,27 @@
 #include "godot/rid.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/entity_options.hpp"
+#include "netw/api/promise.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/entity/control.hpp"
 #include "netw/entity/stage.hpp"
 #include "netw/interest/decl.hpp"
+#include "netw/sim/resolve.hpp"
 
 namespace netw {
+
+namespace spawn {
+class Record;
+} // namespace spawn
+
+namespace predict {
+struct Decl;
+} // namespace predict
+
+namespace sim {
+struct Decl;
+} // namespace sim
 
 class NetwEntityRecord {
 public:
@@ -36,7 +50,33 @@ public:
         uint64_t binding = 0;
     };
 
+    struct ControlClaim {
+        uint64_t op = 0;
+        godot::Ref<NetwPromise> promise;
+    };
+
+    struct StructureOp {
+        uint64_t base = 0;
+        godot::Ref<NetwPromise> promise;
+    };
+
+    struct HeldClaimImage {
+        int64_t sender = 0;
+        uint64_t observed_revision = 0;
+        int64_t received_tick = -1;
+        godot::PackedByteArray state;
+    };
+
+    struct ControlBook {
+        HeldClaimImage held_claim_image;
+        int64_t claim_image_tick = -1;
+        int64_t claim_image_until = -1;
+        godot::LocalVector<ControlClaim> control_claims;
+        godot::LocalVector<StructureOp> structure_ops;
+    };
+
 private:
+    ControlBook control_book;
     godot::LocalVector<HeldBinding> held_bindings;
     uint64_t record_bindings[RECORD_SLOTS] = {};
     godot::RID handle;
@@ -47,6 +87,8 @@ private:
     bool declares_scene = false;
     int64_t stage = int(entity::Stage::UNBOUND);
     entity::Control control;
+    double replication_priority = 1.0;
+    sim::Mode announced_mode = sim::Mode::NONE;
     struct MintedPart {
         int64_t part = 0;
         godot::Variant value;
@@ -58,10 +100,14 @@ private:
     NetwCompTable comp_table;
     godot::LocalVector<godot::ObjectID> comp_registered;
     display::Decl *display_decl = nullptr;
+    predict::Decl *predict_decl = nullptr;
+    sim::Decl *sim_decl = nullptr;
     godot::StringName scene_label;
     int64_t scene_isolation = -1;
     int64_t projected_follower = 0;
     int64_t projected_steerer = 0;
+    spawn::Record *readmission = nullptr;
+    bool predicted_at_departure = false;
 
     struct Projection {
         int64_t follower = SERVER_PEER;
@@ -153,6 +199,27 @@ public:
         return &control;
     }
 
+    ControlBook &get_control_book() {
+        return control_book;
+    }
+    const ControlBook &get_control_book() const {
+        return control_book;
+    }
+
+    double get_replication_priority() const {
+        return replication_priority;
+    }
+    void set_replication_priority(double p_weight) {
+        replication_priority = p_weight;
+    }
+
+    sim::Mode get_announced_mode() const {
+        return announced_mode;
+    }
+    void set_announced_mode(sim::Mode p_mode) {
+        announced_mode = p_mode;
+    }
+
     bool transition(int64_t p_stage);
 
     void deactivate(godot::Node *p_owner);
@@ -209,8 +276,19 @@ public:
     bool complete_departure(godot::Object *p_wrapper);
     void readmit();
 
+    void keep_readmission(const spawn::Record &p_recipe);
+    spawn::Record *take_readmission();
+
+    bool get_predicted_at_departure() const {
+        return predicted_at_departure;
+    }
+    void set_predicted_at_departure(bool p_predicted) {
+        predicted_at_departure = p_predicted;
+    }
+
     godot::Variant part(int64_t p_part, godot::Object *p_wrapper);
     godot::Variant minted_part(int64_t p_part) const;
+    void keep_part(int64_t p_part, const godot::Variant &p_value);
     uint32_t minted_part_count() const {
         return parts.size();
     }
@@ -246,8 +324,11 @@ public:
             + held::vector(parts) + comp_table.held_bytes()
             + held::vector(comp_registered)
             + (interest_facet != nullptr ? int64_t(sizeof(interest::Facet)) : 0)
-            + (display_decl != nullptr ? int64_t(sizeof(display::Decl)) : 0);
+            + (display_decl != nullptr ? int64_t(sizeof(display::Decl)) : 0)
+            + predict_declaration_bytes() + sim_declaration_bytes();
     }
+    int64_t predict_declaration_bytes() const;
+    int64_t sim_declaration_bytes() const;
     uint64_t get_record_binding(int64_t p_record) const {
         return p_record >= 0 && p_record < RECORD_SLOTS
             ? record_bindings[p_record]
@@ -268,6 +349,19 @@ public:
     display::Decl &display_declaration();
     const display::Decl *find_display_declaration() const {
         return display_decl;
+    }
+
+    predict::Decl &predict_declaration();
+    const predict::Decl *find_predict_declaration() const {
+        return predict_decl;
+    }
+    predict::Decl *find_predict_declaration() {
+        return predict_decl;
+    }
+
+    sim::Decl &sim_declaration();
+    const sim::Decl *find_sim_declaration() const {
+        return sim_decl;
     }
 
     static void set_part_factory(

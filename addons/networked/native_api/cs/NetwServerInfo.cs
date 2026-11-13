@@ -10,7 +10,8 @@ namespace Networked;
 /// </summary>
 /// <remarks>
 /// A server browser can check a server without joining it, and gets one of
-/// these back. By default it is <see cref="NetwServerInfo.FromSession"/>. Use
+/// these back. By default it is
+/// <see cref="NetwMultiplayer.SessionGetServerInfo"/>. Use
 /// <see cref="Netw.ConfigureServerInfo"/> to change it.
 /// <code>
 /// func _init() -&gt; void:
@@ -365,27 +366,6 @@ public sealed class NetwServerInfo : NetwRefCounted
                 in slot0,
                 ref discarded);
         }
-    }
-
-    private static readonly IntPtr _bindFromSession =
-        NetwApi.MethodBind("NetwServerInfo", "from_session", 1568850436UL);
-
-    /// <summary>
-    /// Returns a copy of <see cref="NetwSessionConfig.ServerInfo"/> with
-    /// <see cref="NetwServerInfo.Players"/>, <see cref="NetwServerInfo.AppId"/>
-    /// and <see cref="NetwServerInfo.IsLocalListener"/> filled in from the
-    /// session.
-    /// </summary>
-    public static NetwServerInfo FromSession(NetwMultiplayer api)
-    {
-        IntPtr slot0 = api?.Native ?? IntPtr.Zero;
-        IntPtr answered = default;
-        NetwThunks.Ptrcall1_IntPtr_IntPtr(
-            _bindFromSession,
-            IntPtr.Zero,
-            in slot0,
-            ref answered);
-        return NetwServerInfo.Adopt(answered);
     }
 
     private static readonly IntPtr _bindToPayload =

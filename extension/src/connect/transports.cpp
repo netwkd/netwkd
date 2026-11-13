@@ -435,7 +435,7 @@ void LocalTransport::probe(const String &p_address) {
     }
     NetwMultiplayer *bound = bound_session();
     Ref<NetwServerInfo> info = bound != nullptr
-        ? NetwServerInfo::from_session(bound)
+        ? bound->session_get_server_info()
         : Ref<NetwServerInfo>();
     if (info.is_null()) {
         info.instantiate();

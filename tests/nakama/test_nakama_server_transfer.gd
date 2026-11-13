@@ -446,7 +446,8 @@ func judge_hand_off(mode: int) -> void:
 	var ana_id := ana.multiplayer.get_unique_id()
 	var watches: Array[Watch] = [Watch.new(host), Watch.new(ana), Watch.new(ben)]
 
-	assert_int(Netw.session(host).transfer_server(ana_id)).is_equal(OK)
+	var session: NetwSession = Netw.session(host)
+	assert_int(session.transfer_server(session.player_of(ana_id))).is_equal(OK)
 
 	var handed := func() -> bool:
 		return watches.all(func(watch: Watch) -> bool: return not watch.transfers.is_empty())
@@ -507,7 +508,7 @@ func judge_deadline_holds(survivors: Array[MultiplayerViewport]) -> void:
 	await get_tree().create_timer(DEADLINE_WATCH_SECONDS).timeout
 	assert_int(warnings.count(DEADLINE_WARNING)).is_equal(0)
 	for tree in survivors:
-		assert_bool(tree.api.is_online).is_true()
+		assert_bool(tree.api.session_is_online()).is_true()
 		assert_int(tree.multiplayer.get_peers().size()).is_equal(survivors.size() - 1)
 
 
@@ -547,7 +548,7 @@ func migrate(tree: MultiplayerViewport) -> void:
 
 func world_whole(group: Array) -> bool:
 	for tree: MultiplayerViewport in group:
-		if not tree.api.is_online or crate_of(tree) == null:
+		if not tree.api.session_is_online() or crate_of(tree) == null:
 			return false
 		if tree.multiplayer.get_peers().size() != group.size() - 1:
 			return false
@@ -555,14 +556,21 @@ func world_whole(group: Array) -> bool:
 			var player := Netw.session(other).local_player
 			if player == null or body_of(tree, player.username) == null:
 				return false
-		if tree.api.player_entities.size() != group.size():
+		if player_entities_of(tree).size() != group.size():
 			return false
 	return true
 
 
+func player_entities_of(tree: MultiplayerViewport) -> Array[NetwEntity]:
+	var bodies: Array[NetwEntity] = []
+	for scene: NetwScene in Netw.session(tree).scenes:
+		bodies.append_array(scene.player_entities)
+	return bodies
+
+
 func body_of(tree: MultiplayerViewport, username: String) -> Node2D:
 	var wanted := StringName(username)
-	for body: NetwEntity in tree.api.player_entities:
+	for body: NetwEntity in player_entities_of(tree):
 		if body.player != null and body.player.username == wanted:
 			return body.root as Node2D
 	return null

@@ -3,28 +3,15 @@
 #include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/replication_core.hpp"
 #include "netw/fault_book.hpp"
-#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
 
 namespace netw {
 
-namespace {
-
-const GameCall CHANNEL_HANDLER
-    = {"The NetwChannel.register handler",
-       "func(sender: int, payload: PackedByteArray) -> void",
-       2};
-
-} // namespace
-
-ReplicationCore *NetwChannel::plane() const {
-    NetwMultiplayer *api
-        = Object::cast_to<NetwMultiplayer>(gd::object_of(session));
-    return api != nullptr ? api->get_replication_plane() : nullptr;
+NetwMultiplayer *NetwChannel::multiplayer() const {
+    return Object::cast_to<NetwMultiplayer>(gd::object_of(session));
 }
 
 Ref<NetwChannel> NetwChannel::over(int64_t p_id, NetwMultiplayer *p_session) {
@@ -49,7 +36,7 @@ Ref<NetwChannel> NetwChannel::over(int64_t p_id, NetwMultiplayer *p_session) {
 }
 
 Ref<NetwChannel> NetwChannel::of(Node *p_node, int64_t p_id) {
-    NetwMultiplayer *api = NetwMultiplayer::of(p_node);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_node);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -69,20 +56,11 @@ void NetwChannel::send(
     bool p_reliable,
     bool p_batched
 ) {
-    ReplicationCore *replication = plane();
-    if (replication == nullptr) {
+    NetwMultiplayer *api = multiplayer();
+    if (api == nullptr) {
         return;
     }
-    replication->send_to(
-        p_peer_id,
-        0,
-        id,
-        p_payload,
-        p_reliable,
-        0,
-        String(),
-        p_batched
-    );
+    api->rpc_send(p_peer_id, id, p_payload, p_reliable, p_batched);
 }
 
 void NetwChannel::broadcast(
@@ -93,29 +71,12 @@ void NetwChannel::broadcast(
     send(0, p_payload, p_reliable, p_batched);
 }
 
-void NetwChannel::forward_payload(
-    const Variant &,
-    const PackedByteArray &p_payload,
-    int64_t p_sender,
-    const Callable &p_handler
-) {
-    Array args;
-    args.push_back(p_sender);
-    args.push_back(p_payload);
-    game_call(p_handler, args, CHANNEL_HANDLER);
-}
-
 void NetwChannel::register_handler(const Callable &p_handler) {
-    ReplicationCore *replication = plane();
-    if (replication == nullptr) {
+    NetwMultiplayer *api = multiplayer();
+    if (api == nullptr) {
         return;
     }
-    game_call_declared(p_handler, CHANNEL_HANDLER);
-    replication->register_channel(
-        id,
-        callable_mp_static(&NetwChannel::forward_payload).bind(p_handler),
-        false
-    );
+    api->rpc_channel_install(id, p_handler, false, true);
 }
 
 void NetwChannel::_bind_methods() {

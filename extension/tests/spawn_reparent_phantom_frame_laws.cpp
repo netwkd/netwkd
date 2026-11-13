@@ -233,12 +233,10 @@ class AreaHushScenario final : public netw_test::FrameScenario {
     RID seat(Node *p_node) {
         const Ref<netw::NetwEntity> entity = netw::NetwEntity::ensure(p_node);
         const RID handle = Internals::get_liveness_core(core)->entity_create();
-        entity->get_record()->adopt_handle(handle);
         core->liveness_bind(
             handle,
             Internals::get_liveness_core(core)->reserve_route(),
             entity,
-            entity->get_record(),
             p_node
         );
         p_node->set_meta(NetwMultiplayer::wrapper_meta(), Variant(entity));
@@ -257,7 +255,12 @@ class AreaHushScenario final : public netw_test::FrameScenario {
         dock = memnew(Node2D);
         dock->set_name("Dock");
         stage->add_child(dock);
+        stage->set_name("HushStage");
         netw::gd::scene_root()->add_child(stage);
+        netw::gd::scene_tree()->set_multiplayer(
+            Ref<MultiplayerAPI>(core.ptr()),
+            stage->get_path()
+        );
         const int shape = row / HUSH_CARRIES;
         if (shape == HUSH_MOVED_BODY) {
             area = seat_area(stage);
@@ -341,6 +344,10 @@ class AreaHushScenario final : public netw_test::FrameScenario {
             = heard("exited") - exits_before - evidence.exits_in_window;
         evidence.twin_exits = heard("twin_exited");
         core->scene_dispose();
+        netw::gd::scene_tree()->set_multiplayer(
+            Ref<MultiplayerAPI>(),
+            stage->get_path()
+        );
         netw::gd::scene_root()->remove_child(stage);
         memdelete(stage);
         stage = nullptr;

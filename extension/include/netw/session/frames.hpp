@@ -123,11 +123,14 @@ struct SessionReason {
 };
 
 struct KickRequest {
-    int64_t peer = 0;
+    uint64_t player = 0;
     godot::String reason;
 
     static constexpr auto wire = netw::wire::describe(
-        netw::wire::field<&KickRequest::peer>("peer", netw::wire::svarint(5)),
+        netw::wire::field<&KickRequest::player>(
+            "player",
+            netw::wire::varuint(5)
+        ),
         netw::wire::field<&KickRequest::reason>("reason", netw::wire::string())
     );
 };

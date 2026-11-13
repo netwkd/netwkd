@@ -272,7 +272,15 @@ TEST_CASE(
         = rig.prediction_handle(StringName("P"))->get_entity();
     godot::Node *body = entity->get_owner();
     REQUIRE(body != nullptr);
-    netw::gd::scene_root()->add_child(body);
+    godot::Node *stand = memnew(godot::Node);
+    stand->set_name("SteppedStand");
+    netw::gd::scene_root()->add_child(stand);
+    netw::gd::scene_tree()->set_multiplayer(
+        Ref<godot::MultiplayerAPI>(server),
+        stand->get_path()
+    );
+    stand->add_child(body);
+    body->set_owner(stand);
     const godot::RID space = server->entity_space_of(entity).space;
     REQUIRE(space.is_valid());
     Ref<InstallableStepper> stepper;
@@ -290,7 +298,13 @@ TEST_CASE(
     );
     lane = open_hole(rig);
     runs_the_hole_at_once(lane);
-    netw::gd::scene_root()->remove_child(body);
+    stand->remove_child(body);
+    netw::gd::scene_tree()->set_multiplayer(
+        Ref<godot::MultiplayerAPI>(),
+        stand->get_path()
+    );
+    netw::gd::scene_root()->remove_child(stand);
+    memdelete(stand);
 }
 
 } // namespace TestNetwPredictMissingInputLaws

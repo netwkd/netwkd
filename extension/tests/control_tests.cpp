@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
@@ -21,6 +22,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwPromise;
 using netw_test::FaultWatch;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawVerdict;
@@ -270,9 +272,11 @@ LawVerdict server_hands_back(const Stand &) {
 LawVerdict client_assigns(const Stand &) {
     Board board(BOARD_SOURCE);
     const int author = board.rig.peer_id(0);
-    const RID at_server = board.rig.server()->entity_of(board.node(-1));
-    const RID at_client = board.rig.client(1)->entity_of(board.node(1));
-    if (board.rig.server()->entity_grant_control(at_server, author) != OK) {
+    const RID at_server
+        = Internals::entity_of(board.rig.server(), board.node(-1));
+    const RID at_client
+        = Internals::entity_of(board.rig.client(1), board.node(1));
+    if (board.rig.server()->entity_set_controller(at_server, author) != OK) {
         return law_broken("the server could not grant control");
     }
     board.rig.step_ticks(4);
@@ -281,7 +285,7 @@ LawVerdict client_assigns(const Stand &) {
     board.entity(1)->set_controller(board.rig.peer_id(1));
     board.entity(0)->set_controller(1);
     const Error granted
-        = board.rig.client(1)->entity_grant_control(at_client, 1);
+        = board.rig.client(1)->entity_set_controller(at_client, 1);
     if (granted != ERR_UNAUTHORIZED) {
         return law_broken("a client grant answered %d", int(granted));
     }
@@ -315,7 +319,7 @@ const Row ROWS[] = {
      "every peer follows each assignment",
      &server_hands_back},
     {"a client assigning the controller, by property and by "
-     "entity_grant_control",
+     "entity_set_controller",
      "each assigning client is reported once, the grant answers "
      "ERR_UNAUTHORIZED, and control stays where the server put it",
      &client_assigns},

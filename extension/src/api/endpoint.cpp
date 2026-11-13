@@ -28,32 +28,36 @@ enums::NetwEndpoint::Status endpoint_status(int64_t p_flags, int64_t p_error) {
     }
 }
 
-NetwMultiplayer *NetwEndpoint::listed_session() const {
-    if (!listed) {
-        return nullptr;
-    }
+NetwMultiplayer *NetwEndpoint::session() const {
     return Object::cast_to<NetwMultiplayer>(gd::object_of(session_id));
 }
 
-void NetwEndpoint::bind_to(
-    NetwMultiplayer *p_session,
-    const RID &p_row,
-    const StringName &p_peer_class,
-    const String &p_address
-) {
-    session_id = gd::instance_id(p_session);
-    row = p_row;
-    peer_class = p_peer_class;
-    address = p_address;
-    listed = row.is_valid();
+String NetwEndpoint::text_param(int64_t p_param) const {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return String();
+    }
+    const Variant held = api->endpoint_get_param(
+        endpoint,
+        NetwMultiplayer::EndpointParam(p_param)
+    );
+    return held.get_type() == Variant::STRING ? String(held) : String();
 }
 
-void NetwEndpoint::unlist() {
-    listed = false;
+int64_t NetwEndpoint::flags() const {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return -1;
+    }
+    const Variant held = api->endpoint_get_state(
+        endpoint,
+        NetwMultiplayer::ENDPOINT_STATE_FLAGS
+    );
+    return held.get_type() == Variant::INT ? int64_t(held) : -1;
 }
 
-RID NetwEndpoint::get_row() const {
-    return row;
+RID NetwEndpoint::get_rid() const {
+    return endpoint;
 }
 
 StringName NetwEndpoint::get_peer_class() const {
@@ -65,37 +69,32 @@ String NetwEndpoint::get_address() const {
 }
 
 String NetwEndpoint::get_display_name() const {
-    NetwMultiplayer *api = listed_session();
-    if (api == nullptr) {
-        return String();
-    }
-    return api->endpoint_get_param(
-        row,
-        NetwMultiplayer::ENDPOINT_PARAM_DISPLAY_NAME
-    );
+    return text_param(NetwMultiplayer::ENDPOINT_PARAM_DISPLAY_NAME);
 }
 
 String NetwEndpoint::get_source() const {
-    NetwMultiplayer *api = listed_session();
-    return api != nullptr ? api->endpoint_source(row) : String();
+    return text_param(NetwMultiplayer::ENDPOINT_PARAM_SOURCE);
 }
 
 NetwEndpoint::Status NetwEndpoint::get_status() const {
-    NetwMultiplayer *api = listed_session();
-    if (api == nullptr) {
+    const int64_t held = flags();
+    if (held < 0) {
         return STATUS_UNKNOWN;
     }
     return endpoint_status(
-        api->endpoint_get_state(row, NetwMultiplayer::ENDPOINT_STATE_FLAGS),
-        api->endpoint_get_state(row, NetwMultiplayer::ENDPOINT_STATE_STATUS)
+        held,
+        session()->endpoint_get_state(
+            endpoint,
+            NetwMultiplayer::ENDPOINT_STATE_STATUS
+        )
     );
 }
 
 Ref<NetwServerInfo> NetwEndpoint::get_info() {
-    NetwMultiplayer *api = listed_session();
+    NetwMultiplayer *api = session();
     if (api != nullptr) {
         const Ref<NetwServerInfo> answered = api->endpoint_get_state(
-            row,
+            endpoint,
             NetwMultiplayer::ENDPOINT_STATE_INFO
         );
         if (answered.is_valid()) {
@@ -109,27 +108,23 @@ Ref<NetwServerInfo> NetwEndpoint::get_info() {
 }
 
 bool NetwEndpoint::get_is_listed() const {
-    return listed_session() != nullptr;
+    NetwMultiplayer *api = session();
+    return api != nullptr && api->endpoint_list().has(endpoint);
 }
 
 bool NetwEndpoint::get_is_invited() const {
-    NetwMultiplayer *api = listed_session();
-    const connect::TargetRow *held
-        = api != nullptr ? api->connect_plane().list().row(row) : nullptr;
-    return held != nullptr && held->invite_pending;
+    const int64_t held = flags();
+    return held >= 0 && (held & NetwMultiplayer::ENDPOINT_FLAG_INVITED) != 0;
 }
 
 String NetwEndpoint::get_invited_by() const {
-    NetwMultiplayer *api = listed_session();
-    const connect::TargetRow *held
-        = api != nullptr ? api->connect_plane().list().row(row) : nullptr;
-    return held != nullptr ? held->invited_by : String();
+    return text_param(NetwMultiplayer::ENDPOINT_PARAM_INVITED_BY);
 }
 
 void NetwEndpoint::probe() {
-    NetwMultiplayer *api = listed_session();
+    NetwMultiplayer *api = session();
     if (api != nullptr) {
-        api->endpoint_probe(row);
+        api->endpoint_probe(endpoint);
     }
 }
 
@@ -141,6 +136,8 @@ void NetwEndpoint::_bind_methods() {
     BIND_ENUM_CONSTANT(STATUS_INCOMPATIBLE);
     BIND_ENUM_CONSTANT(STATUS_UNSUPPORTED);
 
+    ClassDB::bind_method(D_METHOD("get_rid"), &NetwEndpoint::get_rid);
+    ADD_PROPERTY(PropertyInfo(Variant::RID, "rid"), "", "get_rid");
     ClassDB::bind_method(
         D_METHOD("get_peer_class"),
         &NetwEndpoint::get_peer_class

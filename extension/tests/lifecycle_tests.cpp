@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 #include "support/netw_call_log.h"
@@ -39,6 +40,7 @@ using netw::lifecycle::Ruling;
 using netw::lifecycle::Verdict;
 using netw_test::CallLog;
 using netw_test::FaultWatch;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -629,7 +631,7 @@ struct Stage {
     Node *author_spawns(const char *p_id, const Array &p_args, Node *p_under) {
         NetwMultiplayer *author = rig.client(0);
         const RID entity
-            = author->spawn_registered(StringName(p_id), p_args, nullptr);
+            = author->spawn_registered(StringName(p_id), p_args, 0);
         Node *node = author->entity_get_node(entity);
         if (node != nullptr && p_under != nullptr) {
             node->set(StringName("hp"), int64_t(1));
@@ -643,7 +645,7 @@ struct Stage {
             return 0;
         }
         NetwMultiplayer *api = side(p_side);
-        return int(api->entity_get_route(api->entity_of(p_node)));
+        return int(api->entity_get_route(Internals::entity_of(api, p_node)));
     }
 
     int serve(
@@ -666,7 +668,7 @@ struct Stage {
         REQUIRE(at(p_route, 0) != nullptr);
         NETW_REQUIRE_EQ(
             author->entity_despawn(
-                author->entity_from_route(p_route),
+                Internals::entity_at(author, p_route),
                 netw::NetwDespawnOpts::create(StringName("scrapped"))
             ),
             OK
@@ -783,6 +785,46 @@ LawVerdict spawn_naming_a_despawned_entity(const World &) {
     return law_held();
 }
 
+void free_link(Object *p_link) {
+    memdelete(p_link);
+}
+
+LawVerdict freed_chain(const World &) {
+    constexpr int LINKS = 20;
+    FaultWatch faults;
+    faults.expect_warning("*[NW0010]*", 1);
+    Stage stage;
+    int routes[LINKS];
+    for (int link = 0; link < LINKS; ++link) {
+        routes[link] = stage.serve(
+            "chain_link",
+            callable_mp_static(&build_anchor),
+            "Link",
+            stage.arena_on(-1)
+        );
+    }
+    stage.rig.step_ticks(4);
+    for (int link = 0; link + 1 < LINKS; ++link) {
+        NetwEntity::of(stage.at(routes[link], -1))
+            ->connect(
+                StringName("despawned"),
+                callable_mp_static(&free_link)
+                    .bind(stage.at(routes[link + 1], -1))
+            );
+    }
+
+    memdelete(stage.at(routes[0], -1));
+    stage.rig.step_ticks(SETTLE_TICKS);
+
+    for (const int route : routes) {
+        const int holder = stage.held_nowhere(route);
+        if (holder != -2) {
+            return law_broken("peer %d kept a link of the chain", holder);
+        }
+    }
+    return law_held();
+}
+
 void stamp_arrival(Node *p_node, Node *p_arena) {
     if (p_node->get_parent() == p_arena) {
         p_node->set(StringName("hp"), STAMPED);
@@ -872,7 +914,7 @@ LawVerdict author_leaves(const World &) {
     NetwMultiplayer *session = stage.rig.server();
     Node *freed = stage.at(route, -1);
     if (session->entity_despawn(
-            session->entity_from_route(route),
+            Internals::entity_at(session, route),
             Ref<netw::NetwDespawnOpts>()
         )
         != OK) {
@@ -946,11 +988,14 @@ LawVerdict client_despawns(const World &) {
     Stage &stage = served.stage;
     CallLog despawning[3];
     for (int side = -1; side < 2; ++side) {
-        NetwEntity::of(stage.at(served.crate, side))
-            ->connect(
-                StringName("despawning"),
-                despawning[side + 1].callable("despawning")
+        const Ref<NetwEntity> crate
+            = NetwEntity::of(stage.at(served.crate, side));
+        for (const char *signal : {"despawning", "despawned"}) {
+            crate->connect(
+                StringName(signal),
+                despawning[side + 1].callable(signal)
             );
+        }
     }
 
     Node *mine = stage.at(served.crate, 0);
@@ -963,11 +1008,13 @@ LawVerdict client_despawns(const World &) {
         if (stage.holds(served.crate, side)) {
             return law_broken("peer %d still holds the crate", side);
         }
-        if (despawning[side + 1].count("despawning") != 1) {
+        const Vector<StringName> heard = despawning[side + 1].order();
+        if (heard.size() != 2 || heard[0] != StringName("despawning")
+            || heard[1] != StringName("despawned")) {
             return law_broken(
-                "peer %d heard despawning %d times",
+                "peer %d heard %d signal(s), not despawning then despawned",
                 side,
-                despawning[side + 1].count("despawning")
+                int(heard.size())
             );
         }
         if (despawning[side + 1].args("despawning")
@@ -1433,6 +1480,9 @@ const Row ROWS[] = {
     {"a client spawns naming an entity the server just despawned",
      "it is refused and no peer holds it",
      &spawn_naming_a_despawned_entity},
+    {"the server frees a chain whose despawned handler frees the next link",
+     "every link is gone on every peer a few frames later",
+     &freed_chain},
     {"the server writes a client's new crate as it arrives",
      "the observer's first value is the server's, the author keeps its own",
      &first_values_are_the_servers},
@@ -1449,7 +1499,7 @@ const Row ROWS[] = {
      &spawn_under_a_hidden_parent},
     {"a client despawns the crate it controls",
      "it is gone on every peer and each hears despawning once with the "
-     "client's reason",
+     "client's reason, then despawned",
      &client_despawns},
     {"a client despawns while the server moves the crate",
      "the despawn is refused and the author gets the same crate back with "
@@ -1485,8 +1535,8 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Lifecycle][SceneTree] a client's own spawn, move and "
-    "despawn reach every peer once, and one the server refuses is undone "
+    "[Networked][Lifecycle][SceneTree] every spawn, move and despawn "
+    "reaches every peer once, and one the server refuses is undone "
     "on the author alone"
 ) {
     const World world = {String("two clients and a server on a loopback")};
@@ -1638,7 +1688,7 @@ void act(
     }
     if (p_row.verb == VERB_DESPAWN) {
         r_seen.code = client->entity_despawn(
-            client->entity_from_route(p_route),
+            Internals::entity_at(client, p_route),
             Ref<netw::NetwDespawnOpts>()
         );
         r_seen.answered = r_seen.code != OK;
@@ -1648,7 +1698,7 @@ void act(
                            ->spawn_registered(
                                StringName(BODY_ID),
                                body_args("Spawned", p_row.declared, false),
-                               nullptr
+                               0
                            )
                            .is_valid();
     r_seen.code = p_row.code;
@@ -1675,7 +1725,7 @@ RefusalSeen run_refusal(const Refusal &p_row) {
         ),
         body_types(),
         arena,
-        p_row.standing == STANDING_PLAYER ? Variant(rig.player(0)) : Variant()
+        p_row.standing == STANDING_PLAYER ? rig.player(0)->get_id() : 0
     );
     Node *body = rig.route_node(route, 0);
     Node *held = rig.route_node(route);

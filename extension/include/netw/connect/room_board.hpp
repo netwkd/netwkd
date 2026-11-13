@@ -31,8 +31,6 @@ struct RoomCard {
 godot::String board_hash_of(const godot::String &p_filter_uid);
 
 class RoomBoard {
-    friend struct RoomBoardProbe;
-
 public:
     static const double RECONNECT_COOLDOWN;
 

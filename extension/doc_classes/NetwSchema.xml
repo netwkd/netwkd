@@ -27,7 +27,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_BOOL] column, one bit per element on the wire.
+				Declares a [constant COLUMN_BOOL] column, one bit per element on the wire.
 			</description>
 		</method>
 		<method name="color">
@@ -36,13 +36,13 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_COLOR] column.
+				Declares a [constant COLUMN_COLOR] column.
 			</description>
 		</method>
 		<method name="column">
 			<return type="int" />
 			<param index="0" name="key" type="StringName" />
-			<param index="1" name="type" type="int" enum="NetwMultiplayer.ColumnType" />
+			<param index="1" name="type" type="int" enum="NetwSchema.ColumnType" />
 			<param index="2" name="stride" type="int" default="1" />
 			<param index="3" name="quantizer" type="NetwQuantize" default="null" />
 			<description>
@@ -68,7 +68,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_ENTITY] column of routes, pointing at rows of another table.
+				Declares a [constant COLUMN_ENTITY] column of routes, pointing at rows of another table.
 			</description>
 		</method>
 		<method name="f32">
@@ -77,7 +77,7 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_F32] column.
+				Declares a [constant COLUMN_F32] column.
 			</description>
 		</method>
 		<method name="f64">
@@ -86,7 +86,7 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_F64] column.
+				Declares a [constant COLUMN_F64] column.
 			</description>
 		</method>
 		<method name="i8">
@@ -94,7 +94,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_I8] column.
+				Declares a [constant COLUMN_I8] column.
 			</description>
 		</method>
 		<method name="i16">
@@ -102,7 +102,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_I16] column.
+				Declares a [constant COLUMN_I16] column.
 			</description>
 		</method>
 		<method name="i32">
@@ -110,7 +110,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_I32] column.
+				Declares a [constant COLUMN_I32] column.
 			</description>
 		</method>
 		<method name="i64">
@@ -118,7 +118,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_I64] column.
+				Declares a [constant COLUMN_I64] column.
 			</description>
 		</method>
 		<method name="is_reliable" qualifiers="const">
@@ -164,7 +164,7 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_QUATERNION] column, stored as a [PackedVector4Array] and read as [Quaternion] so [NetwQuantizeQuaternion] can compress it.
+				Declares a [constant COLUMN_QUATERNION] column, stored as a [PackedVector4Array] and read as [Quaternion] so [NetwQuantizeQuaternion] can compress it.
 			</description>
 		</method>
 		<method name="register">
@@ -199,7 +199,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_STRING] column. Like [method variant], a schema holding one cannot become a replicated table.
+				Declares a [constant COLUMN_STRING] column. Like [method variant], a schema holding one cannot become a replicated table.
 			</description>
 		</method>
 		<method name="u8">
@@ -207,7 +207,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_U8] column.
+				Declares a [constant COLUMN_U8] column.
 			</description>
 		</method>
 		<method name="u16">
@@ -215,7 +215,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_U16] column.
+				Declares a [constant COLUMN_U16] column.
 			</description>
 		</method>
 		<method name="variant">
@@ -223,7 +223,7 @@
 			<param index="0" name="key" type="StringName" />
 			<param index="1" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_VARIANT] column, for a [Dictionary], an [Array] or any other value. A schema holding one cannot become a replicated table.
+				Declares a [constant COLUMN_VARIANT] column, for a [Dictionary], an [Array] or any other value. A schema holding one cannot become a replicated table.
 				A saved value holds data only. An [Object], [Resource], [Callable], [Signal] or [RID] is refused, including one nested inside an [Array] or a [Dictionary].
 			</description>
 		</method>
@@ -233,7 +233,7 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_VECTOR2] column.
+				Declares a [constant COLUMN_VECTOR2] column.
 			</description>
 		</method>
 		<method name="vector3">
@@ -242,7 +242,7 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_VECTOR3] column.
+				Declares a [constant COLUMN_VECTOR3] column.
 			</description>
 		</method>
 		<method name="vector4">
@@ -251,7 +251,7 @@
 			<param index="1" name="quantizer" type="NetwQuantize" default="null" />
 			<param index="2" name="stride" type="int" default="1" />
 			<description>
-				Declares a [constant NetwMultiplayer.COLUMN_VECTOR4] column.
+				Declares a [constant COLUMN_VECTOR4] column.
 			</description>
 		</method>
 	</methods>
@@ -263,4 +263,66 @@
 			The version set by [method storage_version].
 		</member>
 	</members>
+	<constants>
+		<constant name="COLUMN_F32" value="0" enum="ColumnType">
+			32-bit float.
+		</constant>
+		<constant name="COLUMN_F64" value="1" enum="ColumnType">
+			64-bit float.
+		</constant>
+		<constant name="COLUMN_I8" value="2" enum="ColumnType">
+			8-bit signed integer.
+		</constant>
+		<constant name="COLUMN_U8" value="3" enum="ColumnType">
+			8-bit unsigned integer.
+		</constant>
+		<constant name="COLUMN_I16" value="4" enum="ColumnType">
+			16-bit signed integer.
+		</constant>
+		<constant name="COLUMN_U16" value="5" enum="ColumnType">
+			16-bit unsigned integer.
+		</constant>
+		<constant name="COLUMN_I32" value="6" enum="ColumnType">
+			32-bit integer.
+		</constant>
+		<constant name="COLUMN_I64" value="7" enum="ColumnType">
+			64-bit integer.
+		</constant>
+		<constant name="COLUMN_BOOL" value="8" enum="ColumnType">
+			[bool], sent as one bit.
+		</constant>
+		<constant name="COLUMN_VECTOR2" value="9" enum="ColumnType">
+			[Vector2].
+		</constant>
+		<constant name="COLUMN_VECTOR3" value="10" enum="ColumnType">
+			[Vector3].
+		</constant>
+		<constant name="COLUMN_VECTOR4" value="11" enum="ColumnType">
+			[Vector4].
+		</constant>
+		<constant name="COLUMN_COLOR" value="12" enum="ColumnType">
+			[Color].
+		</constant>
+		<constant name="COLUMN_QUATERNION" value="13" enum="ColumnType">
+			[Quaternion], sent compressed.
+		</constant>
+		<constant name="COLUMN_ENTITY" value="14" enum="ColumnType">
+			A route to a row of another table, from [method NetwTable.claim_routes].
+		</constant>
+		<constant name="COLUMN_VARIANT" value="15" enum="ColumnType">
+			Any [Variant], such as a [Dictionary]. Not allowed in tables.
+		</constant>
+		<constant name="COLUMN_STRING" value="16" enum="ColumnType">
+			[String]. Not allowed in tables.
+		</constant>
+		<constant name="RECORD_KIND_STATE" value="1" enum="RecordKind">
+			State the server owns and sends to everyone, such as a position. It is kept for rewinding.
+		</constant>
+		<constant name="RECORD_KIND_INPUT" value="2" enum="RecordKind">
+			Input a client sends to the server only, such as movement keys. It is kept for rewinding.
+		</constant>
+		<constant name="RECORD_KIND_BROADCAST" value="3" enum="RecordKind">
+			Cosmetic values sent to everyone and not kept, such as an aim direction.
+		</constant>
+	</constants>
 </class>

@@ -6,6 +6,7 @@
 #include "godot/node.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/interest.hpp"
 #include "netw/api/interest_layer.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/script/model.hpp"
@@ -82,7 +83,7 @@ public:
             named(minted++),
             one_type(),
             p_parent,
-            Variant(),
+            0,
             false
         );
     }
@@ -97,7 +98,7 @@ public:
         NetwMultiplayer *server = rig.server();
         NETW_REQUIRE_EQ(
             server->entity_despawn(
-                server->entity_from_route(p_container),
+                Internals::entity_at(server, p_container),
                 Ref<netw::NetwDespawnOpts>()
             ),
             OK
@@ -233,9 +234,9 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] CB4 a scripted part that leaves the tree "
-    "keeps no path from where it was, so the engine frees its path with "
-    "the node and the part reports its new path once it enters elsewhere"
+    "[Networked][Sync][SceneTree] CB4 a scripted part and an entity on an "
+    "interest layer that leave the tree keep no path from where they were, "
+    "so each reports its new path once it enters elsewhere"
 ) {
     ChurnStage stage(0);
     stage.part = netw_test::script_from(netw_test::gdsrc::STATE_ONLY);
@@ -248,6 +249,7 @@ TEST_CASE(
     REQUIRE(body != nullptr);
     Node *part = body->get_node_or_null(NodePath("Part"));
     REQUIRE(part != nullptr);
+    NetwEntity::of(body)->get_interest()->join(StringName("arena"));
     stage.rig.step_ticks(4);
 
     Node *elsewhere = memnew(Node);
@@ -257,10 +259,10 @@ TEST_CASE(
     from->remove_child(body);
     elsewhere->add_child(body);
 
-    const String expected = String(elsewhere->get_path()) + "/"
-        + String(body->get_name()) + "/Part";
-    const String seen = String(part->get_path());
-    NETW_CHECK_EQ(int(seen == expected), 1);
+    const String moved
+        = String(elsewhere->get_path()) + "/" + String(body->get_name());
+    NETW_CHECK_EQ(int(String(body->get_path()) == moved), 1);
+    NETW_CHECK_EQ(int(String(part->get_path()) == moved + String("/Part")), 1);
     elsewhere->remove_child(body);
     memdelete(body);
     elsewhere->get_parent()->remove_child(elsewhere);

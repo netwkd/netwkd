@@ -51,6 +51,9 @@ public:
     void set_reliable(bool p_reliable);
     bool get_reliable() const;
 
+    godot::PackedInt64Array claim_routes(int p_count);
+    godot::Error release_routes(const godot::PackedInt64Array &p_routes);
+
     godot::Error write_routes(const godot::PackedInt64Array &p_routes);
     godot::Error write_column(int p_column, const godot::Variant &p_data);
     godot::Error commit();

@@ -207,7 +207,7 @@ void Book::mark_dirty(const RID &p_entity, int p_dirt) {
     }
 }
 
-int Book::write_param(
+Error Book::write_param(
     const RID &p_entity,
     Decl &p_fallback,
     int p_param,
@@ -222,14 +222,17 @@ int Book::write_param(
             decl = &p_fallback;
         }
     }
-    const int dirt = decl->set_param(p_param, p_value);
+    const Error verdict = decl->set_param(p_param, p_value);
+    if (verdict != OK) {
+        return verdict;
+    }
     Runtime *runtime = runtime_of(p_entity);
     if (runtime != nullptr) {
         runtime->set_config(*decl);
         wake(runtime);
     }
-    mark_dirty(p_entity, dirt);
-    return dirt;
+    mark_dirty(p_entity, dirt_of(p_param));
+    return OK;
 }
 
 bool Book::is_dirty(const RID &p_entity) const {

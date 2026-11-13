@@ -234,8 +234,6 @@ private:
         const godot::Dictionary &p_facts
     );
 
-    void on_peer_connected(int64_t p_peer_id);
-    godot::Error replay_spawn_book(int64_t p_peer_id);
     void run_visibility_sweep();
     void sweep_now();
     void schedule_carrier_flush();

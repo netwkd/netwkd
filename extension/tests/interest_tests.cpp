@@ -20,6 +20,7 @@
 #include "godot/utility.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/entity_options.hpp"
 #include "netw/api/interest.hpp"
 #include "netw/api/interest_layer.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -548,15 +549,14 @@ LawVerdict host_declares(const Stand &) {
     }
     server->session_flush_deferred();
     const RID handle = entity->get_rid_handle();
-    if (server->interest_get_membership(handle).size() != 1) {
+    if (server->interest_get_layers(handle).size() != 1) {
         return law_broken("the host did not join the declared layer");
     }
     rig.branch()->remove_child(body);
     rig.branch()->add_child(body);
     body->set_owner(rig.branch());
     server->session_flush_deferred();
-    if (server->interest_get_membership(entity->get_rid_handle()).size()
-        != 1) {
+    if (server->interest_get_layers(entity->get_rid_handle()).size() != 1) {
         return law_broken("the layer was not joined again on re-entry");
     }
     return law_held();
@@ -604,9 +604,18 @@ struct Stealthed {
 
 LawVerdict muted_body(const Stand &) {
     Stealthed stand(66);
+    const RID handle = stand.entity->get_rid_handle();
+    const int64_t guest = stand.rig.peer_id(0);
+    if (!stand.server->interest_is_visible(handle, guest)) {
+        return law_broken("an entity on no layer is hidden from a peer");
+    }
     stand.hide();
     if (stand.host_sees() || stand.body->is_visible()) {
         return law_broken("the host still draws a body it cannot see");
+    }
+    if (stand.server->interest_is_visible(handle, guest)
+        || !stand.server->interest_is_visible(handle, HOST_PEER)) {
+        return law_broken("visibility differs from what replication sends");
     }
     if (std::abs(stand.speaker->get_volume_db() + 80.0) > 0.001) {
         return law_broken("the hidden body is still heard");
@@ -760,13 +769,22 @@ LawVerdict owner_shares(const Stand &) {
     if (!stand.owner->liveness_get_entities().has(theirs)) {
         return law_broken("the other car is not live on the owner");
     }
+    const StringName arena("arena");
+    stand.owner->interest_layer_free(stand.owner->interest_layer_find(arena));
+    const RID handle = stand.local_mine->get_rid_handle();
+    if (!stand.owner->interest_get_layers(handle).is_empty()
+        || stand.owner->interest_layer_find(arena).is_valid()) {
+        return law_broken("asking for an entity's layers made a layer");
+    }
     return law_held();
 }
 
 LawVerdict owner_in_scene(const Stand &) {
     Cars stand(76);
-    stand.owner->interest_layer(StringName("scene:Arena"))
-        ->client_admit(stand.local_mine);
+    stand.owner->interest_client_admit(
+        stand.owner->interest_layer_create(StringName("scene:Arena")),
+        stand.local_mine
+    );
     const Array resolved
         = stand.owner->interest_resolved_layer_ids(stand.local_mine);
     if (!resolved.has(StringName("scene:Arena"))) {
@@ -781,6 +799,19 @@ LawVerdict owner_in_scene(const Stand &) {
         return law_broken("the owner does not find the other car");
     }
     return law_held();
+}
+
+struct Freeing {
+    NetwMultiplayer *server = nullptr;
+    RID earlier;
+};
+
+Freeing *freeing = nullptr;
+
+Array free_earlier(const RID &p_layer) {
+    freeing->server->interest_layer_free(freeing->earlier);
+    freeing->server->interest_layer_free(p_layer);
+    return Array();
 }
 
 LawVerdict driver_answers(const Stand &) {
@@ -823,6 +854,198 @@ LawVerdict driver_answers(const Stand &) {
     if (server->interest_flush_now() != OK || !layer->has_entity(own)) {
         return law_broken("the driver's own entity did not join the layer");
     }
+    layer->set_driver(Callable());
+    if (layer->add_entity(foreign) || layer->has_entity(foreign)) {
+        return law_broken("the layer took another session's entity");
+    }
+    layer->connect("interest_entered", driver.callable("entered"));
+    server->interest_layer_report_edge(
+        server->interest_layer_find(StringName("sight")),
+        foreign,
+        rig.peer_id(0),
+        true
+    );
+    if (driver.count("entered") != 0) {
+        return law_broken("the layer reported another session's entity");
+    }
+    const RID first = server->interest_layer_create(StringName("first"));
+    const RID second = server->interest_layer_create(StringName("second"));
+    const RID third = server->interest_layer_create(StringName("third"));
+    server->interest_layer_set_driver_callback(
+        first,
+        driver.answering("first", Array())
+    );
+    server->interest_layer_set_driver_callback(
+        second,
+        callable_mp_static(&free_earlier)
+    );
+    server->interest_layer_set_driver_callback(
+        third,
+        driver.answering("third", Array())
+    );
+    Freeing held;
+    held.server = server;
+    held.earlier = first;
+    freeing = &held;
+    const Error drove = server->interest_flush_now();
+    freeing = nullptr;
+    if (drove != OK || driver.count("third") != 1) {
+        return law_broken("a driver after two freed layers did not run");
+    }
+    return law_held();
+}
+
+LawVerdict kept_view(const Stand &) {
+    Ref<NetwInterestLayer> ended;
+    int64_t viewer = 0;
+    {
+        LoopbackRig rig(1);
+        NetwMultiplayer *server = rig.server();
+        viewer = rig.peer_id(0);
+        const StringName name("kept");
+        const Ref<NetwInterestLayer> freed = server->interest_layer(name);
+        REQUIRE(freed.is_valid());
+        const RID gone = server->interest_layer_find(name);
+        server->interest_layer_free(gone);
+        if (freed->add_viewer(viewer)) {
+            return law_broken("a freed layer took a viewer");
+        }
+        if (server->interest_layer_find(name).is_valid()
+            || server->interest_has_layer(name)) {
+            return law_broken("a freed layer came back");
+        }
+        const RID held = rig.declare_entity(
+            EntityDecl().named("Held").on_route(85)
+        );
+        const RID late = rig.declare_entity(
+            EntityDecl().named("Late").on_route(86)
+        );
+        const Error answers[] = {
+            server->interest_layer_remove_viewer(gone, viewer),
+            server->interest_join(held, gone),
+            server->interest_leave(held, gone),
+            server->interest_on_enter(held, gone, Callable()),
+            server->interest_on_leave(held, gone, Callable()),
+            server->interest_on_leave_policy(
+                held,
+                gone,
+                NetwMultiplayer::LEAVE_POLICY_HIDE,
+                Callable()
+            ),
+            server->interest_on_perception_policy(
+                held,
+                gone,
+                NetwMultiplayer::PERCEPTION_POLICY_HIDE,
+                Callable()
+            ),
+        };
+        for (const Error answer : answers) {
+            if (answer != ERR_DOES_NOT_EXIST) {
+                return law_broken("a freed layer took a change by its RID");
+            }
+        }
+        const StringName doomed("doomed");
+        const RID freed_on_add = server->interest_layer_create(doomed);
+        server->interest_layer(doomed)->connect(
+            "entity_added",
+            Callable(server, "interest_layer_free")
+                .bind(freed_on_add)
+                .unbind(1)
+        );
+        server->interest_layer_add_entity(freed_on_add, held);
+        const StringName refilled("refilled");
+        const RID filled_on_free = server->interest_layer_create(refilled);
+        server->interest_layer_add_entity(filled_on_free, held);
+        server->interest_layer(refilled)->connect(
+            "entity_removed",
+            Callable(server, "interest_layer_add_entity")
+                .bind(filled_on_free, late)
+                .unbind(1)
+        );
+        server->interest_layer_free(filled_on_free);
+        if (server->interest_has_layer(doomed)
+            || server->interest_has_layer(refilled)
+            || !server->interest_membership_ids(held).is_empty()
+            || !server->interest_membership_ids(late).is_empty()) {
+            return law_broken("a layer freed in its own handler came back");
+        }
+        ended = server->interest_layer(StringName("ended"));
+        REQUIRE(ended.is_valid());
+        REQUIRE(ended->add_viewer(viewer));
+
+        FaultWatch faults;
+        faults.expect_error("*[NW0032]*", 1);
+        if (server->interest_layer_set_param(
+                server->interest_layer_find(StringName("ended")),
+                NetwMultiplayer::LAYER_PARAM_POLICY,
+                9
+            )
+            != ERR_INVALID_PARAMETER) {
+            return law_broken("a layer took a policy that does not exist");
+        }
+        faults.expect_error("*belongs to a multiplayer scene*[NW1020]*", 1);
+        rig.declare_scene(StringName("Arena"));
+        rig.pump(4);
+        rig.enter_scene(StringName("Arena"));
+        const RID scene = rig.entity_of(StringName("Arena"));
+        REQUIRE(server->scene_watch_peer(scene, viewer) == OK);
+        const RID owned = server->scene_get_layer(scene);
+        REQUIRE(owned.is_valid());
+        server->interest_layer_free(owned);
+        const Error removed
+            = server->interest_layer_remove_viewer(owned, viewer);
+        const Error added = server->interest_layer_add_viewer(owned, viewer);
+        if (removed != ERR_LOCKED || added != ERR_LOCKED
+            || !server->scene_subscribes(scene, viewer)
+            || server->interest_layer_find(server->scene_layer_id(scene))
+                   != owned) {
+            return law_broken("a scene's layer changed by its RID");
+        }
+    }
+    Node *loose = memnew(Node);
+    Ref<NetwEntity> stray = NetwEntity::ensure(loose);
+    const bool kept = ended->has_viewer(viewer) || ended->add_entity(stray);
+    stray.unref();
+    memdelete(loose);
+    if (kept) {
+        return law_broken("a layer of an ended session changed");
+    }
+    return law_held();
+}
+
+struct Dropping {
+    Ref<NetwMultiplayer> session;
+    ObjectID id;
+    bool alive = false;
+};
+
+Dropping *dropping = nullptr;
+
+void drop_session(int64_t) {
+    dropping->session.unref();
+    dropping->alive = netw::gd::instance_from_id(dropping->id) != nullptr;
+}
+
+LawVerdict dropped_in_handler(const Stand &) {
+    Dropping held;
+    held.session.instantiate();
+    held.id = netw::gd::instance_id(held.session.ptr());
+    const Ref<NetwInterestLayer> layer
+        = held.session->interest_layer(StringName("dropped"));
+    REQUIRE(layer.is_valid());
+    layer->connect("viewer_added", callable_mp_static(&drop_session));
+    dropping = &held;
+    layer->add_viewer(HOST_PEER);
+    dropping = nullptr;
+    if (!held.alive) {
+        return law_broken("the session was freed inside the layer's call");
+    }
+    if (netw::gd::instance_from_id(held.id) != nullptr) {
+        return law_broken("the dropped session outlived the layer's call");
+    }
+    if (layer->has_viewer(HOST_PEER)) {
+        return law_broken("the layer of a dropped session changed");
+    }
     return law_held();
 }
 
@@ -858,6 +1081,217 @@ LawVerdict client_edits_layer(const Stand &) {
     return law_held();
 }
 
+int heard_from(const CallLog &p_log, const char *p_tag, int64_t p_peer) {
+    int heard = 0;
+    for (int at = 0; at < p_log.count(p_tag); ++at) {
+        const Array call = p_log.args(p_tag, at);
+        if (call.size() == 2 && StringName(call[0]) == StringName("sight")
+            && int64_t(call[1]) == p_peer) {
+            heard += 1;
+        }
+    }
+    return heard;
+}
+
+enum StopSeeing {
+    VIEWER_REMOVED,
+    PEER_LEFT,
+    LAYER_FREED,
+    DESPAWNED,
+};
+
+LawVerdict observers_heard(StopSeeing p_stop) {
+    LoopbackRig rig(1);
+    rig.mount();
+    NetwMultiplayer *server = rig.server();
+    server->session_set_role(NetwMultiplayer::ROLE_LISTEN_SERVER);
+    const int64_t guest = rig.peer_id(0);
+    const EntityDecl decl
+        = EntityDecl().named("Watched").on_route(83).mounted();
+    const Ref<NetwEntity> entity
+        = server->entity_get_view(rig.declare_entity(decl));
+    const Ref<NetwEntity> copy
+        = rig.client(0)->entity_get_view(rig.declare_mirror(0, decl));
+    REQUIRE(entity.is_valid());
+    REQUIRE(copy.is_valid());
+    Node *body = entity->get_owner();
+    Node *mirror = copy->get_owner();
+    const CallLog heard;
+    entity->get_interest()->connect(
+        "observer_entered",
+        heard.callable("server_in")
+    );
+    entity->get_interest()->connect(
+        "observer_exited",
+        heard.callable("server_out")
+    );
+    copy->get_interest()->connect("observer_entered", heard.callable("own_in"));
+    copy->get_interest()->connect("observer_exited", heard.callable("own_out"));
+    const Ref<NetwInterestLayer> layer
+        = server->interest_layer(StringName("sight"));
+    layer->connect("interest_exited", heard.callable("layer_out"));
+    layer->add_viewer(HOST_PEER);
+    layer->add_viewer(guest);
+    layer->add_entity(entity);
+    rig.flush_interest();
+    rig.pump(4);
+
+    if (heard.count("server_in") != 2
+        || heard_from(heard, "server_in", HOST_PEER) != 1
+        || heard_from(heard, "server_in", guest) != 1) {
+        return law_broken(
+            "the server heard %d starts, not one for each peer",
+            heard.count("server_in")
+        );
+    }
+    if (heard.count("own_in") != 1 || heard_from(heard, "own_in", guest) != 1) {
+        return law_broken("the client did not hear itself start seeing once");
+    }
+
+    switch (p_stop) {
+        case VIEWER_REMOVED:
+            layer->remove_viewer(guest);
+            break;
+        case PEER_LEFT:
+            rig.drop_client(0);
+            rig.pump(4);
+            break;
+        case LAYER_FREED:
+            server->interest_layer_free(
+                server->interest_layer_find(StringName("sight"))
+            );
+            server->interest_layer(StringName("sight"))
+                ->connect("interest_exited", heard.callable("reopened_out"));
+            break;
+        case DESPAWNED:
+            entity->despawn(Ref<netw::NetwDespawnOpts>());
+            body->get_parent()->remove_child(body);
+            mirror->get_parent()->remove_child(mirror);
+            mirror->queue_free();
+            break;
+    }
+    rig.flush_interest();
+    rig.pump(4);
+
+    const int host_saw = p_stop == VIEWER_REMOVED || p_stop == PEER_LEFT
+        ? 0
+        : 1;
+    if (heard.count("server_out") != host_saw + 1
+        || heard_from(heard, "server_out", HOST_PEER) != host_saw
+        || heard_from(heard, "server_out", guest) != 1) {
+        return law_broken(
+            "the server heard %d stops, %d from the host's player and %d "
+            "from the client",
+            heard.count("server_out"),
+            heard_from(heard, "server_out", HOST_PEER),
+            heard_from(heard, "server_out", guest)
+        );
+    }
+    if (heard.count("layer_out") != host_saw + 1
+        || heard.count("reopened_out") != 0) {
+        return law_broken(
+            "the layer reported %d stops and its reopened name %d",
+            heard.count("layer_out"),
+            heard.count("reopened_out")
+        );
+    }
+    const int own_saw = p_stop == PEER_LEFT ? 0 : 1;
+    if (heard.count("own_out") != own_saw
+        || heard_from(heard, "own_out", guest) != own_saw) {
+        return law_broken(
+            "the client heard itself stop seeing %d times",
+            heard.count("own_out")
+        );
+    }
+    return law_held();
+}
+
+LawVerdict observers_when_unviewed(const Stand &) {
+    return observers_heard(VIEWER_REMOVED);
+}
+
+LawVerdict observers_when_peer_left(const Stand &) {
+    return observers_heard(PEER_LEFT);
+}
+
+LawVerdict observers_when_layer_freed(const Stand &) {
+    return observers_heard(LAYER_FREED);
+}
+
+LawVerdict observers_when_despawned(const Stand &) {
+    return observers_heard(DESPAWNED);
+}
+
+struct Nesting {
+    NetwMultiplayer *server = nullptr;
+    Ref<NetwInterestLayer> near;
+    int64_t guest = 0;
+    int heard = 0;
+};
+
+Nesting *nesting = nullptr;
+
+void enter_near(const StringName &, int64_t p_peer) {
+    if (p_peer != HOST_PEER) {
+        return;
+    }
+    nesting->heard += 1;
+    if (nesting->heard > 1) {
+        return;
+    }
+    nesting->near->add_viewer(nesting->guest);
+    nesting->server->interest_flush_now();
+}
+
+int heard_host(const CallLog &p_log, const char *p_tag) {
+    int heard = 0;
+    for (int at = 0; at < p_log.count(p_tag); ++at) {
+        const Array call = p_log.args(p_tag, at);
+        heard += call.size() == 2 && int64_t(call[1]) == HOST_PEER ? 1 : 0;
+    }
+    return heard;
+}
+
+LawVerdict nested_flush(const Stand &) {
+    LoopbackRig rig(1);
+    Nesting held;
+    held.server = rig.server();
+    held.server->session_set_role(NetwMultiplayer::ROLE_LISTEN_SERVER);
+    held.guest = rig.peer_id(0);
+    const Ref<NetwEntity> entity = held.server->entity_get_view(
+        rig.declare_entity(EntityDecl().named("Nested").on_route(84))
+    );
+    REQUIRE(entity.is_valid());
+    held.near = held.server->interest_layer(StringName("near"));
+    const Ref<NetwInterestLayer> far
+        = held.server->interest_layer(StringName("far"));
+    const CallLog heard;
+    entity->get_interest()->on_enter(
+        callable_mp_static(&enter_near),
+        StringName("near")
+    );
+    entity->get_interest()->on_enter(heard.callable("far"), StringName("far"));
+    held.near->add_entity(entity);
+    far->add_entity(entity);
+    far->add_viewer(held.guest);
+    rig.flush_interest();
+    held.near->add_viewer(HOST_PEER);
+    far->add_viewer(HOST_PEER);
+
+    nesting = &held;
+    rig.flush_interest();
+    rig.flush_interest();
+    nesting = nullptr;
+    if (held.heard != 1 || heard_host(heard, "far") != 1) {
+        return law_broken("a layer heard its enter for peer 1 more than once");
+    }
+    if (!held.server->interest_player_sees(HOST_PEER, entity)
+        || !held.server->interest_player_sees(held.guest, entity)) {
+        return law_broken("the flush after the handler left a peer blind");
+    }
+    return law_held();
+}
+
 const Row WORLD_ROWS[] = {
     {"a listen host's node that joins a layer in _init, leaves the tree and "
      "comes back",
@@ -883,13 +1317,46 @@ const Row WORLD_ROWS[] = {
      "the car still resolves the arena and finds the other car",
      &owner_in_scene},
     {"a layer driver answering a number, then another session's entity, "
-     "then its own",
-     "the first two stop the flush and leave the layer as it was, and the "
-     "third joins",
+     "then its own, then one freeing an earlier layer and its own",
+     "the first two stop the flush and leave the layer as it was, the "
+     "third joins, the layer neither takes nor reports another session's "
+     "entity, and the driver after the freed layers still runs",
      &driver_answers},
+    {"a layer kept after its free, layers freed or refilled by their own "
+     "handlers, a policy that does not exist, and a layer kept after its "
+     "session ends",
+     "none of them changes anything and no freed layer comes back",
+     &kept_view},
+    {"a layer whose viewer_added handler drops the last reference to its "
+     "session",
+     "the session lives until the call returns and then ends",
+     &dropped_in_handler},
     {"a client adding and removing an entity in its copy of a layer",
      "both are refused and reported, and the server's layer keeps it",
      &client_edits_layer},
+    {"a listen host's entity a layer shows to the host's player and a "
+     "client, then the layer losing the client as a viewer",
+     "the server hears each peer start seeing it once, the host's player as "
+     "peer 1, the client hears only itself, and both hear the client stop "
+     "seeing it once",
+     &observers_when_unviewed},
+    {"the same entity's client disconnecting",
+     "the server hears the client stop seeing it once, and the client's "
+     "ended session reports nothing",
+     &observers_when_peer_left},
+    {"the same entity's layer freed and its name opened again",
+     "the server hears both peers stop seeing it once, the client hears "
+     "itself, and the new layer reports none of it",
+     &observers_when_layer_freed},
+    {"the same entity despawned",
+     "the server hears both peers stop seeing it once, and the client hears "
+     "itself",
+     &observers_when_despawned},
+    {"a listen host's entity in two layers whose enter handler adds a viewer "
+     "and flushes",
+     "each layer tells the host's player once, and both peers see it after "
+     "the next flush",
+     &nested_flush},
 };
 
 TEST_CASE(

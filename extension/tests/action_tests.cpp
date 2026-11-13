@@ -200,6 +200,59 @@ LawVerdict accepted_confirms(const World &) {
     return law_held();
 }
 
+enum HostControl {
+    HOST_GIVEN,
+    HOST_GIVEN_BEFORE_JOINING,
+    HOST_RELEASED_TO,
+};
+
+LawVerdict host_fires(HostControl p_way, const char *p_label) {
+    Shot shot;
+    shot.authority->set_denies(false);
+    if (p_way == HOST_GIVEN_BEFORE_JOINING) {
+        shot.rig.server()->entity_set_controller(shot.rig.entity_of("P"), 1);
+    }
+    shot.rig.join(-1, StringName("host"));
+    if (p_way == HOST_GIVEN) {
+        shot.rig.server()->entity_set_controller(shot.rig.entity_of("P"), 1);
+    }
+    if (p_way == HOST_RELEASED_TO) {
+        const Ref<netw::NetwPromise> released
+            = shot.rig.client(0)->entity_release_control(
+                shot.rig.entity_of(StringName("P"), 0),
+                1
+            );
+        shot.rig.step_ticks(ANSWER_TICKS);
+        if (!released->get_is_completed()) {
+            return law_broken("the release did not complete");
+        }
+    }
+    shot.authority->fire(shot.server_tick(), NetwAction::TIMING_IMMEDIATE);
+    if (shot.authority->requests() != 1
+        || shot.authority->confirmations() != 1) {
+        return law_broken(
+            "%s, %d run(s) and %d confirmation(s) as the request returned",
+            p_label,
+            shot.authority->requests(),
+            shot.authority->confirmations()
+        );
+    }
+    return law_held();
+}
+
+LawVerdict host_controlled_confirms(const World &) {
+    const LawVerdict given = host_fires(HOST_GIVEN, "given");
+    if (!given.held) {
+        return given;
+    }
+    const LawVerdict early
+        = host_fires(HOST_GIVEN_BEFORE_JOINING, "given before joining");
+    if (!early.held) {
+        return early;
+    }
+    return host_fires(HOST_RELEASED_TO, "released to peer 1");
+}
+
 LawVerdict confirm_keeps(const World &) {
     Shot shot;
     shot.authority->set_denies(false);
@@ -388,7 +441,7 @@ LawVerdict former_controller_refused(const World &) {
     Shot shot;
     shot.rig.conditions(-1, netw_test::polls(4), shot.rig.peer_id(0));
     shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
-    shot.rig.server()->entity_grant_control(shot.rig.entity_of("P"), 1);
+    shot.rig.server()->entity_set_controller(shot.rig.entity_of("P"), 1);
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.authority->requests() != 0) {
         return law_broken("the server ran a shot from a former controller");
@@ -523,10 +576,10 @@ LawVerdict bound_spawn_shown_at_tick(const World &) {
         args,
         types,
         nullptr,
-        Variant(rig.player(0))
+        rig.player(0)->get_id()
     );
     gun_script = nullptr;
-    rig.server()->entity_grant_control(rig.spawned_entity(), rig.peer_id(0));
+    rig.server()->entity_set_controller(rig.spawned_entity(), rig.peer_id(0));
     rig.step_ticks(2);
 
     Node *owner = rig.route_node(route, 0);
@@ -574,6 +627,68 @@ LawVerdict bound_spawn_shown_at_tick(const World &) {
     return law_held();
 }
 
+struct Reentry {
+    Shot *shot = nullptr;
+    int calls = 0;
+    bool applying = false;
+};
+
+Reentry reentry;
+
+void fire_from_confirmed() {
+    ++reentry.calls;
+    netw::NetwMultiplayer *client = reentry.shot->rig.client(0);
+    reentry.applying = client->config_is_applying();
+    reentry.shot->owner->fire(
+        reentry.shot->client_tick() + 1,
+        NetwAction::TIMING_IMMEDIATE
+    );
+}
+
+LawVerdict confirmed_fires_after_setup(const World &) {
+    FaultWatch faults;
+    Shot shot(&declare_nothing, false);
+    shot.authority->set_denies(false);
+    REQUIRE(shot.rig.server()->lagcomp_require("the server") == OK);
+    netw::NetwMultiplayer *client = shot.rig.client(0);
+    if (client->lagcomp_is_configured()) {
+        return law_broken("lag compensation was set up before the scene");
+    }
+    const StringName entity("Gun");
+    netw::NetwEntity::of(shot.owner)->set_name(entity);
+    reentry = Reentry{&shot};
+    client->lagcomp_effect_arm(entity, Callable(), 0);
+    client->lagcomp_effect_watch(
+        entity,
+        callable_mp_static(&fire_from_confirmed),
+        Callable()
+    );
+    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.rig.step_ticks(ANSWER_TICKS);
+    const Reentry seen = reentry;
+    reentry = Reentry();
+    if (seen.calls != 1 || seen.applying) {
+        return law_broken(
+            "confirmed ran %d time(s), inside the setup %d",
+            seen.calls,
+            int(seen.applying)
+        );
+    }
+    if (faults.errors_containing("[NW1008]") != 0) {
+        return law_broken("the shot from confirmed reported NW1008");
+    }
+    if (shot.owner->ghosts() != 2 || shot.authority->requests() != 2
+        || shot.owner->confirmations() != 2) {
+        return law_broken(
+            "%d ghost(s), %d run(s) and %d confirmation(s) for two shots",
+            shot.owner->ghosts(),
+            shot.authority->requests(),
+            shot.owner->confirmations()
+        );
+    }
+    return law_held();
+}
+
 const Row ROWS[] = {
     {"a shot the server denies",
      "the owner draws a ghost at once, hears denied, and the ghost is freed",
@@ -581,6 +696,10 @@ const Row ROWS[] = {
     {"a shot the server runs without denying it",
      "the owner hears confirmed and the ghost is freed",
      &accepted_confirms},
+    {"a shot the host fires for a player given to it, given before it "
+     "joined, or released to peer 1",
+     "the host runs it and hears confirmed before the request returns",
+     &host_controlled_confirms},
     {"a shot whose confirm callback is set",
      "confirm runs once and the ghost it was handed stays",
      &confirm_keeps},
@@ -629,6 +748,11 @@ const Row ROWS[] = {
      "the second client holds the node hidden until its display reaches the "
      "shot's tick, and the owner hears confirmed",
      &bound_spawn_shown_at_tick},
+    {"an effect confirmed by the setup of lag compensation, whose confirmed "
+     "callback fires a shot",
+     "the callback runs after the setup and its shot is drawn and run with "
+     "no NW1008",
+     &confirmed_fires_after_setup},
 };
 
 TEST_CASE(

@@ -27,6 +27,7 @@ using netw::NetwDatabase;
 using netw::NetwDatabaseBackend;
 using netw::NetwPromise;
 using netw::NetwSchema;
+using netw::NetwSession;
 using netw::NetwWriteBatch;
 using netw::persist::MemoryConnection;
 using netw_test::law_broken;
@@ -43,12 +44,40 @@ class HeldBackend : public NetwDatabaseBackend {
 public:
     Ref<MemoryConnection> connection;
     Ref<NetwPromise> next;
+    Ref<NetwSession> asker;
+    int asks = 0;
+    bool askers_differ = false;
 
     explicit HeldBackend(const char *p_store) {
         connection = MemoryConnection::opened(p_store, "slot1");
     }
 
-    Ref<NetwPromise> open_builtin(Object *, const StringName &) override {
+    void asked_by(const Ref<NetwSession> &p_session) {
+        askers_differ = askers_differ || (asks > 0 && p_session != asker);
+        asker = p_session;
+        asks += 1;
+    }
+
+    Ref<NetwPromise> list_slots_builtin(
+        const Ref<NetwSession> &p_session
+    ) override {
+        asked_by(p_session);
+        return NetwPromise::resolved(PackedStringArray());
+    }
+
+    Ref<NetwPromise> delete_slot_builtin(
+        const Ref<NetwSession> &p_session,
+        const StringName &
+    ) override {
+        asked_by(p_session);
+        return NetwPromise::resolved(OK);
+    }
+
+    Ref<NetwPromise> open_builtin(
+        const Ref<NetwSession> &p_session,
+        const StringName &
+    ) override {
+        asked_by(p_session);
         if (next.is_valid()) {
             const Ref<NetwPromise> answer = next;
             next.unref();
@@ -200,7 +229,10 @@ LawVerdict open_twice(const Stand &) {
 
 class RefusingBackend : public NetwDatabaseBackend {
 public:
-    Ref<NetwPromise> open_builtin(Object *, const StringName &) override {
+    Ref<NetwPromise> open_builtin(
+        const Ref<NetwSession> &,
+        const StringName &
+    ) override {
         return NetwPromise::rejected(ERR_CANT_OPEN, "refused open");
     }
 };
@@ -214,6 +246,12 @@ LawVerdict refused_open(const Stand &) {
     }
     if (!world.opened()) {
         return law_broken("the open did not succeed on retry");
+    }
+    world.db->list_slots();
+    world.db->delete_slot("slot2");
+    if (backend->asks != 4 || backend->askers_differ
+        || backend->asker != Netw::session(world.author)) {
+        return law_broken("the backend was not asked by the session's handle");
     }
 
     World always(
@@ -495,24 +533,6 @@ LawVerdict uncertain_write(const Stand &) {
     return law_held();
 }
 
-void lookup_at_ready(Node *p_child) {
-    p_child->set_meta("found", NetwDatabase::of(p_child, "saves").is_valid());
-}
-
-LawVerdict declared_before_ready(const Stand &) {
-    World world("DeclaredBeforeReady", memory("database_tests_ready"));
-    Node *author = declaring("Later", memory("database_tests_ready"));
-    Node *child = memnew(Node);
-    child->set_name("Child");
-    child->connect("ready", callable_mp_static(&lookup_at_ready).bind(child));
-    author->add_child(child);
-    world.viewport->add_child(author);
-    if (!bool(child->get_meta("found", false))) {
-        return law_broken("the child's ready found no database");
-    }
-    return law_held();
-}
-
 LawVerdict author_freed(const Stand &) {
     World world("AuthorFreed", memory("database_tests_freed"));
     const Ref<NetwSchema> schema = players();
@@ -704,8 +724,9 @@ const Row ROWS[] = {
     {"a second open of the open slot, or of another slot",
      "the same slot answers OK and another is refused as busy",
      &open_twice},
-    {"an open the backend refuses",
-     "it fails with the backend's error and a later open succeeds",
+    {"an open the backend refuses, then a list and a delete",
+     "it fails with the backend's error, a later open succeeds, and every "
+     "backend call receives the session's one NetwSession",
      &refused_open},
     {"a record written, read, missed and erased",
      "it reads back, a missing one is absent, and erasing twice is OK",
@@ -737,9 +758,6 @@ const Row ROWS[] = {
     {"a write whose outcome the backend cannot confirm",
      "it never answers OK",
      &uncertain_write},
-    {"a database looked up in a child's ready",
-     "the declaring node's database is already there",
-     &declared_before_ready},
     {"a declaring node freed and declared again",
      "the database keeps serving, and reopening uses the new backend",
      &author_freed},

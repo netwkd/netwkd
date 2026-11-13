@@ -115,7 +115,7 @@ Builds an offline client :ref:`MultiplayerViewport<class_MultiplayerViewport>` w
 
 :godot:`Error <@GlobalScope#enum_@globalscope_Error>` **join_client**\ (\ tree\: :ref:`MultiplayerViewport<class_MultiplayerViewport>`, port\: :godot:`int`, username\: :godot:`StringName`, join_args\: :godot:`Array` = []\ ) |static| :ref:`🔗<class_EnetTestSupport_method_join_client>`
 
-Connects ``tree`` to a localhost host on ``port`` and waits until ``username`` is seated.  The local player is prepared before the peer is assigned, so the session holds its hello and submits exactly one request once the connection is admitted. Returns :godot:`@GlobalScope.OK <@GlobalScope#class_@GlobalScope_constant_OK>` when :ref:`NetwMultiplayer.local_player<class_NetwMultiplayer_property_local_player>` arrives, the assignment refusal when the peer was refused, and :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>` when the wait ran out.
+Connects ``tree`` to a localhost host on ``port`` and waits until ``username`` is seated.  The local player is prepared before the peer is assigned, so the session holds its hello and submits exactly one request once the connection is admitted. Returns :godot:`@GlobalScope.OK <@GlobalScope#class_@GlobalScope_constant_OK>` when :ref:`NetwSession.local_player<class_NetwSession_property_local_player>` arrives, the assignment refusal when the peer was refused, and :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>` when the wait ran out.
 
 .. rst-class:: classref-item-separator
 

@@ -4,6 +4,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/declared_nodes.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/value_flow_stand.h"
 
@@ -47,7 +48,7 @@ double aim_x(Node *p_node) {
 }
 
 netw::ReplicationSend *row_send_of(NetwMultiplayer *p_core) {
-    netw::ReplicationCore *plane = p_core->get_replication_plane();
+    netw::ReplicationCore *plane = Internals::replication_plane(p_core);
     REQUIRE(bool(plane != nullptr));
     netw::ReplicationSend *send
         = plane->get_sync_pipeline()->row_send_under_test();
@@ -64,7 +65,7 @@ netw::wire::StreamLane broadcast_lane(NetwMultiplayer *p_core, Node *p_node) {
         = NetwEntity::of(p_node)->get_broadcast_binding();
     REQUIRE(binding != nullptr);
     const netw::repl::SetRow *row
-        = p_core->get_replication_plane()->get_sync_model()->row_for(
+        = Internals::replication_plane(p_core)->get_sync_model()->row_for(
             binding->get_route(),
             int64_t(netw::NetwSyncModel::KIND_DERIVED),
             binding->get_order_key(),
@@ -342,7 +343,9 @@ TEST_CASE(
     rig.step_ticks(4);
     NetwMultiplayer *watcher = flow_core(rig.client(1));
     NETW_CHECK_EQ(
-        int64_t(watcher->entity_get_state(watcher->entity_from_route(route))),
+        int64_t(watcher->entity_get_state(
+            Internals::entity_at(watcher, route)
+        )),
         int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
     );
     host->set_controller(1);

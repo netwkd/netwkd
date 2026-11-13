@@ -10,7 +10,6 @@
 #include "netw/interest/decl.hpp"
 
 namespace netw {
-class NetwMultiplayer;
 struct PeerRename;
 } // namespace netw
 
@@ -195,7 +194,6 @@ private:
     godot::HashMap<int64_t, Order> removed;
     godot::HashMap<int64_t, int32_t> peer_bits;
     godot::LocalVector<int64_t> bit_peers;
-    godot::HashMap<int64_t, godot::Callable> exit_handlers;
     godot::HashMap<int64_t, godot::StringName> scene_memberships;
     godot::HashMap<int64_t, godot::StringName> scene_roots;
     godot::HashMap<int64_t, int32_t> fallback_routes;
@@ -220,7 +218,6 @@ private:
     void ensure_layer(const godot::StringName &id);
     void mark_layer_members_dirty(const godot::StringName &id);
     void mark_entity_tree_dirty(int64_t root);
-    bool layer_admits_bit(const godot::StringName &id, int bit) const;
     Order order_of(int64_t key) const;
     bool descends_from(int64_t key, int64_t ancestor) const;
     godot::PackedInt64Array nested_scene_residency(
@@ -269,8 +266,6 @@ public:
     int64_t mark_visits = 0;
 #endif
 
-    NetwMultiplayer *host = nullptr;
-
     Engine();
 
     bool take_moved(godot::LocalVector<int64_t> &r_keys);
@@ -297,12 +292,6 @@ public:
     void rename_peers(const PeerRename &p_rename);
     bool layer_set_policy(const godot::StringName &id, int policy);
     int layer_policy(const godot::StringName &id) const;
-
-    bool layer_admits(const godot::StringName &id, int64_t peer_id) const;
-    godot::String layer_explain(
-        const godot::StringName &id,
-        int64_t peer_id
-    ) const;
 
     bool layer_set_leave_policy(const godot::StringName &id, int policy);
     int layer_leave_policy(const godot::StringName &id) const;
@@ -348,10 +337,6 @@ public:
     bool had_committed_intent(int64_t key) const;
 
     godot::PackedInt64Array intent_keys() const;
-
-    bool set_exit_handler(int64_t key, const godot::Callable &handler);
-    godot::Callable exit_handler(int64_t key) const;
-    godot::Callable take_exit_handler(int64_t key);
 
     godot::StringName scene_membership(int64_t key) const;
 
@@ -409,8 +394,6 @@ public:
     bool has_entity(int64_t key) const;
 
     int layer_edge_count(const godot::StringName &layer_id) const;
-
-    godot::String explain(int64_t key, int bit) const;
 
     int stats_edges() const {
         return last_stats.edges;

@@ -133,7 +133,7 @@ func arrive(tree: MultiplayerViewport, room: String) -> Error:
 
 func room_whole(group: Array) -> bool:
 	for tree: MultiplayerViewport in group:
-		if not tree.api.is_online:
+		if not tree.api.session_is_online():
 			return false
 		if Netw.session(tree).players.size() != group.size():
 			return false

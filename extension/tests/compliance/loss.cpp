@@ -262,7 +262,7 @@ class Herd extends Node:
 		mobs.received.connect(_on_mobs_received)
 
 	func breed() -> void:
-		routes = multiplayer.liveness_claim_routes(3)
+		routes = mobs.claim_routes(3)
 		health = PackedInt32Array([10, 20, 30])
 		commit()
 
@@ -272,7 +272,9 @@ class Herd extends Node:
 		commit()
 
 	func cull() -> void:
-		multiplayer.liveness_release_routes(routes.slice(0, 1))
+		mobs.release_routes(routes.slice(0, 1))
+		if mobs.read_routes().has(routes[0]):
+			returned += 1
 		routes = routes.slice(1)
 		health = health.slice(1)
 

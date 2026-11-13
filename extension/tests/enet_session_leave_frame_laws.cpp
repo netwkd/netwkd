@@ -201,7 +201,7 @@ class EnetLeaveScenario final : public netw_test::FrameScenario {
 
     bool leaver_offline() const {
         return leaver.is_valid()
-            && leaver->session_get_state()
+            && leaver->session_get_stored_state()
             == netw::NetwMultiplayer::SESSION_STATE_OFFLINE;
     }
 

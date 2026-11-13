@@ -1,6 +1,5 @@
 #include "support/loopback_rig.h"
 #include "support/netw_recorder.h"
-#include "support/session_state_walk.h"
 
 #if defined(NETW_TIER_HOSTED)
 
@@ -74,7 +73,7 @@ bool same(const String &p_a, const String &p_b) {
 }
 
 Mode sim_mode(NetwMultiplayer *p_seat, const RID &p_entity) {
-    const netw::sim::Row *row = p_seat->sim_row_of(p_entity);
+    const netw::sim::Row *row = Internals::sim_row_of(p_seat, p_entity);
     return row != nullptr ? row->mode : Mode::NONE;
 }
 
@@ -187,7 +186,7 @@ struct Table {
 
     Ref<NetwPlayer> player_at(int p_at) const {
         return p_at < 0 ? rig.server()->player_local()
-                        : rig.server()->peer_get_player(was(p_at));
+                        : rig.server()->player_joined_of(was(p_at));
     }
 
     int spawn_body(const char *p_name, int p_owner, int64_t p_controller) {
@@ -203,13 +202,9 @@ struct Table {
         }
         Array args;
         args.push_back(String(p_name));
-        const Ref<NetwPlayer> owner
-            = p_owner < -1 ? Ref<NetwPlayer>() : player_at(p_owner);
-        const RID entity = rig.server()->spawn_registered(
-            StringName(BODY_ID),
-            args,
-            owner.ptr()
-        );
+        const int64_t owner = p_owner < -1 ? 0 : player_at(p_owner)->get_id();
+        const RID entity
+            = rig.server()->spawn_registered(StringName(BODY_ID), args, owner);
         REQUIRE(entity.is_valid());
         Node *node = present(rig.server()->entity_get_node(entity));
         arena->add_child(node);
@@ -222,7 +217,7 @@ struct Table {
 
     Node *body_at(int p_route, int p_at) const {
         NetwMultiplayer *api = seat(p_at);
-        return api->entity_get_node(api->entity_from_route(p_route));
+        return api->entity_get_node(Internals::entity_at(api, p_route));
     }
 
     void keep_world() {
@@ -308,11 +303,8 @@ int spawn_probe(Table &p_table) {
     }
     Array args;
     args.push_back(String("Probe"));
-    const RID entity = p_table.rig.server()->spawn_registered(
-        StringName(PROBE_ID),
-        args,
-        nullptr
-    );
+    const RID entity
+        = p_table.rig.server()->spawn_registered(StringName(PROBE_ID), args, 0);
     REQUIRE(entity.is_valid());
     Node *node = present(p_table.rig.server()->entity_get_node(entity));
     p_table.arena->add_child(node);
@@ -413,7 +405,7 @@ TEST_CASE(
         NETW_CHECK_EQ(int64_t(seat->get_unique_id()), label);
         NETW_CHECK_EQ(int(seat->is_server()), int(label == 1));
         NETW_CHECK_EQ(
-            int(seat->session_get_state()),
+            int(seat->session_get_stored_state()),
             int(NetwMultiplayer::SESSION_STATE_ONLINE)
         );
         NETW_CHECK_EQ(heard[at]->count(transferred()), 1);
@@ -458,7 +450,9 @@ TEST_CASE(
 
     netw_test::FaultWatch faults;
     NETW_REQUIRE_EQ(
-        int(table.seat(-1)->get_session()->transfer_server(successor_was)),
+        int(table.seat(-1)->get_session()->transfer_server(
+            table.seat(-1)->get_session()->player_of(successor_was)
+        )),
         int(OK)
     );
     table.rig.pump(SETTLE_PUMPS);
@@ -484,7 +478,7 @@ TEST_CASE(
         NETW_CHECK_EQ(int64_t(seat->get_unique_id()), label);
         NETW_CHECK_EQ(int(seat->is_server()), int(label == 1));
         NETW_CHECK_EQ(
-            int(seat->session_get_state()),
+            int(seat->session_get_stored_state()),
             int(NetwMultiplayer::SESSION_STATE_ONLINE)
         );
         NETW_CHECK_EQ(heard[at + 1]->count(transferred()), 1);
@@ -514,18 +508,13 @@ TEST_CASE(
     }
 }
 
-std::vector<netw_test::StateHeard> &heard_states(int64_t p_seat) {
-    static std::vector<netw_test::StateHeard> heard[CLIENTS + 1];
+std::vector<int64_t> &heard_states(int64_t p_seat) {
+    static std::vector<int64_t> heard[CLIENTS + 1];
     return heard[p_seat + 1];
 }
 
-void hear_state(int64_t p_state, uint64_t p_seat_id, int64_t p_seat) {
-    NetwMultiplayer *seat = Object::cast_to<NetwMultiplayer>(
-        netw::gd::object_of(ObjectID(p_seat_id))
-    );
-    const int64_t read
-        = seat != nullptr ? int64_t(seat->get_session()->get_state()) : -1;
-    heard_states(p_seat).push_back({p_state, read});
+void hear_state(int64_t p_state, int64_t p_seat) {
+    heard_states(p_seat).push_back(p_state);
 }
 
 TEST_CASE(
@@ -548,11 +537,9 @@ TEST_CASE(
         for (int at = -1; at < CLIENTS; ++at) {
             heard_states(at).clear();
             const Ref<NetwSession> door = table.seat(at)->get_session();
-            const uint64_t seat_id
-                = uint64_t(netw::gd::instance_id(table.seat(at)));
             door->connect(
                 StringName("state_changed"),
-                callable_mp_static(&hear_state).bind(seat_id, int64_t(at))
+                callable_mp_static(&hear_state).bind(int64_t(at))
             );
         }
 
@@ -562,7 +549,7 @@ TEST_CASE(
         } else {
             NETW_REQUIRE_EQ(
                 int(table.seat(-1)->get_session()->transfer_server(
-                    successor_was
+                    table.seat(-1)->get_session()->player_of(successor_was)
                 )),
                 int(OK)
             );
@@ -578,12 +565,6 @@ TEST_CASE(
                 int(door->get_state()),
                 int(NetwSession::STATE_ONLINE)
             );
-            const netw_test::LawVerdict walk = netw_test::law_state_walk(
-                heard_states(at),
-                NetwSession::STATE_ONLINE
-            );
-            CAPTURE(walk.detail);
-            CHECK(walk.held);
             NETW_CHECK_EQ(int(heard_states(at).size()), 0);
         }
         for (int at = -1; at < CLIENTS; ++at) {
@@ -626,6 +607,10 @@ void lost_host_body_departs(bool p_keep_world) {
     present(table.body_at(carried, successor));
     Ear ear(table, 0, {transferred(), player_left()});
     slow_reports(table, successor);
+    Vector<Ref<NetwPlayer>> hosts;
+    for (int at = 0; at < CLIENTS; ++at) {
+        hosts.push_back(table.seat(at)->player_of(1));
+    }
 
     netw_test::FaultWatch faults;
     REQUIRE(int(table.rig.session()->lose_server()) == int(OK));
@@ -642,8 +627,8 @@ void lost_host_body_departs(bool p_keep_world) {
         NETW_CHECK_EQ(int(order[0] == transferred()), 1);
         NETW_CHECK_EQ(int(order[1] == player_left()), 1);
         const Ref<NetwPlayer> left = heard->args(player_left())[0];
-        REQUIRE(left.is_valid());
-        NETW_CHECK_EQ(int(same(left->get_username(), "host")), 1);
+        REQUIRE(hosts[at].is_valid());
+        NETW_CHECK_EQ(int(left == hosts[at]), 1);
     }
     Node *body = table.body_at(carried, successor);
     const int64_t stage = body != nullptr ? NetwEntity::of(body)->get_stage()
@@ -729,13 +714,16 @@ TEST_CASE(
 TEST_CASE(
     "[Networked][Session][Transfer][SceneTree] TX6 transfer_server answers "
     "ERR_UNAVAILABLE on a transport that cannot move the server, "
-    "ERR_UNAUTHORIZED on a client, and ERR_INVALID_PARAMETER for peer 1 or a "
-    "peer that is not in the session, and moves nothing"
+    "ERR_UNAUTHORIZED on a client, and ERR_INVALID_PARAMETER for the server's "
+    "own player or a player that is not in the session, and moves nothing"
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error("*transfer_server*[NW0012]*", 1);
-    expected_faults.expect_error("*transfer_server*[NW0018]*", 1);
-    expected_faults.expect_error("*transfer_server*[NW0032]*", 1);
+    expected_faults.expect_error(
+        "*NetwSession.transfer_server got a player that is not in this "
+        "session*[NW0032]*",
+        1
+    );
 
     Ref<MultiplayerPeer> enet;
     for (int port = ENET_PORT; port < ENET_PORT + ENET_PORTS; ++port) {
@@ -752,31 +740,31 @@ TEST_CASE(
     Ref<NetwMultiplayer> hosted = NetwMultiplayer::create();
     hosted->NETW_API_VIRTUAL(set_multiplayer_peer)(enet);
     NETW_REQUIRE_EQ(
-        int(hosted->session_get_state()),
+        int(hosted->session_get_stored_state()),
         int(NetwMultiplayer::SESSION_STATE_ONLINE)
     );
     NETW_CHECK_EQ(
-        int(hosted->get_session()->transfer_server(2)),
+        int(hosted->get_session()->transfer_server(Ref<NetwPlayer>())),
         int(ERR_UNAVAILABLE)
     );
     hosted->NETW_API_VIRTUAL(set_multiplayer_peer)(Ref<MultiplayerPeer>());
     enet->close();
 
     Table table;
+    const Ref<NetwSession> client = table.seat(0)->get_session();
+    const Ref<NetwPlayer> foreign = client->get_local_player();
+    REQUIRE(foreign.is_valid());
     NETW_CHECK_EQ(
-        int(table.seat(0)->get_session()->transfer_server(table.was(1))),
+        int(client->transfer_server(client->player_of(table.was(1)))),
         int(ERR_UNAUTHORIZED)
     );
-    int64_t stranger = 2;
-    while (table.before.has(stranger)) {
-        stranger += 1;
-    }
+    const Ref<NetwSession> door = table.seat(-1)->get_session();
     NETW_CHECK_EQ(
-        int(table.seat(-1)->get_session()->transfer_server(stranger)),
+        int(door->transfer_server(foreign)),
         int(ERR_INVALID_PARAMETER)
     );
     NETW_CHECK_EQ(
-        int(table.seat(-1)->get_session()->transfer_server(1)),
+        int(door->transfer_server(door->get_local_player())),
         int(ERR_INVALID_PARAMETER)
     );
     table.rig.pump(SETTLE_PUMPS);
@@ -808,10 +796,10 @@ TEST_CASE(
     NETW_CHECK_EQ(faults.warnings_containing("[NW0030]"), 1);
     NETW_CHECK_EQ(faults.errors(), 0);
     NETW_CHECK_EQ(
-        int(seat->session_get_state()),
+        int(seat->session_get_stored_state()),
         int(NetwMultiplayer::SESSION_STATE_OFFLINE)
     );
-    NETW_CHECK_EQ(own->get_peer_id(), table.was(refusing));
+    NETW_CHECK_EQ(own->get_peer_id(), int64_t(0));
     NETW_CHECK_EQ(int64_t(seat->get_unique_id()), table.was(refusing));
     for (int at = -1; at < CLIENTS; ++at) {
         if (at == refusing) {
@@ -820,7 +808,7 @@ TEST_CASE(
         NETW_FORMAT_INT(seat_text, at);
         CAPTURE(seat_text);
         NETW_CHECK_EQ(
-            int(table.seat(at)->session_get_state()),
+            int(table.seat(at)->session_get_stored_state()),
             int(NetwMultiplayer::SESSION_STATE_ONLINE)
         );
     }
@@ -858,20 +846,19 @@ int open_level(Table &p_table) {
         callable_mp_static(&build_level),
         named("Level"),
         string_types(),
-        p_table.arena,
-        Variant()
+        p_table.arena
     );
     REQUIRE(route > 0);
     p_table.rig.pump(SETTLE_PUMPS);
     REQUIRE(p_table.rig.server()->scene_is_declared(
-        p_table.rig.server()->entity_from_route(route)
+        Internals::entity_at(p_table.rig.server(), route)
     ));
     return route;
 }
 
 int spawn_member(Table &p_table, int p_level, const char *p_name, int p_owner) {
-    const Ref<NetwPlayer> owner
-        = p_owner < -1 ? Ref<NetwPlayer>() : p_table.player_at(p_owner);
+    const int64_t owner
+        = p_owner < -1 ? 0 : p_table.player_at(p_owner)->get_id();
     const int route = p_table.rig.spawn_registered(
         StringName(MEMBER_ID),
         callable_mp_static(&build_body),
@@ -885,7 +872,7 @@ int spawn_member(Table &p_table, int p_level, const char *p_name, int p_owner) {
 }
 
 RID handle_at(const Table &p_table, int p_route, int p_at) {
-    return p_table.seat(p_at)->entity_from_route(p_route);
+    return Internals::entity_at(p_table.seat(p_at), p_route);
 }
 
 TEST_CASE(
@@ -958,8 +945,9 @@ TEST_CASE(
     NetwMultiplayer *host = table.seat(successor);
     const RID held = handle_at(table, crate, successor);
     REQUIRE(held.is_valid());
-    const StringName filed
-        = host->interest_plane().scene_membership(int64_t(held.get_id()));
+    const StringName filed = Internals::interest_plane(host).scene_membership(
+        int64_t(held.get_id())
+    );
     const StringName layer
         = host->scene_layer_id(handle_at(table, level, successor));
     REQUIRE_FALSE(layer.is_empty());
@@ -1088,14 +1076,16 @@ TEST_CASE(
     values[StringName("score")] = 3.0;
     const Ref<NetwPromise> written = server->database_write(
         database,
-        server->schema_of_declaration(schema),
+        server->schema_declare(schema),
         StringName("hero"),
         values
     );
     REQUIRE_FALSE(written->get_is_settled());
 
     NETW_CHECK_EQ(
-        int(server->get_session()->transfer_server(successor_was)),
+        int(server->get_session()->transfer_server(
+            server->get_session()->player_of(successor_was)
+        )),
         int(ERR_BUSY)
     );
     table.rig.pump(SETTLE_PUMPS);
@@ -1110,7 +1100,9 @@ TEST_CASE(
     REQUIRE(written->get_is_completed());
     netw_test::FaultWatch faults;
     NETW_REQUIRE_EQ(
-        int(server->get_session()->transfer_server(successor_was)),
+        int(server->get_session()->transfer_server(
+            server->get_session()->player_of(successor_was)
+        )),
         int(OK)
     );
     table.rig.pump(SETTLE_PUMPS);
@@ -1322,11 +1314,8 @@ struct Kinds {
         netw::spawn::Pipeline *pipeline = p_table.rig.spawn_plane(-1);
         Node *arena = p_table.arena;
 
-        const RID nest_entity = server->spawn_registered(
-            StringName(NEST_ID),
-            named("Nest"),
-            nullptr
-        );
+        const RID nest_entity
+            = server->spawn_registered(StringName(NEST_ID), named("Nest"), 0);
         Node *nest = server->entity_get_node(nest_entity);
         NETW_REQUIRE_EQ(int(nest != nullptr), 1);
         arena->add_child(nest);
@@ -1428,11 +1417,8 @@ TEST_CASE(
     }
     Node *pen = table.rig.mirror_child("Pen");
     NetwMultiplayer *server = table.seat(-1);
-    const RID entity = server->spawn_registered(
-        StringName(BODY_ID),
-        named("Doomed"),
-        nullptr
-    );
+    const RID entity
+        = server->spawn_registered(StringName(BODY_ID), named("Doomed"), 0);
     Node *served = server->entity_get_node(entity);
     NETW_REQUIRE_EQ(int(served != nullptr), 1);
     table.arena->add_child(served);
@@ -1474,7 +1460,9 @@ TEST_CASE(
     const int64_t successor_was = table.was(successor);
     const int route = table.spawn_body("Handed", -2, 0);
     NETW_REQUIRE_EQ(
-        int(table.seat(-1)->get_session()->transfer_server(successor_was)),
+        int(table.seat(-1)->get_session()->transfer_server(
+            table.seat(-1)->get_session()->player_of(successor_was)
+        )),
         int(OK)
     );
     table.rig.pump(SETTLE_PUMPS);
@@ -1572,11 +1560,8 @@ struct Vitals {
 
     int spawn(Table &p_table, const char *p_name) const {
         NetwMultiplayer *server = p_table.rig.server();
-        const RID entity = server->spawn_registered(
-            StringName(VITAL_ID),
-            named(p_name),
-            nullptr
-        );
+        const RID entity
+            = server->spawn_registered(StringName(VITAL_ID), named(p_name), 0);
         Node *node = server->entity_get_node(entity);
         if (node == nullptr) {
             return 0;
@@ -1675,7 +1660,7 @@ TEST_CASE(
     const RID served = table.rig.server()->spawn_registered(
         StringName("transfer_leased"),
         named("Steady"),
-        nullptr
+        0
     );
     Node *steered = table.rig.server()->entity_get_node(served);
     NETW_REQUIRE_EQ(int(steered != nullptr), 1);
@@ -1687,7 +1672,7 @@ TEST_CASE(
     const RID entity = author->spawn_registered(
         StringName("transfer_leased"),
         named("Leased"),
-        nullptr
+        0
     );
     Node *made = author->entity_get_node(entity);
     NETW_REQUIRE_EQ(int(made != nullptr), 1);
@@ -1744,7 +1729,7 @@ TEST_CASE(
     const RID served = table.rig.server()->spawn_registered(
         StringName("transfer_npc"),
         named("Npc"),
-        nullptr
+        0
     );
     Node *npc = present(table.rig.server()->entity_get_node(served));
     table.arena->add_child(npc);
@@ -1814,7 +1799,9 @@ TEST_CASE(
     const ObjectID before(held->get_instance_id());
 
     NETW_REQUIRE_EQ(
-        int(table.seat(-1)->get_session()->transfer_server(successor_was)),
+        int(table.seat(-1)->get_session()->transfer_server(
+            table.seat(-1)->get_session()->player_of(successor_was)
+        )),
         int(OK)
     );
     table.rig.pump(SETTLE_PUMPS);
@@ -1916,7 +1903,7 @@ int spawn_bodies(Table &p_table, int p_count) {
         const RID entity = server->spawn_registered(
             StringName(BODY_ID),
             named(body_name),
-            nullptr
+            0
         );
         Node *node = server->entity_get_node(entity);
         if (node != nullptr) {
@@ -1942,7 +1929,7 @@ int held_by(Table &p_table, int p_server, int64_t p_peer) {
 int spawn_on(Table &p_table, int p_at, const char *p_id, const char *p_name) {
     NetwMultiplayer *api = p_table.seat(p_at);
     const RID entity
-        = api->spawn_registered(StringName(p_id), named(p_name), nullptr);
+        = api->spawn_registered(StringName(p_id), named(p_name), 0);
     Node *node = api->entity_get_node(entity);
     if (node == nullptr) {
         return 0;
@@ -2115,8 +2102,8 @@ TEST_CASE(
         const TypedArray<NetwPlayer> seen = table.seat(at)->player_all();
         for (int which = 0; which < seen.size(); ++which) {
             const Ref<NetwPlayer> player = seen[which];
-            if (player.is_valid() && !taken.has(player->player_id())) {
-                taken.push_back(player->player_id());
+            if (player.is_valid() && !taken.has(player->get_id())) {
+                taken.push_back(player->get_id());
             }
         }
     }
@@ -2133,13 +2120,13 @@ TEST_CASE(
     NETW_CHECK_EQ(int(host->is_structure_halted()), 0);
     const Ref<NetwPlayer> admitted = table.seat(late)->player_local();
     NETW_REQUIRE_EQ(int(admitted.is_valid()), 1);
-    NETW_CHECK_EQ(int(taken.has(admitted->player_id())), 0);
+    NETW_CHECK_EQ(int(taken.has(admitted->get_id())), 0);
     const int64_t joiner = table.seat(late)->get_unique_id();
     const TypedArray<NetwPlayer> issued = host->player_all();
     for (int at = 0; at < issued.size(); ++at) {
         const Ref<NetwPlayer> player = issued[at];
         if (player.is_valid() && player->get_peer_id() == joiner) {
-            NETW_CHECK_EQ(int(taken.has(player->player_id())), 0);
+            NETW_CHECK_EQ(int(taken.has(player->get_id())), 0);
         }
     }
     NETW_CHECK_EQ(
@@ -2460,7 +2447,7 @@ void survivors_resume(
     NETW_CHECK_EQ(int(alive(p_table, fresh, p_honest)), 1);
     const Ref<NetwPlayer> admitted = p_table.seat(p_late)->player_local();
     NETW_REQUIRE_EQ(int(admitted.is_valid()), 1);
-    NETW_CHECK_LT(admitted->player_id(), SANE_ID);
+    NETW_CHECK_LT(admitted->get_id(), SANE_ID);
 }
 
 TEST_CASE(

@@ -65,11 +65,11 @@ func test_a_server_without_the_module_lets_the_player_join_unproven(
 	Netw.prepare_join(client_gate, &"player")
 	client.api.multiplayer_peer = peer
 	var started := Time.get_ticks_msec()
-	while client.api.local_player == null \
+	while client.api.player_get_local() == 0 \
 			and Time.get_ticks_msec() - started < WAIT_MS:
 		await get_tree().process_frame
 
-	assert_object(client.api.local_player) \
+	assert_object(Netw.session(client).local_player) \
 			.override_failure_message("The player was not let in.") \
 			.is_not_null()
 	assert_int(host_gate.requests.size()).is_equal(1)

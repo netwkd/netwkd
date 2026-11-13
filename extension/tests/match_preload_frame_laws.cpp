@@ -3,6 +3,7 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/sim_stand.h"
 
@@ -15,6 +16,7 @@ using namespace godot;
 namespace TestMatchPreloadFrameLaws {
 
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr const char *HOST_ID = "match_host";
 constexpr const char *HOST_PATH = "res://tests/support/match_host.gd";
@@ -65,7 +67,9 @@ class MatchScenario final : public netw_test::FrameScenario {
         Node *node = Object::cast_to<Node>(netw::gd::live_object(p_node));
         NetwMultiplayer *server = stand->session(-1);
         return node != nullptr
-            ? int(server->entity_get_route(server->entity_of(node)))
+            ? int(server->entity_get_route(
+                  Internals::entity_of(server, node)
+              ))
             : 0;
     }
 
@@ -88,8 +92,7 @@ class MatchScenario final : public netw_test::FrameScenario {
         NetwMultiplayer *server = stand->session(-1);
         Array args;
         args.push_back(String("Host"));
-        const RID made
-            = server->spawn_registered(StringName(HOST_ID), args, nullptr);
+        const RID made = server->spawn_registered(StringName(HOST_ID), args, 0);
         Node *built = server->entity_get_node(made);
         if (built == nullptr || arena == nullptr) {
             return false;

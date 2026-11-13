@@ -41,10 +41,12 @@
 #include "netw/wire/spec.hpp"
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/netw_cells.h"
 #include "support/netw_reset.h"
 
 using namespace godot;
+using netw_test::Internals;
 
 NETW_INSTALL_RESET_LISTENER();
 
@@ -644,6 +646,16 @@ void NetwNativeTests::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "NetwNativeTests",
+        D_METHOD("predict_tap_flush", "session"),
+        &NetwNativeTests::predict_tap_flush
+    );
+    ClassDB::bind_static_method(
+        "NetwNativeTests",
+        D_METHOD("predict_tap_cost", "session"),
+        &NetwNativeTests::predict_tap_cost
+    );
+    ClassDB::bind_static_method(
+        "NetwNativeTests",
         D_METHOD("property_set_keys_of_script", "script", "record"),
         &NetwNativeTests::property_set_keys_of_script
     );
@@ -690,95 +702,6 @@ void NetwNativeTests::_bind_methods() {
         "NetwNativeTests",
         D_METHOD("observe_node_entity_ref", "session", "node_ref"),
         &NetwNativeTests::observe_node_entity_ref
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_is_visible", "entity", "peer_id"),
-        &NetwNativeTests::interest_is_visible
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_layer_ids", "entity"),
-        &NetwNativeTests::interest_layer_ids
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_leave_policy_for", "entity", "layer_id", "fallback"),
-        &NetwNativeTests::interest_leave_policy_for
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_custom_leave_for", "entity", "layer_id"),
-        &NetwNativeTests::interest_custom_leave_for
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD(
-            "interest_perception_policy_for",
-            "entity",
-            "layer_id",
-            "fallback"
-        ),
-        &NetwNativeTests::interest_perception_policy_for
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_custom_perception_for", "entity", "layer_id"),
-        &NetwNativeTests::interest_custom_perception_for
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_set_report_observers", "entity", "enabled"),
-        &NetwNativeTests::interest_set_report_observers
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_reports_observers", "entity"),
-        &NetwNativeTests::interest_reports_observers
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_on_observed", "entity", "callback"),
-        &NetwNativeTests::interest_on_observed
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_on_enter", "entity", "layer_id", "callback"),
-        &NetwNativeTests::interest_on_enter
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_on_leave", "entity", "layer_id", "callback"),
-        &NetwNativeTests::interest_on_leave
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD(
-            "interest_set_leave_policy",
-            "entity",
-            "layer_id",
-            "policy",
-            "custom"
-        ),
-        &NetwNativeTests::interest_set_leave_policy,
-        DEFVAL(Callable())
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD(
-            "interest_set_perception_policy",
-            "entity",
-            "layer_id",
-            "policy",
-            "custom"
-        ),
-        &NetwNativeTests::interest_set_perception_policy,
-        DEFVAL(Callable())
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("interest_on_unobserved", "entity", "callback"),
-        &NetwNativeTests::interest_on_unobserved
     );
 }
 
@@ -878,6 +801,17 @@ void NetwNativeTests::attribution_arm(NetwMultiplayer *p_session) {
 
 Dictionary NetwNativeTests::attribution_snapshot(NetwMultiplayer *p_session) {
     return p_session != nullptr ? p_session->attribution_snapshot()
+                                : Dictionary();
+}
+
+void NetwNativeTests::predict_tap_flush(NetwMultiplayer *p_session) {
+    if (p_session != nullptr) {
+        p_session->predict_flush_tap();
+    }
+}
+
+Dictionary NetwNativeTests::predict_tap_cost(NetwMultiplayer *p_session) {
+    return p_session != nullptr ? p_session->predict_get_tap_cost()
                                 : Dictionary();
 }
 
@@ -1063,175 +997,6 @@ void NetwNativeTests::observe_node_entity_ref(
 ) {
     if (session != nullptr) {
         session->observe_node_entity_ref(p_node_ref);
-    }
-}
-
-bool NetwNativeTests::interest_is_visible(NetwEntity *entity, int64_t peer_id) {
-    return entity != nullptr && entity->get_interest()->is_visible_to(peer_id);
-}
-
-TypedArray<StringName> NetwNativeTests::interest_layer_ids(NetwEntity *entity) {
-    return entity != nullptr
-        ? entity->get_record()->get_interest_facet().layer_ids()
-        : TypedArray<StringName>();
-}
-
-int64_t NetwNativeTests::interest_leave_policy_for(
-    NetwEntity *entity,
-    const StringName &layer_id,
-    int64_t fallback
-) {
-    if (entity == nullptr) {
-        return fallback;
-    }
-    return entity->get_record()
-        ->get_interest_facet()
-        .declaration()
-        ->leave_policy_for(layer_id, int(fallback));
-}
-
-Callable NetwNativeTests::interest_custom_leave_for(
-    NetwEntity *entity,
-    const StringName &layer_id
-) {
-    return entity != nullptr ? entity->get_record()
-                                   ->get_interest_facet()
-                                   .declaration()
-                                   ->custom_leave_for(layer_id)
-                             : Callable();
-}
-
-int64_t NetwNativeTests::interest_perception_policy_for(
-    NetwEntity *entity,
-    const StringName &layer_id,
-    int64_t fallback
-) {
-    if (entity == nullptr) {
-        return fallback;
-    }
-    return entity->get_record()
-        ->get_interest_facet()
-        .declaration()
-        ->perception_policy_for(layer_id, int(fallback));
-}
-
-Callable NetwNativeTests::interest_custom_perception_for(
-    NetwEntity *entity,
-    const StringName &layer_id
-) {
-    return entity != nullptr ? entity->get_record()
-                                   ->get_interest_facet()
-                                   .declaration()
-                                   ->custom_perception_for(layer_id)
-                             : Callable();
-}
-
-void NetwNativeTests::interest_set_report_observers(
-    NetwEntity *entity,
-    bool enabled
-) {
-    if (entity != nullptr) {
-        entity->get_record()
-            ->get_interest_facet()
-            .declaration()
-            ->set_reports_observers(enabled);
-    }
-}
-
-void NetwNativeTests::interest_queue_observer_awareness(
-    NetwMultiplayer *session,
-    const StringName &layer_id,
-    NetwEntity *entity,
-    int64_t observer_peer,
-    int kind
-) {
-    if (session != nullptr) {
-        session->interest_queue_observer_awareness(
-            layer_id,
-            Ref<NetwEntity>(entity),
-            observer_peer,
-            kind
-        );
-    }
-}
-
-Array NetwNativeTests::interest_awareness_drain(NetwMultiplayer *session) {
-    return session != nullptr ? session->interest_awareness_drain() : Array();
-}
-
-bool NetwNativeTests::interest_reports_observers(NetwEntity *entity) {
-    return entity != nullptr
-        && entity->get_record()
-               ->get_interest_facet()
-               .declaration()
-               ->get_reports_observers();
-}
-
-void NetwNativeTests::interest_on_observed(
-    NetwEntity *entity,
-    const Callable &callback
-) {
-    if (entity != nullptr) {
-        entity->get_record()->get_interest_facet().on_observed(callback);
-    }
-}
-
-void NetwNativeTests::interest_on_enter(
-    NetwEntity *entity,
-    const StringName &layer_id,
-    const Callable &callback
-) {
-    if (entity != nullptr) {
-        entity->get_record()->get_interest_facet().on_enter(layer_id, callback);
-    }
-}
-
-void NetwNativeTests::interest_on_leave(
-    NetwEntity *entity,
-    const StringName &layer_id,
-    const Callable &callback
-) {
-    if (entity != nullptr) {
-        entity->get_record()->get_interest_facet().on_leave(layer_id, callback);
-    }
-}
-
-void NetwNativeTests::interest_set_leave_policy(
-    NetwEntity *entity,
-    const StringName &layer_id,
-    int64_t policy,
-    const Callable &custom
-) {
-    if (entity != nullptr) {
-        entity->get_record()->get_interest_facet().set_leave_policy(
-            layer_id,
-            int(policy),
-            custom
-        );
-    }
-}
-
-void NetwNativeTests::interest_set_perception_policy(
-    NetwEntity *entity,
-    const StringName &layer_id,
-    int64_t policy,
-    const Callable &custom
-) {
-    if (entity != nullptr) {
-        entity->get_record()->get_interest_facet().set_perception_policy(
-            layer_id,
-            int(policy),
-            custom
-        );
-    }
-}
-
-void NetwNativeTests::interest_on_unobserved(
-    NetwEntity *entity,
-    const Callable &callback
-) {
-    if (entity != nullptr) {
-        entity->get_record()->get_interest_facet().on_unobserved(callback);
     }
 }
 

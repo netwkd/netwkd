@@ -29,18 +29,12 @@ NetwMultiplayer *NetwConnection::session() const {
 
 void NetwConnection::bind_session(NetwMultiplayer *p_session) {
     session_id = gd::instance_id(p_session);
-    if (p_session == nullptr) {
-        return;
-    }
-    for (const RID &target : p_session->endpoint_list()) {
-        remember_endpoint(target);
-    }
 }
 
-void NetwConnection::announce_attempt_moved(int64_t p_state) {
-    if (p_state != connect::ATTEMPT_ONLINE) {
-        current_endpoint.unref();
-    }
+Ref<NetwEndpoint> NetwConnection::view_of(const RID &p_endpoint) const {
+    NetwMultiplayer *api = session();
+    return api != nullptr ? api->endpoint_view(p_endpoint)
+                          : Ref<NetwEndpoint>();
 }
 
 void NetwConnection::announce_progressed(
@@ -50,76 +44,38 @@ void NetwConnection::announce_progressed(
     emit_signal(StringName(SIG_PROGRESSED), p_message, p_ratio);
 }
 
-bool NetwConnection::announce_failed(int64_t p_error, const String &p_reason) {
-    const bool heard = has_connections(StringName(SIG_FAILED));
+bool NetwConnection::hears_failed() const {
+    return has_connections(StringName(SIG_FAILED));
+}
+
+void NetwConnection::announce_failed(int64_t p_error, const String &p_reason) {
     emit_signal(StringName(SIG_FAILED), p_error, p_reason);
-    return heard;
 }
 
 void NetwConnection::announce_join_address_changed(const String &p_address) {
     emit_signal(StringName(SIG_JOIN_ADDRESS_CHANGED), p_address);
 }
 
-Ref<NetwEndpoint> NetwConnection::remember_endpoint(const RID &p_target) {
-    const HashMap<RID, Ref<NetwEndpoint>>::ConstIterator found
-        = endpoints_by_row.find(p_target);
-    if (found != endpoints_by_row.end()) {
-        return found->value;
-    }
-    NetwMultiplayer *api = session();
-    if (api == nullptr || !p_target.is_valid()) {
-        return Ref<NetwEndpoint>();
-    }
-    const RID transport_rid = api->endpoint_get_param(
-        p_target,
-        NetwMultiplayer::ENDPOINT_PARAM_TRANSPORT
-    );
-    const StringName peer_class = api->transport_class_of(transport_rid);
-    if (peer_class.is_empty()) {
-        return Ref<NetwEndpoint>();
-    }
-    const String address = api->endpoint_get_param(
-        p_target,
-        NetwMultiplayer::ENDPOINT_PARAM_ADDRESS
-    );
-    Ref<NetwEndpoint> made;
-    made.instantiate();
-    made->bind_to(api, p_target, peer_class, address);
-    endpoints_by_row.insert(p_target, made);
-    return made;
+void NetwConnection::announce_endpoint_added(
+    const Ref<NetwEndpoint> &p_endpoint
+) {
+    emit_signal(StringName(SIG_ENDPOINT_ADDED), p_endpoint);
 }
 
-void NetwConnection::announce_endpoint_added(const RID &p_target) {
-    const Ref<NetwEndpoint> held = remember_endpoint(p_target);
-    if (held.is_valid()) {
-        emit_signal(StringName(SIG_ENDPOINT_ADDED), held);
-    }
+void NetwConnection::announce_endpoint_removed(
+    const Ref<NetwEndpoint> &p_endpoint
+) {
+    emit_signal(StringName(SIG_ENDPOINT_REMOVED), p_endpoint);
 }
 
-void NetwConnection::announce_endpoint_removed(const RID &p_target) {
-    const HashMap<RID, Ref<NetwEndpoint>>::ConstIterator found
-        = endpoints_by_row.find(p_target);
-    if (found == endpoints_by_row.end()) {
-        return;
-    }
-    const Ref<NetwEndpoint> held = found->value;
-    endpoints_by_row.erase(p_target);
-    held->unlist();
-    emit_signal(StringName(SIG_ENDPOINT_REMOVED), held);
+void NetwConnection::announce_invited(const Ref<NetwEndpoint> &p_endpoint) {
+    emit_signal(StringName(SIG_INVITED), p_endpoint);
 }
 
-void NetwConnection::announce_invited(const RID &p_target) {
-    const Ref<NetwEndpoint> held = remember_endpoint(p_target);
-    if (held.is_valid()) {
-        emit_signal(StringName(SIG_INVITED), held);
-    }
-}
-
-void NetwConnection::announce_endpoint_updated(const RID &p_target) {
-    const Ref<NetwEndpoint> held = remember_endpoint(p_target);
-    if (held.is_valid()) {
-        held->emit_signal(StringName(SIG_ENDPOINT_CHANGED));
-    }
+void NetwConnection::announce_endpoint_updated(
+    const Ref<NetwEndpoint> &p_endpoint
+) {
+    p_endpoint->emit_signal(StringName(SIG_ENDPOINT_CHANGED));
 }
 
 RID NetwConnection::create_peer(
@@ -163,7 +119,7 @@ Ref<NetwPromise> NetwConnection::join(
             "NetwConnection.join needs an endpoint."
         );
     }
-    return api->endpoint_join(p_endpoint->get_row(), p_settings);
+    return api->endpoint_join(p_endpoint->get_rid(), p_settings);
 }
 
 Ref<NetwPromise> NetwConnection::host(
@@ -208,48 +164,31 @@ Dictionary NetwConnection::defaults(const Variant &p_transport) const {
 
 String NetwConnection::get_join_address() const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->peer_join_address() : String();
+    return api != nullptr ? api->transport_get_join_address() : String();
 }
 
 void NetwConnection::set_join_address(const String &p_address) {
     NetwMultiplayer *api = session();
     if (api != nullptr) {
-        api->connection_set_join_address(p_address);
+        api->transport_set_join_address(p_address);
     }
 }
 
 int64_t NetwConnection::get_max_players() const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->connection_max_players() : 0;
+    return api != nullptr ? api->transport_get_max_players() : 0;
 }
 
 Ref<NetwEndpoint> NetwConnection::get_current_endpoint() {
     NetwMultiplayer *api = session();
-    const connect::Transport *live
-        = api != nullptr ? api->connect_plane().live_transport() : nullptr;
-    const String address
-        = api != nullptr ? api->connect_plane().endpoint_address() : String();
-    if (live == nullptr || address.is_empty()) {
-        current_endpoint.unref();
-        return current_endpoint;
-    }
-    const StringName peer_class = live->peer_class();
-    if (current_endpoint.is_valid()
-        && current_endpoint->get_peer_class() == peer_class
-        && current_endpoint->get_address() == address) {
-        return current_endpoint;
-    }
-    current_endpoint = find(peer_class, address);
-    if (current_endpoint.is_null()) {
-        current_endpoint.instantiate();
-        current_endpoint->bind_to(api, RID(), peer_class, address);
-    }
-    return current_endpoint;
+    return api != nullptr ? view_of(api->endpoint_get_current())
+                          : Ref<NetwEndpoint>();
 }
 
 Dictionary NetwConnection::diagnostics(int64_t p_peer_id) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->peer_diagnostics(p_peer_id) : Dictionary();
+    return api != nullptr ? api->transport_get_peer_diagnostics(p_peer_id)
+                          : Dictionary();
 }
 
 RID NetwConnection::resolve_transport(const Variant &p_of) const {
@@ -291,7 +230,10 @@ Dictionary NetwConnection::transport_snapshot(const RID &p_transport) const {
     if (api == nullptr || !p_transport.is_valid()) {
         return snapshot;
     }
-    const StringName peer_class = api->transport_class_of(p_transport);
+    const StringName peer_class = api->transport_get_param(
+        p_transport,
+        NetwMultiplayer::TRANSPORT_PARAM_PEER_CLASS
+    );
     if (peer_class.is_empty()) {
         return snapshot;
     }
@@ -372,7 +314,7 @@ TypedArray<NetwEndpoint> NetwConnection::endpoints() {
         return listed;
     }
     for (const Variant &entry : api->endpoint_list()) {
-        const Ref<NetwEndpoint> held = remember_endpoint(entry);
+        const Ref<NetwEndpoint> held = api->endpoint_view(entry);
         if (held.is_valid()) {
             listed.push_back(held);
         }
@@ -393,7 +335,7 @@ Ref<NetwEndpoint> NetwConnection::add(
     if (!transport_rid.is_valid()) {
         return Ref<NetwEndpoint>();
     }
-    return remember_endpoint(
+    return api->endpoint_view(
         api->endpoint_add(transport_rid, p_address, p_display_name)
     );
 }
@@ -407,7 +349,7 @@ Ref<NetwEndpoint> NetwConnection::invite(
     if (api == nullptr) {
         return Ref<NetwEndpoint>();
     }
-    return remember_endpoint(api->connect_plane().invite(
+    return api->endpoint_view(api->endpoint_invite(
         resolve_transport(p_transport),
         p_address,
         p_from_name
@@ -418,7 +360,7 @@ Ref<NetwEndpoint> NetwConnection::find(
     const Variant &p_transport,
     const String &p_address
 ) {
-    return remember_endpoint(resolve_endpoint(p_transport, p_address));
+    return view_of(resolve_endpoint(p_transport, p_address));
 }
 
 Error NetwConnection::remove(const Ref<NetwEndpoint> &p_endpoint) {
@@ -429,11 +371,9 @@ Error NetwConnection::remove(const Ref<NetwEndpoint> &p_endpoint) {
     if (p_endpoint.is_null()) {
         return ERR_INVALID_PARAMETER;
     }
-    const RID target = p_endpoint->get_row();
-    const HashMap<RID, Ref<NetwEndpoint>>::ConstIterator found
-        = endpoints_by_row.find(target);
-    if (found == endpoints_by_row.end()
-        || found->value.ptr() != p_endpoint.ptr()) {
+    const RID target = p_endpoint->get_rid();
+    if (api->endpoint_view(target) != p_endpoint
+        || !p_endpoint->get_is_listed()) {
         return ERR_DOES_NOT_EXIST;
     }
     const int64_t flags = api->endpoint_get_state(

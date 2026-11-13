@@ -38,7 +38,8 @@ namespace Networked;
 /// <c>angular_velocity</c> and <c>sleeping</c> read and write the body's
 /// physics state. <c>position</c> stays relative to the parent. While
 /// <c>RigidBody3D.freeze</c> is on, position and rotation use the node
-/// transform.
+/// transform. A write to a body that stays asleep reaches peers within 30
+/// ticks.
 /// <code>
 /// func _init() -&gt; void:
 ///     Netw.configure_property(self, &amp;"position").state()
@@ -844,7 +845,10 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     /// <summary>
     /// The controlling peer owns the value and every peer sees it, with no
     /// server check. Use it for cosmetic values such as an aim direction. The
-    /// server keeps no history of it.
+    /// server keeps no history of it. When a client controls the entity, or the
+    /// entity is kept for a dropped player who controlled it, a spawn carries
+    /// the value, so a controller that receives the node again starts from the
+    /// value the server holds.
     /// <code>
     /// func _init() -&gt; void:
     ///     Netw.configure_property(self, &amp;"aim_dir").broadcast()

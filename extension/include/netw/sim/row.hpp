@@ -57,6 +57,12 @@ struct Declaration {
     double release_on_rest = 0.0;
 };
 
+struct Decl {
+    Declaration declaration;
+    Choice choice;
+    bool declared = false;
+};
+
 struct Row {
     godot::RID entity;
     NetwEntity *view = nullptr;
@@ -64,13 +70,11 @@ struct Row {
     Declaration declaration;
     Facts facts;
     Mode mode = Mode::NONE;
-    Mode announced = Mode::NONE;
-    bool has_announced = false;
     bool owner_ticks = false;
     Bodies bodies;
     Installs installs;
     Contact contact;
-    godot::Callable control_hook;
+    bool follows_control = false;
     godot::Callable sleep_hook;
     uint32_t index = 0;
     uint64_t order = 0;

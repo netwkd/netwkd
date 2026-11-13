@@ -12,6 +12,7 @@ static var broken := 0
 static var bare := 0
 var shelf := {}
 var changes := ""
+var removed := ""
 var cleared := ""
 var carried: NetwPromise
 var dropped: NetwPromise
@@ -111,10 +112,16 @@ func admit(username: String, level: String) -> void:
 
 func listen() -> void:
 	Netw.session(self).local_player.scene_changed.connect(_on_scene_changed)
+	Netw.session(self).scene_removed.connect(_on_scene_removed)
 
 
 func _on_scene_changed(from: NetwScene, to: NetwScene) -> void:
 	changes += "%s>%s;" % [from.label if from else "", to.label if to else ""]
+
+
+func _on_scene_removed(scene: NetwScene) -> void:
+	var held := scene.root or scene.world or scene.entity
+	removed += "%s%s;" % [scene.label, "+" if held else ""]
 
 
 func carry(called: String, level: String) -> void:
@@ -203,8 +210,8 @@ class Toy extends Node3D:
 
 	var seen: bool:
 		get:
-			return multiplayer.interest_player_sees(
-				multiplayer.get_unique_id(), NetwEntity.of(self)
+			return multiplayer.interest_is_visible(
+				NetwEntity.of(self).rid, multiplayer.get_unique_id()
 			)
 
 	func _init() -> void:
@@ -245,6 +252,7 @@ World halls() {
     world.watch("Level", "here")
         .watch("Level", "listed")
         .watch("Level", "changes")
+        .watch("Level", "removed")
         .watch("Level", "cleared")
         .watch("Level", "carry_code")
         .watch("Level", "drop_code")
@@ -447,6 +455,8 @@ TEST_CASE(
     NETW_HOLDS(reads(seen, SERVER, "Level", "listed", open, SHELVE + 1));
     NETW_HOLDS(reads(seen, SERVER, "Den", "viewers", "ana,cy", SHELVE - 1));
     NETW_HOLDS(reads(seen, SERVER, "Level", "shelved", "Den 2"));
+    NETW_HOLDS(reads(seen, ANA, "Level", "removed", "Vault;Den;", END - 1));
+    NETW_HOLDS(reads(seen, BO, "Level", "removed", "Yard;Pit;", END - 1));
     NETW_HOLDS(absent(seen, CY, "Den", SHELVE + 3));
     for (const int peer : {SERVER, BO}) {
         NETW_HOLDS(absent(seen, peer, "Pit", SCRAP + 2));

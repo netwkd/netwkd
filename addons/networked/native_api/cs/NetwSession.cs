@@ -24,7 +24,10 @@ namespace Networked;
 /// </code>
 /// <para>
 /// There is one handle per session, so it is safe to keep it across an await.
-/// Connecting is done as you would normally do with
+/// Signals reported when a <see cref="MultiplayerApi.Poll"/> or a
+/// <see cref="NetwClock"/> tick ends arrive in the order the changes happened,
+/// so a kick or a pause made inside one of their handlers is reported after
+/// that handler returns. Connecting is done as you would normally do with
 /// <see cref="SceneMultiplayer"/>, by assigning
 /// <see cref="MultiplayerApi.MultiplayerPeer"/>.
 /// <see cref="NetwSession.Connection"/> finds servers and joins or hosts one,
@@ -40,7 +43,7 @@ namespace Networked;
 /// the game to go on without it moves the server first.
 /// <code>
 /// func hand_over(successor: NetwPlayer) -&gt; void:
-///     if session.transfer_server(successor.peer_id) == OK:
+///     if session.transfer_server(successor) == OK:
 ///         await session.server_transferred
 ///     await session.leave().wait()
 /// </code>
@@ -177,7 +180,9 @@ public sealed class NetwSession : NetwRefCounted
 
     /// <summary>
     /// Emitted when <see cref="NetwSession.State"/> changes. A server transfer
-    /// does not change it.
+    /// does not change it. A change made while
+    /// <see cref="MultiplayerApi.Poll"/> runs is emitted when that poll ends,
+    /// so <see cref="NetwSession.State"/> can already read a later state.
     /// </summary>
     public event Action<NetwSession.StateEnum> StateChanged
     {
@@ -195,7 +200,9 @@ public sealed class NetwSession : NetwRefCounted
     /// <summary>
     /// Emitted when <see cref="NetwSession.Paused"/> changes. <c>reason</c> is
     /// what the server passed to <see cref="NetwSession.Pause"/>. A session
-    /// that ends while paused emits it with <c>false</c>.
+    /// that ends while paused emits it with <c>false</c>. A change made while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is emitted when that poll or tick ends.
     /// </summary>
     public event Action<bool, string> PausedChanged
     {
@@ -214,7 +221,8 @@ public sealed class NetwSession : NetwRefCounted
     /// Emitted when this peer is online. A client goes online once the server
     /// admits its player, so <see cref="NetwSession.PlayerJoined"/> for each
     /// player already present and then <see cref="NetwSession.LocalJoined"/>
-    /// follow in the same frame.
+    /// follow in the same frame. A peer that goes online while
+    /// <see cref="MultiplayerApi.Poll"/> runs emits it when that poll ends.
     /// </summary>
     public event Action Entered
     {
@@ -233,6 +241,8 @@ public sealed class NetwSession : NetwRefCounted
     /// Emitted before the session is cleaned up, so
     /// <see cref="NetwSession.Players"/> and <see cref="NetwSession.Scenes"/>
     /// can still be read. <c>detail</c> is the message the server gave, if any.
+    /// Every signal the session still owed from the same poll or
+    /// <see cref="NetwClock"/> tick is emitted before it.
     /// </summary>
     public event Action<NetwSession.ExitReason, string> Exiting
     {
@@ -265,7 +275,10 @@ public sealed class NetwSession : NetwRefCounted
     }
 
     /// <summary>
-    /// A <see cref="NetwPlayer"/> has joined, including this peer's own.
+    /// A <see cref="NetwPlayer"/> has joined, including this peer's own. A
+    /// player admitted while <see cref="MultiplayerApi.Poll"/> or a
+    /// <see cref="NetwClock"/> tick runs is reported when that poll or tick
+    /// ends.
     /// </summary>
     public event Action<NetwPlayer> PlayerJoined
     {
@@ -282,7 +295,9 @@ public sealed class NetwSession : NetwRefCounted
 
     /// <summary>
     /// The <see cref="NetwPlayer"/> of this peer has joined.
-    /// <see cref="NetwSession.LocalPlayer"/> is set from here on.
+    /// <see cref="NetwSession.LocalPlayer"/> is set from here on. It is emitted
+    /// before <see cref="NetwSession.PlayerJoined"/> for the same player, at
+    /// the same point in the frame.
     /// </summary>
     public event Action<NetwPlayer> LocalJoined
     {
@@ -299,7 +314,11 @@ public sealed class NetwSession : NetwRefCounted
 
     /// <summary>
     /// A <see cref="NetwPlayer"/> has left for <c>reason</c>.
-    /// <see cref="NetwPlayer.IsActive"/> is already <c>false</c>.
+    /// <see cref="NetwPlayer.IsActive"/> is already <c>false</c>, and every
+    /// property of <c>player</c> reads empty once the handlers return. A player
+    /// who leaves while <see cref="MultiplayerApi.Poll"/> or a
+    /// <see cref="NetwClock"/> tick runs is reported when that poll or tick
+    /// ends.
     /// </summary>
     public event Action<NetwPlayer, NetwPlayer.LeaveReason> PlayerLeft
     {
@@ -321,9 +340,10 @@ public sealed class NetwSession : NetwRefCounted
     /// server gave. <see cref="NetwSession.LocalPlayer"/> stays <c>null</c>. A
     /// client refused while connecting closes its peer and never goes online,
     /// so neither <see cref="NetwSession.Entered"/> nor
-    /// <see cref="NetwSession.Exited"/> fires. Networked refuses with three
-    /// codes, and any other <c>code</c> is the one the admission handler or a
-    /// <see cref="NetwAccountProvider"/> returned.
+    /// <see cref="NetwSession.Exited"/> fires. A refusal heard while
+    /// <see cref="MultiplayerApi.Poll"/> runs is emitted when that poll ends.
+    /// Networked refuses with three codes, and any other <c>code</c> is the one
+    /// the admission handler or a <see cref="NetwAccountProvider"/> returned.
     /// - <c>@GlobalScope.ERR_UNCONFIGURED</c> the two peers are set up
     /// differently, such as another build, another Networked version or other
     /// <see cref="Netw.ConfigureJoin"/> arguments
@@ -348,7 +368,9 @@ public sealed class NetwSession : NetwRefCounted
 
     /// <summary>
     /// Emitted after the root of <c>scene</c> is ready, so the whole scene can
-    /// be accessed.
+    /// be accessed. A scene that becomes ready while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends.
     /// <code>
     /// func on_scene_ready(arena: NetwScene) -&gt; void:
     ///     arena.root.get_node(^"Spawns").arrange()
@@ -371,7 +393,8 @@ public sealed class NetwSession : NetwRefCounted
     /// Emitted on every peer once the peer that was <c>successor_was</c> has
     /// become the server at id <c>1</c>, and the old server, if it stayed, has
     /// become <c>former_now</c>. <c>former_now</c> is <c>0</c> when the old
-    /// server is gone, and its player leaves after this signal.
+    /// server is gone, and its player leaves after this signal. It is emitted
+    /// when the <see cref="MultiplayerApi.Poll"/> that moved the server ends.
     /// <code>
     /// public override void _Ready()
     /// {
@@ -406,7 +429,9 @@ public sealed class NetwSession : NetwRefCounted
     /// <summary>
     /// Emitted on the server when <c>requester</c> asks to kick <c>target</c>
     /// with <see cref="NetwSession.RequestKick"/>.
-    /// <see cref="NetwSession.Kick"/> performs it.
+    /// <see cref="NetwSession.Kick"/> performs it. A request read while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends.
     /// </summary>
     public event Action<NetwPlayer, NetwPlayer, string> KickRequested
     {
@@ -425,7 +450,10 @@ public sealed class NetwSession : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted after <c>scene</c> leaves <see cref="NetwSession.Scenes"/>.
+    /// Emitted after <c>scene</c> leaves <see cref="NetwSession.Scenes"/>. A
+    /// scene removed while <see cref="MultiplayerApi.Poll"/> or a
+    /// <see cref="NetwClock"/> tick runs is reported when that poll or tick
+    /// ends.
     /// </summary>
     public event Action<NetwScene> SceneRemoved
     {
@@ -446,9 +474,7 @@ public sealed class NetwSession : NetwRefCounted
     /// <summary>
     /// Every <see cref="NetwPlayer"/> whose join was accepted and who has not
     /// left, sorted by peer id. A leaving player is already gone from it when
-    /// <see cref="NetwSession.PlayerLeft"/> is emitted, while
-    /// <see cref="NetwMultiplayer.ConnectedPlayers"/> still holds that player
-    /// then.
+    /// <see cref="NetwSession.PlayerLeft"/> is emitted.
     /// </summary>
     public NetwPlayer[] Players
     {
@@ -859,14 +885,15 @@ public sealed class NetwSession : NetwRefCounted
     }
 
     private static readonly IntPtr _bindTransferServer =
-        NetwApi.MethodBind("NetwSession", "transfer_server", 844576869UL);
+        NetwApi.MethodBind("NetwSession", "transfer_server", 1229657424UL);
 
     /// <summary>
-    /// Asks the <see cref="MultiplayerPeer"/> to make <paramref name="peerId"/>
-    /// the server and this peer a client under a new id.
-    /// <see cref="NetwSession.ServerTransferred"/> follows on every peer. A
+    /// Asks the <see cref="MultiplayerPeer"/> to make the peer of
+    /// <paramref name="player"/> the server and this peer a client under a new
+    /// id. <see cref="NetwSession.ServerTransferred"/> follows on every peer. A
     /// peer supports this when it declares a <c>server_relabelled</c> signal
-    /// and a <c>transfer_server</c> method. It emits the signal once
+    /// and a <c>transfer_server</c> method, which receives the player's
+    /// <see cref="NetwPlayer.PeerId"/>. It emits the signal once
     /// <see cref="MultiplayerPeer.GetUniqueId"/> already answers the new id. A
     /// peer with only the signal can still promote a client when the server is
     /// lost.
@@ -885,15 +912,16 @@ public sealed class NetwSession : NetwRefCounted
     /// </code>
     /// <para>
     /// When the server moves, players who have left lose their return window,
-    /// and their kept entities despawn. The new server reads each
-    /// <see cref="NetwPlayer.Account"/> again from the
+    /// and their kept entities despawn. An entity the server spawns or despawns
+    /// in the frame it calls this method is on no peer afterwards. The new
+    /// server reads each <see cref="NetwPlayer.Account"/> again from the
     /// <see cref="LobbyDirectory"/> serving the session when it names one, and
     /// the old server keeps only its own.
     /// <code>
     /// Error
     /// ┠╴ERR_UNAUTHORIZED        called on a client
     /// ┠╴ERR_UNAVAILABLE         the transport cannot move the server
-    /// ┠╴ERR_INVALID_PARAMETER   peer_id is not a connected client
+    /// ┠╴ERR_INVALID_PARAMETER   player is not a connected client's player
     /// ┖╴ERR_BUSY                a database still has writes to settle
     /// </code>
     /// </para>
@@ -901,11 +929,11 @@ public sealed class NetwSession : NetwRefCounted
     /// <b>Server Only.</b>
     /// </para>
     /// </summary>
-    public Error TransferServer(long peerId)
+    public Error TransferServer(NetwPlayer player)
     {
-        long slot0 = peerId;
+        IntPtr slot0 = player?.Native ?? IntPtr.Zero;
         long answered = default;
-        NetwThunks.Ptrcall1_Long_Long(
+        NetwThunks.Ptrcall1_IntPtr_Long(
             _bindTransferServer,
             Checked,
             in slot0,
@@ -957,7 +985,9 @@ public sealed class NetwSession : NetwRefCounted
     /// <summary>
     /// Pauses the <see cref="SceneTree"/> on every peer, which emits
     /// <see cref="NetwSession.PausedChanged"/> with <paramref name="reason"/>.
-    /// A player who joins while paused joins paused. <b>Server Only.</b>
+    /// A player who joins while paused joins paused. A session that ends while
+    /// paused unpauses the <see cref="SceneTree"/> it paused. <b>Server
+    /// Only.</b>
     /// </summary>
     public void Pause(string reason = "")
     {
@@ -1012,7 +1042,8 @@ public sealed class NetwSession : NetwRefCounted
     /// <summary>
     /// Removes <paramref name="player"/> from the session and disconnects their
     /// peer with <paramref name="reason"/>. The server's own player cannot be
-    /// kicked, use <see cref="NetwSession.Leave"/> instead. <b>Server Only.</b>
+    /// kicked. Use <see cref="NetwSession.Leave"/> to end the session.
+    /// <b>Server Only.</b>
     /// </summary>
     public Error Kick(NetwPlayer player, string reason = "")
     {
@@ -1221,7 +1252,7 @@ public sealed class NetwSession : NetwRefCounted
     }
 
     private static readonly IntPtr _bindRegisterService =
-        NetwApi.MethodBind("NetwSession", "register_service", 4084022468UL);
+        NetwApi.MethodBind("NetwSession", "register_service", 262307101UL);
 
     /// <summary>
     /// Registers <paramref name="service"/> so
@@ -1229,7 +1260,7 @@ public sealed class NetwSession : NetwRefCounted
     /// defaults to the script of <paramref name="service"/>. A
     /// <see cref="NetwService"/> registers itself.
     /// </summary>
-    public void RegisterService(GodotObject service, GodotObject type = null)
+    public void RegisterService(Node service, GodotObject type = null)
     {
         IntPtr slot0 = service?.NativeInstance ?? IntPtr.Zero;
         IntPtr slot1 = type?.NativeInstance ?? IntPtr.Zero;
@@ -1243,12 +1274,12 @@ public sealed class NetwSession : NetwRefCounted
     }
 
     private static readonly IntPtr _bindUnregisterService =
-        NetwApi.MethodBind("NetwSession", "unregister_service", 4084022468UL);
+        NetwApi.MethodBind("NetwSession", "unregister_service", 262307101UL);
 
     /// <summary>
     /// Undoes <see cref="NetwSession.RegisterService"/>.
     /// </summary>
-    public void UnregisterService(GodotObject service, GodotObject type = null)
+    public void UnregisterService(Node service, GodotObject type = null)
     {
         IntPtr slot0 = service?.NativeInstance ?? IntPtr.Zero;
         IntPtr slot1 = type?.NativeInstance ?? IntPtr.Zero;

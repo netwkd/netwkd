@@ -9,6 +9,7 @@
 #include "netw/display/decl.hpp"
 #include "netw/interest/engine.hpp"
 #include "netw/liveness_core.hpp"
+#include "netw/repl/set_model.hpp"
 #include "netw/scene_core.hpp"
 #include "netw/session_core.hpp"
 
@@ -25,6 +26,21 @@ struct NetwMultiplayer {
         ENTITY_STATE_LINGERING = NetwLivenessCore::STATE_LINGERING,
         ENTITY_STATE_DEAD = NetwLivenessCore::STATE_DEAD,
         ENTITY_STATE_ABSENT = NetwLivenessCore::STATE_ABSENT,
+    };
+
+    enum EntityParam {
+        ENTITY_PARAM_AUTHORITY = 0,
+        ENTITY_PARAM_TRANSFER = 1,
+        ENTITY_PARAM_ON_CONTROLLER_DISCONNECT = 2,
+        ENTITY_PARAM_ON_PARENT_DESPAWN = 3,
+        ENTITY_PARAM_HOLD = 4,
+        ENTITY_PARAM_REPLICATION_PRIORITY = 5,
+    };
+
+    enum ControlState {
+        CONTROL_STATE_SETTLED = 0,
+        CONTROL_STATE_PENDING = 1,
+        CONTROL_STATE_HELD = 2,
     };
 
     enum ClockParam {
@@ -74,6 +90,7 @@ struct NetwMultiplayer {
         ENDPOINT_PARAM_ADDRESS = 1,
         ENDPOINT_PARAM_DISPLAY_NAME = 2,
         ENDPOINT_PARAM_SOURCE = 3,
+        ENDPOINT_PARAM_INVITED_BY = 4,
     };
 
     enum EndpointState {
@@ -86,6 +103,7 @@ struct NetwMultiplayer {
         ENDPOINT_FLAG_CALLER = 1,
         ENDPOINT_FLAG_AVAILABLE = 2,
         ENDPOINT_FLAG_OBSERVED = 4,
+        ENDPOINT_FLAG_INVITED = 8,
     };
 
     enum SceneParam {
@@ -132,6 +150,13 @@ struct NetwMultiplayer {
         SIMULATION_PARAM_REPLICAS = 2,
         SIMULATION_PARAM_RESTORE = 3,
         SIMULATION_PARAM_MAX_RESTORE_TICKS = 4,
+        SIMULATION_PARAM_CLAIM_ON_CONTACT = 5,
+        SIMULATION_PARAM_RELEASE_ON_REST = 6,
+    };
+
+    enum SimPick {
+        SIM_PICK_CHOSEN = 0,
+        SIM_PICK_FORGET = 1,
     };
 
     enum WritePolicy {
@@ -166,6 +191,15 @@ struct NetwMultiplayer {
         SET_PARAM_HEARTBEAT = 10,
     };
 
+    enum Stat {
+#define NETW_SESSION_STAT_ENUM(m_name, m_key) STAT_##m_name,
+        NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_ENUM)
+#undef NETW_SESSION_STAT_ENUM
+            STAT_COUNT,
+    };
+};
+
+struct NetwSchema {
     enum ColumnType {
         COLUMN_F32 = SchemaCore::F32,
         COLUMN_F64 = SchemaCore::F64,
@@ -186,19 +220,19 @@ struct NetwMultiplayer {
         COLUMN_STRING = SchemaCore::STRING,
     };
 
-    enum DatabaseState {
-        DATABASE_CLOSED = 0,
-        DATABASE_OPENING = 1,
-        DATABASE_OPEN = 2,
-        DATABASE_CLOSING = 3,
-        DATABASE_FAULTED = 4,
+    enum RecordKind {
+        RECORD_KIND_STATE = repl::SET_RECORD_STATE,
+        RECORD_KIND_INPUT = repl::SET_RECORD_INPUT,
+        RECORD_KIND_BROADCAST = repl::SET_RECORD_BROADCAST,
     };
+};
 
-    enum Stat {
-#define NETW_SESSION_STAT_ENUM(m_name, m_key) STAT_##m_name,
-        NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_ENUM)
-#undef NETW_SESSION_STAT_ENUM
-            STAT_COUNT,
+struct NetwDatabase {
+    enum State {
+        STATE_CLOSED = 0,
+        STATE_OPENING = 1,
+        STATE_OPEN = 2,
+        STATE_CLOSING = 3,
     };
 };
 
@@ -334,12 +368,6 @@ struct NetwInterestLayer {
 };
 
 struct NetwScene {
-    enum SceneEvent {
-        SCENE_EVENT_VIEWER = 0,
-        SCENE_EVENT_PLAYER_ENTITY = 1,
-        SCENE_EVENT_ENTITY = 2,
-    };
-
     enum SceneIsolation {
         SCENE_ISOLATION_NONE = NetwSceneCore::ISOLATION_NONE,
         SCENE_ISOLATION_OWN_WORLD = NetwSceneCore::ISOLATION_OWN_WORLD,
@@ -367,7 +395,9 @@ struct LobbyDirectory {
 } // namespace netw::enums
 
 VARIANT_ENUM_CAST(netw::enums::NetwScene::SceneIsolation);
-VARIANT_ENUM_CAST(netw::enums::NetwScene::SceneEvent);
+VARIANT_ENUM_CAST(netw::enums::NetwSchema::ColumnType);
+VARIANT_ENUM_CAST(netw::enums::NetwSchema::RecordKind);
+VARIANT_ENUM_CAST(netw::enums::NetwDatabase::State);
 VARIANT_ENUM_CAST(netw::enums::NetwSession::State);
 VARIANT_ENUM_CAST(netw::enums::NetwSession::Role);
 VARIANT_ENUM_CAST(netw::enums::NetwSession::ExitReason);
@@ -389,6 +419,8 @@ VARIANT_ENUM_CAST(netw::enums::NetwInterestLayer::PerceptionPolicy);
 VARIANT_ENUM_CAST(netw::enums::LobbyDirectory::Capability);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::TableParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::EntityState);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::EntityParam);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ControlState);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ClockParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::LayerParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::TransportParam);
@@ -399,9 +431,8 @@ VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SceneParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::DisplayParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::PredictParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SimulationParam);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SimPick);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::WritePolicy);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ColumnParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::PropertySetParam);
-VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ColumnType);
-VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::DatabaseState);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::Stat);

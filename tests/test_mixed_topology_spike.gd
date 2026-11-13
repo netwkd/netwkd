@@ -31,7 +31,9 @@ func _install_and_host() -> bool:
 		loopback.reset()
 	_host_api.session_prepare_join(&"host", [])
 	_host_api.multiplayer_peer = loopback.get_server_peer()
-	return await _pump_until(func() -> bool: return _host_api.is_online)
+	return await _pump_until(
+		func() -> bool: return _host_api.session_is_online()
+	)
 
 
 func _mount_client() -> NetwMultiplayer:
@@ -71,12 +73,8 @@ func test_root_and_subpath_mounts_coexist_as_live_sessions() -> void:
 	assert_that(get_tree().get_multiplayer(_client_tree.get_path())).is_same(
 		client_api,
 	)
-	assert_that(_host_api.session_is_active()).is_true()
-	assert_that(client_api.session_is_active()).is_true()
-	assert_that(NetwMultiplayer.session_get_all()).contains(
-		[_host_api, client_api],
-	)
-	assert_that(NetwMultiplayer.of(_client_tree)).is_same(client_api)
+	assert_that(NetwMultiplayer.session_of(self)).is_same(_host_api)
+	assert_that(NetwMultiplayer.session_of(_client_tree)).is_same(client_api)
 
 
 func test_tree_less_root_comes_online_as_a_host() -> void:
@@ -96,7 +94,7 @@ func test_subpath_client_is_admitted_across_the_mount_boundary() -> void:
 	_join_client()
 
 	var admitted := await _pump_until(
-		func() -> bool: return client_api.local_player != null
+		func() -> bool: return client_api.player_get_local() != 0
 	)
 	assert_bool(admitted).override_failure_message(
 		"subpath client was never admitted to its own session",
@@ -104,7 +102,7 @@ func test_subpath_client_is_admitted_across_the_mount_boundary() -> void:
 
 	var client_id := client_api.get_unique_id()
 	var host_sees_client := await _pump_until(
-		func() -> bool: return _host_api.peer_get_player(client_id) != null
+		func() -> bool: return Netw.session(self).player_of(client_id) != null
 	)
 	assert_bool(host_sees_client).override_failure_message(
 		"root host admitted no roster row for the subpath client",

@@ -22,6 +22,10 @@
 #include "netw/store/column.hpp"
 #include "netw/store/entity_ref.hpp"
 
+namespace netw {
+class NetwPredictSlotEngine;
+} // namespace netw
+
 namespace netw::predict {
 
 constexpr int TAPE_HISTORY_LIMIT = 256;
@@ -204,7 +208,6 @@ struct RecoveryRows {
     godot::LocalVector<double> tier_errors;
     RecoveryRequest request;
     RecoveryRequest effective;
-    WritePlan staged;
     wire::CodeRow scratch;
     godot::PackedInt64Array codes;
     godot::LocalVector<godot::StringName> install_keys;
@@ -362,7 +365,7 @@ struct Slot {
     store::EntityRef store;
     Listener state_listener = Listener::NONE;
     Listener input_listener = Listener::NONE;
-    godot::ObjectID arrival_seat;
+    NetwPredictSlotEngine *arrival_seat = nullptr;
     godot::StringName breach_source;
     CompareStats compare_stats;
     StateVerdict last_state_verdict;

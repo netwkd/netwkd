@@ -91,9 +91,7 @@ TEST_CASE(
     Ref<netw::NetwEntity> entity;
     entity.instantiate();
     entity->set_owner(body);
-    REQUIRE(
-        core->liveness_adopt_route(17, entity, entity->get_record(), body) == OK
-    );
+    REQUIRE(core->liveness_adopt_route(17, entity, body) == OK);
     REQUIRE(Internals::display_runtime_for(core, 17, entity) != nullptr);
     const RID handle = entity->get_rid_handle();
     auto *pool = Internals::get_prediction_engine(core);
@@ -107,14 +105,14 @@ TEST_CASE(
     memdelete(body);
 
     Internals::session_plane(core).transition(SessionCore::STATE_DISCONNECTING);
-    core->session_flush_deferred();
+    core->NETW_API_VIRTUAL(poll)();
 
     CHECK(Internals::get_display_book(core)->runtimes().is_empty());
-    CHECK_FALSE(core->predict_engine_seated(handle));
+    CHECK_FALSE(core->predict_is_declared(handle));
     NETW_CHECK_EQ(pool->slot_registered(), 0);
     const bool wrapper_freed = netw::gd::object_of(wrapper) == nullptr;
     CHECK(wrapper_freed);
-    if (core->predict_engine_seated(handle)) {
+    if (core->predict_is_declared(handle)) {
         core->unregister_prediction(prediction->seated_entity());
     }
     Internals::get_display_book(core)->clear();
@@ -125,9 +123,7 @@ TEST_CASE(
     body = memnew(Node2D);
     entity.instantiate();
     entity->set_owner(body);
-    REQUIRE(
-        core->liveness_adopt_route(17, entity, entity->get_record(), body) == OK
-    );
+    REQUIRE(core->liveness_adopt_route(17, entity, body) == OK);
     auto *runtime = Internals::display_runtime_for(core, 17, entity);
     REQUIRE(runtime != nullptr);
     CHECK(runtime->entity() == entity);

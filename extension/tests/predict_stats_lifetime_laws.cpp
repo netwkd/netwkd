@@ -8,6 +8,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_stats.hpp"
 #include "netw/api/prediction.hpp"
+#include "netw/predict/decl.hpp"
 
 namespace TestNetwPredictStatsLifetimeLaws {
 
@@ -48,7 +49,10 @@ TEST_CASE(
         REQUIRE(entity.is_valid());
         wrapper = entity->get_instance_id();
         REQUIRE(pool->slot_register(entity) >= 0);
-        entity->get_prediction()->fact_book()->bind_slot(pool, entity);
+        Internals::record(entity.ptr())->predict_declaration().facts.bind_slot(
+            pool,
+            entity
+        );
         pool->slot_unregister(entity);
     }
     REQUIRE(netw::gd::object_registered(wrapper));
@@ -75,7 +79,10 @@ TEST_CASE(
         REQUIRE(entity.is_valid());
         wrapper = entity->get_instance_id();
         REQUIRE(pool->slot_register(entity) >= 0);
-        entity->get_prediction()->fact_book()->bind_slot(pool, entity);
+        Internals::record(entity.ptr())->predict_declaration().facts.bind_slot(
+            pool,
+            entity
+        );
         stats = entity->get_prediction()->get_stats();
         const String seated = facts_off_their_fallback(stats->to_dictionary());
         REQUIRE_FALSE(seated.is_empty());

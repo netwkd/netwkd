@@ -10,7 +10,7 @@ Fault index
 - :doc:`nw0007`, REMOTE
 - :doc:`nw0008`, REMOTE
 - :doc:`nw0009`, MISUSE
-- :doc:`nw0010`, MISUSE
+- :doc:`nw0010`, PRACTICE
 - :doc:`nw0011`, MISUSE
 - :doc:`nw0012`, MISUSE
 - :doc:`nw0013`, REMOTE

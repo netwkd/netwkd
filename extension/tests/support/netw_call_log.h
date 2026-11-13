@@ -22,6 +22,7 @@ class CallLogSink final : public godot::CallableCustom {
     godot::ObjectID anchor;
     godot::Variant answer;
     godot::Variant (*mints)() = nullptr;
+    godot::Variant (*reads)(const godot::Variant &) = nullptr;
 
     static bool same(
         const godot::CallableCustom *a,
@@ -43,11 +44,12 @@ public:
         const godot::StringName &p_tag,
         const godot::Object *p_anchor,
         const godot::Variant &p_answer = godot::Variant(),
-        godot::Variant (*p_mints)() = nullptr
+        godot::Variant (*p_mints)() = nullptr,
+        godot::Variant (*p_reads)(const godot::Variant &) = nullptr
     )
         : entries(p_entries), tag(p_tag),
           anchor(netw::gd::instance_id(p_anchor)), answer(p_answer),
-          mints(p_mints) {
+          mints(p_mints), reads(p_reads) {
     }
 
     uint32_t hash() const override {
@@ -78,7 +80,10 @@ public:
     ) const override {
         godot::Array carried;
         for (int index = 0; index < p_count; ++index) {
-            carried.push_back(*p_arguments[index]);
+            carried.push_back(
+                reads != nullptr ? reads(*p_arguments[index])
+                                 : *p_arguments[index]
+            );
         }
         entries->tags.push_back(tag);
         entries->args.push_back(carried);
@@ -118,6 +123,20 @@ public:
         const godot::StringName &p_tag
     ) const {
         return godot::Callable(memnew(CallLogSink(entries, p_tag, p_anchor)));
+    }
+
+    godot::Callable reading(
+        const godot::StringName &p_tag,
+        godot::Variant (*p_reads)(const godot::Variant &)
+    ) const {
+        return godot::Callable(memnew(CallLogSink(
+            entries,
+            p_tag,
+            anchor.ptr(),
+            godot::Variant(),
+            nullptr,
+            p_reads
+        )));
     }
 
     void note(const godot::StringName &p_tag) const {

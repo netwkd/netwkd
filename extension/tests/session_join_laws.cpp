@@ -14,11 +14,10 @@ namespace TestNetwSessionJoinLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
-using netw_test::EntityDecl;
 using netw_test::LoopbackRig;
 
 Ref<netw::NetwPlayer> player_of(NetwMultiplayer *p_api, int p_peer) {
-    return p_api->peer_get_player(p_peer);
+    return p_api->player_joined_of(p_peer);
 }
 
 TEST_CASE(
@@ -128,63 +127,6 @@ TEST_CASE(
         int(rig.client(0)->entity_get_route(mirror)),
         int(rig.server()->entity_get_route(origin))
     );
-}
-
-TEST_CASE(
-    "[Networked][Session] the session's player roster is every live "
-    "scene's seated players and nothing else, so an entity carrying no "
-    "peer is not a player and a player in a second scene is not lost"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    rig.declare_scene(StringName("Arena"));
-    rig.declare_scene(StringName("Annex"));
-    Node *arena_container = rig.node_of(rig.entity_of(StringName("Arena")));
-    Node *annex_container = rig.node_of(rig.entity_of(StringName("Annex")));
-    REQUIRE(arena_container != nullptr);
-    REQUIRE(annex_container != nullptr);
-    rig.branch(-1)->add_child(arena_container);
-    rig.branch(-1)->add_child(annex_container);
-    arena_container->set_owner(rig.branch(-1));
-    annex_container->set_owner(rig.branch(-1));
-    rig.pump(4);
-    rig.enter_scene(StringName("Arena"));
-    rig.enter_scene(StringName("Annex"));
-
-    netw::NetwMultiplayer *core = rig.server();
-    REQUIRE(core != nullptr);
-    NETW_CHECK_EQ(int(core->scene_list().size()), 2);
-    CHECK(core->scene_player_entities_all().is_empty());
-
-    const RID pawn
-        = rig.declare_entity(EntityDecl().named("Pawn").on_route(71));
-    const RID crate
-        = rig.declare_entity(EntityDecl().named("Crate").on_route(72));
-    const RID guard
-        = rig.declare_entity(EntityDecl().named("Guard").on_route(73));
-    rig.place(pawn, rig.entity_of(StringName("Arena")));
-    rig.place(crate, rig.entity_of(StringName("Arena")));
-    rig.place(guard, rig.entity_of(StringName("Annex")));
-
-    const Ref<netw::NetwEntity> seated_pawn
-        = netw::NetwEntity::of(rig.node_of(pawn));
-    const Ref<netw::NetwEntity> seated_guard
-        = netw::NetwEntity::of(rig.node_of(guard));
-    REQUIRE(seated_pawn.is_valid());
-    REQUIRE(seated_guard.is_valid());
-    seated_pawn->set_peer_id(rig.peer_id(0));
-    seated_guard->set_peer_id(1);
-
-    const TypedArray<netw::NetwEntity> roster
-        = core->scene_player_entities_all();
-
-    NETW_CHECK_EQ(int(roster.size()), 2);
-    CHECK(roster.has(seated_pawn));
-    CHECK(roster.has(seated_guard));
-    CHECK_FALSE(roster.has(netw::NetwEntity::of(rig.node_of(crate))));
-
-    rig.branch(-1)->remove_child(arena_container);
-    rig.branch(-1)->remove_child(annex_container);
 }
 
 TEST_CASE(

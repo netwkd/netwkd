@@ -51,7 +51,7 @@ NetwMultiplayer *SpawnerCompat::core() const {
 
 Node *SpawnerCompat::session_root() const {
     NetwMultiplayer *plane = core();
-    return plane != nullptr ? plane->session_root() : nullptr;
+    return plane != nullptr ? plane->session_get_root() : nullptr;
 }
 
 void SpawnerCompat::set_core(Object *p_core) {

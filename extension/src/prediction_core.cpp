@@ -19,8 +19,6 @@ namespace netw {
 
 constexpr int CAUSAL_FAMILY_COUNT = 3;
 
-constexpr int MEASURE_SATURATED = 0x7FFFFFFF;
-
 constexpr uint32_t FNV_OFFSET = 2166136261u;
 constexpr uint32_t FNV_PRIME = 16777619u;
 
@@ -268,32 +266,6 @@ int prediction_core::domain_of(
         return int(Domain::OUT_OF_DOMAIN);
     }
     return int(Domain::IN_DOMAIN);
-}
-
-int prediction_core::measure(
-    const Dictionary &field_sink,
-    const Dictionary &tolerances
-) {
-    NETW_ZONE_NC("NetwPredict measure", colors::PREDICTION);
-    int meter = 0;
-    const Array fields = tolerances.keys();
-    for (int i = 0; i < fields.size(); i++) {
-        const Variant field = fields[i];
-        const double error = field_sink.has(field)
-            ? double(field_sink[field])
-            : std::numeric_limits<double>::infinity();
-        if (!std::isfinite(error)) {
-            return MEASURE_SATURATED;
-        }
-        const double tolerance = std::max(0.0, double(tolerances[field]));
-        if (tolerance <= 0.0) {
-            meter = std::max(meter, error > 0.0 ? 1 : 0);
-            continue;
-        }
-        const double over = std::max(error - tolerance, 0.0);
-        meter = std::max(meter, int(std::ceil(over / tolerance)));
-    }
-    return meter;
 }
 
 int prediction_core::attribute(

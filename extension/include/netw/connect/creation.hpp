@@ -41,10 +41,6 @@ struct Creation {
     bool dispatching = false;
 };
 
-godot::RID mint_creation(const Creation &p_seed);
-Creation *creation_of(const godot::RID &p_ticket);
-void free_creation(const godot::RID &p_ticket);
-
 struct PeerOffer {
     godot::RID ticket;
     godot::ObjectID session;

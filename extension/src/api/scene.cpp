@@ -21,167 +21,90 @@ const char *SNAME_PLAYER_ENTITY_LEFT = "player_entity_left";
 const char *SNAME_VIEWER_ENTERED = "viewer_entered";
 const char *SNAME_VIEWER_EXITED = "viewer_exited";
 
+TypedArray<NetwEntity> views_of(
+    NetwMultiplayer *p_session,
+    const TypedArray<RID> &p_rows
+) {
+    TypedArray<NetwEntity> views;
+    if (p_session == nullptr) {
+        return views;
+    }
+    views.resize(p_rows.size());
+    for (int at = 0; at < p_rows.size(); ++at) {
+        views[at] = p_session->entity_get_view(RID(p_rows[at]));
+    }
+    return views;
+}
+
 } // namespace
 
-void NetwScene::bind(NetwEntity *p_entity) {
-    entity_id = gd::instance_id(p_entity);
-}
-
-Ref<NetwEntity> NetwScene::entity_of_handle() const {
-    return Ref<NetwEntity>(
-        Object::cast_to<NetwEntity>(gd::object_of(entity_id))
-    );
-}
-
 NetwMultiplayer *NetwScene::core() const {
-    const Ref<NetwEntity> bound = entity_of_handle();
-    return bound.is_valid() ? NetwEntity::session_core_for(bound->get_owner())
-                            : nullptr;
+    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(session_id));
 }
 
 RID NetwScene::get_rid() const {
-    const Ref<NetwEntity> bound = entity_of_handle();
-    NetwMultiplayer *session = core();
-    if (session == nullptr || bound.is_null()) {
-        return RID();
-    }
-    Node *owner = bound->get_owner();
-    if (owner == nullptr) {
-        return RID();
-    }
-    return session->scene_of(session->entity_of(owner));
+    return core() != nullptr ? scene : RID();
 }
 
-Node *NetwScene::scene_node() const {
+NetwMultiplayer *NetwScene::live_core() const {
     NetwMultiplayer *session = core();
-    if (session != nullptr) {
-        const RID resolved = get_rid();
-        if (resolved.is_valid()) {
-            return session->scene_entity_node(resolved);
-        }
-    }
-    const Ref<NetwEntity> bound = entity_of_handle();
-    if (bound.is_null()) {
-        return nullptr;
-    }
-    const StringName marker = NetwMultiplayer::scene_container_meta();
-    Node *walker = bound->get_owner();
-    while (walker != nullptr) {
-        if (walker->has_meta(marker)) {
-            return walker;
-        }
-        walker = walker->get_parent();
-    }
-    return nullptr;
+    return session != nullptr && session->scene_is_live(scene) ? session
+                                                               : nullptr;
 }
 
 Ref<NetwEntity> NetwScene::get_entity() const {
-    return NetwEntity::of(scene_node());
+    NetwMultiplayer *session = live_core();
+    return session != nullptr ? session->entity_get_view(scene)
+                              : Ref<NetwEntity>();
 }
 
 Node *NetwScene::get_root() const {
-    return scene_node();
+    NetwMultiplayer *session = live_core();
+    return session != nullptr ? session->scene_get_root(scene) : nullptr;
 }
 
 Node *NetwScene::get_world() const {
-    return NetwMultiplayer::scene_world_of(scene_node());
+    NetwMultiplayer *session = live_core();
+    return session != nullptr ? session->scene_get_world(scene) : nullptr;
 }
 
 StringName NetwScene::get_label() const {
     NetwMultiplayer *session = core();
-    return session != nullptr ? session->scene_get_label(get_rid())
-                              : StringName();
+    return session != nullptr ? session->scene_get_label(scene) : StringName();
 }
 
 TypedArray<NetwEntity> NetwScene::get_player_entities() const {
     NetwMultiplayer *session = core();
-    return session != nullptr ? session->scene_get_player_entities(get_rid())
-                              : TypedArray<NetwEntity>();
+    return session != nullptr
+        ? views_of(session, session->scene_get_player_entities(scene))
+        : TypedArray<NetwEntity>();
 }
 
 TypedArray<NetwPlayer> NetwScene::get_viewers() const {
+    TypedArray<NetwPlayer> out;
     NetwMultiplayer *session = core();
-    return session != nullptr ? session->scene_get_viewers(get_rid())
-                              : TypedArray<NetwPlayer>();
+    if (session == nullptr) {
+        return out;
+    }
+    const PackedInt64Array ids = session->scene_get_viewers(scene);
+    for (int at = 0; at < ids.size(); ++at) {
+        out.push_back(session->player_view(ids[at]));
+    }
+    return out;
 }
 
 TypedArray<NetwEntity> NetwScene::get_local_player_entities() const {
     NetwMultiplayer *session = core();
     return session != nullptr
-        ? session->scene_get_local_player_entities(get_rid())
+        ? views_of(session, session->scene_get_local_player_entities(scene))
         : TypedArray<NetwEntity>();
 }
 
 TypedArray<NetwEntity> NetwScene::get_entities() const {
-    TypedArray<NetwEntity> views;
     NetwMultiplayer *session = core();
-    if (session == nullptr) {
-        return views;
-    }
-    const TypedArray<RID> rows = session->scene_get_entities(get_rid());
-    views.resize(rows.size());
-    for (int at = 0; at < rows.size(); ++at) {
-        views[at] = session->entity_get_view(RID(rows[at]));
-    }
-    return views;
-}
-
-Variant NetwScene::translate_edge(
-    bool p_present,
-    const Variant &p_subject,
-    int64_t p_event,
-    const Callable &p_target
-) {
-    NetwMultiplayer *session = core();
-    Variant subject;
-    if (session != nullptr) {
-        if (p_event == NetwScene::SCENE_EVENT_VIEWER) {
-            subject = session->player_of(int64_t(p_subject));
-        } else {
-            subject = session->entity_get_view(RID(p_subject));
-        }
-    }
-    Array args;
-    args.push_back(p_present);
-    args.push_back(subject);
-    return p_target.callv(args);
-}
-
-void NetwScene::observe(
-    NetwScene::SceneEvent p_event,
-    const Callable &p_callback
-) {
-    NetwMultiplayer *session = core();
-    if (session == nullptr || !p_callback.is_valid()) {
-        return;
-    }
-    for (uint32_t at = 0; at < relays.size(); ++at) {
-        if (relays[at].event == p_event && relays[at].target == p_callback) {
-            return;
-        }
-    }
-    const Callable mounted = callable_mp(this, &NetwScene::translate_edge)
-                                 .bind(int64_t(p_event), p_callback);
-    relays.push_back(Relay{int64_t(p_event), p_callback, mounted});
-    session->scene_observe(get_rid(), p_event, mounted);
-}
-
-void NetwScene::unobserve(
-    NetwScene::SceneEvent p_event,
-    const Callable &p_callback
-) {
-    for (uint32_t at = 0; at < relays.size(); ++at) {
-        if (relays[at].event != int64_t(p_event)
-            || relays[at].target != p_callback) {
-            continue;
-        }
-        NetwMultiplayer *session = core();
-        if (session != nullptr) {
-            session->scene_unobserve(get_rid(), p_event, relays[at].mounted);
-        }
-        relays.remove_at(at);
-        return;
-    }
+    return session != nullptr
+        ? views_of(session, session->scene_get_entities(scene))
+        : TypedArray<NetwEntity>();
 }
 
 Error NetwScene::watch(const Ref<NetwPlayer> &p_player) {
@@ -189,7 +112,7 @@ Error NetwScene::watch(const Ref<NetwPlayer> &p_player) {
     if (session == nullptr || !session->player_holds(p_player)) {
         return ERR_INVALID_PARAMETER;
     }
-    return session->scene_watch(get_rid(), p_player->get_peer_id());
+    return session->scene_watch(scene, p_player->get_id());
 }
 
 Error NetwScene::unwatch(const Ref<NetwPlayer> &p_player) {
@@ -197,16 +120,13 @@ Error NetwScene::unwatch(const Ref<NetwPlayer> &p_player) {
     if (session == nullptr || !session->player_holds(p_player)) {
         return ERR_INVALID_PARAMETER;
     }
-    return session->scene_unwatch(get_rid(), p_player->get_peer_id())
-        ? OK
-        : ERR_DOES_NOT_EXIST;
+    return session->scene_unwatch(scene, p_player->get_id());
 }
 
 bool NetwScene::is_watching(const Ref<NetwPlayer> &p_player) const {
     NetwMultiplayer *session = core();
-    return session != nullptr && p_player.is_valid()
-        && session->scene_is_live(get_rid())
-        && session->scene_subscribes(get_rid(), p_player->get_peer_id());
+    return session != nullptr && session->player_holds(p_player)
+        && session->scene_is_watching(scene, p_player->get_id());
 }
 
 void NetwScene::announce_entity(
@@ -240,9 +160,6 @@ void NetwScene::announce_viewer(
 }
 
 void NetwScene::_bind_methods() {
-    BIND_ENUM_CONSTANT(SCENE_EVENT_VIEWER);
-    BIND_ENUM_CONSTANT(SCENE_EVENT_PLAYER_ENTITY);
-    BIND_ENUM_CONSTANT(SCENE_EVENT_ENTITY);
     BIND_ENUM_CONSTANT(SCENE_ISOLATION_NONE);
     BIND_ENUM_CONSTANT(SCENE_ISOLATION_OWN_WORLD);
     ClassDB::bind_method(D_METHOD("get_rid"), &NetwScene::get_rid);
@@ -336,14 +253,6 @@ void NetwScene::_bind_methods() {
         "",
         "get_entities"
     );
-    ClassDB::bind_method(
-        D_METHOD("observe", "event", "callback"),
-        &NetwScene::observe
-    );
-    ClassDB::bind_method(
-        D_METHOD("unobserve", "event", "callback"),
-        &NetwScene::unobserve
-    );
     ClassDB::bind_method(D_METHOD("watch", "player"), &NetwScene::watch);
     ClassDB::bind_method(D_METHOD("unwatch", "player"), &NetwScene::unwatch);
     ClassDB::bind_method(
@@ -405,13 +314,6 @@ void NetwScene::_bind_methods() {
             "NetwPlayer"
         )
     ));
-}
-
-Ref<NetwScene> build_scene_handle(Object *p_entity) {
-    Ref<NetwScene> made;
-    made.instantiate();
-    made->bind(Object::cast_to<NetwEntity>(p_entity));
-    return made;
 }
 
 } // namespace netw

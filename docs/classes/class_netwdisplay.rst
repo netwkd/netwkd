@@ -490,6 +490,8 @@ The child node that receives the smoothed values. Position and rotation are writ
 
 The written values replace the visual's own position and rotation, so point this at a plain node and put a model that needs one under it.
 
+\ :ref:`NetwMultiplayer.display_set_callback()<class_NetwMultiplayer_method_display_set_callback>` and :ref:`NetwMultiplayer.display_set_target_item()<class_NetwMultiplayer_method_display_set_target_item>` take the values in place of any node.
+
 Only a child of the entity root is supported. A path that resolves to another node, such as a sibling, raises no fault. When the entity holds a :godot:`RigidBody3D`, that node's own transform is then read as its offset from the entity root, so it is drawn displaced.
 
 .. rst-class:: classref-section-separator

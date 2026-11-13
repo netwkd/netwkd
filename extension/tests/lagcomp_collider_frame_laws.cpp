@@ -175,7 +175,19 @@ class ColliderScenario final : public netw_test::FrameScenario {
         Array keys;
         keys.push_back(StringName("position"));
         history->timeline_declare(slot, keys);
-        history->timeline_record(slot, PAST_TICK, pose_row(PAST_X, p_z));
+        netw::predict::FieldCodec codec;
+        codec.append(
+            StringName("position"),
+            Ref<netw::NetwQuantize>(),
+            int(Variant::VECTOR3)
+        );
+        codec.seal();
+        history->timeline_record_coded(
+            slot,
+            PAST_TICK,
+            pose_row(PAST_X, p_z),
+            codec
+        );
         return slot;
     }
 

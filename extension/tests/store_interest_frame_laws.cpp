@@ -147,11 +147,8 @@ protected:
         for (int index = 0; index < p_marks; ++index) {
             Array args;
             args.push_back(String("mark") + String::num_int64(index));
-            const RID made = server()->spawn_registered(
-                StringName(MARK_ID),
-                args,
-                nullptr
-            );
+            const RID made
+                = server()->spawn_registered(StringName(MARK_ID), args, 0);
             Node *built = server()->entity_get_node(made);
             if (built == nullptr) {
                 return false;
@@ -277,7 +274,7 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
 
     void snapshot() {
         opened = Internals::store(server()).interest_work;
-        marks_opened = server()->interest_plane().mark_visits;
+        marks_opened = Internals::interest_plane(server()).mark_visits;
     }
 
     void join() {
@@ -293,7 +290,8 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
             = Internals::store(server()).interest_work;
         seen.join_evaluations = now.evaluations - opened.evaluations;
         seen.join_writes = now.writes - opened.writes;
-        seen.join_marks = server()->interest_plane().mark_visits - marks_opened;
+        seen.join_marks
+            = Internals::interest_plane(server()).mark_visits - marks_opened;
         seen.admitted_after = admitted_to_client();
         snapshot();
     }

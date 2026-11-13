@@ -684,7 +684,7 @@ netw::repl::PropertyBindingPtr binding_on(
         StringName("x"),
         Ref<netw::NetwQuantize>(),
         false,
-        netw::enums::NetwMultiplayer::ColumnType(netw::SchemaCore::VARIANT)
+        netw::enums::NetwSchema::ColumnType(netw::SchemaCore::VARIANT)
     );
     column.lane = netw::repl::PropertySet::VOLATILE;
     set->bind_column(column);

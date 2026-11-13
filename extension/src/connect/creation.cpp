@@ -1,7 +1,6 @@
 #include "netw/connect/creation.hpp"
 
 #include "godot/local_vector.hpp"
-#include "godot/rid.hpp"
 
 using namespace godot;
 
@@ -9,39 +8,12 @@ namespace netw::connect {
 
 namespace {
 
-RID_Owner<Creation> &creation_owner() {
-    static RID_Owner<Creation> instance;
-    static bool described = false;
-    if (!described) {
-        instance.set_description("netw::connect peer creation");
-        described = true;
-    }
-    return instance;
-}
-
 LocalVector<PeerOffer> &offers() {
     static LocalVector<PeerOffer> instance;
     return instance;
 }
 
 } // namespace
-
-RID mint_creation(const Creation &p_seed) {
-    return creation_owner().make_rid(p_seed);
-}
-
-Creation *creation_of(const RID &p_ticket) {
-    if (!p_ticket.is_valid()) {
-        return nullptr;
-    }
-    return creation_owner().get_or_null(p_ticket);
-}
-
-void free_creation(const RID &p_ticket) {
-    if (creation_of(p_ticket) != nullptr) {
-        creation_owner().free(p_ticket);
-    }
-}
 
 void offer_open(const PeerOffer &p_offer) {
     offers().push_back(p_offer);

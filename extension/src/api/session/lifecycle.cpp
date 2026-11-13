@@ -185,7 +185,7 @@ lifecycle::Destination NetwMultiplayer::lifecycle_destination(
     const Ref<NetwEntity> anchor = NetwEntity::of(p_parent);
     const bool routed
         = anchor.is_valid() && liveness_route_of(anchor.ptr()) > 0;
-    Node *root = session_root();
+    Node *root = session_get_root();
     if (!routed
         && (root == nullptr
             || !(p_parent == root || root->is_ancestor_of(p_parent)))) {
@@ -288,7 +288,7 @@ void NetwMultiplayer::lifecycle_send_move(const EntityDeparture &p_row) {
         );
         return;
     }
-    entity->structure_op_issue(p_row.base, p_row.promise);
+    control_structure_issue(entity, p_row.base, p_row.promise);
     lifecycle_send_to_session(
         p_row.route,
         gate_channels.reparent,
@@ -373,7 +373,7 @@ void NetwMultiplayer::lifecycle_withdraw_author(
     int64_t p_author
 ) {
     spawn::Pipeline *spawns = spawn_plane();
-    Node *owner = liveness_node_of(p_route);
+    Node *owner = wrapper_owner(liveness_core->rid_from_route(int(p_route)));
     if (spawns == nullptr || owner == nullptr) {
         return;
     }
@@ -414,20 +414,19 @@ bool NetwMultiplayer::lifecycle_filter_denies(
 void NetwMultiplayer::lifecycle_notify_refused(
     NetwEntity *p_entity,
     lifecycle::Kind p_kind,
+    ObjectID p_destination,
     const String &p_reason
 ) {
     if (p_entity == nullptr) {
         return;
     }
-    Node *owner = p_entity->get_owner();
-    const Ref<NetwLifecycleRequest> request = NetwLifecycleRequest::create(
-        p_kind,
-        get_unique_id(),
-        Ref<NetwEntity>(p_entity),
-        owner != nullptr ? owner->get_parent() : nullptr
-    );
-    request->deny(p_reason);
-    p_entity->emit_signal(StringName("lifecycle_refused"), request);
+    Announcement row;
+    row.kind = AnnouncementKind::LIFECYCLE_REFUSED;
+    row.code = int64_t(p_kind);
+    row.requester = get_unique_id();
+    row.node = p_destination;
+    row.reason = p_reason;
+    entity_announce(p_entity, row);
 }
 
 bool NetwMultiplayer::lifecycle_admit_despawn(
@@ -486,7 +485,7 @@ bool NetwMultiplayer::lifecycle_withhold_despawn(
     Node *parent = owner != nullptr ? owner->get_parent() : nullptr;
     if (route <= 0 || is_host() || spawns == nullptr || parent == nullptr
         || !spawns->holds_received_route(route)
-        || lifecycle_withheld.has(route)) {
+        || lifecycle_withheld.has(p_entity->get_rid_handle().get_id())) {
         return false;
     }
     AnchorRevision base = anchor_installed(route);
@@ -500,38 +499,43 @@ bool NetwMultiplayer::lifecycle_withhold_despawn(
     lifecycle_detach_ahead(p_entity);
     lifecycle_send_to_session(route, gate_channels.despawn, stream.to_bytes());
     WithheldDespawn held;
-    held.entity = Ref<NetwEntity>(p_entity);
+    held.route = route;
     held.parent = gd::instance_id(parent);
     held.index = owner->get_index();
     held.opts = p_opts;
-    lifecycle_withheld.insert(route, held);
+    lifecycle_withheld.insert(p_entity->get_rid_handle().get_id(), held);
     spawn_carry_land_out_of(owner);
     spawn_unplace_node(owner);
     return true;
 }
 
-void NetwMultiplayer::lifecycle_answer_withheld(
+bool NetwMultiplayer::lifecycle_answer_withheld(
     int64_t p_route,
     bool p_accepted,
     const String &p_reason
 ) {
-    HashMap<int64_t, WithheldDespawn>::Iterator found
-        = lifecycle_withheld.find(p_route);
-    if (!found) {
-        return;
+    HashMap<uint64_t, WithheldDespawn>::Iterator found
+        = lifecycle_withheld.begin();
+    while (found && found->value.route != p_route) {
+        ++found;
     }
+    if (!found) {
+        return false;
+    }
+    const uint64_t id = found->key;
     const WithheldDespawn held = found->value;
     lifecycle_withheld.remove(found);
-    NetwEntity *entity = held.entity.ptr();
-    Node *owner = entity->get_owner();
+    const Ref<NetwEntity> keep(entity_holder(id));
+    NetwEntity *entity = keep.ptr();
+    Node *owner = entity != nullptr ? entity->get_owner() : nullptr;
     Node *parent = Object::cast_to<Node>(gd::object_of(held.parent));
     if (owner == nullptr) {
-        return;
+        return true;
     }
     if (p_accepted || parent == nullptr || !parent->is_inside_tree()) {
-        entity->despawn_here(held.opts);
+        entity_despawn_here(entity, held.opts);
         entity_settle_captured(entity);
-        return;
+        return true;
     }
     if (owner->get_parent() == nullptr) {
         parent->add_child(owner);
@@ -540,13 +544,19 @@ void NetwMultiplayer::lifecycle_answer_withheld(
             MIN(held.index, parent->get_child_count() - 1)
         );
     }
-    lifecycle_notify_refused(entity, lifecycle::Kind::DESPAWN, p_reason);
+    lifecycle_notify_refused(
+        entity,
+        lifecycle::Kind::DESPAWN,
+        gd::instance_id(owner->get_parent()),
+        p_reason
+    );
     lifecycle_restore_detached(p_route);
     entity_settle_captured(entity);
+    return true;
 }
 
-bool NetwMultiplayer::lifecycle_forget_withheld(int64_t p_route) {
-    return lifecycle_withheld.erase(p_route);
+bool NetwMultiplayer::lifecycle_forget_withheld(const RID &p_entity) {
+    return lifecycle_withheld.erase(p_entity.get_id());
 }
 
 void NetwMultiplayer::lifecycle_send_to_session(
@@ -571,8 +581,8 @@ void NetwMultiplayer::lifecycle_seed_controller(
     NetwEntity *p_entity,
     int64_t p_controller
 ) {
-    p_entity->record_controller(p_controller);
-    p_entity->seed_control(1, 1, int64_t(entity::Control::HOLD_NONE));
+    control_record(p_entity, p_controller);
+    control_seed(p_entity, 1, 1, int64_t(entity::Control::HOLD_NONE));
 }
 
 void NetwMultiplayer::lifecycle_detach_ahead(NetwEntity *p_dying) {
@@ -620,7 +630,7 @@ void NetwMultiplayer::lifecycle_restore_detached(int64_t p_route) {
     if (!found) {
         return;
     }
-    Node *owner = liveness_node_of(p_route);
+    Node *owner = wrapper_owner(liveness_core->rid_from_route(int(p_route)));
     if (owner == nullptr) {
         liveness_when_live(
             p_route,
@@ -632,7 +642,8 @@ void NetwMultiplayer::lifecycle_restore_detached(int64_t p_route) {
         return;
     }
     for (const DetachedAhead &row : found->value) {
-        Node *node = liveness_node_of(row.route);
+        Node *node
+            = wrapper_owner(liveness_core->rid_from_route(int(row.route)));
         Node *parent = owner->get_node_or_null(row.from_owner);
         if (node != nullptr && parent != nullptr
             && node->get_parent() != parent) {
@@ -677,7 +688,7 @@ bool NetwMultiplayer::lifecycle_admit_move(
     if (!read_controller_op(this, lifecycle::Kind::REPARENT, p_payload, op)) {
         return true;
     }
-    Node *owner = liveness_node_of(op.route);
+    Node *owner = wrapper_owner(liveness_core->rid_from_route(int(op.route)));
     Node *parent = anchor_resolve(op.anchor);
     if (owner == nullptr || parent == nullptr) {
         lifecycle_decide(
@@ -755,7 +766,8 @@ void NetwMultiplayer::lifecycle_decide(
         uint64_t reason = uint64_t(p_code);
         Node *held = spawn_carry_pending_parent(p_route);
         if (held == nullptr) {
-            Node *owner = liveness_node_of(p_route);
+            Node *owner
+                = wrapper_owner(liveness_core->rid_from_route(int(p_route)));
             held = owner != nullptr ? owner->get_parent() : nullptr;
         }
         wire::WriteStream probe;
@@ -819,8 +831,7 @@ void NetwMultiplayer::lifecycle_receive_decision(
         if (accepted) {
             lifecycle_detached_ahead.erase(route);
         }
-        if (lifecycle_withheld.has(route)) {
-            lifecycle_answer_withheld(route, accepted, reason);
+        if (lifecycle_answer_withheld(route, accepted, reason)) {
             return;
         }
         if (!accepted) {
@@ -832,11 +843,14 @@ void NetwMultiplayer::lifecycle_receive_decision(
         return;
     }
     if (accepted) {
-        entity->structure_ops_accept(standing.revision);
+        control_structure_accept(entity.ptr(), standing.revision);
         return;
     }
+    Node *owner = entity->get_owner();
+    const ObjectID asked
+        = gd::instance_id(owner != nullptr ? owner->get_parent() : nullptr);
     if (decided != lifecycle::Kind::REPARENT) {
-        lifecycle_notify_refused(entity.ptr(), decided, reason);
+        lifecycle_notify_refused(entity.ptr(), decided, asked, reason);
         return;
     }
     const Error code = Error(int(code_named));
@@ -850,15 +864,15 @@ void NetwMultiplayer::lifecycle_receive_decision(
               root_name(entity->get_owner()),
               error_named(code)
           );
-    if (!entity->structure_ops_refuse(base, code, detail)) {
+    if (!control_structure_refuse(entity.ptr(), base, code, detail)) {
         return;
     }
-    lifecycle_notify_refused(entity.ptr(), decided, reason);
     lifecycle_undo(
         entity.ptr(),
         anchored ? anchor_resolve(anchor) : nullptr,
         standing
     );
+    lifecycle_notify_refused(entity.ptr(), decided, asked, reason);
 }
 
 void NetwMultiplayer::entity_settle_foreign_move(const EntityDeparture &p_row) {

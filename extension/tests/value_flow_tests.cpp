@@ -87,7 +87,7 @@ struct Evidence {
 
 int64_t stat_of(Object *p_core, const char *p_name) {
     return int64_t(
-        netw_test::flow_core(p_core)->stats_snapshot().get(p_name, 0)
+        netw_test::flow_core(p_core)->session_get_stats().get(p_name, 0)
     );
 }
 

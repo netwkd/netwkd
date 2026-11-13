@@ -27,11 +27,9 @@
 #include "spawn_header_laws.cpp"
 #include "spawn_pipeline_tests.cpp"
 #include "spawn_record_tests.cpp"
-#include "spawn_replay_laws.cpp"
 #include "spawner_compat_tests.cpp"
 #include "sync_compat_tests.cpp"
 #include "wire_composed_transport_laws.cpp"
-#include "zu25_one_record_laws.cpp"
 
 NETW_INSTALL_RESET_LISTENER();
 NETW_INSTALL_CELLS_LISTENER();

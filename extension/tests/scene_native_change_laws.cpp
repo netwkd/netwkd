@@ -116,7 +116,7 @@ struct NativeChangeRun {
 
         core.instantiate();
         core->session_set_root(Callable(seat, "get_node").bind(NodePath(".")));
-        mount_resolved = core->session_root() == seat;
+        mount_resolved = core->session_get_root() == seat;
         SceneTree *tree = netw::gd::scene_tree();
         displaced = tree->get_multiplayer();
         tree->set_multiplayer(
@@ -137,7 +137,7 @@ struct NativeChangeRun {
     }
 
     bool online() const {
-        return core->session_get_state()
+        return core->session_get_stored_state()
             == netw::NetwMultiplayer::SESSION_STATE_ONLINE;
     }
 

@@ -102,8 +102,8 @@ public:
         netw::gd::scene_root()->add_child(other_body);
         const Ref<NetwEntity> wrapper = NetwEntity::ensure(body);
         const Ref<NetwEntity> other = NetwEntity::ensure(other_body);
-        const RID entity = session->entity_of(body);
-        const RID other_entity = session->entity_of(other_body);
+        const RID entity = Internals::entity_of(session, body);
+        const RID other_entity = Internals::entity_of(session, other_body);
 
         declare_verdict = planted == PLANT_A_DECLARATION_THAT_NEVER_HAPPENED
             ? OK
@@ -111,7 +111,7 @@ public:
         if (declared.selects_another) {
             session->predict_declare(other_entity);
         }
-        engine_after_declare = session->predict_engine_seated(entity);
+        engine_after_declare = session->predict_is_declared(entity);
 
         session->simulation_set_param(
             planted == PLANT_A_PARAM_WRITTEN_TO_ANOTHER_ENTITY ? other_entity
@@ -149,17 +149,23 @@ public:
                                               Variant()
                                           ))
                 == Variant(sensor);
-            step_is_the_one_installed = handle->get_simulate() == step;
+            step_is_the_one_installed
+                = NetwMultiplayer::sim_step_of(handle->get_entity().ptr())
+                == step;
         }
+        const netw::sim::Decl *chose
+            = netw_test::Internals::sim_find_declaration(
+                session->entity_get_view(entity).ptr()
+            );
         const netw::sim::Named *named
-            = simulation->selection_choice().named_of(other_entity);
+            = chose != nullptr ? chose->choice.named_of(other_entity) : nullptr;
         selection_holds_the_other
             = named != nullptr && named->pick == netw::sim::Pick::CHOSEN;
 
         if (planted != PLANT_AN_UNDECLARE_THAT_NEVER_HAPPENED) {
             session->predict_undeclare(entity);
         }
-        engine_after_undeclare = session->predict_engine_seated(entity);
+        engine_after_undeclare = session->predict_is_declared(entity);
 
         session->clear_session_state();
         other_body->queue_free();
@@ -410,7 +416,7 @@ public:
         Node3D *body = declared.rigid ? memnew(RigidBody3D) : memnew(Node3D);
         netw::gd::scene_root()->add_child(body);
         const Ref<NetwEntity> wrapper = NetwEntity::ensure(body);
-        const RID entity = session->entity_of(body);
+        const RID entity = Internals::entity_of(session, body);
         REQUIRE(session->predict_declare(entity) == OK);
         session->predict_set_param(
             entity,
@@ -526,7 +532,7 @@ void check_auto_resolution(bool p_rigid) {
     Node3D *body = p_rigid ? memnew(RigidBody3D) : memnew(Node3D);
     netw::gd::scene_root()->add_child(body);
     const Ref<NetwEntity> wrapper = NetwEntity::ensure(body);
-    const RID entity = session->entity_of(body);
+    const RID entity = Internals::entity_of(session, body);
     REQUIRE(session->predict_declare(entity) == OK);
     const Ref<NetwPrediction> handle = session->prediction_handle(entity);
     REQUIRE(handle.is_valid());
@@ -584,7 +590,7 @@ TEST_CASE(
     Node3D *body = memnew(Node3D);
     netw::gd::scene_root()->add_child(body);
     NetwEntity::ensure(body);
-    const RID entity = session->entity_of(body);
+    const RID entity = Internals::entity_of(session, body);
     REQUIRE(session->predict_declare(entity) == OK);
     const Ref<NetwPrediction> typed = session->prediction_handle(entity);
     REQUIRE(typed.is_valid());

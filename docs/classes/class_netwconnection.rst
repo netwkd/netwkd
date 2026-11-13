@@ -185,7 +185,7 @@ Signals
 
 **endpoint_added**\ (\ endpoint\: :ref:`NetwEndpoint<class_NetwEndpoint>`\ ) :ref:`🔗<class_NetwConnection_signal_endpoint_added>`
 
-Emitted when ``endpoint`` is added to :ref:`endpoints<class_NetwConnection_property_endpoints>`.
+Emitted when ``endpoint`` is added to :ref:`endpoints<class_NetwConnection_property_endpoints>`. An endpoint added while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends.
 
 .. rst-class:: classref-item-separator
 
@@ -197,7 +197,7 @@ Emitted when ``endpoint`` is added to :ref:`endpoints<class_NetwConnection_prope
 
 **endpoint_removed**\ (\ endpoint\: :ref:`NetwEndpoint<class_NetwEndpoint>`\ ) :ref:`🔗<class_NetwConnection_signal_endpoint_removed>`
 
-Its :ref:`NetwEndpoint.is_listed<class_NetwEndpoint_property_is_listed>` is already ``false``.
+Its :ref:`NetwEndpoint.is_listed<class_NetwEndpoint_property_is_listed>` is already ``false``. An endpoint removed while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends.
 
 .. rst-class:: classref-item-separator
 
@@ -211,7 +211,7 @@ Its :ref:`NetwEndpoint.is_listed<class_NetwEndpoint_property_is_listed>` is alre
 
 Emitted once when an attempt fails, and never for :ref:`cancel()<class_NetwConnection_method_cancel>`. A connection to it reads the failure of the :ref:`NetwPromise<class_NetwPromise>` that started the attempt, so a caller may drop that promise.
 
-A join the server refuses fails with the ``error`` and ``reason`` of :ref:`NetwSession.join_failed<class_NetwSession_signal_join_failed>`, also when the game assigned the peer itself. A join whose connection closes with no answer fails with :godot:`@GlobalScope.ERR_CANT_CONNECT <@GlobalScope#class_@GlobalScope_constant_ERR_CANT_CONNECT>` when the server was never reached, and with :godot:`@GlobalScope.ERR_CONNECTION_ERROR <@GlobalScope#class_@GlobalScope_constant_ERR_CONNECTION_ERROR>` when it was.
+A join the server refuses fails with the ``error`` and ``reason`` of :ref:`NetwSession.join_failed<class_NetwSession_signal_join_failed>`, also when the game assigned the peer itself. A join whose connection closes with no answer fails with :godot:`@GlobalScope.ERR_CANT_CONNECT <@GlobalScope#class_@GlobalScope_constant_ERR_CANT_CONNECT>` when the server was never reached, and with :godot:`@GlobalScope.ERR_CONNECTION_ERROR <@GlobalScope#class_@GlobalScope_constant_ERR_CONNECTION_ERROR>` when it was. An attempt that fails while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends, after the :ref:`NetwPromise<class_NetwPromise>` that started it has failed.
 
 .. rst-class:: classref-item-separator
 
@@ -223,7 +223,7 @@ A join the server refuses fails with the ``error`` and ``reason`` of :ref:`NetwS
 
 **invited**\ (\ endpoint\: :ref:`NetwEndpoint<class_NetwEndpoint>`\ ) :ref:`🔗<class_NetwConnection_signal_invited>`
 
-Emitted when someone invites the player to ``endpoint``. :ref:`NetwEndpoint.invited_by<class_NetwEndpoint_property_invited_by>` names the sender, and the player joins only when the game calls :ref:`join()<class_NetwConnection_method_join>`.
+Emitted when someone invites the player to ``endpoint``. :ref:`NetwEndpoint.invited_by<class_NetwEndpoint_property_invited_by>` names the sender, and the player joins only when the game calls :ref:`join()<class_NetwConnection_method_join>`. An invitation received while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends.
 
 .. rst-class:: classref-item-separator
 
@@ -235,7 +235,7 @@ Emitted when someone invites the player to ``endpoint``. :ref:`NetwEndpoint.invi
 
 **join_address_changed**\ (\ address\: :godot:`String`\ ) :ref:`🔗<class_NetwConnection_signal_join_address_changed>`
 
-Emitted when :ref:`join_address<class_NetwConnection_property_join_address>` changes.
+Emitted when :ref:`join_address<class_NetwConnection_property_join_address>` changes. A change made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is emitted when that poll ends, so :ref:`join_address<class_NetwConnection_property_join_address>` can already read a later address.
 
 .. rst-class:: classref-item-separator
 
@@ -247,7 +247,7 @@ Emitted when :ref:`join_address<class_NetwConnection_property_join_address>` cha
 
 **progressed**\ (\ message\: :godot:`String`, ratio\: :godot:`float`\ ) :ref:`🔗<class_NetwConnection_signal_progressed>`
 
-``ratio`` runs from 0 to 1, and is negative when the transport only has a ``message``.
+``ratio`` runs from 0 to 1, and is negative when the transport only has a ``message``. Progress reported while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is emitted when that poll ends.
 
 .. rst-class:: classref-section-separator
 
@@ -366,7 +366,7 @@ While ``true``, every :ref:`LobbyDirectory<class_LobbyDirectory>` keeps listing 
 
 - :ref:`NetwEndpoint<class_NetwEndpoint>` **get_current_endpoint**\ (\ )
 
-The connected server, including while hosting, at the address this peer connected through. ``null`` before :ref:`NetwSession.STATE_ONLINE<class_NetwSession_constant_STATE_ONLINE>` or when an assigned peer supplies no address. It can be absent from :ref:`endpoints<class_NetwConnection_property_endpoints>`.
+The connected server, including while hosting, at the address this peer connected through. ``null`` before :ref:`NetwSession.STATE_ONLINE<class_NetwSession_constant_STATE_ONLINE>`, when an assigned peer supplies no address, or when the peer's transport was removed with :ref:`unregister_transport()<class_NetwConnection_method_unregister_transport>` while online. It can be absent from :ref:`endpoints<class_NetwConnection_property_endpoints>`.
 
 .. rst-class:: classref-item-separator
 
@@ -561,7 +561,7 @@ Invalid :ref:`NetwSessionConfig<class_NetwSessionConfig>`, :ref:`NetwClockConfig
 
 :ref:`NetwEndpoint<class_NetwEndpoint>` **invite**\ (\ transport\: :godot:`Variant`, address\: :godot:`String`, from_name\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwConnection_method_invite>`
 
-Sets :ref:`NetwEndpoint.is_invited<class_NetwEndpoint_property_is_invited>` and :ref:`NetwEndpoint.invited_by<class_NetwEndpoint_property_invited_by>` before emitting :ref:`invited<class_NetwConnection_signal_invited>`. Reuses the row at ``address``. An invitation to the server the session is already on returns its endpoint and emits nothing. Returns ``null`` if ``transport`` is unavailable or the address is empty.
+Sets :ref:`NetwEndpoint.is_invited<class_NetwEndpoint_property_is_invited>` and :ref:`NetwEndpoint.invited_by<class_NetwEndpoint_property_invited_by>` before emitting :ref:`invited<class_NetwConnection_signal_invited>`. Reuses the row at ``address``. An invitation to the server the session is already on returns its endpoint and does not emit :ref:`invited<class_NetwConnection_signal_invited>`. Returns ``null`` if ``transport`` is unavailable or the address is empty.
 
 .. rst-class:: classref-item-separator
 

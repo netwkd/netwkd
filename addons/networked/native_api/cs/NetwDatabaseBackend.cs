@@ -15,7 +15,7 @@ namespace Networked;
 ///
 /// @export var root := "user://saves"
 ///
-/// func _open(session: Object, slot: StringName) -&gt; NetwPromise:
+/// func _open(session: NetwSession, slot: StringName) -&gt; NetwPromise:
 ///     return NetwPromise.resolved(MyConnection.new(root, slot))
 /// </code>
 /// <para>
@@ -47,16 +47,18 @@ public class NetwDatabaseBackend : NetwRefCounted
     }
 
     private static readonly IntPtr _bindOpen =
-        NetwApi.MethodBind("NetwDatabaseBackend", "open", 4122934444UL);
+        NetwApi.MethodBind("NetwDatabaseBackend", "open", 1060174695UL);
 
     /// <summary>
     /// Resolves a <see cref="NetwDatabaseConnection"/> for
     /// <paramref name="slot"/> through <c>_open</c>, or through the backend's
     /// own storage when no script overrides it.
     /// </summary>
-    public NetwPromise Open(GodotObject session, StringName slot)
+    public NetwPromise Open(NetwSession session, StringName slot)
     {
-        godot_variant slot0 = VariantUtils.CreateFromGodotObject(session);
+        godot_variant slot0 =
+            VariantUtils.CreateFromGodotObjectPtr(
+                session?.Native ?? IntPtr.Zero);
         godot_variant slot1 = VariantUtils.CreateFromStringName(slot);
         godot_variant answered = default;
         NetwThunks.Call2(_bindOpen, Checked, in slot0, in slot1, ref answered);
@@ -71,15 +73,15 @@ public class NetwDatabaseBackend : NetwRefCounted
     }
 
     private static readonly IntPtr _bindListSlots =
-        NetwApi.MethodBind("NetwDatabaseBackend", "list_slots", 3111021262UL);
+        NetwApi.MethodBind("NetwDatabaseBackend", "list_slots", 325038311UL);
 
     /// <summary>
     /// Resolves every slot in storage through <c>_list_slots</c>, or through
     /// the backend's own storage when no script overrides it.
     /// </summary>
-    public NetwPromise ListSlots(GodotObject session)
+    public NetwPromise ListSlots(NetwSession session)
     {
-        IntPtr slot0 = session?.NativeInstance ?? IntPtr.Zero;
+        IntPtr slot0 = session?.Native ?? IntPtr.Zero;
         IntPtr answered = default;
         NetwThunks.Ptrcall1_IntPtr_IntPtr(
             _bindListSlots,
@@ -90,16 +92,18 @@ public class NetwDatabaseBackend : NetwRefCounted
     }
 
     private static readonly IntPtr _bindDeleteSlot =
-        NetwApi.MethodBind("NetwDatabaseBackend", "delete_slot", 4122934444UL);
+        NetwApi.MethodBind("NetwDatabaseBackend", "delete_slot", 1060174695UL);
 
     /// <summary>
     /// Removes <paramref name="slot"/> through <c>_delete_slot</c>, or through
     /// the backend's own storage when no script overrides it.
     /// <paramref name="session"/> may be <c>null</c> when no session is asking.
     /// </summary>
-    public NetwPromise DeleteSlot(GodotObject session, StringName slot)
+    public NetwPromise DeleteSlot(NetwSession session, StringName slot)
     {
-        godot_variant slot0 = VariantUtils.CreateFromGodotObject(session);
+        godot_variant slot0 =
+            VariantUtils.CreateFromGodotObjectPtr(
+                session?.Native ?? IntPtr.Zero);
         godot_variant slot1 = VariantUtils.CreateFromStringName(slot);
         godot_variant answered = default;
         NetwThunks.Call2(

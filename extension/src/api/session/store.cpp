@@ -485,7 +485,10 @@ bool NetwMultiplayer::store_mark(
     const Ref<NetwEntity> &p_entity,
     int64_t p_tick
 ) {
-    store_world.set_weight(p_slot, float(p_entity->get_replication_priority()));
+    store_world.set_weight(
+        p_slot,
+        float(p_entity->get_record()->get_replication_priority())
+    );
     const int64_t changed = store_world.note_tenure(
         p_slot,
         p_entity->get_control_tenure(),

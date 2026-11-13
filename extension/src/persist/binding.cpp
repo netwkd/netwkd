@@ -367,7 +367,7 @@ RID Bindings::compile(Node *p_root) {
     }
 
     const StringName database_name = config->get_database_name();
-    const RID database = session->database_lookup(database_name);
+    const RID database = session->database_find(database_name);
     if (!database.is_valid()) {
         fault::raise(
             session,

@@ -278,10 +278,6 @@ void initialize_networked_module(ModuleInitializationLevel level) {
         netw::NetwEntityRecord::PART_SIMULATION,
         callable_mp_static(&netw::build_simulation_handle)
     );
-    netw::NetwEntityRecord::set_part_factory(
-        netw::NetwEntityRecord::PART_SCENE,
-        callable_mp_static(&netw::build_scene_handle)
-    );
 
     netw::NetwMultiplayer::install_default_interface();
     netw::connect::install_native_transports();

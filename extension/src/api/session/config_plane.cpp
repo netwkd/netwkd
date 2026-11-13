@@ -182,23 +182,21 @@ Error NetwMultiplayer::apply_pending_config(
     }
     config_applying = false;
 
-    if (committed != OK || predict_awaiting_config.is_empty()
-        || !lagcomp_configured) {
-        return committed;
-    }
-    LocalVector<RID> waiting;
-    waiting.reserve(predict_awaiting_config.size());
-    for (const RID &held : predict_awaiting_config) {
-        waiting.push_back(held);
-    }
-    predict_awaiting_config.clear();
-    for (const RID &entity : waiting) {
-        const Ref<NetwEntity> wrapper = entity_get_view(entity);
-        if (wrapper.is_valid()) {
-            register_prediction(wrapper);
+    if (committed == OK && lagcomp_configured) {
+        LocalVector<RID> waiting;
+        waiting.reserve(predict_awaiting_config.size());
+        for (const RID &held : predict_awaiting_config) {
+            waiting.push_back(held);
+        }
+        predict_awaiting_config.clear();
+        for (const RID &entity : waiting) {
+            const Ref<NetwEntity> wrapper = entity_get_view(entity);
+            if (wrapper.is_valid()) {
+                register_prediction(wrapper);
+            }
         }
     }
-    return OK;
+    return committed;
 }
 
 void NetwMultiplayer::lagcomp_want() {

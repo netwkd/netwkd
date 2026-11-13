@@ -163,11 +163,6 @@ godot::Dictionary project_payload(
     double age
 );
 
-int measure(
-    const godot::Dictionary &field_sink,
-    const godot::Dictionary &tolerances
-);
-
 int attribute(
     bool pre_equal,
     bool command_equal,

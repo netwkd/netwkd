@@ -122,7 +122,8 @@ func _player_x_greater(
 
 func _find_player(tree: MultiplayerViewport, username: String) -> Node:
 	var username_id := StringName(username)
-	for player: NetwEntity in tree.api.player_entities:
-		if player.name == username_id:
-			return player.root
+	for scene: NetwScene in Netw.session(tree).scenes:
+		for player: NetwEntity in scene.player_entities:
+			if player.name == username_id:
+				return player.root
 	return null

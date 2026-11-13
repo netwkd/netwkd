@@ -76,18 +76,19 @@ public sealed class NetwTransport : NetwRefCounted
     }
 
     private static readonly IntPtr _bindGetSession =
-        NetwApi.MethodBind("NetwTransport", "get_session", 208707294UL);
+        NetwApi.MethodBind("NetwTransport", "get_session", 3160388065UL);
 
     /// <summary>
-    /// The session this transport belongs to.
+    /// The session this transport belongs to, the same
+    /// <see cref="NetwSession"/> that <see cref="Netw.Session"/> answers.
     /// </summary>
-    public NetwMultiplayer Session
+    public NetwSession Session
     {
         get
         {
             IntPtr answered = default;
             NetwThunks.Ptrcall0_IntPtr(_bindGetSession, Checked, ref answered);
-            return NetwMultiplayer.Adopt(answered);
+            return NetwSession.Adopt(answered);
         }
     }
 
@@ -363,7 +364,8 @@ public sealed class NetwTransport : NetwRefCounted
 
     /// <summary>
     /// Reports progress on <paramref name="ticket"/> through
-    /// <see cref="NetwConnection.Progressed"/>.
+    /// <see cref="NetwMultiplayer.TransportReportProgress"/>.
+    /// <paramref name="step"/> is not used.
     /// </summary>
     public void Report(
         Rid ticket,
@@ -396,7 +398,9 @@ public sealed class NetwTransport : NetwRefCounted
 
     /// <summary>
     /// Reports <paramref name="peer"/> as the result of
-    /// <paramref name="ticket"/>. Only the first call for a ticket counts.
+    /// <paramref name="ticket"/> through
+    /// <see cref="NetwMultiplayer.TransportComplete"/>. Only the first call for
+    /// a ticket counts.
     /// </summary>
     public void Deliver(Rid ticket, MultiplayerPeer peer)
     {
@@ -415,7 +419,8 @@ public sealed class NetwTransport : NetwRefCounted
         NetwApi.MethodBind("NetwTransport", "publish_targets", 138736100UL);
 
     /// <summary>
-    /// Reports the servers <c>_browse</c> found, one per address.
+    /// Reports the servers <c>_browse</c> found, one per address, through
+    /// <see cref="NetwMultiplayer.TransportPublishTargets"/>.
     /// <paramref name="names"/> and <paramref name="infos"/> are matched to
     /// <paramref name="addresses"/> by index, and can be shorter.
     /// <code>
@@ -475,7 +480,8 @@ public sealed class NetwTransport : NetwRefCounted
 
     /// <summary>
     /// Reports <paramref name="info"/> as the result of the <c>_probe</c>
-    /// request <paramref name="ticket"/>.
+    /// request <paramref name="ticket"/> through
+    /// <see cref="NetwMultiplayer.TransportComplete"/>.
     /// </summary>
     public void DeliverProbe(Rid ticket, NetwServerInfo info)
     {
@@ -495,7 +501,8 @@ public sealed class NetwTransport : NetwRefCounted
 
     /// <summary>
     /// Reports that <paramref name="ticket"/> failed with
-    /// <paramref name="error"/> and a readable <paramref name="message"/>.
+    /// <paramref name="error"/> and a readable <paramref name="message"/>
+    /// through <see cref="NetwMultiplayer.TransportComplete"/>.
     /// </summary>
     public void Fail(Rid ticket, Error error, string message = "")
     {

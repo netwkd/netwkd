@@ -11,7 +11,6 @@
 namespace netw {
 
 class NetwMultiplayer;
-class ReplicationCore;
 
 class NetwChannel : public godot::RefCounted {
     GDCLASS(NetwChannel, godot::RefCounted)
@@ -19,14 +18,7 @@ class NetwChannel : public godot::RefCounted {
     int64_t id = 0;
     godot::ObjectID session;
 
-    ReplicationCore *plane() const;
-
-    static void forward_payload(
-        const godot::Variant &p_entity,
-        const godot::PackedByteArray &p_payload,
-        int64_t p_sender,
-        const godot::Callable &p_handler
-    );
+    NetwMultiplayer *multiplayer() const;
 
 protected:
     static void _bind_methods();

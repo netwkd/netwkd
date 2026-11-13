@@ -87,7 +87,7 @@ Emitted on the server when ``peer_id`` starts seeing this entity. It is emitted 
 
 **interest_exited**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterest_signal_interest_exited>`
 
-Emitted on the server when ``peer_id`` stops seeing this entity, also when it stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it.
+Emitted on the server when ``peer_id`` stops seeing this entity, also when it stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it. A session that ends does not emit it.
 
 .. rst-class:: classref-item-separator
 
@@ -99,7 +99,9 @@ Emitted on the server when ``peer_id`` stops seeing this entity, also when it st
 
 **observer_entered**\ (\ layer_id\: :godot:`StringName`, peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterest_signal_observer_entered>`
 
-Emitted when ``peer_id`` starts seeing this entity through ``layer_id``.
+Emitted whenever ``peer_id`` starts seeing this entity through the layer ``layer_id``. The server emits it for every peer, with ``1`` for the host's own player on a listen host. A client emits it only for itself, so ``peer_id`` is its :godot:`MultiplayerAPI.get_unique_id() <MultiplayerAPI#class_MultiplayerAPI_method_get_unique_id>`.
+
+On the server it is emitted before :ref:`NetwInterestLayer.interest_entered<class_NetwInterestLayer_signal_interest_entered>`, before :ref:`interest_entered<class_NetwInterest_signal_interest_entered>` and before the change is sent, so a handler that reads visibility sees it as it was before the change.
 
 .. rst-class:: classref-item-separator
 
@@ -111,7 +113,7 @@ Emitted when ``peer_id`` starts seeing this entity through ``layer_id``.
 
 **observer_exited**\ (\ layer_id\: :godot:`StringName`, peer_id\: :godot:`int`\ ) :ref:`🔗<class_NetwInterest_signal_observer_exited>`
 
-Emitted when ``peer_id`` stops seeing this entity through ``layer_id``.
+Emitted whenever ``peer_id`` stops seeing this entity through the layer ``layer_id``, also when the layer is freed. It is emitted on the same peers and in the same order as :ref:`observer_entered<class_NetwInterest_signal_observer_entered>`, and a client also emits it when the entity is removed from that client. A session that ends does not emit it.
 
 .. rst-class:: classref-section-separator
 

@@ -22,28 +22,6 @@ const char *KEY_METADATA = "metadata";
 
 } // namespace
 
-Ref<NetwServerInfo> NetwServerInfo::from_session(NetwMultiplayer *p_api) {
-    Ref<NetwServerInfo> info;
-    if (p_api != nullptr) {
-        const Ref<NetwSessionConfig> config = p_api->session_get_config();
-        const Ref<NetwServerInfo> declared = config.is_valid()
-            ? config->get_server_info()
-            : Ref<NetwServerInfo>();
-        if (declared.is_valid()) {
-            info = declared->duplicate();
-        }
-    }
-    if (info.is_null()) {
-        info.instantiate();
-    }
-    info->set_is_local_listener(true);
-    if (p_api != nullptr) {
-        info->set_players(p_api->get_connected_players().size());
-        info->set_app_id(p_api->session_get_app_id());
-    }
-    return info;
-}
-
 PackedByteArray NetwServerInfo::to_payload(const Ref<NetwServerInfo> &p_info) {
     if (p_info.is_null()) {
         return PackedByteArray();
@@ -228,11 +206,6 @@ void NetwServerInfo::_bind_methods() {
     BIND_ENUM_CONSTANT(VISIBILITY_FRIENDS_ONLY);
     BIND_ENUM_CONSTANT(VISIBILITY_PRIVATE);
 
-    ClassDB::bind_static_method(
-        "NetwServerInfo",
-        D_METHOD("from_session", "api"),
-        &NetwServerInfo::from_session
-    );
     ClassDB::bind_static_method(
         "NetwServerInfo",
         D_METHOD("to_payload", "info"),

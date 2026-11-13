@@ -162,14 +162,14 @@ func collection_for(slot: String) -> String:
 
 ## Adds [param slot] to the slot list, then resolves a
 ## [NakamaDatabase.Connection] for its collection.
-func _open(session: Object, slot: StringName) -> NetwPromise:
+func _open(session: NetwSession, slot: StringName) -> NetwPromise:
 	var promise := NetwPromise.new()
 	_open_async(promise, session, String(slot))
 	return promise
 
 
 ## Resolves every slot in the slot list.
-func _list_slots(session: Object) -> NetwPromise:
+func _list_slots(session: NetwSession) -> NetwPromise:
 	var promise := NetwPromise.new()
 	_list_slots_async(promise, session)
 	return promise
@@ -177,19 +177,19 @@ func _list_slots(session: Object) -> NetwPromise:
 
 ## Deletes every record in [param slot] and removes it from the slot list. On
 ## failure the slot stays listed, so the delete can be retried.
-func _delete_slot(session: Object, slot: StringName) -> NetwPromise:
+func _delete_slot(session: NetwSession, slot: StringName) -> NetwPromise:
 	var promise := NetwPromise.new()
 	_delete_slot_async(promise, session, String(slot))
 	return promise
 
 
 func _signed_in_account(
-		session: Object,
+		session: NetwSession,
 		promise: NetwPromise,
 ) -> NakamaAccount:
 	var account: NakamaAccount = null
 	if session != null:
-		account = session.service_get(NakamaAccount) as NakamaAccount
+		account = session.service(NakamaAccount) as NakamaAccount
 	if account == null:
 		promise.reject(
 			ERR_UNCONFIGURED,
@@ -208,7 +208,11 @@ func _signed_in_account(
 # Writes the slot's manifest entry, then answers a connection over its
 # collection. The manifest entry lands first, so a slot holding records is
 # never missing from the listing.
-func _open_async(promise: NetwPromise, session: Object, slot: String) -> void:
+func _open_async(
+		promise: NetwPromise,
+		session: NetwSession,
+		slot: String,
+) -> void:
 	var account := await _signed_in_account(session, promise)
 	if account == null:
 		return
@@ -232,7 +236,7 @@ func _open_async(promise: NetwPromise, session: Object, slot: String) -> void:
 
 
 # Pages the whole manifest collection, so a slot an earlier run wrote appears.
-func _list_slots_async(promise: NetwPromise, session: Object) -> void:
+func _list_slots_async(promise: NetwPromise, session: NetwSession) -> void:
 	var account := await _signed_in_account(session, promise)
 	if account == null:
 		return
@@ -262,7 +266,7 @@ func _list_slots_async(promise: NetwPromise, session: Object) -> void:
 # manifest entry, so no schema is left behind and a failure stays retryable.
 func _delete_slot_async(
 		promise: NetwPromise,
-		session: Object,
+		session: NetwSession,
 		slot: String,
 ) -> void:
 	var account := await _signed_in_account(session, promise)

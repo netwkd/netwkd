@@ -398,25 +398,34 @@ void NetwMultiplayer::sync_pipeline_note_derived_schema(
     }
 }
 
-Error NetwMultiplayer::sync_send_property(
+void NetwMultiplayer::sync_send_property(
     const RID &p_entity,
-    int64_t p_comp,
+    Node *p_node,
     const StringName &p_property
 ) {
-    Node *node = entity_component_node(p_entity, p_comp);
-    NETW_BUG_COND_V(node == nullptr, ERR_DOES_NOT_EXIST);
-    if (!gd::has_property(node, p_property)) {
+    if (p_node == nullptr) {
+        return;
+    }
+    SyncPipeline *pipeline = sync_pipeline();
+    const int64_t route = liveness_core->route_of(p_entity);
+    if (route <= 0) {
+        if (pipeline != nullptr) {
+            pipeline->send_property(p_node, p_property);
+        }
+        return;
+    }
+    if (!gd::has_property(p_node, p_property)) {
         fault::raise(
             this,
             NETW_FAULT_UNKNOWN_NAME,
             {"Sending a property",
-             String(node->get_name()),
+             String(p_node->get_name()),
              String(p_property)},
-            gd::instance_id(node)
+            gd::instance_id(p_node)
         );
-        return ERR_INVALID_DATA;
+        sink_verdict(ERR_INVALID_DATA, route);
+        return;
     }
-    SyncPipeline *pipeline = sync_pipeline();
     if (pipeline == nullptr) {
         fault::raise(
             this,
@@ -424,32 +433,41 @@ Error NetwMultiplayer::sync_send_property(
             {vformat("Sending property '%s'", String(p_property)),
              String(),
              "replication"},
-            gd::instance_id(node)
+            gd::instance_id(p_node)
         );
-        return ERR_UNCONFIGURED;
+        sink_verdict(ERR_UNCONFIGURED, route);
+        return;
     }
-    pipeline->send_property(node, p_property);
-    return OK;
+    pipeline->send_property(p_node, p_property);
 }
 
-Error NetwMultiplayer::sync_send_signal(
+void NetwMultiplayer::sync_send_signal(
     const RID &p_entity,
-    int64_t p_comp,
+    Node *p_node,
     const StringName &p_signal,
     const Array &p_args
 ) {
-    Node *node = entity_component_node(p_entity, p_comp);
-    NETW_BUG_COND_V(node == nullptr, ERR_DOES_NOT_EXIST);
-    if (!node->has_signal(p_signal)) {
+    if (p_node == nullptr) {
+        return;
+    }
+    SyncPipeline *pipeline = sync_pipeline();
+    const int64_t route = liveness_core->route_of(p_entity);
+    if (route <= 0) {
+        if (pipeline != nullptr) {
+            pipeline->send_signal(p_node, p_signal, p_args);
+        }
+        return;
+    }
+    if (!p_node->has_signal(p_signal)) {
         fault::raise(
             this,
             NETW_FAULT_UNKNOWN_NAME,
-            {"Sending a signal", String(node->get_name()), String(p_signal)},
-            gd::instance_id(node)
+            {"Sending a signal", String(p_node->get_name()), String(p_signal)},
+            gd::instance_id(p_node)
         );
-        return ERR_INVALID_DATA;
+        sink_verdict(ERR_INVALID_DATA, route);
+        return;
     }
-    SyncPipeline *pipeline = sync_pipeline();
     if (pipeline == nullptr) {
         fault::raise(
             this,
@@ -457,12 +475,12 @@ Error NetwMultiplayer::sync_send_signal(
             {vformat("Sending signal '%s'", String(p_signal)),
              String(),
              "replication"},
-            gd::instance_id(node)
+            gd::instance_id(p_node)
         );
-        return ERR_UNCONFIGURED;
+        sink_verdict(ERR_UNCONFIGURED, route);
+        return;
     }
-    pipeline->send_signal(node, p_signal, p_args);
-    return OK;
+    pipeline->send_signal(p_node, p_signal, p_args);
 }
 
 NodePath NetwMultiplayer::property_path(
@@ -512,11 +530,14 @@ void NetwMultiplayer::table_announce_intake() {
 }
 
 void NetwMultiplayer::table_announce(const RID &p_table) {
-    const int64_t tick = store_world.arrays.tick_of(p_table);
-    if (const Ref<NetwTable> *handle
-        = table_handles.getptr(int64_t(p_table.get_id()))) {
-        (*handle)->announce(tick);
+    if (!views.table_handles.has(p_table)) {
+        return;
     }
+    Announcement row;
+    row.kind = AnnouncementKind::TABLE_RECEIVED;
+    row.table = p_table;
+    row.to = store_world.arrays.tick_of(p_table);
+    announce(row);
 }
 
 bool NetwMultiplayer::table_publishes() const {
@@ -689,7 +710,7 @@ void NetwMultiplayer::sync_pump_rows(
 #endif
 }
 
-void NetwMultiplayer::session_set_peer_bandwidth(
+void NetwMultiplayer::peer_set_bandwidth(
     int64_t p_peer,
     int64_t p_kbps
 ) {
@@ -1131,7 +1152,7 @@ void NetwMultiplayer::sync_note_columns(
     }
 }
 
-Dictionary NetwMultiplayer::peer_link_stats(int64_t p_peer) const {
+Dictionary NetwMultiplayer::peer_get_link_stats(int64_t p_peer) const {
     Dictionary out;
     const ClockEngine &clock = clock_engine();
     const double measured_ms = link_round_trip_ms(p_peer);
@@ -1334,50 +1355,33 @@ double NetwMultiplayer::display_default_chase_clamp(const RID &p_entity) {
     return MAX(handle->get_teleport_threshold(), 0.0);
 }
 
+bool NetwMultiplayer::display_absorbs_recovery(const RID &p_entity) const {
+    const display::Runtime *runtime = display_book->runtime_of(p_entity);
+    return runtime != nullptr && runtime->get_chase_absorbs();
+}
+
 void NetwMultiplayer::display_on_recovered(
-    int64_t,
+    const RID &p_entity,
     const Dictionary &p_deltas,
-    bool p_teleported,
-    int64_t,
-    const RID &p_entity
+    bool p_teleported
 ) {
-    display_absorb_recovery(
-        display_book->runtime_of(p_entity),
-        p_deltas,
-        p_teleported
-    );
+    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    if (runtime != nullptr && runtime->get_chase_absorbs()) {
+        display_absorb_recovery(runtime, p_deltas, p_teleported);
+    }
 }
 
 void NetwMultiplayer::display_default_chase_hook(
     const RID &p_entity,
     bool p_bind
 ) {
-    static const StringName RECOVERED("recovered");
-    display::Runtime *p_runtime = display_book->runtime_of(p_entity);
-    if (p_runtime == nullptr) {
+    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    if (runtime == nullptr) {
         return;
     }
-    const Ref<NetwEntity> entity = p_runtime->entity();
-    const Ref<NetwPrediction> handle = prediction_of(entity);
-
-    Array hooks = p_runtime->get_chase_hooks();
-    for (int at = 0; at < hooks.size(); at++) {
-        const Callable held = hooks[at];
-        if (handle.is_valid() && handle->is_connected(RECOVERED, held)) {
-            handle->disconnect(RECOVERED, held);
-        }
-    }
-    hooks.clear();
-    if (!p_bind || handle.is_null()) {
-        p_runtime->set_chase_hooks(hooks);
-        return;
-    }
-    const Callable hook
-        = callable_mp(this, &NetwMultiplayer::display_on_recovered)
-              .bind(p_entity);
-    handle->connect(RECOVERED, hook);
-    hooks.push_back(hook);
-    p_runtime->set_chase_hooks(hooks);
+    runtime->set_chase_absorbs(
+        p_bind && prediction_of(runtime->entity()).is_valid()
+    );
 }
 
 static bool runtime_tracks_key(
@@ -1786,35 +1790,6 @@ void NetwMultiplayer::adopt_table_declarations() {
     }
 }
 
-int NetwMultiplayer::schema_get_hash(const RID &p_schema) const {
-    return schema_core.hash_of(p_schema);
-}
-
-int NetwMultiplayer::schema_get_column_count(const RID &p_schema) const {
-    return schema_core.column_count(p_schema);
-}
-
-StringName NetwMultiplayer::schema_get_column_key(
-    const RID &p_schema,
-    int p_column
-) const {
-    return schema_core.column_key(p_schema, p_column);
-}
-
-NetwMultiplayer::ColumnType NetwMultiplayer::schema_get_column_type(
-    const RID &p_schema,
-    int p_column
-) const {
-    return ColumnType(schema_core.column_type(p_schema, p_column));
-}
-
-int NetwMultiplayer::schema_get_column_stride(
-    const RID &p_schema,
-    int p_column
-) const {
-    return schema_core.column_stride(p_schema, p_column);
-}
-
 RID NetwMultiplayer::table_create(const RID &p_schema) {
     const SchemaRecord *record = schema_core.record_of(p_schema);
     if (record == nullptr || !record->sealed) {
@@ -1834,13 +1809,12 @@ RID NetwMultiplayer::table_create(const RID &p_schema) {
 }
 
 Ref<NetwTable> NetwMultiplayer::get_table_handle(const RID &p_table) {
-    const int64_t key = int64_t(p_table.get_id());
-    if (const Ref<NetwTable> *held = table_handles.getptr(key)) {
+    if (const Ref<NetwTable> *held = views.table_handles.getptr(p_table)) {
         return *held;
     }
     const Ref<NetwTable> minted = NetwTable::over(p_table, this);
     if (minted.is_valid()) {
-        table_handles[key] = minted;
+        views.table_handles[p_table] = minted;
     }
     return minted;
 }
@@ -1850,14 +1824,19 @@ RID NetwMultiplayer::table_get_schema(const RID &p_table) const {
     return bound ? *bound : RID();
 }
 
-void NetwMultiplayer::table_set_param(
+Error NetwMultiplayer::table_set_param(
     const RID &p_table,
     TableParam p_param,
     const Variant &p_value
 ) {
-    if (p_param == TABLE_PARAM_RELIABLE) {
-        store_world.arrays.set_reliable(p_table, bool(p_value));
+    if (!store_world.arrays.is_valid(p_table)) {
+        return ERR_DOES_NOT_EXIST;
     }
+    if (p_param != TABLE_PARAM_RELIABLE) {
+        return ERR_INVALID_PARAMETER;
+    }
+    store_world.arrays.set_reliable(p_table, bool(p_value));
+    return OK;
 }
 
 Variant NetwMultiplayer::table_get_param(
@@ -1973,9 +1952,9 @@ bool NetwMultiplayer::lagcomp_effect_watch(
     return watching;
 }
 
-StringName NetwMultiplayer::lagcomp_effect_key(
+StringName NetwMultiplayer::lagcomp_action_key(
     const RID &p_entity,
-    int64_t p_tick,
+    int64_t p_view_tick,
     int64_t p_slot
 ) const {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
@@ -1983,32 +1962,35 @@ StringName NetwMultiplayer::lagcomp_effect_key(
         = wrapper.is_valid() ? wrapper->get_name() : StringName();
     if (named.is_empty()) {
         Array act_args;
-        act_args.push_back(p_tick);
+        act_args.push_back(p_view_tick);
         act_args.push_back(p_slot);
         return StringName(String("act__{0}__{1}").format(act_args));
     }
     Array act_args;
     act_args.push_back(named);
-    act_args.push_back(p_tick);
+    act_args.push_back(p_view_tick);
     act_args.push_back(p_slot);
     return StringName(String("act__{0}__{1}__{2}").format(act_args));
 }
 
-void NetwMultiplayer::write_display_param(
+Error NetwMultiplayer::write_display_param(
     const Ref<NetwEntity> &p_wrapper,
     int p_param,
     const Variant &p_value
 ) {
-    if (p_wrapper.is_null() || p_wrapper->get_record() == nullptr) {
-        return;
+    NetwEntityRecord *const record = record_of(p_wrapper.ptr());
+    if (record == nullptr) {
+        return ERR_DOES_NOT_EXIST;
     }
-    display::Decl *fallback = &p_wrapper->get_record()->display_declaration();
+    display::Decl *fallback = &record->display_declaration();
     const RID rid = p_wrapper->get_rid_handle();
-    display_book->write_param(rid, *fallback, p_param, p_value);
+    const Error verdict
+        = display_book->write_param(rid, *fallback, p_param, p_value);
     const display::Decl *stored = display_book->decl_ptr(rid);
     if (stored != nullptr) {
         *fallback = *stored;
     }
+    return verdict;
 }
 
 Error NetwMultiplayer::display_declare(
@@ -2104,48 +2086,54 @@ Error NetwMultiplayer::display_write_track(
     }
 }
 
-void NetwMultiplayer::display_set_param(
+Error NetwMultiplayer::display_set_param(
     const RID &p_entity,
     DisplayParam p_param,
     const Variant &p_value
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
+    if (wrapper.is_null()) {
+        return ERR_DOES_NOT_EXIST;
+    }
     if (p_param == DISPLAY_PARAM_VISUAL_ROOT
         && p_value.get_type() != Variant::NODE_PATH
         && p_value.get_type() != Variant::STRING) {
-        display_set_target_node(
+        return display_set_target_node(
             p_entity,
             entity_component_node(p_entity, int64_t(p_value))
         );
-        return;
     }
-    write_display_param(wrapper, p_param, p_value);
+    return write_display_param(wrapper, p_param, p_value);
 }
 
-void NetwMultiplayer::display_set_target_node(
+Error NetwMultiplayer::display_set_target_node(
     const RID &p_entity,
     Node *p_node
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_null()) {
-        return;
+        return ERR_DOES_NOT_EXIST;
     }
     Node *owner = wrapper->get_owner();
     if (p_node == nullptr) {
-        write_display_param(wrapper, DISPLAY_PARAM_VISUAL_ROOT, NodePath());
-        return;
+        return write_display_param(
+            wrapper,
+            DISPLAY_PARAM_VISUAL_ROOT,
+            NodePath()
+        );
     }
     if (owner == nullptr
         || (p_node != owner && !owner->is_ancestor_of(p_node))) {
-        return;
+        return ERR_INVALID_PARAMETER;
     }
-    write_display_param(
+    const Error verdict = write_display_param(
         wrapper,
         DISPLAY_PARAM_VISUAL_ROOT,
         owner->get_path_to(p_node)
     );
     display_target_items.erase(p_entity.get_id());
     display_callbacks.erase(p_entity.get_id());
+    return verdict;
 }
 
 void NetwMultiplayer::display_set_target_item(
@@ -2274,23 +2262,10 @@ PropertySet *NetwMultiplayer::property_set_of(const RID &p_set) const {
     return set_book.get(property_set_id_of(p_set));
 }
 
-PropertySet *NetwMultiplayer::mutable_property_set(
-    const RID &p_set,
-    const char *p_verb
-) {
+PropertySet *NetwMultiplayer::mutable_property_set(const RID &p_set) {
     PropertySet *record = property_set_of(p_set);
     NETW_BUG_COND_V(record == nullptr, nullptr);
-    if (record->get_sealed()) {
-        fault::raise(
-            this,
-            NETW_FAULT_TOO_LATE,
-            {String(p_verb),
-             "a sealed property set",
-             "{NetwMultiplayer.property_set_seal}"}
-        );
-        return nullptr;
-    }
-
+    NETW_BUG_COND_V(record->get_sealed(), nullptr);
     return record;
 }
 
@@ -2313,15 +2288,11 @@ RID NetwMultiplayer::property_set_create(
     record->schema = *declaration;
     record->rid = minted;
     minted_property_sets.insert(minted.get_id(), held);
-    property_set_schema.insert(minted.get_id(), p_schema);
     return minted;
 }
 
 int NetwMultiplayer::property_set_add_column(const RID &p_set, int p_column) {
-    PropertySet *record = mutable_property_set(
-        p_set,
-        "{NetwMultiplayer.property_set_add_column}"
-    );
+    PropertySet *record = mutable_property_set(p_set);
     if (record == nullptr) {
         return -1;
     }
@@ -2343,8 +2314,7 @@ void NetwMultiplayer::property_set_set_column_param(
     int p_param,
     const Variant &p_value
 ) {
-    PropertySet *record
-        = mutable_property_set(p_set, "Changing a property set column");
+    PropertySet *record = mutable_property_set(p_set);
     if (record == nullptr) {
         return;
     }
@@ -2395,8 +2365,7 @@ void NetwMultiplayer::property_set_set_param(
     int p_param,
     const Variant &p_value
 ) {
-    PropertySet *record
-        = mutable_property_set(p_set, "Changing a property set");
+    PropertySet *record = mutable_property_set(p_set);
     if (record == nullptr) {
         return;
     }
@@ -2451,7 +2420,6 @@ void NetwMultiplayer::property_set_clear() {
     entity_property_sets.clear();
     minted_property_sets.clear();
     set_book.clear();
-    property_set_schema.clear();
     property_sets.clear();
 }
 
@@ -2606,22 +2574,20 @@ Error NetwMultiplayer::property_set_seal(const RID &p_set) {
     return OK;
 }
 
-int64_t NetwMultiplayer::property_set_get_wire_hash(const RID &p_set) const {
-    const PropertySet *record = property_set_of(p_set);
-    return record != nullptr ? record->wire_hash() : 0;
-}
-
-RID NetwMultiplayer::property_set_get_schema(const RID &p_set) const {
-    const RID *held = property_set_schema.getptr(p_set.get_id());
-    return held != nullptr ? *held : RID();
-}
-
-void NetwMultiplayer::lagcomp_effect_adopt(const StringName &p_key) {
+void NetwMultiplayer::effect_adopt(const StringName &p_key) {
     effects.adopt(p_key);
 }
 
-void NetwMultiplayer::lagcomp_effect_discard(const StringName &p_key) {
+void NetwMultiplayer::effect_discard(const StringName &p_key) {
     effects.discard(p_key);
+}
+
+void NetwMultiplayer::effect_drain() {
+    if (is_inside_step() || config_applying || action_handler_depth > 0) {
+        return;
+    }
+    const Ref<NetwMultiplayer> keep(this);
+    effects.drain();
 }
 
 bool NetwMultiplayer::lagcomp_effect_pending(const StringName &p_key) const {

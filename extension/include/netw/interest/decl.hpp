@@ -27,7 +27,6 @@ private:
     godot::HashMap<godot::StringName, godot::Callable> leave_callbacks;
     godot::HashMap<godot::StringName, int32_t> perception_policies;
     godot::HashMap<godot::StringName, godot::Callable> perception_callbacks;
-    bool reports_observers = false;
 
 public:
     bool join(const godot::StringName &layer_id);
@@ -35,6 +34,9 @@ public:
     bool leave(const godot::StringName &layer_id);
 
     bool has_label(const godot::StringName &layer_id) const;
+    bool has_labels() const {
+        return !label_ids.is_empty();
+    }
 
     godot::Array labels() const;
 
@@ -60,13 +62,6 @@ public:
     godot::Callable custom_perception_for(
         const godot::StringName &layer_id
     ) const;
-
-    void set_reports_observers(bool p_reports) {
-        reports_observers = p_reports;
-    }
-    bool get_reports_observers() const {
-        return reports_observers;
-    }
 
     void clear();
 };
@@ -116,6 +111,10 @@ public:
     );
     void dispatch_enter(const godot::StringName &layer_id, int64_t peer);
     void dispatch_leave(const godot::StringName &layer_id, int64_t peer);
+    bool observes() const {
+        return !observed_callbacks.is_empty()
+            || !unobserved_callbacks.is_empty();
+    }
     void dispatch_observed(int64_t peer);
     void dispatch_unobserved(int64_t peer);
 };

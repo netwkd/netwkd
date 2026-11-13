@@ -54,8 +54,6 @@ private:
 };
 
 class TrackerSignaler : public Signaler {
-    friend struct TrackerSignalerProbe;
-
 public:
     static const double SIGNALING_CLOSE_DELAY;
 

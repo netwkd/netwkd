@@ -17,26 +17,13 @@ struct Awareness {
         ENTER = 1,
     };
 
-    enum Type {
-        LAYER = 0,
-        OBSERVER = 1,
-    };
-
-    int32_t type = LAYER;
     int64_t route = 0;
     godot::StringName layer_id;
-    int64_t observer_peer = 0;
     int32_t kind = ENTER;
 
     static Awareness layer_edge(
         int64_t route,
         const godot::StringName &layer_id,
-        int kind
-    );
-    static Awareness observer_edge(
-        int64_t route,
-        const godot::StringName &layer_id,
-        int64_t observer_peer,
         int kind
     );
 
@@ -45,17 +32,11 @@ struct Awareness {
 };
 
 struct AwarenessEdge {
-    bool observer_scoped = false;
     uint64_t route = 0;
     godot::StringName layer_id;
-    uint64_t observer = 0;
     bool entered = false;
 
     static constexpr auto wire = netw::wire::describe(
-        netw::wire::field<&AwarenessEdge::observer_scoped>(
-            "observer_scoped",
-            netw::wire::bool1()
-        ),
         netw::wire::field<&AwarenessEdge::route>(
             "route",
             netw::wire::varuint(5)
@@ -63,10 +44,6 @@ struct AwarenessEdge {
         netw::wire::field<&AwarenessEdge::layer_id>(
             "layer_id",
             netw::wire::string()
-        ),
-        netw::wire::field<&AwarenessEdge::observer>(
-            "observer",
-            netw::wire::varuint(5)
         ),
         netw::wire::field<&AwarenessEdge::entered>(
             "entered",

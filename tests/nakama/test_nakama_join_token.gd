@@ -41,7 +41,7 @@ func before_test() -> void:
 	host_gate = Gate.new()
 	host = await EnetTestSupport.start_host(self, host_gate, WAIT_MS / 1000.0)
 	client = EnetTestSupport.make_client_tree(self, host.port)
-	client.api.inner.auth_timeout = WAIT_MS / 1000.0
+	client.api.auth_timeout = WAIT_MS / 1000.0
 	client_gate = Gate.new()
 	client.add_child(client_gate)
 
@@ -72,10 +72,10 @@ func join() -> NetwJoinRequest:
 	client.api.multiplayer_peer = peer
 
 	var started := Time.get_ticks_msec()
-	while client.api.local_player == null \
+	while client.api.player_get_local() == 0 \
 			and Time.get_ticks_msec() - started < WAIT_MS:
 		await get_tree().process_frame
-	assert_object(client.api.local_player).is_not_null()
+	assert_object(Netw.session(client).local_player).is_not_null()
 	assert_int(host_gate.requests.size()).is_equal(1)
 	return host_gate.requests.back() if not host_gate.requests.is_empty() \
 	else null
@@ -93,7 +93,7 @@ func test_a_signed_in_player_joins_as_their_nakama_account(
 	var own := "nakama:" + account.user_id
 	assert_array(request.accounts).contains_exactly([own])
 	assert_str(request.name_of(own)).is_equal(shown)
-	assert_str(client.api.local_player.account).is_equal(own)
+	assert_str(Netw.session(client).local_player.account).is_equal(own)
 
 
 func test_only_the_first_account_in_the_process_supplies_tokens(
@@ -136,4 +136,4 @@ func test_a_token_another_key_signed_proves_nothing(
 	var request := await join()
 
 	assert_array(request.accounts).is_empty()
-	assert_str(client.api.local_player.account).is_empty()
+	assert_str(Netw.session(client).local_player.account).is_empty()

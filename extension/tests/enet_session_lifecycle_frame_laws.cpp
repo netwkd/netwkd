@@ -239,7 +239,7 @@ public:
                 return true;
             }
             case 1: {
-                if (host->is_online()) {
+                if (host->session_is_online()) {
                     evidence.host_online = true;
                     evidence.host_scene_free = host->scene_list().is_empty();
                     host_trace = std::make_unique<ExitTrace>();
@@ -312,7 +312,7 @@ public:
                 return true;
             }
             case 5: {
-                const bool offline = leaving->session_get_state()
+                const bool offline = leaving->session_get_stored_state()
                     == netw::NetwMultiplayer::SESSION_STATE_OFFLINE;
                 if (offline) {
                     evidence.leaving_offline = true;

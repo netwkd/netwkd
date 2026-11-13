@@ -50,7 +50,11 @@ void LobbyDirectory::invite(
         );
         return;
     }
-    session->get_connection()->invite(peer_class(), p_address, p_from_name);
+    session->endpoint_invite(
+        session->transport_find(peer_class()),
+        p_address,
+        p_from_name
+    );
 }
 
 void LobbyDirectory::watched_by(NetwMultiplayer *p_session) {
@@ -158,7 +162,7 @@ void LobbyDirectory::join_lobby(const String &p_address) {
 }
 
 Ref<NetwServerInfo> LobbyDirectory::listed_info(NetwMultiplayer *p_session) {
-    if (p_session == nullptr || !p_session->is_online()
+    if (p_session == nullptr || !p_session->session_is_online()
         || !p_session->has_server_role()) {
         return Ref<NetwServerInfo>();
     }

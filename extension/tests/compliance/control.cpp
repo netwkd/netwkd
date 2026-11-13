@@ -239,11 +239,17 @@ func _ready() -> void:
 
 class Crate extends Node3D:
 	signal refused(detail: String)
+	signal refused_under(parent: String)
 
 	func _init() -> void:
 		var entity := Netw.configure_entity(self)
 		entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
 		entity.lifecycle_requested.connect(judge)
+		entity.lifecycle_refused.connect(
+			func(request: NetwLifecycleRequest) -> void:
+				if request.kind == NetwLifecycleRequest.KIND_REPARENT:
+					refused_under.emit(String(get_parent().name))
+		)
 
 	func judge(_peer_id: int, request: NetwLifecycleRequest) -> void:
 		request.deny("not yours")
@@ -265,6 +271,7 @@ World refused_crates(bool p_slow) {
     }
     return world.hear("Crate", "refused")
         .hear("Crate", "lifecycle_refused")
+        .hear("Crate", "refused_under")
         .hear("Crate", "despawning")
         .hear("Placed", "lifecycle_refused")
         .at(1, spawn("Crate", "Crate"))
@@ -307,6 +314,9 @@ void refused_on_the_author_alone(const Seen &seen) {
     NETW_HOLDS(hears(seen, TAKER, "Crate", "refused", 1, MOVED, SCRAPPED - 1));
     NETW_HOLDS(
         hears_with(seen, TAKER, "Crate", "refused", Array::make("not yours"))
+    );
+    NETW_HOLDS(
+        hears_with(seen, TAKER, "Crate", "refused_under", Array::make("Level"))
     );
     CHECK_MESSAGE(
         seen.sight(TAKER, "Crate", SCRAPPED) == nullptr,

@@ -84,7 +84,7 @@
 			While a peer loses packets its budget halves, and each round trip without loss adds back an eighth of it, up to this value. [method NetwSession.set_peer_bandwidth] gives one peer its own budget.
 		</member>
 		<member name="desired_role" type="int" setter="set_desired_role" getter="get_desired_role" enum="NetwSession.Role">
-			The role this peer takes when it hosts, which becomes [member NetwMultiplayer.role].
+			The role this peer takes when it hosts, which becomes [member NetwSession.role].
 		</member>
 		<member name="link_conditions" type="NetwLinkConditions" setter="set_link_conditions" getter="get_link_conditions">
 			[NetwLinkConditions] copied when the session starts.

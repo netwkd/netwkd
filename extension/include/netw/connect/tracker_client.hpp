@@ -23,8 +23,6 @@ struct TrackerEvent {
 };
 
 class TrackerClient {
-    friend struct TrackerClientProbe;
-
 public:
     static const int64_t CONNECT_TIMEOUT_USEC = 10000000;
     static const char *WARN_SETTING;

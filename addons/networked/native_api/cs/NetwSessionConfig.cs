@@ -91,7 +91,7 @@ public sealed class NetwSessionConfig : NetwRefCounted
 
     /// <summary>
     /// The role this peer takes when it hosts, which becomes
-    /// <see cref="NetwMultiplayer.Role"/>.
+    /// <see cref="NetwSession.Role"/>.
     /// </summary>
     public NetwSession.RoleEnum DesiredRole
     {
@@ -345,7 +345,12 @@ public sealed class NetwSessionConfig : NetwRefCounted
     /// How many seconds the server keeps the entities of a player with an
     /// <see cref="NetwPlayer.Account"/> after it drops or calls
     /// <see cref="NetwSession.StepAway"/>, or <c>0</c> to despawn them when it
-    /// leaves.
+    /// leaves. The server controls them while they are kept. A later join with
+    /// the same <see cref="NetwPlayer.Account"/> gets the same entities back,
+    /// owned and controlled as before, and a join with another account gets
+    /// none of them, even on the same peer id. That join still receives them as
+    /// any other peer does. A spawn for the player in the frame it drops is not
+    /// kept.
     /// </summary>
     public double ReturnWindowSeconds
     {

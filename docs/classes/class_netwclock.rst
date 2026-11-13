@@ -45,6 +45,18 @@ The client pings the server every :ref:`ping_interval<class_NetwClock_property_p
 
 State from other peers arrives late, so remote entities are shown :ref:`display_offset<class_NetwClock_property_display_offset>` ticks in the past. :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` is the offset the current connection needs, the one-way latency plus the jitter times :ref:`NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER<class_NetwMultiplayer_constant_CLOCK_PARAM_JITTER_MULTIPLIER>`, in ticks. It is not applied automatically. :ref:`auto_configure_offset()<class_NetwClock_method_auto_configure_offset>` applies it.
 
+\ **Ticking by hand**\ 
+
+While :ref:`manual_tick<class_NetwClock_property_manual_tick>` is on, physics frames run no ticks, and each :ref:`step()<class_NetwClock_method_step>` call is one frame that runs the ticks it is given. A replay or a test steps the clock this way to get an exact tick count.
+
+::
+
+    clock.manual_tick = true
+    for frame in 4:
+        await get_tree().physics_frame
+        clock.step(1 if frame % 2 == 1 else 0)
+    clock.manual_tick = false
+
 .. rst-class:: classref-reftable-group
 
 Properties
@@ -61,6 +73,8 @@ Properties
    | :godot:`bool`                            | :ref:`is_configured<class_NetwClock_property_is_configured>`                           |
    +------------------------------------------+----------------------------------------------------------------------------------------+
    | :godot:`bool`                            | :ref:`is_synchronized<class_NetwClock_property_is_synchronized>`                       |
+   +------------------------------------------+----------------------------------------------------------------------------------------+
+   | :godot:`bool`                            | :ref:`manual_tick<class_NetwClock_property_manual_tick>`                               |
    +------------------------------------------+----------------------------------------------------------------------------------------+
    | :godot:`float`                           | :ref:`physics_factor<class_NetwClock_property_physics_factor>`                         |
    +------------------------------------------+----------------------------------------------------------------------------------------+
@@ -92,6 +106,8 @@ Methods
    +----------------+--------------------------------------------------------------------------------------------------------------------------+
    | :godot:`float` | :ref:`monitor<class_NetwClock_method_monitor>`\ (\ monitor\: :ref:`ClockMonitor<enum_NetwClock_ClockMonitor>`\ ) |const| |
    +----------------+--------------------------------------------------------------------------------------------------------------------------+
+   | |void|         | :ref:`step<class_NetwClock_method_step>`\ (\ count\: :godot:`int`\ )                                                     |
+   +----------------+--------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -120,7 +136,7 @@ Emitted before ``tick`` runs. Read input here.
 
 **synchronized**\ (\ ) :ref:`🔗<class_NetwClock_signal_synchronized>`
 
-Emitted when :ref:`is_synchronized<class_NetwClock_property_is_synchronized>` becomes ``true``.
+Emitted when :ref:`is_synchronized<class_NetwClock_property_is_synchronized>` becomes ``true``. A clock that synchronizes while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a tick runs emits it when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -144,7 +160,7 @@ Emitted after every entity ran ``_network_tick`` for ``tick``. Read results here
 
 **tickrate_mismatch**\ (\ server_tickrate\: :godot:`int`\ ) :ref:`🔗<class_NetwClock_signal_tickrate_mismatch>`
 
-Emitted on a client whose :ref:`tickrate<class_NetwClock_property_tickrate>` differs from ``server_tickrate`` when :ref:`NetwClockConfig.tickrate_mismatch_action<class_NetwClockConfig_property_tickrate_mismatch_action>` is :ref:`MISMATCH_ACTION_SIGNAL<class_NetwClock_constant_MISMATCH_ACTION_SIGNAL>`.
+Emitted on a client whose :ref:`tickrate<class_NetwClock_property_tickrate>` differs from ``server_tickrate`` when :ref:`NetwClockConfig.tickrate_mismatch_action<class_NetwClockConfig_property_tickrate_mismatch_action>` is :ref:`MISMATCH_ACTION_SIGNAL<class_NetwClock_constant_MISMATCH_ACTION_SIGNAL>`. A rate read while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-section-separator
 
@@ -383,6 +399,23 @@ How many ticks in the past remote entities are shown. See :ref:`recommended_disp
 
 ----
 
+.. _class_NetwClock_property_manual_tick:
+
+.. rst-class:: classref-property
+
+:godot:`bool` **manual_tick** :ref:`🔗<class_NetwClock_property_manual_tick>`
+
+.. rst-class:: classref-property-setget
+
+- |void| **set_manual_tick**\ (\ value\: :godot:`bool`\ )
+- :godot:`bool` **get_manual_tick**\ (\ )
+
+When ``true``, physics frames run no ticks and only :ref:`step()<class_NetwClock_method_step>` advances :ref:`tick<class_NetwClock_property_tick>`. Turning it on also marks the clock :ref:`is_synchronized<class_NetwClock_property_is_synchronized>`.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwClock_property_physics_factor:
 
 .. rst-class:: classref-property
@@ -541,6 +574,18 @@ Returns one clock diagnostic value.
 ::
 
     var rtt := clock.monitor(NetwClock.CLOCK_MONITOR_RTT_AVG)
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwClock_method_step:
+
+.. rst-class:: classref-method
+
+|void| **step**\ (\ count\: :godot:`int`\ ) :ref:`🔗<class_NetwClock_method_step>`
+
+Runs one physics frame of the clock with ``count`` ticks in it, now. A ``count`` of ``0`` runs the frame's prediction and sends with no tick. Use it while :ref:`manual_tick<class_NetwClock_property_manual_tick>` is on.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

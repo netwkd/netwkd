@@ -12,7 +12,6 @@
 namespace netw::connect {
 
 class WebRTCTransport : public Transport {
-    friend struct WebRTCTransportProbe;
     friend struct TurnCredentialProbe;
 
 public:

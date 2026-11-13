@@ -40,14 +40,14 @@ struct PropertyColumn {
         const godot::StringName &p_key,
         const godot::Ref<NetwQuantize> &p_quantizer,
         bool p_watch,
-        enums::NetwMultiplayer::ColumnType p_type
+        enums::NetwSchema::ColumnType p_type
     );
 
     const godot::StringName &get_key() const {
         return shape.key;
     }
-    enums::NetwMultiplayer::ColumnType get_type() const {
-        return enums::NetwMultiplayer::ColumnType(shape.type);
+    enums::NetwSchema::ColumnType get_type() const {
+        return enums::NetwSchema::ColumnType(shape.type);
     }
     godot::Ref<NetwQuantize> get_quantizer() const {
         return shape.quantizer;
@@ -158,7 +158,7 @@ public:
 
     table::DeltaMode delta_of(const PropertyColumn &p_column) const;
 
-    static enums::NetwMultiplayer::ColumnType column_type_for(
+    static enums::NetwSchema::ColumnType column_type_for(
         const godot::Ref<godot::Script> &p_script,
         godot::Node *p_node,
         const godot::StringName &p_property

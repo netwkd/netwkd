@@ -234,16 +234,6 @@ public:
         int64_t p_base_tick
     );
 
-    void send_property(
-        godot::Node *p_node,
-        const godot::StringName &p_property
-    );
-    void send_signal(
-        godot::Node *p_node,
-        const godot::StringName &p_signal,
-        const godot::Array &p_args
-    );
-
     godot::Node *resolve_comp_node(
         const godot::Ref<NetwEntity> &p_entity,
         int64_t p_comp,
@@ -263,19 +253,9 @@ public:
     void dispose();
     godot::Dictionary counters() const;
 
-    godot::Node *spawn(
-        const godot::Callable &p_fn,
-        const godot::Array &p_args,
-        const godot::Ref<NetwPlayer> &p_owner
-    );
     void register_spawn_constructor(
         const godot::StringName &p_id,
         const godot::Callable &p_fn
-    );
-    godot::Node *spawn_registered(
-        const godot::StringName &p_id,
-        const godot::Array &p_args,
-        const godot::Ref<NetwPlayer> &p_owner
     );
     godot::Ref<NetwEntity> adopt_in_place(godot::Node *p_root);
     godot::TypedArray<godot::Dictionary> spawn_state_of(godot::Node *p_root);

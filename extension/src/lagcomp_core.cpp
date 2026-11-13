@@ -385,26 +385,6 @@ Dictionary NetwLagCompCore::declared_only(
     return out;
 }
 
-void NetwLagCompCore::timeline_record(
-    int64_t p_slot,
-    int64_t p_tick,
-    const Dictionary &p_payload
-) {
-    Row *row = mutable_row_of(p_slot);
-    if (row == nullptr) {
-        return;
-    }
-    if (!row->book.is_compiled() || row->declared_changed) {
-        Array keys;
-        for (const StringName &key : row->declared) {
-            keys.push_back(key);
-        }
-        row->book.compile_keys(keys.is_empty() ? p_payload.keys() : keys);
-        row->declared_changed = false;
-    }
-    row->book.record(p_tick, p_payload);
-}
-
 void NetwLagCompCore::timeline_record_coded(
     int64_t p_slot,
     int64_t p_tick,

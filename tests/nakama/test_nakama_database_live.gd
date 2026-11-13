@@ -6,7 +6,7 @@ const _ERROR_SCRUBBER := preload(
 )
 
 var _tree: MultiplayerViewport
-var _api: MultiplayerAPI
+var _session: NetwSession
 var _app := ""
 
 
@@ -21,7 +21,7 @@ func before(
 func before_test() -> void:
 	_app = "netwlive%d%d" % [Time.get_ticks_usec(), randi() % 1000]
 	_tree = auto_free(NakamaTestSupport.make_client_tree(self, "db"))
-	_api = _tree.api
+	_session = Netw.session(_tree)
 	var signed_in := await NakamaTestSupport.sign_in(
 		_tree,
 		"db-%d-%d" % [Time.get_ticks_usec(), randi()],
@@ -33,11 +33,11 @@ func before_test() -> void:
 func after_test() -> void:
 	if NakamaTestSupport.account(_tree).session != null:
 		var backend := _backend()
-		var listing := backend._list_slots(_api)
+		var listing := backend._list_slots(_session)
 		await listing.wait()
 		if listing.get_is_completed():
 			for slot in listing.get_result() as PackedStringArray:
-				await backend._delete_slot(_api, StringName(slot)).wait()
+				await backend._delete_slot(_session, StringName(slot)).wait()
 	await super.after_test()
 
 
@@ -62,7 +62,7 @@ func _address(kind: int, key: String) -> Dictionary:
 
 
 func _open(backend: NakamaDatabase, slot: String) -> NetwDatabaseConnection:
-	var promise := backend._open(_api, StringName(slot))
+	var promise := backend._open(_session, StringName(slot))
 	await promise.wait()
 	assert_bool(promise.get_is_completed()) \
 			.override_failure_message(
@@ -316,17 +316,17 @@ func test_a_slot_is_listed_then_deleted_with_every_schema_under_it() -> void:
 	)
 	await wrote.wait()
 
-	var listing := backend._list_slots(_api)
+	var listing := backend._list_slots(_session)
 	await listing.wait()
 	var names: PackedStringArray = listing.get_result()
 	assert_bool(names.has("slot1")).is_true()
 	assert_bool(names.has("slot2")).is_true()
 
-	var removed := backend._delete_slot(_api, &"slot1")
+	var removed := backend._delete_slot(_session, &"slot1")
 	await removed.wait()
 	assert_int(int(removed.get_result())).is_equal(OK)
 
-	var after := backend._list_slots(_api)
+	var after := backend._list_slots(_session)
 	await after.wait()
 	var left: PackedStringArray = after.get_result()
 	assert_bool(left.has("slot1")) \

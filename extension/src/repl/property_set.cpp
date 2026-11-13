@@ -54,7 +54,7 @@ PropertyColumn PropertyColumn::create(
     const StringName &p_key,
     const Ref<NetwQuantize> &p_quantizer,
     bool p_watch,
-    enums::NetwMultiplayer::ColumnType p_type
+    enums::NetwSchema::ColumnType p_type
 ) {
     PropertyColumn made;
     made.shape.key = p_key;
@@ -238,13 +238,13 @@ void PropertySet::seal() {
     sealed = true;
 }
 
-enums::NetwMultiplayer::ColumnType PropertySet::column_type_for(
+enums::NetwSchema::ColumnType PropertySet::column_type_for(
     const Ref<Script> &p_script,
     Node *p_node,
     const StringName &p_property
 ) {
     PropertyTypeLists lists = lists_for(p_script);
-    return enums::NetwMultiplayer::ColumnType(
+    return enums::NetwSchema::ColumnType(
         column_type_in(lists, p_node, p_property)
     );
 }

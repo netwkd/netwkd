@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "support/netw_cells.h"
@@ -169,7 +170,8 @@ public:
         : declared(p_scenario), planted(p_plant) {
         Ref<NetwMultiplayer> session;
         session.instantiate();
-        ReplicationCore *plane = session->get_replication_plane();
+        ReplicationCore *plane
+            = netw_test::Internals::replication_plane(session);
 
         Node3D *body = memnew(Node3D);
         netw::gd::scene_root()->add_child(body);
@@ -223,7 +225,7 @@ public:
         }
 
         handled = *seen;
-        const Dictionary snapshot = session->stats_snapshot();
+        const Dictionary snapshot = session->session_get_stats();
         unknown_route_drops
             = int64_t(snapshot.get(StringName("drops_unknown_route"), -1));
         missing_route_verdicts

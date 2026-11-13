@@ -10,6 +10,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/promise.hpp"
 #include "netw/wire/registry.hpp"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
 #include "support/value_flow_stand.h"
@@ -21,6 +22,7 @@ using netw::NetwEntity;
 using netw::NetwLifecycleRequest;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
@@ -111,8 +113,9 @@ int64_t frames_in(NetwMultiplayer *p_api, int64_t p_from, const char *p_name) {
 }
 
 int64_t counter_of(NetwMultiplayer *p_api, const char *p_name) {
-    const Dictionary counted
-        = p_api->get_replication_plane()->get_spawn_pipeline()->counters();
+    const Dictionary counted = Internals::replication_plane(p_api)
+                                   ->get_spawn_pipeline()
+                                   ->counters();
     return int64_t(counted.get(StringName(p_name), -1));
 }
 
@@ -179,7 +182,7 @@ public:
         const RID entity = author->spawn_registered(
             StringName("judged_crate"),
             named(p_name),
-            nullptr
+            0
         );
         Node *node = author->entity_get_node(entity);
         if (node != nullptr) {
@@ -192,7 +195,7 @@ public:
     Ref<NetwPromise> author_moves(Node *p_parent) {
         NetwMultiplayer *author = rig.client(0);
         return author->entity_reparent(
-            author->entity_from_route(crate),
+            Internals::entity_at(author, crate),
             p_parent
         );
     }
@@ -202,7 +205,7 @@ public:
         REQUIRE(rig.route_node(crate, 0) != nullptr);
         NETW_REQUIRE_EQ(
             author->entity_despawn(
-                author->entity_from_route(crate),
+                Internals::entity_at(author, crate),
                 Ref<netw::NetwDespawnOpts>()
             ),
             OK
@@ -302,7 +305,7 @@ TEST_CASE(
     stage.deny(NetwLifecycleRequest::KIND_DESPAWN, "no");
 
     const Ref<NetwPromise> moved = session->entity_reparent(
-        session->entity_from_route(stage.crate),
+        Internals::entity_at(session, stage.crate),
         stage.shelf_on(-1)
     );
     stage.rig.step_ticks(SETTLE_TICKS);
@@ -310,7 +313,7 @@ TEST_CASE(
     CHECK(stage.under(stage.crate, 1, stage.shelf_on(1)));
     NETW_CHECK_EQ(
         session->entity_despawn(
-            session->entity_from_route(stage.crate),
+            Internals::entity_at(session, stage.crate),
             Ref<netw::NetwDespawnOpts>()
         ),
         OK

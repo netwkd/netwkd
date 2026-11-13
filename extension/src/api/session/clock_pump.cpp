@@ -97,7 +97,7 @@ void NetwMultiplayer::clock_attach_pump() {
         return;
     }
     SceneTree *tree = gd::scene_tree();
-    if (tree == nullptr || session_root() == nullptr) {
+    if (tree == nullptr || session_get_root() == nullptr) {
         return;
     }
     clock_pump_attached = true;
@@ -126,8 +126,9 @@ void NetwMultiplayer::clock_on_physics_frame() {
     if (authoring_in_editor() || !clock_engine().get_configured()) {
         return;
     }
+    const Ref<NetwMultiplayer> keep(this);
     SceneTree *tree = gd::scene_tree();
-    if (tree == nullptr || session_paused || session_root() == nullptr) {
+    if (tree == nullptr || session_paused || session_get_root() == nullptr) {
         return;
     }
     if (clock_engine().get_manual_tick()) {
@@ -156,6 +157,8 @@ void NetwMultiplayer::clock_on_physics_frame() {
     }
     --step_depth;
     announce_flush();
+    effect_drain();
+    predict_free_retired();
 }
 
 void NetwMultiplayer::clock_start_handshake() {

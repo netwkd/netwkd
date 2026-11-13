@@ -123,7 +123,7 @@ public:
         switch (step) {
             case 1: {
                 if (client->NETW_API_VIRTUAL(get_unique_id)() > 1
-                    && client->is_online()) {
+                    && client->session_is_online()) {
                     evidence.client_seated = true;
                     enter(2);
                 } else if (frames_in_step > SEAT_FRAMES) {

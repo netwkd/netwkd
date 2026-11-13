@@ -1,4 +1,5 @@
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_test.h"
 
@@ -20,6 +21,7 @@ namespace TestLifecycleMoveFrameLaws {
 
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 
 constexpr int TICKRATE = 30;
 constexpr int HOLDER = 0;
@@ -121,8 +123,7 @@ protected:
         NetwMultiplayer *server = stand->session(-1);
         Array args;
         args.push_back(String(p_name));
-        const RID made
-            = server->spawn_registered(StringName(p_id), args, nullptr);
+        const RID made = server->spawn_registered(StringName(p_id), args, 0);
         Node *built = server->entity_get_node(made);
         if (built == nullptr) {
             return 0;
@@ -168,7 +169,7 @@ protected:
     void move() {
         NetwMultiplayer *holder = stand->session(HOLDER);
         moved = holder->entity_reparent(
-            holder->entity_from_route(cube),
+            Internals::entity_at(holder, cube),
             hand_at(HOLDER)
         );
     }
@@ -312,10 +313,10 @@ class LostCarryScenario final : public HandStage {
     Node *holder_origin = nullptr;
 
     int64_t admitted() const {
-        const Dictionary counted = stand->session(-1)
-                                       ->get_replication_plane()
-                                       ->get_spawn_pipeline()
-                                       ->counters();
+        const Dictionary counted
+            = Internals::replication_plane(stand->session(-1))
+                  ->get_spawn_pipeline()
+                  ->counters();
         return int64_t(counted.get(StringName("lifecycle_ops_admitted"), 0));
     }
 

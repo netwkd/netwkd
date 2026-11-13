@@ -59,9 +59,9 @@ display::Decl NetwMultiplayer::display_config_for(
         return *standing;
     }
     display::Decl config;
-    const display::Decl *authored = p_entity->get_record() != nullptr
-        ? p_entity->get_record()->find_display_declaration()
-        : nullptr;
+    const NetwEntityRecord *record = record_of(p_entity.ptr());
+    const display::Decl *authored
+        = record != nullptr ? record->find_display_declaration() : nullptr;
     if (authored != nullptr) {
         config = *authored;
     }
@@ -96,26 +96,8 @@ display::Runtime *NetwMultiplayer::display_runtime_for(
     runtime->set_route(p_route);
     runtime->bind(p_entity.ptr(), p_entity->get_owner());
     runtime->set_config(display_config_for(p_entity));
-    display_hook_control(runtime, p_entity, p_route);
+    runtime->set_follows_control(true);
     return runtime;
-}
-
-void NetwMultiplayer::display_hook_control(
-    display::Runtime *p_runtime,
-    const Ref<NetwEntity> &p_entity,
-    int64_t p_route
-) {
-    if (!Array(p_runtime->get_entity_hooks()).is_empty()) {
-        return;
-    }
-    NETW_ZONE_NC("display connect hooks", colors::INTERP);
-    Array hooks;
-    const Callable on_control
-        = callable_mp(this, &NetwMultiplayer::display_on_control_changed)
-              .bind(p_route);
-    p_entity->connect("control_changed", on_control);
-    hooks.append(on_control);
-    p_runtime->set_entity_hooks(hooks);
 }
 
 void NetwMultiplayer::display_on_entity_live(
@@ -146,7 +128,7 @@ void NetwMultiplayer::display_on_entity_live(
     if (runtime == nullptr) {
         return;
     }
-    display_hook_control(runtime, entity, p_route);
+    runtime->set_follows_control(true);
     {
         NETW_ZONE_NC("display rebuild runtime", colors::INTERP);
         display_rebuild_runtime(runtime);
@@ -164,25 +146,15 @@ void NetwMultiplayer::display_on_entity_live(
     }
 }
 
-void NetwMultiplayer::display_release_hooks(display::Runtime *p_runtime) {
-    const Ref<NetwEntity> entity = p_runtime->entity();
-    const Array hooks = p_runtime->get_entity_hooks();
-    if (entity.is_valid()) {
-        for (int at = 0; at < hooks.size(); ++at) {
-            const Callable hook = hooks[at];
-            if (entity->is_connected("control_changed", hook)) {
-                entity->disconnect("control_changed", hook);
-            }
-        }
-    }
-    p_runtime->set_entity_hooks(Array());
+void NetwMultiplayer::display_detach_runtime(display::Runtime *p_runtime) {
+    p_runtime->set_follows_control(false);
     display_hooks.chase_hook(p_runtime->entity_rid(), false);
 }
 
 void NetwMultiplayer::display_release_route(int64_t p_route) {
     display::Runtime *runtime = display_book->runtime_at(p_route);
     if (runtime != nullptr) {
-        display_release_hooks(runtime);
+        display_detach_runtime(runtime);
         sim_release_body(runtime->entity_rid(), true);
     }
     display_book->drop_route(p_route);
@@ -192,7 +164,7 @@ void NetwMultiplayer::display_release_route(int64_t p_route) {
 void NetwMultiplayer::display_retire_route(int64_t p_route) {
     display::Runtime *runtime = display_book->runtime_at(p_route);
     if (runtime != nullptr) {
-        display_release_hooks(runtime);
+        display_detach_runtime(runtime);
         sim_release_body(runtime->entity_rid(), false);
     }
     display_book->drop_route(p_route);
@@ -203,19 +175,15 @@ void NetwMultiplayer::display_clear_runtimes() {
     const LocalVector<display::Runtime *> runtimes = display_book->runtimes();
     for (int at = 0; at < runtimes.size(); ++at) {
         display::Runtime *runtime = runtimes[at];
-        display_release_hooks(runtime);
+        display_detach_runtime(runtime);
         sim_release_body(runtime->entity_rid(), true);
     }
     display_book->clear();
 }
 
-void NetwMultiplayer::display_on_control_changed(
-    int64_t p_previous,
-    int64_t p_peer,
-    int64_t p_route
-) {
-    display::Runtime *runtime = display_book->runtime_at(p_route);
-    if (runtime != nullptr) {
+void NetwMultiplayer::display_follow_control(const RID &p_entity) {
+    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    if (runtime != nullptr && runtime->get_follows_control()) {
         display_resolve_role(runtime);
     }
 }

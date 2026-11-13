@@ -11,15 +11,9 @@ namespace netw::connect {
 
 namespace {
 
-RID_Owner<TargetRow> &target_owner() {
-    static RID_Owner<TargetRow> instance;
-    static bool described = false;
-    if (!described) {
-        instance.set_description("netw::connect target");
-        described = true;
-    }
-    return instance;
-}
+const char *TARGET_ADDRESS = "address";
+const char *TARGET_DISPLAY_NAME = "display_name";
+const char *TARGET_INFO = "info";
 
 int index_of(const LocalVector<RID> &p_rows, const RID &p_target) {
     for (uint32_t at = 0; at < p_rows.size(); at++) {
@@ -32,6 +26,27 @@ int index_of(const LocalVector<RID> &p_rows, const RID &p_target) {
 
 } // namespace
 
+TypedArray<Dictionary> targets_of(
+    const PackedStringArray &p_addresses,
+    const PackedStringArray &p_names,
+    const Array &p_infos
+) {
+    TypedArray<Dictionary> targets;
+    for (int64_t at = 0; at < p_addresses.size(); at++) {
+        Dictionary target;
+        target[TARGET_ADDRESS] = p_addresses[at];
+        target[TARGET_DISPLAY_NAME]
+            = at < p_names.size() ? p_names[at] : String();
+        target[TARGET_INFO] = at < p_infos.size() ? p_infos[at] : Variant();
+        targets.push_back(target);
+    }
+    return targets;
+}
+
+BrowseList::BrowseList() {
+    targets.set_description("netw::connect target");
+}
+
 BrowseList::~BrowseList() {
     for (uint32_t at = 0; at < caller_rows.size(); at++) {
         release(caller_rows[at]);
@@ -39,6 +54,7 @@ BrowseList::~BrowseList() {
     for (uint32_t at = 0; at < directory_rows.size(); at++) {
         release(directory_rows[at]);
     }
+    release(current);
 }
 
 void BrowseList::set_local_app_id(const StringName &p_app_id) {
@@ -46,21 +62,21 @@ void BrowseList::set_local_app_id(const StringName &p_app_id) {
 }
 
 RID BrowseList::mint(const TargetRow &p_row) {
-    return target_owner().make_rid(p_row);
+    return targets.make_rid(p_row);
 }
 
 void BrowseList::release(const RID &p_target) {
-    if (target_owner().owns(p_target)) {
-        target_owner().free(p_target);
+    if (targets.owns(p_target)) {
+        targets.free(p_target);
     }
 }
 
 TargetRow *BrowseList::row(const RID &p_target) {
-    return target_owner().get_or_null(p_target);
+    return targets.get_or_null(p_target);
 }
 
 const TargetRow *BrowseList::row(const RID &p_target) const {
-    return target_owner().get_or_null(p_target);
+    return targets.get_or_null(p_target);
 }
 
 RID BrowseList::find(const RID &p_transport, const String &p_address) const {
@@ -87,6 +103,37 @@ bool BrowseList::is_removable(const RID &p_target) const {
     }
     const TargetRow *held = row(p_target);
     return held != nullptr && held->invited;
+}
+
+bool BrowseList::holds(const RID &p_target) const {
+    return p_target.is_valid()
+        && (p_target == current || index_of(caller_rows, p_target) >= 0
+            || index_of(directory_rows, p_target) >= 0);
+}
+
+RID BrowseList::hold_current(
+    const RID &p_transport,
+    const String &p_address,
+    RID &r_dropped
+) {
+    const TargetRow *held = row(current);
+    if (held != nullptr && held->transport == p_transport
+        && held->address == p_address) {
+        return current;
+    }
+    r_dropped = drop_current();
+    TargetRow made;
+    made.transport = p_transport;
+    made.address = p_address;
+    current = mint(made);
+    return current;
+}
+
+RID BrowseList::drop_current() {
+    const RID dropped = current;
+    current = RID();
+    release(dropped);
+    return dropped;
 }
 
 RID BrowseList::add(
@@ -146,23 +193,21 @@ void BrowseList::publish_directory(
     const StringName &p_directory,
     ObjectID p_source,
     const RID &p_transport,
-    const PackedStringArray &p_addresses,
-    const PackedStringArray &p_names,
-    const Array &p_infos,
+    const TypedArray<Dictionary> &p_targets,
     LocalVector<RID> &r_dropped,
     LocalVector<RID> &r_added,
     LocalVector<RID> &r_updated
 ) {
     LocalVector<RID> standing;
-    for (int64_t at = 0; at < p_addresses.size(); at++) {
-        const String address = p_addresses[at];
-        const String named = at < p_names.size() ? p_names[at] : String();
-        Ref<NetwServerInfo> advertised;
-        if (at < p_infos.size()) {
-            advertised = Ref<NetwServerInfo>(
-                Object::cast_to<NetwServerInfo>(gd::live_object(p_infos[at]))
-            );
-        }
+    for (int64_t at = 0; at < p_targets.size(); at++) {
+        const Dictionary target = p_targets[at];
+        const String address = target.get(TARGET_ADDRESS, String());
+        const String named = target.get(TARGET_DISPLAY_NAME, String());
+        const Ref<NetwServerInfo> advertised = Ref<NetwServerInfo>(
+            Object::cast_to<NetwServerInfo>(
+                gd::live_object(target.get(TARGET_INFO, Variant()))
+            )
+        );
         RID held = find(p_transport, address);
         const bool minted = !held.is_valid();
         if (minted) {
@@ -308,7 +353,7 @@ bool BrowseList::next_to_probe(RID &r_target) {
 
 bool BrowseList::begin_probe(const RID &p_target) {
     TargetRow *seat = row(p_target);
-    if (seat == nullptr || seat->probing) {
+    if (seat == nullptr || seat->probing || p_target == current) {
         return false;
     }
     const int queued = index_of(queue, p_target);

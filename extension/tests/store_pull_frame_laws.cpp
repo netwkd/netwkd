@@ -173,7 +173,7 @@ protected:
             Array args;
             args.push_back(String("pulled") + String::num_int64(index));
             const StringName id(CUBE_ID);
-            const RID made = server()->spawn_registered(id, args, nullptr);
+            const RID made = server()->spawn_registered(id, args, 0);
             Node *built = server()->entity_get_node(made);
             if (built == nullptr) {
                 return false;
@@ -450,7 +450,7 @@ class SendAllocScenario final : public netw_test::FrameScenario {
             Array args;
             args.push_back(String("beating") + String::num_int64(index));
             const StringName id(CUBE_ID);
-            const RID made = server()->spawn_registered(id, args, nullptr);
+            const RID made = server()->spawn_registered(id, args, 0);
             Node *built = server()->entity_get_node(made);
             if (built == nullptr) {
                 return false;

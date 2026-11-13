@@ -153,7 +153,7 @@
 			<param index="1" name="address" type="String" />
 			<param index="2" name="from_name" type="String" default="&quot;&quot;" />
 			<description>
-				Sets [member NetwEndpoint.is_invited] and [member NetwEndpoint.invited_by] before emitting [signal invited]. Reuses the row at [param address]. An invitation to the server the session is already on returns its endpoint and emits nothing. Returns [code]null[/code] if [param transport] is unavailable or the address is empty.
+				Sets [member NetwEndpoint.is_invited] and [member NetwEndpoint.invited_by] before emitting [signal invited]. Reuses the row at [param address]. An invitation to the server the session is already on returns its endpoint and does not emit [signal invited]. Returns [code]null[/code] if [param transport] is unavailable or the address is empty.
 			</description>
 		</method>
 		<method name="join">
@@ -232,7 +232,7 @@
 			While [code]true[/code], every [LobbyDirectory] keeps listing and every row from [method add] is probed every [member probe_interval], which costs network traffic.
 		</member>
 		<member name="current_endpoint" type="NetwEndpoint" setter="" getter="get_current_endpoint">
-			The connected server, including while hosting, at the address this peer connected through. [code]null[/code] before [constant NetwSession.STATE_ONLINE] or when an assigned peer supplies no address. It can be absent from [member endpoints].
+			The connected server, including while hosting, at the address this peer connected through. [code]null[/code] before [constant NetwSession.STATE_ONLINE], when an assigned peer supplies no address, or when the peer's transport was removed with [method unregister_transport] while online. It can be absent from [member endpoints].
 		</member>
 		<member name="endpoints" type="NetwEndpoint[]" setter="" getter="get_endpoints">
 			The rows from [method add] come first.
@@ -252,13 +252,13 @@
 		<signal name="endpoint_added">
 			<param index="0" name="endpoint" type="NetwEndpoint" />
 			<description>
-				Emitted when [param endpoint] is added to [member endpoints].
+				Emitted when [param endpoint] is added to [member endpoints]. An endpoint added while [method MultiplayerAPI.poll] runs is reported when that poll ends.
 			</description>
 		</signal>
 		<signal name="endpoint_removed">
 			<param index="0" name="endpoint" type="NetwEndpoint" />
 			<description>
-				Its [member NetwEndpoint.is_listed] is already [code]false[/code].
+				Its [member NetwEndpoint.is_listed] is already [code]false[/code]. An endpoint removed while [method MultiplayerAPI.poll] runs is reported when that poll ends.
 			</description>
 		</signal>
 		<signal name="failed">
@@ -266,26 +266,26 @@
 			<param index="1" name="reason" type="String" />
 			<description>
 				Emitted once when an attempt fails, and never for [method cancel]. A connection to it reads the failure of the [NetwPromise] that started the attempt, so a caller may drop that promise.
-				A join the server refuses fails with the [param error] and [param reason] of [signal NetwSession.join_failed], also when the game assigned the peer itself. A join whose connection closes with no answer fails with [constant @GlobalScope.ERR_CANT_CONNECT] when the server was never reached, and with [constant @GlobalScope.ERR_CONNECTION_ERROR] when it was.
+				A join the server refuses fails with the [param error] and [param reason] of [signal NetwSession.join_failed], also when the game assigned the peer itself. A join whose connection closes with no answer fails with [constant @GlobalScope.ERR_CANT_CONNECT] when the server was never reached, and with [constant @GlobalScope.ERR_CONNECTION_ERROR] when it was. An attempt that fails while [method MultiplayerAPI.poll] runs is reported when that poll ends, after the [NetwPromise] that started it has failed.
 			</description>
 		</signal>
 		<signal name="invited">
 			<param index="0" name="endpoint" type="NetwEndpoint" />
 			<description>
-				Emitted when someone invites the player to [param endpoint]. [member NetwEndpoint.invited_by] names the sender, and the player joins only when the game calls [method join].
+				Emitted when someone invites the player to [param endpoint]. [member NetwEndpoint.invited_by] names the sender, and the player joins only when the game calls [method join]. An invitation received while [method MultiplayerAPI.poll] runs is reported when that poll ends.
 			</description>
 		</signal>
 		<signal name="join_address_changed">
 			<param index="0" name="address" type="String" />
 			<description>
-				Emitted when [member join_address] changes.
+				Emitted when [member join_address] changes. A change made while [method MultiplayerAPI.poll] runs is emitted when that poll ends, so [member join_address] can already read a later address.
 			</description>
 		</signal>
 		<signal name="progressed">
 			<param index="0" name="message" type="String" />
 			<param index="1" name="ratio" type="float" />
 			<description>
-				[param ratio] runs from 0 to 1, and is negative when the transport only has a [param message].
+				[param ratio] runs from 0 to 1, and is negative when the transport only has a [param message]. Progress reported while [method MultiplayerAPI.poll] runs is emitted when that poll ends.
 			</description>
 		</signal>
 	</signals>

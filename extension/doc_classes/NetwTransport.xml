@@ -259,7 +259,7 @@
 			<param index="0" name="ticket" type="RID" />
 			<param index="1" name="peer" type="MultiplayerPeer" />
 			<description>
-				Reports [param peer] as the result of [param ticket]. Only the first call for a ticket counts.
+				Reports [param peer] as the result of [param ticket] through [method NetwMultiplayer.transport_complete]. Only the first call for a ticket counts.
 			</description>
 		</method>
 		<method name="deliver_probe">
@@ -267,7 +267,7 @@
 			<param index="0" name="ticket" type="RID" />
 			<param index="1" name="info" type="NetwServerInfo" />
 			<description>
-				Reports [param info] as the result of the [method _probe] request [param ticket].
+				Reports [param info] as the result of the [method _probe] request [param ticket] through [method NetwMultiplayer.transport_complete].
 			</description>
 		</method>
 		<method name="diagnostics">
@@ -289,7 +289,7 @@
 			<param index="1" name="error" type="int" enum="Error" />
 			<param index="2" name="message" type="String" default="&quot;&quot;" />
 			<description>
-				Reports that [param ticket] failed with [param error] and a readable [param message].
+				Reports that [param ticket] failed with [param error] and a readable [param message] through [method NetwMultiplayer.transport_complete].
 			</description>
 		</method>
 		<method name="host_settings">
@@ -336,7 +336,7 @@
 			<param index="1" name="names" type="PackedStringArray" default="PackedStringArray()" />
 			<param index="2" name="infos" type="Array" default="[]" />
 			<description>
-				Reports the servers [method _browse] found, one per address. [param names] and [param infos] are matched to [param addresses] by index, and can be shorter.
+				Reports the servers [method _browse] found, one per address, through [method NetwMultiplayer.transport_publish_targets]. [param names] and [param infos] are matched to [param addresses] by index, and can be shorter.
 				[codeblock]
 				func _browse() -&gt; void:
 				    var lobbies := await _sdk.search()
@@ -365,7 +365,7 @@
 			<param index="2" name="message" type="String" />
 			<param index="3" name="ratio" type="float" />
 			<description>
-				Reports progress on [param ticket] through [signal NetwConnection.progressed].
+				Reports progress on [param ticket] through [method NetwMultiplayer.transport_report_progress]. [param step] is not used.
 			</description>
 		</method>
 		<method name="timeout_hint">
@@ -376,8 +376,8 @@
 		</method>
 	</methods>
 	<members>
-		<member name="session" type="NetwMultiplayer" setter="" getter="get_session">
-			The session this transport belongs to.
+		<member name="session" type="NetwSession" setter="" getter="get_session">
+			The session this transport belongs to, the same [NetwSession] that [method Netw.session] answers.
 		</member>
 	</members>
 </class>

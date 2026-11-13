@@ -10,6 +10,7 @@
 #include "netw/api/promise.hpp"
 #include "netw/wire/registry.hpp"
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/value_flow_stand.h"
 
@@ -19,6 +20,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
@@ -110,8 +112,9 @@ int64_t frames_in(
 }
 
 int64_t counter_of(NetwMultiplayer *p_session, const char *p_name) {
-    const Dictionary counted
-        = p_session->get_replication_plane()->get_spawn_pipeline()->counters();
+    const Dictionary counted = Internals::replication_plane(p_session)
+                                   ->get_spawn_pipeline()
+                                   ->counters();
     return int64_t(counted.get(StringName(p_name), -1));
 }
 
@@ -183,7 +186,7 @@ public:
     Ref<NetwPromise> moves_on(int p_side, Node *p_parent) {
         NetwMultiplayer *author = side(p_side);
         return author->entity_reparent(
-            author->entity_from_route(cube),
+            Internals::entity_at(author, cube),
             p_parent
         );
     }
@@ -272,7 +275,7 @@ TEST_CASE(
 
     stage.rig.hold(0);
     const Ref<NetwPromise> ruled = session->entity_reparent(
-        session->entity_from_route(stage.cube),
+        Internals::entity_at(session, stage.cube),
         stage.hand_on(-1)
     );
     stage.write_ticks(2);

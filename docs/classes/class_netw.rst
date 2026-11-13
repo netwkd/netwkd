@@ -581,7 +581,7 @@ Emits ``sig`` on every peer, including the local one, with the arguments that fo
 
 :ref:`NetwMultiplayer<class_NetwMultiplayer>` **of**\ (\ node\: :godot:`Node`\ ) |static| :ref:`🔗<class_Netw_method_of>`
 
-Returns the :godot:`Node.multiplayer <Node#class_Node_property_multiplayer>` of ``node`` as a :ref:`NetwMultiplayer<class_NetwMultiplayer>`, for advanced use. A node that is in no tree returns ``null``.
+Returns the :godot:`Node.multiplayer <Node#class_Node_property_multiplayer>` of ``node`` as a :ref:`NetwMultiplayer<class_NetwMultiplayer>`, for advanced use. A ``null`` node, or a node that is in no tree, returns ``null``.
 
 .. rst-class:: classref-item-separator
 
@@ -1023,7 +1023,7 @@ Like :ref:`spawn()<class_Netw_method_spawn>`, and writes :ref:`NetwEntity.player
         NetwEntity.of(avatar).player = who
         return avatar
 
-\ Returns ``null`` and spawns nothing when the session does not hold ``player``. The node keeps the name ``fn`` gave it, and :ref:`NetwEntity.name<class_NetwEntity_property_name>` is the player's :ref:`NetwPlayer.username<class_NetwPlayer_property_username>`. The node is despawned when ``player`` leaves. With :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>`, other peers receive it once its save is loaded.
+\ Returns ``null`` and spawns nothing when the session does not hold ``player``, and raises an error unless that player left the session. The node keeps the name ``fn`` gave it, and :ref:`NetwEntity.name<class_NetwEntity_property_name>` is the player's :ref:`NetwPlayer.username<class_NetwPlayer_property_username>`. The node is despawned when ``player`` leaves. With :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>`, other peers receive it once its save is loaded.
 
 \ **Server Only.**
 

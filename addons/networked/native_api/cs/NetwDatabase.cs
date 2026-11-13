@@ -42,12 +42,39 @@ public sealed class NetwDatabase : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
+    public enum StateEnum : long
+    {
+        /// <summary>
+        /// No slot is open.
+        /// </summary>
+        Closed = 0,
+        /// <summary>
+        /// <see cref="NetwDatabase.Open"/> has not finished.
+        /// </summary>
+        Opening = 1,
+        /// <summary>
+        /// A slot is open.
+        /// </summary>
+        Open = 2,
+        /// <summary>
+        /// <see cref="NetwDatabase.Close"/> is waiting for pending operations.
+        /// </summary>
+        Closing = 3,
+    }
+
     /// <summary>
     /// Emitted when an <see cref="NetwEntity"/> fails to load or save its
     /// record. <c>error</c> is one of the codes
     /// <see cref="NetwPersistence.Load"/> and
     /// <see cref="NetwPersistence.Save"/> list, and <c>detail</c> names the
-    /// record and what went wrong.
+    /// record and what went wrong. A failure while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends, after the
+    /// <see cref="NetwPromise"/> from <see cref="NetwPersistence.Load"/> or
+    /// <see cref="NetwPersistence.Save"/> has failed.
+    /// <see cref="NetwSession.SaveEntities"/> writes one batch per database, so
+    /// a failed batch can be reported before its <see cref="NetwPromise"/>
+    /// settles.
     /// <code>
     /// func _ready() -&gt; void:
     ///     Netw.session(self).database(&amp;"saves").failed.connect(show_save_error)
@@ -106,18 +133,18 @@ public sealed class NetwDatabase : NetwRefCounted
     }
 
     private static readonly IntPtr _bindGetState =
-        NetwApi.MethodBind("NetwDatabase", "get_state", 1003870803UL);
+        NetwApi.MethodBind("NetwDatabase", "get_state", 3389705944UL);
 
     /// <summary>
     /// The state of the connection to the <see cref="NetwDatabaseBackend"/>.
     /// </summary>
-    public NetwMultiplayer.DatabaseState State
+    public NetwDatabase.StateEnum State
     {
         get
         {
             long answered = default;
             NetwThunks.Ptrcall0_Long(_bindGetState, Checked, ref answered);
-            return (NetwMultiplayer.DatabaseState)answered;
+            return (NetwDatabase.StateEnum)answered;
         }
     }
 

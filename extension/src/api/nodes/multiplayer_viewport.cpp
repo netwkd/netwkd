@@ -108,7 +108,7 @@ void MultiplayerViewport::follow_rename() {
 void MultiplayerViewport::release_peer() {
     if (api.is_valid() && api->has_multiplayer_peer()) {
         api->get_multiplayer_peer()->close();
-        api->set_multiplayer_peer(Ref<MultiplayerPeer>());
+        api->peer_assign(Ref<MultiplayerPeer>());
     }
 }
 

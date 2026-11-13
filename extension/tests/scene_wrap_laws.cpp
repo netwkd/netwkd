@@ -34,13 +34,11 @@ Ref<NetwEntity> bind(const Ref<NetwMultiplayer> &p_core, Node *p_node) {
     Ref<NetwEntity> wrapper;
     wrapper.instantiate();
     const RID handle = Internals::get_liveness_core(p_core)->entity_create();
-    wrapper->set_rid_handle(handle);
     wrapper->stamp_multiplayer(p_core);
     REQUIRE(p_core->liveness_bind(
         handle,
         Internals::get_liveness_core(p_core)->reserve_route(),
         wrapper,
-        wrapper->get_record(),
         p_node
     ));
     wrapper->set_owner(p_node);
@@ -58,8 +56,8 @@ Wrapped wrapped(
     made.root->set_name(p_stem);
     made.wrapper = bind(p_core, made.root);
     made.handle = made.wrapper->get_rid_handle();
-    made.wrapper->get_record()->set_declares_scene(true);
-    made.wrapper->get_record()->set_scene_isolation(
+    made.wrapper->set_declares_scene(true);
+    made.wrapper->set_scene_isolation(
         int64_t(NetwSceneCore::ISOLATION_OWN_WORLD)
     );
     p_parent->add_child(NetwMultiplayer::scene_wrap_world(made.root));

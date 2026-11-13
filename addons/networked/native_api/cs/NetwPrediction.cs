@@ -23,8 +23,11 @@ namespace Networked;
 /// predicted, because that state is what gets compared and restored.
 /// Per-property tolerances are set with <see cref="NetwPropertyConfig"/>. The
 /// schedule and the simulation mode are on <see cref="NetwEntity.Simulation"/>.
-/// Values set on a <see cref="MultiplayerSynchronizer"/> in the scene act as
-/// defaults, and values set in code override them. <b>Settings</b>
+/// An entity keeps predicting through <see cref="Netw.Reparent"/>, and one
+/// taken out of the tree with <see cref="Node.RemoveChild"/> and added back
+/// later predicts again. Values set on a <see cref="MultiplayerSynchronizer"/>
+/// in the scene act as defaults, and values set in code override them.
+/// <b>Settings</b>
 /// - <see cref="NetwPrediction.ArchetypeEnum"/> a preset for the other settings
 /// - <see cref="NetwPrediction.RecoveryPolicyEnum"/> how a misprediction is
 /// corrected
@@ -486,7 +489,9 @@ public sealed class NetwPrediction : NetwRefCounted
     /// <summary>
     /// Emitted when a predicted tick disagrees with the server, with what the
     /// disagreement is blamed on. It is emitted whether or not a correction
-    /// follows.
+    /// follows. It is emitted when the <see cref="MultiplayerApi.Poll"/> or
+    /// <see cref="NetwClock"/> tick that found it ends, so a handler reads the
+    /// entity as that poll or tick left it.
     /// <code>
     /// entity.prediction.divergence_detected.connect(
     ///     func(entry: int, attribution: NetwPrediction.Attribution):
@@ -512,7 +517,9 @@ public sealed class NetwPrediction : NetwRefCounted
     /// Emitted when a misprediction episode opens, falls back or closes, as
     /// <c>change</c> says. An episode holds the corrections from one
     /// misprediction until the peers agree again. <c>report</c> is the whole
-    /// episode so far.
+    /// episode so far. It is emitted when the <see cref="MultiplayerApi.Poll"/>
+    /// or <see cref="NetwClock"/> tick that changed the episode ends, so a
+    /// handler reads the entity as that poll or tick left it.
     /// <code>
     /// Dictionary
     /// ┠╴id            int
@@ -574,8 +581,11 @@ public sealed class NetwPrediction : NetwRefCounted
     /// Emitted after a correction moved the body. <c>deltas</c> holds how far
     /// each property moved, as <c>after - before</c>, with angles taken the
     /// short way around. <c>teleported</c> is <c>true</c> when the correction
-    /// was a teleport. Under <see cref="NetwDisplay.LiveModeEnum.Chase"/> the
-    /// display already smooths the correction away.
+    /// was a teleport. It is emitted when the <see cref="MultiplayerApi.Poll"/>
+    /// or <see cref="NetwClock"/> tick that corrected the body ends, so a
+    /// handler reads the body as that poll or tick left it. Under
+    /// <see cref="NetwDisplay.LiveModeEnum.Chase"/> the display already smooths
+    /// the correction away.
     /// <code>
     /// entity.display.live_mode = NetwDisplay.LIVE_MODE_CHASE
     /// api.display_set_param(entity.rid,
@@ -605,7 +615,10 @@ public sealed class NetwPrediction : NetwRefCounted
     /// under <see cref="NetwPrediction.DivergenceEpsilon"/>. <c>diverged</c> is
     /// whether the error was large enough to act on, even when no correction
     /// was written. Connect to <see cref="NetwPrediction.Recovered"/> to know
-    /// when the body actually moved.
+    /// when the body actually moved. It is emitted when the
+    /// <see cref="MultiplayerApi.Poll"/> or <see cref="NetwClock"/> tick that
+    /// compared the state ends, so a handler reads the entity as that poll or
+    /// tick left it.
     /// </summary>
     public event Action<long, long, double, bool> StateEvaluated
     {
@@ -1458,7 +1471,10 @@ public sealed class NetwPrediction : NetwRefCounted
         NetwApi.MethodBind("NetwPrediction", "is_registered", 36873697UL);
 
     /// <summary>
-    /// Whether the entity is being predicted, as opposed to only configured.
+    /// Whether the entity is being predicted, as opposed to only configured. It
+    /// is already false when <see cref="NetwSimulation.ModeChanged"/> reports
+    /// <see cref="NetwSimulation.ModeEnum.None"/> as the entity stops being
+    /// predicted.
     /// </summary>
     public bool IsRegistered()
     {

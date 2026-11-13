@@ -100,7 +100,7 @@ void NetwActionContext::deny() {
     }
     denied = true;
     if (NetwMultiplayer *core = session()) {
-        core->lagcomp_deny_action(requester, key);
+        core->lagcomp_action_deny(requester, key);
     }
 }
 
@@ -177,8 +177,8 @@ NetwMultiplayer *NetwAction::session() const {
 }
 
 NodePath NetwAction::tree_relative_path(Node *p_target) {
-    NetwMultiplayer *api = NetwMultiplayer::of(p_target);
-    Node *root = api != nullptr ? api->session_root() : nullptr;
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_target);
+    Node *root = api != nullptr ? api->session_get_root() : nullptr;
     return root != nullptr ? root->get_path_to(p_target) : NodePath();
 }
 
@@ -255,6 +255,7 @@ void NetwAction::request(int64_t p_view_tick, const Array &p_args) {
     if (api == nullptr) {
         return;
     }
+    const Ref<NetwMultiplayer> keep(api);
     Node *target = Object::cast_to<Node>(authority.get_object());
     if (target != nullptr && target->is_inside_tree()) {
         target_path = tree_relative_path(target);
@@ -281,10 +282,11 @@ void NetwAction::request(int64_t p_view_tick, const Array &p_args) {
     }
     if (ready != OK || !entity->get_is_controlled_locally() || session() != api
         || authority.get_object() == nullptr) {
+        api->effect_drain();
         return;
     }
     const StringName key
-        = api->lagcomp_effect_key(entity->get_rid_handle(), p_view_tick, slot);
+        = api->lagcomp_action_key(entity->get_rid_handle(), p_view_tick, slot);
     Node *ghost = predict.is_valid()
         ? Object::cast_to<Node>(
               gd::live_object(game_call(predict, Array(), ACTION_PREDICT))
@@ -301,14 +303,15 @@ void NetwAction::request(int64_t p_view_tick, const Array &p_args) {
         callable_mp(this, &NetwAction::run_confirm).bind(ghost_id),
         callable_mp(this, &NetwAction::run_denied)
     );
-    api->action_send_request(
+    api->lagcomp_action_request(
+        key,
         target_path,
         method,
         p_view_tick,
         p_args,
-        key,
-        timing_mode
+        TimingMode(timing_mode)
     );
+    api->effect_drain();
 }
 
 void NetwAction::_bind_methods() {

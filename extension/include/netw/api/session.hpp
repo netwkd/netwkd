@@ -99,7 +99,7 @@ public:
         const godot::Ref<NetwPlayer> &p_player,
         const godot::String &p_reason
     );
-    godot::Error transfer_server(int64_t p_peer);
+    godot::Error transfer_server(const godot::Ref<NetwPlayer> &p_player);
     godot::Ref<NetwScene> find_scene(const godot::StringName &p_label);
     godot::Error install_physics_stepper(
         const godot::Ref<godot::World3D> &p_world,
@@ -118,8 +118,8 @@ public:
         const godot::StringName &p_name
     ) const;
     godot::Node *service(godot::Object *p_type) const;
-    void register_service(godot::Object *p_service, godot::Object *p_type);
-    void unregister_service(godot::Object *p_service, godot::Object *p_type);
+    void register_service(godot::Node *p_service, godot::Object *p_type);
+    void unregister_service(godot::Node *p_service, godot::Object *p_type);
 };
 
 } // namespace netw

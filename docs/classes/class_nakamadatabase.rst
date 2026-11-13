@@ -57,25 +57,25 @@ Methods
 .. table::
    :widths: auto
 
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`                       | :ref:`encoded<class_NakamaDatabase_method_encoded>`\ (\ text\: :godot:`String`\ ) |static|                                           |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`                       | :ref:`address_key<class_NakamaDatabase_method_address_key>`\ (\ address\: :godot:`Dictionary`\ ) |static|                            |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`                       | :ref:`address_prefix<class_NakamaDatabase_method_address_prefix>`\ (\ kind\: :godot:`int`, schema_name\: :godot:`String`\ ) |static| |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`                       | :ref:`packed<class_NakamaDatabase_method_packed>`\ (\ envelope\: :godot:`Dictionary`\ ) |static|                                     |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                   | :ref:`unpacked<class_NakamaDatabase_method_unpacked>`\ (\ value\: :godot:`Variant`\ ) |static|                                       |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`                       | :ref:`collection_for<class_NakamaDatabase_method_collection_for>`\ (\ slot\: :godot:`String`\ )                                      |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_open<class_NakamaDatabase_private_method__open>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )                 |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_list_slots<class_NakamaDatabase_private_method__list_slots>`\ (\ session\: :godot:`Object`\ )                                 |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_delete_slot<class_NakamaDatabase_private_method__delete_slot>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )   |
-   +---------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------+
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`String`                       | :ref:`encoded<class_NakamaDatabase_method_encoded>`\ (\ text\: :godot:`String`\ ) |static|                                                               |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`String`                       | :ref:`address_key<class_NakamaDatabase_method_address_key>`\ (\ address\: :godot:`Dictionary`\ ) |static|                                                |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`String`                       | :ref:`address_prefix<class_NakamaDatabase_method_address_prefix>`\ (\ kind\: :godot:`int`, schema_name\: :godot:`String`\ ) |static|                     |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`String`                       | :ref:`packed<class_NakamaDatabase_method_packed>`\ (\ envelope\: :godot:`Dictionary`\ ) |static|                                                         |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Dictionary`                   | :ref:`unpacked<class_NakamaDatabase_method_unpacked>`\ (\ value\: :godot:`Variant`\ ) |static|                                                           |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`String`                       | :ref:`collection_for<class_NakamaDatabase_method_collection_for>`\ (\ slot\: :godot:`String`\ )                                                          |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_open<class_NakamaDatabase_private_method__open>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ )               |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_list_slots<class_NakamaDatabase_private_method__list_slots>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`\ )                               |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_delete_slot<class_NakamaDatabase_private_method__delete_slot>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) |
+   +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -196,7 +196,7 @@ Returns the storage collection holding ``slot``'s records.
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **_open**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NakamaDatabase_private_method__open>`
+:ref:`NetwPromise<class_NetwPromise>` **_open**\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NakamaDatabase_private_method__open>`
 
 Adds ``slot`` to the slot list, then resolves a :ref:`NakamaDatabase.Connection<class_NakamaDatabase_Connection>` for its collection.
 
@@ -208,7 +208,7 @@ Adds ``slot`` to the slot list, then resolves a :ref:`NakamaDatabase.Connection<
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **_list_slots**\ (\ session\: :godot:`Object`\ ) :ref:`🔗<class_NakamaDatabase_private_method__list_slots>`
+:ref:`NetwPromise<class_NetwPromise>` **_list_slots**\ (\ session\: :ref:`NetwSession<class_NetwSession>`\ ) :ref:`🔗<class_NakamaDatabase_private_method__list_slots>`
 
 Resolves every slot in the slot list.
 
@@ -220,7 +220,7 @@ Resolves every slot in the slot list.
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **_delete_slot**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NakamaDatabase_private_method__delete_slot>`
+:ref:`NetwPromise<class_NetwPromise>` **_delete_slot**\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NakamaDatabase_private_method__delete_slot>`
 
 Deletes every record in ``slot`` and removes it from the slot list. On failure the slot stays listed, so the delete can be retried.
 

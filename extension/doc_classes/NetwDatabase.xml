@@ -258,7 +258,7 @@
 		<member name="slot" type="StringName" setter="" getter="get_slot">
 			The open slot, or empty when this database is not open.
 		</member>
-		<member name="state" type="int" setter="" getter="get_state" enum="NetwMultiplayer.DatabaseState">
+		<member name="state" type="int" setter="" getter="get_state" enum="NetwDatabase.State">
 			The state of the connection to the [NetwDatabaseBackend].
 		</member>
 	</members>
@@ -268,6 +268,7 @@
 			<param index="1" name="detail" type="String" />
 			<description>
 				Emitted when an [NetwEntity] fails to load or save its record. [param error] is one of the codes [method NetwPersistence.load] and [method NetwPersistence.save] list, and [param detail] names the record and what went wrong.
+				A failure while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends, after the [NetwPromise] from [method NetwPersistence.load] or [method NetwPersistence.save] has failed. [method NetwSession.save_entities] writes one batch per database, so a failed batch can be reported before its [NetwPromise] settles.
 				[codeblock]
 				func _ready() -&gt; void:
 				    Netw.session(self).database(&amp;"saves").failed.connect(show_save_error)
@@ -278,4 +279,18 @@
 			</description>
 		</signal>
 	</signals>
+	<constants>
+		<constant name="STATE_CLOSED" value="0" enum="State">
+			No slot is open.
+		</constant>
+		<constant name="STATE_OPENING" value="1" enum="State">
+			[method open] has not finished.
+		</constant>
+		<constant name="STATE_OPEN" value="2" enum="State">
+			A slot is open.
+		</constant>
+		<constant name="STATE_CLOSING" value="3" enum="State">
+			[method close] is waiting for pending operations.
+		</constant>
+	</constants>
 </class>

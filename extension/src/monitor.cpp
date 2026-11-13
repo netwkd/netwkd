@@ -81,7 +81,8 @@ void refresh() {
     }
     cache->frame = frame;
     Sample now;
-    NetwMultiplayer *session = NetwMultiplayer::of(gd::scene_root());
+    NetwMultiplayer *session
+        = NetwMultiplayer::session_holding(gd::scene_root());
     if (session != nullptr) {
         session->monitor_sample(now);
     }

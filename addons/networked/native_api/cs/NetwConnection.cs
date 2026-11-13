@@ -161,7 +161,8 @@ public sealed class NetwConnection : NetwRefCounted
 
     /// <summary>
     /// <c>ratio</c> runs from 0 to 1, and is negative when the transport only
-    /// has a <c>message</c>.
+    /// has a <c>message</c>. Progress reported while
+    /// <see cref="MultiplayerApi.Poll"/> runs is emitted when that poll ends.
     /// </summary>
     public event Action<string, double> Progressed
     {
@@ -185,7 +186,10 @@ public sealed class NetwConnection : NetwRefCounted
     /// also when the game assigned the peer itself. A join whose connection
     /// closes with no answer fails with <c>@GlobalScope.ERR_CANT_CONNECT</c>
     /// when the server was never reached, and with
-    /// <c>@GlobalScope.ERR_CONNECTION_ERROR</c> when it was.
+    /// <c>@GlobalScope.ERR_CONNECTION_ERROR</c> when it was. An attempt that
+    /// fails while <see cref="MultiplayerApi.Poll"/> runs is reported when that
+    /// poll ends, after the <see cref="NetwPromise"/> that started it has
+    /// failed.
     /// </summary>
     public event Action<Error, string> Failed
     {
@@ -201,7 +205,10 @@ public sealed class NetwConnection : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when <see cref="NetwConnection.JoinAddress"/> changes.
+    /// Emitted when <see cref="NetwConnection.JoinAddress"/> changes. A change
+    /// made while <see cref="MultiplayerApi.Poll"/> runs is emitted when that
+    /// poll ends, so <see cref="NetwConnection.JoinAddress"/> can already read
+    /// a later address.
     /// </summary>
     public event Action<string> JoinAddressChanged
     {
@@ -219,7 +226,9 @@ public sealed class NetwConnection : NetwRefCounted
     /// <summary>
     /// Emitted when someone invites the player to <c>endpoint</c>.
     /// <see cref="NetwEndpoint.InvitedBy"/> names the sender, and the player
-    /// joins only when the game calls <see cref="NetwConnection.Join"/>.
+    /// joins only when the game calls <see cref="NetwConnection.Join"/>. An
+    /// invitation received while <see cref="MultiplayerApi.Poll"/> runs is
+    /// reported when that poll ends.
     /// </summary>
     public event Action<NetwEndpoint> Invited
     {
@@ -236,7 +245,8 @@ public sealed class NetwConnection : NetwRefCounted
 
     /// <summary>
     /// Emitted when <c>endpoint</c> is added to
-    /// <see cref="NetwConnection.Endpoints"/>.
+    /// <see cref="NetwConnection.Endpoints"/>. An endpoint added while
+    /// <see cref="MultiplayerApi.Poll"/> runs is reported when that poll ends.
     /// </summary>
     public event Action<NetwEndpoint> EndpointAdded
     {
@@ -252,7 +262,9 @@ public sealed class NetwConnection : NetwRefCounted
     }
 
     /// <summary>
-    /// Its <see cref="NetwEndpoint.IsListed"/> is already <c>false</c>.
+    /// Its <see cref="NetwEndpoint.IsListed"/> is already <c>false</c>. An
+    /// endpoint removed while <see cref="MultiplayerApi.Poll"/> runs is
+    /// reported when that poll ends.
     /// </summary>
     public event Action<NetwEndpoint> EndpointRemoved
     {
@@ -276,9 +288,10 @@ public sealed class NetwConnection : NetwRefCounted
     /// <summary>
     /// The connected server, including while hosting, at the address this peer
     /// connected through. <c>null</c> before
-    /// <see cref="NetwSession.StateEnum.Online"/> or when an assigned peer
-    /// supplies no address. It can be absent from
-    /// <see cref="NetwConnection.Endpoints"/>.
+    /// <see cref="NetwSession.StateEnum.Online"/>, when an assigned peer
+    /// supplies no address, or when the peer's transport was removed with
+    /// <see cref="NetwConnection.UnregisterTransport"/> while online. It can be
+    /// absent from <see cref="NetwConnection.Endpoints"/>.
     /// </summary>
     public NetwEndpoint CurrentEndpoint
     {
@@ -802,8 +815,9 @@ public sealed class NetwConnection : NetwRefCounted
     /// <see cref="NetwEndpoint.InvitedBy"/> before emitting
     /// <see cref="NetwConnection.Invited"/>. Reuses the row at
     /// <paramref name="address"/>. An invitation to the server the session is
-    /// already on returns its endpoint and emits nothing. Returns <c>null</c>
-    /// if <paramref name="transport"/> is unavailable or the address is empty.
+    /// already on returns its endpoint and does not emit
+    /// <see cref="NetwConnection.Invited"/>. Returns <c>null</c> if
+    /// <paramref name="transport"/> is unavailable or the address is empty.
     /// </summary>
     public NetwEndpoint Invite(
         Variant transport,

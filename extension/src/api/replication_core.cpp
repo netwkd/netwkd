@@ -293,7 +293,7 @@ void ReplicationCore::broadcast_control(
     shared.op = 0;
     shared.outcome = 0;
     const PackedByteArray payload = session::frame_write(shared);
-    const PackedInt32Array recipients = plane->rpc_get_recipients(p_entity);
+    const PackedInt32Array recipients = plane->rpc_recipients(p_entity);
     for (int at = 0; at < recipients.size(); ++at) {
         if (p_decision.op != 0 && recipients[at] == p_issuer) {
             reply_control(p_entity, p_decision, p_issuer);
@@ -357,7 +357,7 @@ bool ReplicationCore::lanes_stream_to(
     if (plane == nullptr || send == nullptr) {
         return true;
     }
-    const int64_t live = plane->liveness_route_of(p_entity.ptr());
+    const int64_t live = books->liveness->route_of(p_entity->get_rid_handle());
     const LocalVector<PropertyBindingPtr> group
         = derived_group(live > 0 ? live : p_entity->get_route());
     for (const PropertyBindingPtr &binding : group) {
@@ -405,12 +405,13 @@ void ReplicationCore::send_claim_images(int64_t p_tick) {
     for (uint32_t at = 0; at < held.size(); ++at) {
         NetwEntity *entity
             = Object::cast_to<NetwEntity>(gd::object_of(held[at]));
-        if (entity == nullptr || !entity->sends_claim_image(p_tick)) {
+        if (entity == nullptr
+            || !NetwMultiplayer::control_sends_claim_image(entity, p_tick)) {
             continue;
         }
         const Ref<NetwEntity> view(entity);
         const bool ahead = entity->is_claim_running_ahead();
-        const PackedInt32Array holders = plane->rpc_get_recipients(view);
+        const PackedInt32Array holders = plane->rpc_recipients(view);
         PackedInt32Array owed;
         for (int which = 0; which < holders.size(); ++which) {
             if (ahead || !lanes_stream_to(view, holders[which])) {
@@ -421,7 +422,8 @@ void ReplicationCore::send_claim_images(int64_t p_tick) {
             continue;
         }
         watch_claim_image(view);
-        const PackedByteArray payload = entity->claim_image(p_tick);
+        const PackedByteArray payload
+            = NetwMultiplayer::control_claim_image(entity, p_tick);
         if (payload.is_empty()) {
             continue;
         }
@@ -462,7 +464,8 @@ void ReplicationCore::expire_control(int64_t p_tick) {
     for (uint32_t at = 0; at < held.size(); ++at) {
         NetwEntity *entity
             = Object::cast_to<NetwEntity>(gd::object_of(held[at]));
-        if (entity != nullptr && entity->expire_control(p_tick, deadline)) {
+        if (entity != nullptr
+            && NetwMultiplayer::control_expire(entity, p_tick, deadline)) {
             watch_control(Ref<NetwEntity>(entity));
         }
     }
@@ -496,7 +499,7 @@ bool ReplicationCore::policy_admits(
 
 PackedInt32Array ReplicationCore::live_peers(const Ref<NetwEntity> &p_entity) {
     NetwMultiplayer *plane = core();
-    return plane != nullptr ? plane->rpc_get_recipients(p_entity)
+    return plane != nullptr ? plane->rpc_recipients(p_entity)
                             : PackedInt32Array();
 }
 
@@ -877,18 +880,26 @@ void ReplicationCore::dispatch_frame(
     } else if (p_channel == ids.control_request) {
         session::ControlRequest request;
         if (entity.is_valid() && session::frame_read(p_payload, request)) {
-            entity->_handle_control_request(p_sender, request);
+            plane->control_receive_request(
+                entity->get_rid_handle(),
+                p_sender,
+                request
+            );
         }
     } else if (p_channel == ids.control_apply) {
         session::ControlApply applied;
         if (entity.is_valid() && p_sender == SERVER_PEER
             && session::frame_read(p_payload, applied)) {
-            entity->_handle_control_apply(applied);
+            plane->control_receive_apply(entity->get_rid_handle(), applied);
         }
     } else if (p_channel == ids.claim_image) {
         session::ClaimImage image;
         if (entity.is_valid() && session::frame_read(p_payload, image)) {
-            entity->_handle_claim_image(p_sender, image);
+            plane->control_receive_claim_image(
+                entity->get_rid_handle(),
+                p_sender,
+                image
+            );
         }
     } else if (p_channel == ids.property_sync) {
         sync_pipeline.handle_property_sync(
@@ -975,46 +986,6 @@ Error ReplicationCore::admit_entity_frame(
         return OK;
     }
     return plane->finish_stage_verdict(gate, verdict, p_route, p_sender);
-}
-
-void ReplicationCore::send_property(
-    Node *p_node,
-    const StringName &p_property
-) {
-    NetwMultiplayer *plane = core();
-    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
-    if (plane == nullptr || entity.is_null()
-        || plane->liveness_route_of(entity.ptr()) <= 0) {
-        sync_pipeline.send_property(p_node, p_property);
-        return;
-    }
-    const Error verdict = plane->sync_send_property(
-        entity->get_rid_handle(),
-        entity->comp_of(p_node),
-        p_property
-    );
-    plane->sink_verdict(verdict, entity->get_route());
-}
-
-void ReplicationCore::send_signal(
-    Node *p_node,
-    const StringName &p_signal,
-    const Array &p_args
-) {
-    NetwMultiplayer *plane = core();
-    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
-    if (plane == nullptr || entity.is_null()
-        || plane->liveness_route_of(entity.ptr()) <= 0) {
-        sync_pipeline.send_signal(p_node, p_signal, p_args);
-        return;
-    }
-    const Error verdict = plane->sync_send_signal(
-        entity->get_rid_handle(),
-        entity->comp_of(p_node),
-        p_signal,
-        p_args
-    );
-    plane->sink_verdict(verdict, entity->get_route());
 }
 
 Node *ReplicationCore::resolve_comp_node(
@@ -1207,7 +1178,7 @@ void ReplicationCore::on_poll() {
     if (books->clock->get_configured()) {
         return;
     }
-    if (plane->is_online() && sync_pipeline.owes_rows()) {
+    if (plane->session_is_online() && sync_pipeline.owes_rows()) {
         fault::raise(plane, NETW_FAULT_ROWS_WITHOUT_CLOCK, {});
     }
     sync_compat.pump();
@@ -1270,19 +1241,6 @@ Dictionary ReplicationCore::counters() const {
     return out;
 }
 
-Node *ReplicationCore::spawn(
-    const Callable &p_fn,
-    const Array &p_args,
-    const Ref<NetwPlayer> &p_owner
-) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
-        return nullptr;
-    }
-    const RID handle = plane->spawn_fn(p_fn, p_args, p_owner.ptr());
-    return NetwMultiplayer::scene_outer_of(plane->entity_get_node(handle));
-}
-
 void ReplicationCore::register_spawn_constructor(
     const StringName &p_id,
     const Callable &p_fn
@@ -1293,26 +1251,16 @@ void ReplicationCore::register_spawn_constructor(
     }
 }
 
-Node *ReplicationCore::spawn_registered(
-    const StringName &p_id,
-    const Array &p_args,
-    const Ref<NetwPlayer> &p_owner
-) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
-        return nullptr;
-    }
-    const RID handle = plane->spawn_registered(p_id, p_args, p_owner.ptr());
-    return NetwMultiplayer::scene_outer_of(plane->entity_get_node(handle));
-}
-
 Ref<NetwEntity> ReplicationCore::adopt_in_place(Node *p_root) {
     NetwMultiplayer *plane = core();
     if (plane == nullptr) {
         return Ref<NetwEntity>();
     }
-    const RID handle = plane->entity_adopt(p_root);
-    return plane->entity_get_view(handle);
+    const Ref<NetwEntity> adopted = spawn_pipeline.adopt_in_place(p_root);
+    if (adopted.is_null()) {
+        return Ref<NetwEntity>();
+    }
+    return plane->entity_get_view(adopted->get_rid_handle());
 }
 
 TypedArray<Dictionary> ReplicationCore::spawn_state_of(Node *p_root) {

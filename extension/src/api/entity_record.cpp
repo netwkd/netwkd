@@ -4,11 +4,14 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/entity/ids.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
+#include "netw/predict/decl.hpp"
 #include "netw/scene_decl.hpp"
 #include "netw/script/model.hpp"
+#include "netw/sim/row.hpp"
+#include "netw/spawn/record.hpp"
 #include "netw/synchronizers.hpp"
 #include "netw/tree_hook.hpp"
 
@@ -26,7 +29,6 @@ Callable *part_factories() {
 } // namespace
 
 NetwEntityRecord::NetwEntityRecord() {
-    handle = entity::mint();
 }
 
 NetwEntityRecord::~NetwEntityRecord() {
@@ -36,7 +38,30 @@ NetwEntityRecord::~NetwEntityRecord() {
     if (display_decl != nullptr) {
         memdelete(display_decl);
     }
+    if (predict_decl != nullptr) {
+        memdelete(predict_decl);
+    }
+    if (sim_decl != nullptr) {
+        memdelete(sim_decl);
+    }
+    if (readmission != nullptr) {
+        memdelete(readmission);
+    }
     entity::release(handle);
+}
+
+void NetwEntityRecord::keep_readmission(const spawn::Record &p_recipe) {
+    if (readmission == nullptr) {
+        readmission = memnew(spawn::Record(p_recipe));
+        return;
+    }
+    *readmission = p_recipe;
+}
+
+spawn::Record *NetwEntityRecord::take_readmission() {
+    spawn::Record *taken = readmission;
+    readmission = nullptr;
+    return taken;
 }
 
 interest::Facet &NetwEntityRecord::get_interest_facet() {
@@ -51,6 +76,28 @@ display::Decl &NetwEntityRecord::display_declaration() {
         display_decl = memnew(display::Decl);
     }
     return *display_decl;
+}
+
+predict::Decl &NetwEntityRecord::predict_declaration() {
+    if (predict_decl == nullptr) {
+        predict_decl = memnew(predict::Decl);
+    }
+    return *predict_decl;
+}
+
+int64_t NetwEntityRecord::predict_declaration_bytes() const {
+    return predict_decl != nullptr ? int64_t(sizeof(predict::Decl)) : 0;
+}
+
+sim::Decl &NetwEntityRecord::sim_declaration() {
+    if (sim_decl == nullptr) {
+        sim_decl = memnew(sim::Decl);
+    }
+    return *sim_decl;
+}
+
+int64_t NetwEntityRecord::sim_declaration_bytes() const {
+    return sim_decl != nullptr ? int64_t(sizeof(sim::Decl)) : 0;
 }
 
 Variant NetwEntityRecord::minted_part(int64_t p_part) const {
@@ -93,17 +140,21 @@ Variant NetwEntityRecord::part(int64_t p_part, Object *p_wrapper) {
     const Ref<RefCounted> minted = made;
     NETW_BUG_COND_V(minted.is_null(), Variant());
     NETW_TRACE(sys::ENTITY, "Made entity part %d.", int(p_part));
+    keep_part(p_part, made);
+    return made;
+}
+
+void NetwEntityRecord::keep_part(int64_t p_part, const Variant &p_value) {
     for (MintedPart &slot : parts) {
         if (slot.part == p_part) {
-            slot.value = made;
-            return made;
+            slot.value = p_value;
+            return;
         }
     }
     MintedPart minted_now;
     minted_now.part = p_part;
-    minted_now.value = made;
+    minted_now.value = p_value;
     parts.push_back(minted_now);
-    return made;
 }
 
 void NetwEntityRecord::set_part_factory(
@@ -184,7 +235,7 @@ void NetwEntityRecord::write_authority(
     }
     if (now != p_prior) {
         fault::raise(
-            p_node->is_inside_tree() ? NetwMultiplayer::of(p_node) : nullptr,
+            NetwMultiplayer::session_holding(p_node),
             NETW_FAULT_AUTHORITY_OVERRIDDEN,
             {String(p_node->get_name()), String(), String(), 0, now, p_to},
             gd::instance_id(p_node)
@@ -257,7 +308,11 @@ void NetwEntityRecord::apply_control(
             int(was),
             int(steerer)
         );
-        p_wrapper->emit_signal(StringName("control_changed"), was, steerer);
+        NetwMultiplayer::Announcement row;
+        row.kind = NetwMultiplayer::AnnouncementKind::CONTROL_CHANGED;
+        row.from = was;
+        row.to = steerer;
+        NetwMultiplayer::entity_announce(p_wrapper, row);
     }
 }
 
@@ -316,7 +371,11 @@ bool NetwEntityRecord::set_controller(Object *p_wrapper, int64_t p_peer) {
         return false;
     }
     if (p_wrapper != nullptr) {
-        p_wrapper->emit_signal(StringName("control_changed"), previous, p_peer);
+        NetwMultiplayer::Announcement row;
+        row.kind = NetwMultiplayer::AnnouncementKind::CONTROL_CHANGED;
+        row.from = previous;
+        row.to = p_peer;
+        NetwMultiplayer::entity_announce(p_wrapper, row);
     }
     return true;
 }
@@ -366,7 +425,8 @@ bool NetwEntityRecord::publish_stage(Object *p_wrapper, int64_t p_from) {
         return true;
     }
     NetwEntity *wrapper = Object::cast_to<NetwEntity>(p_wrapper);
-    if (wrapper != nullptr && wrapper->get_record() == this) {
+    if (wrapper != nullptr
+        && NetwMultiplayer::record_of_wrapper(wrapper) == this) {
         return wrapper->publish_stage(p_from, stage);
     }
     return true;
@@ -405,14 +465,15 @@ bool NetwEntityRecord::begin_despawn(
         const RID captured_handle = handle;
         tree::despawning(p_wrapper);
         if (wrapper == nullptr
-            || (wrapper->get_record() == this && handle == captured_handle
+            || (NetwMultiplayer::record_of_wrapper(wrapper) == this
+                && handle == captured_handle
                 && wrapper->get_multiplayer() == session
                 && gd::instance_id(wrapper->get_owner()) == owner
                 && stage == int64_t(entity::Stage::DESPAWNING))) {
-            p_wrapper->emit_signal(
-                StringName("despawning"),
-                opts->get_reason()
-            );
+            NetwMultiplayer::Announcement row;
+            row.kind = NetwMultiplayer::AnnouncementKind::DESPAWNING;
+            row.reason = opts->get_reason();
+            NetwMultiplayer::entity_announce(p_wrapper, row);
         }
     }
     despawning_opts = Ref<NetwDespawnOpts>();
@@ -429,7 +490,9 @@ bool NetwEntityRecord::finish_teardown(Object *p_wrapper) {
         return true;
     }
     if (p_wrapper != nullptr) {
-        p_wrapper->emit_signal(StringName("despawned"));
+        NetwMultiplayer::Announcement row;
+        row.kind = NetwMultiplayer::AnnouncementKind::DESPAWNED;
+        NetwMultiplayer::entity_announce(p_wrapper, row);
     }
     return true;
 }
@@ -453,7 +516,7 @@ void NetwEntityRecord::readmit() {
     stage = int64_t(entity::Stage::UNBOUND);
     route = 0;
     entity::release(handle);
-    handle = entity::mint();
+    handle = RID();
     despawning_opts = Ref<NetwDespawnOpts>();
     despawn_reason = StringName();
     projected_follower = 0;

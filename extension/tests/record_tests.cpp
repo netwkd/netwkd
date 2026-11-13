@@ -6,6 +6,7 @@
 #include "netw/api/record.hpp"
 
 #if defined(NETW_TIER_HOSTED)
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 
@@ -117,6 +118,7 @@ TEST_CASE(
 
 using netw::Netw;
 using netw::NetwEntity;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
@@ -258,7 +260,7 @@ LawVerdict undeclared_answers_nothing(const World &) {
         return law_broken("%d timeline(s) before", range.timelines());
     }
     range.rig.server()->lagcomp_timeline_undeclare(
-        range.rig.server()->entity_of(range.body)
+        Internals::entity_of(range.rig.server(), range.body)
     );
     range.rig.step_ticks(1);
     const Ref<DictionaryRecord> sampled

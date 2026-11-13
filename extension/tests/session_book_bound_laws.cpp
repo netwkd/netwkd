@@ -7,6 +7,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/script/model.hpp"
+#include "support/internals.h"
 #include "support/value_flow_stand.h"
 
 namespace TestNetwSessionBookBoundLaws {
@@ -14,6 +15,7 @@ namespace TestNetwSessionBookBoundLaws {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
@@ -64,7 +66,7 @@ public:
                 named(minted++),
                 one_type(),
                 nullptr,
-                Variant(),
+                0,
                 false
             ));
         }
@@ -75,7 +77,7 @@ public:
             REQUIRE(gone != nullptr);
             NETW_REQUIRE_EQ(
                 server->entity_despawn(
-                    server->entity_from_route(route),
+                    Internals::entity_at(server, route),
                     Ref<netw::NetwDespawnOpts>()
                 ),
                 OK

@@ -25,7 +25,6 @@ enum class State {
     OPENING = 1,
     OPEN = 2,
     CLOSING = 3,
-    FAULTED = 4,
 };
 
 enum class Op {

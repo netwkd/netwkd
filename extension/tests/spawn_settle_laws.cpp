@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/event_ring.h"
+#include "support/internals.h"
 
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
@@ -41,7 +42,7 @@ Array one_type() {
 int64_t state_of(LoopbackRig &p_rig, int p_client, int p_route) {
     NetwMultiplayer *api
         = p_client < 0 ? p_rig.server() : p_rig.client(p_client);
-    return int64_t(api->entity_get_state(api->entity_from_route(p_route)));
+    return int64_t(api->entity_get_state(Internals::entity_at(api, p_route)));
 }
 
 TEST_CASE(
@@ -182,7 +183,7 @@ TEST_CASE(
         one_arg(),
         one_type(),
         arena,
-        Variant(),
+        0,
         false
     );
 
@@ -222,7 +223,7 @@ TEST_CASE(
         one_arg(),
         one_type(),
         arena,
-        Variant(),
+        0,
         false
     );
 

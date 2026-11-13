@@ -33,25 +33,27 @@ Ref<NetwPromise> answered(
 } // namespace
 
 Ref<NetwPromise> NetwDatabaseBackend::open_builtin(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     return unimplemented("_open");
 }
 
-Ref<NetwPromise> NetwDatabaseBackend::list_slots_builtin(Object *p_session) {
+Ref<NetwPromise> NetwDatabaseBackend::list_slots_builtin(
+    const Ref<NetwSession> &p_session
+) {
     return unimplemented("_list_slots");
 }
 
 Ref<NetwPromise> NetwDatabaseBackend::delete_slot_builtin(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     return unimplemented("_delete_slot");
 }
 
 Ref<NetwPromise> NetwDatabaseBackend::open(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     Ref<NetwPromise> answer;
@@ -61,7 +63,9 @@ Ref<NetwPromise> NetwDatabaseBackend::open(
     return open_builtin(p_session, p_slot);
 }
 
-Ref<NetwPromise> NetwDatabaseBackend::list_slots(Object *p_session) {
+Ref<NetwPromise> NetwDatabaseBackend::list_slots(
+    const Ref<NetwSession> &p_session
+) {
     Ref<NetwPromise> answer;
     if (GDVIRTUAL_CALL(_list_slots, p_session, answer)) {
         return answered(answer, "_list_slots");
@@ -70,7 +74,7 @@ Ref<NetwPromise> NetwDatabaseBackend::list_slots(Object *p_session) {
 }
 
 Ref<NetwPromise> NetwDatabaseBackend::delete_slot(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     Ref<NetwPromise> answer;
@@ -104,7 +108,7 @@ void MemoryDatabase::set_store(const StringName &p_store) {
 }
 
 Ref<NetwPromise> MemoryDatabase::open_builtin(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     return NetwPromise::resolved(
@@ -112,14 +116,16 @@ Ref<NetwPromise> MemoryDatabase::open_builtin(
     );
 }
 
-Ref<NetwPromise> MemoryDatabase::list_slots_builtin(Object *p_session) {
+Ref<NetwPromise> MemoryDatabase::list_slots_builtin(
+    const Ref<NetwSession> &p_session
+) {
     return NetwPromise::resolved(
         persist::store_named(String(store)).slot_names()
     );
 }
 
 Ref<NetwPromise> MemoryDatabase::delete_slot_builtin(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     persist::store_named(String(store)).erase_slot(String(p_slot));
@@ -148,7 +154,7 @@ void FileSystemDatabase::set_format(Format p_format) {
 }
 
 Ref<NetwPromise> FileSystemDatabase::open_builtin(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     persist::FileStore store(root);
@@ -169,12 +175,14 @@ Ref<NetwPromise> FileSystemDatabase::open_builtin(
     );
 }
 
-Ref<NetwPromise> FileSystemDatabase::list_slots_builtin(Object *p_session) {
+Ref<NetwPromise> FileSystemDatabase::list_slots_builtin(
+    const Ref<NetwSession> &p_session
+) {
     return NetwPromise::resolved(persist::FileStore(root).slot_names());
 }
 
 Ref<NetwPromise> FileSystemDatabase::delete_slot_builtin(
-    Object *p_session,
+    const Ref<NetwSession> &p_session,
     const StringName &p_slot
 ) {
     persist::FileStore store(root);

@@ -1,143 +1,10 @@
 #include "netw/scene_core.hpp"
 
-#include "netw/colors.hpp"
-#include "netw/game_call.hpp"
 #include "netw/log.hpp"
-#include "netw/profile.hpp"
 
 using namespace godot;
 
 namespace netw {
-
-namespace {
-
-const GameCall SCENE_OBSERVER
-    = {"The NetwScene.observe callback",
-       "func(present: bool, subject) -> bool",
-       2};
-
-} // namespace
-
-NetwSceneCore::Row *NetwSceneCore::row_for(int event, const RID &scene) {
-    for (uint32_t index = 0; index < rows.size(); ++index) {
-        if (rows[index].event == event && rows[index].scene == scene) {
-            return &rows[index];
-        }
-    }
-    return nullptr;
-}
-
-void NetwSceneCore::observe(
-    const RID &scene,
-    int event,
-    const Callable &callback
-) {
-    if (!scene.is_valid() || !callback.is_valid()) {
-        return;
-    }
-    game_call_declared(callback, SCENE_OBSERVER);
-    Row *row = row_for(event, scene);
-    if (row == nullptr) {
-        Row fresh;
-        fresh.event = event;
-        fresh.scene = scene;
-        rows.push_back(fresh);
-        row = &rows[rows.size() - 1];
-    }
-    for (uint32_t index = 0; index < row->callbacks.size(); ++index) {
-        if (row->callbacks[index] == callback) {
-            return;
-        }
-    }
-    row->callbacks.push_back(callback);
-}
-
-void NetwSceneCore::unobserve(
-    const RID &scene,
-    int event,
-    const Callable &callback
-) {
-    Row *row = row_for(event, scene);
-    if (row == nullptr) {
-        return;
-    }
-    LocalVector<Callable> kept;
-    for (uint32_t index = 0; index < row->callbacks.size(); ++index) {
-        if (!(row->callbacks[index] == callback)) {
-            kept.push_back(row->callbacks[index]);
-        }
-    }
-    row->callbacks = kept;
-}
-
-int NetwSceneCore::dispatch(
-    const RID &scene,
-    int event,
-    bool present,
-    const Variant &subject
-) {
-    NETW_ZONE_NC("NetwSceneCore dispatch", colors::SCENE);
-    const Row *row = row_for(event, scene);
-    if (row == nullptr || row->callbacks.is_empty()) {
-        return 0;
-    }
-    const LocalVector<Callable> walking(row->callbacks);
-    const uint32_t started_with = walking.size();
-
-    LocalVector<Callable> surviving;
-    Array args;
-    args.push_back(present);
-    args.push_back(subject);
-    for (uint32_t index = 0; index < walking.size(); ++index) {
-        const Callable callback = walking[index];
-        if (!callback.is_valid()) {
-            continue;
-        }
-        const Variant answer = game_call(callback, args, SCENE_OBSERVER);
-        if (answer.get_type() == Variant::BOOL && bool(answer)) {
-            NETW_TRACE(
-                sys::SCENE,
-                "An observer of event %d asked to stop.",
-                event
-            );
-            continue;
-        }
-        surviving.push_back(callback);
-    }
-    const int called = int(surviving.size());
-    if (surviving.size() == started_with) {
-        return called;
-    }
-    Row *current = row_for(event, scene);
-    if (current == nullptr) {
-        return called;
-    }
-    for (uint32_t index = started_with; index < current->callbacks.size();
-         ++index) {
-        surviving.push_back(current->callbacks[index]);
-    }
-    current->callbacks = surviving;
-    return called;
-}
-
-int NetwSceneCore::observer_count(const RID &scene, int event) const {
-    for (uint32_t index = 0; index < rows.size(); ++index) {
-        if (rows[index].event == event && rows[index].scene == scene) {
-            return int(rows[index].callbacks.size());
-        }
-    }
-    return 0;
-}
-
-void NetwSceneCore::forget_scene(const RID &scene) {
-    LocalVector<Row> kept;
-    for (uint32_t index = 0; index < rows.size(); ++index) {
-        if (!(rows[index].scene == scene)) {
-            kept.push_back(rows[index]);
-        }
-    }
-    rows = kept;
-}
 
 void NetwSceneCore::promote_survivors() {
     for (uint32_t index = 0; index < live.size(); ++index) {
@@ -254,7 +121,6 @@ bool NetwSceneCore::isolation_owns_world(int isolation) {
 }
 
 void NetwSceneCore::clear() {
-    rows.clear();
     live.clear();
     named.clear();
 }

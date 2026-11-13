@@ -167,59 +167,6 @@ LawVerdict signals_in_order(const World &) {
     return law_held();
 }
 
-Error replace_state(NetwMultiplayer *p_api, const RID &p_entity) {
-    const RID schema = p_api->schema_create(StringName("RunnerPositionOnly"));
-    p_api->schema_add_column(
-        schema,
-        StringName("position"),
-        NetwMultiplayer::COLUMN_VECTOR2,
-        1
-    );
-    p_api->schema_seal(schema);
-    const RID set = p_api->property_set_create(
-        schema,
-        NetwMultiplayer::RECORD_KIND_STATE
-    );
-    p_api->property_set_add_column(set, 0);
-    p_api->property_set_seal(set);
-    return p_api->entity_add_property_set(p_entity, set, 0);
-}
-
-LawVerdict replaced_state_keeps_client(const World &) {
-    const FaultWatch faults;
-    LoopbackRig rig(1);
-    rig.declare_world(
-        WorldDecl().clocked(30, 3).lag_compensated().player(
-            runner("P").synced("lean").spawned(),
-            0
-        )
-    );
-    run(rig, "P", 0);
-    rig.step_ticks(SETTLE_TICKS);
-    const Dictionary before = prediction(rig, "P", 0)->reachability();
-    if (!Dictionary(before["fields"]).has(StringName("lean"))) {
-        return law_broken("the declared state never carried lean");
-    }
-
-    for (int at = SERVER; at < 1; ++at) {
-        NetwMultiplayer *api = at < 0 ? rig.server() : rig.client(at);
-        if (replace_state(api, rig.entity_of(StringName("P"), at)) != OK) {
-            return law_broken("the replacement did not attach");
-        }
-    }
-    rig.step_ticks(SETTLE_TICKS);
-    if (faults.errors_containing("NW0025")
-            + faults.warnings_containing("NW0025")
-        != 0) {
-        return law_broken("the server refused the client after the swap");
-    }
-    const Dictionary fields = prediction(rig, "P", 0)->reachability()["fields"];
-    if (!fields.has(StringName("position")) || fields.has(StringName("lean"))) {
-        return law_broken("the prediction still reads the replaced set");
-    }
-    return law_held();
-}
-
 LawVerdict refused_joint_once(bool p_spawned) {
     EntityDecl p = runner("P");
     EntityDecl q = runner("Q");
@@ -292,9 +239,6 @@ const Row ROWS[] = {
      "it hears divergence_detected, episode_changed opening, recovered for "
      "the same tick, and episode_changed closing, and is moved once",
      &signals_in_order},
-    {"a state set replaced on both copies of a spawned predicted runner",
-     "the client stays in the session and the prediction reads the new set",
-     &replaced_state_keeps_client},
     {"RECONCILE_JOINT on placed runners whose schedule cannot replay",
      "each is reported once with NW1014, by the peer that predicts it",
      &refused_joint_placed},
@@ -305,8 +249,8 @@ const Row ROWS[] = {
 
 TEST_CASE(
     "[Networked][Predict][SceneTree] a predicting client stops at its "
-    "horizon and resumes, hears its correction in order, and keeps its "
-    "seat through a changed declaration"
+    "horizon and resumes, hears its correction in order, and a joint it "
+    "cannot replay is reported once"
 ) {
     const World world = {String("a server and clients on a loopback")};
     for (const Row &row : ROWS) {

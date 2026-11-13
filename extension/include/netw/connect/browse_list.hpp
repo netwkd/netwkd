@@ -10,6 +10,12 @@
 
 namespace netw::connect {
 
+godot::TypedArray<godot::Dictionary> targets_of(
+    const godot::PackedStringArray &p_addresses,
+    const godot::PackedStringArray &p_names,
+    const godot::Array &p_infos
+);
+
 struct TargetRow {
     godot::RID transport;
     godot::String address;
@@ -32,6 +38,7 @@ class BrowseList {
 public:
     static const int MAX_IN_FLIGHT_PROBES = 6;
 
+    BrowseList();
     ~BrowseList();
 
     void set_local_app_id(const godot::StringName &p_app_id);
@@ -47,6 +54,13 @@ public:
         const godot::String &p_address
     ) const;
     bool is_removable(const godot::RID &p_target) const;
+    bool holds(const godot::RID &p_target) const;
+    godot::RID hold_current(
+        const godot::RID &p_transport,
+        const godot::String &p_address,
+        godot::RID &r_dropped
+    );
+    godot::RID drop_current();
 
     TargetRow *row(const godot::RID &p_target);
     const TargetRow *row(const godot::RID &p_target) const;
@@ -61,9 +75,7 @@ public:
         const godot::StringName &p_directory,
         godot::ObjectID p_source,
         const godot::RID &p_transport,
-        const godot::PackedStringArray &p_addresses,
-        const godot::PackedStringArray &p_names,
-        const godot::Array &p_infos,
+        const godot::TypedArray<godot::Dictionary> &p_targets,
         godot::LocalVector<godot::RID> &r_dropped,
         godot::LocalVector<godot::RID> &r_added,
         godot::LocalVector<godot::RID> &r_updated
@@ -101,10 +113,12 @@ public:
     ) const;
 
 private:
+    mutable godot::RID_Owner<TargetRow> targets;
     godot::StringName local_app_id;
     godot::LocalVector<godot::RID> caller_rows;
     godot::LocalVector<godot::RID> directory_rows;
     godot::LocalVector<godot::RID> queue;
+    godot::RID current;
     int probes_in_flight = 0;
 
     godot::RID mint(const TargetRow &p_row);

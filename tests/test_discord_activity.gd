@@ -162,7 +162,7 @@ func join_with(discord: NetwTestDiscordService) -> NetwJoinRequest:
 	var host := await EnetTestSupport.start_host(self, host_gate, WAIT_SECONDS)
 	var client := EnetTestSupport.make_client_tree(self, host.port)
 	trees.append_array([host.tree, client])
-	client.api.inner.auth_timeout = WAIT_SECONDS
+	client.api.auth_timeout = WAIT_SECONDS
 	var client_gate := Gate.new()
 	client.add_child(client_gate)
 	discord.application_id = APP

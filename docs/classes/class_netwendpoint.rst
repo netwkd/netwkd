@@ -58,6 +58,8 @@ Properties
    +---------------------------------------------+---------------------------------------------------------------+
    | :godot:`StringName`                         | :ref:`peer_class<class_NetwEndpoint_property_peer_class>`     |
    +---------------------------------------------+---------------------------------------------------------------+
+   | :godot:`RID`                                | :ref:`rid<class_NetwEndpoint_property_rid>`                   |
+   +---------------------------------------------+---------------------------------------------------------------+
    | :godot:`String`                             | :ref:`source<class_NetwEndpoint_property_source>`             |
    +---------------------------------------------+---------------------------------------------------------------+
    | :ref:`Status<enum_NetwEndpoint_Status>`     | :ref:`status<class_NetwEndpoint_property_status>`             |
@@ -90,7 +92,7 @@ Signals
 
 **changed**\ (\ ) :ref:`🔗<class_NetwEndpoint_signal_changed>`
 
-Emitted when server information or the invitation changes.
+Emitted when server information or the invitation changes. A change made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is emitted when that poll ends.
 
 .. rst-class:: classref-section-separator
 
@@ -254,7 +256,7 @@ The sender's display name while :ref:`is_invited<class_NetwEndpoint_property_is_
 
 - :godot:`bool` **get_is_listed**\ (\ )
 
-``false`` once the row is removed. Only :ref:`peer_class<class_NetwEndpoint_property_peer_class>` and :ref:`address<class_NetwEndpoint_property_address>` keep their values after that.
+``true`` while :ref:`NetwConnection.endpoints<class_NetwConnection_property_endpoints>` holds the row. ``false`` once the row is removed, and for a :ref:`NetwConnection.current_endpoint<class_NetwConnection_property_current_endpoint>` no row lists. Only :ref:`rid<class_NetwEndpoint_property_rid>`, :ref:`peer_class<class_NetwEndpoint_property_peer_class>` and :ref:`address<class_NetwEndpoint_property_address>` keep their values after removal.
 
 .. rst-class:: classref-item-separator
 
@@ -271,6 +273,22 @@ The sender's display name while :ref:`is_invited<class_NetwEndpoint_property_is_
 - :godot:`StringName` **get_peer_class**\ (\ )
 
 The :godot:`MultiplayerPeer` class used to connect to this server.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwEndpoint_property_rid:
+
+.. rst-class:: classref-property
+
+:godot:`RID` **rid** :ref:`🔗<class_NetwEndpoint_property_rid>`
+
+.. rst-class:: classref-property-setget
+
+- :godot:`RID` **get_rid**\ (\ )
+
+The endpoint's :godot:`RID`, for the ``endpoint_*`` methods of :ref:`NetwMultiplayer<class_NetwMultiplayer>` such as :ref:`NetwMultiplayer.endpoint_get_param()<class_NetwMultiplayer_method_endpoint_get_param>`.
 
 .. rst-class:: classref-item-separator
 

@@ -138,7 +138,7 @@ void apply_timeline(
     if (!declared(p_sync, KEY_TIMELINE_MODE)) {
         return;
     }
-    const Ref<NetwMultiplayer> core = NetwMultiplayer::core_of(p_owner);
+    const Ref<NetwMultiplayer> core = NetwMultiplayer::session_holding(p_owner);
     if (core.is_null()) {
         return;
     }
@@ -347,9 +347,9 @@ void apply(Node *p_root, Object *p_sync) {
         apply_prediction(p_sync, entity);
     }
     apply_interpolators(p_sync, owner);
-    const Ref<NetwMultiplayer> core = NetwMultiplayer::core_of(owner);
+    const Ref<NetwMultiplayer> core = NetwMultiplayer::session_holding(owner);
     if (core.is_valid() && predicts) {
-        core->predict_declare(core->entity_of(owner));
+        core->predict_declare(core->liveness_adopt(entity.ptr()));
     }
     if (core.is_valid()) {
         core->display_mark_dirty(

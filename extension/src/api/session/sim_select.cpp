@@ -5,6 +5,7 @@
 #include "godot/node.hpp"
 #include "godot/object.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/entity_record.hpp"
 #include "netw/api/simulation.hpp"
 #include "netw/colors.hpp"
 #include "netw/log.hpp"
@@ -99,24 +100,25 @@ void NetwMultiplayer::sim_release_row(const RID &p_entity) {
     sim_refresh_members(sim_rows.release(p_entity));
 }
 
-Error NetwMultiplayer::sim_simulate(
+Error NetwMultiplayer::sim_choose(
     const RID &p_subject,
-    const Ref<NetwEntity> &p_entity
+    const Ref<NetwEntity> &p_other,
+    const char *p_call
 ) {
     const Ref<NetwEntity> subject = entity_get_view(p_subject);
-    if (subject.is_null() || p_entity.is_null()) {
+    if (subject.is_null() || p_other.is_null()) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwSimulation.simulate}", String(), "live entities"}
+            {p_call, String(), "live entities"}
         );
         return ERR_INVALID_PARAMETER;
     }
-    if (!same_scene(*this, subject, p_entity)) {
+    if (!same_scene(*this, subject, p_other)) {
         fault::raise(
             this,
             NETW_FAULT_BAD_VALUE,
-            {"{NetwSimulation.simulate}",
+            {p_call,
              vformat(
                  "an entity in another scene than '%s'",
                  String(subject->get_name())
@@ -125,41 +127,75 @@ Error NetwMultiplayer::sim_simulate(
         );
         return ERR_INVALID_PARAMETER;
     }
-    sim::choose(
-        sim_rows.ensure(p_subject).choice,
-        p_entity->get_rid_handle(),
-        sim::Pick::CHOSEN
-    );
+    sim_write_choice(subject.ptr(), p_other->get_rid_handle(), SIM_PICK_CHOSEN);
     return OK;
 }
 
-void NetwMultiplayer::sim_forget(
-    const RID &p_subject,
-    const Ref<NetwEntity> &p_entity
+Error NetwMultiplayer::simulation_select(
+    const RID &p_entity,
+    const RID &p_other,
+    SimPick p_pick
 ) {
-    sim::Row *row = sim_rows.find(p_subject);
-    if (row != nullptr && p_entity.is_valid()) {
-        sim::forget(row->choice, p_entity->get_rid_handle());
+    if (p_pick == SIM_PICK_CHOSEN) {
+        return sim_choose(
+            p_entity,
+            entity_get_view(p_other),
+            "{NetwMultiplayer.simulation_select}"
+        );
     }
+    const Ref<NetwEntity> subject = entity_get_view(p_entity);
+    if (subject.is_null()) {
+        fault::raise(
+            this,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwMultiplayer.simulation_select}", String(), "a live entity"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    sim_write_choice(subject.ptr(), p_other, SIM_PICK_FORGET);
+    return OK;
 }
 
-void NetwMultiplayer::sim_simulate_all(
-    const RID &p_subject,
-    const StringName &p_layer
+Error NetwMultiplayer::simulation_select_layer(
+    const RID &p_entity,
+    const RID &p_layer,
+    SimPick p_pick
 ) {
-    sim::simulate_all(sim_rows.ensure(p_subject).choice, p_layer);
-}
-
-void NetwMultiplayer::sim_simulate_none(const RID &p_subject) {
-    sim::Row *row = sim_rows.find(p_subject);
-    if (row != nullptr) {
-        sim::simulate_none(row->choice);
+    const Ref<NetwEntity> subject = entity_get_view(p_entity);
+    if (subject.is_null()) {
+        fault::raise(
+            this,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {"{NetwMultiplayer.simulation_select_layer}",
+             String(),
+             "a live entity"}
+        );
+        return ERR_INVALID_PARAMETER;
     }
+    if (p_pick == SIM_PICK_FORGET) {
+        sim_write_layer(subject.ptr(), StringName(), p_pick);
+        return OK;
+    }
+    const StringName layer
+        = p_layer.is_valid() ? layer_name_of(p_layer) : StringName();
+    if (p_layer.is_valid() && layer.is_empty()) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwMultiplayer.simulation_select_layer}",
+             "a layer this session does not have",
+             "a layer from {NetwMultiplayer.interest_layer_create}, or an "
+             "empty RID"}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    sim_write_layer(subject.ptr(), layer, p_pick);
+    return OK;
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::sim_selected(const RID &p_subject) {
-    TypedArray<NetwEntity> out;
-    const sim::Row *row = sim_rows.row_of(p_subject);
+TypedArray<RID> NetwMultiplayer::simulation_get_selected(const RID &p_entity) {
+    TypedArray<RID> out;
+    const sim::Row *row = sim_rows.row_of(p_entity);
     if (row == nullptr) {
         return out;
     }
@@ -167,9 +203,8 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_selected(const RID &p_subject) {
         if (!member.promoted) {
             continue;
         }
-        const Ref<NetwEntity> entity
-            = entity_get_view(sim_rows.entity_of_key(member.key));
-        if (entity.is_valid()) {
+        const RID entity = sim_rows.entity_of_key(member.key);
+        if (entity_get_view(entity).is_valid()) {
             out.push_back(entity);
         }
     }
@@ -257,8 +292,10 @@ bool NetwMultiplayer::sim_selectable(const Ref<NetwEntity> &p_member) {
     if (owner == nullptr || authoring::declares_prediction(owner)) {
         return false;
     }
-    const Ref<NetwSimulation> simulation = p_member->simulation_if_minted();
-    const bool simulated = simulation.is_valid() && simulation->is_declared();
+    const NetwEntityRecord *record = record_of(p_member.ptr());
+    const sim::Decl *simulation
+        = record != nullptr ? record->find_sim_declaration() : nullptr;
+    const bool simulated = simulation != nullptr && simulation->declared;
     if (!simulated && !sim::is_solver_body(owner)) {
         return false;
     }
@@ -421,10 +458,12 @@ void NetwMultiplayer::sim_seed(sim::Row &r_row) {
     }
     r_row.view = entity.ptr();
     r_row.steering = sim_steering_of(*entity.ptr());
-    const Ref<NetwSimulation> handle = entity->simulation_if_minted();
+    const NetwEntityRecord *record = record_of(entity.ptr());
+    const sim::Decl *found
+        = record != nullptr ? record->find_sim_declaration() : nullptr;
     const sim::Declaration undeclared;
     const sim::Declaration &held
-        = handle.is_valid() ? handle->declaration() : undeclared;
+        = found != nullptr ? found->declaration : undeclared;
     if (!r_row.bodies.recorded) {
         r_row.declaration.bodies = held.bodies;
     }
@@ -436,8 +475,7 @@ void NetwMultiplayer::sim_seed(sim::Row &r_row) {
     r_row.declaration.claim_on_contact = held.claim_on_contact;
     r_row.declaration.release_on_rest = held.release_on_rest;
     r_row.facts.replicas = held.replicas;
-    r_row.choice
-        = handle.is_valid() ? handle->selection_choice() : sim::Choice();
+    r_row.choice = found != nullptr ? found->choice : sim::Choice();
 }
 
 void NetwMultiplayer::sim_declare(const Ref<NetwEntity> &p_entity) {
@@ -449,8 +487,10 @@ void NetwMultiplayer::sim_declare(const Ref<NetwEntity> &p_entity) {
         return;
     }
     sim::Row *standing = sim_rows.find(entity);
-    const Ref<NetwSimulation> handle = p_entity->simulation_if_minted();
-    if (standing == nullptr && (handle.is_null() || !handle->is_declared())) {
+    const NetwEntityRecord *record = record_of(p_entity.ptr());
+    const sim::Decl *found
+        = record != nullptr ? record->find_sim_declaration() : nullptr;
+    if (standing == nullptr && (found == nullptr || !found->declared)) {
         return;
     }
     {
@@ -463,24 +503,37 @@ void NetwMultiplayer::sim_declare(const Ref<NetwEntity> &p_entity) {
 }
 
 void NetwMultiplayer::sim_announce(const RID &p_entity) {
-    sim::Row *row = sim_rows.peek(p_entity);
-    if (row == nullptr || (row->has_announced && row->announced == row->mode)) {
+    const sim::Row *row = sim_rows.row_of(p_entity);
+    const EntitySlot *slot
+        = row != nullptr ? entity_slots.find(p_entity.get_id()) : nullptr;
+    if (slot == nullptr || slot->record == nullptr || slot->live.is_null()
+        || slot->record->get_announced_mode() == row->mode) {
         return;
     }
-    const Ref<NetwEntity> entity = entity_get_view(p_entity);
-    if (entity.is_null()) {
-        return;
-    }
-    const sim::Mode mode = row->mode;
-    row->announced = mode;
-    row->has_announced = true;
 #if defined(NETW_TESTS)
     idle_work.announced += 1;
 #endif
-    const Ref<NetwSimulation> handle = entity->simulation_if_minted();
-    if (handle.is_valid()) {
-        handle->announce(NetwSimulation::Mode(int(mode)));
+    sim_tell_mode(slot->record, slot->live, row->mode);
+}
+
+void NetwMultiplayer::sim_tell_mode(
+    NetwEntityRecord *p_record,
+    const Ref<NetwEntity> &p_entity,
+    sim::Mode p_mode
+) {
+    const sim::Mode previous = p_record->get_announced_mode();
+    if (previous == p_mode) {
+        return;
     }
+    p_record->set_announced_mode(p_mode);
+    if (p_entity->simulation_if_minted().is_null()) {
+        return;
+    }
+    Announcement row;
+    row.kind = AnnouncementKind::MODE_CHANGED;
+    row.from = int64_t(previous);
+    row.to = int64_t(p_mode);
+    entity_announce(p_entity.ptr(), row);
 }
 
 void NetwMultiplayer::sim_refresh_members(const LocalVector<RID> &p_members) {

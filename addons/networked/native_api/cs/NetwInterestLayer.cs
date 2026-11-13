@@ -28,13 +28,13 @@ namespace Networked;
 /// )
 /// </code>
 /// <para>
-/// Changes apply at the end of the frame, or at
-/// <see cref="NetwMultiplayer.InterestFlushNow"/>. On the server, use
+/// Changes apply at the end of the frame. On the server, use
 /// <see cref="NetwInterestLayer.InterestEntered"/> and
 /// <see cref="NetwInterestLayer.InterestExited"/>. On a client, use
 /// <see cref="NetwInterestLayer.VisibilityChanged"/>. An entity inside a
 /// multiplayer scene is only visible to peers in that scene, whatever other
-/// layers say.
+/// layers say. A <see cref="NetwEntity"/> under another entity is only visible
+/// to peers that also see the entity above it, whatever its own layers say.
 /// </para>
 /// </remarks>
 public sealed class NetwInterestLayer : NetwRefCounted
@@ -107,8 +107,9 @@ public sealed class NetwInterestLayer : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted on the server when <c>peer_id</c> starts seeing <c>entity</c>
-    /// through this layer.
+    /// Emitted on the server when this layer shows <c>entity</c> to
+    /// <c>peer_id</c>, once <c>peer_id</c> also sees the
+    /// <see cref="NetwEntity"/> above it.
     /// </summary>
     public event Action<NetwEntity, long> InterestEntered
     {
@@ -124,8 +125,10 @@ public sealed class NetwInterestLayer : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted on the server when <c>peer_id</c> stops seeing <c>entity</c>
-    /// through this layer.
+    /// Emitted on the server when this layer stops showing <c>entity</c> to
+    /// <c>peer_id</c>, also when <c>peer_id</c> stops seeing the
+    /// <see cref="NetwEntity"/> above it or the layer is freed. A session that
+    /// ends does not emit it.
     /// </summary>
     public event Action<NetwEntity, long> InterestExited
     {
@@ -227,9 +230,6 @@ public sealed class NetwInterestLayer : NetwRefCounted
     private static readonly IntPtr _bindGetLayerId =
         NetwApi.MethodBind("NetwInterestLayer", "get_layer_id", 2002593661UL);
 
-    private static readonly IntPtr _bindSetLayerId =
-        NetwApi.MethodBind("NetwInterestLayer", "set_layer_id", 3304788590UL);
-
     /// <summary>
     /// The name of the layer.
     /// </summary>
@@ -242,14 +242,6 @@ public sealed class NetwInterestLayer : NetwRefCounted
             StringName result = VariantUtils.ConvertToStringName(answered);
             answered.Dispose();
             return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromStringName(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(_bindSetLayerId, Checked, in slot0, ref answered);
-            slot0.Dispose();
-            answered.Dispose();
         }
     }
 
@@ -448,8 +440,11 @@ public sealed class NetwInterestLayer : NetwRefCounted
         NetwApi.MethodBind("NetwInterestLayer", "set_monitor", 1611583062UL);
 
     /// <summary>
-    /// Called when a peer starts or stops seeing an entity through this layer.
-    /// On a client, the peer is always this one.
+    /// Called whenever this layer emits
+    /// <see cref="NetwInterestLayer.InterestEntered"/>,
+    /// <see cref="NetwInterestLayer.InterestExited"/> or
+    /// <see cref="NetwInterestLayer.VisibilityChanged"/>. On a client, the peer
+    /// is always this one.
     /// <code>
     /// sight.monitor = func(entity: NetwEntity, peer_id: int, visible: bool) -&gt; void:
     ///     print(entity.root.name," ", peer_id, " ", visible)
@@ -593,102 +588,13 @@ public sealed class NetwInterestLayer : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindClientAdmit =
-        NetwApi.MethodBind("NetwInterestLayer", "client_admit", 3949104711UL);
-
-    /// <summary>
-    /// Marks <paramref name="entity"/> as visible to this client and emits
-    /// <see cref="NetwInterestLayer.VisibilityChanged"/>. The session calls it.
-    /// </summary>
-    public void ClientAdmit(NetwEntity entity)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindClientAdmit,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindClientRevoke =
-        NetwApi.MethodBind("NetwInterestLayer", "client_revoke", 3949104711UL);
-
-    /// <summary>
-    /// Marks <paramref name="entity"/> as no longer visible to this client and
-    /// emits <see cref="NetwInterestLayer.VisibilityChanged"/>. The session
-    /// calls it.
-    /// </summary>
-    public void ClientRevoke(NetwEntity entity)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindClientRevoke,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindClientUntrackEntity =
-        NetwApi.MethodBind(
-            "NetwInterestLayer",
-            "client_untrack_entity",
-            3949104711UL);
-
-    /// <summary>
-    /// Removes <paramref name="entity"/> on a client when it leaves the tree,
-    /// emitting <see cref="NetwInterestLayer.EntityRemoved"/> and then
-    /// <see cref="NetwInterestLayer.VisibilityChanged"/>. The session calls it.
-    /// </summary>
-    public void ClientUntrackEntity(NetwEntity entity)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindClientUntrackEntity,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindApplyServerTransition =
-        NetwApi.MethodBind(
-            "NetwInterestLayer",
-            "apply_server_transition",
-            1449035650UL);
-
-    /// <summary>
-    /// Emits <see cref="NetwInterestLayer.InterestEntered"/> or
-    /// <see cref="NetwInterestLayer.InterestExited"/>, then the entity's own
-    /// signals and callbacks. The session calls it. Calling it yourself emits a
-    /// change that did not happen. <b>Server Only.</b>
-    /// </summary>
-    public void ApplyServerTransition(
-        NetwEntity entity,
-        long peerId,
-        bool visible)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long slot1 = peerId;
-        byte slot2 = visible ? (byte)1 : (byte)0;
-        long discarded = default;
-        NetwThunks.Ptrcall3_IntPtr_Long_Byte_Long(
-            _bindApplyServerTransition,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref discarded);
-    }
-
     private static readonly IntPtr _bindIsVisibleTo =
         NetwApi.MethodBind("NetwInterestLayer", "is_visible_to", 1105242255UL);
 
     /// <summary>
-    /// Returns <c>true</c> when <paramref name="peerId"/> can see
-    /// <paramref name="entity"/>, considering every layer. A client can only
-    /// ask about itself.
+    /// Returns <c>true</c> when updates for <paramref name="entity"/> are sent
+    /// to <paramref name="peerId"/>, considering every layer. It answers as
+    /// <see cref="NetwMultiplayer.InterestIsVisible"/> does.
     /// </summary>
     public bool IsVisibleTo(NetwEntity entity, long peerId)
     {
@@ -700,26 +606,6 @@ public sealed class NetwInterestLayer : NetwRefCounted
             Checked,
             in slot0,
             in slot1,
-            ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindVerdictFor =
-        NetwApi.MethodBind("NetwInterestLayer", "verdict_for", 1116898809UL);
-
-    /// <summary>
-    /// Returns whether this layer alone lets <paramref name="peerId"/> see its
-    /// entities. Use <see cref="NetwInterestLayer.IsVisibleTo"/> for the full
-    /// answer.
-    /// </summary>
-    public bool VerdictFor(long peerId)
-    {
-        long slot0 = peerId;
-        byte answered = default;
-        NetwThunks.Ptrcall1_Long_Byte(
-            _bindVerdictFor,
-            Checked,
-            in slot0,
             ref answered);
         return answered != 0;
     }
@@ -759,35 +645,6 @@ public sealed class NetwInterestLayer : NetwRefCounted
     {
         godot_variant answered = default;
         NetwThunks.Call0(_bindMonitorSnapshot, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindDebugDump =
-        NetwApi.MethodBind("NetwInterestLayer", "debug_dump", 1903255502UL);
-
-    /// <summary>
-    /// Returns the state of this layer and why <paramref name="peerId"/> can or
-    /// cannot see it.
-    /// <code>
-    /// Dictionary
-    /// ┠╴layer_id     String   this layer
-    /// ┠╴policy       int      a LayerPolicy value
-    /// ┠╴viewers      Array    the viewer peer ids
-    /// ┠╴entities     int      number of entities
-    /// ┠╴peer_id      int      the peer asked about
-    /// ┠╴verdict      bool     what verdict_for returns for that peer
-    /// ┖╴explanation  String   the reason, for reading
-    /// </code>
-    /// </summary>
-    public Godot.Collections.Dictionary DebugDump(long peerId = 0)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindDebugDump, Checked, in slot0, ref answered);
-        slot0.Dispose();
         Godot.Collections.Dictionary result =
             VariantUtils.ConvertToDictionary(answered);
         answered.Dispose();

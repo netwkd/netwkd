@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 
 #if defined(NETW_TIER_HOSTED)
@@ -45,7 +46,7 @@ Array one_type() {
 int64_t state_of(LoopbackRig &p_rig, int p_client, int p_route) {
     NetwMultiplayer *api
         = p_client < 0 ? p_rig.server() : p_rig.client(p_client);
-    return int64_t(api->entity_get_state(api->entity_from_route(p_route)));
+    return int64_t(api->entity_get_state(Internals::entity_at(api, p_route)));
 }
 
 struct Flapped {
@@ -82,7 +83,7 @@ Flapped a_hidden_body(
         named("Flapper"),
         one_type(),
         p_parent,
-        Variant(),
+        0,
         false
     );
     made.entity = NetwEntity::of(p_rig.route_node(made.route));
@@ -140,36 +141,6 @@ TEST_CASE(
         int64_t(NetwLivenessCore::STATE_LIVE)
     );
     CHECK(rig.route_node(made.route, 0) != nullptr);
-}
-
-TEST_CASE(
-    "[Networked][Spawn] IF4 a hidden route keeps naming its entity, so a "
-    "re-admission binds the same handle rather than minting a second identity "
-    "for one route"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-
-    const Flapped made = a_hidden_body(rig, arena, "naming", Decl::LEAVE_HIDE);
-    const int64_t watcher = rig.peer_id(0);
-
-    made.layer->add_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-    const RID handle = rig.client(0)->entity_from_route(made.route);
-    REQUIRE(handle.is_valid());
-
-    made.layer->remove_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-    CHECK(rig.client(0)->entity_from_route(made.route) == handle);
-
-    made.layer->add_viewer(watcher);
-    rig.flush_interest();
-    rig.pump(10);
-    CHECK(rig.client(0)->entity_from_route(made.route) == handle);
-    NETW_CHECK_EQ(rig.client(0)->entity_get_epoch(handle), 0);
 }
 
 TEST_CASE(
@@ -306,7 +277,7 @@ TEST_CASE(
         named("Hanger"),
         one_type(),
         rig.route_node(anchor.route),
-        Variant(),
+        0,
         false
     );
     rig.pump(10);

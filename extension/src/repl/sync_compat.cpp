@@ -799,7 +799,7 @@ PackedInt32Array SyncCompat::recipients_for(
         base = record->recipient_list().ptr();
         count = int(record->recipient_list().size());
     } else {
-        listed = plane->rpc_get_recipients(p_entity);
+        listed = plane->rpc_recipients(p_entity);
         base = listed.ptr();
         count = listed.size();
     }
@@ -1132,7 +1132,7 @@ void SyncCompat::handle_sync(
     if (plane == nullptr || p_entity.is_null()) {
         return;
     }
-    const int64_t route = plane->liveness_route_of(p_entity.ptr());
+    const int64_t route = books->liveness->route_of(p_entity->get_rid_handle());
     wire::ReadStream reader(p_payload);
     sync_kernel::VolatileHead head;
     if (!sync_kernel::VolatileHead::wire.run(reader, head)) {
@@ -1211,7 +1211,7 @@ void SyncCompat::handle_sync_delta(
     if (plane == nullptr || p_entity.is_null()) {
         return;
     }
-    const int64_t route = plane->liveness_route_of(p_entity.ptr());
+    const int64_t route = books->liveness->route_of(p_entity->get_rid_handle());
     wire::ReadStream reader(p_payload);
     sync_kernel::RetainedHead head;
     if (!sync_kernel::RetainedHead::wire.run(reader, head)) {

@@ -75,7 +75,7 @@ void serve_accounts(
             Dictionary()
         );
     }
-    p_api->connect_plane().on_poll(0.0);
+    netw_test::Internals::connect_plane(p_api).on_poll(0.0);
 }
 
 struct ServedDirectories {
@@ -143,10 +143,11 @@ TEST_CASE(
             }
         }
 
+        const Ref<NetwSession> session = host->get_session();
         REQUIRE(
-            int(
-                host->get_session()->transfer_server(successor->get_unique_id())
-            )
+            int(session->transfer_server(
+                session->player_of(successor->get_unique_id())
+            ))
             == int(OK)
         );
         seated.rig.pump(SETTLE_PUMPS);

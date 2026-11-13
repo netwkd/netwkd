@@ -90,15 +90,19 @@ Ref<NetwEntity> Record::stamp_header(
             ? session->player_incarnation(entity->get_peer_id())
             : int64_t(p_header.get(StringName("player_id"), 0))
     );
-    entity->get_record()->get_control()->set_authority(
-        bool(p_header.get(StringName("controller_authority"), false))
-            ? int64_t(NetwEntity::AUTHORITY_CONTROLLER)
-            : int64_t(NetwEntity::AUTHORITY_SERVER)
-    );
-    entity->record_controller(
+    NetwMultiplayer::record_of_wrapper(entity.ptr())
+        ->get_control()
+        ->set_authority(
+            bool(p_header.get(StringName("controller_authority"), false))
+                ? int64_t(NetwEntity::AUTHORITY_CONTROLLER)
+                : int64_t(NetwEntity::AUTHORITY_SERVER)
+        );
+    NetwMultiplayer::control_record(
+        entity.ptr(),
         int64_t(p_header.get(StringName("controller"), 0))
     );
-    entity->seed_control(
+    NetwMultiplayer::control_seed(
+        entity.ptr(),
         uint64_t(int64_t(p_header.get(StringName("control_revision"), 0))),
         uint64_t(int64_t(p_header.get(StringName("control_tenure"), 0))),
         int64_t(p_header.get(StringName("control_hold"), 0))

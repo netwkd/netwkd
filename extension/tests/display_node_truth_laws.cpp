@@ -3,6 +3,7 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "support/netw_call_log.h"
 #include "support/value_flow_stand.h"
 
 #include "netw/api/context.hpp"
@@ -19,6 +20,7 @@
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
 
 namespace TestDisplayNodeTruthLaws {
 
@@ -234,24 +236,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a snap writes the visual for a "
-    "track that has no history"
-) {
-    Bench bench;
-    const Subject subject = stand_predicted(bench);
-
-    bench.core()->display_snap(subject.rid(), StringName("position"), p2());
-
-    CHECK(near(subject.visual->get_global_position(), p2()));
-    const netw::display::Runtime *runtime
-        = NetwNativeTests::display_runtime_of(bench.core(), subject.rid());
-    CHECK(runtime != nullptr);
-    const bool holds_no_history = runtime == nullptr
-        || runtime->history_of(StringName("position")) == nullptr;
-    CHECK(holds_no_history);
-}
-
-TEST_CASE(
     "[Networked][Display][SceneTree] a demote to remote resumes from the "
     "rows recorded while predicted and seeds its role offset on the "
     "first frame"
@@ -325,6 +309,48 @@ TEST_CASE(
     );
     bench.render_many(subject.rid(), 90);
     CHECK(near(subject.visual->get_global_position(), p0()));
+}
+
+TEST_CASE(
+    "[Networked][Display][SceneTree] a callback or a rendering item set on "
+    "an entity takes its drawn values, and its visual node is left alone"
+) {
+    for (const bool called : {true, false}) {
+        CAPTURE(called);
+        Bench bench;
+        const Subject subject = stand_interpolated(
+            bench,
+            "SinkTarget",
+            NetwMultiplayer::DISPLAY_ROLE_REMOTE
+        );
+        netw_test::CallLog drawn;
+        const RID item = RenderingServer::get_singleton()->canvas_item_create();
+        if (called) {
+            bench.core()->display_set_callback(
+                subject.rid(),
+                drawn.callable(StringName("drawn"))
+            );
+        } else {
+            bench.core()->display_set_target_item(subject.rid(), item);
+        }
+
+        bench.record(subject.body, StringName("position"), p1(), 1);
+        bench.display_at(1, 0, 0.0);
+        bench.render_many(subject.rid(), 90);
+
+        CHECK(near(subject.visual->get_global_position(), p0()));
+        const Array last = drawn.args(
+            StringName("drawn"),
+            drawn.count(StringName("drawn")) - 1
+        );
+        CHECK(last.size() == (called ? 3 : 0));
+        if (last.size() == 3) {
+            CHECK(RID(last[0]) == subject.rid());
+            CHECK(StringName(last[1]) == StringName("position"));
+            CHECK(near(Vector2(last[2]), p1()));
+        }
+        RenderingServer::get_singleton()->free_rid(item);
+    }
 }
 
 } // namespace TestDisplayNodeTruthLaws

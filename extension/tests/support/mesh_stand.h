@@ -142,7 +142,7 @@ public:
         );
         mounted_paths.push_back(path);
         REQUIRE_MESSAGE(
-            session->session_root() == p_at,
+            session->session_get_root() == p_at,
             "the session did not take that node as its root"
         );
     }

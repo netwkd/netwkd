@@ -20,6 +20,15 @@
 		[constant SYNC_MODE_SNAP] sets the tick directly every time, which can move it backwards. [constant SYNC_MODE_STRETCH], the default, runs the clock slightly faster or slower each frame by [constant NetwMultiplayer.CLOCK_PARAM_STRETCH_NUDGE_FACTOR] of the difference, so the tick never jumps. A difference larger than [constant NetwMultiplayer.CLOCK_PARAM_PANIC_SNAP_THRESHOLD] ticks is snapped.
 		[b]Showing remote state[/b]
 		State from other peers arrives late, so remote entities are shown [member display_offset] ticks in the past. [member recommended_display_offset] is the offset the current connection needs, the one-way latency plus the jitter times [constant NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER], in ticks. It is not applied automatically. [method auto_configure_offset] applies it.
+		[b]Ticking by hand[/b]
+		While [member manual_tick] is on, physics frames run no ticks, and each [method step] call is one frame that runs the ticks it is given. A replay or a test steps the clock this way to get an exact tick count.
+		[codeblock]
+		clock.manual_tick = true
+		for frame in 4:
+		    await get_tree().physics_frame
+		    clock.step(1 if frame % 2 == 1 else 0)
+		clock.manual_tick = false
+		[/codeblock]
 	</description>
 	<tutorials>
 	</tutorials>
@@ -40,6 +49,13 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="step">
+			<return type="void" />
+			<param index="0" name="count" type="int" />
+			<description>
+				Runs one physics frame of the clock with [param count] ticks in it, now. A [param count] of [code]0[/code] runs the frame's prediction and sends with no tick. Use it while [member manual_tick] is on.
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="behind_count" type="int" setter="" getter="get_behind_count">
@@ -53,6 +69,9 @@
 		</member>
 		<member name="is_synchronized" type="bool" setter="" getter="get_is_synchronized">
 			[code]true[/code] once the tick follows the server. Always [code]true[/code] on the server and on a peer with no connection, as [method MultiplayerAPI.is_server] is.
+		</member>
+		<member name="manual_tick" type="bool" setter="set_manual_tick" getter="get_manual_tick">
+			When [code]true[/code], physics frames run no ticks and only [method step] advances [member tick]. Turning it on also marks the clock [member is_synchronized].
 		</member>
 		<member name="physics_factor" type="float" setter="" getter="get_physics_factor">
 			Physics frames per tick. Multiply a per-frame value by it to get a per-tick value.
@@ -89,7 +108,7 @@
 		</signal>
 		<signal name="synchronized">
 			<description>
-				Emitted when [member is_synchronized] becomes [code]true[/code].
+				Emitted when [member is_synchronized] becomes [code]true[/code]. A clock that synchronizes while [method MultiplayerAPI.poll] or a tick runs emits it when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="ticked">
@@ -102,7 +121,7 @@
 		<signal name="tickrate_mismatch">
 			<param index="0" name="server_tickrate" type="int" />
 			<description>
-				Emitted on a client whose [member tickrate] differs from [param server_tickrate] when [member NetwClockConfig.tickrate_mismatch_action] is [constant MISMATCH_ACTION_SIGNAL].
+				Emitted on a client whose [member tickrate] differs from [param server_tickrate] when [member NetwClockConfig.tickrate_mismatch_action] is [constant MISMATCH_ACTION_SIGNAL]. A rate read while [method MultiplayerAPI.poll] or a tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 	</signals>

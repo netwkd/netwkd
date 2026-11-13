@@ -49,7 +49,17 @@ namespace Networked;
 /// current connection needs, the one-way latency plus the jitter times
 /// <see cref="NetwMultiplayer.ClockParam.JitterMultiplier"/>, in ticks. It is
 /// not applied automatically. <see cref="NetwClock.AutoConfigureOffset"/>
-/// applies it.
+/// applies it. <b>Ticking by hand</b> While <see cref="NetwClock.ManualTick"/>
+/// is on, physics frames run no ticks, and each <see cref="NetwClock.Step"/>
+/// call is one frame that runs the ticks it is given. A replay or a test steps
+/// the clock this way to get an exact tick count.
+/// <code>
+/// clock.manual_tick = true
+/// for frame in 4:
+///     await get_tree().physics_frame
+///     clock.step(1 if frame % 2 == 1 else 0)
+/// clock.manual_tick = false
+/// </code>
 /// </para>
 /// </remarks>
 public sealed class NetwClock : NetwRefCounted
@@ -185,6 +195,8 @@ public sealed class NetwClock : NetwRefCounted
 
     /// <summary>
     /// Emitted when <see cref="NetwClock.IsSynchronized"/> becomes <c>true</c>.
+    /// A clock that synchronizes while <see cref="MultiplayerApi.Poll"/> or a
+    /// tick runs emits it when that poll or tick ends.
     /// </summary>
     public event Action Synchronized
     {
@@ -203,7 +215,9 @@ public sealed class NetwClock : NetwRefCounted
     /// Emitted on a client whose <see cref="NetwClock.Tickrate"/> differs from
     /// <c>server_tickrate</c> when
     /// <see cref="NetwClockConfig.TickrateMismatchAction"/> is
-    /// <see cref="NetwClock.MismatchAction.Signal"/>.
+    /// <see cref="NetwClock.MismatchAction.Signal"/>. A rate read while
+    /// <see cref="MultiplayerApi.Poll"/> or a tick runs is reported when that
+    /// poll or tick ends.
     /// </summary>
     public event Action<long> TickrateMismatch
     {
@@ -468,7 +482,8 @@ public sealed class NetwClock : NetwRefCounted
 
     /// <summary>
     /// Seconds between pings. Shorter follows the connection more closely and
-    /// sends more packets.
+    /// sends more packets. The clock pings five times slower once
+    /// <see cref="NetwClock.ClockMonitor.RttJitter"/> is under half a tick.
     /// </summary>
     public double PingInterval
     {
@@ -487,6 +502,38 @@ public sealed class NetwClock : NetwRefCounted
             long discarded = default;
             NetwThunks.Ptrcall1_Double_Long(
                 _bindSetPingInterval,
+                Checked,
+                in slot0,
+                ref discarded);
+        }
+    }
+
+    private static readonly IntPtr _bindGetManualTick =
+        NetwApi.MethodBind("NetwClock", "get_manual_tick", 36873697UL);
+
+    private static readonly IntPtr _bindSetManualTick =
+        NetwApi.MethodBind("NetwClock", "set_manual_tick", 2586408642UL);
+
+    /// <summary>
+    /// When <c>true</c>, physics frames run no ticks and only
+    /// <see cref="NetwClock.Step"/> advances <see cref="NetwClock.Tick"/>.
+    /// Turning it on also marks the clock
+    /// <see cref="NetwClock.IsSynchronized"/>.
+    /// </summary>
+    public bool ManualTick
+    {
+        get
+        {
+            byte answered = default;
+            NetwThunks.Ptrcall0_Byte(_bindGetManualTick, Checked, ref answered);
+            return answered != 0;
+        }
+        set
+        {
+            byte slot0 = value ? (byte)1 : (byte)0;
+            long discarded = default;
+            NetwThunks.Ptrcall1_Byte_Long(
+                _bindSetManualTick,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -529,6 +576,26 @@ public sealed class NetwClock : NetwRefCounted
         NetwThunks.Ptrcall0_Long(
             _bindAutoConfigureOffset,
             Checked,
+            ref discarded);
+    }
+
+    private static readonly IntPtr _bindStep =
+        NetwApi.MethodBind("NetwClock", "step", 1286410249UL);
+
+    /// <summary>
+    /// Runs one physics frame of the clock with <paramref name="count"/> ticks
+    /// in it, now. A <paramref name="count"/> of <c>0</c> runs the frame's
+    /// prediction and sends with no tick. Use it while
+    /// <see cref="NetwClock.ManualTick"/> is on.
+    /// </summary>
+    public void Step(long count)
+    {
+        long slot0 = count;
+        long discarded = default;
+        NetwThunks.Ptrcall1_Long_Long(
+            _bindStep,
+            Checked,
+            in slot0,
             ref discarded);
     }
 }

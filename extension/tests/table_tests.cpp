@@ -2,6 +2,7 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "support/internals.h"
 #include "support/link.h"
 #include "support/loopback_rig.h"
 #include "support/netw_cells.h"
@@ -29,8 +30,10 @@ using netw::NetwLinkConditions;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw::NetwSchema;
+using netw::NetwSession;
 using netw::NetwTable;
 using netw::persist::MemoryConnection;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawVerdict;
@@ -45,7 +48,10 @@ public:
         connection = MemoryConnection::opened(p_store, "slot1");
     }
 
-    Ref<NetwPromise> open_builtin(Object *, const StringName &) override {
+    Ref<NetwPromise> open_builtin(
+        const Ref<NetwSession> &,
+        const StringName &
+    ) override {
         return NetwPromise::resolved(connection);
     }
 };
@@ -85,7 +91,7 @@ struct Stage {
     }
 
     PackedInt64Array claim(int p_count) const {
-        return rig.server()->liveness_claim_routes(p_count);
+        return rig.server()->table_claim_routes(host->get_rid(), p_count);
     }
 
     Ref<NetwDatabase> database(int p_client, const Ref<HeldBackend> &p_with) {
@@ -205,7 +211,7 @@ LawVerdict wave_without_nodes(const World &) {
         return seen;
     }
     NetwMultiplayer *guest = stage.rig.client(0);
-    const RID entity = guest->entity_from_route(routes[0]);
+    const RID entity = Internals::entity_at(guest, routes[0]);
     if (!entity.is_valid() || guest->entity_get_node(entity) != nullptr) {
         return law_broken("the client did not hold a nodeless entity");
     }
@@ -216,6 +222,9 @@ LawVerdict received_per_wave(const World &) {
     Stage stage;
     const Recorder host_heard(stage.host.ptr(), {"received"});
     const Recorder guest_heard(stage.guest.ptr(), {"received"});
+    if (stage.at(0) != stage.guest) {
+        return law_broken("a second lookup answered another table");
+    }
 
     const PackedInt64Array first = stage.claim(2);
     publish(stage.host, first, 1);
@@ -486,8 +495,9 @@ const Row ROWS[] = {
      "the client holds the rows and their values with no node for any",
      &wave_without_nodes},
     {"two waves, the second keeping one route and adding one",
-     "server and client each hear one received a wave, and the client "
-     "reads one birth and one death for the second",
+     "every lookup answers the same table, server and client each hear one "
+     "received a wave, and the client reads one birth and one death for "
+     "the second",
      &received_per_wave},
     {"a second wave over the routes a client already holds",
      "the client's rows move to the second wave's values",

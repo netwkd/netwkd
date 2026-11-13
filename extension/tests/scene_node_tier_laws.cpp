@@ -36,7 +36,7 @@ Node *named_scene_node(
     const Ref<NetwMultiplayer> &p_core,
     const StringName &p_stem
 ) {
-    return p_core->scene_get_node(p_core->scene_named(p_stem));
+    return p_core->scene_get_root(p_core->scene_named(p_stem));
 }
 
 Mounted mount(
@@ -51,14 +51,14 @@ Mounted mount(
         made.root->set_name(p_stem);
     }
     made.entity.instantiate();
-    made.entity->attach_to(made.root);
+    NetwMultiplayer::wrapper_attach_to(made.root, made.entity);
     made.entity->set_scene_isolation(
         p_owns_its_world ? int64_t(NetwSceneCore::ISOLATION_OWN_WORLD)
                          : int64_t(NetwSceneCore::ISOLATION_NONE)
     );
     made.scene = Internals::get_liveness_core(p_core)->entity_create();
-    made.entity->get_record()->adopt_handle(made.scene);
-    REQUIRE(p_core->entity_of(made.root) == made.scene);
+    Internals::adopt_handle(made.entity, made.scene);
+    REQUIRE(Internals::entity_of(p_core, made.root) == made.scene);
     Internals::get_scene_core(p_core)
         ->scene_enter(made.scene, p_stem, p_owns_its_world);
     REQUIRE(named_scene_node(p_core, p_stem) == made.root);
@@ -204,8 +204,8 @@ TEST_CASE(
 
 TEST_CASE(
     "[Networked][Scene][Hosted] SNT14 forgetting a container emits "
-    "scene_removed with its scene at the next poll, and a null container or "
-    "a node the session never held emits nothing"
+    "scene_removed with its scene at once, and a null container or a node "
+    "the session never held emits nothing"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -215,7 +215,6 @@ TEST_CASE(
         arena.scene,
         Internals::get_liveness_core(core)->reserve_route(),
         arena.entity,
-        arena.entity->get_record(),
         arena.root
     ));
     const Ref<netw::NetwSession> session = core->get_session();
@@ -231,7 +230,6 @@ TEST_CASE(
     core->scene_forget(nullptr);
     core->scene_forget(stranger);
     core->scene_forget(arena.root);
-    core->NETW_API_VIRTUAL(poll)();
 
     NETW_CHECK_EQ(removals.count(StringName("scene_removed")), 1);
     const Array removed = removals.args(StringName("scene_removed"), 0);
@@ -256,8 +254,9 @@ TEST_CASE(
     root->add_child(arena);
     Ref<netw::NetwEntity> seated;
     seated.instantiate();
-    seated->attach_to(arena);
-    seated->get_record()->adopt_handle(
+    NetwMultiplayer::wrapper_attach_to(arena, seated);
+    Internals::adopt_handle(
+        seated,
         Internals::get_liveness_core(core)->entity_create()
     );
 
@@ -289,7 +288,7 @@ TEST_CASE(
     arena.root->add_child(body);
     Ref<netw::NetwEntity> mover;
     mover.instantiate();
-    mover->attach_to(body);
+    NetwMultiplayer::wrapper_attach_to(body, mover);
 
     Ref<netw::NetwPromise> settled;
     settled.instantiate();
@@ -310,18 +309,20 @@ TEST_CASE(
     core.instantiate();
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    const CallLog seen;
-    core->scene_observe(
+    REQUIRE(core->liveness_bind(
         arena.scene,
-        NetwMultiplayer::SCENE_EVENT_VIEWER,
-        seen.callable("viewer")
+        Internals::get_liveness_core(core)->reserve_route(),
+        arena.entity,
+        arena.root
+    ));
+    const Ref<netw::NetwScene> scene = core->scene_handle_of(arena.scene);
+    REQUIRE(scene.is_valid());
+    Recorder seen(
+        scene.ptr(),
+        Vector<StringName>{StringName("viewer_entered")}
     );
 
-    Ref<netw::NetwPlayer> waiting;
-    waiting.instantiate();
-    waiting->bind_to(core.ptr(), 9);
-    core->player_adopt(9, waiting);
-    core->player_admit(9);
+    const Ref<netw::NetwPlayer> waiting = Internals::seat_player(core, 9);
     CHECK(Internals::get_scene_core(core)->admission_park(arena.scene, 9));
     CHECK(Internals::get_scene_core(core)->admission_is_parked(arena.scene, 9));
 
@@ -330,17 +331,13 @@ TEST_CASE(
     CHECK_FALSE(
         Internals::get_scene_core(core)->admission_is_parked(arena.scene, 9)
     );
-    NETW_CHECK_EQ(seen.count(StringName("viewer")), 1);
+    NETW_CHECK_EQ(seen.count(StringName("viewer_entered")), 1);
 
-    Ref<netw::NetwPlayer> stranger;
-    stranger.instantiate();
-    stranger->bind_to(core.ptr(), 11);
-    core->player_adopt(11, stranger);
-    core->player_admit(11);
+    const Ref<netw::NetwPlayer> stranger = Internals::seat_player(core, 11);
 
     core->scene_on_player_joined(stranger);
 
-    NETW_CHECK_EQ(seen.count(StringName("viewer")), 1);
+    NETW_CHECK_EQ(seen.count(StringName("viewer_entered")), 1);
 
     memdelete(root);
 }
@@ -360,29 +357,31 @@ TEST_CASE(
     core->set_interest_flush(flushed.callable("flush"));
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    const CallLog seen;
-    core->scene_observe(
+    REQUIRE(core->liveness_bind(
         arena.scene,
-        NetwMultiplayer::SCENE_EVENT_VIEWER,
-        seen.callable("viewer")
+        Internals::get_liveness_core(core)->reserve_route(),
+        arena.entity,
+        arena.root
+    ));
+    const Ref<netw::NetwScene> scene = core->scene_handle_of(arena.scene);
+    REQUIRE(scene.is_valid());
+    Recorder seen(
+        scene.ptr(),
+        Vector<StringName>{StringName("viewer_entered")}
     );
 
     REQUIRE(core->scene_admit_peer(arena.scene, 7));
-    Ref<netw::NetwPlayer> watching;
-    watching.instantiate();
-    watching->bind_to(core.ptr(), 7);
-    core->player_adopt(7, watching);
-    core->player_admit(7);
-    const int announced = seen.count(StringName("viewer"));
+    Internals::seat_player(core, 7);
+    const int announced = seen.count(StringName("viewer_entered"));
 
     core->scene_open_admission(arena.root);
 
-    NETW_CHECK_EQ(seen.count(StringName("viewer")), announced + 1);
+    NETW_CHECK_EQ(seen.count(StringName("viewer_entered")), announced + 1);
     CHECK(core->scene_subscribes(arena.scene, 7));
 
     core->scene_open_admission(arena.root);
 
-    NETW_CHECK_EQ(seen.count(StringName("viewer")), announced + 1);
+    NETW_CHECK_EQ(seen.count(StringName("viewer_entered")), announced + 1);
 
     core->scene_close_admission(arena.scene);
 
@@ -411,28 +410,22 @@ TEST_CASE(
     root->add_child(arena);
     Ref<netw::NetwEntity> arena_wrapper;
     arena_wrapper.instantiate();
-    arena_wrapper->attach_to(arena);
+    NetwMultiplayer::wrapper_attach_to(arena, arena_wrapper);
     arena_wrapper->set_declares_scene(true);
     const RID scene = Internals::get_liveness_core(core)->entity_create();
-    arena_wrapper->get_record()->adopt_handle(scene);
-    REQUIRE(core->entity_of(arena) == scene);
-    REQUIRE(core->liveness_bind(
-        scene,
-        61,
-        arena_wrapper,
-        arena_wrapper->get_record(),
-        arena
-    ));
+    Internals::adopt_handle(arena_wrapper, scene);
+    REQUIRE(Internals::entity_of(core, arena) == scene);
+    REQUIRE(core->liveness_bind(scene, 61, arena_wrapper, arena));
 
     Node *body = memnew(Node);
     arena->add_child(body);
     Ref<netw::NetwEntity> player;
     player.instantiate();
-    player->attach_to(body);
+    NetwMultiplayer::wrapper_attach_to(body, player);
     const RID mover = Internals::get_liveness_core(core)->entity_create();
-    player->get_record()->adopt_handle(mover);
-    REQUIRE(core->entity_of(body) == mover);
-    REQUIRE(core->liveness_bind(mover, 62, player, player->get_record(), body));
+    Internals::adopt_handle(player, mover);
+    REQUIRE(Internals::entity_of(core, body) == mover);
+    REQUIRE(core->liveness_bind(mover, 62, player, body));
     const int64_t host = MultiplayerPeer::TARGET_PEER_SERVER;
     player->set_peer_id(host);
 

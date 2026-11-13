@@ -35,7 +35,7 @@ Ref<NetwTable> NetwTable::over(const RID &p_table, NetwMultiplayer *p_session) {
 }
 
 Ref<NetwTable> NetwTable::of(Node *p_node, const StringName &p_name) {
-    NetwMultiplayer *api = NetwMultiplayer::of(p_node);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_node);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -115,6 +115,20 @@ bool NetwTable::get_reliable() const {
     return bool(
         api->table_get_param(table, NetwMultiplayer::TABLE_PARAM_RELIABLE)
     );
+}
+
+PackedInt64Array NetwTable::claim_routes(int p_count) {
+    NetwMultiplayer *api = session();
+    return api != nullptr ? api->table_claim_routes(table, p_count)
+                          : PackedInt64Array();
+}
+
+Error NetwTable::release_routes(const PackedInt64Array &p_routes) {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return ERR_DOES_NOT_EXIST;
+    }
+    return api->table_release_routes(table, p_routes);
 }
 
 Error NetwTable::write_routes(const PackedInt64Array &p_routes) {
@@ -222,6 +236,15 @@ void NetwTable::_bind_methods() {
         &NetwTable::set_reliable
     );
     ClassDB::bind_method(D_METHOD("get_reliable"), &NetwTable::get_reliable);
+
+    ClassDB::bind_method(
+        D_METHOD("claim_routes", "count"),
+        &NetwTable::claim_routes
+    );
+    ClassDB::bind_method(
+        D_METHOD("release_routes", "routes"),
+        &NetwTable::release_routes
+    );
 
     ClassDB::bind_method(
         D_METHOD("write_routes", "routes"),

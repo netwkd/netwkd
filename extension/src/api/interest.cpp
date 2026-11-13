@@ -20,8 +20,11 @@ void NetwInterest::bind(NetwEntity *p_entity) {
     if (root == nullptr) {
         return;
     }
-    if (root->is_inside_tree()) {
-        activate();
+    if (!root->is_inside_tree()) {
+        return;
+    }
+    if (NetwMultiplayer *session = core()) {
+        session->interest_activate(entity());
     }
 }
 
@@ -33,8 +36,9 @@ Ref<NetwEntity> NetwInterest::entity() const {
 
 NetwMultiplayer *NetwInterest::core() const {
     const Ref<NetwEntity> bound = entity();
-    return bound.is_valid() ? NetwEntity::session_core_for(bound->get_owner())
-                            : nullptr;
+    return bound.is_valid()
+        ? NetwMultiplayer::session_holding(bound->get_owner())
+        : nullptr;
 }
 
 NetwMultiplayer *NetwInterest::attached_core() const {
@@ -51,67 +55,14 @@ NetwMultiplayer *NetwInterest::attached_core() const {
 
 interest::Facet *NetwInterest::facet() const {
     const Ref<NetwEntity> bound = entity();
-    if (bound.is_null() || bound->get_record() == nullptr) {
-        return nullptr;
-    }
-    return &bound->get_record()->get_interest_facet();
+    NetwEntityRecord *const record
+        = NetwMultiplayer::record_of_wrapper(bound.ptr());
+    return record != nullptr ? &record->get_interest_facet() : nullptr;
 }
 
 interest::Decl *NetwInterest::declaration() {
     interest::Facet *held = facet();
     return held != nullptr ? held->declaration() : nullptr;
-}
-
-bool NetwInterest::is_authority() const {
-    NetwMultiplayer *session = core();
-    return session != nullptr && session->is_host();
-}
-
-RID NetwInterest::layer_ensure(const StringName &p_layer_id) {
-    NetwMultiplayer *session = core();
-    if (session == nullptr) {
-        return RID();
-    }
-    const RID known = session->interest_layer_find(p_layer_id);
-    if (known.is_valid()) {
-        return known;
-    }
-    const RID opened = session->layer_open(p_layer_id);
-    if (opened.is_valid() && session->layer_record(opened).is_null()) {
-        session->layer_close(opened);
-        return RID();
-    }
-    return opened;
-}
-
-void NetwInterest::layer_join_live(const StringName &p_layer_id) {
-    const Ref<NetwEntity> bound = entity();
-    NetwMultiplayer *session = core();
-    if (session == nullptr || bound.is_null()) {
-        return;
-    }
-    const RID layer = layer_ensure(p_layer_id);
-    if (!is_authority() || !layer.is_valid()) {
-        return;
-    }
-    session->liveness_adopt(bound.ptr());
-    const Ref<NetwInterestLayer> record = session->layer_record(layer);
-    if (record.is_valid()) {
-        record->add_entity(bound);
-    }
-}
-
-void NetwInterest::layer_leave_live(const StringName &p_layer_id) {
-    const Ref<NetwEntity> bound = entity();
-    NetwMultiplayer *session = core();
-    if (session == nullptr || bound.is_null() || !is_authority()) {
-        return;
-    }
-    const Ref<NetwInterestLayer> record
-        = session->layer_record(session->interest_layer_find(p_layer_id));
-    if (record.is_valid()) {
-        record->remove_entity(bound);
-    }
 }
 
 Ref<NetwInterest> NetwInterest::of(Node *p_node) {
@@ -138,7 +89,7 @@ Ref<NetwInterest> NetwInterest::join(
     const Ref<NetwEntity> bound = entity();
     interest::Facet *held = facet();
     if (session != nullptr && bound.is_valid()) {
-        session->interest_join(bound->get_rid_handle(), p_layer_id);
+        session->interest_join_label(bound->get_rid_handle(), p_layer_id);
     } else if (held != nullptr) {
         held->join(p_layer_id);
     }
@@ -156,7 +107,7 @@ Ref<NetwInterest> NetwInterest::leave(const StringName &p_layer_id) {
     const Ref<NetwEntity> bound = entity();
     interest::Facet *held = facet();
     if (session != nullptr && bound.is_valid()) {
-        session->interest_leave(bound->get_rid_handle(), p_layer_id);
+        session->interest_leave_label(bound->get_rid_handle(), p_layer_id);
     } else if (held != nullptr) {
         held->leave(p_layer_id);
     }
@@ -166,19 +117,6 @@ Ref<NetwInterest> NetwInterest::leave(const StringName &p_layer_id) {
 TypedArray<StringName> NetwInterest::layer_ids() const {
     interest::Facet *held = facet();
     return held != nullptr ? held->layer_ids() : TypedArray<StringName>();
-}
-
-bool NetwInterest::is_visible_to(int64_t p_peer_id) const {
-    const Ref<NetwEntity> bound = entity();
-    NetwMultiplayer *session = core();
-    if (session == nullptr || bound.is_null()) {
-        return false;
-    }
-    if (!session->interest_is_filtered(bound->get_rid_handle())) {
-        return true;
-    }
-    const int bit = session->interest_peer_bit(p_peer_id);
-    return bit >= 0 && session->interest_bit_admits(bound, bit);
 }
 
 Ref<NetwInterest> NetwInterest::bind_layer_callback(
@@ -191,13 +129,13 @@ Ref<NetwInterest> NetwInterest::bind_layer_callback(
     interest::Facet *held = facet();
     if (session != nullptr && bound.is_valid()) {
         if (p_on_enter) {
-            session->interest_on_enter(
+            session->interest_on_enter_label(
                 bound->get_rid_handle(),
                 p_layer_id,
                 p_callback
             );
         } else {
-            session->interest_on_leave(
+            session->interest_on_leave_label(
                 bound->get_rid_handle(),
                 p_layer_id,
                 p_callback
@@ -266,7 +204,7 @@ Ref<NetwInterest> NetwInterest::on_leave_policy(
     const Ref<NetwEntity> bound = entity();
     interest::Facet *held = facet();
     if (session != nullptr && bound.is_valid()) {
-        session->interest_on_leave_policy(
+        session->interest_leave_policy_label(
             bound->get_rid_handle(),
             p_layer_id,
             p_policy,
@@ -287,7 +225,7 @@ Ref<NetwInterest> NetwInterest::on_perception_policy(
     const Ref<NetwEntity> bound = entity();
     NetwMultiplayer *session = attached_core();
     if (session != nullptr && bound.is_valid()) {
-        session->interest_on_perception_policy(
+        session->interest_perception_policy_label(
             bound->get_rid_handle(),
             p_layer_id,
             p_policy,
@@ -297,18 +235,6 @@ Ref<NetwInterest> NetwInterest::on_perception_policy(
         held->set_perception_policy(p_layer_id, int(p_policy), p_custom);
     }
     return Ref<NetwInterest>(this);
-}
-
-void NetwInterest::set_report_observers(bool p_enabled) {
-    interest::Facet *held = facet();
-    if (held != nullptr) {
-        held->declaration()->set_reports_observers(p_enabled);
-    }
-}
-
-bool NetwInterest::reports_observers() const {
-    interest::Facet *held = facet();
-    return held != nullptr && held->declaration()->get_reports_observers();
 }
 
 int64_t NetwInterest::leave_policy_for(
@@ -366,53 +292,6 @@ void NetwInterest::dispatch_leave(
     if (held != nullptr) {
         held->dispatch_leave(p_layer_id, p_peer);
     }
-}
-
-void NetwInterest::activate() {
-    const Ref<NetwEntity> bound = entity();
-    if (bound.is_null() || core() == nullptr) {
-        return;
-    }
-    interest::Facet *held = facet();
-    if (held == nullptr) {
-        return;
-    }
-    const Array labels = held->declaration()->labels();
-    for (int at = 0; at < labels.size(); at++) {
-        layer_join_live(labels[at]);
-    }
-}
-
-void NetwInterest::deactivate() {
-    interest::Facet *held = facet();
-    if (held == nullptr) {
-        return;
-    }
-    const Array labels = held->declaration()->labels();
-    for (int at = 0; at < labels.size(); at++) {
-        layer_leave_live(labels[at]);
-    }
-}
-
-void NetwInterest::announce_observer(
-    const StringName &p_layer_id,
-    int64_t p_peer,
-    bool p_entered
-) {
-    interest::Facet *held = facet();
-    if (held != nullptr) {
-        if (p_entered) {
-            held->dispatch_observed(p_peer);
-        } else {
-            held->dispatch_unobserved(p_peer);
-        }
-    }
-    emit_signal(
-        p_entered ? StringName("observer_entered")
-                  : StringName("observer_exited"),
-        p_layer_id,
-        p_peer
-    );
 }
 
 void NetwInterest::_bind_methods() {

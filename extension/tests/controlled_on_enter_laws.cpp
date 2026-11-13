@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/level_spawn.h"
 #include "support/loopback_rig.h"
 
@@ -17,6 +18,7 @@ using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 struct Entered {
@@ -42,7 +44,7 @@ Node *build_body(const Variant &p_peer) {
     body->set_name("Body");
     const Ref<NetwEntity> entity = NetwEntity::ensure(body);
     entity->set_peer_id(int64_t(p_peer));
-    entity->record_controller(int64_t(p_peer));
+    netw_test::Internals::control_record(entity.ptr(), int64_t(p_peer));
     Node *camera = memnew(Node);
     camera->set_name("Camera");
     camera->connect(
@@ -115,7 +117,7 @@ TEST_CASE(
     const int before = enters_of(camera);
 
     const Ref<NetwPromise> moved
-        = api->entity_reparent(api->entity_from_route(route), second);
+        = api->entity_reparent(Internals::entity_at(api, route), second);
     rig.pump(6);
 
     CHECK(moved->get_is_settled());

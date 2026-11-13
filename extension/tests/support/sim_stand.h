@@ -208,7 +208,7 @@ public:
 
     godot::Node *node_at(int p_client, int p_route) const {
         netw::NetwMultiplayer *api = session(p_client);
-        return api->entity_get_node(api->entity_from_route(p_route));
+        return api->entity_get_node(Internals::entity_at(api, p_route));
     }
 };
 

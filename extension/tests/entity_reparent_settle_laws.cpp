@@ -17,6 +17,7 @@ using netw::NetwMultiplayer;
 
 struct Stand {
     LoopbackRig rig;
+    Node *scene = nullptr;
     Node *home = nullptr;
     Node *away = nullptr;
     Node *body = nullptr;
@@ -24,8 +25,13 @@ struct Stand {
     CallLog seen;
 
     Stand() : rig(0) {
-        Node *scene = netw::gd::scene_root();
-        REQUIRE(scene != nullptr);
+        scene = memnew(Node);
+        scene->set_name("SettleStand");
+        netw::gd::scene_root()->add_child(scene);
+        netw::gd::scene_tree()->set_multiplayer(
+            Ref<godot::MultiplayerAPI>(rig.server()),
+            scene->get_path()
+        );
         home = memnew(Node);
         home->set_name("Home");
         scene->add_child(home);
@@ -43,6 +49,7 @@ struct Stand {
         );
         entity->connect(StringName("reparented"), seen.callable("reparented"));
         home->add_child(body);
+        body->set_owner(scene);
     }
 
     ~Stand() {
@@ -50,6 +57,12 @@ struct Stand {
         away->get_parent()->remove_child(away);
         memdelete(home);
         memdelete(away);
+        netw::gd::scene_tree()->set_multiplayer(
+            Ref<godot::MultiplayerAPI>(),
+            scene->get_path()
+        );
+        scene->get_parent()->remove_child(scene);
+        memdelete(scene);
     }
 
     void settle() {

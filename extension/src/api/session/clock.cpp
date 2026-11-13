@@ -17,30 +17,6 @@ Error NetwMultiplayer::clock_configure(const Ref<NetwClockConfig> &p_config) {
     return OK;
 }
 
-Ref<NetwClockConfig> NetwMultiplayer::clock_get_config() const {
-    const ClockEngine &clock = clock_engine();
-    Ref<NetwClockConfig> effective;
-    effective.instantiate();
-    effective->set_tickrate(clock.get_tickrate());
-    effective->set_max_ticks_per_frame(clock.get_max_ticks_per_frame());
-    effective->set_stall_threshold(clock.get_stall_threshold());
-    effective->set_use_physics_interpolation(
-        clock.get_use_physics_interpolation()
-    );
-    effective->set_sync_mode(SyncMode(clock.get_sync_mode()));
-    effective->set_panic_snap_threshold(clock.get_panic_snap_threshold());
-    effective->set_stretch_nudge_factor(clock.get_stretch_nudge_factor());
-    effective->set_ping_interval(clock.get_ping_interval());
-    effective->set_display_offset(clock.get_display_offset());
-    effective->set_jitter_multiplier(clock.get_jitter_multiplier());
-    effective->set_jitter_window(clock.get_jitter_window());
-    effective->set_jitter_stability_threshold(
-        clock.get_jitter_stability_threshold()
-    );
-    effective->set_enable_drift_logging(clock.get_enable_drift_logging());
-    return effective;
-}
-
 Variant NetwMultiplayer::clock_get_param(ClockParam p_param) const {
     const ClockEngine &engine = clock_engine();
     switch (p_param) {
@@ -202,26 +178,29 @@ bool NetwMultiplayer::clock_is_gated() const {
 }
 
 void NetwMultiplayer::clock_step(int64_t p_count) {
+    const Ref<NetwMultiplayer> keep(this);
     ++step_depth;
+    clock_engine().begin_tick_loop();
     clock_engine().force_step(int(p_count));
+    clock_engine().end_tick_loop();
     --step_depth;
     announce_flush();
+    effect_drain();
+    predict_free_retired();
 }
 
 void NetwMultiplayer::clock_physics_step(double p_delta) {
+    const Ref<NetwMultiplayer> keep(this);
+    ++step_depth;
     clock_engine().physics_step(p_delta);
+    --step_depth;
+    announce_flush();
+    effect_drain();
+    predict_free_retired();
 }
 
 bool NetwMultiplayer::clock_consume_ping_due(double p_delta) {
     return clock_engine().consume_ping_due(p_delta);
-}
-
-void NetwMultiplayer::clock_tick_loop(bool p_open) {
-    if (p_open) {
-        clock_engine().begin_tick_loop();
-        return;
-    }
-    clock_engine().end_tick_loop();
 }
 
 void NetwMultiplayer::clock_set_gate(bool p_armed) {

@@ -17,29 +17,23 @@ enums::NetwEndpoint::Status endpoint_status(int64_t p_flags, int64_t p_error);
 
 class NetwEndpoint : public godot::RefCounted, public enums::NetwEndpoint {
     GDCLASS(NetwEndpoint, godot::RefCounted)
+    friend class NetwMultiplayer;
 
     godot::ObjectID session_id;
-    godot::RID row;
+    godot::RID endpoint;
     godot::StringName peer_class;
     godot::String address;
-    bool listed = false;
     godot::Ref<NetwServerInfo> unanswered;
 
-    NetwMultiplayer *listed_session() const;
+    NetwMultiplayer *session() const;
+    godot::String text_param(int64_t p_param) const;
+    int64_t flags() const;
 
 protected:
     static void _bind_methods();
 
 public:
-    void bind_to(
-        NetwMultiplayer *p_session,
-        const godot::RID &p_row,
-        const godot::StringName &p_peer_class,
-        const godot::String &p_address
-    );
-    void unlist();
-    godot::RID get_row() const;
-
+    godot::RID get_rid() const;
     godot::StringName get_peer_class() const;
     godot::String get_address() const;
     godot::String get_display_name() const;

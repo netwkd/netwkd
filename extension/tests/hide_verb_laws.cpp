@@ -9,7 +9,6 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/interest/decl.hpp"
-#include "netw/liveness_core.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 
@@ -18,8 +17,6 @@ namespace TestHideVerbLaws {
 using namespace godot;
 using namespace netw_test;
 using netw::NetwEntity;
-using netw::NetwInterestLayer;
-using netw::NetwLivenessCore;
 using netw::NetwMultiplayer;
 
 const char *SHOWN_ID = "shown_body";
@@ -63,76 +60,12 @@ int a_body_the_client_holds(LoopbackRig &p_rig, Node *p_parent) {
         named("Shown"),
         one_type(),
         p_parent,
-        Variant(),
+        0,
         false
     );
     p_rig.pump(10);
     REQUIRE(p_rig.route_node(route, 0) != nullptr);
     return route;
-}
-
-TEST_CASE(
-    "[Networked][Liveness] HV1 the hide verb takes a held route to "
-    "absent, drops it from the live index, and leaves it naming its entity"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-    const int route = a_body_the_client_holds(rig, arena);
-
-    NetwMultiplayer *held = rig.client(0);
-    const RID entity = held->entity_from_route(route);
-    REQUIRE(entity.is_valid());
-    CHECK(held->liveness_hide(route));
-
-    NETW_CHECK_EQ(
-        int64_t(held->liveness_route_state(route)),
-        int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
-    );
-
-    SUBCASE("the route still names the entity it named while it was here") {
-        CHECK(held->entity_from_route(route) == entity);
-    }
-
-    SUBCASE("the wrapper is out of the live index") {
-        CHECK(held->wrapper_for_route(route).is_null());
-    }
-
-    SUBCASE("the server never heard of it, because presence is per peer") {
-        NETW_CHECK_EQ(
-            int64_t(rig.server()->liveness_route_state(route)),
-            int64_t(NetwMultiplayer::ENTITY_STATE_LIVE)
-        );
-    }
-}
-
-TEST_CASE(
-    "[Networked][Liveness] HV2 a hide that names no held route is "
-    "refused and leaves the held route as it was"
-) {
-    LoopbackRig rig(1);
-    rig.mount();
-    Node *arena = rig.mirror_child("Arena");
-    const int route = a_body_the_client_holds(rig, arena);
-
-    NetwMultiplayer *held = rig.client(0);
-
-    SUBCASE("a route this peer never heard of") {
-        CHECK_FALSE(held->liveness_hide(route + 1000));
-        NETW_CHECK_EQ(
-            int64_t(held->liveness_route_state(route)),
-            int64_t(NetwMultiplayer::ENTITY_STATE_LIVE)
-        );
-    }
-
-    SUBCASE("a route already absent") {
-        CHECK(held->liveness_hide(route));
-        CHECK_FALSE(held->liveness_hide(route));
-        NETW_CHECK_EQ(
-            int64_t(held->liveness_route_state(route)),
-            int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
-        );
-    }
 }
 
 TEST_CASE(

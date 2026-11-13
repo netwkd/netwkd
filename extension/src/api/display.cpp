@@ -22,8 +22,9 @@ Ref<NetwEntity> NetwDisplay::entity() const {
 
 NetwMultiplayer *NetwDisplay::core() const {
     const Ref<NetwEntity> bound = entity();
-    return bound.is_valid() ? NetwEntity::session_core_for(bound->get_owner())
-                            : nullptr;
+    return bound.is_valid()
+        ? NetwMultiplayer::session_holding(bound->get_owner())
+        : nullptr;
 }
 
 RID NetwDisplay::entity_rid() const {
@@ -33,10 +34,9 @@ RID NetwDisplay::entity_rid() const {
 
 display::Decl *NetwDisplay::declaration() const {
     const Ref<NetwEntity> bound = entity();
-    if (bound.is_null() || bound->get_record() == nullptr) {
-        return nullptr;
-    }
-    return &bound->get_record()->display_declaration();
+    NetwEntityRecord *const record
+        = NetwMultiplayer::record_of_wrapper(bound.ptr());
+    return record != nullptr ? &record->display_declaration() : nullptr;
 }
 
 void NetwDisplay::write(int p_param, const Variant &p_value) {

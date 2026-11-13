@@ -28,7 +28,7 @@ The session creates one **NetwPlayer** when it accepts a join and keeps that obj
     for entity: NetwEntity in player.entities:
         follow(entity.root)
 
-\ A player is not a peer. After the player leaves, :ref:`is_active<class_NetwPlayer_property_is_active>` is ``false``, even if a new player connects with the same :ref:`peer_id<class_NetwPlayer_property_peer_id>`.
+\ A player is not a peer. After the player leaves, :ref:`is_active<class_NetwPlayer_property_is_active>` is ``false``, even if a new player connects with the same :ref:`peer_id<class_NetwPlayer_property_peer_id>`. Its :ref:`id<class_NetwPlayer_property_id>`, :ref:`peer_id<class_NetwPlayer_property_peer_id>`, :ref:`username<class_NetwPlayer_property_username>`, :ref:`account<class_NetwPlayer_property_account>` and :ref:`account_name<class_NetwPlayer_property_account_name>` still read while :ref:`NetwSession.player_left<class_NetwSession_signal_player_left>` runs. After that, or once the session ends, every property reads empty, and :ref:`id<class_NetwPlayer_property_id>` reads ``0``.
 
 Every join is a new player, including a join with an :ref:`account<class_NetwPlayer_property_account>` that joined before. A game that wants to recognise a returning player keys its own data by :ref:`account<class_NetwPlayer_property_account>` on the server, which is empty for a guest.
 
@@ -57,6 +57,8 @@ Properties
    +-------------------------------------------------------+-------------------------------------------------------------+
    | :godot:`Array`\[:ref:`NetwEntity<class_NetwEntity>`\] | :ref:`entities<class_NetwPlayer_property_entities>`         |
    +-------------------------------------------------------+-------------------------------------------------------------+
+   | :godot:`int`                                          | :ref:`id<class_NetwPlayer_property_id>`                     |
+   +-------------------------------------------------------+-------------------------------------------------------------+
    | :godot:`bool`                                         | :ref:`is_active<class_NetwPlayer_property_is_active>`       |
    +-------------------------------------------------------+-------------------------------------------------------------+
    | :godot:`int`                                          | :ref:`peer_id<class_NetwPlayer_property_peer_id>`           |
@@ -81,7 +83,7 @@ Signals
 
 **scene_changed**\ (\ from\: :ref:`NetwScene<class_NetwScene>`, to\: :ref:`NetwScene<class_NetwScene>`\ ) :ref:`🔗<class_NetwPlayer_signal_scene_changed>`
 
-Emitted when :ref:`scene<class_NetwPlayer_property_scene>` changes. Either may be ``null``. Only :ref:`NetwSession.local_player<class_NetwSession_property_local_player>` emits it.
+Emitted when :ref:`scene<class_NetwPlayer_property_scene>` changes. Either may be ``null``. Only :ref:`NetwSession.local_player<class_NetwSession_property_local_player>` emits it. A change while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 ::
 
@@ -194,7 +196,23 @@ The display name admission verified with :ref:`account<class_NetwPlayer_property
 
 - :godot:`Array`\[:ref:`NetwEntity<class_NetwEntity>`\] **get_entities**\ (\ )
 
-The entities spawned for this player with :ref:`Netw.spawn_player()<class_Netw_method_spawn_player>`, in no particular order. Empty for a spectator. On the server a player who dropped or stepped away still lists the entities kept for it, and a returning player lists them when it joins.
+The entities spawned for this player with :ref:`Netw.spawn_player()<class_Netw_method_spawn_player>`, in no particular order. Empty for a spectator. On the server a player who dropped or stepped away lists the entities kept for it while :ref:`NetwSession.player_left<class_NetwSession_signal_player_left>` runs, and a returning player lists them when it joins.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwPlayer_property_id:
+
+.. rst-class:: classref-property
+
+:godot:`int` **id** :ref:`🔗<class_NetwPlayer_property_id>`
+
+.. rst-class:: classref-property-setget
+
+- :godot:`int` **get_id**\ (\ )
+
+The player's id, which the :ref:`NetwMultiplayer<class_NetwMultiplayer>` ``player_*`` methods such as :ref:`NetwMultiplayer.player_get_peer()<class_NetwMultiplayer_method_player_get_peer>` take. It stays the same across a server transfer, and reads ``0`` after :ref:`NetwSession.player_left<class_NetwSession_signal_player_left>` has run or once the session ends.
 
 .. rst-class:: classref-item-separator
 
@@ -260,7 +278,7 @@ A client only knows about the scenes it receives.
 
 - :godot:`StringName` **get_username**\ (\ )
 
-The username from :ref:`Netw.prepare_join()<class_Netw_method_prepare_join>`. It is empty for a peer that never called :ref:`Netw.prepare_join()<class_Netw_method_prepare_join>`. It is kept after the player leaves. Two players may join with the same name, unless :ref:`Netw.configure_admission()<class_Netw_method_configure_admission>` refuses it.
+The username from :ref:`Netw.prepare_join()<class_Netw_method_prepare_join>`. It is empty for a peer that never called :ref:`Netw.prepare_join()<class_Netw_method_prepare_join>`. It still reads while :ref:`NetwSession.player_left<class_NetwSession_signal_player_left>` runs. Two players may join with the same name, unless :ref:`Netw.configure_admission()<class_Netw_method_configure_admission>` refuses it.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

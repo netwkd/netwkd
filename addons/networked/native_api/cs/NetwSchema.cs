@@ -46,6 +46,99 @@ public sealed class NetwSchema : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
+    public enum ColumnType : long
+    {
+        /// <summary>
+        /// 32-bit float.
+        /// </summary>
+        F32 = 0,
+        /// <summary>
+        /// 64-bit float.
+        /// </summary>
+        F64 = 1,
+        /// <summary>
+        /// 8-bit signed integer.
+        /// </summary>
+        I8 = 2,
+        /// <summary>
+        /// 8-bit unsigned integer.
+        /// </summary>
+        U8 = 3,
+        /// <summary>
+        /// 16-bit signed integer.
+        /// </summary>
+        I16 = 4,
+        /// <summary>
+        /// 16-bit unsigned integer.
+        /// </summary>
+        U16 = 5,
+        /// <summary>
+        /// 32-bit integer.
+        /// </summary>
+        I32 = 6,
+        /// <summary>
+        /// 64-bit integer.
+        /// </summary>
+        I64 = 7,
+        /// <summary>
+        /// [bool], sent as one bit.
+        /// </summary>
+        Bool = 8,
+        /// <summary>
+        /// <see cref="Vector2"/>.
+        /// </summary>
+        Vector2 = 9,
+        /// <summary>
+        /// <see cref="Vector3"/>.
+        /// </summary>
+        Vector3 = 10,
+        /// <summary>
+        /// <see cref="Vector4"/>.
+        /// </summary>
+        Vector4 = 11,
+        /// <summary>
+        /// <see cref="Color"/>.
+        /// </summary>
+        Color = 12,
+        /// <summary>
+        /// <see cref="Quaternion"/>, sent compressed.
+        /// </summary>
+        Quaternion = 13,
+        /// <summary>
+        /// A route to a row of another table, from
+        /// <see cref="NetwTable.ClaimRoutes"/>.
+        /// </summary>
+        Entity = 14,
+        /// <summary>
+        /// Any <see cref="Variant"/>, such as a
+        /// <see cref="Godot.Collections.Dictionary"/>. Not allowed in tables.
+        /// </summary>
+        Variant = 15,
+        /// <summary>
+        /// <see cref="string"/>. Not allowed in tables.
+        /// </summary>
+        String = 16,
+    }
+
+    public enum RecordKind : long
+    {
+        /// <summary>
+        /// State the server owns and sends to everyone, such as a position. It
+        /// is kept for rewinding.
+        /// </summary>
+        State = 1,
+        /// <summary>
+        /// Input a client sends to the server only, such as movement keys. It
+        /// is kept for rewinding.
+        /// </summary>
+        Input = 2,
+        /// <summary>
+        /// Cosmetic values sent to everyone and not kept, such as an aim
+        /// direction.
+        /// </summary>
+        Broadcast = 3,
+    }
+
     private static readonly IntPtr _bindGetStorageVersion =
         NetwApi.MethodBind("NetwSchema", "get_storage_version", 3905245786UL);
 
@@ -128,7 +221,7 @@ public sealed class NetwSchema : NetwRefCounted
     }
 
     private static readonly IntPtr _bindColumn =
-        NetwApi.MethodBind("NetwSchema", "column", 3200875955UL);
+        NetwApi.MethodBind("NetwSchema", "column", 1681565646UL);
 
     /// <summary>
     /// Declaring <paramref name="key"/> again with the same
@@ -137,7 +230,7 @@ public sealed class NetwSchema : NetwRefCounted
     /// </summary>
     public int Column(
         StringName key,
-        NetwMultiplayer.ColumnType type,
+        NetwSchema.ColumnType type,
         int stride = 1,
         NetwQuantize quantizer = null)
     {
@@ -169,7 +262,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "f32", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.F32"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.F32"/> column.
     /// </summary>
     public int F32(
         StringName key,
@@ -201,7 +294,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "f64", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.F64"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.F64"/> column.
     /// </summary>
     public int F64(
         StringName key,
@@ -233,7 +326,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "i8", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.I8"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.I8"/> column.
     /// </summary>
     public int I8(StringName key, int stride = 1)
     {
@@ -252,7 +345,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "u8", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.U8"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.U8"/> column.
     /// </summary>
     public int U8(StringName key, int stride = 1)
     {
@@ -271,7 +364,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "i16", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.I16"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.I16"/> column.
     /// </summary>
     public int I16(StringName key, int stride = 1)
     {
@@ -290,7 +383,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "u16", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.U16"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.U16"/> column.
     /// </summary>
     public int U16(StringName key, int stride = 1)
     {
@@ -309,7 +402,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "i32", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.I32"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.I32"/> column.
     /// </summary>
     public int I32(StringName key, int stride = 1)
     {
@@ -328,7 +421,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "i64", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.I64"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.I64"/> column.
     /// </summary>
     public int I64(StringName key, int stride = 1)
     {
@@ -347,8 +440,8 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "boolean", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Bool"/> column, one bit
-    /// per element on the wire.
+    /// Declares a <see cref="NetwSchema.ColumnType.Bool"/> column, one bit per
+    /// element on the wire.
     /// </summary>
     public int Boolean(StringName key, int stride = 1)
     {
@@ -372,7 +465,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "vector2", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Vector2"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.Vector2"/> column.
     /// </summary>
     public int Vector2(
         StringName key,
@@ -404,7 +497,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "vector3", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Vector3"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.Vector3"/> column.
     /// </summary>
     public int Vector3(
         StringName key,
@@ -436,7 +529,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "vector4", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Vector4"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.Vector4"/> column.
     /// </summary>
     public int Vector4(
         StringName key,
@@ -468,7 +561,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "color", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Color"/> column.
+    /// Declares a <see cref="NetwSchema.ColumnType.Color"/> column.
     /// </summary>
     public int Color(
         StringName key,
@@ -500,10 +593,9 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "quaternion", 3292787355UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Quaternion"/> column,
-    /// stored as a <c>PackedVector4Array</c> and read as
-    /// <see cref="Quaternion"/> so <see cref="NetwQuantizeQuaternion"/> can
-    /// compress it.
+    /// Declares a <see cref="NetwSchema.ColumnType.Quaternion"/> column, stored
+    /// as a <c>PackedVector4Array</c> and read as <see cref="Quaternion"/> so
+    /// <see cref="NetwQuantizeQuaternion"/> can compress it.
     /// </summary>
     public int Quaternion(
         StringName key,
@@ -535,8 +627,8 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "entity", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Entity"/> column of
-    /// routes, pointing at rows of another table.
+    /// Declares a <see cref="NetwSchema.ColumnType.Entity"/> column of routes,
+    /// pointing at rows of another table.
     /// </summary>
     public int Entity(StringName key, int stride = 1)
     {
@@ -560,8 +652,8 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "variant", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.Variant"/> column, for
-    /// a <see cref="Godot.Collections.Dictionary"/>, an
+    /// Declares a <see cref="NetwSchema.ColumnType.Variant"/> column, for a
+    /// <see cref="Godot.Collections.Dictionary"/>, an
     /// <see cref="Godot.Collections.Array"/> or any other value. A schema
     /// holding one cannot become a replicated table. A saved value holds data
     /// only. An <see cref="GodotObject"/>, <see cref="Resource"/>,
@@ -592,7 +684,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "string", 518967810UL);
 
     /// <summary>
-    /// Declares a <see cref="NetwMultiplayer.ColumnType.String"/> column. Like
+    /// Declares a <see cref="NetwSchema.ColumnType.String"/> column. Like
     /// <see cref="NetwSchema.Variant"/>, a schema holding one cannot become a
     /// replicated table.
     /// </summary>

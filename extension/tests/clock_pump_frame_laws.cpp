@@ -171,7 +171,7 @@ public:
                 return true;
             }
             case 1: {
-                if (host->is_online()) {
+                if (host->session_is_online()) {
                     if (!open_client(evidence.port)) {
                         enter(99);
                         return true;

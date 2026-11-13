@@ -151,16 +151,6 @@ Ref<NetwPromise> Databases::open(
             "this database handle names no database"
         );
     }
-    if (instance->state == State::FAULTED) {
-        return NetwPromise::rejected(
-            ERR_CANT_ACQUIRE_RESOURCE,
-            vformat(
-                "database '%s' is faulted and its storage is unavailable "
-                "until the backend proves its outstanding work has stopped",
-                String(instance->name)
-            )
-        );
-    }
     if (instance->state == State::OPENING) {
         if (instance->opening_slot == p_slot) {
             return instance->opening;

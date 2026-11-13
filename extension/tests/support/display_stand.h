@@ -24,6 +24,7 @@ struct DisplaySubject {
     godot::Node2D *body = nullptr;
     godot::Node2D *first = nullptr;
     godot::Node2D *second = nullptr;
+    godot::Node *branch = nullptr;
     godot::Ref<netw::NetwEntity> entity;
     int64_t route = 0;
 };
@@ -79,8 +80,17 @@ inline DisplaySubject stand_subject(
                 spec->lerp()->smooth(0.0)->to(godot::StringName("position"))
             )
         );
-    godot::Node *parent
-        = p_parent != nullptr ? p_parent : netw::gd::scene_root();
+    godot::Node *parent = p_parent;
+    if (parent == nullptr) {
+        subject.branch = memnew(godot::Node);
+        subject.branch->set_name("DisplayStand");
+        netw::gd::scene_root()->add_child(subject.branch);
+        netw::gd::scene_tree()->set_multiplayer(
+            godot::Ref<godot::MultiplayerAPI>(p_core.ptr()),
+            subject.branch->get_path()
+        );
+        parent = subject.branch;
+    }
     parent->add_child(subject.body);
     p_core->liveness_bind_route(subject.route, subject.entity.ptr());
     return subject;
@@ -92,6 +102,14 @@ inline void retire_subject(const DisplaySubject &p_subject) {
         parent->remove_child(p_subject.body);
     }
     memdelete(p_subject.body);
+    if (p_subject.branch != nullptr) {
+        netw::gd::scene_tree()->set_multiplayer(
+            godot::Ref<godot::MultiplayerAPI>(),
+            p_subject.branch->get_path()
+        );
+        p_subject.branch->get_parent()->remove_child(p_subject.branch);
+        memdelete(p_subject.branch);
+    }
 }
 
 inline void record_sample(

@@ -168,7 +168,7 @@ Brings ``tree`` online as ``entry``, the ordinary way.  ``adapter`` supplies the
 
 :godot:`int` **disconnect_tree**\ (\ tree\: :ref:`MultiplayerViewport<class_MultiplayerViewport>`\ ) :ref:`🔗<class_NetwHarnessSession_method_disconnect_tree>`
 
-Takes ``tree`` offline. Marks it :godot:`MultiplayerViewport.DISCONNECTING <MultiplayerViewport#class_MultiplayerViewport_constant_DISCONNECTING>`, flushes held inbound packets, and closes the peer. Returns the closed peer id so callers can await server unregistration. Inverse of :ref:`connect_tree()<class_NetwHarnessSession_method_connect_tree>`.
+Delivers the packets held for ``tree`` and closes its peer at once, as a dropped connection does. Returns the closed peer id.
 
 .. rst-class:: classref-item-separator
 

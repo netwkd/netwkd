@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include "godot/multiplayer_spawner.hpp"
@@ -207,7 +208,12 @@ TEST_CASE(
     Node *owner = memnew(Node);
     const Ref<netw::NetwEntity> entity = netw::NetwEntity::ensure(owner);
     REQUIRE(entity.is_valid());
-    entity->seed_control(300, 7, netw::entity::Control::HOLD_SOFT);
+    netw_test::Internals::control_seed(
+        entity.ptr(),
+        300,
+        7,
+        netw::entity::Control::HOLD_SOFT
+    );
 
     Record record;
     record.set_route(1);

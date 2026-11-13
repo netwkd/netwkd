@@ -21,11 +21,14 @@ namespace Networked;
 /// </code>
 /// <para>
 /// There is one <see cref="NetwTable"/> per table. Connect
-/// <see cref="NetwTable.Received"/> once and keep the result in a variable.
-/// Each row is identified by a route. Row indices change when rows are added or
-/// removed, and routes do not. <b>Writing</b> Write the routes and every
-/// column, then call <see cref="NetwTable.Commit"/> to apply them with the
-/// current tick and send them.
+/// <see cref="NetwTable.Received"/> once and keep the result in a variable. A
+/// peer that joins later receives the committed rows and emits
+/// <see cref="NetwTable.Received"/> without waiting for the next commit. Each
+/// row is identified by a route from <see cref="NetwTable.ClaimRoutes"/>. Row
+/// indices change when rows are added or removed, and routes do not.
+/// <b>Writing</b> Write the routes and every column, then call
+/// <see cref="NetwTable.Commit"/> to apply them with the current tick and send
+/// them.
 /// <code>
 /// func _on_tick() -&gt; void:
 ///     mobs.write_routes(routes)
@@ -88,7 +91,10 @@ public sealed class NetwTable : NetwRefCounted
 
     /// <summary>
     /// Emitted when this table is committed locally or receives data from a
-    /// peer. <c>tick</c> is the tick of the commit.
+    /// peer. <c>tick</c> is the tick of the commit. A commit made or data
+    /// received while <see cref="MultiplayerApi.Poll"/> or a
+    /// <see cref="NetwClock"/> tick runs is reported when that poll or tick
+    /// ends.
     /// </summary>
     public event Action<long> Received
     {
@@ -225,6 +231,54 @@ public sealed class NetwTable : NetwRefCounted
             NetwTable.Adopt(
                 NetwApi.Retained(
                     VariantUtils.ConvertToGodotObjectPtr(answered)));
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindClaimRoutes =
+        NetwApi.MethodBind("NetwTable", "claim_routes", 2865087369UL);
+
+    /// <summary>
+    /// Creates <paramref name="count"/> routes for new rows. Each route is
+    /// unique in the session, and <see cref="NetwTable.ReleaseRoutes"/> gives
+    /// it back. Returns an empty array on a client. <b>Server Only.</b>
+    /// </summary>
+    public long[] ClaimRoutes(int count)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)count);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindClaimRoutes, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        long[] result =
+            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
+        answered.Dispose();
+        return result;
+    }
+
+    private static readonly IntPtr _bindReleaseRoutes =
+        NetwApi.MethodBind("NetwTable", "release_routes", 820105581UL);
+
+    /// <summary>
+    /// Releases <paramref name="routes"/> from
+    /// <see cref="NetwTable.ClaimRoutes"/>. Their rows leave every table that
+    /// holds them, and every peer is told. A released route is never reused.
+    /// <code>
+    /// Error
+    /// ┠╴OK                  the routes were released
+    /// ┠╴ERR_DOES_NOT_EXIST  the session this handle names is gone
+    /// ┖╴ERR_UNCONFIGURED    called on a client
+    /// </code>
+    /// <para>
+    /// <b>Server Only.</b>
+    /// </para>
+    /// </summary>
+    public Error ReleaseRoutes(long[] routes)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromPackedInt64Array(routes);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindReleaseRoutes, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
     }

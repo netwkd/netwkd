@@ -2,6 +2,7 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "support/internals.h"
 #include "support/netw_cells.h"
 #include "support/stock_probes.h"
 #include "support/stock_stand.h"
@@ -445,7 +446,8 @@ uint64_t lane_token(
     int p_writer,
     int64_t p_route
 ) {
-    netw::ReplicationCore *plane = p_reader->get_replication_plane();
+    netw::ReplicationCore *plane
+        = netw_test::Internals::replication_plane(p_reader);
     if (plane == nullptr || p_route <= 0) {
         return 0;
     }

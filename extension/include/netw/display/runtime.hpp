@@ -34,8 +34,8 @@ private:
     bool rebuild_queued = false;
     bool authored_by_state = false;
     int64_t trace_frame = 0;
-    godot::Array entity_hooks;
-    godot::Array chase_hooks;
+    bool follows_control = false;
+    bool chase_absorbs = false;
     bool disabled = false;
     int64_t disable_until_tick = -1;
     double display_offset_limit = 0.0;
@@ -160,18 +160,18 @@ public:
         return trace_frame;
     }
 
-    void set_entity_hooks(const godot::Array &p_hooks) {
-        entity_hooks = p_hooks;
+    void set_follows_control(bool p_follows) {
+        follows_control = p_follows;
     }
-    godot::Array get_entity_hooks() const {
-        return entity_hooks;
+    bool get_follows_control() const {
+        return follows_control;
     }
 
-    void set_chase_hooks(const godot::Array &p_hooks) {
-        chase_hooks = p_hooks;
+    void set_chase_absorbs(bool p_absorbs) {
+        chase_absorbs = p_absorbs;
     }
-    godot::Array get_chase_hooks() const {
-        return chase_hooks;
+    bool get_chase_absorbs() const {
+        return chase_absorbs;
     }
 
     void set_disabled(bool p_disabled) {

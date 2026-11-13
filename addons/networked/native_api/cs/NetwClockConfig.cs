@@ -295,7 +295,8 @@ public sealed class NetwClockConfig : NetwRefCounted
         NetwApi.MethodBind("NetwClockConfig", "set_ping_interval", 373806689UL);
 
     /// <summary>
-    /// Seconds between pings to the server.
+    /// Seconds between pings to the server. The clock pings five times slower
+    /// once the round trip varies by less than half a tick.
     /// </summary>
     public double PingInterval
     {

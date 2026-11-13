@@ -141,7 +141,7 @@ struct Stand {
     }
 
     const netw::sim::Row *row(int p_client) {
-        return core(p_client)->sim_row_of(rid(p_client));
+        return Internals::sim_row_of(core(p_client), rid(p_client));
     }
 
     InstallStats stats(int p_client) {
@@ -151,8 +151,10 @@ struct Stand {
 
     int pending(int p_client) {
         NetwMultiplayer *session = core(p_client);
-        const int64_t route
-            = session->liveness_route_of(NetwEntity::of(copy(p_client)).ptr());
+        const int64_t route = Internals::route_of(
+            session,
+            NetwEntity::of(copy(p_client)).ptr()
+        );
         netw::store::World &world = Internals::store(session);
         int held = 0;
         for (uint32_t at = 0; at < world.table_count(); ++at) {
@@ -289,6 +291,7 @@ TEST_CASE(
         = Internals::get_prediction_engine(stand.core(0));
     const int64_t slot = pool->slot_register(seated);
     REQUIRE(slot >= 0);
+    Internals::record(seated.ptr())->predict_declaration();
     pool->adopt_declaration(
         seated,
         seated->get_state_binding(),

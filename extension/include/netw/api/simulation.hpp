@@ -48,16 +48,10 @@ public:
 
 private:
     godot::ObjectID entity_id;
-    sim::Declaration declared;
-    sim::Choice choice;
-    bool declared_here = false;
-    Mode announced = MODE_NONE;
 
-    NetwMultiplayer *core() const;
     godot::RID entity_rid() const;
-    bool live() const;
-    void declare();
-    void restate();
+    void write(int p_param, const godot::Variant &p_value);
+    godot::Variant read(int p_param) const;
 
 protected:
     static void _bind_methods();
@@ -65,20 +59,6 @@ protected:
 public:
     void bind(NetwEntity *p_entity);
     godot::Ref<NetwEntity> entity() const;
-
-    const sim::Declaration &declaration() const {
-        return declared;
-    }
-
-    const sim::Choice &selection_choice() const {
-        return choice;
-    }
-
-    bool is_declared() const {
-        return declared_here;
-    }
-
-    void announce(Mode p_mode);
 
     godot::TypedArray<godot::NodePath> get_bodies() const;
     void set_bodies(const godot::TypedArray<godot::NodePath> &p_value);
@@ -96,8 +76,6 @@ public:
     void set_release_on_rest(double p_value);
     godot::Callable get_step() const;
     void set_step(const godot::Callable &p_value);
-    void adopt_step(const godot::Callable &p_value);
-    void preset(Schedule p_schedule, bool p_restores, Restore p_restore);
     Mode get_mode() const;
     godot::TypedArray<NetwEntity> get_selected() const;
 
@@ -105,8 +83,6 @@ public:
     void forget(const godot::Ref<NetwEntity> &p_entity);
     void simulate_all(const godot::StringName &p_layer = godot::StringName());
     void simulate_none();
-
-    Schedule resolved_schedule() const;
 };
 
 godot::Ref<NetwSimulation> build_simulation_handle(godot::Object *p_entity);

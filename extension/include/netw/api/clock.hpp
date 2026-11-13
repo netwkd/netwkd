@@ -48,6 +48,10 @@ public:
     void set_ping_interval(double p_seconds);
     void auto_configure_offset();
 
+    bool get_manual_tick() const;
+    void set_manual_tick(bool p_manual);
+    void step(int64_t p_count);
+
     double monitor(enums::NetwClock::ClockMonitor p_monitor) const;
 };
 

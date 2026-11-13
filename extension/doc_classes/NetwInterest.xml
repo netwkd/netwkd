@@ -99,21 +99,22 @@
 		<signal name="interest_exited">
 			<param index="0" name="peer_id" type="int" />
 			<description>
-				Emitted on the server when [param peer_id] stops seeing this entity, also when it stops seeing the [NetwEntity] above it.
+				Emitted on the server when [param peer_id] stops seeing this entity, also when it stops seeing the [NetwEntity] above it. A session that ends does not emit it.
 			</description>
 		</signal>
 		<signal name="observer_entered">
 			<param index="0" name="layer_id" type="StringName" />
 			<param index="1" name="peer_id" type="int" />
 			<description>
-				Emitted when [param peer_id] starts seeing this entity through [param layer_id].
+				Emitted whenever [param peer_id] starts seeing this entity through the layer [param layer_id]. The server emits it for every peer, with [code]1[/code] for the host's own player on a listen host. A client emits it only for itself, so [param peer_id] is its [method MultiplayerAPI.get_unique_id].
+				On the server it is emitted before [signal NetwInterestLayer.interest_entered], before [signal interest_entered] and before the change is sent, so a handler that reads visibility sees it as it was before the change.
 			</description>
 		</signal>
 		<signal name="observer_exited">
 			<param index="0" name="layer_id" type="StringName" />
 			<param index="1" name="peer_id" type="int" />
 			<description>
-				Emitted when [param peer_id] stops seeing this entity through [param layer_id].
+				Emitted whenever [param peer_id] stops seeing this entity through the layer [param layer_id], also when the layer is freed. It is emitted on the same peers and in the same order as [signal observer_entered], and a client also emits it when the entity is removed from that client. A session that ends does not emit it.
 			</description>
 		</signal>
 	</signals>

@@ -185,7 +185,8 @@ public:
                 return true;
             }
             case 1: {
-                if (host->is_online() && host->player_local().is_valid()) {
+                if (host->session_is_online()
+                    && host->player_local().is_valid()) {
                     evidence.host_seated_itself = true;
                     if (!arm_return_ignored_policy() || !open_client(port)) {
                         enter(99);
@@ -543,7 +544,7 @@ public:
                 return true;
             }
             case 1: {
-                if (host.session->is_online()
+                if (host.session->session_is_online()
                     && host.session->player_local().is_valid()) {
                     enter(open_clients() ? 2 : 99);
                 } else if (over_budget()) {
@@ -571,7 +572,7 @@ public:
                 return true;
             }
             case 4: {
-                if (refused.session->session_get_state()
+                if (refused.session->session_get_stored_state()
                     != netw::NetwMultiplayer::SESSION_STATE_OFFLINE) {
                     if (over_budget()) {
                         enter(99);

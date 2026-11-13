@@ -32,7 +32,7 @@ void NetwMultiplayer::scene_player_display_invalidate() {
 void NetwMultiplayer::scene_player_display_settle() {
     scene_player_display_pending = false;
     StretchViewportContainer *shown
-        = scene_view_of(scene_get_node(scene_shown_derive()));
+        = scene_view_of(scene_get_root(scene_shown_derive()));
     const ObjectID settled
         = shown != nullptr ? ObjectID(shown->get_instance_id()) : ObjectID();
     if (settled == scene_player_display_id) {

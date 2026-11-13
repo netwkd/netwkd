@@ -61,6 +61,7 @@
 			<return type="bool" />
 			<description>
 				Whether the entity is being predicted, as opposed to only configured.
+				It is already false when [signal NetwSimulation.mode_changed] reports [constant NetwSimulation.MODE_NONE] as the entity stops being predicted.
 			</description>
 		</method>
 		<method name="notify_contact">
@@ -296,7 +297,7 @@
 			<param index="0" name="entry" type="int" />
 			<param index="1" name="attribution" type="int" enum="NetwPrediction.Attribution" />
 			<description>
-				Emitted when a predicted tick disagrees with the server, with what the disagreement is blamed on. It is emitted whether or not a correction follows.
+				Emitted when a predicted tick disagrees with the server, with what the disagreement is blamed on. It is emitted whether or not a correction follows. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that found it ends, so a handler reads the entity as that poll or tick left it.
 				[codeblock]
 				entity.prediction.divergence_detected.connect(
 				    func(entry: int, attribution: NetwPrediction.Attribution):
@@ -310,7 +311,7 @@
 			<param index="0" name="change" type="int" enum="NetwPrediction.EpisodeChange" />
 			<param index="1" name="report" type="Dictionary" />
 			<description>
-				Emitted when a misprediction episode opens, falls back or closes, as [param change] says. An episode holds the corrections from one misprediction until the peers agree again. [param report] is the whole episode so far.
+				Emitted when a misprediction episode opens, falls back or closes, as [param change] says. An episode holds the corrections from one misprediction until the peers agree again. [param report] is the whole episode so far. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that changed the episode ends, so a handler reads the entity as that poll or tick left it.
 				[codeblock lang=text]
 				Dictionary
 				┠╴id            int
@@ -354,7 +355,7 @@
 			<param index="2" name="teleported" type="bool" />
 			<param index="3" name="attribution" type="int" enum="NetwPrediction.Attribution" />
 			<description>
-				Emitted after a correction moved the body. [param deltas] holds how far each property moved, as [code]after - before[/code], with angles taken the short way around. [param teleported] is [code]true[/code] when the correction was a teleport.
+				Emitted after a correction moved the body. [param deltas] holds how far each property moved, as [code]after - before[/code], with angles taken the short way around. [param teleported] is [code]true[/code] when the correction was a teleport. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that corrected the body ends, so a handler reads the body as that poll or tick left it.
 				Under [constant NetwDisplay.LIVE_MODE_CHASE] the display already smooths the correction away.
 				[codeblock]
 				entity.display.live_mode = NetwDisplay.LIVE_MODE_CHASE
@@ -369,7 +370,7 @@
 			<param index="2" name="divergence" type="float" />
 			<param index="3" name="diverged" type="bool" />
 			<description>
-				Emitted on the controlling client each time server state arrives. [param divergence] is the largest error of any property, including errors under [member divergence_epsilon]. [param diverged] is whether the error was large enough to act on, even when no correction was written. Connect to [signal recovered] to know when the body actually moved.
+				Emitted on the controlling client each time server state arrives. [param divergence] is the largest error of any property, including errors under [member divergence_epsilon]. [param diverged] is whether the error was large enough to act on, even when no correction was written. Connect to [signal recovered] to know when the body actually moved. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that compared the state ends, so a handler reads the entity as that poll or tick left it.
 			</description>
 		</signal>
 	</signals>

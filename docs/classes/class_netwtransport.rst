@@ -63,9 +63,9 @@ Properties
 .. table::
    :widths: auto
 
-   +-----------------------------------------------+------------------------------------------------------+
-   | :ref:`NetwMultiplayer<class_NetwMultiplayer>` | :ref:`session<class_NetwTransport_property_session>` |
-   +-----------------------------------------------+------------------------------------------------------+
+   +---------------------------------------+------------------------------------------------------+
+   | :ref:`NetwSession<class_NetwSession>` | :ref:`session<class_NetwTransport_property_session>` |
+   +---------------------------------------+------------------------------------------------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -184,13 +184,13 @@ Property Descriptions
 
 .. rst-class:: classref-property
 
-:ref:`NetwMultiplayer<class_NetwMultiplayer>` **session** :ref:`🔗<class_NetwTransport_property_session>`
+:ref:`NetwSession<class_NetwSession>` **session** :ref:`🔗<class_NetwTransport_property_session>`
 
 .. rst-class:: classref-property-setget
 
-- :ref:`NetwMultiplayer<class_NetwMultiplayer>` **get_session**\ (\ )
+- :ref:`NetwSession<class_NetwSession>` **get_session**\ (\ )
 
-The session this transport belongs to.
+The session this transport belongs to, the same :ref:`NetwSession<class_NetwSession>` that :ref:`Netw.session()<class_Netw_method_session>` answers.
 
 .. rst-class:: classref-section-separator
 
@@ -603,7 +603,7 @@ Calls :ref:`_client_settings()<class_NetwTransport_private_method__client_settin
 
 |void| **deliver**\ (\ ticket\: :godot:`RID`, peer\: :godot:`MultiplayerPeer`\ ) :ref:`🔗<class_NetwTransport_method_deliver>`
 
-Reports ``peer`` as the result of ``ticket``. Only the first call for a ticket counts.
+Reports ``peer`` as the result of ``ticket`` through :ref:`NetwMultiplayer.transport_complete()<class_NetwMultiplayer_method_transport_complete>`. Only the first call for a ticket counts.
 
 .. rst-class:: classref-item-separator
 
@@ -615,7 +615,7 @@ Reports ``peer`` as the result of ``ticket``. Only the first call for a ticket c
 
 |void| **deliver_probe**\ (\ ticket\: :godot:`RID`, info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ ) :ref:`🔗<class_NetwTransport_method_deliver_probe>`
 
-Reports ``info`` as the result of the :ref:`_probe()<class_NetwTransport_private_method__probe>` request ``ticket``.
+Reports ``info`` as the result of the :ref:`_probe()<class_NetwTransport_private_method__probe>` request ``ticket`` through :ref:`NetwMultiplayer.transport_complete()<class_NetwMultiplayer_method_transport_complete>`.
 
 .. rst-class:: classref-item-separator
 
@@ -651,7 +651,7 @@ Calls :ref:`_display_name()<class_NetwTransport_private_method__display_name>`, 
 
 |void| **fail**\ (\ ticket\: :godot:`RID`, error\: :godot:`Error <@GlobalScope#enum_@globalscope_Error>`, message\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwTransport_method_fail>`
 
-Reports that ``ticket`` failed with ``error`` and a readable ``message``.
+Reports that ``ticket`` failed with ``error`` and a readable ``message`` through :ref:`NetwMultiplayer.transport_complete()<class_NetwMultiplayer_method_transport_complete>`.
 
 .. rst-class:: classref-item-separator
 
@@ -735,7 +735,7 @@ Returns the class name of ``peer``, or its script's ``class_name``.
 
 |void| **publish_targets**\ (\ addresses\: :godot:`PackedStringArray`, names\: :godot:`PackedStringArray` = PackedStringArray(), infos\: :godot:`Array` = []\ ) :ref:`🔗<class_NetwTransport_method_publish_targets>`
 
-Reports the servers :ref:`_browse()<class_NetwTransport_private_method__browse>` found, one per address. ``names`` and ``infos`` are matched to ``addresses`` by index, and can be shorter.
+Reports the servers :ref:`_browse()<class_NetwTransport_private_method__browse>` found, one per address, through :ref:`NetwMultiplayer.transport_publish_targets()<class_NetwMultiplayer_method_transport_publish_targets>`. ``names`` and ``infos`` are matched to ``addresses`` by index, and can be shorter.
 
 ::
 
@@ -772,7 +772,7 @@ Calls :ref:`_recognizes_peer()<class_NetwTransport_private_method__recognizes_pe
 
 |void| **report**\ (\ ticket\: :godot:`RID`, step\: :godot:`StringName`, message\: :godot:`String`, ratio\: :godot:`float`\ ) :ref:`🔗<class_NetwTransport_method_report>`
 
-Reports progress on ``ticket`` through :ref:`NetwConnection.progressed<class_NetwConnection_signal_progressed>`.
+Reports progress on ``ticket`` through :ref:`NetwMultiplayer.transport_report_progress()<class_NetwMultiplayer_method_transport_report_progress>`. ``step`` is not used.
 
 .. rst-class:: classref-item-separator
 

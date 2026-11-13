@@ -4,7 +4,6 @@
 
 #include "lane.h"
 #include "membership.h"
-#include "occupancy.h"
 #include "scenario.h"
 
 #include "godot/templates.hpp"
@@ -43,9 +42,7 @@ enum Plant {
     PLANT_RETAINED_SAMPLE,
     PLANT_PEER_READS_AUTHORITY,
     PLANT_LOCKSTEP_AUTHORITY,
-    PLANT_ENROLLED_MEMBERSHIP,
     PLANT_TRANSPARENT_NESTING,
-    PLANT_SHARED_ADMISSION,
 };
 
 class ScenarioRun {
@@ -84,7 +81,6 @@ class ScenarioRun {
     Scenario ran;
     godot::Vector<Track> tracks;
     godot::Vector<Membership> scene_rows;
-    Occupancy held;
     bool reached_regime = false;
     int judged = 0;
     int64_t witnessed = 0;
@@ -153,10 +149,6 @@ public:
         return judged;
     }
 
-    const Occupancy &occupancy() const {
-        return held;
-    }
-
     int64_t digest() const {
         int64_t hash = 1469598103934665603LL;
         for (int index = 0; index < tracks.size(); ++index) {
@@ -213,12 +205,6 @@ private:
     void seed_tracks(const Scenario &p_scenario);
     void settle_regime(const Scenario &p_scenario);
 #if defined(NETW_TIER_HOSTED)
-    static void watch_declared(
-        LoopbackRig &p_rig,
-        const Scenario &p_scenario,
-        const Scenario::Step &p_step,
-        Plant p_plant
-    );
     static godot::Vector<Membership> read_scene_rows(
         LoopbackRig &p_rig,
         const Scenario &p_scenario,
@@ -1047,13 +1033,6 @@ inline ScenarioRun ScenarioRun::record(
         track.lane.lane_rewound_x = carrier->observed_x();
         track.lane.lane_restored_x = carrier->get_position().x;
     }
-    const godot::Dictionary metrics = p_rig.server()->lagcomp_metrics();
-    const godot::Array reported = metrics.keys();
-    for (int index = 0; index < reported.size(); ++index) {
-        run.held.occupancy_keys.push_back(godot::StringName(reported[index]));
-    }
-    run.held.occupancy_timelines
-        = int(metrics.get(godot::StringName("timelines"), 0));
 
     run.reached_regime = run.judged > 0 && moved;
     return run;
@@ -1084,9 +1063,6 @@ inline ScenarioRun ScenarioRun::scenes(
         }
     }
 
-    const godot::Vector<Membership> declared_rows
-        = read_scene_rows(p_rig, p_scenario, entity_names, p_plant);
-
     for (int tick = 1; tick <= p_scenario.run_ticks; ++tick) {
         for (const Scenario::Step &step : p_scenario.steps) {
             if (step.tick != tick) {
@@ -1105,10 +1081,13 @@ inline ScenarioRun ScenarioRun::scenes(
                 );
                 run.judged += 1;
             } else if (step.verb == godot::StringName("watch")) {
-                watch_declared(p_rig, p_scenario, step, p_plant);
+                p_rig.server()->scene_watch_peer(
+                    p_rig.entity_of(step.subject),
+                    p_rig.peer_id(int(step.value))
+                );
                 run.judged += 1;
             } else if (step.verb == godot::StringName("unwatch")) {
-                p_rig.server()->scene_unwatch(
+                p_rig.server()->scene_unwatch_peer(
                     p_rig.entity_of(step.subject),
                     p_rig.peer_id(int(step.value))
                 );
@@ -1119,9 +1098,8 @@ inline ScenarioRun ScenarioRun::scenes(
         p_rig.pump();
     }
 
-    run.scene_rows = p_plant == PLANT_ENROLLED_MEMBERSHIP
-        ? declared_rows
-        : read_scene_rows(p_rig, p_scenario, entity_names, p_plant);
+    run.scene_rows
+        = read_scene_rows(p_rig, p_scenario, entity_names, p_plant);
 
     bool answered = !run.scene_rows.is_empty();
     for (int index = 0; index < run.scene_rows.size(); ++index) {
@@ -1129,32 +1107,6 @@ inline ScenarioRun ScenarioRun::scenes(
     }
     run.reached_regime = answered;
     return run;
-}
-
-inline void ScenarioRun::watch_declared(
-    LoopbackRig &p_rig,
-    const Scenario &p_scenario,
-    const Scenario::Step &p_step,
-    Plant p_plant
-) {
-    const int peer = p_rig.peer_id(int(p_step.value));
-    p_rig.server()->scene_watch(p_rig.entity_of(p_step.subject), peer);
-    if (p_plant != PLANT_SHARED_ADMISSION) {
-        return;
-    }
-    godot::StringName stem;
-    for (int index = 0; index < p_scenario.world.scene_count(); ++index) {
-        const WorldDecl::SceneRow &row = p_scenario.world.scene_at(index);
-        if (row.name == p_step.subject) {
-            stem = row.stem;
-        }
-    }
-    for (int index = 0; index < p_scenario.world.scene_count(); ++index) {
-        const WorldDecl::SceneRow &row = p_scenario.world.scene_at(index);
-        if (row.name != p_step.subject && row.stem == stem) {
-            p_rig.server()->scene_watch(p_rig.entity_of(row.name), peer);
-        }
-    }
 }
 
 inline godot::Vector<Membership> ScenarioRun::read_scene_rows(

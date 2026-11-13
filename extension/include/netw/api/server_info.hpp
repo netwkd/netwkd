@@ -7,8 +7,6 @@
 
 namespace netw {
 
-class NetwMultiplayer;
-
 class NetwServerInfo : public godot::Resource {
     GDCLASS(NetwServerInfo, godot::Resource)
 
@@ -96,7 +94,6 @@ public:
 
     void copy_values_from(const NetwServerInfo &p_source);
 
-    static godot::Ref<NetwServerInfo> from_session(NetwMultiplayer *p_api);
     static godot::PackedByteArray to_payload(
         const godot::Ref<NetwServerInfo> &p_info
     );

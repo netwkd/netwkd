@@ -17,7 +17,7 @@ namespace netw {
 
 class NetwWriteBatch;
 
-class NetwDatabase : public godot::RefCounted {
+class NetwDatabase : public godot::RefCounted, public enums::NetwDatabase {
     GDCLASS(NetwDatabase, godot::RefCounted)
 
     godot::ObjectID session_id;
@@ -90,7 +90,7 @@ public:
 
     godot::StringName get_database_name() const;
     godot::StringName get_slot() const;
-    NetwMultiplayer::DatabaseState get_state() const;
+    State get_state() const;
     bool get_is_valid() const;
 };
 

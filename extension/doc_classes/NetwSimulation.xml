@@ -117,7 +117,7 @@
 			<param index="0" name="previous" type="int" enum="NetwSimulation.Mode" />
 			<param index="1" name="mode" type="int" enum="NetwSimulation.Mode" />
 			<description>
-				Emitted when [member mode] changes on this peer, after the body has switched to [param mode].
+				Emitted when [member mode] changes on this peer, after the body has switched to [param mode]. A change made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 	</signals>

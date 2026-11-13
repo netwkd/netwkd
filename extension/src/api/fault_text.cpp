@@ -59,17 +59,13 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_SETTLE_BOUND:
             return {
                 vformat(
-                    "Calls queued with {NetwMultiplayer.session_defer} kept "
-                    "queuing more for %d passes, so the calls under '%s' "
-                    "were dropped.",
-                    v.a,
-                    v.name
+                    "Handlers the session called kept giving it more work "
+                    "for %d passes, so it finishes the rest on its next "
+                    "update.",
+                    v.a
                 ),
-                vformat(
-                    "Stop the call under '%s' from queuing itself again with "
-                    "{NetwMultiplayer.session_defer}.",
-                    v.name
-                )
+                "Defer that work in such a handler with {Node.queue_free} "
+                "or {Object.call_deferred}."
             };
         case NETW_FAULT_ROWS_WITHOUT_CLOCK:
             return {
@@ -568,13 +564,11 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
             return {
                 vformat(
                     "Route %d did not become live within its timeout, so its "
-                    "{NetwMultiplayer.liveness_when_live} callback was "
-                    "dropped.",
+                    "waiting packet was dropped.",
                     v.a
                 ),
-                "Pass a longer timeout to "
-                "{NetwMultiplayer.liveness_when_live}, or wait only on a "
-                "route this peer will receive."
+                "Make sure the server sends the entity at that route to this "
+                "peer."
             };
         case NETW_FAULT_NO_FREE_PORT:
             return {

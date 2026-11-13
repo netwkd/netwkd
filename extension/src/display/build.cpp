@@ -1,6 +1,7 @@
 #include "netw/display/build.hpp"
 
 #include "godot/class_db.hpp"
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
 #include "netw/display/channel.hpp"
@@ -102,7 +103,7 @@ Channel *ensure_state(
         visual = owner->get_node_or_null(config.visual_root);
         if (has_source && visual == nullptr) {
             fault::raise(
-                NetwEntity::session_core_for(owner),
+                NetwMultiplayer::session_holding(owner),
                 NETW_FAULT_INTERPOLATION_IGNORED,
                 {vformat(
                      "%s:%s",
@@ -125,7 +126,7 @@ Channel *ensure_state(
     if (has_source && !split && p_target_prop != p_source_prop
         && p_runtime->holds_body(p_node)) {
         fault::raise(
-            owner != nullptr ? NetwEntity::session_core_for(owner) : nullptr,
+            NetwMultiplayer::session_holding(owner),
             NETW_FAULT_INTERPOLATION_IGNORED,
             {vformat(
                  "%s:%s",

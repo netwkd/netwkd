@@ -173,11 +173,14 @@ public sealed class NetwDisplay : NetwRefCounted
     /// are. A visual with <see cref="CanvasItem.TopLevel"/> set receives every
     /// property in global space. The written values replace the visual's own
     /// position and rotation, so point this at a plain node and put a model
-    /// that needs one under it. Only a child of the entity root is supported. A
-    /// path that resolves to another node, such as a sibling, raises no fault.
-    /// When the entity holds a <see cref="RigidBody3D"/>, that node's own
-    /// transform is then read as its offset from the entity root, so it is
-    /// drawn displaced.
+    /// that needs one under it.
+    /// <see cref="NetwMultiplayer.DisplaySetCallback"/> and
+    /// <see cref="NetwMultiplayer.DisplaySetTargetItem"/> take the values in
+    /// place of any node. Only a child of the entity root is supported. A path
+    /// that resolves to another node, such as a sibling, raises no fault. When
+    /// the entity holds a <see cref="RigidBody3D"/>, that node's own transform
+    /// is then read as its offset from the entity root, so it is drawn
+    /// displaced.
     /// </summary>
     public NodePath VisualRoot
     {
@@ -277,7 +280,8 @@ public sealed class NetwDisplay : NetwRefCounted
 
     /// <summary>
     /// Smoothing time in seconds for
-    /// <see cref="NetwDisplay.LiveModeEnum.Chase"/>. <c>0</c> uses one tick.
+    /// <see cref="NetwDisplay.LiveModeEnum.Chase"/>. <c>0</c> uses one tick. It
+    /// counts the process frame time, so <c>Engine.time_scale</c> slows it too.
     /// </summary>
     public double LiveSmoothTime
     {

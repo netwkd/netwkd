@@ -93,7 +93,7 @@ Spawned spawn_marked(
     }
 
     Spawned made;
-    made.entity = p_rig.server()->spawn_registered(id, named(p_name), nullptr);
+    made.entity = p_rig.server()->spawn_registered(id, named(p_name), 0);
     REQUIRE_MESSAGE(made.entity.is_valid(), "the spawn verb minted no entity");
     made.node = p_rig.server()->entity_get_node(made.entity);
     REQUIRE_MESSAGE(made.node != nullptr, "the spawn verb built no node");

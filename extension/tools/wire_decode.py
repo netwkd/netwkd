@@ -492,9 +492,9 @@ AGAINST_SPEC = [
     },
     {
         "record": "KickRequest",
-        "bytes": bytes([0x12, 0x03, 0x00]) + b"afk",
-        "values": {"peer": 9, "reason": "afk"},
-        "why": "WIRE.md 16, peer 9 zigzagged, then the reason",
+        "bytes": bytes([0x09, 0x03, 0x00]) + b"afk",
+        "values": {"player": 9, "reason": "afk"},
+        "why": "WIRE.md 16, player 9, then the reason",
     },
     {
         "record": "SessionLeave",
@@ -596,15 +596,13 @@ AGAINST_SPEC = [
     },
     {
         "record": "AwarenessEdge",
-        "bytes": bytes([0x01, 0x07, 0x04, 0x00]) + b"zone" + bytes([0x03, 0x01]),
+        "bytes": bytes([0x07, 0x04, 0x00]) + b"zone" + bytes([0x01]),
         "values": {
-            "observer_scoped": True,
             "route": 7,
             "layer_id": "zone",
-            "observer": 3,
             "entered": True,
         },
-        "why": "WIRE.md 15, peer 3 gains awareness of route 7 inside zone",
+        "why": "WIRE.md 15, the receiving peer starts seeing route 7 inside zone",
     },
     {
         "record": "ControlRequest",

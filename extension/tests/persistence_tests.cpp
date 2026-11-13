@@ -77,7 +77,10 @@ public:
         connection = MemoryConnection::opened(p_store, "slot1");
     }
 
-    Ref<NetwPromise> open_builtin(Object *, const StringName &) override {
+    Ref<NetwPromise> open_builtin(
+        const Ref<NetwSession> &,
+        const StringName &
+    ) override {
         return NetwPromise::resolved(connection);
     }
 };
@@ -149,7 +152,7 @@ struct Stand {
         const RID entity = server->spawn_registered(
             StringName("saved"),
             named,
-            rig.player(0).ptr()
+            rig.player(0)->get_id()
         );
         body = Object::cast_to<Node2D>(server->entity_get_node(entity));
         REQUIRE(body != nullptr);
@@ -410,7 +413,7 @@ LawVerdict leave_keeps_unsaved(const World &) {
     if (answer(refused) != ERR_FILE_CANT_WRITE) {
         return law_broken("the leave answered %d", answer(refused));
     }
-    if (stand.server->session_get_state()
+    if (stand.server->session_get_stored_state()
         != NetwMultiplayer::SESSION_STATE_ONLINE) {
         return law_broken("the server went down with a row unsaved");
     }
@@ -469,7 +472,9 @@ LawVerdict loads_before_mount(const World &) {
         stand.store(STORED);
         const Ref<NetwPromise> loading = stand.saved()->load();
         stand.rig.pump(2);
-        if (answer(loading) != 1 || stand.body->get("where") != STORED) {
+        const Array found = stand.log.args("loaded");
+        if (answer(loading) != 1 || stand.body->get("where") != STORED
+            || found.size() != 1 || !bool(found[0])) {
             return law_broken("the stored record was not loaded");
         }
         stand.mount();
@@ -604,8 +609,8 @@ LawVerdict freed_before_mount(const World &) {
 
 const Row LOADING[] = {
     {"a spawned entity loading a stored record, and one with none stored",
-     "the first takes the stored values before the client sees it, the "
-     "second keeps its spawn values",
+     "the first reports found and takes the stored values before the "
+     "client sees it, the second keeps its spawn values",
      &loads_before_mount},
     {"an entity added to the tree while its load is in flight",
      "the client sees nothing until the load lands, then only the stored "

@@ -82,14 +82,14 @@ Seated seat(
     LoopbackRig &p_rig,
     Node *p_parent,
     const char *p_name,
-    const Variant &p_owner = Variant()
+    int64_t p_player = 0
 ) {
     teach(p_rig);
     Seated made;
     made.entity = p_rig.server()->spawn_registered(
         StringName(VERB_ID),
         named(p_name),
-        netw::gd::live_object(p_owner)
+        p_player
     );
     REQUIRE_MESSAGE(made.entity.is_valid(), "the verb minted no entity");
     made.node = p_rig.server()->entity_get_node(made.entity);
@@ -137,7 +137,7 @@ TEST_CASE(
     teach(rig);
     const int64_t owned_by = rig.peer_id(0);
 
-    const Seated made = seat(rig, arena, "Owned", rig.player(0));
+    const Seated made = seat(rig, arena, "Owned", rig.player(0)->get_id());
     rig.pump(8);
 
     const Ref<NetwEntity> host = NetwEntity::of(made.node);

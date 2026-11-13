@@ -11,7 +11,6 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/promise.hpp"
 #include "netw/api/server_info.hpp"
-#include "netw/connect/probe_client.hpp"
 
 namespace netw {
 
@@ -21,36 +20,19 @@ class NetwTransport : public godot::RefCounted {
     GDCLASS(NetwTransport, godot::RefCounted)
 
     godot::ObjectID session_id;
-    connect::ProbeClient *probing = nullptr;
-    godot::Ref<NetwPromise> outcome;
-    godot::RID armed_ticket;
 
-    bool speaks_for(const godot::RID &p_ticket) const;
-
-    void probe_authenticating(int64_t p_peer_id);
-    void probe_auth_received(
-        int64_t p_peer_id,
-        const godot::PackedByteArray &p_data
-    );
-    void probe_connection_failed();
-    void probe_authentication_failed(int64_t p_peer_id);
-    void probe_by_connecting(
-        const godot::RID &p_ticket,
-        const godot::String &p_address
-    );
+    NetwMultiplayer *session() const;
 
 protected:
     static void _bind_methods();
 
 public:
-    ~NetwTransport();
-
     static godot::StringName peer_class_of(
         const godot::Ref<godot::MultiplayerPeer> &p_peer
     );
 
     void bind_session(NetwMultiplayer *p_session);
-    godot::Ref<NetwMultiplayer> get_session() const;
+    godot::Ref<NetwSession> get_session() const;
 
     void report(
         const godot::RID &p_ticket,
@@ -59,10 +41,6 @@ public:
         double p_ratio
     );
 
-    void arm(
-        const godot::RID &p_ticket,
-        const godot::Ref<NetwPromise> &p_outcome
-    );
     void deliver(
         const godot::RID &p_ticket,
         const godot::Ref<godot::MultiplayerPeer> &p_peer
@@ -97,14 +75,14 @@ public:
     virtual godot::Dictionary host_settings();
     virtual godot::Dictionary client_settings();
 
-    virtual void make_peer(
+    virtual bool make_peer(
         const godot::RID &p_ticket,
         NetwMultiplayer::TransportMode p_mode,
         const godot::String &p_address,
         const godot::Dictionary &p_settings
     );
     virtual void cancel_peer_creation(const godot::RID &p_ticket);
-    virtual void probe(
+    virtual bool probe(
         const godot::RID &p_ticket,
         const godot::String &p_address
     );

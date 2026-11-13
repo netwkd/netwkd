@@ -257,10 +257,7 @@ struct InterpHarness {
     double tickrate = 60.0;
     double fps = 60.0;
     int send_period = 1;
-    int timeline_mode = netw::display::TIMELINE_BUFFERED;
-    int max_forecast_ticks = 6;
     int pump_mode = netw::display::PUMP_REMOTE;
-    double record_cutoff_sec = INFINITY;
 
     std::vector<double> frames;
     std::vector<godot::Vector2> displayed;
@@ -294,11 +291,6 @@ struct InterpHarness {
 
     void configure(double p_smoothing, const godot::Vector2 &p_initial) {
         build_runtime(pump_mode);
-        config.set_param(netw::display::PARAM_TIMELINE_MODE, timeline_mode);
-        config.set_param(
-            netw::display::PARAM_MAX_FORECAST_TICKS,
-            max_forecast_ticks
-        );
         runtime->set_config(config);
         runtime->display_playhead().set_expected_interval_ticks(
             std::max(1, send_period)
@@ -392,13 +384,11 @@ struct InterpHarness {
             const double wall = double(at) / fps;
             while (next < schedule.size()
                    && schedule[next].arrival_sec <= wall) {
-                if (schedule[next].arrival_sec <= record_cutoff_sec) {
-                    channel->display_history().record(
-                        schedule[next].tick,
-                        schedule[next].value,
-                        false
-                    );
-                }
+                channel->display_history().record(
+                    schedule[next].tick,
+                    schedule[next].value,
+                    false
+                );
                 ++next;
             }
             const netw::display::Timing timing = pump_at(wall);

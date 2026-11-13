@@ -12,79 +12,78 @@ using namespace godot;
 namespace netw {
 
 NetwMultiplayer *NetwPlayer::core() const {
-    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
+    return row_dropped
+        ? nullptr
+        : Object::cast_to<NetwMultiplayer>(gd::instance_from_id(session_id));
 }
 
-void NetwPlayer::bind_to(
-    NetwMultiplayer *p_core,
-    int64_t p_peer,
-    int64_t p_incarnation,
-    const StringName &p_username
-) {
-    core_id = gd::instance_id(p_core);
-    peer_id = p_peer;
-    if (p_incarnation != 0) {
-        incarnation = p_incarnation;
-    }
-    if (!String(p_username).is_empty()) {
-        username = p_username;
-    }
+int64_t NetwPlayer::get_id() const {
+    return core() != nullptr ? incarnation : 0;
 }
 
-void NetwPlayer::rebind_peer(int64_t p_peer) {
-    peer_id = p_peer;
-}
-
-void NetwPlayer::bind_account(
-    const String &p_account,
-    const String &p_account_name
-) {
-    account = p_account;
-    account_name = p_account_name;
+bool NetwPlayer::belongs_to(const NetwMultiplayer *p_session) const {
+    return p_session != nullptr && session_id == gd::instance_id(p_session);
 }
 
 bool NetwPlayer::get_is_active() const {
     NetwMultiplayer *held = core();
-    return held != nullptr && held->player_is_active(peer_id, incarnation);
+    return held != nullptr && held->player_is_active(incarnation);
 }
 
 String NetwPlayer::get_account() const {
-    return account;
+    NetwMultiplayer *held = core();
+    return held != nullptr ? held->player_get_account(incarnation) : String();
 }
 
 String NetwPlayer::get_account_name() const {
-    return account_name;
+    NetwMultiplayer *held = core();
+    return held != nullptr ? held->player_get_account_name(incarnation)
+                           : String();
 }
 
 int64_t NetwPlayer::get_peer_id() const {
-    return peer_id;
-}
-
-int64_t NetwPlayer::player_id() const {
-    return incarnation;
+    NetwMultiplayer *held = core();
+    return held != nullptr ? held->player_get_peer(incarnation) : 0;
 }
 
 StringName NetwPlayer::get_username() const {
-    return username;
+    NetwMultiplayer *held = core();
+    return held != nullptr ? held->player_get_username(incarnation)
+                           : StringName();
 }
 
 TypedArray<NetwEntity> NetwPlayer::get_entities() const {
     NETW_ZONE_NC("NetwPlayer entities", colors::SESSION);
+    TypedArray<NetwEntity> views;
     NetwMultiplayer *held = core();
-    return held == nullptr ? TypedArray<NetwEntity>()
-                           : held->player_entities_held(peer_id, incarnation);
+    if (held == nullptr) {
+        return views;
+    }
+    const TypedArray<RID> rows = held->player_get_entities(incarnation);
+    for (int at = 0; at < rows.size(); ++at) {
+        views.push_back(held->wrapper_for_id(int64_t(RID(rows[at]).get_id())));
+    }
+    return views;
 }
 
 Ref<NetwScene> NetwPlayer::get_scene() const {
     NETW_ZONE_NC("NetwPlayer scene", colors::SESSION);
     NetwMultiplayer *held = core();
-    if (held == nullptr || !held->player_is_active(peer_id, incarnation)) {
-        return Ref<NetwScene>();
-    }
-    return held->scene_handle_of(held->scene_of_peer(peer_id));
+    return held != nullptr
+        ? held->scene_handle_of(held->player_get_scene(incarnation))
+        : Ref<NetwScene>();
+}
+
+void NetwPlayer::announce_scene_changed(
+    const Ref<NetwScene> &p_from,
+    const Ref<NetwScene> &p_to
+) {
+    emit_signal(StringName("scene_changed"), p_from, p_to);
 }
 
 void NetwPlayer::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_id"), &NetwPlayer::get_id);
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "id"), "", "get_id");
     ClassDB::bind_method(D_METHOD("get_peer_id"), &NetwPlayer::get_peer_id);
     ADD_PROPERTY(PropertyInfo(Variant::INT, "peer_id"), "", "get_peer_id");
     ClassDB::bind_method(D_METHOD("get_is_active"), &NetwPlayer::get_is_active);

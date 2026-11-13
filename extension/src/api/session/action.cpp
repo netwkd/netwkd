@@ -30,7 +30,7 @@ Node *NetwMultiplayer::node_from_tree_path(const NodePath &p_path) const {
     if (!lagcomp_configured) {
         return nullptr;
     }
-    Node *anchor = session_root();
+    Node *anchor = session_get_root();
     return anchor != nullptr ? anchor->get_node_or_null(p_path) : nullptr;
 }
 
@@ -109,10 +109,11 @@ void NetwMultiplayer::execute_action(
     const PendingAction &p_request,
     int64_t p_tick
 ) {
+    const Ref<NetwMultiplayer> keep(this);
     NETW_ZONE_NC("action execute", colors::PREDICTION);
     Node *target = node_from_tree_path(p_request.target_path);
     if (target == nullptr || !target->has_method(p_request.method)) {
-        lagcomp_deny_action(p_request.requester, p_request.key);
+        effect_deny_action(p_request.requester, p_request.key);
         return;
     }
     const int64_t clamped
@@ -133,9 +134,11 @@ void NetwMultiplayer::execute_action(
     for (int at = 0; at < p_request.args.size(); ++at) {
         arguments[at + 1] = p_request.args[at];
     }
+    ++action_handler_depth;
     const Variant ran = Callable(target, p_request.method).callv(arguments);
+    --action_handler_depth;
     if (!context->answered() && !is_coroutine(ran)) {
-        lagcomp_confirm_action(p_request.requester, p_request.key);
+        effect_confirm_action(p_request.requester, p_request.key);
     }
 }
 
@@ -158,6 +161,39 @@ int64_t NetwMultiplayer::action_slot_of(const Callable &p_authority) {
     const int64_t minted = int64_t(action_slots.size());
     action_slots[route] = minted;
     return minted;
+}
+
+Error NetwMultiplayer::lagcomp_action_request(
+    const StringName &p_key,
+    const NodePath &p_target,
+    const StringName &p_method,
+    int64_t p_view_tick,
+    const Array &p_args,
+    NetwAction::TimingMode p_timing
+) {
+    const Error ready = lagcomp_require("the action request");
+    if (ready == ERR_BUSY) {
+        fault::raise(
+            this,
+            NETW_FAULT_BUSY_APPLYING,
+            {"NetwMultiplayer.lagcomp_action_request"}
+        );
+        return ERR_BUSY;
+    }
+    if (ready != OK) {
+        return ready;
+    }
+    const Ref<NetwMultiplayer> keep(this);
+    action_send_request(
+        p_target,
+        p_method,
+        p_view_tick,
+        p_args,
+        p_key,
+        int(p_timing)
+    );
+    effect_drain();
+    return OK;
 }
 
 Ref<NetwAction> NetwMultiplayer::lagcomp_action(const Callable &p_authority) {
@@ -271,7 +307,7 @@ void NetwMultiplayer::submit_action(
     request.timing_mode = p_timing_mode;
     request.queued_at_tick = clock_engine().get_tick();
 
-    Node *anchor = lagcomp_configured ? session_root() : nullptr;
+    Node *anchor = lagcomp_configured ? session_get_root() : nullptr;
     if (anchor != nullptr) {
         const Ref<NetwEntity> entity
             = Object::cast_to<NetwEntity>(wrapper_for_route(p_route).ptr());
@@ -287,7 +323,7 @@ void NetwMultiplayer::submit_action(
             "Action %s names a method this session cannot reach.",
             String(p_key).utf8().get_data()
         );
-        lagcomp_deny_action(requester, p_key);
+        effect_deny_action(requester, p_key);
         return;
     }
     const int64_t now = clock_engine().get_tick();
@@ -304,7 +340,7 @@ void NetwMultiplayer::submit_action(
             int(p_view_tick),
             int(now + max_future_action_ticks)
         );
-        lagcomp_deny_action(requester, p_key);
+        effect_deny_action(requester, p_key);
         return;
     }
     pending_actions.push_back(request);
@@ -325,7 +361,7 @@ void NetwMultiplayer::drain_pending_actions(int64_t p_tick) {
                 "Queued action %s lost the method it names.",
                 String(request.key).utf8().get_data()
             );
-            lagcomp_deny_action(request.requester, request.key);
+            effect_deny_action(request.requester, request.key);
             continue;
         }
         const int readiness = action_readiness(request, p_tick);

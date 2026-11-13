@@ -159,7 +159,7 @@ struct Stand {
         args.push_back(String("Spawner"));
         NetwMultiplayer *server = sim.session(SERVER);
         const RID made
-            = server->spawn_registered(StringName(SPAWNER_ID), args, nullptr);
+            = server->spawn_registered(StringName(SPAWNER_ID), args, 0);
         host = server->entity_get_node(made);
         REQUIRE(host != nullptr);
         arena->add_child(host);
@@ -311,7 +311,7 @@ TEST_CASE(
         Array args;
         args.push_back(String("Child"));
         const RID child
-            = server->spawn_registered(StringName(SPAWNER_ID), args, nullptr);
+            = server->spawn_registered(StringName(SPAWNER_ID), args, 0);
         REQUIRE(child.is_valid());
         made->add_child(server->entity_get_node(child));
         made->call(StringName("send"));

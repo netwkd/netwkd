@@ -34,7 +34,6 @@ namespace netw::spawn {
 
 namespace {
 
-const char *SIG_PEER_CONNECTED = "peer_connected";
 const char *SIG_CLOCK_ON_TICK = "clock_on_tick";
 const char *SIG_TREE_ENTERED = "tree_entered";
 const char *SIG_TREE_EXITING = "tree_exiting";
@@ -128,11 +127,6 @@ void Pipeline::set_core(Object *p_core, const session::Books *p_books) {
         return;
     }
     park.hold_routes_in(Ref<NetwLivenessCore>(books->liveness));
-    const Callable joined
-        = callable_mp(plane, &NetwMultiplayer::spawn_on_peer_connected);
-    if (!plane->is_connected(SIG_PEER_CONNECTED, joined)) {
-        plane->connect(SIG_PEER_CONNECTED, joined);
-    }
 }
 
 void Pipeline::set_api(Object *p_api) {
@@ -223,33 +217,6 @@ void Pipeline::connect_once(
     p_source->connect(p_signal, p_callable, p_flags);
 }
 
-void Pipeline::on_peer_connected(int64_t p_peer_id) {
-    if (!is_server_authority()) {
-        return;
-    }
-    sink_verdict(replay_spawn_book(p_peer_id), 0);
-}
-
-Error Pipeline::replay_spawn_book(int64_t p_peer_id) {
-    NETW_ZONE_NC("Spawn replay book", colors::LIVENESS);
-    NETW_ZONE_VALUE(p_peer_id);
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !has_peer()) {
-        return ERR_UNAVAILABLE;
-    }
-    const PackedInt64Array unencodable = plane->spawn_replay_to(
-        &spawn_book,
-        p_peer_id,
-        channel_spawn,
-        callable_mp(plane, &NetwMultiplayer::spawn_encode_spawn_frame)
-    );
-    for (int at = 0; at < unencodable.size(); ++at) {
-        sink_verdict(ERR_INVALID_DATA, unencodable[at]);
-    }
-    schedule_carrier_flush();
-    return OK;
-}
-
 void Pipeline::schedule_visibility_sweep() {
     NetwMultiplayer *plane = core();
     if (plane == nullptr || !is_server_authority()) {
@@ -276,7 +243,7 @@ void Pipeline::run_visibility_sweep() {
     if (plane == nullptr || !has_peer()) {
         return;
     }
-    if (!plane->is_online()) {
+    if (!plane->session_is_online()) {
         return;
     }
     const PackedInt32Array peers = connected_peers();
@@ -365,7 +332,7 @@ Ref<NetwEntity> Pipeline::arm_authoritative_spawn(
     }
     plane->persist_bind_spawned(p_node);
     if (p_node->is_inside_tree()) {
-        entity->_go_live_if_armed();
+        plane->entity_go_live(entity->get_rid_handle());
         schedule_armed_flush(route);
     } else {
         unadded[route] = Unadded{
@@ -418,7 +385,7 @@ bool Pipeline::armed_player_left(int64_t p_route) {
     }
     const Ref<NetwPlayer> seated = plane->player_of(entity->get_peer_id());
     if (plane->player_holds(seated)
-        && seated->player_id() == entity->get_player_id()) {
+        && seated->get_id() == entity->get_player_id()) {
         return false;
     }
     NETW_INFO(
@@ -446,21 +413,23 @@ bool Pipeline::spawn_admitted(Node *p_node, const char *p_verb) {
         return authors(lifecycle::Kind::SPAWN, is_server_authority());
     }
     const Ref<NetwEntity> entity = NetwEntity::of(p_node);
+    const bool represents = entity.is_valid() && entity->has_unbound_player();
     const Ref<NetwPlayer> represented
-        = entity.is_valid() ? entity->unbound_player() : Ref<NetwPlayer>();
+        = represents ? entity->unbound_player() : Ref<NetwPlayer>();
     lifecycle::Facts facts
         = plane->lifecycle_local_facts(entity.ptr(), lifecycle::Kind::SPAWN);
-    facts.player_bound = facts.player_bound || represented.is_valid();
+    facts.player_bound = facts.player_bound || represents;
     String refusal;
     if (!plane->lifecycle_judge_verb(facts, String(p_verb), p_node, refusal)
              .admitted()) {
         return false;
     }
-    if (represented.is_valid() && !plane->player_holds(represented)) {
+    if (represents && !plane->player_holds(represented)) {
         NETW_INFO(
             sys::SPAWN,
             "Nothing was spawned, because player '%s' left the session.",
-            String(represented->get_username())
+            represented.is_valid() ? String(represented->get_username())
+                                   : String()
         );
         return false;
     }
@@ -1226,7 +1195,9 @@ void Pipeline::reconcile_nested_child(int64_t p_route) {
         return;
     }
     NetwMultiplayer *plane = core();
-    Node *node = plane != nullptr ? plane->liveness_node_of(p_route) : nullptr;
+    Node *node = plane != nullptr
+        ? plane->wrapper_owner(books->liveness->rid_from_route(int(p_route)))
+        : nullptr;
     if (node == nullptr || is_booked(p_route)) {
         return;
     }
@@ -1250,7 +1221,7 @@ void Pipeline::note_placed_before_host(int64_t p_route) {
 
 void Pipeline::publish_placed(Node *p_node, int64_t p_route) {
     NetwMultiplayer *plane = core();
-    if (plane == nullptr || !plane->is_online()) {
+    if (plane == nullptr || !plane->session_is_online()) {
         return;
     }
     const bool placed = placed_before_host.erase(p_route);
@@ -1364,7 +1335,7 @@ void Pipeline::despawn_tracked_route(int64_t p_route, Node *p_within) {
     if (plane == nullptr) {
         return;
     }
-    const bool live = has_peer() && plane->is_online();
+    const bool live = has_peer() && plane->session_is_online();
     if (plane->spawn_despawn_route(
             &spawn_book,
             p_route,
@@ -1390,7 +1361,7 @@ void Pipeline::send_reparent(Record *p_record, Node *p_node, int64_t p_author) {
     if (!has_peer()) {
         return;
     }
-    if (!plane->is_online()) {
+    if (!plane->session_is_online()) {
         return;
     }
     sweep_now();
@@ -2842,9 +2813,10 @@ void Pipeline::handle_despawn_frame(
         drops_despawn_unknown += 1;
         return;
     }
-    const bool withheld = plane->lifecycle_forget_withheld(route);
+    const RID handle = entity->get_rid_handle();
+    const bool withheld = plane->lifecycle_forget_withheld(handle);
     const double linger = run_despawn_hook(entity->get_owner());
-    entity->_remote_despawn(StringName(reason), linger);
+    plane->entity_remote_despawn(handle, StringName(reason), linger);
     if (withheld) {
         free_despawned(route);
         plane->entity_settle_captured(entity.ptr());
@@ -2893,9 +2865,10 @@ void Pipeline::release_received() {
         if (entity.is_null() || entity->get_owner() == nullptr) {
             continue;
         }
-        const bool withheld = plane->lifecycle_forget_withheld(route);
+        const RID handle = entity->get_rid_handle();
+        const bool withheld = plane->lifecycle_forget_withheld(handle);
         run_despawn_hook(entity->get_owner());
-        entity->_remote_despawn(StringName("despawn"), 0.0);
+        plane->entity_remote_despawn(handle, StringName("despawn"), 0.0);
         free_despawned(route);
         if (withheld) {
             plane->entity_settle_captured(entity.ptr());
@@ -3261,7 +3234,7 @@ String Pipeline::adopt_place_of(const PackedByteArray &p_payload) {
             int64_t(anchor.get(StringName("route"), int64_t(0)))
         );
         Node *holder = entity.is_valid() ? entity->get_owner() : nullptr;
-        Node *root = plane->session_root();
+        Node *root = plane->session_get_root();
         if (holder != nullptr && root != nullptr
             && root->is_ancestor_of(holder)) {
             under = String(root->get_path_to(holder)).path_join(under);
@@ -3702,7 +3675,9 @@ PackedInt64Array Pipeline::promote_received() {
         const Ref<NetwEntity> above = NetwEntity::of(node->get_parent());
         record.set_node_name(String(node->get_name()));
         record.set_parent_route(
-            above.is_valid() ? plane->liveness_route_of(above.ptr()) : 0
+            above.is_valid()
+                ? books->liveness->route_of(above->get_rid_handle())
+                : 0
         );
         record.set_entity_id(entity->get_name());
         record.set_peer_id(entity->get_peer_id());

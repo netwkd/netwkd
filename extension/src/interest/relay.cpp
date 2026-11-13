@@ -18,27 +18,8 @@ Awareness Awareness::layer_edge(
     int kind
 ) {
     Array raw;
-    raw.push_back(int64_t(LAYER));
     raw.push_back(route);
     raw.push_back(layer_id);
-    raw.push_back(int64_t(0));
-    raw.push_back(int64_t(kind));
-    Awareness edge;
-    from_array(raw, edge);
-    return edge;
-}
-
-Awareness Awareness::observer_edge(
-    int64_t route,
-    const StringName &layer_id,
-    int64_t observer_peer,
-    int kind
-) {
-    Array raw;
-    raw.push_back(int64_t(OBSERVER));
-    raw.push_back(route);
-    raw.push_back(layer_id);
-    raw.push_back(observer_peer);
     raw.push_back(int64_t(kind));
     Awareness edge;
     from_array(raw, edge);
@@ -50,44 +31,30 @@ bool Awareness::from_array(const Variant &raw, Awareness &r_edge) {
         return false;
     }
     const Array row = raw;
-    if (row.size() != 5) {
+    if (row.size() != 3) {
         return false;
     }
-    if (row[0].get_type() != Variant::INT || row[1].get_type() != Variant::INT
-        || row[2].get_type() != Variant::STRING_NAME
-        || row[3].get_type() != Variant::INT
-        || row[4].get_type() != Variant::INT) {
+    if (row[0].get_type() != Variant::INT
+        || row[1].get_type() != Variant::STRING_NAME
+        || row[2].get_type() != Variant::INT) {
         return false;
     }
-    const int64_t row_type = row[0];
-    const int64_t row_route = row[1];
-    const StringName row_layer = row[2];
-    const int64_t row_observer = row[3];
-    const int64_t row_kind = row[4];
-    if (row_type != LAYER && row_type != OBSERVER) {
+    const int64_t row_route = row[0];
+    const StringName row_layer = row[1];
+    const int64_t row_kind = row[2];
+    if (row_route <= 0 || row_layer.is_empty() || !is_kind(row_kind)) {
         return false;
     }
-    if (row_route <= 0 || row_layer.is_empty() || row_observer < 0
-        || !is_kind(row_kind)) {
-        return false;
-    }
-    if ((row_type == LAYER) != (row_observer == 0)) {
-        return false;
-    }
-    r_edge.type = int32_t(row_type);
     r_edge.route = row_route;
     r_edge.layer_id = row_layer;
-    r_edge.observer_peer = row_observer;
     r_edge.kind = int32_t(row_kind);
     return true;
 }
 
 Array Awareness::to_array() const {
     Array out;
-    out.push_back(int64_t(type));
     out.push_back(route);
     out.push_back(layer_id);
-    out.push_back(observer_peer);
     out.push_back(int64_t(kind));
     return out;
 }
@@ -97,26 +64,21 @@ namespace {
 constexpr int EDGE_COUNT_BYTES = 2;
 
 bool edge_is_coherent(const AwarenessEdge &edge) {
-    return edge.route > 0 && !edge.layer_id.is_empty()
-        && (edge.observer_scoped == (edge.observer > 0));
+    return edge.route > 0 && !edge.layer_id.is_empty();
 }
 
 AwarenessEdge edge_of(const Awareness &source) {
     AwarenessEdge out;
-    out.observer_scoped = source.type == Awareness::OBSERVER;
     out.route = uint64_t(source.route);
     out.layer_id = source.layer_id;
-    out.observer = uint64_t(source.observer_peer);
     out.entered = source.kind == Awareness::ENTER;
     return out;
 }
 
 Awareness awareness_of(const AwarenessEdge &edge) {
     Awareness out;
-    out.type = edge.observer_scoped ? Awareness::OBSERVER : Awareness::LAYER;
     out.route = int64_t(edge.route);
     out.layer_id = edge.layer_id;
-    out.observer_peer = int64_t(edge.observer);
     out.kind = edge.entered ? Awareness::ENTER : Awareness::EXIT;
     return out;
 }

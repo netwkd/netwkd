@@ -35,8 +35,6 @@ struct SessionOutcome {
 };
 
 class WebRTCSession {
-    friend struct WebRTCSessionProbe;
-
 public:
     WebRTCSession();
     ~WebRTCSession();

@@ -161,6 +161,28 @@ void NetwClock::auto_configure_offset() {
     api->clock_auto_configure_offset();
 }
 
+bool NetwClock::get_manual_tick() const {
+    NetwMultiplayer *api = session();
+    return api != nullptr
+        && bool(api->clock_get_param(NetwMultiplayer::CLOCK_PARAM_MANUAL_TICK));
+}
+
+void NetwClock::set_manual_tick(bool p_manual) {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return;
+    }
+    api->clock_set_param(NetwMultiplayer::CLOCK_PARAM_MANUAL_TICK, p_manual);
+}
+
+void NetwClock::step(int64_t p_count) {
+    NetwMultiplayer *api = session();
+    if (api == nullptr) {
+        return;
+    }
+    api->clock_step(p_count);
+}
+
 double NetwClock::monitor(NetwClock::ClockMonitor p_monitor) const {
     NetwMultiplayer *api = session();
     return api != nullptr ? api->clock_get_monitor(p_monitor) : 0.0;
@@ -299,6 +321,20 @@ void NetwClock::_bind_methods() {
         D_METHOD("auto_configure_offset"),
         &NetwClock::auto_configure_offset
     );
+    ClassDB::bind_method(
+        D_METHOD("get_manual_tick"),
+        &NetwClock::get_manual_tick
+    );
+    ClassDB::bind_method(
+        D_METHOD("set_manual_tick", "manual"),
+        &NetwClock::set_manual_tick
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::BOOL, "manual_tick"),
+        "set_manual_tick",
+        "get_manual_tick"
+    );
+    ClassDB::bind_method(D_METHOD("step", "count"), &NetwClock::step);
 
     ADD_SIGNAL(MethodInfo(
         SIG_BEFORE_TICK,

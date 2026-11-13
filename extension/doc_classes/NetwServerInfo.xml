@@ -4,7 +4,7 @@
 		What a server tells a server browser about itself.
 	</brief_description>
 	<description>
-		A server browser can check a server without joining it, and gets one of these back. By default it is [method from_session]. Use [method Netw.configure_server_info] to change it.
+		A server browser can check a server without joining it, and gets one of these back. By default it is [method NetwMultiplayer.session_get_server_info]. Use [method Netw.configure_server_info] to change it.
 		[codeblock]
 		func _init() -&gt; void:
 		    Netw.configure_server_info(server_info)
@@ -24,13 +24,6 @@
 			<param index="0" name="bytes" type="PackedByteArray" />
 			<description>
 				Reads a [NetwServerInfo] from [param bytes], or returns [code]null[/code].
-			</description>
-		</method>
-		<method name="from_session" qualifiers="static">
-			<return type="NetwServerInfo" />
-			<param index="0" name="api" type="NetwMultiplayer" />
-			<description>
-				Returns a copy of [member NetwSessionConfig.server_info] with [member players], [member app_id] and [member is_local_listener] filled in from the session.
 			</description>
 		</method>
 		<method name="to_payload" qualifiers="static">

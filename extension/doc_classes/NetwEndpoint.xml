@@ -46,10 +46,13 @@
 			[code]true[/code] after [method NetwConnection.invite]. Cleared when joining this server reaches [constant NetwSession.STATE_ONLINE] or the row is removed.
 		</member>
 		<member name="is_listed" type="bool" setter="" getter="get_is_listed">
-			[code]false[/code] once the row is removed. Only [member peer_class] and [member address] keep their values after that.
+			[code]true[/code] while [member NetwConnection.endpoints] holds the row. [code]false[/code] once the row is removed, and for a [member NetwConnection.current_endpoint] no row lists. Only [member rid], [member peer_class] and [member address] keep their values after removal.
 		</member>
 		<member name="peer_class" type="StringName" setter="" getter="get_peer_class">
 			The [MultiplayerPeer] class used to connect to this server.
+		</member>
+		<member name="rid" type="RID" setter="" getter="get_rid">
+			The endpoint's [RID], for the [code]endpoint_*[/code] methods of [NetwMultiplayer] such as [method NetwMultiplayer.endpoint_get_param].
 		</member>
 		<member name="source" type="String" setter="" getter="get_source">
 			The name of the [LobbyDirectory] that listed this row, or [code]""[/code] when the game added it with [method NetwConnection.add].
@@ -61,7 +64,7 @@
 	<signals>
 		<signal name="changed">
 			<description>
-				Emitted when server information or the invitation changes.
+				Emitted when server information or the invitation changes. A change made while [method MultiplayerAPI.poll] runs is emitted when that poll ends.
 			</description>
 		</signal>
 	</signals>

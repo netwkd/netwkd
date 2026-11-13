@@ -135,7 +135,8 @@ public sealed class NetwSimulation : NetwRefCounted
         Proxy = 0,
         /// <summary>
         /// Copies whose state comes from another peer are
-        /// <see cref="NetwSimulation.ModeEnum.Active"/>.
+        /// <see cref="NetwSimulation.ModeEnum.Active"/>. A sample that matches
+        /// the copy is not written, so a resting copy can sleep.
         /// </summary>
         Active = 1,
     }
@@ -154,14 +155,18 @@ public sealed class NetwSimulation : NetwRefCounted
         Extrapolated = 1,
         /// <summary>
         /// A sample is held until the clock's display tick reaches it, then
-        /// lands as it was sent.
+        /// lands as it was sent. A copy that turns
+        /// <see cref="NetwSimulation.ModeEnum.Active"/> starts from the sample
+        /// at the display tick.
         /// </summary>
         Buffered = 2,
     }
 
     /// <summary>
     /// Emitted when <see cref="NetwSimulation.Mode"/> changes on this peer,
-    /// after the body has switched to <c>mode</c>.
+    /// after the body has switched to <c>mode</c>. A change made while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends.
     /// </summary>
     public event Action<
         NetwSimulation.ModeEnum,

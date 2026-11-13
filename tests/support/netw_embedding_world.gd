@@ -47,14 +47,14 @@ func spawn_level(api: NetwMultiplayer, scene: PackedScene) -> Node:
 	var level := api.entity_get_node(
 		api.spawn_registered(&"level", [scene.resource_path]),
 	)
-	api.root.add_child(level)
+	api.session_get_root().add_child(level)
 	return level
 
 
 func spawn_probe(name: String) -> int:
 	var host_api := await host()
 	var entity := host_api.spawn_registered(&"probe", [name])
-	host_api.root.add_child(host_api.entity_get_node(entity))
+	host_api.session_get_root().add_child(host_api.entity_get_node(entity))
 	return host_api.entity_get_route(entity)
 
 

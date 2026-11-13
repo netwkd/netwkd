@@ -89,7 +89,7 @@ struct Crates {
         const RID made = author->spawn_registered(
             StringName(CRATE_ID),
             one_string(String("Crate") + String::num_int64(minted++)),
-            nullptr
+            0
         );
         Node *node = author->entity_get_node(made);
         if (node == nullptr) {

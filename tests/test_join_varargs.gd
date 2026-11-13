@@ -64,7 +64,7 @@ func test_an_array_argument_stays_one_argument() -> void:
 func test_a_username_alone_passes_no_arguments() -> void:
 	Netw.prepare_join(declarer, &"ana")
 	await _bring_host_online()
-	await _pump_until(func() -> bool: return tree.api.is_online)
+	await _pump_until(func() -> bool: return tree.api.session_is_online())
 
 	assert_int(declarer.calls).is_equal(0)
 	assert_int(
@@ -87,7 +87,7 @@ func test_a_collected_list_submits_through_a_callable() -> void:
 func _bring_host_online() -> void:
 	var peer := session.session().get_server_peer()
 	tree.api.multiplayer_peer = peer
-	await _pump_until(func() -> bool: return tree.api.is_online)
+	await _pump_until(func() -> bool: return tree.api.session_is_online())
 
 
 func _pump_until(condition: Callable) -> void:

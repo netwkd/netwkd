@@ -17,17 +17,18 @@ func test_different_names_never_share_a_key() -> void:
 func test_a_session_with_no_account_refuses_every_verb() -> void:
 	var tree: MultiplayerViewport = auto_free(MultiplayerViewport.new())
 	add_child(tree)
+	var session := Netw.session(tree)
 	var database := NakamaDatabase.new()
 
-	var opening := database._open(tree.api, &"slot1")
+	var opening := database._open(session, &"slot1")
 	await opening.wait()
 	assert_bool(opening.get_is_failed()).is_true()
 	assert_int(opening.get_code()).is_equal(ERR_UNCONFIGURED)
 
-	var listing := database._list_slots(tree.api)
+	var listing := database._list_slots(session)
 	await listing.wait()
 	assert_int(listing.get_code()).is_equal(ERR_UNCONFIGURED)
 
-	var deleting := database._delete_slot(tree.api, &"slot1")
+	var deleting := database._delete_slot(session, &"slot1")
 	await deleting.wait()
 	assert_int(deleting.get_code()).is_equal(ERR_UNCONFIGURED)

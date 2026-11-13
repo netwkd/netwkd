@@ -45,7 +45,7 @@ public sealed class NetwDespawnOpts : NetwRefCounted
     /// <summary>
     /// Passed to <see cref="NetwEntity.Despawning"/> so a game can react to the
     /// cause, such as <c>&amp;"peer_disconnected"</c>, <c>&amp;"killed"</c> or
-    /// <c>&amp;"timeout"</c>.
+    /// <c>&amp;"timeout"</c>. Every peer hears the reason the server passed.
     /// </summary>
     public StringName Reason
     {

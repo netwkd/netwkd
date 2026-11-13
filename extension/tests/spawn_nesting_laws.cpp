@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/level_spawn.h"
 #include "support/loopback_rig.h"
 
@@ -73,7 +74,7 @@ Nested spawn_pair(LoopbackRig &p_rig, Node *p_under = nullptr) {
 
 int64_t state_of(LoopbackRig &p_rig, int p_client, int p_route) {
     netw::NetwMultiplayer *api = p_rig.client(p_client);
-    return int64_t(api->entity_get_state(api->entity_from_route(p_route)));
+    return int64_t(api->entity_get_state(Internals::entity_at(api, p_route)));
 }
 
 TEST_CASE(
@@ -238,8 +239,8 @@ TEST_CASE(
     const Nested pair = spawn_pair(rig);
 
     netw::NetwMultiplayer *api = rig.server();
-    const RID parent = api->entity_from_route(pair.parent_route);
-    const RID child = api->entity_from_route(pair.child_route);
+    const RID parent = Internals::entity_at(api, pair.parent_route);
+    const RID child = Internals::entity_at(api, pair.child_route);
 
     const bool child_names_parent = api->entity_get_parent(child) == parent;
     CHECK(child_names_parent);
@@ -299,8 +300,8 @@ TEST_CASE(
     const Nested pair = spawn_pair(rig, arena);
 
     netw::NetwMultiplayer *api = rig.server();
-    const RID owned = api->entity_from_route(pair.parent_route);
-    NETW_CHECK_EQ(api->entity_get_peer(owned), int64_t(0));
+    const RID owned = Internals::entity_at(api, pair.parent_route);
+    NETW_CHECK_EQ(api->entity_get_player(owned), int64_t(0));
 
     Array peer_arg;
     peer_arg.push_back(rig.peer_id(0));
@@ -314,8 +315,11 @@ TEST_CASE(
         arena
     );
 
-    const RID represented = api->entity_from_route(player_route);
-    NETW_CHECK_EQ(api->entity_get_peer(represented), int64_t(rig.peer_id(0)));
+    const RID represented = Internals::entity_at(api, player_route);
+    NETW_CHECK_EQ(
+        NetwEntity::of(api->entity_get_node(represented))->get_peer_id(),
+        int64_t(rig.peer_id(0))
+    );
 
     const Ref<NetwEntity> seat
         = NetwEntity::of(rig.route_node(player_route, 0));
@@ -339,8 +343,8 @@ TEST_CASE(
     REQUIRE(spawned);
     rig.pump(6);
 
-    const RID scene = api->entity_of(authored);
-    api->scene_watch(scene, rig.peer_id(0));
+    const RID scene = Internals::entity_of(api, authored);
+    api->scene_watch_peer(scene, rig.peer_id(0));
     rig.pump(6);
 
     const int route = int(api->entity_get_route(scene));
@@ -457,7 +461,7 @@ Transform3D world_of(LoopbackRig &p_rig, int p_route, int p_side) {
 int64_t state_on(LoopbackRig &p_rig, int p_side, int p_route) {
     netw::NetwMultiplayer *api
         = p_side < 0 ? p_rig.server() : p_rig.client(p_side);
-    return int64_t(api->entity_get_state(api->entity_from_route(p_route)));
+    return int64_t(api->entity_get_state(Internals::entity_at(api, p_route)));
 }
 
 bool stands_at(const Transform3D &p_seen, const Transform3D &p_before) {

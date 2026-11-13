@@ -29,7 +29,7 @@ Subclass this to store records in a file, in memory, or on a server.
 
     @export var root := "user://saves"
 
-    func _open(session: Object, slot: StringName) -> NetwPromise:
+    func _open(session: NetwSession, slot: StringName) -> NetwPromise:
         return NetwPromise.resolved(MyConnection.new(root, slot))
 
 \ A method left unimplemented rejects with :godot:`@GlobalScope.ERR_UNAVAILABLE <@GlobalScope#class_@GlobalScope_constant_ERR_UNAVAILABLE>`. The records themselves are read and written by the :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` that :ref:`_open()<class_NetwDatabaseBackend_private_method__open>` returns.
@@ -42,19 +42,19 @@ Methods
 .. table::
    :widths: auto
 
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_delete_slot<class_NetwDatabaseBackend_private_method__delete_slot>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) |virtual| |
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_list_slots<class_NetwDatabaseBackend_private_method__list_slots>`\ (\ session\: :godot:`Object`\ ) |virtual|                               |
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_open<class_NetwDatabaseBackend_private_method__open>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) |virtual|               |
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`delete_slot<class_NetwDatabaseBackend_method_delete_slot>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )                     |
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`list_slots<class_NetwDatabaseBackend_method_list_slots>`\ (\ session\: :godot:`Object`\ )                                                   |
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`open<class_NetwDatabaseBackend_method_open>`\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ )                                   |
-   +---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_delete_slot<class_NetwDatabaseBackend_private_method__delete_slot>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) |virtual| |
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_list_slots<class_NetwDatabaseBackend_private_method__list_slots>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`\ ) |virtual|                               |
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`_open<class_NetwDatabaseBackend_private_method__open>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) |virtual|               |
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`delete_slot<class_NetwDatabaseBackend_method_delete_slot>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ )                     |
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`list_slots<class_NetwDatabaseBackend_method_list_slots>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`\ )                                                   |
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`open<class_NetwDatabaseBackend_method_open>`\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ )                                   |
+   +---------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -69,9 +69,9 @@ Method Descriptions
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **_delete_slot**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) |virtual| :ref:`🔗<class_NetwDatabaseBackend_private_method__delete_slot>`
+:ref:`NetwPromise<class_NetwPromise>` **_delete_slot**\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) |virtual| :ref:`🔗<class_NetwDatabaseBackend_private_method__delete_slot>`
 
-Removes ``slot`` and resolves an :godot:`@GlobalScope.Error <@GlobalScope#enum_@globalscope_Error>`, which :ref:`NetwDatabase.delete_slot()<class_NetwDatabase_method_delete_slot>` gives. Resolve an error when the slot could not be fully removed. ``session`` is the :ref:`NetwMultiplayer<class_NetwMultiplayer>` asking.
+Removes ``slot`` and resolves an :godot:`@GlobalScope.Error <@GlobalScope#enum_@globalscope_Error>`, which :ref:`NetwDatabase.delete_slot()<class_NetwDatabase_method_delete_slot>` gives. Resolve an error when the slot could not be fully removed. ``session`` is the session asking, the same :ref:`NetwSession<class_NetwSession>` that :ref:`Netw.session()<class_Netw_method_session>` answers, or ``null`` when a game calls :ref:`delete_slot()<class_NetwDatabaseBackend_method_delete_slot>` with none.
 
 .. rst-class:: classref-item-separator
 
@@ -81,9 +81,9 @@ Removes ``slot`` and resolves an :godot:`@GlobalScope.Error <@GlobalScope#enum_@
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **_list_slots**\ (\ session\: :godot:`Object`\ ) |virtual| :ref:`🔗<class_NetwDatabaseBackend_private_method__list_slots>`
+:ref:`NetwPromise<class_NetwPromise>` **_list_slots**\ (\ session\: :ref:`NetwSession<class_NetwSession>`\ ) |virtual| :ref:`🔗<class_NetwDatabaseBackend_private_method__list_slots>`
 
-Resolves a :godot:`PackedStringArray` of every slot in storage, including ones written by earlier runs. :ref:`NetwDatabase.list_slots()<class_NetwDatabase_method_list_slots>` gives it. ``session`` is the :ref:`NetwMultiplayer<class_NetwMultiplayer>` asking.
+Resolves a :godot:`PackedStringArray` of every slot in storage, including ones written by earlier runs. :ref:`NetwDatabase.list_slots()<class_NetwDatabase_method_list_slots>` gives it. ``session`` is the session asking, the same :ref:`NetwSession<class_NetwSession>` that :ref:`Netw.session()<class_Netw_method_session>` answers, or ``null`` when a game calls :ref:`list_slots()<class_NetwDatabaseBackend_method_list_slots>` with none.
 
 .. rst-class:: classref-item-separator
 
@@ -93,9 +93,9 @@ Resolves a :godot:`PackedStringArray` of every slot in storage, including ones w
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **_open**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) |virtual| :ref:`🔗<class_NetwDatabaseBackend_private_method__open>`
+:ref:`NetwPromise<class_NetwPromise>` **_open**\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) |virtual| :ref:`🔗<class_NetwDatabaseBackend_private_method__open>`
 
-Resolves a new :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` for ``slot``, or rejects with an error. ``session`` is the :ref:`NetwMultiplayer<class_NetwMultiplayer>` opening the slot.
+Resolves a new :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` for ``slot``, or rejects with an error. ``session`` is the session opening the slot, the same :ref:`NetwSession<class_NetwSession>` that :ref:`Netw.session()<class_Netw_method_session>` answers, or ``null`` when a game calls :ref:`open()<class_NetwDatabaseBackend_method_open>` with none.
 
 .. rst-class:: classref-item-separator
 
@@ -105,7 +105,7 @@ Resolves a new :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` for `
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **delete_slot**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_delete_slot>`
+:ref:`NetwPromise<class_NetwPromise>` **delete_slot**\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_delete_slot>`
 
 Removes ``slot`` through :ref:`_delete_slot()<class_NetwDatabaseBackend_private_method__delete_slot>`, or through the backend's own storage when no script overrides it. ``session`` may be ``null`` when no session is asking.
 
@@ -117,7 +117,7 @@ Removes ``slot`` through :ref:`_delete_slot()<class_NetwDatabaseBackend_private_
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **list_slots**\ (\ session\: :godot:`Object`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_list_slots>`
+:ref:`NetwPromise<class_NetwPromise>` **list_slots**\ (\ session\: :ref:`NetwSession<class_NetwSession>`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_list_slots>`
 
 Resolves every slot in storage through :ref:`_list_slots()<class_NetwDatabaseBackend_private_method__list_slots>`, or through the backend's own storage when no script overrides it.
 
@@ -129,7 +129,7 @@ Resolves every slot in storage through :ref:`_list_slots()<class_NetwDatabaseBac
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **open**\ (\ session\: :godot:`Object`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_open>`
+:ref:`NetwPromise<class_NetwPromise>` **open**\ (\ session\: :ref:`NetwSession<class_NetwSession>`, slot\: :godot:`StringName`\ ) :ref:`🔗<class_NetwDatabaseBackend_method_open>`
 
 Resolves a :ref:`NetwDatabaseConnection<class_NetwDatabaseConnection>` for ``slot`` through :ref:`_open()<class_NetwDatabaseBackend_private_method__open>`, or through the backend's own storage when no script overrides it.
 

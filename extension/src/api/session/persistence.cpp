@@ -120,7 +120,7 @@ void NetwMultiplayer::database_connected(
     databases.connected(p_database, p_generation);
 }
 
-RID NetwMultiplayer::schema_of_declaration(const Ref<NetwSchema> &p_schema) {
+RID NetwMultiplayer::schema_declare(const Ref<NetwSchema> &p_schema) {
     if (p_schema.is_null()) {
         return RID();
     }
@@ -177,11 +177,7 @@ void NetwMultiplayer::database_install_from(Node *p_scope) {
     }
 }
 
-RID NetwMultiplayer::database_find(const StringName &p_name) const {
-    return databases.find(p_name);
-}
-
-RID NetwMultiplayer::database_lookup(const StringName &p_name) {
+RID NetwMultiplayer::database_find(const StringName &p_name) {
     const RID found = get_databases()->find(p_name);
     if (found.is_valid()) {
         return found;
@@ -201,22 +197,19 @@ bool NetwMultiplayer::database_declaration_live(
         || scope->is_queued_for_deletion()) {
         return false;
     }
-    return NetwMultiplayer::of(scope) == this;
+    return NetwMultiplayer::session_holding(scope) == this;
 }
 
 Ref<NetwDatabase> NetwMultiplayer::database_handle(const RID &p_database) {
     if (!get_databases()->is_valid(p_database)) {
         return Ref<NetwDatabase>();
     }
-    const HashMap<RID, Ref<RefCounted>>::Iterator held
-        = database_handles.find(p_database);
-    if (held != database_handles.end()) {
-        return Ref<NetwDatabase>(
-            Object::cast_to<NetwDatabase>(held->value.ptr())
-        );
+    if (const Ref<NetwDatabase> *held
+        = views.database_handles.getptr(p_database)) {
+        return *held;
     }
     const Ref<NetwDatabase> made = NetwDatabase::over(p_database, this);
-    database_handles[p_database] = made;
+    views.database_handles[p_database] = made;
     return made;
 }
 
@@ -249,7 +242,8 @@ Ref<NetwPromise> NetwMultiplayer::database_open(
             )
         );
     }
-    return plane->open(p_database, p_slot, backend->open(this, p_slot));
+    return plane
+        ->open(p_database, p_slot, backend->open(get_session(), p_slot));
 }
 
 Error NetwMultiplayer::database_backend_of(
@@ -369,7 +363,7 @@ Ref<NetwPromise> NetwMultiplayer::database_list_slots(const RID &p_database) {
             "this database declares no backend to list slots of"
         ));
     }
-    const Ref<NetwPromise> asked = backend->list_slots(this);
+    const Ref<NetwPromise> asked = backend->list_slots(get_session());
     Ref<NetwPromise> answer;
     answer.instantiate();
     asked->when_settled(
@@ -435,7 +429,7 @@ Ref<NetwPromise> NetwMultiplayer::database_delete_slot(
             "this database declares no backend to delete a slot of"
         );
     }
-    return backend->delete_slot(this, p_slot);
+    return backend->delete_slot(get_session(), p_slot);
 }
 
 StringName NetwMultiplayer::database_get_name(const RID &p_database) const {
@@ -475,7 +469,7 @@ Error NetwMultiplayer::database_batch_write(
         fault::raise(
             this,
             NETW_FAULT_BAD_VALUE,
-            {String("NetwMultiplayer.database_batch_write"),
+            {String("{NetwWriteBatch.write}"),
              String("a row where ") + detail,
              String("a row with one value of the declared type for each "
                     "column of its schema")}
@@ -535,16 +529,7 @@ RID NetwMultiplayer::persist_binding_of_entity(const RID &p_entity) const {
     return node != nullptr ? bindings.find(node) : RID();
 }
 
-RID NetwMultiplayer::persist_entity_of_binding(const RID &p_binding) const {
-    const persist::Binding *held = bindings.at(p_binding);
-    Node *root = held != nullptr
-        ? Object::cast_to<Node>(gd::object_of(held->root))
-        : nullptr;
-    const Ref<NetwEntity> entity = NetwEntity::resolve(root);
-    return entity.is_valid() ? entity->get_rid_handle() : RID();
-}
-
-Ref<NetwPersistence> NetwMultiplayer::persist_handle_of_binding(
+Ref<NetwEntity> NetwMultiplayer::persist_heard_entity(
     const RID &p_binding
 ) const {
     const persist::Binding *held = bindings.at(p_binding);
@@ -552,13 +537,13 @@ Ref<NetwPersistence> NetwMultiplayer::persist_handle_of_binding(
         ? Object::cast_to<Node>(gd::object_of(held->root))
         : nullptr;
     const Ref<NetwEntity> entity = NetwEntity::resolve(root);
-    const NetwEntityRecord *record
-        = entity.is_valid() ? entity->get_record() : nullptr;
-    return record != nullptr
+    const NetwEntityRecord *record = record_of(entity.ptr());
+    const Ref<NetwPersistence> view = record != nullptr
         ? Ref<NetwPersistence>(
               record->minted_part(NetwEntityRecord::PART_PERSISTENCE)
           )
         : Ref<NetwPersistence>();
+    return view.is_valid() ? entity : Ref<NetwEntity>();
 }
 
 int64_t NetwMultiplayer::persist_tenure() const {
@@ -578,7 +563,7 @@ bool NetwMultiplayer::persist_is_dirty_binding(const RID &p_binding) {
     return get_bindings()->is_dirty(p_binding);
 }
 
-RID NetwMultiplayer::persist_get_database(const RID &p_binding) const {
+RID NetwMultiplayer::persist_get_database_binding(const RID &p_binding) const {
     const persist::Binding *held = bindings.at(p_binding);
     return held != nullptr ? held->database : RID();
 }
@@ -623,22 +608,36 @@ StringName NetwMultiplayer::persist_get_record_id(const RID &p_entity) const {
                               : StringName();
 }
 
+RID NetwMultiplayer::persist_get_database(const RID &p_entity) const {
+    const RID binding = persist_binding_of_entity(p_entity);
+    return binding.is_valid() ? persist_get_database_binding(binding) : RID();
+}
+
+RID NetwMultiplayer::persist_get_schema(const RID &p_entity) const {
+    const persist::Binding *held
+        = bindings.at(persist_binding_of_entity(p_entity));
+    return held != nullptr ? held->schema : RID();
+}
+
 void NetwMultiplayer::persist_notify_loaded(
     const RID &p_binding,
     bool p_found
 ) {
-    const RID entity = persist_entity_of_binding(p_binding);
-    const Ref<NetwPersistence> handle = persist_handle_of_binding(p_binding);
-    if (handle.is_valid()) {
-        handle->announce_loaded(entity, p_found);
+    const Ref<NetwEntity> entity = persist_heard_entity(p_binding);
+    if (entity.is_valid()) {
+        Announcement row;
+        row.kind = AnnouncementKind::PERSIST_LOADED;
+        row.flag = p_found;
+        entity_announce(entity.ptr(), row);
     }
 }
 
 void NetwMultiplayer::persist_notify_saved(const RID &p_binding) {
-    const RID entity = persist_entity_of_binding(p_binding);
-    const Ref<NetwPersistence> handle = persist_handle_of_binding(p_binding);
-    if (handle.is_valid()) {
-        handle->announce_saved(entity);
+    const Ref<NetwEntity> entity = persist_heard_entity(p_binding);
+    if (entity.is_valid()) {
+        Announcement row;
+        row.kind = AnnouncementKind::PERSIST_SAVED;
+        entity_announce(entity.ptr(), row);
     }
 }
 
@@ -647,11 +646,13 @@ void NetwMultiplayer::persist_notify_failed(
     Error p_error,
     const String &p_detail
 ) {
-    const HashMap<RID, Ref<RefCounted>>::Iterator held
-        = database_handles.find(p_database);
-    if (held != database_handles.end()) {
-        Object::cast_to<NetwDatabase>(held->value.ptr())
-            ->announce_failed(p_database, int(p_error), p_detail);
+    if (views.database_handles.has(p_database)) {
+        Announcement row;
+        row.kind = AnnouncementKind::DATABASE_FAILED;
+        row.database = p_database;
+        row.code = int64_t(p_error);
+        row.reason = p_detail;
+        announce(row);
     }
 }
 
@@ -1578,7 +1579,7 @@ void NetwMultiplayer::persist_table_retire(
             retiring.push_back(p_routes[at]);
         }
     }
-    liveness_release_routes(retiring);
+    table_release_routes(p_table, retiring);
 }
 
 } // namespace netw

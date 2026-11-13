@@ -153,8 +153,9 @@ struct World {
         rig.mirror_scene(p_seat, StringName("Arena"), true);
         rig.pump(4);
         if (p_watch) {
+            const int64_t peer = rig.peer_id(p_seat);
             NETW_REQUIRE_EQ(
-                int(rig.server()->scene_watch(arena, rig.peer_id(p_seat))),
+                int(rig.server()->scene_watch_peer(arena, peer)),
                 int(OK)
             );
         }
@@ -181,8 +182,8 @@ struct World {
     ) {
         Array args;
         args.push_back(String(p_name));
-        const RID made
-            = rig.server()->spawn_registered(p_id, args, p_owner.ptr());
+        const int64_t owner = p_owner.is_valid() ? p_owner->get_id() : 0;
+        const RID made = rig.server()->spawn_registered(p_id, args, owner);
         REQUIRE(made.is_valid());
         Node *home = outside_scenes ? rig.branch(-1) : level();
         home->add_child(rig.server()->entity_get_node(made));
@@ -601,13 +602,13 @@ TEST_CASE(
     }
     NETW_CHECK_EQ(
         world.entity(route, -1)->get_player_id(),
-        returned->player_id()
+        returned->get_id()
     );
     CHECK(world.entity(route, back)->get_is_controlled_locally());
     REQUIRE(returned->get_scene().is_valid());
     CHECK(world.rig.server()
               ->scene_get_player_entities(world.arena)
-              .has(world.entity(route, -1)));
+              .has(world.entity(route, -1)->get_rid_handle()));
 }
 
 TEST_CASE(
@@ -844,9 +845,10 @@ public:
     Node *spawn(const char *p_name, NetwPlayer *p_owner) {
         Array args;
         args.push_back(String(p_name));
+        const int64_t owner = p_owner != nullptr ? p_owner->get_id() : 0;
         const RID made
             = at(SEAT_SERVER)
-                  ->spawn_registered(StringName(AVATAR_ID), args, p_owner);
+                  ->spawn_registered(StringName(AVATAR_ID), args, owner);
         Node *node = at(SEAT_SERVER)->entity_get_node(made);
         if (node != nullptr) {
             arenas[SEAT_SERVER]->add_child(node);
@@ -871,7 +873,7 @@ class KeptTransferScenario final : public netw_test::FrameScenario {
         stand = new TransferStand();
         NetwMultiplayer *server = stand->at(SEAT_SERVER);
         const Ref<NetwPlayer> ada
-            = server->peer_get_player(stand->peer_id(SEAT_DROPPED));
+            = server->player_joined_of(stand->peer_id(SEAT_DROPPED));
         if (ada.is_null()) {
             return;
         }
@@ -891,8 +893,10 @@ class KeptTransferScenario final : public netw_test::FrameScenario {
             seen.kept_before = seen.kept_before && stand->shows(seat_at, "ada")
                 && stand->shows(seat_at, "Crate");
         }
-        seen.moved
-            = server->get_session()->transfer_server(stand->peer_id(successor))
+        const Ref<netw::NetwSession> session = server->get_session();
+        seen.moved = session->transfer_server(
+                         session->player_of(stand->peer_id(successor))
+                     )
             == OK;
     }
 
@@ -1004,9 +1008,11 @@ class MoveScenario final : public netw_test::FrameScenario {
     TransferStand *stand = nullptr;
 
     bool move() {
-        return stand->at(SEAT_SERVER)
-                   ->get_session()
-                   ->transfer_server(stand->peer_id(SEAT_SUCCESSOR))
+        const Ref<netw::NetwSession> session
+            = stand->at(SEAT_SERVER)->get_session();
+        return session->transfer_server(
+                   session->player_of(stand->peer_id(SEAT_SUCCESSOR))
+               )
             == OK;
     }
 

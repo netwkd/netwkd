@@ -58,6 +58,7 @@ struct AttemptEvidence {
     bool driven = false;
     int port = 0;
     int64_t tag_refusals = 0;
+    int64_t unhandled_failures = 0;
     SideEvidence sides[SIDE_COUNT];
 };
 
@@ -91,7 +92,7 @@ void record_settled_address(Variant, uint64_t p_session) {
     );
     if (session != nullptr) {
         attempt_evidence().sides[SIDE_HOST].address_when_settled
-            = session->peer_join_address();
+            = session->transport_get_join_address();
     }
 }
 
@@ -169,9 +170,12 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
             connection->join(invited, Dictionary());
             return;
         }
-        client->transport_join(
-            enet(client),
-            String("127.0.0.1:") + itos(p_port),
+        client->endpoint_join(
+            client->endpoint_add(
+                enet(client),
+                String("127.0.0.1:") + itos(p_port),
+                String()
+            ),
             Dictionary()
         );
     }
@@ -193,7 +197,8 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
         connection->connect(StringName("invited"), here);
         const Ref<netw::NetwEndpoint> joined
             = connection->invite(enet, invited->get_address(), String("Ada"));
-        connection->invite(enet, client->peer_join_address(), String("Ada"));
+        const String here_address = client->transport_get_join_address();
+        connection->invite(enet, here_address, String("Ada"));
         connection->disconnect(StringName("invited"), here);
         r_side.here_answers_joined_endpoint = joined == invited;
 
@@ -206,7 +211,7 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
 
     void finish_client(Side p_side) {
         SideEvidence &side = attempt_evidence().sides[p_side];
-        side.end_session_state = int(client->session_get_state());
+        side.end_session_state = int(client->session_get_stored_state());
         side.walked = side.states;
         if (p_side == SIDE_INVITED) {
             side.invite_pending = invited->get_is_invited();
@@ -232,7 +237,7 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
     }
 
     bool connecting() const {
-        return client->session_get_computed_state() == CONNECTING;
+        return client->session_get_state() == CONNECTING;
     }
 
 public:
@@ -286,7 +291,7 @@ public:
                 return true;
             }
             case 2: {
-                if (client->is_online() || over_budget()) {
+                if (client->session_is_online() || over_budget()) {
                     finish_client(SIDE_ASSIGNED);
                     join(SIDE_INVITED, evidence.port);
                     enter(7);
@@ -346,6 +351,8 @@ public:
                 evidence.tag_refusals = diagnostics->warning_count_containing(
                     "differ in the app tag"
                 );
+                evidence.unhandled_failures
+                    = diagnostics->warning_count_containing("[NW1011]");
                 diagnostics.unref();
                 evidence.driven = true;
                 return false;
@@ -407,6 +414,7 @@ TEST_CASE(
     const SideEvidence &side = evidence.sides[SIDE_CLOSED];
     NETW_CHECK_EQ(side.failed, 1);
     NETW_CHECK_EQ(side.failed_error, int64_t(ERR_CANT_CONNECT));
+    NETW_CHECK_EQ(evidence.unhandled_failures, 0);
     check_states(side, {CREATING, CONNECTING, OFFLINE});
 }
 

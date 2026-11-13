@@ -39,6 +39,7 @@
 #include "godot/viewport.hpp"
 #include "godot/world.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/database.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_options.hpp"
 #include "netw/api/join_request.hpp"
@@ -131,7 +132,6 @@ NetwMultiplayer::NetwMultiplayer() {
     session_set_inner(transport);
     liveness_core.instantiate();
     clock.sink.bind(this);
-    interest_engine.host = this;
     clock.hook_with(
         [](void *p_context,
            ClockEngine::Event p_event,
@@ -202,7 +202,6 @@ NetwMultiplayer::NetwMultiplayer() {
     control_channels.kicked = declared_channel("SESSION_KICKED");
     control_channels.shutdown = declared_channel("SESSION_SHUTDOWN");
     control_channels.kick_request = declared_channel("SESSION_KICK_REQUEST");
-    control_channels.leave_request = declared_channel("SESSION_LEAVE_REQUEST");
     control_channels.leave = declared_channel("SESSION_LEAVE");
     control_channels.player_left = declared_channel("SESSION_PLAYER_LEFT");
     control_channels.pause = declared_channel("SESSION_PAUSE");
@@ -265,7 +264,6 @@ NetwMultiplayer::NetwMultiplayer() {
         control_channels.kicked,
         control_channels.shutdown,
         control_channels.kick_request,
-        control_channels.leave_request,
         control_channels.leave,
         control_channels.player_left,
     };
@@ -339,7 +337,7 @@ void NetwMultiplayer::embed_dispose() {
     service_clear();
     session_clear_roster();
     player_clear();
-    announcements.clear();
+    announce_drop();
 }
 
 void NetwMultiplayer::clock_event(
@@ -351,8 +349,8 @@ void NetwMultiplayer::clock_event(
     const int64_t tick = p_b;
     switch (p_event) {
         case ClockEngine::EVENT_BEFORE_TICK:
-            if (clock_handle.is_valid()) {
-                clock_handle->announce_before_tick(delta, tick);
+            if (views.clock_handle.is_valid()) {
+                views.clock_handle->announce_before_tick(delta, tick);
             }
             return;
         case ClockEngine::EVENT_ON_TICK:
@@ -374,8 +372,8 @@ void NetwMultiplayer::clock_event(
                 display_on_clock_tick(delta, tick);
             }
             session_on_clock_tick(delta, tick);
-            if (clock_handle.is_valid()) {
-                clock_handle->announce_ticked(delta, tick);
+            if (views.clock_handle.is_valid()) {
+                views.clock_handle->announce_ticked(delta, tick);
             }
             return;
         case ClockEngine::EVENT_BEFORE_TICK_LOOP:
@@ -385,8 +383,10 @@ void NetwMultiplayer::clock_event(
             frame_step();
             return;
         case ClockEngine::EVENT_SYNCHRONIZED:
-            if (clock_handle.is_valid()) {
-                clock_handle->announce_synchronized();
+            if (views.clock_handle.is_valid()) {
+                Announcement row;
+                row.kind = AnnouncementKind::SYNCHRONIZED;
+                announce(row);
             }
             return;
         case ClockEngine::EVENT_STABILITY_CHANGED:
@@ -418,11 +418,6 @@ int64_t NetwMultiplayer::player_mint_id() {
     return minted;
 }
 
-int64_t NetwMultiplayer::player_peer_of_id(int64_t p_player_id) const {
-    const PlayerRow *found = players.getptr(p_player_id);
-    return found != nullptr ? found->peer : 0;
-}
-
 void NetwMultiplayer::participant_index_peer(
     int64_t p_peer,
     int64_t p_player_id
@@ -437,33 +432,31 @@ void NetwMultiplayer::participant_unindex(int64_t p_peer, int64_t p_player_id) {
     }
 }
 
-Ref<NetwPlayer> NetwMultiplayer::player_ensure(
-    const session::AcceptFrame &p_accepted
-) {
+bool NetwMultiplayer::player_ensure(const session::AcceptFrame &p_accepted) {
     if (p_accepted.player_id == 0) {
-        return Ref<NetwPlayer>();
+        return false;
     }
     const int64_t player_id = int64_t(p_accepted.player_id);
+    player_incarnation_next = MAX(player_incarnation_next, player_id + 1);
     PlayerRow *found = players.getptr(player_id);
     if (found != nullptr) {
         if (found->peer != p_accepted.peer_id) {
             participant_unindex(found->peer, player_id);
             found->peer = p_accepted.peer_id;
-            if (found->row.is_valid()) {
-                found->row->rebind_peer(p_accepted.peer_id);
-            }
         }
+        found->departed = false;
+        found->drop_owed = false;
         participant_index_peer(p_accepted.peer_id, player_id);
-        return found->row;
+        return true;
     }
-    if (PlayerRow *stale = player_row(p_accepted.peer_id)) {
-        stale->admitted = false;
-        stale->incarnation = 0;
+    if (const int64_t *stale = player_id_of_peer.getptr(p_accepted.peer_id)) {
+        const int64_t stale_id = *stale;
+        if (PlayerRow *departing = players.getptr(stale_id)) {
+            departing->admitted = false;
+            departing->departed = true;
+        }
+        player_drop_row(stale_id);
     }
-    Ref<NetwPlayer> minted;
-    minted.instantiate();
-    minted->bind_to(this, p_accepted.peer_id, player_id, p_accepted.username);
-    minted->bind_account(p_accepted.account, p_accepted.account_name);
     NETW_TRACE(
         sys::SESSION,
         "Gave player id %d to peer %d.",
@@ -471,34 +464,34 @@ Ref<NetwPlayer> NetwMultiplayer::player_ensure(
         int(p_accepted.peer_id)
     );
     PlayerRow seating;
-    seating.row = minted;
     seating.peer = p_accepted.peer_id;
     seating.incarnation = player_id;
+    seating.username = p_accepted.username;
+    seating.account = p_accepted.account;
+    seating.account_name = p_accepted.account_name;
     players[player_id] = seating;
     participant_index_peer(p_accepted.peer_id, player_id);
+    return true;
+}
+
+Ref<NetwPlayer> NetwMultiplayer::player_view(int64_t p_player) const {
+    if (!players.has(p_player)) {
+        return Ref<NetwPlayer>();
+    }
+    if (const Ref<NetwPlayer> *held = views.player_views.getptr(p_player)) {
+        return *held;
+    }
+    Ref<NetwPlayer> minted;
+    minted.instantiate();
+    minted->session_id = gd::instance_id(this);
+    minted->incarnation = p_player;
+    views.player_views[p_player] = minted;
     return minted;
 }
 
-void NetwMultiplayer::player_adopt(
-    int64_t p_peer,
-    const Ref<NetwPlayer> &p_player
-) {
-    if (p_player.is_null() || player_row(p_peer) != nullptr) {
-        return;
-    }
-    const int64_t player_id = player_mint_id();
-    p_player->bind_to(this, p_peer, player_id);
-    PlayerRow seating;
-    seating.row = p_player;
-    seating.peer = p_peer;
-    seating.incarnation = player_id;
-    players[player_id] = seating;
-    participant_index_peer(p_peer, player_id);
-}
-
 Ref<NetwPlayer> NetwMultiplayer::player_of(int64_t p_peer) const {
-    const PlayerRow *found = player_row(p_peer);
-    return found ? found->row : Ref<NetwPlayer>();
+    const int64_t *player_id = player_id_of_peer.getptr(p_peer);
+    return player_id != nullptr ? player_view(*player_id) : Ref<NetwPlayer>();
 }
 
 bool NetwMultiplayer::player_has(int64_t p_peer) const {
@@ -508,7 +501,9 @@ bool NetwMultiplayer::player_has(int64_t p_peer) const {
 TypedArray<NetwPlayer> NetwMultiplayer::player_all() const {
     LocalVector<int64_t> peers;
     for (const KeyValue<int64_t, PlayerRow> &row : players) {
-        peers.push_back(row.value.peer);
+        if (!row.value.departed && !row.value.drop_owed) {
+            peers.push_back(row.value.peer);
+        }
     }
     peers.sort();
     TypedArray<NetwPlayer> out;
@@ -518,7 +513,7 @@ TypedArray<NetwPlayer> NetwMultiplayer::player_all() const {
     return out;
 }
 
-Ref<NetwPlayer> NetwMultiplayer::player_joined_of(int64_t p_peer) {
+Ref<NetwPlayer> NetwMultiplayer::player_joined_of(int64_t p_peer) const {
     if (!session_has_accepted(p_peer)) {
         return Ref<NetwPlayer>();
     }
@@ -537,8 +532,24 @@ TypedArray<NetwPlayer> NetwMultiplayer::player_joined_all() {
     return out;
 }
 
+PackedInt64Array NetwMultiplayer::player_list() const {
+    const LocalVector<session::AcceptFrame> joins = session_accepted_joins();
+    PackedInt64Array out;
+    for (uint32_t at = 0; at < joins.size(); ++at) {
+        const int64_t player = peer_get_player(joins[at].peer_id);
+        if (player != 0) {
+            out.push_back(player);
+        }
+    }
+    return out;
+}
+
 Ref<NetwPlayer> NetwMultiplayer::player_local() {
     return player_joined_of(get_unique_id());
+}
+
+int64_t NetwMultiplayer::player_get_local() {
+    return peer_get_player(get_unique_id());
 }
 
 bool NetwMultiplayer::player_admit(int64_t p_peer) {
@@ -555,7 +566,7 @@ Ref<NetwPlayer> NetwMultiplayer::player_admitted_of(int64_t p_peer) const {
     if (found == nullptr || !found->admitted) {
         return Ref<NetwPlayer>();
     }
-    return found->row;
+    return player_of(p_peer);
 }
 
 TypedArray<NetwPlayer> NetwMultiplayer::player_admitted_all() const {
@@ -577,19 +588,17 @@ Ref<NetwPlayer> NetwMultiplayer::player_admitted_local() {
     return player_admitted_of(get_unique_id());
 }
 
-Ref<NetwPlayer> NetwMultiplayer::player_find_account(
-    const String &p_account
-) const {
+int64_t NetwMultiplayer::player_find_account(const String &p_account) const {
     if (p_account.is_empty()) {
-        return Ref<NetwPlayer>();
+        return 0;
     }
     for (const KeyValue<int64_t, PlayerRow> &row : players) {
-        if (row.value.admitted && row.value.row.is_valid()
-            && row.value.row->get_account() == p_account) {
-            return row.value.row;
+        if (row.value.admitted && !row.value.departed && !row.value.drop_owed
+            && row.value.account == p_account) {
+            return row.key;
         }
     }
-    return Ref<NetwPlayer>();
+    return 0;
 }
 
 TypedArray<NetwEntity> NetwMultiplayer::player_entities_held(
@@ -597,7 +606,7 @@ TypedArray<NetwEntity> NetwMultiplayer::player_entities_held(
     int64_t p_player_id
 ) {
     TypedArray<NetwEntity> held;
-    if (!is_host() && !player_is_active(p_peer, p_player_id)) {
+    if (!is_host() && !player_is_active(p_player_id)) {
         return held;
     }
     entity_slots.each([&](uint64_t, const EntitySlot &p_slot) {
@@ -624,18 +633,14 @@ TypedArray<NetwEntity> NetwMultiplayer::player_entities_held(
     return held;
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::player_get_entities(int64_t p_peer) {
-    return player_entities_held(p_peer, player_incarnation(p_peer));
-}
-
 bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
     if (session_settings.return_window <= 0.0 || p_entity == nullptr
         || !is_host() || p_peer == get_unique_id()) {
         return false;
     }
     const PlayerRow *leaving = player_row(p_peer);
-    if (leaving == nullptr || !leaving->admitted || leaving->row.is_null()
-        || leaving->row->get_account().is_empty()) {
+    if (leaving == nullptr || !leaving->admitted
+        || leaving->account.is_empty()) {
         return false;
     }
     if (leaving->leave_reason != NetwPlayer::LEAVE_DROPPED
@@ -650,7 +655,7 @@ bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
     const bool owned = p_entity->get_peer_id() == p_peer;
     KeptEntity kept;
     kept.player_id = leaving->incarnation;
-    kept.account = leaving->row->get_account();
+    kept.account = leaving->account;
     kept.deadline_msec = int64_t(Time::get_singleton()->get_ticks_msec())
         + int64_t(session_settings.return_window * 1000.0);
     kept.owned = owned;
@@ -661,7 +666,7 @@ bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
     const RID handle = p_entity->get_rid_handle();
     kept_entities[handle.get_id()] = kept;
     if (!owned) {
-        p_entity->revert_to_server(p_peer);
+        control_revert_to_server(p_entity, p_peer);
         return true;
     }
     const RID standing = scene_of(handle);
@@ -671,7 +676,7 @@ bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
     if (issued != nullptr) {
         issued->set_peer_id(0);
     }
-    p_entity->revert_to_server(p_peer);
+    control_revert_to_server(p_entity, p_peer);
     membership_drop_entity_in(handle, standing, p_peer);
     return true;
 }
@@ -681,11 +686,10 @@ void NetwMultiplayer::player_hand_back(int64_t p_peer) {
         return;
     }
     const PlayerRow *returning = player_row(p_peer);
-    if (returning == nullptr || returning->row.is_null()
-        || returning->row->get_account().is_empty()) {
+    if (returning == nullptr || returning->account.is_empty()) {
         return;
     }
-    const String account = returning->row->get_account();
+    const String account = returning->account;
     LocalVector<uint64_t> held;
     for (const KeyValue<uint64_t, KeptEntity> &kept : kept_entities) {
         if (kept.value.account == account) {
@@ -708,7 +712,8 @@ void NetwMultiplayer::player_hand_back(int64_t p_peer) {
             : controller;
         if (!kept.owned) {
             if (driver != controller || kept.despawns) {
-                entity->reassign(
+                control_reassign(
+                    entity.ptr(),
                     entity->get_peer_id(),
                     entity->get_player_id(),
                     driver
@@ -722,7 +727,7 @@ void NetwMultiplayer::player_hand_back(int64_t p_peer) {
         if (issued != nullptr) {
             issued->set_peer_id(p_peer);
         }
-        entity->reassign(p_peer, returning->incarnation, driver);
+        control_reassign(entity.ptr(), p_peer, returning->incarnation, driver);
         membership_place_entity(entity);
         scene_adopt_entity(entity->get_rid_handle());
     }
@@ -768,7 +773,7 @@ void NetwMultiplayer::player_tell_kept(int64_t p_peer) {
     for (const KeyValue<uint64_t, KeptEntity> &kept : kept_entities) {
         const Ref<NetwEntity> entity = wrapper_for_id(int64_t(kept.key));
         if (kept.value.despawns && entity.is_valid()) {
-            entity->restate_control(p_peer);
+            control_restate(entity.ptr(), p_peer);
         }
     }
 }
@@ -814,7 +819,7 @@ int64_t NetwMultiplayer::membership_entity_id(const RID &p_entity) {
 
 bool NetwMultiplayer::membership_member_active(int64_t p_peer) const {
     const PlayerRow *found = player_row(p_peer);
-    return found != nullptr && found->incarnation != 0;
+    return found != nullptr && !found->departed;
 }
 
 bool NetwMultiplayer::membership_destination_foreign(Node *p_owner) const {
@@ -1013,8 +1018,8 @@ void NetwMultiplayer::membership_audit() {
     }
     LocalVector<NetwEntityRecord *> held;
     entity_slots.each([&held](uint64_t, const EntitySlot &p_slot) {
-        if (p_slot.record != nullptr) {
-            held.push_back(p_slot.record);
+        if (NetwEntityRecord *record = p_slot.routed_record()) {
+            held.push_back(record);
         }
     });
     for (NetwEntityRecord *record : held) {
@@ -1038,92 +1043,194 @@ void NetwMultiplayer::membership_audit() {
 
 #endif
 
-void NetwMultiplayer::player_forget(int64_t p_peer) {
-    const PlayerRow *found = player_row(p_peer);
+void NetwMultiplayer::player_forget(int64_t p_player) {
+    const PlayerRow *found = players.getptr(p_player);
     if (found == nullptr) {
         return;
     }
-    const int64_t player_id = found->incarnation != 0
-        ? found->incarnation
-        : *player_id_of_peer.getptr(p_peer);
-    if (found->row == local_player) {
-        bind_local_player(Ref<NetwPlayer>());
+    const int64_t peer = found->peer;
+    if (p_player == local_player_id) {
+        local_player_id = 0;
     }
-    participant_unindex(p_peer, player_id);
-    players.erase(player_id);
-    membership_mirror_release(p_peer);
+    participant_unindex(peer, p_player);
+    player_drop_row(p_player);
+    membership_mirror_release(peer);
+}
+
+void NetwMultiplayer::player_drop_row(int64_t p_player) {
+    PlayerRow *found = players.getptr(p_player);
+    if (found != nullptr && found->pins > 0) {
+        found->drop_owed = true;
+        return;
+    }
+    if (const Ref<NetwPlayer> *held = views.player_views.getptr(p_player)) {
+        (*held)->row_dropped = true;
+    }
+    players.erase(p_player);
+    views.player_views.erase(p_player);
+}
+
+bool NetwMultiplayer::player_pin(int64_t p_player) {
+    PlayerRow *found = players.getptr(p_player);
+    NETW_BUG_COND_V(found == nullptr, false);
+    found->pins += 1;
+    return true;
+}
+
+void NetwMultiplayer::player_unpin(int64_t p_player) {
+    PlayerRow *found = players.getptr(p_player);
+    if (found == nullptr || found->pins == 0) {
+        return;
+    }
+    found->pins -= 1;
+    if (found->pins == 0 && found->drop_owed) {
+        player_drop_row(p_player);
+    }
 }
 
 void NetwMultiplayer::player_clear() {
-    bind_local_player(Ref<NetwPlayer>());
+    local_player_id = 0;
+    for (const KeyValue<int64_t, Ref<NetwPlayer>> &held : views.player_views) {
+        held.value->session_id = ObjectID();
+    }
     players.clear();
+    views.player_views.clear();
     player_id_of_peer.clear();
     kept_entities.clear();
     kept_by_server.clear();
+    control_host_gifts.clear();
     scene_membership.clear();
-}
-
-void NetwMultiplayer::bind_local_player(const Ref<NetwPlayer> &p_row) {
-    local_player = p_row;
 }
 
 int64_t NetwMultiplayer::player_incarnation(int64_t p_peer) const {
     const PlayerRow *found = player_row(p_peer);
-    return found ? found->incarnation : 0;
+    return found != nullptr && !found->departed ? found->incarnation : 0;
 }
 
-bool NetwMultiplayer::player_is_active(
-    int64_t p_peer,
-    int64_t p_incarnation
-) const {
-    const PlayerRow *found = player_row(p_peer);
-    return found != nullptr && found->admitted
-        && found->incarnation == p_incarnation;
+bool NetwMultiplayer::player_is_active(int64_t p_player) const {
+    const PlayerRow *found = players.getptr(p_player);
+    return found != nullptr && found->admitted && !found->departed;
+}
+
+int64_t NetwMultiplayer::player_get_peer(int64_t p_player) const {
+    const PlayerRow *found = players.getptr(p_player);
+    return found != nullptr ? found->peer : 0;
+}
+
+StringName NetwMultiplayer::player_get_username(int64_t p_player) const {
+    const PlayerRow *found = players.getptr(p_player);
+    return found != nullptr ? found->username : StringName();
+}
+
+String NetwMultiplayer::player_get_account(int64_t p_player) const {
+    const PlayerRow *found = players.getptr(p_player);
+    return found != nullptr ? found->account : String();
+}
+
+String NetwMultiplayer::player_get_account_name(int64_t p_player) const {
+    const PlayerRow *found = players.getptr(p_player);
+    return found != nullptr ? found->account_name : String();
+}
+
+TypedArray<RID> NetwMultiplayer::player_get_entities(int64_t p_player) {
+    TypedArray<RID> out;
+    const PlayerRow *found = players.getptr(p_player);
+    if (found == nullptr) {
+        return out;
+    }
+    const TypedArray<NetwEntity> held
+        = player_entities_held(found->peer, p_player);
+    for (int at = 0; at < held.size(); ++at) {
+        const Ref<NetwEntity> entity = held[at];
+        out.push_back(entity->get_rid_handle());
+    }
+    return out;
+}
+
+RID NetwMultiplayer::player_get_scene(int64_t p_player) {
+    return player_is_active(p_player)
+        ? scene_of_peer(player_get_peer(p_player))
+        : RID();
 }
 
 bool NetwMultiplayer::player_holds(const Ref<NetwPlayer> &p_who) const {
-    if (p_who.is_null()) {
-        return false;
-    }
-    const PlayerRow *found = player_row(p_who->get_peer_id());
-    return found != nullptr && found->admitted && found->row == p_who;
+    return p_who.is_valid() && p_who->core() == this
+        && player_is_active(p_who->incarnation);
 }
 
-Error NetwMultiplayer::player_kick(
-    const Ref<NetwPlayer> &p_who,
-    const String &p_reason
+Error NetwMultiplayer::player_kick(int64_t p_player, const String &p_reason) {
+    return player_kick_from(p_player, p_reason, false);
+}
+
+Error NetwMultiplayer::player_kick_from(
+    int64_t p_player,
+    const String &p_reason,
+    bool p_door
 ) {
+    const String verb = p_door ? String("{NetwSession.kick}")
+                               : String("{NetwMultiplayer.player_kick}");
     if (!is_host()) {
-        fault::raise(this, NETW_FAULT_SERVER_ONLY, {"{NetwSession.kick}"});
+        fault::raise(this, NETW_FAULT_SERVER_ONLY, {verb});
         return ERR_UNAUTHORIZED;
     }
-    if (!player_holds(p_who)) {
+    if (!player_is_active(p_player)) {
         fault::raise(
             this,
-            NETW_FAULT_UNKNOWN_PEER,
-            {"{NetwSession.kick}",
-             String(),
-             String(),
-             p_who.is_valid() ? p_who->get_peer_id() : 0}
+            NETW_FAULT_BAD_VALUE,
+            {verb,
+             p_door ? String("a player that is not in this session")
+                    : vformat("player %d", p_player),
+             p_door ? String("a player from {NetwSession.players}")
+                    : String("the id of a client's player, such as one from "
+                             "{NetwMultiplayer.player_list}")}
         );
         return ERR_INVALID_PARAMETER;
     }
-    const int64_t peer = p_who->get_peer_id();
+    const int64_t peer = player_get_peer(p_player);
     if (peer == get_unique_id()) {
         fault::raise(
             this,
             NETW_FAULT_BAD_VALUE,
-            {"{NetwSession.kick}",
+            {verb,
              "the server's own player",
-             "a client's player, or call {NetwSession.leave} to end the "
-             "session"}
+             vformat(
+                 "a client's player, or call %s to end the session",
+                 p_door ? "{NetwSession.leave}"
+                        : "{NetwMultiplayer.session_leave}"
+             )}
         );
         return ERR_INVALID_PARAMETER;
     }
     player_note_leave(peer, NetwPlayer::LEAVE_KICKED);
-    player_release_id(p_who);
+    player_release_id(p_player);
     session_turn_peer_away(peer, p_reason);
     return OK;
+}
+
+void NetwMultiplayer::player_request_kick(
+    int64_t p_player,
+    const String &p_reason
+) {
+    const int64_t wire_player_limit = int64_t(1) << 35;
+    const uint64_t player = p_player > 0 && p_player < wire_player_limit
+        ? uint64_t(p_player)
+        : 0;
+    const PackedByteArray payload
+        = session::frame_write(session::KickRequest{player, p_reason});
+    if (is_server()) {
+        session_publish_control(control_channels.kick_request, 1, payload);
+        return;
+    }
+    send_to(
+        MultiplayerPeer::TARGET_PEER_SERVER,
+        0,
+        control_channels.kick_request,
+        payload,
+        true,
+        0,
+        String(),
+        false
+    );
 }
 
 void NetwMultiplayer::player_note_leave(
@@ -1160,49 +1267,58 @@ void NetwMultiplayer::player_note_leave(
     }
 }
 
-void NetwMultiplayer::player_release_id(const Ref<NetwPlayer> &p_who) {
-    const int64_t peer = p_who->get_peer_id();
-    PlayerRow *found = player_row(peer);
+void NetwMultiplayer::player_release_id(int64_t p_player) {
+    PlayerRow *found = players.getptr(p_player);
+    const int64_t peer = found != nullptr ? found->peer : 0;
     NetwPlayer::LeaveReason reason = NetwPlayer::LEAVE_DROPPED;
     if (found != nullptr) {
         reason = found->leave_reason;
         found->admitted = false;
-        found->incarnation = 0;
+        found->departed = true;
         membership_mirror_release(peer);
     }
     join_roster.forget(peer);
-    player_publish_left(p_who, reason);
-    player_forget(peer);
+    if (found != nullptr) {
+        player_publish_left(p_player, reason);
+    }
+    player_forget(p_player);
 }
 
 void NetwMultiplayer::player_publish_left(
-    const Ref<NetwPlayer> &p_who,
+    int64_t p_player,
     enums::NetwPlayer::LeaveReason p_reason
 ) {
-    if (p_who.is_null()) {
+    if (views.session_handle.is_null()) {
         return;
     }
-    if (session_handle.is_valid()) {
-        session_handle->announce_player_left(p_who, p_reason);
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::PLAYER_LEFT;
+    row.player = p_player;
+    row.code = int64_t(p_reason);
+    announce(row);
 }
 
 void NetwMultiplayer::player_publish_joined(int64_t p_peer) {
+    const int64_t *seated = player_id_of_peer.getptr(p_peer);
     const Ref<NetwPlayer> player = player_of(p_peer);
-    if (player.is_null()) {
+    if (seated == nullptr || player.is_null()) {
         return;
     }
+    Announcement row;
+    row.player = *seated;
     if (p_peer == get_unique_id()) {
-        bind_local_player(player);
-        if (session_handle.is_valid()) {
-            session_handle->announce_local_joined(player);
+        local_player_id = row.player;
+        if (views.session_handle.is_valid()) {
+            row.kind = AnnouncementKind::LOCAL_JOINED;
+            announce(row);
         }
     }
     if (scene_admits_on_join) {
         scene_on_player_joined(player);
     }
-    if (session_handle.is_valid()) {
-        session_handle->announce_player_joined(player);
+    if (views.session_handle.is_valid()) {
+        row.kind = AnnouncementKind::PLAYER_JOINED;
+        announce(row);
     }
 }
 
@@ -1216,30 +1332,10 @@ bool NetwMultiplayer::session_is_active() const {
     return live.ptr() == this;
 }
 
-TypedArray<MultiplayerAPI> NetwMultiplayer::session_get_all() {
-    NETW_ZONE_NC("netw::session_get_all", colors::SESSION);
-    TypedArray<MultiplayerAPI> out;
-    LocalVector<ObjectID> kept;
-    for (const ObjectID &id : live_registry) {
-        NetwMultiplayer *session
-            = Object::cast_to<NetwMultiplayer>(gd::instance_from_id(id));
-        if (session == nullptr) {
-            NETW_TRACE(
-                sys::SESSION,
-                "A disposed session left the list of live sessions."
-            );
-            continue;
-        }
-        kept.push_back(id);
-        if (session->session_is_active()) {
-            out.push_back(Ref<MultiplayerAPI>(session));
-        }
-    }
-    live_registry = kept;
-    return out;
-}
-
-NetwMultiplayer *NetwMultiplayer::of(Node *p_node) {
+NetwMultiplayer *NetwMultiplayer::session_holding(
+    Node *p_node,
+    TreeState p_state
+) {
     if (p_node == nullptr || !p_node->is_inside_tree()) {
         NETW_TRACE(
             sys::SESSION,
@@ -1247,61 +1343,58 @@ NetwMultiplayer *NetwMultiplayer::of(Node *p_node) {
         );
         return nullptr;
     }
-    return of_installed(p_node->get_multiplayer());
+    Ref<MultiplayerAPI> installed;
+    if (p_state == TreeState::EXITING) {
+        String path;
+        for (Node *at = p_node; at != nullptr; at = at->get_parent()) {
+            path = "/" + String(at->get_name()) + path;
+        }
+        installed = p_node->get_tree()->get_multiplayer(NodePath(path));
+    } else {
+        installed = p_node->get_multiplayer();
+    }
+    NetwMultiplayer *session
+        = Object::cast_to<NetwMultiplayer>(installed.ptr());
+    if (session == nullptr) {
+        NETW_TRACE(sys::SESSION, "A node's branch has no NetwMultiplayer.");
+    }
+    return session;
 }
 
-NetwMultiplayer *NetwMultiplayer::of_leaving(Node *p_node) {
-    if (p_node == nullptr || !p_node->is_inside_tree()) {
-        return nullptr;
+Ref<NetwMultiplayer> NetwMultiplayer::session_of(Node *p_node) {
+    if (p_node != nullptr) {
+        return Ref<NetwMultiplayer>(session_holding(p_node));
     }
-    String path;
-    for (Node *at = p_node; at != nullptr; at = at->get_parent()) {
-        path = "/" + String(at->get_name()) + path;
-    }
-    const Ref<MultiplayerAPI> installed
-        = p_node->get_tree()->get_multiplayer(NodePath(path));
-    return of_installed(installed);
-}
-
-NetwMultiplayer *NetwMultiplayer::of_installed(
-    const Ref<MultiplayerAPI> &p_installed
-) {
-    const Ref<MultiplayerAPI> installed = p_installed;
-    if (installed.is_null()) {
-        NETW_TRACE(sys::SESSION, "A node's branch has no MultiplayerAPI.");
-        return nullptr;
-    }
-    NetwMultiplayer *direct = Object::cast_to<NetwMultiplayer>(installed.ptr());
-    if (direct == nullptr) {
-        NETW_TRACE(
-            sys::SESSION,
-            "No live session owns the MultiplayerAPI on that branch."
-        );
-    }
-    return direct;
-}
-
-Ref<NetwMultiplayer> NetwMultiplayer::core_of(Node *p_node) {
-    return Ref<NetwMultiplayer>(of(p_node));
-}
-
-NetwMultiplayer *NetwMultiplayer::core_rooted_at(Node *p_root) {
-    if (p_root == nullptr) {
-        return nullptr;
-    }
+    NETW_ZONE_NC("netw::session_of", colors::SESSION);
+    NetwMultiplayer *only = nullptr;
+    int64_t running = 0;
+    LocalVector<ObjectID> kept;
     for (const ObjectID &id : live_registry) {
         NetwMultiplayer *session
             = Object::cast_to<NetwMultiplayer>(gd::instance_from_id(id));
-        if (session != nullptr && session->session_root() == p_root) {
-            return session;
+        if (session == nullptr) {
+            continue;
+        }
+        kept.push_back(id);
+        if (session->session_is_active()) {
+            only = session;
+            running += 1;
         }
     }
-    return nullptr;
-}
-
-Ref<MultiplayerAPI> NetwMultiplayer::session_of(Node *p_node) {
-    NetwMultiplayer *core = of(p_node);
-    return Ref<MultiplayerAPI>(core);
+    live_registry = kept;
+    if (running != 1) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_SESSION_NOT_FOUND,
+            {String("{NetwMultiplayer.session_of}"),
+             String(),
+             String(),
+             0,
+             running}
+        );
+        return Ref<NetwMultiplayer>();
+    }
+    return Ref<NetwMultiplayer>(only);
 }
 
 NodePath NetwMultiplayer::relative_path(Object *p_source, Object *p_target) {
@@ -1319,8 +1412,8 @@ void NetwMultiplayer::set_scene_viewer_edge(const Callable &p_edge) {
 
 int NetwMultiplayer::service_row(Object *p_type) const {
     const ObjectID wanted = gd::instance_id(p_type);
-    for (uint32_t at = 0; at < services.size(); at++) {
-        if (services[at].type == wanted) {
+    for (uint32_t at = 0; at < views.services.size(); at++) {
+        if (views.services[at].type == wanted) {
             return int(at);
         }
     }
@@ -1331,8 +1424,8 @@ int NetwMultiplayer::service_row_named(const StringName &p_class) const {
     if (p_class == StringName()) {
         return -1;
     }
-    for (uint32_t at = 0; at < services.size(); at++) {
-        if (services[at].class_key == p_class) {
+    for (uint32_t at = 0; at < views.services.size(); at++) {
+        if (views.services[at].class_key == p_class) {
             return int(at);
         }
     }
@@ -1341,10 +1434,10 @@ int NetwMultiplayer::service_row_named(const StringName &p_class) const {
 
 Object *NetwMultiplayer::get_service_named(const StringName &p_class) const {
     const int at = service_row_named(p_class);
-    return at < 0 ? nullptr : gd::instance_from_id(services[at].service);
+    return at < 0 ? nullptr : gd::instance_from_id(views.services[at].service);
 }
 
-void NetwMultiplayer::service_register(Object *p_service, Object *p_type) {
+void NetwMultiplayer::service_register(Node *p_service, Object *p_type) {
     if (p_service == nullptr) {
         return;
     }
@@ -1353,19 +1446,19 @@ void NetwMultiplayer::service_register(Object *p_service, Object *p_type) {
         const StringName owned = p_service->get_class();
         const int held = service_row_named(owned);
         if (held >= 0) {
-            services[held].service = gd::instance_id(p_service);
+            views.services[held].service = gd::instance_id(p_service);
         } else {
-            ServiceRow row;
+            session::ServiceRow row;
             row.service = gd::instance_id(p_service);
             row.class_key = owned;
-            services.push_back(row);
+            views.services.push_back(row);
         }
         discovery_watch_directory(p_service);
         return;
     }
     const int at = service_row(type);
     if (at >= 0) {
-        Object *held = gd::instance_from_id(services[at].service);
+        Object *held = gd::instance_from_id(views.services[at].service);
         if (held == p_service) {
             return;
         }
@@ -1376,32 +1469,29 @@ void NetwMultiplayer::service_register(Object *p_service, Object *p_type) {
                 {String("The service"), type->to_string()}
             );
         }
-        services[at].service = gd::instance_id(p_service);
+        views.services[at].service = gd::instance_id(p_service);
         discovery_watch_directory(p_service);
         return;
     }
-    ServiceRow row;
+    session::ServiceRow row;
     row.type = gd::instance_id(type);
     row.service = gd::instance_id(p_service);
-    services.push_back(row);
+    views.services.push_back(row);
     discovery_watch_directory(p_service);
 }
 
-void NetwMultiplayer::service_unregister(Object *p_service, Object *p_type) {
+void NetwMultiplayer::service_unregister(Node *p_service, Object *p_type) {
     Object *type = p_type ? p_type : script_of(p_service);
     int at = type ? service_row(type) : -1;
     if (at < 0 && type == nullptr && p_service != nullptr) {
         at = service_row_named(p_service->get_class());
     }
-    if (at < 0 || gd::instance_from_id(services[at].service) != p_service) {
+    if (at < 0
+        || gd::instance_from_id(views.services[at].service) != p_service) {
         return;
     }
-    services.remove_at(at);
+    views.services.remove_at(at);
     discovery_unwatch_directory(p_service);
-}
-
-Variant NetwMultiplayer::service_held(Object *p_type) const {
-    return gd::held(get_service(p_type));
 }
 
 StringName NetwMultiplayer::class_named_by(Object *p_type) const {
@@ -1410,7 +1500,7 @@ StringName NetwMultiplayer::class_named_by(Object *p_type) const {
         return StringName();
     }
     const uint64_t asked = uint64_t(gd::instance_id(p_type));
-    const StringName *cached = native_class_names.getptr(asked);
+    const StringName *cached = views.native_class_names.getptr(asked);
     if (cached != nullptr) {
         return *cached;
     }
@@ -1423,51 +1513,26 @@ StringName NetwMultiplayer::class_named_by(Object *p_type) const {
             memdelete(probe);
         }
     }
-    native_class_names.insert(asked, named);
+    views.native_class_names.insert(asked, named);
     return named;
 }
 
-Object *NetwMultiplayer::get_service(Object *p_type) const {
+Node *NetwMultiplayer::service_get(Object *p_type) const {
     const int at = service_row(p_type);
     if (at >= 0) {
-        return gd::instance_from_id(services[at].service);
+        return Object::cast_to<Node>(
+            gd::instance_from_id(views.services[at].service)
+        );
     }
-    return get_service_named(class_named_by(p_type));
+    return Object::cast_to<Node>(get_service_named(class_named_by(p_type)));
 }
 
 void NetwMultiplayer::service_clear() {
-    services.clear();
+    views.services.clear();
     for (const KeyValue<uint64_t, RID> &held : directory_slots) {
         connect::free_transport_slot(held.value);
     }
     directory_slots.clear();
-}
-
-TypedArray<Node> NetwMultiplayer::service_get_all(Object *p_base) const {
-    TypedArray<Node> out;
-    const StringName native_base = class_named_by(p_base);
-    for (uint32_t at = 0; at < services.size(); at++) {
-        Object *service = gd::instance_from_id(services[at].service);
-        if (service == nullptr) {
-            continue;
-        }
-        if (native_base != StringName()) {
-            if (service->is_class(native_base)) {
-                out.push_back(service);
-            }
-            continue;
-        }
-        Ref<Script> script
-            = Object::cast_to<Script>(gd::instance_from_id(services[at].type));
-        while (script.is_valid()) {
-            if (script.ptr() == p_base) {
-                out.push_back(service);
-                break;
-            }
-            script = script->get_base_script();
-        }
-    }
-    return out;
 }
 
 bool NetwMultiplayer::session_publish_control(
@@ -1511,10 +1576,10 @@ bool NetwMultiplayer::session_publish_control(
         if (is_host() && session::frame_read(p_payload, asked)) {
             Announcement row;
             row.kind = AnnouncementKind::KICK_REQUESTED;
-            row.requester = p_sender;
-            row.target = asked.peer;
+            row.requester = player_incarnation(p_sender);
+            row.target = int64_t(asked.player);
             row.reason = asked.reason;
-            announcements.push_back(row);
+            announce(row);
         }
         return true;
     }
@@ -1533,60 +1598,300 @@ bool NetwMultiplayer::session_publish_control(
         }
         return true;
     }
-    if (p_channel == control_channels.leave_request) {
+    return false;
+}
+
+void NetwMultiplayer::announce(const Announcement &p_row) {
+    announce_push(p_row);
+    announce_flush();
+}
+
+bool NetwMultiplayer::announce_pin(const Announcement &p_row) {
+    const bool entity = !p_row.entity.is_valid() || slot_pin(p_row.entity);
+    const bool scene = !p_row.scene.is_valid() || slot_pin(p_row.scene);
+    const bool scene_to
+        = !p_row.scene_to.is_valid() || slot_pin(p_row.scene_to);
+    const bool player = p_row.player == 0 || player_pin(p_row.player);
+    const bool endpoint
+        = !p_row.endpoint.is_valid() || endpoint_pin(p_row.endpoint);
+    if (entity && scene && scene_to && player && endpoint) {
         return true;
+    }
+    if (p_row.endpoint.is_valid() && endpoint) {
+        endpoint_unpin(p_row.endpoint);
+    }
+    if (p_row.entity.is_valid() && entity) {
+        slot_unpin(p_row.entity);
+    }
+    if (p_row.scene.is_valid() && scene) {
+        slot_unpin(p_row.scene);
+    }
+    if (p_row.scene_to.is_valid() && scene_to) {
+        slot_unpin(p_row.scene_to);
+    }
+    if (p_row.player != 0 && player) {
+        player_unpin(p_row.player);
     }
     return false;
 }
 
-void NetwMultiplayer::announce_flush() {
-    if (is_inside_step() || announcements.is_empty()) {
-        return;
+void NetwMultiplayer::announce_push(const Announcement &p_row) {
+    if (announce_pin(p_row)) {
+        announcements.push_back(p_row);
     }
-    LocalVector<Announcement> due;
-    due.reserve(announcements.size());
-    for (const Announcement &row : announcements) {
-        due.push_back(row);
+}
+
+void NetwMultiplayer::announce_unpin(const Announcement &p_row) {
+    if (p_row.entity.is_valid()) {
+        slot_unpin(p_row.entity);
+    }
+    if (p_row.scene.is_valid()) {
+        slot_unpin(p_row.scene);
+    }
+    if (p_row.scene_to.is_valid()) {
+        slot_unpin(p_row.scene_to);
+    }
+    if (p_row.player != 0) {
+        player_unpin(p_row.player);
+    }
+    if (p_row.endpoint.is_valid()) {
+        endpoint_unpin(p_row.endpoint);
+    }
+}
+
+void NetwMultiplayer::announce_drop() {
+    for (uint32_t at = announce_next; at < announcements.size(); ++at) {
+        announce_unpin(announcements[at]);
     }
     announcements.clear();
-    const Ref<NetwSession> session = session_handle;
-    const Ref<NetwClock> clock_view = clock_handle;
+    announce_next = 0;
+}
 
-    for (const Announcement &row : due) {
-        switch (row.kind) {
-            case AnnouncementKind::KICK_REQUESTED: {
-                const Ref<NetwPlayer> requester
-                    = player_admitted_of(row.requester);
-                const Ref<NetwPlayer> target = player_admitted_of(row.target);
-                if (session.is_valid() && requester.is_valid()
-                    && target.is_valid()) {
-                    session->announce_kick_requested(
-                        requester,
-                        target,
-                        row.reason
+void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
+    const Ref<NetwSession> session = views.session_handle;
+    const Ref<NetwConnection> connection = views.connection_handle;
+    switch (p_row.kind) {
+        case AnnouncementKind::KICK_REQUESTED: {
+            if (session.is_valid() && player_is_active(p_row.requester)
+                && player_is_active(p_row.target)) {
+                session->announce_kick_requested(
+                    player_view(p_row.requester),
+                    player_view(p_row.target),
+                    p_row.reason
+                );
+            }
+        } break;
+        case AnnouncementKind::TICKRATE_MISMATCH: {
+            const Ref<NetwClock> clock_view = views.clock_handle;
+            if (clock_view.is_valid()) {
+                clock_view->announce_tickrate_mismatch(p_row.server_tickrate);
+            }
+        } break;
+        case AnnouncementKind::ENTITY_ENTERED:
+        case AnnouncementKind::ENTITY_EXITED: {
+            const Ref<NetwEntity> entity = slot_pinned_entity(p_row.entity);
+            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            const bool present = p_row.kind == AnnouncementKind::ENTITY_ENTERED;
+            if (entity.is_valid() && scene.is_valid()) {
+                scene->announce_entity(entity, present);
+                if (p_row.entity_is_player) {
+                    scene->announce_player_entity(entity, present);
+                }
+            }
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::SCENE_REMOVED: {
+            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            if (session.is_valid() && scene.is_valid()) {
+                session->announce_scene_removed(scene);
+            }
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::SCENE_READY: {
+            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            if (session.is_valid()) {
+                session->announce_scene_ready(scene);
+            }
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::SCENE_CHANGED: {
+            const Ref<NetwPlayer> player = player_view(p_row.player);
+            if (player.is_valid()) {
+                player->announce_scene_changed(
+                    slot_pinned_scene(p_row.scene),
+                    slot_pinned_scene(p_row.scene_to)
+                );
+            }
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::STATE_CHANGED: {
+            if (session.is_valid()) {
+                const NetwSession::State state = NetwSession::State(p_row.code);
+                session->announce_state_changed(state);
+            }
+        } break;
+        case AnnouncementKind::ENTERED: {
+            if (session.is_valid()) {
+                session->announce_entered();
+            }
+        } break;
+        case AnnouncementKind::LOCAL_JOINED:
+        case AnnouncementKind::PLAYER_JOINED:
+        case AnnouncementKind::PLAYER_LEFT: {
+            const Ref<NetwPlayer> player = player_view(p_row.player);
+            if (session.is_valid() && player.is_valid()) {
+                if (p_row.kind == AnnouncementKind::LOCAL_JOINED) {
+                    session->announce_local_joined(player);
+                } else if (p_row.kind == AnnouncementKind::PLAYER_JOINED) {
+                    session->announce_player_joined(player);
+                } else {
+                    session->announce_player_left(
+                        player,
+                        NetwPlayer::LeaveReason(p_row.code)
                     );
                 }
-            } break;
-            case AnnouncementKind::TICKRATE_MISMATCH: {
-                if (clock_view.is_valid()) {
-                    clock_view->announce_tickrate_mismatch(row.server_tickrate);
-                }
-            } break;
-            case AnnouncementKind::ENTITY_ENTERED:
-            case AnnouncementKind::ENTITY_EXITED: {
-                const bool present
-                    = row.kind == AnnouncementKind::ENTITY_ENTERED;
-                row.scene->announce_entity(row.entity, present);
-                if (row.entity_is_player) {
-                    row.scene->announce_player_entity(row.entity, present);
-                }
-            } break;
-            case AnnouncementKind::SCENE_REMOVED: {
-                if (session.is_valid()) {
-                    session->announce_scene_removed(row.scene);
-                }
-            } break;
-        }
+            }
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::JOIN_FAILED: {
+            if (session.is_valid()) {
+                session->announce_join_failed(p_row.code, p_row.reason);
+            }
+        } break;
+        case AnnouncementKind::PAUSED_CHANGED: {
+            if (session.is_valid()) {
+                session->announce_paused_changed(p_row.paused, p_row.reason);
+            }
+        } break;
+        case AnnouncementKind::SERVER_TRANSFERRED: {
+            if (session.is_valid()) {
+                session->announce_server_transferred(
+                    p_row.successor_was,
+                    p_row.former_now
+                );
+            }
+        } break;
+        case AnnouncementKind::VIEWER_ENTERED:
+        case AnnouncementKind::VIEWER_EXITED: {
+            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            const Ref<NetwPlayer> player = player_view(p_row.player);
+            if (scene.is_valid() && player.is_valid()) {
+                scene->announce_viewer(
+                    player,
+                    p_row.kind == AnnouncementKind::VIEWER_ENTERED
+                );
+            }
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::CONTROL_CHANGED:
+        case AnnouncementKind::DESPAWNING:
+        case AnnouncementKind::DESPAWNED:
+        case AnnouncementKind::LIFECYCLE_REFUSED:
+        case AnnouncementKind::REPARENTED:
+        case AnnouncementKind::HIDDEN:
+        case AnnouncementKind::MODE_CHANGED:
+        case AnnouncementKind::STATE_EVALUATED:
+        case AnnouncementKind::EPISODE_CHANGED:
+        case AnnouncementKind::RECOVERED:
+        case AnnouncementKind::DIVERGENCE_DETECTED:
+        case AnnouncementKind::PERSIST_LOADED:
+        case AnnouncementKind::PERSIST_SAVED: {
+            const Ref<NetwEntity> entity = slot_pinned_entity(p_row.entity);
+            entity_emit(entity.ptr(), p_row);
+            announce_unpin(p_row);
+        } break;
+        case AnnouncementKind::DATABASE_FAILED: {
+            const Ref<NetwDatabase> *held
+                = views.database_handles.getptr(p_row.database);
+            const Ref<NetwDatabase> database
+                = held != nullptr ? *held : Ref<NetwDatabase>();
+            if (database.is_valid()) {
+                database->announce_failed(
+                    p_row.database,
+                    p_row.code,
+                    p_row.reason
+                );
+            }
+        } break;
+        case AnnouncementKind::SYNCHRONIZED: {
+            const Ref<NetwClock> clock_view = views.clock_handle;
+            if (clock_view.is_valid()) {
+                clock_view->announce_synchronized();
+            }
+        } break;
+        case AnnouncementKind::TABLE_RECEIVED: {
+            const Ref<NetwTable> *handle
+                = views.table_handles.getptr(p_row.table);
+            if (handle != nullptr) {
+                const Ref<NetwTable> table = *handle;
+                table->announce(p_row.to);
+            }
+        } break;
+        case AnnouncementKind::CONNECTION_PROGRESSED: {
+            if (connection.is_valid()) {
+                connection->announce_progressed(p_row.reason, p_row.amount);
+            }
+        } break;
+        case AnnouncementKind::CONNECTION_FAILED: {
+            if (connection.is_valid()) {
+                connection->announce_failed(p_row.code, p_row.reason);
+            }
+        } break;
+        case AnnouncementKind::JOIN_ADDRESS_CHANGED: {
+            if (connection.is_valid()) {
+                connection->announce_join_address_changed(p_row.reason);
+            }
+        } break;
+        case AnnouncementKind::ENDPOINT_ADDED:
+        case AnnouncementKind::ENDPOINT_REMOVED:
+        case AnnouncementKind::INVITED:
+        case AnnouncementKind::ENDPOINT_CHANGED: {
+            const session::EndpointView *held
+                = views.endpoint_views.getptr(p_row.endpoint);
+            const Ref<NetwEndpoint> view
+                = held != nullptr ? held->view : Ref<NetwEndpoint>();
+            const bool heard = connection.is_valid() && view.is_valid();
+            if (heard && p_row.kind == AnnouncementKind::ENDPOINT_ADDED) {
+                connection->announce_endpoint_added(view);
+            } else if (heard
+                       && p_row.kind == AnnouncementKind::ENDPOINT_REMOVED) {
+                connection->announce_endpoint_removed(view);
+            } else if (heard && p_row.kind == AnnouncementKind::INVITED) {
+                connection->announce_invited(view);
+            } else if (heard) {
+                connection->announce_endpoint_updated(view);
+            }
+            if (p_row.kind == AnnouncementKind::ENDPOINT_REMOVED) {
+                endpoint_view_drop(p_row.endpoint);
+            }
+            announce_unpin(p_row);
+        } break;
+    }
+}
+
+void NetwMultiplayer::announce_flush() {
+    if (announce_draining || is_inside_step()) {
+        return;
+    }
+    announce_drain();
+}
+
+void NetwMultiplayer::announce_drain() {
+    if (announce_next >= announcements.size()) {
+        return;
+    }
+    const Ref<NetwMultiplayer> keep(this);
+    const bool outermost = !announce_draining;
+    announce_draining = true;
+    while (announce_next < announcements.size()) {
+        const Announcement row = announcements[announce_next];
+        announce_next += 1;
+        announce_dispatch(row);
+    }
+    if (outermost) {
+        announcements.clear();
+        announce_next = 0;
+        announce_draining = false;
     }
 }
 
@@ -1602,11 +1907,14 @@ void NetwMultiplayer::session_admit(const session::AcceptFrame &p_accepted) {
         join_awaiting_admission = false;
         submitted_join.reset();
     }
-    if (player_ensure(p_accepted).is_null()) {
+    if (!player_ensure(p_accepted)) {
         return;
     }
     player_admit(joined);
     player_hand_back(joined);
+    if (joined == SERVER_PEER) {
+        control_seat_host();
+    }
     player_tell_kept(joined);
     player_publish_joined(joined);
     if (!has_server_role()) {
@@ -1731,9 +2039,11 @@ void NetwMultiplayer::session_report_join_failure(
     join_awaiting_admission = false;
     prepared_join.reset();
     submitted_join.reset();
-    if (session_handle.is_valid()) {
-        session_handle->announce_join_failed(int64_t(p_error), p_reason);
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::JOIN_FAILED;
+    row.code = int64_t(p_error);
+    row.reason = p_reason;
+    announce(row);
 }
 
 void NetwMultiplayer::session_run_join_handler(
@@ -1753,7 +2063,7 @@ void NetwMultiplayer::session_run_join_handler(
         seated->handled = true;
         return;
     }
-    const Ref<NetwPlayer> joining = seated->row;
+    const Ref<NetwPlayer> joining = player_of(peer);
     if (joining.is_null()) {
         return;
     }
@@ -1915,7 +2225,8 @@ void NetwMultiplayer::session_settle_peer_loss(int64_t p_peer) {
     settled_peer_departures.insert(p_peer);
 
     const bool terminates_session = p_peer == SERVER_PEER
-        && !embed_is_disposing() && session_get_state() == SESSION_STATE_ONLINE;
+        && !embed_is_disposing()
+        && session_get_stored_state() == SESSION_STATE_ONLINE;
 
     unreachable_peers.insert(p_peer);
     session_clear_disconnected_peer(p_peer);
@@ -1940,11 +2251,11 @@ void NetwMultiplayer::session_transport_connected() {
     if (installing_transfer) {
         return;
     }
-    if (session_get_state() != SESSION_STATE_CONNECTING) {
+    if (session_get_stored_state() != SESSION_STATE_CONNECTING) {
         NETW_TRACE(
             sys::SESSION,
             "The transport connected while the session is in state %d.",
-            session_get_state()
+            session_get_stored_state()
         );
         return;
     }
@@ -1953,11 +2264,11 @@ void NetwMultiplayer::session_transport_connected() {
 }
 
 void NetwMultiplayer::session_transport_failed() {
-    if (session_get_state() != SESSION_STATE_CONNECTING) {
+    if (session_get_stored_state() != SESSION_STATE_CONNECTING) {
         NETW_TRACE(
             sys::SESSION,
             "The transport failed while the session is in state %d.",
-            session_get_state()
+            session_get_stored_state()
         );
         return;
     }
@@ -1973,15 +2284,15 @@ void NetwMultiplayer::session_transport_dropped() {
         );
         return;
     }
-    if (session_get_state() == SESSION_STATE_CONNECTING) {
+    if (session_get_stored_state() == SESSION_STATE_CONNECTING) {
         session_transport_failed();
         return;
     }
-    if (session_get_state() != SESSION_STATE_ONLINE) {
+    if (session_get_stored_state() != SESSION_STATE_ONLINE) {
         NETW_TRACE(
             sys::SESSION,
             "The transport dropped while the session is in state %d.",
-            session_get_state()
+            session_get_stored_state()
         );
         return;
     }
@@ -2023,9 +2334,11 @@ void NetwMultiplayer::session_apply_pause(
     session_paused = p_paused;
     session_pause_reason = p_paused ? p_reason : String();
     session_set_tree_paused(p_paused);
-    if (session_handle.is_valid()) {
-        session_handle->announce_paused_changed(p_paused, session_pause_reason);
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::PAUSED_CHANGED;
+    row.paused = p_paused;
+    row.reason = session_pause_reason;
+    announce(row);
 }
 
 void NetwMultiplayer::session_dispose() {
@@ -2159,8 +2472,9 @@ void NetwMultiplayer::session_finish_join(
     JoinRequest requested = p_request;
     const int64_t p_sender = requested.peer_id;
     const String account = p_admission->get_account();
-    const Ref<NetwPlayer> playing = player_find_account(account);
-    if (playing.is_valid() && playing->get_peer_id() == get_unique_id()
+    const int64_t playing = player_find_account(account);
+    const int64_t playing_peer = player_get_peer(playing);
+    if (playing != 0 && playing_peer == get_unique_id()
         && p_sender != get_unique_id()) {
         session_fail_join(
             p_sender,
@@ -2169,8 +2483,8 @@ void NetwMultiplayer::session_finish_join(
         );
         return;
     }
-    if (playing.is_valid() && playing->get_peer_id() != p_sender) {
-        const int64_t replaced = playing->get_peer_id();
+    if (playing != 0 && playing_peer != p_sender) {
+        const int64_t replaced = playing_peer;
         player_note_leave(replaced, NetwPlayer::LEAVE_DROPPED);
         session_turn_peer_away(replaced, String("Signed in again."));
         session_settle_peer_loss(replaced);
@@ -2223,7 +2537,7 @@ PackedByteArray NetwMultiplayer::auth_admitted_bytes(
     if (wire::string_bytes(address) <= wire::STRING_CAP) {
         own.join_address = address;
     }
-    own.max_players = uint64_t(connection_max_players());
+    own.max_players = uint64_t(transport_get_max_players());
     rows.push_back(own);
     return session::roster_write(rows);
 }
@@ -2296,7 +2610,7 @@ PackedByteArray NetwMultiplayer::session_accept_payload(
                  int64_t(wire::STRING_CAP)}
             );
         }
-        p_row.max_players = uint64_t(connection_max_players());
+        p_row.max_players = uint64_t(transport_get_max_players());
     }
     return session::frame_write(session::accept_seen_by(p_row, p_destination));
 }
@@ -2341,7 +2655,7 @@ void NetwMultiplayer::session_receive_accept(
     session_admit(accepted);
 }
 
-int64_t NetwMultiplayer::connection_max_players() const {
+int64_t NetwMultiplayer::transport_get_max_players() const {
     if (!has_server_role()) {
         return connect_core.advertised_max_players();
     }
@@ -2350,8 +2664,8 @@ int64_t NetwMultiplayer::connection_max_players() const {
         : 0;
 }
 
-Error NetwMultiplayer::connection_set_join_address(const String &p_address) {
-    if (!is_online()) {
+Error NetwMultiplayer::transport_set_join_address(const String &p_address) {
+    if (!session_is_online()) {
         fault::raise(
             this,
             NETW_FAULT_NOT_RUNNING,
@@ -2435,9 +2749,9 @@ void NetwMultiplayer::session_announce_entered() {
     if (clock_handshakes_on_enter) {
         clock_start_handshake();
     }
-    if (session_handle.is_valid()) {
-        session_handle->announce_entered();
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::ENTERED;
+    announce(row);
     scene_player_display_invalidate();
     entity_publish_placed();
     entity_demote_placed();
@@ -2452,8 +2766,9 @@ void NetwMultiplayer::session_announce_ended() {
     const String detail = session_exit_detail;
     session_exit_reason = -1;
     session_exit_detail = String();
-    if (session_handle.is_valid()) {
-        session_handle->announce_exiting(
+    announce_drain();
+    if (views.session_handle.is_valid()) {
+        views.session_handle->announce_exiting(
             enums::NetwSession::ExitReason(reason),
             detail
         );
@@ -2478,13 +2793,13 @@ void NetwMultiplayer::session_announce_exited(
     int p_reason,
     const String &p_detail
 ) {
-    if (session_get_state() == SESSION_STATE_DISCONNECTING) {
+    if (session_get_stored_state() == SESSION_STATE_DISCONNECTING) {
         session_exited_awaits_offline = p_reason;
         session_exited_detail = p_detail;
         return;
     }
-    if (session_handle.is_valid()) {
-        session_handle->announce_exited(
+    if (views.session_handle.is_valid()) {
+        views.session_handle->announce_exited(
             enums::NetwSession::ExitReason(p_reason),
             p_detail
         );
@@ -2496,7 +2811,7 @@ void NetwMultiplayer::session_note_exit(
     const String &p_detail
 ) {
     if (session_exit_reason >= 0
-        || session_get_state() != SESSION_STATE_ONLINE) {
+        || session_get_stored_state() != SESSION_STATE_ONLINE) {
         return;
     }
     session_exit_reason = int(p_reason);
@@ -2505,7 +2820,7 @@ void NetwMultiplayer::session_note_exit(
 
 void NetwMultiplayer::session_leave_for_schema(const String &p_node) {
     if (is_host() || session_exit_reason >= 0
-        || session_get_state() != SESSION_STATE_ONLINE) {
+        || session_get_stored_state() != SESSION_STATE_ONLINE) {
         return;
     }
     const String reason = vformat(
@@ -2533,14 +2848,15 @@ void NetwMultiplayer::session_announce_edge(int p_old, int p_new) {
 }
 
 void NetwMultiplayer::session_publish_state() {
-    const SessionState now = session_get_computed_state();
+    const SessionState now = session_get_state();
     if (now == session_published_state) {
         return;
     }
     session_published_state = now;
-    if (session_handle.is_valid()) {
-        session_handle->announce_state_changed(now);
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::STATE_CHANGED;
+    row.code = int64_t(now);
+    announce(row);
 }
 
 session::AcceptFrame NetwMultiplayer::session_accepted_join(
@@ -2660,7 +2976,7 @@ bool NetwMultiplayer::session_links_peers_but_not_server() const {
 
 void NetwMultiplayer::session_watch_serverless_mesh() {
     if (serverless_mesh_polls >= SERVERLESS_MESH_WARN_POLLS
-        || session_get_state() != SESSION_STATE_CONNECTING
+        || session_get_stored_state() != SESSION_STATE_CONNECTING
         || !session_links_peers_but_not_server()) {
         return;
     }
@@ -2677,7 +2993,7 @@ void NetwMultiplayer::session_watch_serverless_mesh() {
 }
 
 void NetwMultiplayer::session_watch_late_server() {
-    if (session_get_state() != SESSION_STATE_CONNECTING
+    if (session_get_stored_state() != SESSION_STATE_CONNECTING
         || !session_link_is_connected()
         || NETW_API_VIRTUAL(get_unique_id)() != SERVER_PEER) {
         return;
@@ -3101,7 +3417,7 @@ void NetwMultiplayer::auth_advance(int64_t p_peer) {
         prepared_join.reset();
     }
     session_submit_request(request);
-    connection_emit_progressed(
+    connection_announce_progressed(
         String("Waiting for the server to admit the player."),
         -1.0
     );
@@ -3309,11 +3625,11 @@ void NetwMultiplayer::auth_refused_locally(
 }
 
 void NetwMultiplayer::auth_close_refused_peer() {
-    if (session_get_state() != SESSION_STATE_CONNECTING) {
+    if (session_get_stored_state() != SESSION_STATE_CONNECTING) {
         return;
     }
     const Ref<MultiplayerPeer> refused = assigned_peer;
-    NETW_API_VIRTUAL(set_multiplayer_peer)(Ref<MultiplayerPeer>());
+    peer_assign(Ref<MultiplayerPeer>());
     if (refused.is_valid()) {
         refused->close();
     }
@@ -3484,7 +3800,7 @@ FaultBook::Admit NetwMultiplayer::fault_admit(const FaultKey &p_key) {
 
 PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
     r_answered = true;
-    const Ref<NetwServerInfo> base = NetwServerInfo::from_session(this);
+    const Ref<NetwServerInfo> base = session_get_server_info();
     const session_decl::Resolved declared
         = declaration_slots.resolve(this, session_decl::KIND_SERVER_INFO);
     if (declared.state == session_decl::ABSENT) {
@@ -3776,40 +4092,6 @@ void NetwMultiplayer::session_notify_shutdown(const String &p_reason) {
     );
 }
 
-void NetwMultiplayer::peer_kick(int64_t p_peer_id, const String &p_reason) {
-    if (!is_host()) {
-        fault::raise(
-            this,
-            NETW_FAULT_SERVER_ONLY,
-            {"{NetwMultiplayer.peer_kick}", String(), String(), p_peer_id}
-        );
-        return;
-    }
-    session_turn_peer_away(p_peer_id, p_reason);
-}
-
-void NetwMultiplayer::peer_request_kick(
-    int64_t p_peer_id,
-    const String &p_reason
-) {
-    const PackedByteArray payload
-        = session::frame_write(session::KickRequest{p_peer_id, p_reason});
-    if (is_server()) {
-        session_publish_control(control_channels.kick_request, 1, payload);
-        return;
-    }
-    send_to(
-        MultiplayerPeer::TARGET_PEER_SERVER,
-        0,
-        control_channels.kick_request,
-        payload,
-        true,
-        0,
-        String(),
-        false
-    );
-}
-
 namespace {
 
 LocalVector<uint64_t> &sessions_tearing_down() {
@@ -3843,6 +4125,16 @@ NetwMultiplayer::~NetwMultiplayer() {
     if (session_paused) {
         session_set_tree_paused(false);
     }
+    for (const KeyValue<int64_t, NetwPredictSlotEngine *> &row :
+         predict_engines) {
+        row.value->release();
+        predict_retired.push_back(row.value);
+    }
+    predict_engines.clear();
+    for (NetwPredictSlotEngine *engine : predict_retired) {
+        godot::memdelete(engine);
+    }
+    predict_retired.clear();
     capture_close();
     clock_release();
     lagcomp_release();
@@ -3851,15 +4143,14 @@ NetwMultiplayer::~NetwMultiplayer() {
         memdelete(replication_owner);
         replication_owner = nullptr;
     }
-    for (const KeyValue<int64_t, NetwPredictSlotEngine *> &row :
-         predict_engines) {
-        godot::memdelete(row.value);
-    }
-    predict_engines.clear();
     for (const KeyValue<uint64_t, RID> &held : directory_slots) {
         connect::free_transport_slot(held.value);
     }
     directory_slots.clear();
+    announce_drop();
+    wrapper_detach_all();
+    layer_forget_all();
+    views.endpoint_views.clear();
 }
 
 Error NetwMultiplayer::session_flush_tick(int64_t p_tick) {
@@ -3956,6 +4247,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
         return OK;
     }
     NETW_NETWORK_PROFILE(profiler_poll());
+    const Ref<NetwMultiplayer> keep(this);
     ++step_depth;
     embed_settle_on_first_poll();
     if (!transfer_called) {
@@ -4009,6 +4301,8 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
     sink_verdict(display_pump(display_delta()), 0);
     --step_depth;
     announce_flush();
+    effect_drain();
+    predict_free_retired();
     NETW_HINTS(diag_poll());
     NETW_STAGE_FLUSH();
     return err;
@@ -4061,6 +4355,11 @@ Ref<MultiplayerPeer> NetwMultiplayer::peer_shaped(
 void NetwMultiplayer::NETW_API_VIRTUAL(set_multiplayer_peer)(
     const Ref<MultiplayerPeer> &p_peer
 ) {
+    peer_assign(p_peer);
+    effect_drain();
+}
+
+void NetwMultiplayer::peer_assign(const Ref<MultiplayerPeer> &p_peer) {
     if (peer_assignment_repeats(p_peer)) {
         return;
     }
@@ -4104,7 +4403,7 @@ void NetwMultiplayer::NETW_API_VIRTUAL(set_multiplayer_peer)(
         }
         session_apply_auth_config();
     }
-    if (session_get_state() == SESSION_STATE_ONLINE) {
+    if (session_get_stored_state() == SESSION_STATE_ONLINE) {
         session_note_exit(
             live ? enums::NetwSession::REPLACED
                  : enums::NetwSession::LOCAL_LEAVE,
@@ -4141,8 +4440,18 @@ RID NetwMultiplayer::endpoint_add(
     return connect_core.target_add(p_transport, p_address, p_display_name);
 }
 
+RID NetwMultiplayer::endpoint_invite(
+    const RID &p_transport,
+    const String &p_address,
+    const String &p_from_name
+) {
+    return connect_core.invite(p_transport, p_address, p_from_name);
+}
+
 void NetwMultiplayer::endpoint_remove(const RID &p_endpoint) {
-    connect_core.target_remove(p_endpoint);
+    if (connect_core.list().holds(p_endpoint)) {
+        connect_core.target_remove(p_endpoint);
+    }
 }
 
 RID NetwMultiplayer::endpoint_find(
@@ -4156,12 +4465,51 @@ Array NetwMultiplayer::endpoint_list() {
     return connect_core.list().list();
 }
 
+RID NetwMultiplayer::endpoint_get_current() {
+    return connect_core.current_target();
+}
+
+Ref<NetwEndpoint> NetwMultiplayer::endpoint_view(const RID &p_endpoint) {
+    const session::EndpointView *held = views.endpoint_views.getptr(p_endpoint);
+    if (held != nullptr) {
+        return held->view;
+    }
+    const connect::TargetRow *row = connect_core.list().row(p_endpoint);
+    if (row == nullptr || !connect_core.list().holds(p_endpoint)) {
+        return Ref<NetwEndpoint>();
+    }
+    const StringName peer_class = transport_class_of(row->transport);
+    if (peer_class.is_empty()) {
+        return Ref<NetwEndpoint>();
+    }
+    Ref<NetwEndpoint> minted;
+    minted.instantiate();
+    minted->session_id = gd::instance_id(this);
+    minted->endpoint = p_endpoint;
+    minted->peer_class = peer_class;
+    minted->address = row->address;
+    views.endpoint_views[p_endpoint].view = minted;
+    return minted;
+}
+
+void NetwMultiplayer::endpoint_view_drop(const RID &p_endpoint) {
+    session::EndpointView *held = views.endpoint_views.getptr(p_endpoint);
+    if (held == nullptr) {
+        return;
+    }
+    if (held->pins > 0) {
+        held->dropped = true;
+        return;
+    }
+    views.endpoint_views.erase(p_endpoint);
+}
+
 Variant NetwMultiplayer::endpoint_get_param(
     const RID &p_endpoint,
     EndpointParam p_param
 ) {
     const connect::TargetRow *held = connect_core.list().row(p_endpoint);
-    if (held == nullptr) {
+    if (held == nullptr || !connect_core.list().holds(p_endpoint)) {
         return Variant();
     }
     switch (p_param) {
@@ -4171,38 +4519,16 @@ Variant NetwMultiplayer::endpoint_get_param(
             return held->address;
         case ENDPOINT_PARAM_DISPLAY_NAME:
             return held->display_name;
-        case ENDPOINT_PARAM_SOURCE:
-            return endpoint_source(p_endpoint);
+        case ENDPOINT_PARAM_SOURCE: {
+            LobbyDirectory *found
+                = Object::cast_to<LobbyDirectory>(gd::object_of(held->source));
+            return found == nullptr ? String() : found->get_display_name();
+        }
+        case ENDPOINT_PARAM_INVITED_BY:
+            return held->invited_by;
         default:
             return Variant();
     }
-}
-
-String NetwMultiplayer::endpoint_source(const RID &p_endpoint) const {
-    const connect::TargetRow *held = connect_core.list().row(p_endpoint);
-    if (held == nullptr) {
-        return String();
-    }
-    LobbyDirectory *found
-        = Object::cast_to<LobbyDirectory>(gd::object_of(held->source));
-    return found == nullptr ? String() : found->get_display_name();
-}
-
-Error NetwMultiplayer::endpoint_set_param(
-    const RID &p_endpoint,
-    EndpointParam p_param,
-    const Variant &p_value
-) {
-    connect::TargetRow *held = connect_core.list().row(p_endpoint);
-    if (held == nullptr) {
-        return ERR_DOES_NOT_EXIST;
-    }
-    if (p_param != ENDPOINT_PARAM_DISPLAY_NAME) {
-        return ERR_INVALID_PARAMETER;
-    }
-    held->display_name = String(p_value);
-    endpoint_emit_updated(p_endpoint);
-    return OK;
 }
 
 Variant NetwMultiplayer::endpoint_get_state(
@@ -4210,7 +4536,7 @@ Variant NetwMultiplayer::endpoint_get_state(
     EndpointState p_state
 ) {
     const connect::TargetRow *held = connect_core.list().row(p_endpoint);
-    if (held == nullptr) {
+    if (held == nullptr || !connect_core.list().holds(p_endpoint)) {
         return Variant();
     }
     switch (p_state) {
@@ -4225,6 +4551,9 @@ Variant NetwMultiplayer::endpoint_get_state(
             if (held->observed) {
                 flags |= ENDPOINT_FLAG_OBSERVED;
             }
+            if (held->invite_pending) {
+                flags |= ENDPOINT_FLAG_INVITED;
+            }
             return flags;
         }
         case ENDPOINT_STATE_STATUS:
@@ -4237,7 +4566,9 @@ Variant NetwMultiplayer::endpoint_get_state(
 }
 
 void NetwMultiplayer::endpoint_probe(const RID &p_endpoint) {
-    connect_core.probe_target(p_endpoint);
+    if (connect_core.list().holds(p_endpoint)) {
+        connect_core.probe_target(p_endpoint);
+    }
 }
 
 void NetwMultiplayer::endpoint_set_browsing(bool p_enabled) {
@@ -4294,14 +4625,6 @@ void NetwMultiplayer::transport_cancel_peer_creation(const RID &p_ticket) {
     connect_core.cancel_peer_creation(p_ticket);
 }
 
-Ref<NetwPromise> NetwMultiplayer::transport_join(
-    const RID &p_transport,
-    const String &p_address,
-    const Dictionary &p_settings
-) {
-    return connect_core.join(p_transport, p_address, p_settings);
-}
-
 Ref<NetwPromise> NetwMultiplayer::endpoint_join(
     const RID &p_endpoint,
     const Dictionary &p_settings
@@ -4337,41 +4660,70 @@ Dictionary NetwMultiplayer::transport_get_defaults(const RID &p_transport) {
     return connect_core.defaults_of(p_transport);
 }
 
-void NetwMultiplayer::connection_attempt_moved(int64_t p_state) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_attempt_moved(p_state);
-    }
+void NetwMultiplayer::connection_attempt_moved() {
     session_publish_state();
 }
 
-void NetwMultiplayer::connection_emit_progressed(
+void NetwMultiplayer::connection_announce_progressed(
     const String &p_message,
     double p_ratio
 ) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_progressed(p_message, p_ratio);
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::CONNECTION_PROGRESSED;
+    row.reason = p_message;
+    row.amount = p_ratio;
+    announce(row);
 }
 
-bool NetwMultiplayer::connection_emit_failed(
+bool NetwMultiplayer::connection_announce_failed(
     Error p_error,
     const String &p_reason
 ) {
-    return connection_handle.is_valid()
-        && connection_handle->announce_failed(int64_t(p_error), p_reason);
+    const Ref<NetwConnection> connection = views.connection_handle;
+    const bool heard = connection.is_valid() && connection->hears_failed();
+    Announcement row;
+    row.kind = AnnouncementKind::CONNECTION_FAILED;
+    row.code = int64_t(p_error);
+    row.reason = p_reason;
+    announce(row);
+    return heard;
 }
 
-void NetwMultiplayer::connection_emit_join_address_changed(
+void NetwMultiplayer::connection_announce_join_address(
     const String &p_address
 ) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_join_address_changed(p_address);
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::JOIN_ADDRESS_CHANGED;
+    row.reason = p_address;
+    announce(row);
 }
 
-void NetwMultiplayer::connection_emit_invited(const RID &p_endpoint) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_invited(p_endpoint);
+void NetwMultiplayer::endpoint_announce(
+    AnnouncementKind p_kind,
+    const RID &p_endpoint
+) {
+    Announcement row;
+    row.kind = p_kind;
+    row.endpoint = p_endpoint;
+    announce(row);
+}
+
+bool NetwMultiplayer::endpoint_pin(const RID &p_endpoint) {
+    if (endpoint_view(p_endpoint).is_null()) {
+        return false;
+    }
+    views.endpoint_views[p_endpoint].pins += 1;
+    return true;
+}
+
+void NetwMultiplayer::endpoint_unpin(const RID &p_endpoint) {
+    session::EndpointView *held = views.endpoint_views.getptr(p_endpoint);
+    if (held == nullptr || held->pins == 0) {
+        return;
+    }
+    held->pins -= 1;
+    if (held->pins == 0 && held->dropped) {
+        views.endpoint_views.erase(p_endpoint);
     }
 }
 
@@ -4580,52 +4932,46 @@ void NetwMultiplayer::discovery_probe_authentication_failed(int64_t p_peer_id) {
     }
 }
 
-void NetwMultiplayer::discovery_publish(
-    const StringName &p_peer_class,
-    const PackedStringArray &p_addresses,
-    const PackedStringArray &p_names,
-    const Array &p_infos
+void NetwMultiplayer::transport_report_progress(
+    const RID &p_ticket,
+    const String &p_message,
+    double p_ratio
 ) {
-    connect_core.publish_targets(
-        p_peer_class,
-        ObjectID(),
-        p_addresses,
-        p_names,
-        p_infos
-    );
+    connect_core.on_progress(p_ticket, p_message, p_ratio);
 }
 
-void NetwMultiplayer::endpoint_emit_added(const RID &p_endpoint) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_endpoint_added(p_endpoint);
+void NetwMultiplayer::transport_complete(
+    const RID &p_ticket,
+    Error p_error,
+    const Variant &p_result,
+    const String &p_message
+) {
+    connect_core.complete(p_ticket, p_error, p_result, p_message);
+}
+
+void NetwMultiplayer::transport_publish_targets(
+    const RID &p_transport,
+    const TypedArray<Dictionary> &p_targets
+) {
+    const connect::TransportSlot *slot = transport_held(p_transport);
+    if (slot != nullptr) {
+        connect_core.publish_targets(p_transport, slot->directory, p_targets);
     }
 }
 
-void NetwMultiplayer::endpoint_emit_removed(const RID &p_endpoint) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_endpoint_removed(p_endpoint);
-    }
-}
-
-void NetwMultiplayer::endpoint_emit_updated(const RID &p_endpoint) {
-    if (connection_handle.is_valid()) {
-        connection_handle->announce_endpoint_updated(p_endpoint);
-    }
-}
-
-String NetwMultiplayer::peer_join_address() {
+String NetwMultiplayer::transport_get_join_address() {
     return connect_core.join_address();
 }
 
-Dictionary NetwMultiplayer::peer_diagnostics(int64_t p_peer_id) {
+Dictionary NetwMultiplayer::transport_get_peer_diagnostics(int64_t p_peer_id) {
     return connect_core.diagnostics(p_peer_id);
 }
 
 Object *NetwMultiplayer::discovery_find_directory(
     const StringName &p_peer_class
 ) const {
-    for (uint32_t at = 0; at < services.size(); at++) {
-        Object *service = gd::instance_from_id(services[at].service);
+    for (const session::ServiceRow &row : views.services) {
+        Object *service = gd::instance_from_id(row.service);
         if (connect::DirectoryTransport::peer_class_of_directory(service)
             == p_peer_class) {
             return service;
@@ -4636,10 +4982,10 @@ Object *NetwMultiplayer::discovery_find_directory(
 
 LocalVector<ObjectID> NetwMultiplayer::discovery_directories() const {
     LocalVector<ObjectID> found;
-    for (uint32_t at = 0; at < services.size(); at++) {
-        Object *service = gd::instance_from_id(services[at].service);
+    for (const session::ServiceRow &row : views.services) {
+        Object *service = gd::instance_from_id(row.service);
         if (connect::DirectoryTransport::is_directory(service)) {
-            found.push_back(services[at].service);
+            found.push_back(row.service);
         }
     }
     return found;
@@ -4712,7 +5058,12 @@ void NetwMultiplayer::discovery_directory_delivered(
     const Ref<MultiplayerPeer> &p_peer,
     int64_t p_directory
 ) {
-    connect_core.on_directory_delivered(p_peer, p_directory);
+    transport_complete(
+        connect_core.directory_ticket(p_directory),
+        OK,
+        p_peer,
+        String()
+    );
 }
 
 void NetwMultiplayer::discovery_directory_failed(
@@ -4720,7 +5071,12 @@ void NetwMultiplayer::discovery_directory_failed(
     const String &p_message,
     int64_t p_directory
 ) {
-    connect_core.on_directory_failed(p_error, p_message, p_directory);
+    transport_complete(
+        connect_core.directory_ticket(p_directory),
+        Error(p_error),
+        Variant(),
+        p_message
+    );
 }
 
 void NetwMultiplayer::discovery_directory_listed(
@@ -4729,32 +5085,39 @@ void NetwMultiplayer::discovery_directory_listed(
     const Array &p_infos,
     int64_t p_directory
 ) {
-    connect_core
-        .on_directory_listed(p_addresses, p_names, p_infos, p_directory);
+    const StringName named = connect_core.directory_peer_class(p_directory);
+    if (named.is_empty()) {
+        return;
+    }
+    connect_core.publish_targets(
+        transport_find(named),
+        ObjectID(uint64_t(p_directory)),
+        connect::targets_of(p_addresses, p_names, p_infos)
+    );
 }
 
 Ref<NetwConnection> NetwMultiplayer::get_connection() {
-    if (connection_handle.is_null()) {
-        connection_handle.instantiate();
-        connection_handle->bind_session(this);
+    if (views.connection_handle.is_null()) {
+        views.connection_handle.instantiate();
+        views.connection_handle->bind_session(this);
     }
-    return connection_handle;
+    return views.connection_handle;
 }
 
 Ref<NetwSession> NetwMultiplayer::get_session() {
-    if (session_handle.is_null()) {
-        session_handle.instantiate();
-        session_handle->bind_session(this);
+    if (views.session_handle.is_null()) {
+        views.session_handle.instantiate();
+        views.session_handle->bind_session(this);
     }
-    return session_handle;
+    return views.session_handle;
 }
 
 Ref<NetwClock> NetwMultiplayer::get_clock() {
-    if (clock_handle.is_null()) {
-        clock_handle.instantiate();
-        clock_handle->bind_session(this);
+    if (views.clock_handle.is_null()) {
+        views.clock_handle.instantiate();
+        views.clock_handle->bind_session(this);
     }
-    return clock_handle;
+    return views.clock_handle;
 }
 
 Ref<MultiplayerPeer> NetwMultiplayer::NETW_API_VIRTUAL(get_multiplayer_peer)() {
@@ -4876,14 +5239,6 @@ NetwPredictionEngine *NetwMultiplayer::get_prediction_engine() {
     return &prediction_engine;
 }
 
-void NetwMultiplayer::set_interest_compat_refresh(const Callable &p_refresh) {
-    interest_compat_refresh = p_refresh;
-}
-
-void NetwMultiplayer::set_interest_awareness_send(const Callable &p_send) {
-    interest_awareness_send = p_send;
-}
-
 void NetwMultiplayer::interest_flush_sink() {
     sink_verdict(interest_flush_now(), 0);
 }
@@ -4995,7 +5350,7 @@ void NetwMultiplayer::clock_receive_handshake_reply(
             Announcement row;
             row.kind = AnnouncementKind::TICKRATE_MISMATCH;
             row.server_tickrate = server_tickrate;
-            announcements.push_back(row);
+            announce(row);
         } else {
             fault::raise(
                 this,
@@ -5087,25 +5442,17 @@ void NetwMultiplayer::set_display_authors_streams(const Callable &p_authors) {
     display_hooks.authors_streams = p_authors;
 }
 
-void NetwMultiplayer::set_display_role_reader(const Callable &p_reader) {
-    display_hooks.role_reader = p_reader;
-}
-
-void NetwMultiplayer::set_display_chase_hook(const Callable &p_hook) {
-    display_hooks.chase_hook_binder = p_hook;
-}
-
 int NetwMultiplayer::declared_quantum() const {
     return MAX(1, int(Math::round(clock_engine().physics_factor())));
 }
 
-NetwMultiplayer::SessionState NetwMultiplayer::session_get_state() const {
+NetwMultiplayer::SessionState NetwMultiplayer::
+    session_get_stored_state() const {
     return SessionState(session_core.get_state());
 }
 
-NetwMultiplayer::SessionState NetwMultiplayer::
-    session_get_computed_state() const {
-    const SessionState own = session_get_state();
+NetwMultiplayer::SessionState NetwMultiplayer::session_get_state() const {
+    const SessionState own = session_get_stored_state();
     if (own == SESSION_STATE_OFFLINE
         && connect_core.attempt_state() == connect::ATTEMPT_CREATING) {
         return SESSION_STATE_CREATING;
@@ -5117,8 +5464,8 @@ NetwMultiplayer::Role NetwMultiplayer::session_get_role() const {
     return Role(session_core.get_role());
 }
 
-bool NetwMultiplayer::is_online() const {
-    return session_get_state() == SESSION_STATE_ONLINE;
+bool NetwMultiplayer::session_is_online() const {
+    return session_get_stored_state() == SESSION_STATE_ONLINE;
 }
 
 bool NetwMultiplayer::is_host() const {
@@ -5208,7 +5555,7 @@ bool NetwMultiplayer::has_server_role() const {
     return session_core.is_server_role();
 }
 
-bool NetwMultiplayer::is_local_client() const {
+bool NetwMultiplayer::session_is_local_client() const {
     const Role current = session_get_role();
     return current == ROLE_CLIENT || current == ROLE_LISTEN_SERVER;
 }
@@ -5449,7 +5796,7 @@ int64_t NetwMultiplayer::action_gate_count() const {
     return int64_t(action_gates.size());
 }
 
-Node *NetwMultiplayer::session_root() const {
+Node *NetwMultiplayer::session_get_root() const {
     if (session_root_reader.is_valid()) {
         static const GameCall ROOT_READER
             = {"The NetwMultiplayer.session_set_root reader",
@@ -5507,6 +5854,24 @@ void NetwMultiplayer::session_set_server_info(
     }
     session_settings.server_info.instantiate();
     session_settings.server_info->copy_values_from(**p_info);
+}
+
+Ref<NetwServerInfo> NetwMultiplayer::session_get_server_info() const {
+    Ref<NetwServerInfo> info;
+    const Ref<NetwSessionConfig> config = session_get_config();
+    const Ref<NetwServerInfo> declared = config.is_valid()
+        ? config->get_server_info()
+        : Ref<NetwServerInfo>();
+    if (declared.is_valid()) {
+        info = declared->duplicate();
+    }
+    if (info.is_null()) {
+        info.instantiate();
+    }
+    info->set_is_local_listener(true);
+    info->set_players(get_connected_players().size());
+    info->set_app_id(session_get_app_id());
+    return info;
 }
 
 StringName NetwMultiplayer::session_get_app_id() const {
@@ -5845,7 +6210,7 @@ Ref<NetwPromise> NetwMultiplayer::session_step_away() {
 
 Ref<NetwPromise> NetwMultiplayer::session_depart(bool p_returning) {
     NETW_ZONE_NC("netw::session_leave", colors::SESSION);
-    if (session_get_state() == SESSION_STATE_OFFLINE) {
+    if (session_get_stored_state() == SESSION_STATE_OFFLINE) {
         return NetwPromise::resolved(OK);
     }
     if (session_leaving.is_valid()) {
@@ -5899,7 +6264,7 @@ void NetwMultiplayer::session_leave_closed(
 }
 
 Ref<NetwPromise> NetwMultiplayer::session_close_peer() {
-    if (session_get_state() == SESSION_STATE_OFFLINE) {
+    if (session_get_stored_state() == SESSION_STATE_OFFLINE) {
         return NetwPromise::resolved(OK);
     }
     if (session_shutting_down.is_valid()) {
@@ -5975,7 +6340,7 @@ void NetwMultiplayer::session_poll_server_shutdown() {
         return;
     }
     session_server_shut_down = false;
-    if (is_host() || session_get_state() != SESSION_STATE_ONLINE) {
+    if (is_host() || session_get_stored_state() != SESSION_STATE_ONLINE) {
         return;
     }
     session_transition(SESSION_STATE_DISCONNECTING);
@@ -6112,14 +6477,13 @@ void NetwMultiplayer::session_receive_leave(
 void NetwMultiplayer::session_receive_player_left(
     const session::PlayerLeft &p_left
 ) {
-    PlayerRow *found = players.getptr(int64_t(p_left.player_id));
-    if (found == nullptr || found->row.is_null() || found->row == local_player
-        || !found->admitted) {
+    const int64_t player_id = int64_t(p_left.player_id);
+    PlayerRow *found = players.getptr(player_id);
+    if (found == nullptr || player_id == local_player_id || !found->admitted) {
         return;
     }
     found->leave_reason = NetwPlayer::LeaveReason(p_left.reason);
-    const Ref<NetwPlayer> leaving = found->row;
-    player_release_id(leaving);
+    player_release_id(player_id);
 }
 
 void NetwMultiplayer::session_leave_on_quit() {
@@ -6144,7 +6508,7 @@ void NetwMultiplayer::session_end_on_quit() {
         return;
     }
     if (session_shutting_down.is_null()
-        && session_get_state() == SESSION_STATE_ONLINE) {
+        && session_get_stored_state() == SESSION_STATE_ONLINE) {
         player_note_leave(get_unique_id(), NetwPlayer::LEAVE_QUIT);
         session_notify_shutdown(String());
     }
@@ -6377,31 +6741,36 @@ void NetwMultiplayer::restore_default_interface() {
 
 void NetwMultiplayer::embed_settle_on_first_poll() {
     if (embed_phase_value != EMBED_PHASE_DECLARING
-        || session_root() == nullptr) {
+        || session_get_root() == nullptr) {
         return;
     }
     embed_settle();
 }
 
 void NetwMultiplayer::peer_forget(int64_t p_peer) {
-    const Ref<NetwPlayer> leaving = player_admitted_of(p_peer);
+    const bool leaving = player_admitted_of(p_peer).is_valid();
+    const int64_t *seated = player_id_of_peer.getptr(p_peer);
+    const int64_t player_id = seated != nullptr ? *seated : 0;
     NetwPlayer::LeaveReason reason = NetwPlayer::LEAVE_DROPPED;
-    if (PlayerRow *found = player_row(p_peer)) {
+    if (PlayerRow *found = players.getptr(player_id)) {
         reason = found->leave_reason;
         found->admitted = false;
-        found->incarnation = 0;
+        found->departed = true;
     }
     session_forget_peer(p_peer);
-    player_publish_left(leaving, reason);
-    player_forget(p_peer);
+    if (leaving) {
+        player_publish_left(player_id, reason);
+    }
+    player_forget(player_id);
     attribution.forget_peer(p_peer);
 }
 
-Ref<NetwPlayer> NetwMultiplayer::peer_get_player(int64_t p_peer) {
+int64_t NetwMultiplayer::peer_get_player(int64_t p_peer) const {
     if (!session_has_accepted(p_peer)) {
-        return Ref<NetwPlayer>();
+        return 0;
     }
-    return player_of(p_peer);
+    const int64_t *player = player_id_of_peer.getptr(p_peer);
+    return player != nullptr && players.has(*player) ? *player : 0;
 }
 
 void NetwMultiplayer::handle_deny(
@@ -6412,7 +6781,7 @@ void NetwMultiplayer::handle_deny(
     if (p_sender != SERVER_PEER || !session::frame_read(p_payload, denied)) {
         return;
     }
-    lagcomp_effect_discard(denied.key);
+    effect_discard(denied.key);
 }
 
 void NetwMultiplayer::handle_confirm(
@@ -6423,7 +6792,7 @@ void NetwMultiplayer::handle_confirm(
     if (p_sender != SERVER_PEER || !session::frame_read(p_payload, confirmed)) {
         return;
     }
-    lagcomp_effect_adopt(confirmed.key);
+    effect_adopt(confirmed.key);
 }
 
 bool NetwMultiplayer::is_coroutine(const Variant &p_value) {

@@ -16,6 +16,10 @@ namespace netw::session {
 struct Books;
 } // namespace netw::session
 
+namespace netw::predict {
+struct Decl;
+} // namespace netw::predict
+
 namespace netw {
 
 class NetwMultiplayer;
@@ -23,7 +27,7 @@ class NetwPrediction;
 
 class NetwPredictSlotEngine {
     friend class NetwMultiplayer;
-    friend class NetwPrediction;
+    friend class NetwPredictionEngine;
 
     struct Declaration {
         uint64_t state = 0;
@@ -38,8 +42,9 @@ class NetwPredictSlotEngine {
     int64_t seat = -1;
     godot::Ref<NetwEntity> entity;
     godot::Ref<NetwPrediction> handle;
+    predict::Decl *decl = nullptr;
     Declaration declaration;
-    godot::Callable fallback_at_sink;
+    bool follows_control = false;
     godot::Dictionary unsampled;
     godot::PackedStringArray unparticipated;
     bool consume_primed = false;
@@ -218,7 +223,6 @@ class NetwPredictSlotEngine {
     void register_with_loop();
     void unregister_from_loop();
 
-    void on_control_changed(int64_t p_previous_peer, int64_t p_peer);
     void on_reparented();
     void on_state_frame(const predict::Arrival &p_arrival);
     void on_input_frame(const predict::Arrival &p_arrival);
@@ -226,7 +230,6 @@ class NetwPredictSlotEngine {
     void on_quarantine_state_frame(const predict::Arrival &p_arrival);
     void apply_quarantine_witness(int64_t p_basis);
     void retry_deferred_operator(int64_t p_basis);
-    void enter_fallback_at(int64_t p_transition, int p_attribution);
     void enter_fallback(
         int64_t p_transition,
         int p_attribution,

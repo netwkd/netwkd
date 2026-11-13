@@ -113,7 +113,7 @@ class AwaitScenario final : public netw_test::FrameScenario {
         Array args;
         args.push_back(String("Probe"));
         const RID made
-            = server->spawn_registered(StringName(PROBE_ID), args, nullptr);
+            = server->spawn_registered(StringName(PROBE_ID), args, 0);
         Node *built = server->entity_get_node(made);
         if (built == nullptr || arena == nullptr) {
             return false;

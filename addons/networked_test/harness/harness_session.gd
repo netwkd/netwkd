@@ -137,24 +137,21 @@ func connect_tree(
 func _await_online(tree: MultiplayerViewport) -> Error:
 	var deadline := Time.get_ticks_msec() + ONLINE_TIMEOUT_MS
 	var scene_tree := tree.get_tree()
-	while not tree.api.is_online:
+	while not tree.api.session_is_online():
 		if Time.get_ticks_msec() > deadline or scene_tree == null:
 			return ERR_TIMEOUT
 		await scene_tree.process_frame
 	return OK
 
 
-## Takes [param tree] offline. Marks it
-## [constant MultiplayerViewport.DISCONNECTING], flushes held inbound
-## packets, and closes the peer. Returns the closed peer id so callers can
-## await server unregistration. Inverse of [method connect_tree].
+## Delivers the packets held for [param tree] and closes its peer at once,
+## as a dropped connection does. Returns the closed peer id.
 func disconnect_tree(tree: MultiplayerViewport) -> int:
 	if not tree.api.multiplayer_peer:
 		return 0
 
 	var peer := tree.api.multiplayer_peer as LocalMultiplayerPeer
 	var peer_id := tree.api.multiplayer_peer.get_unique_id()
-	tree.api.session_set_state(NetwSession.STATE_DISCONNECTING)
 	if peer:
 		_session.release_inbound_packets(peer)
 	tree.api.multiplayer_peer.close()

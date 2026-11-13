@@ -33,7 +33,8 @@ NetwMultiplayer *NetwPersistence::session() const {
     if (held == nullptr) {
         return nullptr;
     }
-    NetwMultiplayer *mounted = NetwEntity::session_core_for(held->get_owner());
+    NetwMultiplayer *mounted
+        = NetwMultiplayer::session_holding(held->get_owner());
     if (mounted != nullptr) {
         return mounted;
     }
@@ -85,28 +86,25 @@ StringName NetwPersistence::get_database() {
     if (api == nullptr || !entity.is_valid()) {
         return StringName();
     }
-    const RID binding = api->persist_binding_of_entity(entity);
-    return binding.is_valid()
-        ? api->database_get_name(api->persist_get_database(binding))
-        : StringName();
+    return api->database_get_name(api->persist_get_database(entity));
 }
 
 Ref<NetwSchema> NetwPersistence::get_schema() {
     NetwMultiplayer *api = session();
-    const persist::Binding *held = api != nullptr && entity.is_valid()
-        ? api->get_bindings()->at(api->persist_binding_of_entity(entity))
-        : nullptr;
-    if (held == nullptr) {
+    const RID found = api != nullptr && entity.is_valid()
+        ? api->persist_get_schema(entity)
+        : RID();
+    if (!found.is_valid()) {
         schema.unref();
         schema_id = RID();
         return Ref<NetwSchema>();
     }
-    if (schema_id != held->schema) {
+    if (schema_id != found) {
         const table::SchemaRecord *record
-            = api->get_schema_core()->record_of(held->schema);
+            = api->get_schema_core()->record_of(found);
         schema = record != nullptr ? NetwSchema::from_record(*record)
                                    : Ref<NetwSchema>();
-        schema_id = held->schema;
+        schema_id = found;
     }
     return schema;
 }

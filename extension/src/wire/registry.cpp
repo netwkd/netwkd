@@ -202,7 +202,8 @@ WireRegistry WireRegistry::create_default() {
         Freshness::NONE,
         Delivery::FITTED,
         Direction::SERVER_TO_CLIENT,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
     reg_c(
         9,
@@ -444,17 +445,8 @@ WireRegistry WireRegistry::create_default() {
         Freshness::NONE,
         Delivery::FITTED,
         Direction::CLIENT_TO_SERVER,
-        PayloadContract::PLANNED
-    );
-    reg_c(
-        34,
-        "SESSION_LEAVE_REQUEST",
-        ChannelKind::SESSION,
-        Reliability::RELIABLE,
-        Freshness::NONE,
-        Delivery::FITTED,
-        Direction::CLIENT_TO_SERVER,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
 
     reg_c(

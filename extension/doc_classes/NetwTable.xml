@@ -14,7 +14,7 @@
 		@onready var mobs := Netw.session(self).table(&amp;"Mob")
 		[/codeblock]
 		There is one [NetwTable] per table. Connect [signal received] once and keep the result in a variable. A peer that joins later receives the committed rows and emits [signal received] without waiting for the next commit.
-		Each row is identified by a route. Row indices change when rows are added or removed, and routes do not.
+		Each row is identified by a route from [method claim_routes]. Row indices change when rows are added or removed, and routes do not.
 		[b]Writing[/b]
 		Write the routes and every column, then call [method commit] to apply them with the current tick and send them.
 		[codeblock]
@@ -56,6 +56,14 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="claim_routes">
+			<return type="PackedInt64Array" />
+			<param index="0" name="count" type="int" />
+			<description>
+				Creates [param count] routes for new rows. Each route is unique in the session, and [method release_routes] gives it back. Returns an empty array on a client.
+				[b]Server Only.[/b]
+			</description>
+		</method>
 		<method name="commit">
 			<return type="int" enum="Error" />
 			<description>
@@ -132,6 +140,20 @@
 			<return type="PackedInt64Array" />
 			<description>
 				The routes stored in this table, in row order.
+			</description>
+		</method>
+		<method name="release_routes">
+			<return type="int" enum="Error" />
+			<param index="0" name="routes" type="PackedInt64Array" />
+			<description>
+				Releases [param routes] from [method claim_routes]. Their rows leave every table that holds them, and every peer is told. A released route is never reused.
+				[codeblock lang=text]
+				Error
+				┠╴OK                  the routes were released
+				┠╴ERR_DOES_NOT_EXIST  the session this handle names is gone
+				┖╴ERR_UNCONFIGURED    called on a client
+				[/codeblock]
+				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="row_of" qualifiers="const">
@@ -221,7 +243,7 @@
 		<signal name="received">
 			<param index="0" name="tick" type="int" />
 			<description>
-				Emitted when this table is committed locally or receives data from a peer. [param tick] is the tick of the commit.
+				Emitted when this table is committed locally or receives data from a peer. [param tick] is the tick of the commit. A commit made or data received while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 	</signals>

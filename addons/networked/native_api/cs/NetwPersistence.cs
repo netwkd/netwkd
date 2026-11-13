@@ -49,7 +49,11 @@ public sealed class NetwPersistence : NetwRefCounted
     /// Emitted when a load finishes, including the one
     /// <see cref="NetwPersistenceConfig.LoadOnSpawn"/> starts. <c>found</c> is
     /// <c>false</c> when no record was stored for
-    /// <see cref="NetwPersistence.RecordId"/>.
+    /// <see cref="NetwPersistence.RecordId"/>. A load that finishes while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends, after the
+    /// <see cref="NetwPromise"/> from <see cref="NetwPersistence.Load"/> has
+    /// settled.
     /// </summary>
     public event Action<bool> Loaded
     {
@@ -65,7 +69,11 @@ public sealed class NetwPersistence : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when a save is stored.
+    /// Emitted when a save is stored. A save stored while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends, after the
+    /// <see cref="NetwPromise"/> from <see cref="NetwPersistence.Save"/> has
+    /// settled.
     /// </summary>
     public event Action Saved
     {

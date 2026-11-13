@@ -6,6 +6,7 @@
 #include "netw/api/prediction.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/display/role_facts.hpp"
+#include "netw/predict/decl.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/sim/resolve.hpp"
 
@@ -327,8 +328,7 @@ Resolved resolve_through_prediction(const Concrete &p_point) {
 
     NetwPredictionEngine pool;
     const int64_t slot = pool.open();
-    Ref<NetwPrediction> handle;
-    handle.instantiate();
+    netw::predict::Decl decl;
     pool.declare_axes(
         slot,
         authority,
@@ -337,17 +337,15 @@ Resolved resolve_through_prediction(const Concrete &p_point) {
     );
     pool.set_fallback_latched(slot, p_point.closure == FALLBACK);
     if (p_point.closure == DELAY_CLOSED) {
-        handle->set_recovery_policy(
-            NetwPrediction::RECOVERY_POLICY_DELAY_CLOSED
-        );
+        decl.recovery_policy = NetwPrediction::RECOVERY_POLICY_DELAY_CLOSED;
     }
-    Facts facts = pool.resolution_facts(slot, handle);
+    Facts facts = pool.resolution_facts(slot, &decl);
     facts.selection_count = p_point.selection == SELECTED ? 1 : 0;
 
     Resolved out;
     out.mode = netw::sim::resolve(facts);
-    out.role = pool.apply_mode(slot, handle, out.mode);
-    out.source = int(handle->get_input_source());
+    out.role = pool.apply_mode(slot, &decl, out.mode);
+    out.source = decl.input_source;
     out.display_role = netw::display::role_for_mode(out.mode, true, controls);
     return out;
 }

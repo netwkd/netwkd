@@ -7,6 +7,7 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "internals.h"
 #include "loopback_rig.h"
 #include "world_decl.h"
 
@@ -111,7 +112,7 @@ inline FlowPair stand_flow_pair(
     const godot::Ref<netw::NetwEntity> authored
         = netw::NetwEntity::of(pair.authored);
     REQUIRE_MESSAGE(authored.is_valid(), "the authored body has no record");
-    pair.route = server->liveness_route_of(authored.ptr());
+    pair.route = Internals::route_of(server, authored.ptr());
     REQUIRE_MESSAGE(pair.route > 0, "the authored body went live unrouted");
     for (int index = 0; index < pair.mirrors.size(); ++index) {
         if (!binds_mirror(p_binding, index)) {
@@ -130,10 +131,15 @@ inline FlowPair stand_flow_pair(
 }
 
 inline void steer(const FlowPair &p_pair, int p_controller) {
-    netw::NetwEntity::of(p_pair.authored)->record_controller(p_controller);
+    netw_test::Internals::control_record(
+        netw::NetwEntity::of(p_pair.authored).ptr(),
+        p_controller
+    );
     for (int index = 0; index < p_pair.mirrors.size(); ++index) {
-        netw::NetwEntity::of(p_pair.mirrors[index])
-            ->record_controller(p_controller);
+        netw_test::Internals::control_record(
+            netw::NetwEntity::of(p_pair.mirrors[index]).ptr(),
+            p_controller
+        );
     }
 }
 

@@ -131,13 +131,13 @@ class IndependentScenario final : public netw_test::FrameScenario {
         stand->pump(4);
         NetwMultiplayer *server = stand->session(SERVER);
         const Ref<netw::NetwPlayer> owner
-            = server->peer_get_player(stand->peer_id(A));
+            = server->player_joined_of(stand->peer_id(A));
         Array args;
         args.push_back(String("Runner"));
         const RID made = server->spawn_registered(
             StringName(RUNNER_ID),
             args,
-            owner.ptr()
+            owner->get_id()
         );
         Node *built = server->entity_get_node(made);
         if (built == nullptr) {

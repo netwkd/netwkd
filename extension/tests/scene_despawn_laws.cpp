@@ -188,9 +188,7 @@ struct Stand {
     }
 
     String scene_of(int p_seat) const {
-        const Ref<NetwPlayer> me = Object::cast_to<NetwPlayer>(
-            netw::gd::live_object(at(p_seat)->get("local_player"))
-        );
+        const Ref<NetwPlayer> me = at(p_seat)->player_local();
         const Ref<NetwScene> scene
             = me.is_valid() ? me->get_scene() : Ref<NetwScene>();
         return scene.is_valid() ? String(scene->get_label()) : String("none");

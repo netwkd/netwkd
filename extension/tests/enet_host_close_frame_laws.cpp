@@ -144,7 +144,7 @@ class EnetHostCloseScenario final : public netw_test::FrameScenario {
         bool all = true;
         for (int at = 0; at < CLIENTS; at++) {
             ClientRun &run = host_close_evidence().clients[at];
-            const bool offline = clients[at]->session_get_state()
+            const bool offline = clients[at]->session_get_stored_state()
                 == netw::NetwMultiplayer::SESSION_STATE_OFFLINE;
             if (offline && run.offline_frames < 0) {
                 run.offline_frames = frames;

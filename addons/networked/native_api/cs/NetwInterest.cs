@@ -42,7 +42,9 @@ public sealed class NetwInterest : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted on the server when <c>peer_id</c> starts seeing this entity.
+    /// Emitted on the server when <c>peer_id</c> starts seeing this entity. It
+    /// is emitted once however many layers show the entity, and only once
+    /// <c>peer_id</c> also sees the <see cref="NetwEntity"/> above it.
     /// </summary>
     public event Action<long> InterestEntered
     {
@@ -58,7 +60,9 @@ public sealed class NetwInterest : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted on the server when <c>peer_id</c> stops seeing this entity.
+    /// Emitted on the server when <c>peer_id</c> stops seeing this entity, also
+    /// when it stops seeing the <see cref="NetwEntity"/> above it. A session
+    /// that ends does not emit it.
     /// </summary>
     public event Action<long> InterestExited
     {
@@ -74,8 +78,15 @@ public sealed class NetwInterest : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when <c>peer_id</c> starts seeing this entity through
-    /// <c>layer_id</c>.
+    /// Emitted whenever <c>peer_id</c> starts seeing this entity through the
+    /// layer <c>layer_id</c>. The server emits it for every peer, with <c>1</c>
+    /// for the host's own player on a listen host. A client emits it only for
+    /// itself, so <c>peer_id</c> is its <c>MultiplayerAPI.get_unique_id</c>. On
+    /// the server it is emitted before
+    /// <see cref="NetwInterestLayer.InterestEntered"/>, before
+    /// <see cref="NetwInterest.InterestEntered"/> and before the change is
+    /// sent, so a handler that reads visibility sees it as it was before the
+    /// change.
     /// </summary>
     public event Action<StringName, long> ObserverEntered
     {
@@ -91,8 +102,12 @@ public sealed class NetwInterest : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when <c>peer_id</c> stops seeing this entity through
-    /// <c>layer_id</c>.
+    /// Emitted whenever <c>peer_id</c> stops seeing this entity through the
+    /// layer <c>layer_id</c>, also when the layer is freed. It is emitted on
+    /// the same peers and in the same order as
+    /// <see cref="NetwInterest.ObserverEntered"/>, and a client also emits it
+    /// when the entity is removed from that client. A session that ends does
+    /// not emit it.
     /// </summary>
     public event Action<StringName, long> ObserverExited
     {
@@ -205,8 +220,9 @@ public sealed class NetwInterest : NetwRefCounted
 
     /// <summary>
     /// Calls <paramref name="callback"/> as <c>callback(layer_id, peer_id)</c>
-    /// when a peer starts seeing the entity through <paramref name="layerId"/>.
-    /// An empty <paramref name="layerId"/> means every layer joined so far.
+    /// when <paramref name="layerId"/> shows the entity to a peer, once that
+    /// peer also sees the <see cref="NetwEntity"/> above it. An empty
+    /// <paramref name="layerId"/> means every layer joined so far.
     /// </summary>
     public NetwInterest OnEnter(Callable callback, StringName layerId = null)
     {
@@ -235,8 +251,9 @@ public sealed class NetwInterest : NetwRefCounted
 
     /// <summary>
     /// Calls <paramref name="callback"/> as <c>callback(layer_id, peer_id)</c>
-    /// when a peer stops seeing the entity through <paramref name="layerId"/>.
-    /// An empty <paramref name="layerId"/> means every layer joined so far.
+    /// when <paramref name="layerId"/> stops showing the entity to a peer, also
+    /// when that peer stops seeing the <see cref="NetwEntity"/> above it. An
+    /// empty <paramref name="layerId"/> means every layer joined so far.
     /// </summary>
     public NetwInterest OnLeave(Callable callback, StringName layerId = null)
     {

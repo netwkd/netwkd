@@ -97,6 +97,10 @@ const GameCall CHANNEL_HANDLER
     = {"The NetwMultiplayer.rpc_channel_register handler",
        "func(entity: RID, payload: PackedByteArray, sender: int)",
        3};
+const GameCall NETW_CHANNEL_HANDLER
+    = {"The NetwChannel.register handler",
+       "func(sender: int, payload: PackedByteArray) -> void",
+       2};
 const GameCall RPC_LOCAL
     = {"The method Netw.rpc runs on this peer",
        "a function that takes the arguments given to Netw.rpc",
@@ -157,15 +161,21 @@ void NetwMultiplayer::channel_dispatch(
     int64_t p_sender,
     int64_t p_channel
 ) {
-    const Callable *handler = channel_handlers.getptr(p_channel);
-    if (handler == nullptr || !handler->is_valid()) {
+    const ChannelHandler *row = channel_handlers.getptr(p_channel);
+    if (row == nullptr || !row->handler.is_valid()) {
         return;
     }
     Array args;
+    if (row->sender_first) {
+        args.push_back(p_sender);
+        args.push_back(p_payload);
+        game_call(row->handler, args, NETW_CHANNEL_HANDLER);
+        return;
+    }
     args.push_back(p_wrapper.is_valid() ? p_wrapper->get_rid_handle() : RID());
     args.push_back(p_payload);
     args.push_back(p_sender);
-    game_call(*handler, args, CHANNEL_HANDLER);
+    game_call(row->handler, args, CHANNEL_HANDLER);
 }
 
 void NetwMultiplayer::rpc_channel_register(
@@ -173,12 +183,26 @@ void NetwMultiplayer::rpc_channel_register(
     const Callable &p_handler,
     bool p_defer_when_unknown
 ) {
-    if (p_channel < CHANNEL_USER_FIRST || p_channel > CHANNEL_USER_LAST
-        || !p_handler.is_valid()) {
+    rpc_channel_install(p_channel, p_handler, p_defer_when_unknown, false);
+}
+
+void NetwMultiplayer::rpc_channel_install(
+    int64_t p_channel,
+    const Callable &p_handler,
+    bool p_defer_when_unknown,
+    bool p_sender_first
+) {
+    if (p_channel < CHANNEL_USER_FIRST || p_channel > CHANNEL_USER_LAST) {
         return;
     }
-    game_call_declared(p_handler, CHANNEL_HANDLER);
-    channel_handlers.insert(p_channel, p_handler);
+    game_call_declared(
+        p_handler,
+        p_sender_first ? NETW_CHANNEL_HANDLER : CHANNEL_HANDLER
+    );
+    if (!p_handler.is_valid()) {
+        return;
+    }
+    channel_handlers.insert(p_channel, {p_handler, p_sender_first});
     get_channel_book()->register_channel(
         p_channel,
         callable_mp(this, &NetwMultiplayer::channel_dispatch).bind(p_channel),
@@ -918,7 +942,7 @@ Dictionary NetwMultiplayer::lagcomp_metrics() const {
     return out;
 }
 
-Dictionary NetwMultiplayer::stats_snapshot() {
+Dictionary NetwMultiplayer::session_get_stats() {
     NETW_ZONE_NC("Stats snapshot", colors::SESSION);
     Dictionary out = relay_stats_snapshot();
     out[StringName("pending_live")] = liveness_pending_live_count();
@@ -1258,7 +1282,7 @@ void NetwMultiplayer::rpc_call(
 
     PackedInt32Array recipients;
     if (p_peer == 0) {
-        recipients = rpc_get_recipients(entity);
+        recipients = rpc_recipients(entity);
     } else if (p_peer != local_id) {
         recipients.push_back(int32_t(p_peer));
     }
@@ -1431,7 +1455,7 @@ Ref<NetwGroupPromise> NetwMultiplayer::rpc_request_call_group(
         return NetwGroupPromise::refused(prepared, refusal);
     }
 
-    const PackedInt32Array peers = rpc_get_recipients(request.entity);
+    const PackedInt32Array peers = rpc_recipients(request.entity);
     const int64_t local_id = get_unique_id();
     const bool asks_caller
         = request.call_local && !peers.has(int32_t(local_id));
@@ -2217,6 +2241,37 @@ Error NetwMultiplayer::send_to(
         p_batched,
         nullptr,
         false
+    );
+}
+
+Error NetwMultiplayer::rpc_send(
+    int64_t p_peer,
+    int64_t p_channel,
+    const PackedByteArray &p_payload,
+    bool p_reliable,
+    bool p_batched
+) {
+    if (p_channel < CHANNEL_USER_FIRST || p_channel > CHANNEL_USER_LAST) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwMultiplayer.rpc_send}"),
+             vformat("channel id %d", int(p_channel)),
+             vformat("an id from %d to %d",
+                     int(CHANNEL_USER_FIRST),
+                     int(CHANNEL_USER_LAST))}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    return send_to(
+        p_peer,
+        0,
+        p_channel,
+        p_payload,
+        p_reliable,
+        0,
+        String(),
+        p_batched
     );
 }
 

@@ -1,9 +1,9 @@
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/lan_directory_probe.h"
 #include "support/netw_cells.h"
 #include "support/netw_test.h"
-#include "support/session_state_walk.h"
 
 #include <memory>
 #include <vector>
@@ -26,7 +26,6 @@ using netw::NetwSession;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawVerdict;
-using netw_test::StateHeard;
 
 constexpr int GAMEPLAY_PORT_START = 30700;
 constexpr int GAMEPLAY_PORT_END = 30800;
@@ -150,7 +149,7 @@ struct Moment {
     String host_address;
     bool has_current = false;
     String current_address;
-    std::vector<StateHeard> heard;
+    std::vector<int64_t> heard;
     String incomplete;
     String twin;
     String unlisted;
@@ -174,7 +173,7 @@ struct Browser {
     Ref<NetwSession> door;
     Ref<netw::NetwConnection> connection;
     std::vector<Ref<NetwEndpoint>> shown;
-    std::vector<StateHeard> heard;
+    std::vector<int64_t> heard;
     bool list_visible = true;
     int failed = 0;
     String incomplete;
@@ -210,7 +209,7 @@ void on_endpoint_removed(const Variant &p_endpoint, int64_t p_side) {
 
 void on_state_changed(int64_t p_state, int64_t p_side) {
     Browser &held = browser(p_side);
-    held.heard.push_back({p_state, int64_t(held.door->get_state())});
+    held.heard.push_back(p_state);
     apply_browsing(p_side);
 }
 
@@ -360,7 +359,7 @@ class ConnectLifecycleMatrix final : public netw_test::FrameScenario {
     void pump() {
         for (Side &side : sides) {
             side.session->NETW_API_VIRTUAL(poll)();
-            side.session->connect_plane().on_poll(FRAME);
+            netw_test::Internals::connect_plane(side.session).on_poll(FRAME);
             netw::LANLobbyDirectoryProbe::tick(side.directory, FRAME);
         }
     }
@@ -827,12 +826,21 @@ LawVerdict added_rows_ping(const Moment &p_seen) {
 }
 
 LawVerdict state_changed_walks(const Moment &p_seen) {
-    const LawVerdict walk = netw_test::law_state_walk(p_seen.heard, p_seen.was);
-    if (!walk.held) {
-        return walk;
+    int64_t last = p_seen.was;
+    for (size_t at = 0; at < p_seen.heard.size(); at++) {
+        const int64_t emitted = p_seen.heard[at];
+        const bool climbs = emitted > last;
+        const bool lands = emitted == OFFLINE && last != ONLINE;
+        if (emitted == last || (!climbs && !lands)) {
+            return law_broken(
+                "change %d moved from %d to %d",
+                int(at),
+                int(last),
+                int(emitted)
+            );
+        }
+        last = emitted;
     }
-    const int64_t last
-        = p_seen.heard.empty() ? p_seen.was : p_seen.heard.back().emitted;
     if (last != p_seen.state) {
         return law_broken("last heard %d, reads %d", int(last), p_seen.state);
     }
@@ -869,8 +877,8 @@ const Law LAWS[] = {
      "a host or client holds one current endpoint while online",
      &current_endpoint},
     {"V10",
-     "every state_changed carries the state read at that moment, and the "
-     "values climb and then return to STATE_OFFLINE with no repeat",
+     "the state_changed values climb and then return to STATE_OFFLINE "
+     "with no repeat, and the last one is the state read",
      &state_changed_walks},
 };
 

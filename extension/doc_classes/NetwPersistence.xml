@@ -76,11 +76,13 @@
 			<param index="0" name="found" type="bool" />
 			<description>
 				Emitted when a load finishes, including the one [method NetwPersistenceConfig.load_on_spawn] starts. [param found] is [code]false[/code] when no record was stored for [member record_id].
+				A load that finishes while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends, after the [NetwPromise] from [method load] has settled.
 			</description>
 		</signal>
 		<signal name="saved">
 			<description>
 				Emitted when a save is stored.
+				A save stored while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends, after the [NetwPromise] from [method save] has settled.
 			</description>
 		</signal>
 	</signals>

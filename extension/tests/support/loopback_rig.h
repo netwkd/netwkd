@@ -190,7 +190,7 @@ class LoopbackRig {
         netw::NetwMultiplayer *api = p_api;
         REQUIRE_MESSAGE(api != nullptr, "a declaration needs a session");
         godot::RID entity = p_decl.route() > 0
-            ? api->entity_from_route(p_decl.route())
+            ? Internals::entity_at(api, p_decl.route())
             : godot::RID();
         if (!entity.is_valid()) {
             entity = api->entity_create();
@@ -207,7 +207,7 @@ class LoopbackRig {
             REQUIRE_MESSAGE(bool(owned == godot::OK), "the owner did not bind");
         }
         if (p_grant_control && p_decl.controller() != 0) {
-            api->entity_grant_control(entity, p_decl.controller());
+            api->entity_set_controller(entity, p_decl.controller());
         }
         return entity;
     }
@@ -658,7 +658,7 @@ public:
         const godot::Array &p_args = godot::Array(),
         const godot::Array &p_arg_types = godot::Array(),
         godot::Node *p_parent = nullptr,
-        const godot::Variant &p_owner = godot::Variant(),
+        int64_t p_player = 0,
         bool p_pump = true
     ) {
         REQUIRE_MESSAGE(!mounts.is_empty(), "a spawn needs a mounted rig");
@@ -666,11 +666,8 @@ public:
         for (int index = 0; index < count(); ++index) {
             register_constructor(client(index), p_id, p_build, p_arg_types);
         }
-        const godot::RID entity = server()->spawn_registered(
-            p_id,
-            p_args,
-            netw::gd::live_object(p_owner)
-        );
+        const godot::RID entity
+            = server()->spawn_registered(p_id, p_args, p_player);
         REQUIRE_MESSAGE(entity.is_valid(), "the spawn verb minted no entity");
         godot::Node *node = server()->entity_get_node(entity);
         REQUIRE_MESSAGE(node != nullptr, "the spawn verb built no node");
@@ -686,14 +683,14 @@ public:
     }
 
     godot::Ref<netw::NetwPlayer> player(int p_client) const {
-        return server()->peer_get_player(peer_id(p_client));
+        return server()->player_joined_of(peer_id(p_client));
     }
 
     netw::spawn::Pipeline *spawn_plane(int p_client = -1) const {
         netw::NetwMultiplayer *core
             = p_client < 0 ? server() : client(p_client);
         netw::ReplicationCore *plane
-            = core != nullptr ? core->get_replication_plane() : nullptr;
+            = core != nullptr ? Internals::replication_plane(core) : nullptr;
         REQUIRE_MESSAGE(plane != nullptr, "the session has no plane");
         return plane != nullptr ? plane->get_spawn_pipeline() : nullptr;
     }
@@ -748,7 +745,7 @@ public:
 
     godot::Node *route_node(int p_route, int p_client = -1) const {
         netw::NetwMultiplayer *api = p_client < 0 ? server() : client(p_client);
-        return api->entity_get_node(api->entity_from_route(p_route));
+        return api->entity_get_node(Internals::entity_at(api, p_route));
     }
 
     netw::NetwMultiplayer *client(int p_index) const {
@@ -902,12 +899,12 @@ public:
         const godot::RID entity = server()->spawn_registered(
             godot::StringName(DECLARED_SPAWN),
             args,
-            nullptr
+            0
         );
         REQUIRE_MESSAGE(entity.is_valid(), "the declared spawn made no entity");
         branch(-1)->add_child(owner);
         if (p_decl.controller() != 0) {
-            server()->entity_grant_control(entity, p_decl.controller());
+            server()->entity_set_controller(entity, p_decl.controller());
         }
         const godot::RID state = attach_state(server(), entity, owner, p_decl);
         attach_input(server(), entity, owner, p_decl);
@@ -924,7 +921,7 @@ public:
             bool reached = true;
             for (int at = 0; at < count(); ++at) {
                 reached = reached
-                    && client(at)->entity_from_route(route).is_valid();
+                    && Internals::entity_at(client(at), route).is_valid();
             }
             if (reached) {
                 break;
@@ -972,9 +969,7 @@ public:
         );
         api->session_submit_join(p_username, p_args);
         pump(4);
-        return godot::Object::cast_to<netw::NetwPlayer>(
-            netw::gd::live_object(api->get("local_player"))
-        );
+        return api->player_local();
     }
 
     godot::Ref<netw::NetwEntity> declare_unrecorded_wrapper(
@@ -989,7 +984,7 @@ public:
     godot::RID declare_mirror(int p_client, const EntityDecl &p_decl) {
         REQUIRE_MESSAGE(p_decl.route() > 0, "a mirror needs an admitted route");
         const godot::RID spawned
-            = client(p_client)->entity_from_route(p_decl.route());
+            = Internals::entity_at(client(p_client), p_decl.route());
         Carrier *owner = godot::Object::cast_to<Carrier>(
             client(p_client)->entity_get_node(spawned)
         );
@@ -1095,7 +1090,7 @@ public:
         REQUIRE_MESSAGE(route > 0, "the scene holds no route to mirror");
 
         netw::NetwMultiplayer *api = client(p_client);
-        godot::RID mirror = api->entity_from_route(route);
+        godot::RID mirror = Internals::entity_at(api, route);
         if (!mirror.is_valid()) {
             mirror = api->entity_create();
         }
@@ -1192,7 +1187,7 @@ public:
                     row.player_client,
                     EntityDecl(decl).on_route(route)
                 );
-                server()->entity_grant_control(
+                server()->entity_set_controller(
                     entity,
                     peer_id(row.player_client)
                 );

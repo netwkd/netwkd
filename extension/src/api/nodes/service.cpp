@@ -17,33 +17,11 @@ bool in_editor() {
 
 } // namespace
 
-NetwMultiplayer *NetwService::resolve_api(Node *p_service) {
-    if (p_service == nullptr) {
-        return nullptr;
-    }
-    NetwMultiplayer *api = Object::cast_to<NetwMultiplayer>(
-        NetwMultiplayer::session_of(p_service).ptr()
-    );
-    if (api != nullptr) {
-        return api;
-    }
-    for (Node *walked = p_service; walked != nullptr;
-         walked = walked->get_parent()) {
-        NetwMultiplayer *owned = NetwMultiplayer::core_rooted_at(walked);
-        if (owned != nullptr) {
-            return owned;
-        }
-    }
-    return nullptr;
-}
-
 void NetwService::register_on_session(
     Node *p_service,
     const Ref<Script> &p_type
 ) {
-    NetwMultiplayer *api = Object::cast_to<NetwMultiplayer>(
-        NetwMultiplayer::session_of(p_service).ptr()
-    );
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_service);
     if (api != nullptr) {
         api->service_register(p_service, p_type.ptr());
     }
@@ -53,9 +31,7 @@ void NetwService::unregister_from_session(
     Node *p_service,
     const Ref<Script> &p_type
 ) {
-    NetwMultiplayer *api = Object::cast_to<NetwMultiplayer>(
-        NetwMultiplayer::session_of(p_service).ptr()
-    );
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_service);
     if (api != nullptr) {
         api->service_unregister(p_service, p_type.ptr());
     }
@@ -85,7 +61,7 @@ void NetwService::enter_registry() {
     if (in_editor() || !should_register()) {
         return;
     }
-    NetwMultiplayer *api = resolve_api(this);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(this);
     if (api == nullptr) {
         return;
     }
@@ -99,7 +75,7 @@ void NetwService::exit_registry() {
     if (in_editor() || !should_register()) {
         return;
     }
-    NetwMultiplayer *api = resolve_api(this);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(this);
     if (api == nullptr) {
         return;
     }

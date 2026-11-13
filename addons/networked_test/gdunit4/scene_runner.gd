@@ -29,7 +29,7 @@ var local_player_entities: Array[NetwEntity]:
 	get:
 		if not tree:
 			return []
-		var who: NetwPlayer = tree.api.local_player
+		var who: NetwPlayer = Netw.session(tree).local_player
 		if who == null:
 			return []
 		var owned: Array[NetwEntity] = []
@@ -96,14 +96,15 @@ func find(path: NodePath) -> Node:
 
 ## Returns the player named [param player_username] in this peer's scenes.
 func find_player(player_username: StringName) -> Node:
-	if tree == null or tree.api == null:
+	if session == null:
 		return null
 
 	var player_name := StringName(str(player_username))
-	for player: NetwEntity in tree.api.player_entities:
-		if player != null and is_instance_valid(player.root):
-			if _player_matches_username(player.root, player_name):
-				return player.root
+	for scene: NetwScene in session.scenes:
+		for player: NetwEntity in scene.player_entities:
+			if player != null and is_instance_valid(player.root):
+				if _player_matches_username(player.root, player_name):
+					return player.root
 	return null
 
 

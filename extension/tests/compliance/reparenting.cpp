@@ -132,7 +132,7 @@ class Declared extends Runner:
 
 	func _ready() -> void:
 		var session := multiplayer as NetwMultiplayer
-		if session.predict_declare(session.entity_of(self)) != OK:
+		if session.predict_declare(session.entity_attach(self)) != OK:
 			push_error("predict_declare refused %s" % name)
 )";
 

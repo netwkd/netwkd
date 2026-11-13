@@ -55,7 +55,7 @@ int seat_body(LoopbackRig &p_rig, Node *p_parent, const char *p_name) {
     const RID entity = p_rig.server()->spawn_registered(
         StringName(BODY_ID),
         named(p_name),
-        p_rig.player(0).ptr()
+        p_rig.player(0)->get_id()
     );
     REQUIRE_MESSAGE(entity.is_valid(), "the spawn verb minted no entity");
     Node *node = p_rig.server()->entity_get_node(entity);
@@ -77,7 +77,7 @@ TEST_CASE(
     LoopbackRig rig(1);
     rig.mount();
     REQUIRE(
-        rig.client(0)->session_get_state()
+        rig.client(0)->session_get_stored_state()
         == NetwMultiplayer::SESSION_STATE_ONLINE
     );
 
@@ -86,7 +86,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(seen.count("exiting"), 1);
     CHECK(
-        rig.client(0)->session_get_state()
+        rig.client(0)->session_get_stored_state()
         == NetwMultiplayer::SESSION_STATE_OFFLINE
     );
 }
@@ -132,7 +132,7 @@ TEST_CASE(
 
     NETW_CHECK_EQ(seen.count("exiting"), 1);
     CHECK(
-        rig.client(0)->session_get_state()
+        rig.client(0)->session_get_stored_state()
         == NetwMultiplayer::SESSION_STATE_OFFLINE
     );
 }
@@ -158,7 +158,7 @@ TEST_CASE(
     LoopbackRig rig(1);
     rig.mount();
     REQUIRE(
-        rig.client(0)->session_get_state()
+        rig.client(0)->session_get_stored_state()
         == NetwMultiplayer::SESSION_STATE_ONLINE
     );
 
@@ -172,7 +172,7 @@ TEST_CASE(
     leaving_session() = nullptr;
 
     CHECK(
-        rig.client(0)->session_get_state()
+        rig.client(0)->session_get_stored_state()
         == NetwMultiplayer::SESSION_STATE_OFFLINE
     );
 }

@@ -21,12 +21,18 @@ class NetwPlayer;
 class NetwScene : public godot::RefCounted, public enums::NetwScene {
     GDCLASS(NetwScene, godot::RefCounted)
 
+    friend class NetwMultiplayer;
+
+    godot::ObjectID session_id;
+    godot::RID scene;
+
+    NetwMultiplayer *core() const;
+    NetwMultiplayer *live_core() const;
+
 protected:
     static void _bind_methods();
 
 public:
-    void bind(NetwEntity *p_entity);
-
     godot::RID get_rid() const;
     godot::Ref<NetwEntity> get_entity() const;
     godot::Node *get_root() const;
@@ -38,14 +44,6 @@ public:
     godot::TypedArray<NetwEntity> get_local_player_entities() const;
 
     godot::TypedArray<NetwEntity> get_entities() const;
-    void observe(
-        enums::NetwScene::SceneEvent p_event,
-        const godot::Callable &p_callback
-    );
-    void unobserve(
-        enums::NetwScene::SceneEvent p_event,
-        const godot::Callable &p_callback
-    );
     godot::Error watch(const godot::Ref<NetwPlayer> &p_player);
     godot::Error unwatch(const godot::Ref<NetwPlayer> &p_player);
     bool is_watching(const godot::Ref<NetwPlayer> &p_player) const;
@@ -62,30 +60,6 @@ public:
         const godot::Ref<NetwPlayer> &p_player,
         bool p_present
     );
-
-    godot::Ref<NetwEntity> entity_of_handle() const;
-
-private:
-    struct Relay {
-        int64_t event;
-        godot::Callable target;
-        godot::Callable mounted;
-    };
-
-    godot::ObjectID entity_id;
-    godot::LocalVector<Relay> relays;
-
-    godot::Variant translate_edge(
-        bool p_present,
-        const godot::Variant &p_subject,
-        int64_t p_event,
-        const godot::Callable &p_target
-    );
-
-    NetwMultiplayer *core() const;
-    godot::Node *scene_node() const;
 };
-
-godot::Ref<NetwScene> build_scene_handle(godot::Object *p_entity);
 
 } // namespace netw

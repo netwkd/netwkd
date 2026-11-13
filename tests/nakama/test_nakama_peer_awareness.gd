@@ -45,7 +45,7 @@ func test_peers_and_rosters_see_each_other() -> void:
 
 	for tree in [host_tree, client_a, client_b]:
 		assert_int(tree.multiplayer.get_peers().size()).is_equal(2)
-		assert_int(tree.api.players.size()).is_equal(3)
+		assert_int(tree.api.player_list().size()).is_equal(3)
 
 
 func test_disconnect_propagates_to_remaining_peers() -> void:
@@ -119,7 +119,7 @@ func _await(
 
 
 func _sees_all(tree: MultiplayerViewport) -> bool:
-	return tree.api.is_online \
+	return tree.api.session_is_online() \
 			and tree.multiplayer.get_peers().size() == 2 \
 			and _joined_count(tree) == 3
 
@@ -148,7 +148,8 @@ func _server_disconnect_seen(
 		client_b: MultiplayerViewport,
 		client_b_saw_server_disconnect: Array,
 ) -> bool:
-	return client_b_saw_server_disconnect[0] or not client_b.api.is_online
+	return client_b_saw_server_disconnect[0] \
+			or not client_b.api.session_is_online()
 
 
 func _has_peer(tree: MultiplayerViewport, peer_id: int) -> bool:
@@ -160,4 +161,4 @@ func _has_peer(tree: MultiplayerViewport, peer_id: int) -> bool:
 func _joined_count(tree: MultiplayerViewport) -> int:
 	if not is_instance_valid(tree):
 		return 0
-	return tree.api.players.size()
+	return tree.api.player_list().size()

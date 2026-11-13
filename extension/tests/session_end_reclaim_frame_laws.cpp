@@ -1,5 +1,6 @@
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 #include "support/netw_test.h"
 
@@ -27,6 +28,7 @@ namespace TestSessionEndReclaimFrameLaws {
 
 using netw::NetwMultiplayer;
 using netw::NetwSession;
+using netw_test::Internals;
 
 constexpr int SEATS = 3;
 constexpr int HOST = 0;
@@ -71,6 +73,7 @@ struct ReclaimEvidence {
     bool removed_kept = false;
     Census removed_replicas;
     bool moved_alive = true;
+    int64_t moved_faults = 0;
     bool linger_alive = true;
     bool transfer_seated = false;
     bool transfer_exited = true;
@@ -217,7 +220,7 @@ class ReclaimScenario final : public netw_test::FrameScenario {
 
     bool everyone_seated() const {
         for (int at = 0; at < SEATS; ++at) {
-            if (seat(HOST)->peer_get_player(peer_of(at)).is_null()) {
+            if (seat(HOST)->player_joined_of(peer_of(at)).is_null()) {
                 return false;
             }
         }
@@ -227,14 +230,14 @@ class ReclaimScenario final : public netw_test::FrameScenario {
     Node *spawn(const String &p_name, int p_owner, bool p_mount) {
         Ref<netw::NetwPlayer> player;
         if (p_owner >= 0) {
-            player = seat(HOST)->peer_get_player(peer_of(p_owner));
+            player = seat(HOST)->player_joined_of(peer_of(p_owner));
         }
         Array args;
         args.push_back(p_name);
         const RID made = seat(HOST)->spawn_registered(
             StringName(BODY_ID),
             args,
-            player.ptr()
+            player.is_valid() ? player->get_id() : 0
         );
         Node *node = seat(HOST)->entity_get_node(made);
         if (node == nullptr) {
@@ -256,7 +259,7 @@ class ReclaimScenario final : public netw_test::FrameScenario {
         for (int at = 1; at < SEATS; ++at) {
             for (const int route : routes) {
                 Node *node = seat(at)->entity_get_node(
-                    seat(at)->entity_from_route(route)
+                    Internals::entity_at(seat(at), route)
                 );
                 if (node != nullptr) {
                     spawned[at].push_back(uint64_t(node->get_instance_id()));
@@ -332,7 +335,10 @@ class ReclaimScenario final : public netw_test::FrameScenario {
         opts.instantiate();
         opts->set_linger(true);
         opts->set_linger_seconds(1.0);
-        seat(HOST)->entity_despawn(seat(HOST)->entity_of(lingering), opts);
+        seat(HOST)->entity_despawn(
+            Internals::entity_of(seat(HOST), lingering),
+            opts
+        );
         pump(1);
     }
 
@@ -586,6 +592,7 @@ public:
                 close_seats();
                 seen.orphan_warnings
                     = faults->warnings_containing("never entered the tree");
+                seen.moved_faults = faults->errors_containing("[NW0041]");
                 delete faults;
                 faults = nullptr;
                 seen.driven = true;
@@ -686,6 +693,7 @@ TEST_CASE(
     const ReclaimEvidence &seen = driven();
     CHECK_FALSE(seen.orphan_alive);
     CHECK_FALSE(seen.moved_alive);
+    NETW_CHECK_EQ(seen.moved_faults, 2);
 }
 
 TEST_CASE(

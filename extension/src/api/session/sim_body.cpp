@@ -17,11 +17,6 @@ namespace netw {
 
 namespace {
 
-const StringName &control_changed_name() {
-    static const StringName name("control_changed");
-    return name;
-}
-
 const StringName &network_tick_name() {
     static const StringName name("_network_tick");
     return name;
@@ -93,10 +88,7 @@ void NetwMultiplayer::sim_settle_body(const Ref<NetwEntity> &p_entity) {
         );
         row.bodies.residents = &store().residents;
         row.owner_ticks = owner->has_method(network_tick_name());
-        row.control_hook
-            = callable_mp(this, &NetwMultiplayer::sim_on_body_control)
-                  .bind(entity);
-        p_entity->connect(control_changed_name(), row.control_hook);
+        row.follows_control = true;
         sim_watch_sleep(row, true);
         if (display::Runtime *runtime = display_book->runtime_of(entity)) {
             display_seat_bodies(runtime);
@@ -130,12 +122,11 @@ void NetwMultiplayer::sim_settle_body_of(const RID &p_entity) {
     sim_settle_body(entity_get_view(p_entity));
 }
 
-void NetwMultiplayer::sim_on_body_control(
-    int64_t,
-    int64_t,
-    const RID &p_entity
-) {
-    sim_settle_body_of(p_entity);
+void NetwMultiplayer::sim_follow_control(const RID &p_entity) {
+    const sim::Row *row = sim_rows.row_of(p_entity);
+    if (row != nullptr && row->follows_control) {
+        sim_settle_body_of(p_entity);
+    }
 }
 
 void NetwMultiplayer::sim_reinstall(const Ref<NetwEntity> &p_entity) {
@@ -169,12 +160,7 @@ void NetwMultiplayer::sim_release_body(const RID &p_entity, bool p_restore) {
     } else {
         row->bodies = sim::Bodies();
     }
-    const Ref<NetwEntity> entity = entity_get_view(p_entity);
-    if (entity.is_valid() && row->control_hook.is_valid()
-        && entity->is_connected(control_changed_name(), row->control_hook)) {
-        entity->disconnect(control_changed_name(), row->control_hook);
-    }
-    row->control_hook = Callable();
+    row->follows_control = false;
     if (!row->facts.predicted) {
         sim_release_row(p_entity);
     }

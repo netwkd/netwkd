@@ -1,4 +1,5 @@
 #include "support/directory_stubs.h"
+#include "support/internals.h"
 #include "support/netw_call_log.h"
 #include "support/netw_test.h"
 
@@ -117,7 +118,7 @@ struct HostedBranch {
             StringName(p_directory ? "StubLobbyPeer" : "ENetMultiplayerPeer"),
             settings
         );
-        host->connect_plane().on_poll(0.0);
+        netw_test::Internals::connect_plane(host).on_poll(0.0);
         CHECK(hosting->get_is_completed());
     }
 
@@ -169,7 +170,7 @@ TEST_CASE(
     const Ref<netw::NetwEndpoint> endpoint
         = connection->add(StringName("StubLobbyPeer"), String("77"), String());
     connection->join(endpoint, Dictionary());
-    client->connect_plane().on_poll(0.0);
+    netw_test::Internals::connect_plane(client).on_poll(0.0);
 
     bool bound = false;
     const String made
@@ -256,21 +257,19 @@ TEST_CASE(
 
         join_as(host, "ana", row.first_peer);
         const Ref<netw::NetwPlayer> first
-            = host->peer_get_player(row.first_peer);
+            = host->player_joined_of(row.first_peer);
         REQUIRE(first.is_valid());
         if (path == "dropped") {
             host->session_settle_peer_loss(row.first_peer);
         }
         join_as(host, "ana", 11);
 
-        const Ref<netw::NetwPlayer> second = host->peer_get_player(11);
+        const Ref<netw::NetwPlayer> second = host->player_joined_of(11);
         CHECK(second.is_valid() == row.replaced);
         CHECK(first->get_is_active() == !row.replaced);
-        CHECK(
-            bool(
-                host->player_find_account("test:ana")
-                == (row.replaced ? second : first)
-            )
+        NETW_CHECK_EQ(
+            host->player_find_account("test:ana"),
+            (row.replaced ? second : first)->get_id()
         );
         NETW_CHECK_EQ(
             int(gate->get(StringName("seats"))),

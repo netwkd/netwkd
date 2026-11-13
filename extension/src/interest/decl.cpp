@@ -20,7 +20,7 @@ const GameCall INTEREST_LEAVE
        2};
 
 void fire_each(
-    const Array &callbacks,
+    const Array callbacks,
     const StringName &layer_id,
     int64_t peer,
     const GameCall &site
@@ -208,7 +208,6 @@ void Decl::clear() {
     leave_callbacks.clear();
     perception_policies.clear();
     perception_callbacks.clear();
-    reports_observers = false;
 }
 
 void Facet::remember(
@@ -286,7 +285,6 @@ bool Facet::on_observed(const Callable &callback) {
         );
         return false;
     }
-    decl.set_reports_observers(true);
     if (!observed_callbacks.has(callback)) {
         observed_callbacks.push_back(callback);
     }
@@ -304,7 +302,6 @@ bool Facet::on_unobserved(const Callable &callback) {
         );
         return false;
     }
-    decl.set_reports_observers(true);
     if (!unobserved_callbacks.has(callback)) {
         unobserved_callbacks.push_back(callback);
     }
@@ -342,8 +339,9 @@ void Facet::dispatch_leave(const StringName &layer_id, int64_t peer) {
 }
 
 void Facet::dispatch_observed(int64_t peer) {
-    for (int at = 0; at < observed_callbacks.size(); ++at) {
-        const Callable held = observed_callbacks[at];
+    const Array callbacks = observed_callbacks;
+    for (int at = 0; at < callbacks.size(); ++at) {
+        const Callable held = callbacks[at];
         if (held.is_valid()) {
             held.call(peer);
         }
@@ -351,8 +349,9 @@ void Facet::dispatch_observed(int64_t peer) {
 }
 
 void Facet::dispatch_unobserved(int64_t peer) {
-    for (int at = 0; at < unobserved_callbacks.size(); ++at) {
-        const Callable held = unobserved_callbacks[at];
+    const Array callbacks = unobserved_callbacks;
+    for (int at = 0; at < callbacks.size(); ++at) {
+        const Callable held = callbacks[at];
         if (held.is_valid()) {
             held.call(peer);
         }

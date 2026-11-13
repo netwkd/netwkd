@@ -211,11 +211,8 @@ NetwMultiplayer *NetwMultiplayer::tree_adopt(
     const Ref<NetwEntity> &p_entity,
     NetwMultiplayer *p_session
 ) {
-    NetwMultiplayer *session = p_session;
-    if (session == nullptr) {
-        const Ref<MultiplayerAPI> api = p_node->get_multiplayer();
-        session = Object::cast_to<NetwMultiplayer>(api.ptr());
-    }
+    NetwMultiplayer *session
+        = p_session != nullptr ? p_session : session_holding(p_node);
     if (session == nullptr) {
         return nullptr;
     }
@@ -268,7 +265,7 @@ void NetwMultiplayer::tree_node_added(Node *p_node) {
             NetwEntity *watcher
                 = Object::cast_to<NetwEntity>(gd::object_of(ObjectID(*entity)));
             if (watcher != nullptr) {
-                watcher->descendant_entered(p_node);
+                NetwMultiplayer::control_descendant_entered(watcher, p_node);
             }
         }
     }
@@ -291,13 +288,12 @@ void NetwMultiplayer::tree_marked_entered(
     NETW_ZONE_NC("Tree marked node entered", colors::SCENE);
     if ((p_marks & tree::MARK_ENTITY) != 0) {
         const Ref<NetwEntity> entity = meta_entity(p_node);
-        const Ref<MultiplayerAPI> api = p_node->get_multiplayer();
-        NetwMultiplayer *branch = Object::cast_to<NetwMultiplayer>(api.ptr());
+        NetwMultiplayer *branch = session_holding(p_node);
         if (entity.is_valid()) {
             if (entity->belongs_to(branch)) {
                 tree_adopt(p_node, entity, branch);
             }
-            entity->tree_entered_edge();
+            entity_tree_entered(entity.ptr());
         }
     }
     const uint16_t due
@@ -332,13 +328,13 @@ void NetwMultiplayer::tree_node_removed(Node *p_node) {
     if ((marked & tree::MARK_BOOKED) != 0) {
         const Ref<NetwEntity> booked = tree_booked(id);
         if (booked.is_valid()) {
-            booked->tree_exiting_edge();
+            entity_tree_exiting(booked.ptr());
             tree_release(p_node, booked);
         }
     } else if ((marked & tree::MARK_ENTITY) != 0) {
         const Ref<NetwEntity> carried = meta_entity(p_node);
         if (carried.is_valid()) {
-            carried->tree_exiting_edge();
+            entity_tree_exiting(carried.ptr());
         }
     }
     if ((marked & tree::MARK_DERIVED_EXIT) != 0) {

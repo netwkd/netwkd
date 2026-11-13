@@ -155,7 +155,7 @@ Methods
    +---------------------------------------+--------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwEntity<class_NetwEntity>`   | :ref:`of<class_NetwEntity_method_of>`\ (\ node\: :godot:`Node`\ ) |static|                                         |
    +---------------------------------------+--------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`release_control<class_NetwEntity_method_release_control>`\ (\ successor\: :godot:`int` = 1\ )                |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`release_control<class_NetwEntity_method_release_control>`\ (\ successor\: :godot:`int` = 0\ )                |
    +---------------------------------------+--------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -173,7 +173,7 @@ Signals
 
 **control_changed**\ (\ previous_peer\: :godot:`int`, peer\: :godot:`int`\ ) :ref:`🔗<class_NetwEntity_signal_control_changed>`
 
-Emitted once on each peer when :ref:`controller<class_NetwEntity_property_controller>` changes, after the multiplayer authority has moved under :ref:`AUTHORITY_CONTROLLER<class_NetwEntity_constant_AUTHORITY_CONTROLLER>`.
+Emitted once on each peer when :ref:`controller<class_NetwEntity_property_controller>` changes, after the multiplayer authority has moved under :ref:`AUTHORITY_CONTROLLER<class_NetwEntity_constant_AUTHORITY_CONTROLLER>`. A change made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends. An entity that is not in a session yet reports it at once.
 
 .. rst-class:: classref-item-separator
 
@@ -199,7 +199,7 @@ Not emitted when a :ref:`hold<class_NetwEntity_property_hold>` already refuses t
 
 **despawned**\ (\ ) :ref:`🔗<class_NetwEntity_signal_despawned>`
 
-Emitted once the entity has been freed, by :ref:`despawn()<class_NetwEntity_method_despawn>` or by freeing :ref:`root<class_NetwEntity_property_root>` directly. :ref:`root<class_NetwEntity_property_root>` may already be ``null``, so cleanup that needs the node belongs in :ref:`despawning<class_NetwEntity_signal_despawning>`.
+Emitted once the entity has been freed, by :ref:`despawn()<class_NetwEntity_method_despawn>` or by freeing :ref:`root<class_NetwEntity_property_root>` directly. :ref:`root<class_NetwEntity_property_root>` may already be ``null``, so cleanup that needs the node belongs in :ref:`despawning<class_NetwEntity_signal_despawning>`. An entity freed while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported after its :ref:`despawning<class_NetwEntity_signal_despawning>`, at the latest when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -211,7 +211,7 @@ Emitted once the entity has been freed, by :ref:`despawn()<class_NetwEntity_meth
 
 **despawning**\ (\ reason\: :godot:`StringName`\ ) :ref:`🔗<class_NetwEntity_signal_despawning>`
 
-Emitted right before :ref:`despawn()<class_NetwEntity_method_despawn>` frees the entity, with its ``reason``, while :ref:`root<class_NetwEntity_property_root>` can still be read. Freeing :ref:`root<class_NetwEntity_property_root>` directly does not emit it. Every entity that goes with a despawned parent emits it too, on every peer, before its parent does.
+Emitted right before :ref:`despawn()<class_NetwEntity_method_despawn>` frees the entity, with its ``reason``, while :ref:`root<class_NetwEntity_property_root>` can still be read. Freeing :ref:`root<class_NetwEntity_property_root>` directly does not emit it. Every entity that goes with a despawned parent emits it too, on every peer, before its parent does. A despawn made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends, and :ref:`root<class_NetwEntity_property_root>` can still be read then.
 
 .. rst-class:: classref-item-separator
 
@@ -225,7 +225,7 @@ Emitted right before :ref:`despawn()<class_NetwEntity_method_despawn>` frees the
 
 Emitted on a client that loses its copy of the entity without the entity being despawned, such as a hide under :ref:`NetwInterestLayer.LEAVE_POLICY_HIDE<class_NetwInterestLayer_constant_LEAVE_POLICY_HIDE>`. The entity may come back later with the same :ref:`rid<class_NetwEntity_property_rid>`.
 
-Neither :ref:`despawning<class_NetwEntity_signal_despawning>` nor :ref:`despawned<class_NetwEntity_signal_despawned>` is emitted, so anything tied to an entity that may return connects here.
+Neither :ref:`despawning<class_NetwEntity_signal_despawning>` nor :ref:`despawned<class_NetwEntity_signal_despawned>` is emitted, so anything tied to an entity that may return connects here. A copy lost while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 .. rst-class:: classref-item-separator
 
@@ -237,7 +237,7 @@ Neither :ref:`despawning<class_NetwEntity_signal_despawning>` nor :ref:`despawne
 
 **lifecycle_refused**\ (\ request\: :ref:`NetwLifecycleRequest<class_NetwLifecycleRequest>`\ ) :ref:`🔗<class_NetwEntity_signal_lifecycle_refused>`
 
-Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused spawn or move is undone after it, and a refused despawn puts the same :ref:`root<class_NetwEntity_property_root>` back before it. :ref:`NetwLifecycleRequest.reason<class_NetwLifecycleRequest_property_reason>` is what the server passed to :ref:`NetwLifecycleRequest.deny()<class_NetwLifecycleRequest_method_deny>`, or empty when the server refused for another reason.
+Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused move is already undone and a refused despawn has already put the same :ref:`root<class_NetwEntity_property_root>` back. A refusal heard while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends. :ref:`NetwLifecycleRequest.destination<class_NetwLifecycleRequest_property_destination>` is the parent the move asked for. :ref:`NetwLifecycleRequest.reason<class_NetwLifecycleRequest_property_reason>` is what the server passed to :ref:`NetwLifecycleRequest.deny()<class_NetwLifecycleRequest_method_deny>`, or empty when the server refused for another reason.
 
 .. rst-class:: classref-item-separator
 
@@ -292,7 +292,7 @@ On a spawn the entity has not entered the tree yet, so :ref:`NetwLifecycleReques
 
 **reparented**\ (\ ) :ref:`🔗<class_NetwEntity_signal_reparented>`
 
-Emitted once after the entity moves to a new parent, by :godot:`Node.reparent() <Node#class_Node_method_reparent>`, :ref:`Netw.reparent()<class_Netw_method_reparent>`, or :godot:`Node.remove_child() <Node#class_Node_method_remove_child>` followed by :godot:`Node.add_child() <Node#class_Node_method_add_child>`. Read the new parent from :ref:`root<class_NetwEntity_property_root>`.
+Emitted once after the entity moves to a new parent, by :godot:`Node.reparent() <Node#class_Node_method_reparent>`, :ref:`Netw.reparent()<class_Netw_method_reparent>`, or :godot:`Node.remove_child() <Node#class_Node_method_remove_child>` followed by :godot:`Node.add_child() <Node#class_Node_method_add_child>`. Read the new parent from :ref:`root<class_NetwEntity_property_root>`. A move made while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` or a :ref:`NetwClock<class_NetwClock>` tick runs is reported when that poll or tick ends.
 
 \ ``_exit_tree`` also runs during a move, so teardown that must happen once belongs in :ref:`despawning<class_NetwEntity_signal_despawning>` or :ref:`hidden<class_NetwEntity_signal_hidden>`.
 
@@ -799,7 +799,7 @@ Relative priority when a peer's bandwidth cannot carry every property update. ``
 
 - :godot:`RID` **get_rid**\ (\ )
 
-The :godot:`RID` that :ref:`NetwMultiplayer<class_NetwMultiplayer>` methods take for this entity.
+The :godot:`RID` that :ref:`NetwMultiplayer<class_NetwMultiplayer>` methods take for this entity. It is valid once the node has entered a session, and empty before.
 
 ::
 
@@ -961,9 +961,9 @@ The **NetwEntity** of ``node``'s entity root, walking up the parents, or ``null`
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **release_control**\ (\ successor\: :godot:`int` = 1\ ) :ref:`🔗<class_NetwEntity_method_release_control>`
+:ref:`NetwPromise<class_NetwPromise>` **release_control**\ (\ successor\: :godot:`int` = 0\ ) :ref:`🔗<class_NetwEntity_method_release_control>`
 
-Hands control of this entity to ``successor``, which is the server by default. The returned :ref:`NetwPromise<class_NetwPromise>` resolves with this entity once the decision reaches this peer.
+Hands control of this entity to ``successor``, which is the server by default. ``0`` is the server and ``1`` is the host's player, as in :ref:`NetwMultiplayer.entity_set_controller()<class_NetwMultiplayer_method_entity_set_controller>`. The returned :ref:`NetwPromise<class_NetwPromise>` resolves with this entity once the decision reaches this peer.
 
 The request carries this peer's latest :ref:`NetwPropertyConfig.broadcast()<class_NetwPropertyConfig_method_broadcast>` values, and ``successor`` starts from them. Values larger than 1024 bytes are not sent, and ``successor`` starts from its own copy.
 

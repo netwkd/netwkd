@@ -76,11 +76,10 @@ func sync_ticks(ticks: int) -> void:
 	for frame in range(1, ticks * max_ratio + 1):
 		await tree.physics_frame
 		for i in sessions.size():
-			sessions[i].clock_tick_loop(true)
-			if stepped[i] < ticks and frame % ratios[i] == 0:
-				sessions[i].clock_step(1)
+			var due := stepped[i] < ticks and frame % ratios[i] == 0
+			sessions[i].clock_step(1 if due else 0)
+			if due:
 				stepped[i] += 1
-			sessions[i].clock_tick_loop(false)
 
 	for api in sessions:
 		api.clock_set_param(NetwMultiplayer.CLOCK_PARAM_MANUAL_TICK, false)

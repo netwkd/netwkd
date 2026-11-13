@@ -137,7 +137,7 @@ void install_now(const Variant &p_held) {
     if (scope == nullptr) {
         return;
     }
-    NetwMultiplayer *api = NetwMultiplayer::of(scope);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(scope);
     if (api == nullptr) {
         return;
     }
@@ -172,7 +172,7 @@ bool usable(
         || scope->is_queued_for_deletion()) {
         return false;
     }
-    if (NetwMultiplayer::of(scope) != p_api) {
+    if (NetwMultiplayer::session_holding(scope) != p_api) {
         return false;
     }
     if (row_of(p_kind).form == FORM_CONFIG) {
@@ -403,7 +403,7 @@ void Book::reconcile(NetwMultiplayer *p_api) {
         if (!scope->is_inside_tree()) {
             continue;
         }
-        if (NetwMultiplayer::of(scope) == p_api) {
+        if (NetwMultiplayer::session_holding(scope) == p_api) {
             install_from(p_api, scope);
         }
     }

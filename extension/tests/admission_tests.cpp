@@ -1,6 +1,7 @@
 #include "support/directory_stubs.h"
 #include "support/fault_log.h"
 #include "support/frame_drive.h"
+#include "support/internals.h"
 #include "support/netw_cells.h"
 #include "support/netw_test.h"
 
@@ -249,7 +250,7 @@ struct Host {
     }
 
     bool seated(int64_t p_peer) const {
-        return session->peer_get_player(p_peer).is_valid();
+        return session->player_joined_of(p_peer).is_valid();
     }
 
     String refusal(int64_t p_peer) const {
@@ -292,7 +293,7 @@ struct HostedBranch {
             StringName(p_directory ? "StubLobbyPeer" : "ENetMultiplayerPeer"),
             settings
         );
-        host->connect_plane().on_poll(0.0);
+        netw_test::Internals::connect_plane(host).on_poll(0.0);
         CHECK(hosting->get_is_completed());
     }
 
@@ -404,14 +405,14 @@ LawVerdict refusal_spends_no_player(const Admission &) {
     gate->set(StringName("verdict"), int(OK));
     join_as(host.session, "bo", 11);
 
-    const Ref<netw::NetwPlayer> seated = host.session->peer_get_player(11);
+    const Ref<netw::NetwPlayer> seated = host.session->player_joined_of(11);
     if (seated.is_null()) {
         return law_broken("peer 11 has no player");
     }
-    if (seated->player_id() != 1) {
+    if (seated->get_id() != 1) {
         return law_broken(
             "peer 11 holds player %lld",
-            (long long)seated->player_id()
+            (long long)seated->get_id()
         );
     }
     return law_held();
@@ -832,7 +833,7 @@ LawVerdict accounts_in_order(const Admission &) {
         if (request->is_bound(first) != arm.first_bound) {
             return law_broken("arm %d bound the first account wrongly", at);
         }
-        if (hosted.host->peer_get_player(9).is_null()) {
+        if (hosted.host->player_joined_of(9).is_null()) {
             return law_broken("arm %d seated nobody", at);
         }
         at += 1;
@@ -1177,7 +1178,7 @@ public:
                 if (!hosting->get_is_completed()) {
                     break;
                 }
-                const String address = host->peer_join_address();
+                const String address = host->transport_get_join_address();
                 const Ref<netw::NetwEndpoint> endpoint
                     = client->get_connection()->add(
                         StringName(peer_class),
@@ -1194,10 +1195,11 @@ public:
                 if (client_account->heard.is_empty()) {
                     break;
                 }
-                evidence.waited_for_proof = !client->is_online();
-                client->connect_plane().on_poll(60.0);
+                evidence.waited_for_proof = !client->session_is_online();
+                netw_test::Internals::connect_plane(client).on_poll(60.0);
                 evidence.outlasted_timeout_hint
-                    = client->connect_plane().attempt_state()
+                    = netw_test::Internals::connect_plane(client)
+                          .attempt_state()
                     == int(netw::connect::ATTEMPT_CONNECTING);
                 if (server_gives_up) {
                     phase = 6;
@@ -1221,7 +1223,7 @@ public:
                     break;
                 }
                 evidence.waited_for_admission = client->player_local().is_null()
-                    && host->peer_get_player(client->get_unique_id()).is_null();
+                    && host->peer_get_player(client->get_unique_id()) == 0;
                 const Ref<netw::NetwJoinRequest> request
                     = host_gate->get("request");
                 evidence.account_bound = request.is_valid()
@@ -1243,7 +1245,7 @@ public:
             case 4: {
                 const int64_t joined = client->get_unique_id();
                 if (client->player_local().is_null()
-                    || host->peer_get_player(joined).is_null()) {
+                    || host->player_joined_of(joined).is_null()) {
                     break;
                 }
                 evidence.admitted = true;

@@ -155,6 +155,18 @@ LawVerdict off_tree_session(const Stand &) {
     if (orphan_answered || Netw::session(nullptr).is_valid()) {
         return law_broken("a node outside the tree reached a session");
     }
+
+    const Ref<MultiplayerAPI> root = netw::gd::scene_root()->get_multiplayer();
+    const Ref<netw::NetwMultiplayer> retired = netw::NetwMultiplayer::create();
+    if (netw::NetwMultiplayer::session_of(nullptr).ptr() != root.ptr()) {
+        return law_broken("no node did not answer the one running session");
+    }
+    Mounted second("DoorSecond");
+    const FaultWatch watch;
+    if (netw::NetwMultiplayer::session_of(nullptr).is_valid()
+        || watch.log->error_count_containing("[NW1004]") != 1) {
+        return law_broken("two running sessions answered one without NW1004");
+    }
     return law_held();
 }
 
@@ -301,8 +313,10 @@ const Row ROWS[] = {
      "every read answers empty, leave answers a promise, and the clock "
      "reads stopped",
      &outlives_session},
-    {"Netw.session on a node outside the tree and on null",
-     "both answer no session",
+    {"Netw.session on a node outside the tree and on null, and "
+     "NetwMultiplayer.session_of with no node",
+     "both answer no session, and session_of answers the one running "
+     "session and reports NW1004 once a second one runs",
      &off_tree_session},
     {"Netw.configure_session on a node before a peer is assigned",
      "the settings apply before the assignment returns, a repeat changes "

@@ -115,11 +115,6 @@ public:
     const godot::RID &ticket() const {
         return armed_ticket;
     }
-    void publish_targets(
-        const godot::PackedStringArray &p_addresses,
-        const godot::PackedStringArray &p_names,
-        const godot::Array &p_infos
-    );
     void deliver(const godot::Ref<godot::MultiplayerPeer> &p_peer);
     void deliver_probe(const godot::Ref<NetwServerInfo> &p_info);
     void fail(godot::Error p_error, const godot::String &p_message);

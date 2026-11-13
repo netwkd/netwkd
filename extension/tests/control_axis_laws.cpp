@@ -99,7 +99,7 @@ int seat_player(LoopbackRig &p_rig, Node *p_parent, const char *p_name) {
     const RID entity = p_rig.server()->spawn_registered(
         StringName(PLAYER_ID),
         named(p_name),
-        p_rig.player(0).ptr()
+        p_rig.player(0)->get_id()
     );
     REQUIRE_MESSAGE(entity.is_valid(), "the spawn verb minted no entity");
     Node *node = p_rig.server()->entity_get_node(entity);
@@ -214,7 +214,7 @@ int seat_free(LoopbackRig &p_rig, Node *p_parent, const char *p_name) {
     const RID entity = p_rig.server()->spawn_registered(
         StringName(PLAYER_ID),
         named(p_name),
-        nullptr
+        0
     );
     REQUIRE_MESSAGE(entity.is_valid(), "the spawn verb minted no entity");
     Node *node = p_rig.server()->entity_get_node(entity);
@@ -453,7 +453,7 @@ TEST_CASE(
         int64_t(rig.peer_id(0))
     );
 
-    const Ref<NetwPromise> released = entity->release_control(1);
+    const Ref<NetwPromise> released = entity->release_control();
     rig.pump(10);
     CHECK(released->get_is_settled());
     NETW_CHECK_EQ(entity_at(rig, route, -1)->get_controller(), 1);

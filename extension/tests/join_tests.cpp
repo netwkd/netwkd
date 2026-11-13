@@ -7,6 +7,7 @@
 
 #include "godot/scene_tree.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/entity.hpp"
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/nodes/multiplayer_viewport.hpp"
@@ -19,6 +20,7 @@ namespace TestNetwJoin {
 
 using namespace godot;
 using netw::Netw;
+using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPlayer;
 using netw_test::law_broken;
@@ -112,7 +114,7 @@ LawVerdict one_name_twice(const Stand &) {
             return law_broken("client %d is not seated as ana", at);
         }
         const Ref<NetwPlayer> seen
-            = rig.server()->peer_get_player(rig.peer_id(at));
+            = rig.server()->player_joined_of(rig.peer_id(at));
         if (seen.is_null() || !seen->get_is_active()
             || seen->get_username() != StringName("ana")) {
             return law_broken("the server holds no active ana for %d", at);
@@ -143,7 +145,13 @@ LawVerdict nameless_join(const Stand &) {
             && (mine.is_null() || !String(mine->get_username()).is_empty())) {
             return law_broken("client %d holds no unnamed player", at);
         }
-        if (Array(api->get(StringName("players"))).size() != 3) {
+        const int64_t own = api->player_get_local();
+        if (own != mine->get_id()
+            || int64_t(mine->get(StringName("id"))) != own) {
+            return law_broken("peer %d reads another id as its own", at);
+        }
+        const PackedInt64Array listed = api->player_list();
+        if (listed.size() != 3 || !listed.has(own)) {
             return law_broken("peer %d does not list three players", at);
         }
     }
@@ -200,7 +208,7 @@ LawVerdict refused_join(LoopbackRig &p_rig, int p_at, const char *p_reason) {
         return law_broken("the client heard %s", reason.utf8().get_data());
     }
     if (local_of(p_rig.client(p_at)).is_valid()
-        || p_rig.server()->peer_get_player(p_rig.peer_id(p_at)).is_valid()) {
+        || p_rig.server()->player_joined_of(p_rig.peer_id(p_at)).is_valid()) {
         return law_broken("the refused client holds a player");
     }
     return law_held();
@@ -249,7 +257,7 @@ LawVerdict rival_handlers(const Stand &) {
     Netw::configure_join(Callable(second, StringName("seat")));
 
     const int refused = rig.arrive(StringName("ana"));
-    if (rig.server()->peer_get_player(rig.peer_id(refused)).is_valid()) {
+    if (rig.server()->player_joined_of(rig.peer_id(refused)).is_valid()) {
         return law_broken("a join was seated under two handlers");
     }
 
@@ -279,16 +287,16 @@ LawVerdict account_privacy(const Stand &) {
     NetwMultiplayer *host = rig.server();
     NetwMultiplayer *first = rig.client(0);
     NetwMultiplayer *second = rig.client(1);
-    if (host->peer_get_player(ana)->get_account() != String("test:ana")
-        || host->peer_get_player(bo)->get_account() != String("test:bo")) {
+    if (host->player_joined_of(ana)->get_account() != String("test:ana")
+        || host->player_joined_of(bo)->get_account() != String("test:bo")) {
         return law_broken("the server does not hold both accounts");
     }
-    if (first->peer_get_player(ana)->get_account() != String("test:ana")
-        || second->peer_get_player(bo)->get_account() != String("test:bo")) {
+    if (first->player_joined_of(ana)->get_account() != String("test:ana")
+        || second->player_joined_of(bo)->get_account() != String("test:bo")) {
         return law_broken("a player does not hold its own account");
     }
-    const Ref<NetwPlayer> accepted = first->peer_get_player(bo);
-    const Ref<NetwPlayer> rostered = second->peer_get_player(ana);
+    const Ref<NetwPlayer> accepted = first->player_joined_of(bo);
+    const Ref<NetwPlayer> rostered = second->player_joined_of(ana);
     if (accepted.is_null() || rostered.is_null()) {
         return law_broken("a client does not see the other player");
     }
@@ -307,7 +315,7 @@ LawVerdict rejoin_is_new(const Stand &) {
     LoopbackRig rig(0);
     const int left = rig.arrive(StringName("ana"));
     const Ref<NetwPlayer> before
-        = rig.server()->peer_get_player(rig.peer_id(left));
+        = rig.server()->player_joined_of(rig.peer_id(left));
     REQUIRE(before.is_valid());
 
     rig.drop_client(left);
@@ -315,7 +323,7 @@ LawVerdict rejoin_is_new(const Stand &) {
     const int back = rig.arrive(StringName("ana"));
 
     const Ref<NetwPlayer> after
-        = rig.server()->peer_get_player(rig.peer_id(back));
+        = rig.server()->player_joined_of(rig.peer_id(back));
     if (after.is_null() || after == before || !after->get_is_active()) {
         return law_broken("the returning client is not a new active player");
     }
@@ -340,7 +348,7 @@ LawVerdict prepare_join_door(const Stand &) {
     netw::gd::scene_root()->add_child(seat);
     Node *inside = memnew(Node);
     seat->add_child(inside);
-    const Ref<NetwMultiplayer> api = seat->get_api();
+    Ref<NetwMultiplayer> api = seat->get_api();
 
     const int empty = prepared(inside, StringName());
     const int offline = prepared(inside, StringName("ana"));
@@ -352,10 +360,29 @@ LawVerdict prepare_join_door(const Stand &) {
     const Ref<NetwPlayer> seated = local_of(api.ptr());
     const int online = prepared(inside, StringName("bo"));
     const Ref<NetwPlayer> still = local_of(api.ptr());
+    const StringName seated_as
+        = seated.is_valid() ? seated->get_username() : StringName();
+    Node *pawn = memnew(Node);
+    const Ref<NetwEntity> drafted = Netw::configure_entity(pawn);
+    drafted->set_player(seated);
 
+    api->set("multiplayer_peer", Variant());
+    LoopbackRig next(0);
+    api->set("multiplayer_peer", next.session()->create_client_peer());
+    for (int round = 0; round < 8; ++round) {
+        next.pump();
+        api->poll();
+    }
+    const Ref<NetwPlayer> rejoined = local_of(api.ptr());
+    const bool aliased = seated.is_valid()
+        && (seated->get_is_active() || seated->get_id() != 0
+            || drafted->get_player().is_valid());
+
+    memdelete(pawn);
     api->set("multiplayer_peer", Variant());
     netw::gd::scene_root()->remove_child(seat);
     memdelete(seat);
+    api.unref();
 
     if (empty != ERR_INVALID_PARAMETER) {
         return law_broken("an empty name answered %d", empty);
@@ -363,8 +390,16 @@ LawVerdict prepare_join_door(const Stand &) {
     if (offline != OK) {
         return law_broken("an offline session answered %d", offline);
     }
-    if (seated.is_null() || seated->get_username() != StringName("ana")) {
+    if (seated_as != StringName("ana")) {
         return law_broken("the prepared join was not seated as ana");
+    }
+    if (rejoined.is_null() || aliased) {
+        return law_broken(
+            "the player from the first server still read as joined"
+        );
+    }
+    if (seated->get_username() != StringName()) {
+        return law_broken("the player still answered a name once freed");
     }
     if (online != ERR_ALREADY_IN_USE || still != seated) {
         return law_broken("an online session answered %d", online);
@@ -380,12 +415,12 @@ LawVerdict relay_becomes_server(const Stand &) {
     session.instantiate();
     session->set("multiplayer_peer", peer);
     session->poll();
-    const int waiting = session->get(StringName("state"));
+    const int waiting = int(session->session_get_state());
 
     REQUIRE(peer->create_server(1) == OK);
     session->poll();
-    const int state = session->get(StringName("state"));
-    const int role = session->get(StringName("role"));
+    const int state = int(session->session_get_state());
+    const int role = int(session->session_get_role());
     session->set("multiplayer_peer", Variant());
 
     if (waiting != NetwMultiplayer::SESSION_STATE_CONNECTING) {
@@ -405,7 +440,7 @@ const Row ROWS[] = {
      &one_name_twice},
     {"a host joining itself and two clients that prepared no join",
      "the host is its own local player, each client holds an unnamed one, "
-     "every peer lists all three, and the join handler ran for each",
+     "every peer lists all three by id, and the join handler ran for each",
      &nameless_join},
     {"a client joining with typed arguments and the server's handler",
      "the server's handler reads the values with their types, and the "
@@ -432,7 +467,9 @@ const Row ROWS[] = {
      &rejoin_is_new},
     {"Netw.prepare_join with no name, offline and online",
      "no name and an online session are refused, and an offline one is "
-     "seated under the prepared name",
+     "seated under the prepared name, and that player reads inactive with "
+     "id 0 after the client joins another server, an entity given it then "
+     "reads no player, and it answers nothing once freed",
      &prepare_join_door},
     {"a relay peer that becomes peer 1 while connecting",
      "the session goes online as the listen server on the next poll",

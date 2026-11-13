@@ -14,7 +14,7 @@ The call did nothing. The log line names the call and what is not running.
 .. code-block:: gdscript
 
     func _ready() -> void:
-        session.transfer_server(2)
+        session.transfer_server(successor)
 
 Call it after the session starts, such as from a handler for
 :ref:`NetwSession.state_changed <class_NetwSession_signal_state_changed>`.
@@ -23,4 +23,4 @@ Call it after the session starts, such as from a handler for
 
     func _on_state_changed(state: int) -> void:
         if state == NetwSession.STATE_ONLINE:
-            session.transfer_server(2)
+            session.transfer_server(successor)

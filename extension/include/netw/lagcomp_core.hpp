@@ -104,11 +104,6 @@ public:
 
     godot::Ref<godot::RefCounted> entity_at(int64_t p_slot) const;
 
-    void timeline_record(
-        int64_t p_slot,
-        int64_t p_tick,
-        const godot::Dictionary &p_payload
-    );
     void timeline_record_coded(
         int64_t p_slot,
         int64_t p_tick,

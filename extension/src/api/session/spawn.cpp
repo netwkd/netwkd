@@ -25,12 +25,6 @@ bool NetwMultiplayer::spawn_fn_waits(int64_t p_route) const {
         && pipeline->get_spawn_book()->fn_waits_of(p_route);
 }
 
-void NetwMultiplayer::spawn_on_peer_connected(int64_t p_peer_id) {
-    if (spawn::Pipeline *pipeline = spawn_plane()) {
-        pipeline->on_peer_connected(p_peer_id);
-    }
-}
-
 PackedByteArray NetwMultiplayer::spawn_encode_spawn_frame(
     int64_t p_route,
     Node *p_node

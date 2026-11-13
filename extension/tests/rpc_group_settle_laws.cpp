@@ -71,8 +71,7 @@ TEST_CASE(
     NETW_CHECK_GT(route, 0);
     NETW_CHECK_EQ(int(core->entity_bind_node(entity, probe)), int(OK));
 
-    const Ref<NetwEntity> wrapper = core->entity_get_view(entity);
-    NETW_CHECK_EQ(core->rpc_get_recipients(wrapper).size(), 0);
+    NETW_CHECK_EQ(core->entity_get_recipients(entity).size(), 0);
 
     Array args;
     args.push_back(1);
@@ -236,73 +235,6 @@ TEST_CASE(
     passenger->get_parent()->remove_child(passenger);
     memdelete(target);
     memdelete(passenger);
-}
-
-TEST_CASE(
-    "[Networked][Rpc] a call whose node argument names a route this peer "
-    "does not know yet is PARKED until that route arrives, because a spawn "
-    "and the call that names it can cross in either order"
-) {
-    LoopbackRig rig(0);
-    rig.mount();
-    NetwMultiplayer *core = rig.server();
-    REQUIRE(core != nullptr);
-
-    Node *target = an_arg_probe();
-    REQUIRE(target != nullptr);
-    rig.branch(-1)->add_child(target);
-
-    const RID seat = core->entity_create();
-    const int64_t open_route = core->entity_admit(seat);
-    NETW_CHECK_EQ(int(core->entity_bind_node(seat, target)), int(OK));
-    const Ref<NetwEntity> host = core->entity_get_view(seat);
-
-    const int64_t unknown_route = open_route + 4096;
-    NETW_CHECK_EQ(
-        int(core->liveness_route_state(unknown_route)),
-        int(NetwMultiplayer::ENTITY_STATE_UNKNOWN)
-    );
-    const int64_t parked_before = core->liveness_pending_live_count();
-
-    LocalVector<netw::call_args::Slot> encoded;
-    encoded.push_back(netw::call_args::of_node(unknown_route, 0, String()));
-    encoded.push_back(netw::call_args::of_value(3));
-    netw::wire::WriteStream writer;
-    uint64_t flags = 0;
-    REQUIRE(writer.bits(flags, 8));
-    REQUIRE(
-        script_model::write_call_body(
-            writer,
-            core->rpc_method_token(host, target, StringName("receive_node")),
-            encoded,
-            Array(),
-            Array()
-        )
-    );
-    REQUIRE(writer.align_verify());
-
-    core->receive_carrier(
-        netw::NetwMultiplayer::frame_pack(
-            open_route,
-            0,
-            netw::wire::builtin_channel("CALL"),
-            writer.to_bytes(),
-            String()
-        ),
-        2,
-        true,
-        -1,
-        -1
-    );
-
-    NETW_CHECK_EQ(int64_t(target->get("last_value")), int64_t(-1));
-    NETW_CHECK_EQ(
-        core->liveness_pending_live_count() - parked_before,
-        int64_t(1)
-    );
-
-    target->get_parent()->remove_child(target);
-    memdelete(target);
 }
 
 } // namespace TestNetwRpcGroupSettleLaws

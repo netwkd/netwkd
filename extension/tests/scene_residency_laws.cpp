@@ -60,8 +60,7 @@ RID open_scene(LoopbackRig &p_rig, const StringName &p_name, Node *p_under) {
         callable_mp_static(&build_level),
         one_string(String(p_name)),
         string_types(),
-        p_under != nullptr ? p_under : p_rig.branch(-1),
-        Variant()
+        p_under != nullptr ? p_under : p_rig.branch(-1)
     );
     REQUIRE(route > 0);
     const RID scene = p_rig.spawned_entity();
@@ -89,7 +88,7 @@ int spawn_into(
         one_string(p_marker),
         string_types(),
         p_parent,
-        p_owner,
+        p_owner.is_valid() ? p_owner->get_id() : 0,
         p_pump
     );
 }
@@ -294,7 +293,7 @@ TEST_CASE(
     const int route
         = spawn_into(rig, level_of(rig, arena), ana, "orphan", false);
     NETW_CHECK_GT(route, 0);
-    host->player_forget(peer);
+    host->player_forget(ana->get_id());
     REQUIRE_FALSE(host->player_has(peer));
 
     rig.pump(8);

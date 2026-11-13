@@ -34,9 +34,7 @@ void warn_self_feedback(Runtime *p_runtime) {
         const String named
             = owner != nullptr ? String(owner->get_name()) : String("?");
         fault::raise(
-            owner != nullptr && owner->is_inside_tree()
-                ? NetwMultiplayer::of(owner)
-                : nullptr,
+            NetwMultiplayer::session_holding(owner),
             NETW_FAULT_INTERPOLATION_IGNORED,
             {named + String(":") + String(state->get_target_prop()),
              String("simulation on this peer"),

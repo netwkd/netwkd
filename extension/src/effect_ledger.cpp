@@ -103,11 +103,27 @@ void NetwEffectLedger::resolve(const StringName &p_key, bool p_keep) {
         int(p_keep)
     );
     if (!p_keep && revert.is_valid()) {
-        game_call(revert, Array(), EFFECT_REVERT);
+        settled.push_back({revert, &EFFECT_REVERT});
     }
     if (observer.is_valid()) {
-        game_call(observer, Array(), p_keep ? EFFECT_CONFIRMED : EFFECT_DENIED);
+        settled.push_back(
+            {observer, p_keep ? &EFFECT_CONFIRMED : &EFFECT_DENIED}
+        );
     }
+}
+
+void NetwEffectLedger::drain() {
+    if (draining || settled.is_empty()) {
+        return;
+    }
+    NETW_ZONE_NC("Effect ledger drain", colors::PREDICTION);
+    draining = true;
+    while (!settled.is_empty()) {
+        const Settled row = settled[0];
+        settled.remove_at(0);
+        game_call(row.call, Array(), *row.site);
+    }
+    draining = false;
 }
 
 bool NetwEffectLedger::pending(const StringName &p_key) const {
@@ -132,11 +148,6 @@ void NetwEffectLedger::sweep(int64_t p_tick) {
     for (const StringName &key : expired) {
         resolve(key, false);
     }
-}
-
-void NetwEffectLedger::clear() {
-    entries.clear();
-    watchers.clear();
 }
 
 } // namespace netw

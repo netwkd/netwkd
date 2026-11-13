@@ -35,7 +35,7 @@ func host() -> NetwMultiplayer:
 	register_probe(_host_api)
 	_host_api.session_prepare_join(&"host", [])
 	_host_api.multiplayer_peer = _loopback_server_peer()
-	await pump_until(func() -> bool: return _host_api.is_online)
+	await pump_until(func() -> bool: return _host_api.session_is_online())
 	if _initial_scene != null:
 		_scene_decl = spawn_level(_host_api, _initial_scene)
 	return _host_api
@@ -66,7 +66,7 @@ func add_client(username: String) -> NetwMultiplayer:
 			.create_client_peer()
 
 	var api := tree.api
-	await pump_until(func() -> bool: return api.local_player != null)
+	await pump_until(func() -> bool: return api.player_get_local() != 0)
 	return api
 
 

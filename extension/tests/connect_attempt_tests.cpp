@@ -37,6 +37,8 @@ static var hint := 5.0
 static var built := 0
 static var cancelled := 0
 static var settings := {}
+static var tickets: Array[RID] = []
+static var standing := 0
 
 func _peer_class() -> StringName:
 	return &"AttemptTestPeer"
@@ -51,16 +53,22 @@ func _client_settings() -> Dictionary:
 	return {a = "built-in", b = "built-in", c = "built-in"}
 
 func _make_peer(
-	_ticket: RID,
+	ticket: RID,
 	_mode: NetwConnection.TransportMode,
 	_address: String,
 	p_settings: Dictionary,
 ) -> void:
 	built += 1
 	settings = p_settings
+	standing = get_instance_id()
+	tickets.append(ticket)
 
 func _cancel_peer_creation(_ticket: RID) -> void:
 	cancelled += 1
+
+static func fail_first() -> void:
+	var transport := instance_from_id(standing) as NetwTransport
+	transport.fail(tickets[0], ERR_CANT_CONNECT, "late")
 )";
 
 constexpr const char *RECORDER = R"(extends RefCounted
@@ -215,6 +223,30 @@ LawVerdict cancel_while_creating(const Stand &) {
     return law_held();
 }
 
+LawVerdict late_report(const Stand &) {
+    Attempt attempt;
+    attempt.join();
+    attempt.poll_for(0.02);
+    attempt.connection->cancel();
+    attempt.poll_for(0.02);
+    const Ref<NetwPromise> outcome = attempt.join();
+    attempt.poll_for(0.02);
+    const int built = attempt.stat("built");
+    if (built != 2) {
+        return law_broken("the transport was asked %d times", built);
+    }
+
+    attempt.transport->call(StringName("fail_first"));
+    attempt.poll_for(0.02);
+    if (outcome->get_is_settled()) {
+        return law_broken("the cancelled ticket settled the next join");
+    }
+    if (!attempt.failures().is_empty()) {
+        return law_broken("the cancelled ticket emitted failed");
+    }
+    return law_held();
+}
+
 LawVerdict join_while_online(const Stand &) {
     Attempt attempt;
     Ref<netw::LocalMultiplayerPeer> hosting;
@@ -321,8 +353,8 @@ LawVerdict lobby_join_address(const Stand &) {
         rig.mount();
         rig.join(-1, StringName("host"));
         rig.pump(8);
-        at_server = rig.server()->peer_join_address();
-        at_client = rig.client(0)->peer_join_address();
+        at_server = rig.server()->transport_get_join_address();
+        at_client = rig.client(0)->transport_get_join_address();
     }
     for (MatchDirectory *directory : served()) {
         memdelete(directory);
@@ -348,6 +380,9 @@ const Row ROWS[] = {
      "state_changed walks creating then offline, failed stays silent and "
      "the promise settles ERR_SKIP",
      &cancel_while_creating},
+    {"a transport fails the ticket of a join that was cancelled",
+     "the join started after it stays pending and failed stays silent",
+     &late_report},
     {"join while the session hosts",
      "the promise settles ERR_ALREADY_IN_USE and the hosting peer stays",
      &join_while_online},

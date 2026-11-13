@@ -192,7 +192,7 @@ struct Session {
         const RID entity = server->spawn_registered(
             StringName(p_id),
             named(p_name),
-            p_owner.ptr()
+            p_owner.is_valid() ? p_owner->get_id() : 0
         );
         Node *node = server->entity_get_node(entity);
         if (node == nullptr || p_parent == nullptr) {
@@ -204,7 +204,7 @@ struct Session {
 
     Node *body_at(int p_route, int p_at) const {
         NetwMultiplayer *api = seat(p_at);
-        return api->entity_get_node(api->entity_from_route(p_route));
+        return api->entity_get_node(Internals::entity_at(api, p_route));
     }
 
     bool alive(int p_route, int p_at) const {
@@ -230,7 +230,7 @@ struct Session {
         }
         NetwMultiplayer *api = seat(p_at);
         const Ref<netw::NetwPredictStats> stats
-            = api->predict_get_stats(api->entity_of(node));
+            = api->predict_get_stats(Internals::entity_of(api, node));
         return stats.is_valid() ? stats->get_corrections() : int64_t(-1);
     }
 };
@@ -242,7 +242,7 @@ void ticks_after_loss_keep_bodies(NetwSession::TransferMode p_mode) {
         BODY_ID,
         "Owned",
         session.arena_of(-1),
-        session.rig.server()->peer_get_player(session.was(0))
+        session.rig.server()->player_joined_of(session.was(0))
     );
     const int shared
         = session.spawn(-1, BODY_ID, "Shared", session.arena_of(-1), {});
@@ -292,10 +292,10 @@ void lost_body_leaves_nothing_waiting(NetwSession::TransferMode p_mode) {
         named("Lost"),
         string_types(),
         session.body_at(plaza, -1),
-        server->peer_get_player(session.was(-1)),
+        server->player_joined_of(session.was(-1))->get_id(),
         true
     );
-    const RID plaza_scene = server->entity_from_route(plaza);
+    const RID plaza_scene = Internals::entity_at(server, plaza);
     bool admitted = true;
     for (int at = 0; at < CLIENTS; ++at) {
         admitted = server->scene_admit_peer(plaza_scene, session.was(at))
@@ -425,7 +425,7 @@ class WorldRun {
 
     int64_t viewers_on(int p_at) const {
         NetwMultiplayer *api = session.seat(p_at);
-        const RID scene = api->entity_from_route(plaza);
+        const RID scene = Internals::entity_at(api, plaza);
         if (!scene.is_valid()) {
             return -1;
         }
@@ -494,7 +494,7 @@ class WorldRun {
             RUNNER_ID,
             "Runner",
             arena,
-            server->peer_get_player(session.was(holder))
+            server->player_joined_of(session.was(holder))
         );
         plaza = session.spawn(-1, LEVEL_ID, "Plaza", arena, {});
         vault = session.spawn(-1, LEVEL_ID, "Vault", arena, {});
@@ -504,8 +504,8 @@ class WorldRun {
                   .spawn(-1, BODY_ID, "Crate", session.body_at(plaza, -1), {});
         loot = session
                    .spawn(-1, BODY_ID, "Loot", session.body_at(vault, -1), {});
-        const RID plaza_scene = server->entity_from_route(plaza);
-        const RID vault_scene = server->entity_from_route(vault);
+        const RID plaza_scene = Internals::entity_at(server, plaza);
+        const RID vault_scene = Internals::entity_at(server, vault);
         const bool admitted
             = server->scene_admit_peer(plaza_scene, session.was(successor))
             && server->scene_admit_peer(plaza_scene, session.was(holder))
@@ -514,7 +514,7 @@ class WorldRun {
             unstood("a viewer was not admitted");
         }
         const RID table = server->table_find_or_adopt(StringName(TABLE_ID));
-        rows = server->liveness_claim_routes(2);
+        rows = server->table_claim_routes(table, 2);
         server->table_write_routes(table, rows);
         server->table_write_column(table, 0, hit_points(5, 6));
         if (server->table_commit(table) != OK) {
@@ -555,9 +555,9 @@ class WorldRun {
             }
             return;
         }
-        const Error handed = session.seat(-1)->get_session()->transfer_server(
-            session.was(successor)
-        );
+        const Ref<NetwSession> door = session.seat(-1)->get_session();
+        const Error handed
+            = door->transfer_server(door->player_of(session.was(successor)));
         if (handed != OK) {
             unstood("transfer_server refused");
         }

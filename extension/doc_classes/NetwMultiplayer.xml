@@ -8,7 +8,7 @@
 		[codeblock]
 		var api := Netw.of(self)
 		api.entity_despawn(NetwEntity.of(self).rid)
-		api.scene_watch(Netw.scene(self).rid, peer_id)
+		api.scene_watch(Netw.scene(self).rid, player.id)
 		[/codeblock]
 		Each method prefix matches the class that wraps it.
 		- [code]scene_*[/code]: [NetwScene]
@@ -16,17 +16,18 @@
 		- [code]session_*[/code] and [code]stats_*[/code]: [NetwSession]
 		- [code]clock_*[/code]: [NetwClock]
 		- [code]predict_*[/code]: [NetwPrediction]
-		- [code]entity_*[/code], [code]liveness_*[/code], and [code]spawn_*[/code]: [NetwEntity]
-		- [code]table_*[/code]: [NetwTable]
+		- [code]entity_*[/code] and [code]spawn_*[/code]: [NetwEntity]
+		- [code]table_*[/code] and [code]liveness_*[/code]: [NetwTable]
 		- [code]schema_*[/code]: [NetwSchema]
 		- [code]lagcomp_*[/code]: [NetwAction]
-		- [code]peer_*[/code]: [NetwPlayer]
+		- [code]player_*[/code] and [code]peer_*[/code]: [NetwPlayer]
 		- [code]display_*[/code]: [NetwDisplay]
 		- [code]endpoint_*[/code]: [NetwConnection]
 		- [code]transport_*[/code]: [NetwTransport]
 		- [code]rpc_*[/code] and [code]sync_*[/code]: [NetwMemberConfig]
 		- [code]service_*[/code]: [NetwService]
 		- [code]database_*[/code] and [code]persist_*[/code]: [NetwDatabase] and [NetwPersistence]
+		The [code]player_*[/code] methods take or return a player id, which the session gives each player when its join is accepted. The id stays the same across a server transfer. Another session, such as one under a second [MultiplayerViewport], gives out its own ids, so the same number names a different player there or none.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -34,19 +35,13 @@
 		<method name="clear">
 			<return type="void" />
 			<description>
-				Clears the replication state of the wrapped [member inner] [SceneMultiplayer]. Players, services and entities are kept.
+				Clears the replication state of the wrapped [SceneMultiplayer]. Players, services and entities are kept.
 			</description>
 		</method>
 		<method name="clock_auto_configure_offset">
 			<return type="void" />
 			<description>
 				Measures the connection for five seconds, then sets [constant CLOCK_PARAM_DISPLAY_OFFSET] to the largest value [method clock_get_recommended_display_offset] returned. Does nothing on the server.
-			</description>
-		</method>
-		<method name="clock_get_config" qualifiers="const">
-			<return type="NetwClockConfig" />
-			<description>
-				Returns a copy of the current clock settings. Changing the copy has no effect.
 			</description>
 		</method>
 		<method name="clock_get_monitor" qualifiers="const">
@@ -99,28 +94,6 @@
 				How far into the current tick the clock is, from [code]0.0[/code] to [code]1.0[/code].
 			</description>
 		</method>
-		<method name="clock_ingest_pong">
-			<return type="Dictionary" />
-			<param index="0" name="sample" type="float" />
-			<param index="1" name="server_tick_at_pong" type="int" />
-			<param index="2" name="server_tick_phase" type="float" />
-			<param index="3" name="apply_lead" type="bool" />
-			<description>
-				Adjusts the local tick toward the server's using one round-trip [param sample], in seconds. [constant NetwClock.SYNC_MODE_SNAP] corrects at once, and [constant NetwClock.SYNC_MODE_STRETCH] corrects a little each frame until the difference passes [constant CLOCK_PARAM_PANIC_SNAP_THRESHOLD]. Returns a [Dictionary] describing the adjustment.
-				[codeblock lang=text]
-				Dictionary
-				┠╴rtt_raw                     float   this sample's round trip, in seconds
-				┠╴rtt_avg                     float   the running average round trip
-				┠╴rtt_jitter                  float   the running jitter estimate
-				┠╴diff                        int     ticks the calibration moved this peer
-				┠╴tick                        int     the tick after calibrating
-				┠╴display_offset              float   the offset the display is running
-				┠╴recommended_display_offset  float   the offset this sample recommends
-				┠╴is_stable                   bool    whether jitter is under threshold
-				┖╴is_synchronized             bool    whether a calibration has ever landed
-				[/codeblock]
-			</description>
-		</method>
 		<method name="clock_is_configured" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -145,13 +118,6 @@
 				Returns [code]true[/code] once the clock has synchronized with the server at least once.
 			</description>
 		</method>
-		<method name="clock_physics_step">
-			<return type="void" />
-			<param index="0" name="delta" type="float" />
-			<description>
-				Advances the clock by [param delta] seconds and runs every tick that completes. The session calls it every physics frame unless [constant CLOCK_PARAM_MANUAL_TICK] is set. A frame longer than [constant CLOCK_PARAM_STALL_THRESHOLD] is skipped, and no frame runs more than [constant CLOCK_PARAM_MAX_TICKS_PER_FRAME] ticks.
-			</description>
-		</method>
 		<method name="clock_set_gate">
 			<return type="void" />
 			<param index="0" name="armed" type="bool" />
@@ -173,39 +139,18 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="clock_set_synchronized">
-			<return type="void" />
-			<param index="0" name="value" type="bool" />
-			<description>
-				Sets [method clock_is_synchronized]. Set it to [code]false[/code] to resynchronize from scratch on the next ping.
-			</description>
-		</method>
 		<method name="clock_step">
 			<return type="void" />
 			<param index="0" name="count" type="int" />
 			<description>
-				Runs [param count] ticks immediately. It does not open a tick loop, so wrap it in [method clock_tick_loop] when predicted entities must run.
-			</description>
-		</method>
-		<method name="clock_tick_loop">
-			<return type="void" />
-			<param index="0" name="open" type="bool" />
-			<description>
-				Opens a tick loop when [param open] is [code]true[/code], and closes it otherwise. Predicted entities only run between the two.
+				Runs one physics frame of the clock with [param count] ticks in it, now. A [param count] of [code]0[/code] runs the frame's prediction and sends with no tick. [signal NetwScene.entity_entered], [signal NetwScene.entity_exited] and the callbacks of [method lagcomp_effect_watch] for its ticks run just before it returns. [method NetwClock.step] calls it.
 			</description>
 		</method>
 		<method name="complete_auth">
 			<return type="int" enum="Error" />
 			<param index="0" name="id" type="int" />
 			<description>
-				Same as [method SceneMultiplayer.complete_auth], called from [member auth_callback] when the game's own check of [param id] passes. The peer connects once its join is admitted. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member inner].
-			</description>
-		</method>
-		<method name="core_of" qualifiers="static">
-			<return type="NetwMultiplayer" />
-			<param index="0" name="node" type="Node" />
-			<description>
-				Returns the [NetwMultiplayer] that [param node] belongs to.
+				Same as [method SceneMultiplayer.complete_auth], called from [member auth_callback] when the game's own check of [param id] passes. The peer connects once its join is admitted. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no wrapped [SceneMultiplayer].
 			</description>
 		</method>
 		<method name="database_close">
@@ -232,11 +177,11 @@
 				Removes the record at [param id]. Erasing a record that is not there succeeds. See [method NetwDatabase.erase] for the errors.
 			</description>
 		</method>
-		<method name="database_find" qualifiers="const">
+		<method name="database_find">
 			<return type="RID" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				The database declared as [param name], or an invalid [RID] when none is.
+				The database declared as [param name], or an invalid [RID] when none is. A database declared on a node is found from the [method Node._ready] of that node's children.
 			</description>
 		</method>
 		<method name="database_flush">
@@ -244,6 +189,13 @@
 			<param index="0" name="database" type="RID" />
 			<description>
 				Resolves once every operation started on [param database] before this call has finished. See [method NetwDatabase.flush] for the errors.
+			</description>
+		</method>
+		<method name="database_get_name" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="database" type="RID" />
+			<description>
+				The name [param database] was declared with in [method Netw.configure_database], or empty when it does not exist.
 			</description>
 		</method>
 		<method name="database_get_slot" qualifiers="const">
@@ -254,10 +206,17 @@
 			</description>
 		</method>
 		<method name="database_get_state" qualifiers="const">
-			<return type="int" enum="NetwMultiplayer.DatabaseState" />
+			<return type="int" enum="NetwDatabase.State" />
 			<param index="0" name="database" type="RID" />
 			<description>
-				Whether [param database] is closed, opening, open, closing or faulted, as a [enum DatabaseState].
+				Whether [param database] is closed, opening, open or closing, as a [enum NetwDatabase.State].
+			</description>
+		</method>
+		<method name="database_is_valid" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="database" type="RID" />
+			<description>
+				Returns [code]true[/code] while [param database] exists in this session.
 			</description>
 		</method>
 		<method name="database_list_slots">
@@ -311,7 +270,14 @@
 			<param index="0" name="database" type="RID" />
 			<param index="1" name="operations" type="Array" />
 			<description>
-				Applies [param operations] in order, see [method NetwWriteBatch.submit] for the result. Build [param operations] with [NetwWriteBatch].
+				Applies [param operations] in order, see [method NetwWriteBatch.submit] for the result. [NetwWriteBatch] builds [param operations].
+				[codeblock lang=text]
+				Array[Dictionary]
+				┖╴operation
+				  ┠╴kind       String      "replace" or "erase"
+				  ┠╴address    Dictionary  the record's address
+				  ┖╴envelope   Dictionary  the sealed record, replace only
+				[/codeblock]
 			</description>
 		</method>
 		<method name="database_write">
@@ -328,24 +294,7 @@
 			<return type="void" />
 			<param index="0" name="id" type="int" />
 			<description>
-				Same as [method SceneMultiplayer.disconnect_peer]. [method peer_kick] also tells the peer why.
-			</description>
-		</method>
-		<method name="display_declare">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="comp" type="int" />
-			<param index="2" name="track" type="StringName" />
-			<param index="3" name="spec" type="NetwInterpolate" />
-			<description>
-				Interpolates the property [param track] of [param entity] with [param spec].
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the track was declared
-				┠╴ERR_DOES_NOT_EXIST  entity is not registered
-				┠╴ERR_INVALID_DATA    track is empty, or spec is null
-				┖╴ERR_UNAVAILABLE     comp names no live node on entity
-				[/codeblock]
+				Same as [method SceneMultiplayer.disconnect_peer]. [method NetwSession.kick] also tells the peer why.
 			</description>
 		</method>
 		<method name="display_get_param">
@@ -365,12 +314,11 @@
 				Returns the display diagnostic [param stat] of [param entity], or [code]null[/code] when unknown. Some stats describe one [param track], and the rest ignore it.
 			</description>
 		</method>
-		<method name="display_get_value">
-			<return type="Variant" />
+		<method name="display_get_tick">
+			<return type="int" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="track" type="StringName" />
 			<description>
-				The last displayed value of [param track] on [param entity], or [code]null[/code] when there is none.
+				Returns the tick [param entity] is displayed at, or [code]-1[/code] when it is not interpolated.
 			</description>
 		</method>
 		<method name="display_reset">
@@ -385,16 +333,29 @@
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="callback" type="Callable" />
 			<description>
-				Calls [param callback] as [code]callback(entity, track, value)[/code] for every displayed value, in place of writing the node. An empty [Callable] clears it. Clears [method display_set_target_item].
+				Calls [param callback] with every interpolated value of [param entity] in place of writing its node. An empty [Callable] clears it, and setting it clears [method display_set_target_item].
+				[codeblock]
+				func _ready() -&gt; void:
+				    Netw.of(self).display_set_callback(NetwEntity.of(self).rid, _on_drawn)
+
+				func _on_drawn(entity: RID, track: StringName, value: Variant) -&gt; void:
+				    marker.position = value
+				[/codeblock]
 			</description>
 		</method>
 		<method name="display_set_param">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="param" type="int" enum="NetwMultiplayer.DisplayParam" />
 			<param index="2" name="value" type="Variant" />
 			<description>
 				Changes one display setting of [param entity]. [constant DISPLAY_PARAM_VISUAL_ROOT] takes a [NodePath].
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the setting changed
+				┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+				┖╴ERR_INVALID_PARAMETER  param is unknown, or value is refused
+				[/codeblock]
 			</description>
 		</method>
 		<method name="display_set_target_item">
@@ -402,16 +363,7 @@
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="item" type="RID" />
 			<description>
-				Displays [param entity] on a [RenderingServer] canvas item or instance [param item] in place of a node. An invalid [RID] clears it. Clears [method display_set_callback].
-			</description>
-		</method>
-		<method name="display_snap">
-			<return type="void" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="track" type="StringName" />
-			<param index="2" name="value" type="Variant" />
-			<description>
-				Sets [param track] on [param entity] to [param value] without interpolating.
+				Draws [param entity] on a [RenderingServer] canvas item or instance [param item] in place of writing its node. An interpolated [Transform2D] goes to the canvas item and a [Transform3D] to the instance, so the entity interpolates its [code]transform[/code]. An invalid [RID] clears it, and setting it clears [method display_set_callback].
 			</description>
 		</method>
 		<method name="endpoint_add">
@@ -437,6 +389,12 @@
 				Returns the endpoint for [param transport] and [param address], or an invalid [RID].
 			</description>
 		</method>
+		<method name="endpoint_get_current">
+			<return type="RID" />
+			<description>
+				Returns the endpoint this peer is connected through, its own on a host, or an invalid [RID] before [constant NetwSession.STATE_ONLINE]. It is also invalid when the assigned peer supplies no address, or when the peer's transport was removed with [method transport_unregister] while online. It is the listed endpoint at that address when there is one, and otherwise an endpoint [method endpoint_list] does not return and [method endpoint_probe] does not probe. The flat form of [member NetwConnection.current_endpoint].
+			</description>
+		</method>
 		<method name="endpoint_get_param">
 			<return type="Variant" />
 			<param index="0" name="endpoint" type="RID" />
@@ -457,6 +415,15 @@
 			<param index="1" name="state" type="int" enum="NetwMultiplayer.EndpointState" />
 			<description>
 				Returns what the last probe found for [param endpoint]. [constant ENDPOINT_STATE_STATUS] is [constant @GlobalScope.FAILED] until the first probe.
+			</description>
+		</method>
+		<method name="endpoint_invite">
+			<return type="RID" />
+			<param index="0" name="transport" type="RID" />
+			<param index="1" name="address" type="String" />
+			<param index="2" name="from_name" type="String" default="&quot;&quot;" />
+			<description>
+				The flat form of [method NetwConnection.invite]. Returns the invited endpoint, or an invalid [RID] when [param transport] is unknown or [param address] is empty.
 			</description>
 		</method>
 		<method name="endpoint_is_browsing" qualifiers="const">
@@ -500,21 +467,6 @@
 				The flat form of [member NetwConnection.browsing].
 			</description>
 		</method>
-		<method name="endpoint_set_param">
-			<return type="int" enum="Error" />
-			<param index="0" name="endpoint" type="RID" />
-			<param index="1" name="param" type="int" enum="NetwMultiplayer.EndpointParam" />
-			<param index="2" name="value" type="Variant" />
-			<description>
-				Changes one property of [param endpoint] and emits [signal NetwEndpoint.changed]. Only [constant ENDPOINT_PARAM_DISPLAY_NAME] can be changed.
-				[codeblock lang=text]
-				Error
-				┠╴OK                     the property changed
-				┠╴ERR_DOES_NOT_EXIST     the endpoint does not exist
-				┖╴ERR_INVALID_PARAMETER  param names anything but ENDPOINT_PARAM_DISPLAY_NAME
-				[/codeblock]
-			</description>
-		</method>
 		<method name="endpoint_set_probe_interval">
 			<return type="void" />
 			<param index="0" name="seconds" type="float" />
@@ -522,89 +474,11 @@
 				The flat form of [member NetwConnection.probe_interval].
 			</description>
 		</method>
-		<method name="entity_add_property_set">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="set" type="RID" />
-			<param index="2" name="comp" type="int" />
-			<description>
-				Synchronizes the properties in [param set] on the node [param comp] of [param entity]. [code]0[/code] is the entity's root node. Create [param set] with [method property_set_create] and seal it with [method property_set_seal] first.
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the set was attached
-				┠╴ERR_DOES_NOT_EXIST  entity or set does not exist
-				┠╴ERR_INVALID_DATA    the set is not sealed
-				┠╴ERR_UNAVAILABLE     comp is not a node of this entity
-				┖╴ERR_UNCONFIGURED    property synchronization is unavailable
-				[/codeblock]
-			</description>
-		</method>
-		<method name="entity_admit">
-			<return type="int" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Gives [param entity] a new route, the id peers use to address it, and returns it. An entity that has one returns the same route. Returns [code]0[/code] on a client or for an unknown entity.
-			</description>
-		</method>
-		<method name="entity_adopt">
+		<method name="entity_attach">
 			<return type="RID" />
-			<param index="0" name="root" type="Object" />
+			<param index="0" name="node" type="Node" />
 			<description>
-				Replicates a node that is already in the scene tree, and returns its entity. Returns an invalid [RID] on failure. Use [method spawn_registered] for a node that is not in the tree yet.
-			</description>
-		</method>
-		<method name="entity_bind_node">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="node" type="Node" />
-			<description>
-				Makes [param node] the node of [param entity].
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the node was bound, or already was
-				┠╴ERR_DOES_NOT_EXIST  entity does not exist
-				┠╴ERR_INVALID_DATA    node is null, or entity has no route yet
-				┖╴ERR_ALREADY_EXISTS  a different node is already bound
-				[/codeblock]
-			</description>
-		</method>
-		<method name="entity_bind_route">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="route" type="int" />
-			<description>
-				Gives [param entity] a route received from another peer.
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the route was assigned
-				┠╴ERR_DOES_NOT_EXIST  entity does not exist
-				┠╴ERR_INVALID_DATA    route is not positive
-				┖╴ERR_ALREADY_IN_USE  another entity has this route
-				[/codeblock]
-			</description>
-		</method>
-		<method name="entity_call">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="comp" type="int" />
-			<param index="2" name="method" type="StringName" />
-			<param index="3" name="args" type="Array" />
-			<param index="4" name="peer" type="int" />
-			<description>
-				Calls [param method] as an RPC on the node [param comp] of [param entity]. [param peer] [code]0[/code] sends it to every peer [method rpc_call] would. The method needs an [code]@rpc[/code] annotation or a [method Netw.configure_rpc] declaration.
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the call was sent
-				┠╴ERR_DOES_NOT_EXIST  the node or the method does not exist
-				┠╴ERR_UNAVAILABLE     the node is not ready on this peer yet
-				┖╴ERR_UNCONFIGURED    the method is not an RPC
-				[/codeblock]
-			</description>
-		</method>
-		<method name="entity_create">
-			<return type="RID" />
-			<description>
-				Creates an empty entity. Give it a route with [method entity_admit] or [method entity_bind_route].
+				Makes [param node] an entity of this session and returns its [RID], the [member NetwEntity.rid] of its [NetwEntity]. A node that already is an entity returns its [RID]. Returns an invalid [RID] when [param node] is null or belongs to another session.
 			</description>
 		</method>
 		<method name="entity_despawn">
@@ -622,18 +496,18 @@
 				[b]Server Only.[/b]
 			</description>
 		</method>
-		<method name="entity_from_route" qualifiers="const">
-			<return type="RID" />
-			<param index="0" name="route" type="int" />
+		<method name="entity_get_control_state" qualifiers="const">
+			<return type="int" enum="NetwMultiplayer.ControlState" />
+			<param index="0" name="entity" type="RID" />
 			<description>
-				Returns the entity at [param route], or an invalid [RID].
+				Returns the [enum ControlState] of [param entity], or [constant CONTROL_STATE_SETTLED] when [param entity] is not in this session.
 			</description>
 		</method>
-		<method name="entity_get_epoch" qualifiers="const">
+		<method name="entity_get_controller" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="entity" type="RID" />
 			<description>
-				How many times the route of [param entity] has been reused by a new entity.
+				Returns the peer that controls [param entity], [code]1[/code] when the server does, or [code]0[/code] when [param entity] is not in this session. [member NetwEntity.controller] answers the same control as a [NetwPlayer].
 			</description>
 		</method>
 		<method name="entity_get_node" qualifiers="const">
@@ -643,6 +517,14 @@
 				Returns the node of [param entity], or [code]null[/code].
 			</description>
 		</method>
+		<method name="entity_get_param" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="param" type="int" enum="NetwMultiplayer.EntityParam" />
+			<description>
+				Returns one setting of [param entity], or [code]null[/code] when [param entity] is not in this session.
+			</description>
+		</method>
 		<method name="entity_get_parent">
 			<return type="RID" />
 			<param index="0" name="entity" type="RID" />
@@ -650,11 +532,18 @@
 				Returns the closest entity above [param entity] in the scene tree, or an invalid [RID].
 			</description>
 		</method>
-		<method name="entity_get_peer" qualifiers="const">
+		<method name="entity_get_player" qualifiers="const">
 			<return type="int" />
 			<param index="0" name="entity" type="RID" />
 			<description>
-				Returns the peer that controls [param entity], or [code]0[/code].
+				Returns the id of the player [param entity] represents, or [code]0[/code] when it represents none. The player is set with [member NetwEntity.player].
+			</description>
+		</method>
+		<method name="entity_get_recipients">
+			<return type="PackedInt32Array" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns the peers an RPC on [param entity] is sent to, which is every connected peer except this one. Offline, it returns [code][1][/code]. Returns an empty array when [param entity] is not in this session. Use [method interest_is_visible] to ask who can see the entity.
 			</description>
 		</method>
 		<method name="entity_get_route" qualifiers="const">
@@ -664,6 +553,13 @@
 				Returns the route of [param entity], the id every peer uses to address it, or [code]0[/code].
 			</description>
 		</method>
+		<method name="entity_get_scene" qualifiers="const">
+			<return type="RID" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns the scene [param entity] is in, the closest entity at or above it that is a [NetwScene], or an invalid [RID].
+			</description>
+		</method>
 		<method name="entity_get_state" qualifiers="const">
 			<return type="int" enum="NetwMultiplayer.EntityState" />
 			<param index="0" name="entity" type="RID" />
@@ -671,26 +567,64 @@
 				Returns whether [param entity] is alive on this peer. An entity with no route returns [constant ENTITY_STATE_UNKNOWN].
 			</description>
 		</method>
-		<method name="entity_get_view" qualifiers="const">
-			<return type="NetwEntity" />
+		<method name="entity_release_control">
+			<return type="NetwPromise" />
 			<param index="0" name="entity" type="RID" />
+			<param index="1" name="successor" type="int" default="0" />
 			<description>
-				Returns the [NetwEntity] of [param entity], or [code]null[/code] once it is despawned.
+				Hands control of [param entity] to [param successor], a peer id, or [code]0[/code] for the server. Peer [code]1[/code] is the host's player, as in [method entity_set_controller]. It works as [method NetwEntity.release_control] does, and the [NetwPromise] fails with [constant @GlobalScope.ERR_DOES_NOT_EXIST] when [param entity] is not in this session.
+				[b]Player request.[/b]
 			</description>
 		</method>
-		<method name="entity_grant_control">
+		<method name="entity_reparent">
+			<return type="NetwPromise" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="parent" type="Node" />
+			<description>
+				Moves the node of [param entity] under [param parent] on every peer, as [method Netw.reparent] does. The [NetwPromise] fails with [constant @GlobalScope.ERR_UNAVAILABLE] when [param entity] is not in this session or [param parent] is null.
+			</description>
+		</method>
+		<method name="entity_request_control">
+			<return type="NetwPromise" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="hold" type="int" enum="NetwEntity.Hold" default="2" />
+			<description>
+				Asks the server to make this peer the controller of [param entity] with [param hold]. It works as [method NetwEntity.claim_control] does, and the [NetwPromise] fails with [constant @GlobalScope.ERR_DOES_NOT_EXIST] when [param entity] is not in this session.
+				[b]Player request.[/b]
+			</description>
+		</method>
+		<method name="entity_set_controller">
 			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="peer" type="int" />
 			<description>
-				Gives control of [param entity] to [param peer]. Returns [constant @GlobalScope.ERR_UNAUTHORIZED] on a client, or [constant @GlobalScope.ERR_DOES_NOT_EXIST] when [param entity] has no bound node.
+				Gives control of [param entity] to [param peer]. Peer [code]1[/code] is the host's player. Given before the host's player joins, the entity stays with the server until it joins, and on a dedicated server it stays with the server, which controls nothing locally. The hold resets to [constant NetwEntity.HOLD_NONE].
+				[codeblock lang=text]
+				Error
+				┠╴OK                     control moved
+				┠╴ERR_DOES_NOT_EXIST     the entity is not in this session
+				┠╴ERR_INVALID_PARAMETER  peer is not a peer id
+				┠╴ERR_UNCONFIGURED       the entity is not spawned yet
+				┖╴ERR_UNAUTHORIZED       called on a client
+				[/codeblock]
+				[b]Server Only.[/b]
 			</description>
 		</method>
-		<method name="entity_of">
-			<return type="RID" />
-			<param index="0" name="node" type="Object" />
+		<method name="entity_set_param">
+			<return type="int" enum="Error" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="param" type="int" enum="NetwMultiplayer.EntityParam" />
+			<param index="2" name="value" type="Variant" />
 			<description>
-				Returns the entity of [param node] or of its closest ancestor that has one.
+				Changes one setting of [param entity]. A refused value is reported and the setting keeps its value.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the setting changed
+				┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+				┠╴ERR_LOCKED             authority cannot change once the node is in the tree
+				┠╴ERR_UNAVAILABLE        param is ENTITY_PARAM_HOLD, or a late TRANSFER_IMMEDIATE without AUTHORITY_CONTROLLER
+				┖╴ERR_INVALID_PARAMETER  param is unknown, or value is refused
+				[/codeblock]
 			</description>
 		</method>
 		<method name="event_arm">
@@ -752,43 +686,11 @@
 				Same as [method SceneMultiplayer.get_authenticating_peers].
 			</description>
 		</method>
-		<method name="interest_admits">
-			<return type="bool" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="peer" type="int" />
-			<description>
-				Returns [code]true[/code] when [param peer] can see [param entity]. Returns [code]false[/code] when either is unknown.
-			</description>
-		</method>
-		<method name="interest_flush_now">
-			<return type="int" enum="Error" />
-			<description>
-				Applies pending layer changes now, where they would otherwise apply at the end of the frame.
-				[codeblock]
-				layer.add_viewer(peer)
-				api.interest_flush_now()
-				assert(api.interest_admits(entity, peer))
-				[/codeblock]
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the changes were applied
-				┠╴ERR_INVALID_DATA    a driver callback did not return an Array
-				┖╴ERR_DOES_NOT_EXIST  a driver callback returned an unknown entity
-				[/codeblock]
-			</description>
-		</method>
-		<method name="interest_get_membership">
+		<method name="interest_get_layers">
 			<return type="RID[]" />
 			<param index="0" name="entity" type="RID" />
 			<description>
-				Returns every layer [param entity] is in.
-			</description>
-		</method>
-		<method name="interest_get_row">
-			<return type="PackedInt64Array" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns a bitset with one bit per peer that can see [param entity]. Empty when the entity is unknown.
+				Returns every existing layer [param entity] is in. It creates no layer.
 			</description>
 		</method>
 		<method name="interest_is_filtered">
@@ -798,19 +700,25 @@
 				Returns [code]true[/code] when [param entity] is in any layer. An entity in none is visible to every peer.
 			</description>
 		</method>
-		<method name="interest_join">
-			<return type="void" />
+		<method name="interest_is_visible">
+			<return type="bool" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer_id" type="StringName" />
+			<param index="1" name="peer" type="int" />
 			<description>
-				Adds [param entity] to the layer [param layer_id]. Can be called before the node enters the tree.
+				Returns [code]true[/code] when updates for [param entity] are sent to [param peer]. That is always so for the server, for the controller of [param entity] and for an entity in no layer. A client answers for itself.
 			</description>
 		</method>
-		<method name="interest_layer">
-			<return type="NetwInterestLayer" />
-			<param index="0" name="name" type="StringName" />
+		<method name="interest_join">
+			<return type="int" enum="Error" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="layer" type="RID" />
 			<description>
-				Returns the layer called [param name], creating it on first use. Returns [code]null[/code] for a layer that belongs to a scene.
+				Adds [param entity] to [param layer] from the entity's side.
+				[codeblock lang=text]
+				Error
+				┠╴OK                  the entity will be added, or is already in the layer
+				┖╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_layer_add_entity">
@@ -818,11 +726,12 @@
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="entity" type="RID" />
 			<description>
-				Adds [param entity] to [param layer], so every viewer of the layer sees it. Applies at the end of the frame, or at [method interest_flush_now].
+				Adds [param entity] to [param layer], so every viewer of the layer sees it. Applies at the end of the frame.
 				[codeblock lang=text]
 				Error
 				┠╴OK                  the entity will be added
 				┠╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+				┠╴ERR_LOCKED          layer belongs to a scene
 				┠╴ERR_UNAUTHORIZED    called on a client
 				┖╴ERR_UNAVAILABLE     the layer rejected the entity
 				[/codeblock]
@@ -833,11 +742,12 @@
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="peer" type="int" />
 			<description>
-				Lets [param peer] see every entity in [param layer]. Applies at the end of the frame, or at [method interest_flush_now].
+				Lets [param peer] see every entity in [param layer]. Applies at the end of the frame.
 				[codeblock lang=text]
 				Error
 				┠╴OK                  the peer will be added
 				┠╴ERR_DOES_NOT_EXIST  layer does not exist
+				┠╴ERR_LOCKED          layer belongs to a scene
 				┖╴ERR_INVALID_DATA    peer is 0
 				[/codeblock]
 			</description>
@@ -860,14 +770,66 @@
 			<return type="void" />
 			<param index="0" name="layer" type="RID" />
 			<description>
-				Deletes [param layer] with its viewers, entities, settings and callbacks.
+				Deletes [param layer] with its viewers, entities, settings and callbacks. A layer that belongs to a scene is left as it is, and an error is pushed.
 			</description>
 		</method>
-		<method name="interest_layer_named" qualifiers="const">
-			<return type="NetwInterestLayer" />
-			<param index="0" name="name" type="StringName" />
+		<method name="interest_layer_get_entities">
+			<return type="RID[]" />
+			<param index="0" name="layer" type="RID" />
 			<description>
-				Returns the layer called [param name], or [code]null[/code]. Does not create it. A layer that belongs to a scene returns [code]null[/code], so use [method Netw.scene] for it.
+				Returns the entities in [param layer]. On a client, only the ones it sees.
+			</description>
+		</method>
+		<method name="interest_layer_get_name" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="layer" type="RID" />
+			<description>
+				Returns the name [param layer] was created with.
+			</description>
+		</method>
+		<method name="interest_layer_get_param" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="layer" type="RID" />
+			<param index="1" name="param" type="int" enum="NetwMultiplayer.LayerParam" />
+			<description>
+				Returns the value of [param param] for [param layer].
+			</description>
+		</method>
+		<method name="interest_layer_get_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="layer" type="RID" />
+			<description>
+				Returns the visibility counters of [param layer].
+				[codeblock lang=text]
+				Dictionary
+				┠╴viewers            int   number of viewers
+				┠╴entities           int   number of entities
+				┠╴visible_edges      int   (entity, peer) pairs that can see each other
+				┖╴transitions_total  int   shows plus hides since the layer was created
+				[/codeblock]
+			</description>
+		</method>
+		<method name="interest_layer_get_viewers" qualifiers="const">
+			<return type="PackedInt32Array" />
+			<param index="0" name="layer" type="RID" />
+			<description>
+				Returns the peers that view [param layer].
+			</description>
+		</method>
+		<method name="interest_layer_has_entity" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="layer" type="RID" />
+			<param index="1" name="entity" type="RID" />
+			<description>
+				Returns [code]true[/code] when [param entity] is in [param layer].
+			</description>
+		</method>
+		<method name="interest_layer_has_viewer" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="layer" type="RID" />
+			<param index="1" name="peer" type="int" />
+			<description>
+				Returns [code]true[/code] when [param peer] views [param layer].
 			</description>
 		</method>
 		<method name="interest_layer_remove_entity">
@@ -875,21 +837,29 @@
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="entity" type="RID" />
 			<description>
-				Removes [param entity] from [param layer], so its viewers stop seeing it. Applies at the end of the frame, or at [method interest_flush_now].
+				Removes [param entity] from [param layer], so its viewers stop seeing it. Applies at the end of the frame.
 				[codeblock lang=text]
 				Error
 				┠╴OK                  the entity will be removed, or was not in the layer
 				┠╴ERR_DOES_NOT_EXIST  layer or entity does not exist
+				┠╴ERR_LOCKED          layer belongs to a scene
 				┖╴ERR_UNAUTHORIZED    called on a client
 				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_layer_remove_viewer">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="peer" type="int" />
 			<description>
 				Stops [param peer] from seeing [param layer]. Entities it still sees through another layer stay. The layer's [enum NetwInterestLayer.LeavePolicy] decides what happens to the rest.
+				[codeblock lang=text]
+				Error
+				┠╴OK                  the peer will be removed, or did not view the layer
+				┠╴ERR_DOES_NOT_EXIST  layer does not exist
+				┠╴ERR_LOCKED          layer belongs to a scene
+				┖╴ERR_INVALID_DATA    peer is 0
+				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_layer_set_driver_callback">
@@ -897,7 +867,7 @@
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="callback" type="Callable" />
 			<description>
-				Makes [param callback] decide which entities are in [param layer]. It runs once per frame with the layer's [RID] and returns the [RID] of every entity in it. An empty [Callable] removes it. [member NetwInterestLayer.driver] is the same with objects, and setting one replaces the other.
+				Makes [param callback] decide which entities are in [param layer]. It runs once per frame with the layer's [RID] and returns the [RID] of every entity in it. An empty [Callable] removes it. [member NetwInterestLayer.driver] is the same with objects, and setting one replaces the other. A layer that belongs to a scene takes no callback, and an error is pushed.
 			</description>
 		</method>
 		<method name="interest_layer_set_monitor_callback">
@@ -909,121 +879,97 @@
 			</description>
 		</method>
 		<method name="interest_layer_set_param">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="param" type="int" enum="NetwMultiplayer.LayerParam" />
 			<param index="2" name="value" type="Variant" />
 			<description>
 				Changes one setting of [param layer].
-			</description>
-		</method>
-		<method name="interest_layer_view" qualifiers="const">
-			<return type="NetwInterestLayer" />
-			<param index="0" name="layer" type="RID" />
-			<description>
-				Returns [param layer] as a [NetwInterestLayer], or [code]null[/code]. A layer that belongs to a scene returns [code]null[/code], so use [method Netw.scene] for it.
-			</description>
-		</method>
-		<method name="interest_layers" qualifiers="const">
-			<return type="Array" />
-			<description>
-				Returns every [NetwInterestLayer] in this session, in no particular order.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the setting changed
+				┠╴ERR_DOES_NOT_EXIST     layer is not in this session
+				┠╴ERR_LOCKED             layer belongs to a scene
+				┖╴ERR_INVALID_PARAMETER  param is unknown, or value is not one of its constants
+				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_leave">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer_id" type="StringName" />
+			<param index="1" name="layer" type="RID" />
 			<description>
-				Removes [param entity] from the layer [param layer_id].
-			</description>
-		</method>
-		<method name="interest_monitor_snapshot">
-			<return type="Dictionary" />
-			<description>
-				Returns counts across every layer in this session.
+				Removes [param entity] from [param layer] from the entity's side.
 				[codeblock lang=text]
-				Dictionary
-				┠╴layers                 int  number of layers
-				┠╴entities_filtered      int  entities in at least one layer
-				┠╴visible_edges          int  (entity, peer) pairs that can see each other
-				┠╴dirty_entities         int  entities with pending changes
-				┠╴relay_backlog          int  pending visibility updates to send
-				┠╴transitions_total      int  enters plus leaves since startup
-				┖╴vanished_dirty_skips   int  pending entities that left before applying
+				Error
+				┠╴OK                  the entity will be removed, or was not in the layer
+				┖╴ERR_DOES_NOT_EXIST  layer or entity does not exist
 				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_on_enter">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer_id" type="StringName" />
+			<param index="1" name="layer" type="RID" />
 			<param index="2" name="callback" type="Callable" />
 			<description>
-				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when a peer starts seeing [param entity] through [param layer_id].
+				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when a peer starts seeing [param entity] through [param layer], where [code]layer_id[/code] is the layer's name.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the callback was added
+				┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+				┖╴ERR_INVALID_PARAMETER  callback is not valid
+				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_on_leave">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer_id" type="StringName" />
+			<param index="1" name="layer" type="RID" />
 			<param index="2" name="callback" type="Callable" />
 			<description>
-				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when a peer stops seeing [param entity] through [param layer_id].
+				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when a peer stops seeing [param entity] through [param layer], where [code]layer_id[/code] is the layer's name.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the callback was added
+				┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+				┖╴ERR_INVALID_PARAMETER  callback is not valid
+				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_on_leave_policy">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer_id" type="StringName" />
+			<param index="1" name="layer" type="RID" />
 			<param index="2" name="policy" type="int" enum="NetwInterestLayer.LeavePolicy" />
 			<param index="3" name="custom_callback" type="Callable" default="Callable()" />
 			<description>
-				Sets the [enum NetwInterestLayer.LeavePolicy] for [param entity] on [param layer_id]. [constant NetwInterestLayer.LEAVE_POLICY_CUSTOM] requires [param custom_callback], called with [code](peer_id, layer_id)[/code] on the server. Other policies reject a callback.
+				Sets the [enum NetwInterestLayer.LeavePolicy] for [param entity] on [param layer]. [constant NetwInterestLayer.LEAVE_POLICY_CUSTOM] requires [param custom_callback], called on the server with [code](peer_id, layer_id)[/code], where [code]layer_id[/code] is the layer's name. Other policies reject a callback.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the policy was set
+				┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+				┖╴ERR_INVALID_PARAMETER  policy is unknown, or custom_callback does not match it
+				[/codeblock]
 			</description>
 		</method>
 		<method name="interest_on_perception_policy">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer_id" type="StringName" />
+			<param index="1" name="layer" type="RID" />
 			<param index="2" name="policy" type="int" enum="NetwInterestLayer.PerceptionPolicy" />
 			<param index="3" name="custom_callback" type="Callable" default="Callable()" />
 			<description>
-				Sets what this peer does with [param entity] when its visibility through [param layer_id] changes. [constant NetwInterestLayer.PERCEPTION_POLICY_CUSTOM] requires [param custom_callback], called as [code]custom_callback(visible, peer_id, layer_id)[/code].
+				Sets what this peer does with [param entity] when its visibility through [param layer] changes. [constant NetwInterestLayer.PERCEPTION_POLICY_CUSTOM] requires [param custom_callback], called as [code]custom_callback(visible, peer_id, layer_id)[/code], where [code]layer_id[/code] is the layer's name.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the policy was set
+				┠╴ERR_DOES_NOT_EXIST     layer or entity does not exist
+				┖╴ERR_INVALID_PARAMETER  policy is unknown, or custom_callback does not match it
+				[/codeblock]
 			</description>
 		</method>
-		<method name="interest_player_sees">
-			<return type="bool" />
-			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="entity" type="NetwEntity" />
-			<description>
-				Returns [code]true[/code] when the player [param peer_id] can see [param entity]. A host player follows the same rules as a client. A client can only ask about itself.
-			</description>
-		</method>
-		<method name="interest_resolved_layer_ids">
-			<return type="Array" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Returns the sorted names of every layer [param entity] is in.
-			</description>
-		</method>
-		<method name="interest_shared_entities">
-			<return type="NetwEntity[]" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<param index="1" name="layer_id" type="StringName" default="&amp;&quot;&quot;" />
-			<description>
-				Returns every other entity that shares the layer [param layer_id] with [param entity], sorted by [member NetwEntity.name]. An empty [param layer_id] checks every layer of [param entity].
-			</description>
-		</method>
-		<method name="interest_wire_admits">
-			<return type="bool" />
-			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="entity" type="NetwEntity" />
-			<description>
-				Returns [code]true[/code] when updates for [param entity] are sent to [param peer_id]. Always [code]true[/code] for the server and for the controller of [param entity], and [method interest_player_sees] for everyone else.
-			</description>
-		</method>
-		<method name="lagcomp_deny_action">
+		<method name="lagcomp_action_deny">
 			<return type="void" />
 			<param index="0" name="requester" type="int" />
 			<param index="1" name="key" type="StringName" />
@@ -1031,11 +977,32 @@
 				Rejects the action [param key] from [param requester], which undoes its local effect.
 			</description>
 		</method>
-		<method name="lagcomp_effect_adopt">
-			<return type="void" />
-			<param index="0" name="key" type="StringName" />
+		<method name="lagcomp_action_key" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="view_tick" type="int" />
+			<param index="2" name="slot" type="int" default="0" />
 			<description>
-				Confirms the effect [param key] and calls the [code]confirmed[/code] callbacks from [method lagcomp_effect_watch].
+				Returns the key of the action [param entity] requests for [param view_tick]. [param slot] tells apart two actions of [param entity] on the same tick. The key is passed to [method lagcomp_effect_arm], [method lagcomp_effect_watch] and [method lagcomp_action_request].
+			</description>
+		</method>
+		<method name="lagcomp_action_request">
+			<return type="int" enum="Error" />
+			<param index="0" name="key" type="StringName" />
+			<param index="1" name="target" type="NodePath" />
+			<param index="2" name="method" type="StringName" />
+			<param index="3" name="view_tick" type="int" />
+			<param index="4" name="args" type="Array" default="[]" />
+			<param index="5" name="timing" type="int" enum="NetwAction.TimingMode" default="2" />
+			<description>
+				Sends [param method] with [param args] to the server, which calls it on the node at [param target], a path from the session's root node, as the world was at [param view_tick]. [param timing] picks when the server runs it. On a server, a host or an offline session the action runs and resolves [param key] before this returns, so [method lagcomp_effect_arm] and [method lagcomp_effect_watch] are called for [param key] first. Returns [constant @GlobalScope.ERR_BUSY] while the session applies its settings.
+				[codeblock]
+				var key := api.lagcomp_action_key(entity, tick)
+				api.lagcomp_effect_arm(key, revert)
+				api.lagcomp_effect_watch(key, confirmed, denied)
+				api.lagcomp_action_request(key, target, &amp;"fire", tick, [aim])
+				[/codeblock]
+				[b]Player request.[/b]
 			</description>
 		</method>
 		<method name="lagcomp_effect_arm">
@@ -1044,30 +1011,7 @@
 			<param index="1" name="revert" type="Callable" />
 			<param index="2" name="timeout_ticks" type="int" default="0" />
 			<description>
-				Starts a predicted effect [param key]. [param revert] runs if the server denies it or does not confirm it within [param timeout_ticks]. [code]0[/code] uses the default timeout.
-			</description>
-		</method>
-		<method name="lagcomp_effect_discard">
-			<return type="void" />
-			<param index="0" name="key" type="StringName" />
-			<description>
-				Denies the effect [param key], runs its revert, and calls the [code]denied[/code] callbacks from [method lagcomp_effect_watch].
-			</description>
-		</method>
-		<method name="lagcomp_effect_key" qualifiers="const">
-			<return type="StringName" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="tick" type="int" />
-			<param index="2" name="slot" type="int" default="0" />
-			<description>
-				Returns the key of the effect [param entity] started on [param tick]. [param slot] tells apart two effects on the same tick.
-			</description>
-		</method>
-		<method name="lagcomp_effect_pending" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="key" type="StringName" />
-			<description>
-				Returns [code]true[/code] while the effect [param key] waits to be confirmed or denied.
+				Starts a predicted effect [param key]. [param revert] runs if the server denies it or does not confirm it within [param timeout_ticks]. [code]0[/code] uses the default timeout. [param revert] runs at the same moment as the callbacks of [method lagcomp_effect_watch].
 			</description>
 		</method>
 		<method name="lagcomp_effect_watch">
@@ -1076,34 +1020,7 @@
 			<param index="1" name="confirmed" type="Callable" />
 			<param index="2" name="denied" type="Callable" />
 			<description>
-				Calls [param confirmed] or [param denied] when the effect [param key] resolves. Returns [code]false[/code] when the effect is not pending.
-			</description>
-		</method>
-		<method name="lagcomp_is_configured" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Returns [code]true[/code] when a [NetwLagCompensationConfig] was applied. Without one, rewinding does nothing.
-			</description>
-		</method>
-		<method name="lagcomp_metrics" qualifiers="const">
-			<return type="Dictionary" />
-			<description>
-				Returns lag compensation counters. Totals count from startup.
-				[codeblock lang=text]
-				Dictionary
-				┠╴entities          int         entities simulated this tick
-				┠╴timelines         int         rewindable entities recorded this tick
-				┠╴corrections       int         total corrections
-				┠╴installs          int         total server states written onto simulated entities
-				┠╴max_replay_depth  int         most ticks replayed at once
-				┠╴consumed          int         total inputs the server used
-				┠╴missing           int         total input ticks that never arrived
-				┠╴folded            int         physics frames merged into an existing input
-				┠╴joint             Dictionary  totals for bodies simulated together
-				┠╴pending_actions   int         actions waiting to run
-				┠╴effects_armed     int         effects waiting to be confirmed or denied
-				┖╴gate_fallbacks    int         actions that ran without all their state
-				[/codeblock]
+				Calls [param confirmed] or [param denied] when the effect [param key] resolves. When [method lagcomp_action_deny],[method NetwActionContext.deny], [method lagcomp_action_request], [method NetwAction.request] or an assignment of [member MultiplayerAPI.multiplayer_peer] resolves it outside a poll and a network tick, they run as that call returns. When a host's own [method lagcomp_action_request] runs its handler at once, a [method NetwActionContext.deny] inside that handler runs them as the request returns. Otherwise they run when the poll or the run of network ticks in progress ends, or at the end of the next one. Returns [code]false[/code] when the effect is not pending.
 			</description>
 		</method>
 		<method name="lagcomp_rewind">
@@ -1147,116 +1064,6 @@
 				Stops recording the history of [param entity].
 			</description>
 		</method>
-		<method name="liveness_allocate_route">
-			<return type="int" />
-			<param index="0" name="wrapper" type="Object" />
-			<description>
-				Returns the route bound to [param wrapper]. Reserves and binds a route when needed. Repeated calls for one entity return the same route.
-			</description>
-		</method>
-		<method name="liveness_bind_route">
-			<return type="bool" />
-			<param index="0" name="route" type="int" />
-			<param index="1" name="wrapper" type="Object" />
-			<description>
-				Gives [param route] to [param wrapper].
-			</description>
-		</method>
-		<method name="liveness_claim_routes">
-			<return type="PackedInt64Array" />
-			<param index="0" name="count" type="int" />
-			<description>
-				Creates [param count] routes with no node attached, for example to address table rows. Release them with [method liveness_release_routes]. Returns an empty array on a client.
-				[b]Server Only.[/b]
-			</description>
-		</method>
-		<method name="liveness_get_entities" qualifiers="const">
-			<return type="NetwEntity[]" />
-			<description>
-				Every live [NetwEntity] on this peer, sorted by route.
-			</description>
-		</method>
-		<method name="liveness_get_routes" qualifiers="const">
-			<return type="PackedInt32Array" />
-			<description>
-				Every live route on this peer, in no particular order.
-			</description>
-		</method>
-		<method name="liveness_pending_live_count" qualifiers="const">
-			<return type="int" />
-			<description>
-				How many [method liveness_when_live] callbacks are still waiting.
-			</description>
-		</method>
-		<method name="liveness_poll_now">
-			<return type="void" />
-			<description>
-				Times out the [method liveness_when_live] callbacks whose deadline has passed.
-			</description>
-		</method>
-		<method name="liveness_release_routes">
-			<return type="int" enum="Error" />
-			<param index="0" name="routes" type="PackedInt64Array" />
-			<description>
-				Releases [param routes] from [method liveness_claim_routes], removes their table rows, and tells every peer. A released route is never reused.
-				[codeblock lang=text]
-				Error
-				┠╴OK                the routes were released
-				┖╴ERR_UNCONFIGURED  called on a client
-				[/codeblock]
-			</description>
-		</method>
-		<method name="liveness_reserve_route">
-			<return type="int" />
-			<description>
-				Returns a new route without attaching anything to it. Routes are never reused.
-			</description>
-		</method>
-		<method name="liveness_route_of" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="wrapper" type="Object" />
-			<description>
-				The route bound to [param wrapper], or [code]0[/code].
-			</description>
-		</method>
-		<method name="liveness_route_state" qualifiers="const">
-			<return type="int" enum="NetwMultiplayer.EntityState" />
-			<param index="0" name="route" type="int" />
-			<description>
-				The [enum EntityState] of [param route].
-			</description>
-		</method>
-		<method name="liveness_when_live">
-			<return type="void" />
-			<param index="0" name="route" type="int" />
-			<param index="1" name="callback" type="Callable" />
-			<param index="2" name="timeout_ticks" type="int" default="0" />
-			<param index="3" name="on_timeout" type="Callable" default="Callable()" />
-			<description>
-				Calls [param callback] once [param route] has an entity. Calls [param on_timeout] instead after [param timeout_ticks]. [code]0[/code] waits one second.
-			</description>
-		</method>
-		<method name="of" qualifiers="static">
-			<return type="MultiplayerAPI" />
-			<param index="0" name="node" type="Node" />
-			<description>
-				Returns the session [param node] belongs to, or [code]null[/code] when it is outside the tree.
-			</description>
-		</method>
-		<method name="peer_ack" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="peer" type="int" />
-			<description>
-				The newest packet sequence [param peer] acknowledged, or [code]-1[/code] when none.
-			</description>
-		</method>
-		<method name="peer_forget">
-			<return type="void" />
-			<param index="0" name="peer" type="int" />
-			<description>
-				Forgets everything about [param peer], including its [NetwPlayer]. It does not disconnect it. Use [method disconnect_peer] for that.
-			</description>
-		</method>
 		<method name="peer_get_bucket">
 			<return type="Variant" />
 			<param index="0" name="peer" type="int" />
@@ -1269,39 +1076,10 @@
 
 				var bucket := api.peer_get_bucket(peer, Bucket) as Bucket
 				[/codeblock]
-				[param bucket_type] must create a [RefCounted]. Returns [code]null[/code] for an unknown peer. [method peer_forget] deletes the bucket.
+				[param bucket_type] must create a [RefCounted]. Returns [code]null[/code] for an unknown peer. The bucket goes when the peer leaves.
 			</description>
 		</method>
-		<method name="peer_get_player">
-			<return type="NetwPlayer" />
-			<param index="0" name="peer" type="int" />
-			<description>
-				Returns the [NetwPlayer] of [param peer], or [code]null[/code] until its join is accepted.
-			</description>
-		</method>
-		<method name="peer_has_bucket" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="peer" type="int" />
-			<param index="1" name="bucket_type" type="Variant" />
-			<description>
-				Returns [code]true[/code] when [param peer] has a [param bucket_type] bucket. Does not create one.
-			</description>
-		</method>
-		<method name="peer_join_address">
-			<return type="String" />
-			<description>
-				The address other players use to join this session, such as a host and port for [ENetMultiplayerPeer] or a lobby id. Empty when there is none.
-			</description>
-		</method>
-		<method name="peer_kick">
-			<return type="void" />
-			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="reason" type="String" default="&quot;&quot;" />
-			<description>
-				Disconnects [param peer_id]. When [param reason] is not empty, that peer receives it first. Does nothing on a client.
-			</description>
-		</method>
-		<method name="peer_link_stats" qualifiers="const">
+		<method name="peer_get_link_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="peer" type="int" />
 			<description>
@@ -1323,13 +1101,19 @@
 				Losing packets halves [code]budget_bytes[/code] and [code]budget_bits[/code]. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While [code]debt_bytes[/code] is above zero, volatile properties wait, and retained properties and RPCs still go.
 			</description>
 		</method>
-		<method name="peer_request_kick">
-			<return type="void" />
-			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="reason" type="String" default="&quot;&quot;" />
+		<method name="peer_get_player" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="peer" type="int" />
 			<description>
-				Asks the server to kick [param peer_id]. The server receives [signal NetwSession.kick_requested] and decides.
-				[b]Player request.[/b]
+				Returns the id of the player connected through [param peer], or [code]0[/code] until its join is accepted.
+			</description>
+		</method>
+		<method name="peer_set_bandwidth">
+			<return type="void" />
+			<param index="0" name="peer" type="int" />
+			<param index="1" name="kbps" type="int" />
+			<description>
+				Sets how many kilobits a second this peer may send to [param peer]. [code]0[/code] returns it to [member NetwSessionConfig.bandwidth_kbps]. See [method NetwSession.set_peer_bandwidth].
 			</description>
 		</method>
 		<method name="persist_flush_all">
@@ -1339,11 +1123,25 @@
 				[b]Server Only.[/b]
 			</description>
 		</method>
+		<method name="persist_get_database" qualifiers="const">
+			<return type="RID" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				The database [param entity] is saved to, or an invalid [RID] when it is not persistent. See [member NetwPersistence.database].
+			</description>
+		</method>
 		<method name="persist_get_record_id" qualifiers="const">
 			<return type="StringName" />
 			<param index="0" name="entity" type="RID" />
 			<description>
 				The key [param entity] is saved under, or empty when it is not persistent.
+			</description>
+		</method>
+		<method name="persist_get_schema" qualifiers="const">
+			<return type="RID" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				The schema [param entity] is saved with, or an invalid [RID] when it is not persistent. See [member NetwPersistence.schema].
 			</description>
 		</method>
 		<method name="persist_is_dirty">
@@ -1369,19 +1167,74 @@
 				[b]Server Only.[/b]
 			</description>
 		</method>
-		<method name="player_get_entities">
-			<return type="NetwEntity[]" />
-			<param index="0" name="peer" type="int" />
+		<method name="player_find_account" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="account" type="String" />
 			<description>
-				Every entity spawned for the player of [param peer] with [method Netw.spawn_player], in no particular order.
+				Returns the id of the player signed in as [param account], or [code]0[/code] when no player is.
+			</description>
+		</method>
+		<method name="player_get_account" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns the account the player whose id is [param player] signed in with, the same as [member NetwPlayer.account].
+			</description>
+		</method>
+		<method name="player_get_account_name" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns the display name of the account of [param player], the same as [member NetwPlayer.account_name].
+			</description>
+		</method>
+		<method name="player_get_entities">
+			<return type="RID[]" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns every entity spawned for [param player] with [method Netw.spawn_player], in no particular order.
+			</description>
+		</method>
+		<method name="player_get_local">
+			<return type="int" />
+			<description>
+				Returns the id of this peer's player, or [code]0[/code] on a dedicated server and before its join is accepted.
+			</description>
+		</method>
+		<method name="player_get_peer" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns the peer [param player] is connected through, or [code]0[/code] for an unknown id.
+			</description>
+		</method>
+		<method name="player_get_scene">
+			<return type="RID" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns the [RID] of the [NetwScene] [param player] is in, or an empty [RID] when the player is in none or has left.
+			</description>
+		</method>
+		<method name="player_get_username" qualifiers="const">
+			<return type="StringName" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns the name [param player] joined with, the same as [member NetwPlayer.username].
+			</description>
+		</method>
+		<method name="player_is_active" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="player" type="int" />
+			<description>
+				Returns [code]true[/code] while [param player] is in the session, the same as [member NetwPlayer.is_active].
 			</description>
 		</method>
 		<method name="player_kick">
 			<return type="int" enum="Error" />
-			<param index="0" name="player" type="NetwPlayer" />
+			<param index="0" name="player" type="int" />
 			<param index="1" name="reason" type="String" default="&quot;&quot;" />
 			<description>
-				Removes [param player] from the session and disconnects their peer with [param reason].
+				Removes the player whose id is [param player] from the session and disconnects their peer with [param reason].
 				[codeblock lang=text]
 				Error
 				┠╴OK                      the player was kicked
@@ -1389,6 +1242,21 @@
 				┖╴ERR_INVALID_PARAMETER   unknown player, or the server's own player
 				[/codeblock]
 				[b]Server Only.[/b]
+			</description>
+		</method>
+		<method name="player_list" qualifiers="const">
+			<return type="PackedInt64Array" />
+			<description>
+				Returns the id of every player whose join was accepted. A connected peer that has not joined is not here.
+			</description>
+		</method>
+		<method name="player_request_kick">
+			<return type="void" />
+			<param index="0" name="player" type="int" />
+			<param index="1" name="reason" type="String" default="&quot;&quot;" />
+			<description>
+				Asks the server to kick the player whose id is [param player]. The server receives [signal NetwSession.kick_requested] and decides.
+				[b]Player request.[/b]
 			</description>
 		</method>
 		<method name="predict_declare">
@@ -1406,25 +1274,64 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="predict_engine_seated" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns [code]true[/code] when this peer predicts [param entity]. Entities controlled by other peers usually return [code]false[/code].
-			</description>
-		</method>
-		<method name="predict_flush_tap">
-			<return type="void" />
-			<description>
-				Writes the buffered prediction log to disk now. It is also written every second.
-			</description>
-		</method>
 		<method name="predict_get_param">
 			<return type="Variant" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="param" type="int" enum="NetwMultiplayer.PredictParam" />
 			<description>
 				Returns one prediction setting of [param entity], or [code]null[/code].
+			</description>
+		</method>
+		<method name="predict_get_reachability">
+			<return type="Dictionary" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns, property by property, whether the prediction settings of [param entity] take effect, or an empty [Dictionary] before it is predicted. A row's [code]class[/code] names a [enum NetwPropertyConfig.PropertyClass] value.
+				[codeblock lang=text]
+				Dictionary
+				┠╴entity      StringName  the entity's name
+				┠╴schedule    StringName  TICK or FRAME
+				┠╴breach      Dictionary
+				┃ ┠╴response     StringName  DEMOTE or PREDICT_THROUGH
+				┃ ┖╴declared_by  StringName  what set the breach response
+				┠╴domain      Dictionary
+				┃ ┠╴island                StringName  exact, approximate or none
+				┃ ┖╴contact_window_ticks  int         ticks a contact holds corrections off
+				┠╴transport   bool        true when a correction path callback is set
+				┠╴fields      Dictionary  one row per state property, keyed by its name
+				┃ ┖╴row
+				┃   ┠╴class                 StringName         the property class
+				┃   ┠╴triggers              bool               whether it can force a correction alone
+				┃   ┠╴tolerance             float              the divergence epsilon in force
+				┃   ┠╴tolerance_declared    bool               true when the property set its own
+				┃   ┠╴teleport_at           float              the teleport distance in force
+				┃   ┠╴teleport_at_declared  bool               true when the property set its own
+				┃   ┠╴in_tier               bool               whether it is in the tier being compared
+				┃   ┠╴operators             PackedStringArray  what may write it during a recovery
+				┃   ┖╴forward_model         Dictionary         kind, live and why
+				┖╴findings    Array       one entry per problem found in the settings
+				  ┖╴finding
+				    ┠╴code      StringName         which check found it, such as unobserved
+				    ┠╴severity  StringName         debug, warning or error
+				    ┠╴fields    PackedStringArray  the state properties it applies to
+				    ┖╴message   String             what is wrong and how to fix it
+				[/codeblock]
+			</description>
+		</method>
+		<method name="predict_get_recovery_policy">
+			<return type="int" enum="NetwPrediction.RecoveryPolicy" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns the [enum NetwPrediction.RecoveryPolicy] that [param entity] actually uses, with [constant NetwPrediction.RECOVERY_POLICY_AUTO] resolved from its body and schedule.
+			</description>
+		</method>
+		<method name="predict_get_sensor">
+			<return type="Variant" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="name" type="StringName" />
+			<param index="2" name="default" type="Variant" default="null" />
+			<description>
+				Returns the value the sensor [param name] of [param entity] sampled before the current step, or [param default] when nothing sampled it.
 			</description>
 		</method>
 		<method name="predict_get_stats">
@@ -1434,24 +1341,18 @@
 				Returns the [member NetwPrediction.stats] of [param entity], or [code]null[/code] when it does not predict.
 			</description>
 		</method>
-		<method name="predict_get_stepper" qualifiers="const">
-			<return type="NetwPhysicsStepper" />
-			<param index="0" name="space" type="RID" />
+		<method name="predict_is_declared" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="entity" type="RID" />
 			<description>
-				Returns the [NetwPhysicsStepper] installed on the physics [param space], or [code]null[/code]. Without one, [constant NetwSimulation.SCHEDULE_STEPPED] runs as [constant NetwSimulation.SCHEDULE_FRAME].
+				Returns [code]true[/code] while [param entity] is declared with [method predict_declare], whichever peer controls it.
 			</description>
 		</method>
-		<method name="predict_get_tap_cost" qualifiers="const">
-			<return type="Dictionary" />
+		<method name="predict_notify_contact">
+			<return type="void" />
+			<param index="0" name="entity" type="RID" />
 			<description>
-				Returns what the prediction log has cost so far, or an empty [Dictionary] when it is off.
-				[codeblock lang=text]
-				Dictionary
-				┠╴bytes            int     bytes written
-				┠╴lines            int     lines written
-				┠╴drains           int     how many times it was written out
-				┖╴mean_drain_usec  float   average time of one write, in microseconds
-				[/codeblock]
+				Holds off small corrections of [param entity] for [member NetwPrediction.collision_cooldown_ticks]. Call it on the controlling client when the predicted body collides.
 			</description>
 		</method>
 		<method name="predict_set_correction_path_callback">
@@ -1471,12 +1372,18 @@
 			</description>
 		</method>
 		<method name="predict_set_param">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="param" type="int" enum="NetwMultiplayer.PredictParam" />
 			<param index="2" name="value" type="Variant" />
 			<description>
 				Changes one prediction setting of [param entity].
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the setting changed
+				┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+				┖╴ERR_INVALID_PARAMETER  param is unknown
+				[/codeblock]
 			</description>
 		</method>
 		<method name="predict_set_sensor_callback">
@@ -1512,57 +1419,13 @@
 				Turns off prediction for [param entity].
 			</description>
 		</method>
-		<method name="property_path" qualifiers="static">
-			<return type="NodePath" />
-			<param index="0" name="source" type="Object" />
-			<param index="1" name="property" type="StringName" />
-			<param index="2" name="base" type="Object" />
-			<description>
-				Returns the path to [param property] of [param source], relative to [param base], such as [code]"Body:position"[/code]. Empty when either node is freed.
-			</description>
-		</method>
-		<method name="property_set_add_column">
-			<return type="int" />
-			<param index="0" name="set" type="RID" />
-			<param index="1" name="column" type="int" />
-			<description>
-				Adds the schema's [param column] to [param set] and returns its index. Returns [code]-1[/code] when the set is sealed, the column is unknown, or already added.
-			</description>
-		</method>
-		<method name="property_set_create">
-			<return type="RID" />
-			<param index="0" name="schema" type="RID" />
-			<param index="1" name="record" type="int" enum="NetwMultiplayer.RecordKind" />
-			<description>
-				Creates an empty set of synchronized properties for [param schema]. Add properties with [method property_set_add_column], then call [method property_set_seal]. Returns an invalid [RID] when [param schema] is unknown or has an array column.
-			</description>
-		</method>
-		<method name="property_set_get_wire_hash" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="set" type="RID" />
-			<description>
-				A hash of the properties of [param set] and their order. Two peers with the same hash read each other's packets correctly. Returns [code]0[/code] for an unknown set.
-			</description>
-		</method>
-		<method name="property_set_seal">
-			<return type="int" enum="Error" />
-			<param index="0" name="set" type="RID" />
-			<description>
-				Locks [param set] so no more properties can be added.
-				[codeblock lang=text]
-				Error
-				┠╴OK                  the set was sealed
-				┖╴ERR_DOES_NOT_EXIST  the set does not exist
-				[/codeblock]
-			</description>
-		</method>
 		<method name="rpc_call">
 			<return type="void" />
 			<param index="0" name="callable" type="Callable" />
 			<param index="1" name="args" type="Array" />
 			<param index="2" name="peer" type="int" />
 			<description>
-				Calls [param callable] with [param args] as an RPC on [param peer], or on every peer from [method rpc_get_recipients] when [param peer] is [code]0[/code]. The node must belong to an entity, and the method must be an RPC. A [NetwEntity] in [param args] arrives as the receiver's own [NetwEntity].
+				Calls [param callable] with [param args] as an RPC on [param peer], or on every peer from [method entity_get_recipients] when [param peer] is [code]0[/code]. The node must belong to an entity, and the method must be an RPC. A [NetwEntity] in [param args] arrives as the receiver's own [NetwEntity].
 			</description>
 		</method>
 		<method name="rpc_channel_register">
@@ -1571,14 +1434,7 @@
 			<param index="1" name="handler" type="Callable" />
 			<param index="2" name="defer_when_unknown" type="bool" default="false" />
 			<description>
-				Calls [param handler] as [code]handler(entity, payload, sender)[/code] for every packet on [param channel], which must be between 100 and 254. When [param defer_when_unknown] is [code]true[/code], a packet for an entity that is not spawned yet waits for it.
-			</description>
-		</method>
-		<method name="rpc_get_recipients">
-			<return type="PackedInt32Array" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Returns the peers an RPC on [param entity] is sent to, which is every connected peer except this one. Offline, it returns [code][1][/code]. Use [method interest_player_sees] to ask who can see the entity.
+				Calls [param handler] as [code]handler(entity, payload, sender)[/code] for every packet on [param channel], which must be between 100 and 254. When [param defer_when_unknown] is [code]true[/code], a packet for an entity that is not spawned yet waits for it. A later registration on the same [param channel] replaces this one, including one from [method NetwChannel.register].
 			</description>
 		</method>
 		<method name="rpc_request_call">
@@ -1602,22 +1458,20 @@
 				[param timeout_seconds] works as in [method rpc_request_call]. A [code]call_local[/code] method also runs on this peer, as for [method Netw.request_all].
 			</description>
 		</method>
-		<method name="scene_declare">
+		<method name="rpc_send">
 			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
+			<param index="0" name="peer" type="int" />
+			<param index="1" name="channel" type="int" />
+			<param index="2" name="payload" type="PackedByteArray" />
+			<param index="3" name="reliable" type="bool" default="true" />
+			<param index="4" name="batched" type="bool" default="false" />
 			<description>
-				Makes [param entity] a multiplayer scene that replicates its nodes to the players in it. Call it before [method entity_bind_node]. A client can only declare an entity that has a route from the server. [method scene_undeclare] reverses it.
-				[codeblock]
-				var mirror := api.entity_create()
-				api.entity_bind_route(mirror, route) # the server's route
-				api.scene_declare(mirror)
-				[/codeblock]
+				Sends [param payload] to [param peer] on [param channel], which must be between 100 and 254. A [param peer] of [code]0[/code] sends to every peer. The handler from [method rpc_channel_register] receives it. With [param batched], it is sent at the end of the frame together with other data, in fewer packets. [method NetwChannel.send] calls this.
 				[codeblock lang=text]
 				Error
-				┠╴OK                  the entity is a scene
-				┠╴ERR_UNAUTHORIZED    called on a client without the entity's route
-				┠╴ERR_DOES_NOT_EXIST  the entity does not exist
-				┖╴ERR_UNCONFIGURED    the entity already has a node
+				┠╴OK                     the payload was sent or queued
+				┠╴ERR_INVALID_PARAMETER  channel is outside 100 to 254
+				┖╴ERR_UNCONFIGURED       the session cannot send yet
 				[/codeblock]
 			</description>
 		</method>
@@ -1625,14 +1479,7 @@
 			<return type="RID" />
 			<param index="0" name="stem" type="StringName" />
 			<description>
-				Returns the newest scene whose root node is named [param stem], or an invalid [RID]. Use [method scene_find_all] when several copies may exist.
-			</description>
-		</method>
-		<method name="scene_find_all">
-			<return type="RID[]" />
-			<param index="0" name="stem" type="StringName" />
-			<description>
-				Returns every scene whose root node is named [param stem].
+				Returns the newest scene whose root node is named [param stem], or an invalid [RID].
 			</description>
 		</method>
 		<method name="scene_get_entities">
@@ -1649,25 +1496,11 @@
 				Returns the display name of [param scene]. Two copies of one scene share a name.
 			</description>
 		</method>
-		<method name="scene_get_layer">
-			<return type="RID" />
-			<param index="0" name="scene" type="RID" />
-			<description>
-				Returns the [NetwInterestLayer] that decides who sees [param scene].
-			</description>
-		</method>
 		<method name="scene_get_local_player_entities">
-			<return type="NetwEntity[]" />
+			<return type="RID[]" />
 			<param index="0" name="scene" type="RID" />
 			<description>
 				Returns the entities in [param scene] spawned for this peer's player.
-			</description>
-		</method>
-		<method name="scene_get_node" qualifiers="const">
-			<return type="Node" />
-			<param index="0" name="scene" type="RID" />
-			<description>
-				Returns the root node of [param scene], or [code]null[/code].
 			</description>
 		</method>
 		<method name="scene_get_param">
@@ -1679,45 +1512,52 @@
 			</description>
 		</method>
 		<method name="scene_get_player_entities">
-			<return type="NetwEntity[]" />
+			<return type="RID[]" />
 			<param index="0" name="scene" type="RID" />
 			<description>
-				The entities in [param scene] spawned for a player with [method Netw.spawn_player]. [member player_entities] contains them from every live scene.
+				Returns the entities in [param scene] spawned for a player with [method Netw.spawn_player].
+			</description>
+		</method>
+		<method name="scene_get_root" qualifiers="const">
+			<return type="Node" />
+			<param index="0" name="scene" type="RID" />
+			<description>
+				Returns the node [param scene] was declared on, or [code]null[/code].
 			</description>
 		</method>
 		<method name="scene_get_viewers">
-			<return type="NetwPlayer[]" />
+			<return type="PackedInt64Array" />
 			<param index="0" name="scene" type="RID" />
 			<description>
-				Returns the players who see [param scene].
+				Returns the [member NetwPlayer.id] of every player who sees [param scene].
 			</description>
 		</method>
-		<method name="scene_is_declared" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="entity" type="RID" />
+		<method name="scene_get_world" qualifiers="const">
+			<return type="Node" />
+			<param index="0" name="scene" type="RID" />
 			<description>
-				Returns [code]true[/code] when [param entity] is a multiplayer scene.
+				Returns the [SubViewport] that gives [param scene] its own world, or [code]null[/code] when the scene shares the game's world. See [method NetwSceneConfig.isolated].
+			</description>
+		</method>
+		<method name="scene_is_live" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="scene" type="RID" />
+			<description>
+				Returns [code]true[/code] from the moment the root of [param scene] enters the tree until the scene is removed.
+			</description>
+		</method>
+		<method name="scene_is_watching" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="scene" type="RID" />
+			<param index="1" name="player" type="int" />
+			<description>
+				Returns [code]true[/code] when the player with id [param player] receives [param scene], either through [method scene_watch] or because one of their entities is in it.
 			</description>
 		</method>
 		<method name="scene_list">
 			<return type="RID[]" />
 			<description>
 				Returns every scene in the tree, in no particular order.
-			</description>
-		</method>
-		<method name="scene_observe">
-			<return type="void" />
-			<param index="0" name="scene" type="RID" />
-			<param index="1" name="event" type="int" enum="NetwScene.SceneEvent" />
-			<param index="2" name="callback" type="Callable" />
-			<description>
-				Calls [param callback] when [param event] happens on [param scene]. Adding the same callback twice has no effect. Return [code]true[/code] from [param callback] to stop receiving events. [method scene_unobserve] removes it.
-			</description>
-		</method>
-		<method name="scene_presented" qualifiers="const">
-			<return type="RID" />
-			<description>
-				Returns the scene this peer displays, or an invalid [RID]. See [member NetwPlayer.scene].
 			</description>
 		</method>
 		<method name="scene_set_param">
@@ -1736,130 +1576,51 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="scene_subscribes" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="scene" type="RID" />
-			<param index="1" name="peer" type="int" />
-			<description>
-				Returns [code]true[/code] when [param peer] receives [param scene], for any reason.
-			</description>
-		</method>
-		<method name="scene_undeclare">
+		<method name="scene_unwatch">
 			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
+			<param index="0" name="scene" type="RID" />
+			<param index="1" name="player" type="int" />
 			<description>
-				Reverses [method scene_declare], with the same rules.
+				Reverses [method scene_watch] for the player with id [param player]. A player with an entity in the scene keeps receiving it.
 				[codeblock lang=text]
 				Error
-				┠╴OK                  the entity is no longer a scene
-				┠╴ERR_UNAUTHORIZED    called on a client without the entity's route
-				┠╴ERR_DOES_NOT_EXIST  the entity does not exist
-				┖╴ERR_UNCONFIGURED    the entity already has a node
+				┠╴OK                     the watch is withdrawn, or there was none
+				┠╴ERR_UNAUTHORIZED       called on a client
+				┠╴ERR_INVALID_PARAMETER  the session holds no player with this id
+				┖╴ERR_DOES_NOT_EXIST     the scene has no node
 				[/codeblock]
-			</description>
-		</method>
-		<method name="scene_unobserve">
-			<return type="void" />
-			<param index="0" name="scene" type="RID" />
-			<param index="1" name="event" type="int" enum="NetwScene.SceneEvent" />
-			<param index="2" name="callback" type="Callable" />
-			<description>
-				Removes a [param callback] added with [method scene_observe].
-			</description>
-		</method>
-		<method name="scene_unwatch">
-			<return type="bool" />
-			<param index="0" name="scene" type="RID" />
-			<param index="1" name="peer" type="int" />
-			<description>
-				Reverses [method scene_watch]. A peer with an entity spawned for it in the scene keeps receiving it. Returns [code]false[/code] when the scene does not exist.
 				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="scene_watch">
 			<return type="int" enum="Error" />
 			<param index="0" name="scene" type="RID" />
-			<param index="1" name="peer" type="int" />
+			<param index="1" name="player" type="int" />
 			<description>
-				Replicates [param scene] to [param peer] until [method scene_unwatch], without moving any of its player entities. Applies immediately.
+				Replicates [param scene] to the player with id [param player] until [method scene_unwatch], without moving any of their entities. Applies immediately.
 				[codeblock lang=text]
 				Error
-				┠╴OK                     the peer receives the scene
+				┠╴OK                     the player receives the scene
 				┠╴ERR_UNAUTHORIZED       called on a client
-				┠╴ERR_INVALID_PARAMETER  peer is 0
+				┠╴ERR_INVALID_PARAMETER  the session holds no player with this id
 				┠╴ERR_DOES_NOT_EXIST     the scene has no node
-				┖╴ERR_UNAVAILABLE        the peer still does not receive it
+				┖╴ERR_UNAVAILABLE        the player still does not receive it
 				[/codeblock]
 				[b]Server Only.[/b]
 			</description>
 		</method>
-		<method name="schema_add_column">
-			<return type="int" />
-			<param index="0" name="schema" type="RID" />
-			<param index="1" name="key" type="StringName" />
-			<param index="2" name="type" type="int" enum="NetwMultiplayer.ColumnType" />
-			<param index="3" name="stride" type="int" default="1" />
-			<description>
-				Adds the column [param key] to [param schema] and returns its index. [param stride] is how many values each row holds. Returns [code]-1[/code] for a duplicate key, an invalid type or stride, or a sealed schema.
-			</description>
-		</method>
-		<method name="schema_create">
+		<method name="schema_declare">
 			<return type="RID" />
-			<param index="0" name="name" type="StringName" />
+			<param index="0" name="schema" type="NetwSchema" />
 			<description>
-				Returns the schema called [param name], creating it if needed. Calling it again lets the columns be declared again, as after a script reload.
+				Registers [param schema] under its name and returns the schema this session holds for that name. When a schema with that name is already registered, that one is kept. Returns an invalid [RID] for a null [param schema] or one with an empty [member NetwSchema.schema_name]. It creates no [NetwTable].
 			</description>
 		</method>
 		<method name="schema_find" qualifiers="const">
 			<return type="RID" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Returns the schema called [param name], or an invalid [RID]. See [method schema_find_or_adopt].
-			</description>
-		</method>
-		<method name="schema_find_or_adopt">
-			<return type="RID" />
-			<param index="0" name="name" type="StringName" />
-			<description>
-				Like [method schema_find], and also finds a [NetwSchema] declared after the session started, for example in a [code]static var[/code]. Returns an invalid [RID] when none exists.
-			</description>
-		</method>
-		<method name="schema_get_column_count" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="schema" type="RID" />
-			<description>
-				The number of columns in [param schema], or [code]0[/code].
-			</description>
-		</method>
-		<method name="schema_get_column_key" qualifiers="const">
-			<return type="StringName" />
-			<param index="0" name="schema" type="RID" />
-			<param index="1" name="column" type="int" />
-			<description>
-				The key of [param column], or empty.
-			</description>
-		</method>
-		<method name="schema_get_column_stride" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="schema" type="RID" />
-			<param index="1" name="column" type="int" />
-			<description>
-				How many values each row holds in [param column], or [code]0[/code].
-			</description>
-		</method>
-		<method name="schema_get_column_type" qualifiers="const">
-			<return type="int" enum="NetwMultiplayer.ColumnType" />
-			<param index="0" name="schema" type="RID" />
-			<param index="1" name="column" type="int" />
-			<description>
-				The type of [param column], or [code]-1[/code].
-			</description>
-		</method>
-		<method name="schema_get_hash" qualifiers="const">
-			<return type="int" />
-			<param index="0" name="schema" type="RID" />
-			<description>
-				A hash of the columns of [param schema], or [code]0[/code] before [method schema_seal].
+				Returns the schema called [param name], or an invalid [RID]. A [NetwSchema] declared after the session started is found once [method schema_declare] registers it.
 			</description>
 		</method>
 		<method name="schema_get_name" qualifiers="const">
@@ -1869,35 +1630,12 @@
 				The name of [param schema], or empty.
 			</description>
 		</method>
-		<method name="schema_seal">
-			<return type="int" enum="Error" />
-			<param index="0" name="schema" type="RID" />
-			<description>
-				Locks the columns of [param schema].
-				[codeblock lang=text]
-				Error
-				┠╴OK                       the schema is sealed
-				┠╴ERR_DOES_NOT_EXIST       the schema does not exist
-				┠╴ERR_INVALID_DECLARATION  the schema has too many columns
-				┖╴ERR_UNCONFIGURED         the columns differ from the last time it was sealed
-				[/codeblock]
-			</description>
-		</method>
-		<method name="schema_set_column_quantizer">
-			<return type="void" />
-			<param index="0" name="schema" type="RID" />
-			<param index="1" name="column" type="int" />
-			<param index="2" name="quantizer" type="NetwQuantize" />
-			<description>
-				Compresses [param column] with [param quantizer]. Has no effect after [method schema_seal].
-			</description>
-		</method>
 		<method name="send_auth">
 			<return type="int" enum="Error" />
 			<param index="0" name="id" type="int" />
 			<param index="1" name="data" type="PackedByteArray" />
 			<description>
-				Same as [method SceneMultiplayer.send_auth]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member inner].
+				Same as [method SceneMultiplayer.send_auth]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no wrapped [SceneMultiplayer].
 			</description>
 		</method>
 		<method name="send_bytes">
@@ -1910,49 +1648,16 @@
 				Same as [method SceneMultiplayer.send_bytes]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member MultiplayerAPI.multiplayer_peer]. Networked reserves twelve first bytes, [code]0x4E[/code], [code]0x56[/code], [code]0x57[/code], [code]0x58[/code], [code]0x6E[/code], [code]0x76[/code], [code]0x77[/code], [code]0x78[/code], [code]0x8E[/code], [code]0x96[/code], [code]0x97[/code] and [code]0x98[/code]. A packet that starts with one of them never reaches [signal peer_packet], so give a raw packet a first byte of your own.
 			</description>
 		</method>
-		<method name="send_to">
-			<return type="int" enum="Error" />
-			<param index="0" name="peer" type="int" />
-			<param index="1" name="route" type="int" />
-			<param index="2" name="channel" type="int" />
-			<param index="3" name="payload" type="PackedByteArray" />
-			<param index="4" name="reliable" type="bool" />
-			<param index="5" name="comp" type="int" default="0" />
-			<param index="6" name="path" type="String" default="&quot;&quot;" />
-			<param index="7" name="batched" type="bool" default="false" />
-			<description>
-				Sends [param payload] on [param channel] to [param peer], about the entity at [param route]. A payload for this peer is handled locally. When a clock runs, some channels wait and send together at the next tick.
-				[codeblock lang=text]
-				Error
-				┠╴OK                     the payload was sent or queued
-				┠╴ERR_INVALID_PARAMETER  route is negative
-				┖╴ERR_UNCONFIGURED       the session cannot send yet
-				[/codeblock]
-			</description>
-		</method>
-		<method name="service_clear">
-			<return type="void" />
-			<description>
-				Removes every service without emitting signals.
-			</description>
-		</method>
 		<method name="service_get" qualifiers="const">
-			<return type="Variant" />
+			<return type="Node" />
 			<param index="0" name="type" type="Object" />
 			<description>
-				Returns the service registered as [param type], a script or a class, or [code]null[/code]. A freed service returns [code]null[/code].
-			</description>
-		</method>
-		<method name="service_get_all" qualifiers="const">
-			<return type="Node[]" />
-			<param index="0" name="base" type="Object" />
-			<description>
-				Every service whose script is or extends [param base], in registration order.
+				Returns the service [Node] registered as [param type], a script or a class, or [code]null[/code]. A freed service returns [code]null[/code].
 			</description>
 		</method>
 		<method name="service_register">
 			<return type="void" />
-			<param index="0" name="service" type="Object" />
+			<param index="0" name="service" type="Node" />
 			<param index="1" name="type" type="Object" default="null" />
 			<description>
 				Registers [param service] as [param type], or as its own script when [code]null[/code]. Registering it again has no effect.
@@ -1960,51 +1665,16 @@
 		</method>
 		<method name="service_unregister">
 			<return type="void" />
-			<param index="0" name="service" type="Object" />
+			<param index="0" name="service" type="Node" />
 			<param index="1" name="type" type="Object" default="null" />
 			<description>
 				Reverses [method service_register], if [param type] is still registered to [param service].
 			</description>
 		</method>
-		<method name="session_cancel_deferred">
-			<return type="void" />
-			<param index="0" name="key" type="StringName" />
+		<method name="session_get_app_id" qualifiers="const">
+			<return type="StringName" />
 			<description>
-				Removes the call queued under [param key] by [method session_defer].
-			</description>
-		</method>
-		<method name="session_defer">
-			<return type="void" />
-			<param index="0" name="fn" type="Callable" />
-			<param index="1" name="key" type="StringName" default="&amp;&quot;&quot;" />
-			<description>
-				Queues [param fn] to run at the next [method session_flush_deferred]. A [param key] already queued moves to the back and runs once. Calls queued while flushing run in the same flush.
-			</description>
-		</method>
-		<method name="session_flush_deferred">
-			<return type="void" />
-			<description>
-				Runs every call queued with [method session_defer] until none are left. This is where the session reacts to nodes added, moved or freed. The session calls it every frame. Call it to see the result of tree changes before then.
-				Do not call it from [signal Node.tree_entered] or [signal Node.tree_exiting], since a [method Node.reparent] may be half done. An error is pushed if calls keep queueing themselves forever.
-			</description>
-		</method>
-		<method name="session_flush_tick">
-			<return type="int" enum="Error" />
-			<param index="0" name="tick" type="int" />
-			<description>
-				Sends everything for [param tick]. The session calls it at the end of every tick. Call it only when driving ticks without the clock. Returns the error of [method interest_flush_now] when that fails.
-			</description>
-		</method>
-		<method name="session_get_all" qualifiers="static">
-			<return type="MultiplayerAPI[]" />
-			<description>
-				Every session that exists, in the order they were created.
-			</description>
-		</method>
-		<method name="session_get_authored_role" qualifiers="const">
-			<return type="int" enum="NetwSession.Role" />
-			<description>
-				The role the game asked for in [member NetwSessionConfig.desired_role]. [member role] is the role the session actually has.
+				Returns [member NetwSessionConfig.app_id], the id that names this game and build.
 			</description>
 		</method>
 		<method name="session_get_config" qualifiers="const">
@@ -2027,10 +1697,59 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="session_is_active" qualifiers="const">
+		<method name="session_get_role" qualifiers="const">
+			<return type="int" enum="NetwSession.Role" />
+			<description>
+				Returns the [enum NetwSession.Role] of this peer. [method MultiplayerAPI.is_server] and [method session_is_local_client] are usually what a game wants.
+			</description>
+		</method>
+		<method name="session_get_root" qualifiers="const">
+			<return type="Node" />
+			<description>
+				Returns the node the session runs under, at [member root_path]. It is the root window or a [MultiplayerViewport].
+			</description>
+		</method>
+		<method name="session_get_server_info" qualifiers="const">
+			<return type="NetwServerInfo" />
+			<description>
+				Returns a copy of [member NetwSessionConfig.server_info] with [member NetwServerInfo.players], [member NetwServerInfo.app_id] and [member NetwServerInfo.is_local_listener] filled in from the session. A server browser receives it after [method Netw.configure_server_info] changes it.
+			</description>
+		</method>
+		<method name="session_get_state" qualifiers="const">
+			<return type="int" enum="NetwSession.State" />
+			<description>
+				Returns the [enum NetwSession.State] the session is in, the same as [member NetwSession.state].
+			</description>
+		</method>
+		<method name="session_get_stats">
+			<return type="Dictionary" />
+			<description>
+				Returns every [enum Stat] value, keyed by the lowercase constant name, such as [code]sent_bytes[/code].
+			</description>
+		</method>
+		<method name="session_is_local_client" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Returns [code]true[/code] when [method SceneTree.get_multiplayer] returns this session for its root path.
+				Returns [code]true[/code] when this peer has its own player, at [constant NetwSession.ROLE_CLIENT] and [constant NetwSession.ROLE_LISTEN_SERVER]. Ask [member NetwEntity.is_controlled_locally] whether an entity is this player's.
+			</description>
+		</method>
+		<method name="session_is_online" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the session is at [constant NetwSession.STATE_ONLINE], the same as [member NetwSession.is_online].
+			</description>
+		</method>
+		<method name="session_is_paused" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the server has paused the session with [method session_pause].
+			</description>
+		</method>
+		<method name="session_of" qualifiers="static">
+			<return type="NetwMultiplayer" />
+			<param index="0" name="node" type="Node" default="null" />
+			<description>
+				Returns the session [param node] is in, or [code]null[/code] when it is outside the tree. A [code]null[/code] [param node] returns the only running session, or reports an error and returns [code]null[/code] when there is not exactly one.
 			</description>
 		</method>
 		<method name="session_leave">
@@ -2044,6 +1763,14 @@
 				if left.result != OK:
 				    push_error("still online: %s" % error_string(left.result))
 				[/codeblock]
+			</description>
+		</method>
+		<method name="session_pause">
+			<return type="void" />
+			<param index="0" name="reason" type="String" default="&quot;&quot;" />
+			<description>
+				Pauses the session on every peer with [param reason]. See [method NetwSession.pause].
+				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="session_prepare_join">
@@ -2063,20 +1790,6 @@
 				[b]Player request.[/b]
 			</description>
 		</method>
-		<method name="session_set_role">
-			<return type="void" />
-			<param index="0" name="role" type="int" enum="NetwSession.Role" />
-			<description>
-				Sets [member role], which also sets [member is_local_client]. The session sets it when a peer is assigned.
-			</description>
-		</method>
-		<method name="session_set_root">
-			<return type="void" />
-			<param index="0" name="reader" type="Callable" />
-			<description>
-				Sets the function [member root] calls to find its node. [param reader] takes no arguments and returns a [Node].
-			</description>
-		</method>
 		<method name="session_set_server_info">
 			<return type="void" />
 			<param index="0" name="info" type="NetwServerInfo" />
@@ -2084,18 +1797,25 @@
 				Sets the [NetwServerInfo] this host shows in server browsers, for example after a player names their server. [param info] is copied. [code]null[/code] clears it. A provider from [method Netw.configure_server_info] receives this value and can change it.
 			</description>
 		</method>
-		<method name="session_set_state">
-			<return type="void" />
-			<param index="0" name="state" type="int" enum="NetwSession.State" />
+		<method name="session_step_away">
+			<return type="NetwPromise" />
 			<description>
-				Sets [member state] without checking the change is allowed. Prefer [method session_transition]. [constant NetwSession.STATE_CREATING] is refused with an error.
+				Leaves like [method session_leave], and the server keeps this peer's entities for [member NetwSessionConfig.return_window_seconds]. See [method NetwSession.step_away].
 			</description>
 		</method>
-		<method name="session_transition">
-			<return type="void" />
-			<param index="0" name="state" type="int" enum="NetwSession.State" />
+		<method name="session_transfer_server">
+			<return type="int" enum="Error" />
+			<param index="0" name="player" type="int" />
 			<description>
-				Changes [member state]. A change that is not allowed, or [constant NetwSession.STATE_CREATING], pushes an error and does nothing.
+				Makes the peer of the player whose id is [param player] the server. See [method NetwSession.transfer_server] for what the [MultiplayerPeer] must support.
+				[b]Server Only.[/b]
+			</description>
+		</method>
+		<method name="session_unpause">
+			<return type="void" />
+			<description>
+				Unpauses every peer that [method session_pause] paused.
+				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="simulation_get_mode">
@@ -2113,13 +1833,52 @@
 				Returns one simulation setting of [param entity], or [code]null[/code].
 			</description>
 		</method>
+		<method name="simulation_get_schedule">
+			<return type="int" enum="NetwSimulation.Schedule" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns the schedule [param entity] runs on here, with [constant NetwSimulation.SCHEDULE_AUTO] resolved to the schedule it picked.
+			</description>
+		</method>
+		<method name="simulation_get_selected">
+			<return type="RID[]" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns the entities [param entity] simulates on this peer right now, the same set as [member NetwSimulation.selected].
+			</description>
+		</method>
+		<method name="simulation_select">
+			<return type="int" enum="Error" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="other" type="RID" />
+			<param index="2" name="pick" type="int" enum="NetwMultiplayer.SimPick" />
+			<description>
+				Names [param other] as a body [param entity] simulates with [constant SIM_PICK_CHOSEN], or drops that name with [constant SIM_PICK_FORGET]. Both entities must be live in the same scene to choose. The choice is kept until it is forgotten, and [method simulation_get_selected] shows what it selects.
+			</description>
+		</method>
+		<method name="simulation_select_layer">
+			<return type="int" enum="Error" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="layer" type="RID" />
+			<param index="2" name="pick" type="int" enum="NetwMultiplayer.SimPick" />
+			<description>
+				With [constant SIM_PICK_CHOSEN], [param entity] simulates every entity it shares [param layer] with, or every layer it is in when [param layer] is an empty [RID]. With [constant SIM_PICK_FORGET], [param layer] is ignored and every layer pick is cleared. For a predicted entity, this also turns off the default selection of every layer it is in, even though that default was never made with [constant SIM_PICK_CHOSEN]. Entities named with [method simulation_select] stay selected. Returns [constant @GlobalScope.ERR_INVALID_PARAMETER] when [param entity] is not live or [param layer] is not in this session.
+			</description>
+		</method>
 		<method name="simulation_set_param">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="param" type="int" enum="NetwMultiplayer.SimulationParam" />
 			<param index="2" name="value" type="Variant" />
 			<description>
 				Changes one simulation setting of [param entity].
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the setting changed
+				┠╴ERR_DOES_NOT_EXIST     entity is not in this session
+				┠╴ERR_LOCKED             bodies changed after the entity entered the tree
+				┖╴ERR_INVALID_PARAMETER  param is unknown
+				[/codeblock]
 			</description>
 		</method>
 		<method name="simulation_set_step_callback">
@@ -2128,6 +1887,24 @@
 			<param index="1" name="callback" type="Callable" />
 			<description>
 				Sets [member NetwSimulation.step] on [param entity].
+			</description>
+		</method>
+		<method name="spawn_call">
+			<return type="RID" />
+			<param index="0" name="function" type="Callable" />
+			<param index="1" name="args" type="Array" default="[]" />
+			<param index="2" name="player" type="int" default="0" />
+			<description>
+				Calls [param function] with [param args] on every peer, and returns the entity it made here, or an empty [RID] when nothing spawned. A nonzero [param player] is the id of the player the entity belongs to, and the entity despawns with that player. An id the session does not hold spawns nothing, and raises an error unless that player left the session. [method Netw.spawn] and [method Netw.spawn_player] call this and describe the rules.
+			</description>
+		</method>
+		<method name="spawn_call_async">
+			<return type="NetwPromise" />
+			<param index="0" name="function" type="Callable" />
+			<param index="1" name="args" type="Array" default="[]" />
+			<description>
+				Like [method spawn_call], and [param function] may await. The [NetwPromise] settles with the node once [param function] returns on this peer. [method Netw.spawn_async] calls this.
+				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="spawn_register_constructor">
@@ -2144,9 +1921,9 @@
 			<return type="RID" />
 			<param index="0" name="id" type="StringName" />
 			<param index="1" name="args" type="Array" default="[]" />
-			<param index="2" name="owner" type="Object" default="null" />
+			<param index="2" name="player" type="int" default="0" />
 			<description>
-				Spawns by calling the function registered as [param id] with [param args] on every peer. Returns the local entity.
+				Spawns by calling the function registered as [param id] with [param args] on every peer. Returns the local entity, or an empty [RID] when nothing spawned. A nonzero [param player] is the id of the player the entity belongs to, as in [method spawn_call].
 			</description>
 		</method>
 		<method name="stats_get">
@@ -2159,10 +1936,32 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="stats_snapshot">
-			<return type="Dictionary" />
+		<method name="sync_send_property">
+			<return type="void" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="node" type="Node" />
+			<param index="2" name="property" type="StringName" />
 			<description>
-				Every [enum Stat] value, keyed by the lowercase constant name, such as [code]sent_bytes[/code].
+				Sends the current value of [param property] on [param node], a node of [param entity], once to the peers connected now. [method Netw.sync_property] calls this and describes who may send.
+			</description>
+		</method>
+		<method name="sync_send_signal">
+			<return type="void" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="node" type="Node" />
+			<param index="2" name="signal" type="StringName" />
+			<param index="3" name="args" type="Array" default="[]" />
+			<description>
+				Emits [param signal] on [param node], a node of [param entity], with [param args] on every peer. [method Netw.emit_entity_signal] calls this.
+			</description>
+		</method>
+		<method name="table_claim_routes">
+			<return type="PackedInt64Array" />
+			<param index="0" name="table" type="RID" />
+			<param index="1" name="count" type="int" />
+			<description>
+				Creates [param count] routes to address rows of [param table]. Each route is unique in the session, including the routes [method table_load] gives its rows. Release them with [method table_release_routes]. Returns an empty array on a client or when [param table] is not in this session.
+				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="table_commit">
@@ -2178,25 +1977,19 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="table_create">
-			<return type="RID" />
-			<param index="0" name="schema" type="RID" />
-			<description>
-				Returns the table for [param schema], creating it if needed. [param schema] must be sealed.
-			</description>
-		</method>
-		<method name="table_find" qualifiers="const">
-			<return type="RID" />
-			<param index="0" name="name" type="StringName" />
-			<description>
-				Returns the table for the schema called [param name], or an invalid [RID].
-			</description>
-		</method>
 		<method name="table_find_or_adopt">
 			<return type="RID" />
 			<param index="0" name="name" type="StringName" />
 			<description>
-				Like [method table_find], and also creates the table for a [NetwSchema] declared after the session started. Declare every schema before going online, so all peers number their tables the same way.
+				Returns the table for the schema called [param name], creating it for a [NetwSchema] declared after the session started, or an invalid [RID]. Declare every schema before going online, so all peers number their tables the same way.
+			</description>
+		</method>
+		<method name="table_get_param" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="table" type="RID" />
+			<param index="1" name="param" type="int" enum="NetwMultiplayer.TableParam" />
+			<description>
+				Returns one setting of [param table], or [code]null[/code] when [param param] is unknown.
 			</description>
 		</method>
 		<method name="table_get_row" qualifiers="const">
@@ -2275,6 +2068,21 @@
 				The routes stored in [param table], in row order.
 			</description>
 		</method>
+		<method name="table_release_routes">
+			<return type="int" enum="Error" />
+			<param index="0" name="table" type="RID" />
+			<param index="1" name="routes" type="PackedInt64Array" />
+			<description>
+				Releases [param routes] from [method table_claim_routes]. Their rows leave every table that holds them, not only [param table], and every peer is told. A released route is never reused.
+				[codeblock lang=text]
+				Error
+				┠╴OK                  the routes were released
+				┠╴ERR_DOES_NOT_EXIST  table is not in this session
+				┖╴ERR_UNCONFIGURED    called on a client
+				[/codeblock]
+				[b]Server Only.[/b]
+			</description>
+		</method>
 		<method name="table_save">
 			<return type="NetwPromise" />
 			<param index="0" name="table" type="RID" />
@@ -2287,12 +2095,18 @@
 			</description>
 		</method>
 		<method name="table_set_param">
-			<return type="void" />
+			<return type="int" enum="Error" />
 			<param index="0" name="table" type="RID" />
 			<param index="1" name="param" type="int" enum="NetwMultiplayer.TableParam" />
 			<param index="2" name="value" type="Variant" />
 			<description>
 				Changes one setting of [param table].
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the setting changed
+				┠╴ERR_DOES_NOT_EXIST     table is not in this session
+				┖╴ERR_INVALID_PARAMETER  param is unknown
+				[/codeblock]
 			</description>
 		</method>
 		<method name="table_write_column">
@@ -2338,6 +2152,22 @@
 				Cancels the [method transport_create_peer] request [param ticket]. Its callback receives [code](null, ERR_SKIP, "")[/code]. Does nothing once the callback has started.
 			</description>
 		</method>
+		<method name="transport_complete">
+			<return type="void" />
+			<param index="0" name="ticket" type="RID" />
+			<param index="1" name="error" type="int" enum="Error" />
+			<param index="2" name="result" type="Variant" default="null" />
+			<param index="3" name="message" type="String" default="&quot;&quot;" />
+			<description>
+				Settles the request [param ticket] that a transport is working on. [method NetwTransport.deliver], [method NetwTransport.deliver_probe] and [method NetwTransport.fail] call it. A ticket that is already settled, cancelled or from another session settles nothing.
+				[codeblock lang=text]
+				error OK, a MultiplayerPeer    the peer is the result of the request
+				error OK, a NetwServerInfo     the server info is the result of a probe
+				error OK, any other result     a peer request fails, a probe finds no server
+				any other error                the request fails with error and message
+				[/codeblock]
+			</description>
+		</method>
 		<method name="transport_create_peer">
 			<return type="RID" />
 			<param index="0" name="transport" type="RID" />
@@ -2372,11 +2202,30 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="transport_find_script" qualifiers="const">
+			<return type="RID" />
+			<param index="0" name="type" type="Script" />
+			<description>
+				Returns the transport [method transport_register] registered for the [NetwTransport] script [param type], or an invalid [RID].
+			</description>
+		</method>
 		<method name="transport_get_defaults">
 			<return type="Dictionary" />
 			<param index="0" name="transport" type="RID" />
 			<description>
 				The flat form of [method NetwConnection.defaults].
+			</description>
+		</method>
+		<method name="transport_get_join_address">
+			<return type="String" />
+			<description>
+				The flat form of reading [member NetwConnection.join_address].
+			</description>
+		</method>
+		<method name="transport_get_max_players" qualifiers="const">
+			<return type="int" />
+			<description>
+				The flat form of [member NetwConnection.max_players].
 			</description>
 		</method>
 		<method name="transport_get_param">
@@ -2393,6 +2242,13 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="transport_get_peer_diagnostics">
+			<return type="Dictionary" />
+			<param index="0" name="peer" type="int" />
+			<description>
+				The flat form of [method NetwConnection.diagnostics].
+			</description>
+		</method>
 		<method name="transport_host">
 			<return type="NetwPromise" />
 			<param index="0" name="transport" type="RID" />
@@ -2401,19 +2257,25 @@
 				The flat form of [method NetwConnection.host].
 			</description>
 		</method>
-		<method name="transport_join">
-			<return type="NetwPromise" />
-			<param index="0" name="transport" type="RID" />
-			<param index="1" name="address" type="String" />
-			<param index="2" name="settings" type="Dictionary" default="{}" />
-			<description>
-				Joins [param address] through [param transport], as [method NetwConnection.join] joins a listed row.
-			</description>
-		</method>
 		<method name="transport_list">
 			<return type="Array" />
 			<description>
 				Every available transport, the registered ones first, then those from a [LobbyDirectory]. Any other [MultiplayerPeer] still works when assigned directly.
+			</description>
+		</method>
+		<method name="transport_publish_targets">
+			<return type="void" />
+			<param index="0" name="transport" type="RID" />
+			<param index="1" name="targets" type="Dictionary[]" />
+			<description>
+				Lists [param targets] as the [NetwEndpoint] rows of [param transport], and removes the rows it listed before that [param targets] leaves out. [method NetwTransport.publish_targets] calls it.
+				[codeblock lang=text]
+				Array[Dictionary]
+				┖╴target
+				  ┠╴address       String          the address a player joins
+				  ┠╴display_name  String          what a server browser draws in the row
+				  ┖╴info          NetwServerInfo  what the server advertises, or null
+				[/codeblock]
 			</description>
 		</method>
 		<method name="transport_register">
@@ -2430,12 +2292,35 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="transport_report_progress">
+			<return type="void" />
+			<param index="0" name="ticket" type="RID" />
+			<param index="1" name="message" type="String" />
+			<param index="2" name="ratio" type="float" default="-1.0" />
+			<description>
+				Reports progress on the request [param ticket] through [signal NetwConnection.progressed], while it is the host or join in progress. [method NetwTransport.report] calls it.
+			</description>
+		</method>
 		<method name="transport_set_defaults">
 			<return type="int" enum="Error" />
 			<param index="0" name="transport" type="RID" />
 			<param index="1" name="settings" type="Dictionary" />
 			<description>
 				The flat form of [method NetwConnection.set_defaults].
+			</description>
+		</method>
+		<method name="transport_set_join_address">
+			<return type="int" enum="Error" />
+			<param index="0" name="address" type="String" />
+			<description>
+				The flat form of setting [member NetwConnection.join_address]. Every admitted client receives the new address.
+				[codeblock lang=text]
+				Error
+				┠╴OK                     the address changed
+				┠╴ERR_UNAVAILABLE        the session is not online, or this peer is not the server
+				┖╴ERR_INVALID_PARAMETER  address is longer than 1023 bytes of UTF-8
+				[/codeblock]
+				[b]Server Only.[/b]
 			</description>
 		</method>
 		<method name="transport_unregister">
@@ -2458,7 +2343,7 @@
 	</methods>
 	<members>
 		<member name="allow_object_decoding" type="bool" setter="set_allow_object_decoding" getter="is_object_decoding_allowed" default="false">
-			Same as [member SceneMultiplayer.allow_object_decoding], applied to [member inner].
+			Same as [member SceneMultiplayer.allow_object_decoding].
 		</member>
 		<member name="auth_callback" type="Callable" setter="set_auth_callback" getter="get_auth_callback" default="Callable()">
 			Same as [member SceneMultiplayer.auth_callback]. It runs first on each link and receives what the other peer passed to [method send_auth]. The join continues once the game calls [method complete_auth], so the [method Netw.configure_admission] handler runs after it. Set the same callback on every peer, or the join is refused with [constant @GlobalScope.ERR_UNCONFIGURED].
@@ -2466,70 +2351,33 @@
 		<member name="auth_timeout" type="float" setter="set_auth_timeout" getter="get_auth_timeout" default="3.0">
 			Seconds a peer has from connecting until a link is admitted, or [code]0[/code] for no limit. On the server it is a joining client's deadline unless [method NetwAdmissionConfig.timeout] is declared, and the server tells the client that deadline. A client uses its own value until the server first replies, and on links to other clients. A join that passes its deadline is refused with [constant @GlobalScope.ERR_TIMEOUT].
 		</member>
-		<member name="connected_players" type="NetwPlayer[]" setter="" getter="player_all" default="[]">
-			Every player, sorted by peer id. Same as [member players], except that a player who is leaving stays here a little longer.
-		</member>
-		<member name="inner" type="SceneMultiplayer" setter="session_set_inner" getter="session_get_inner">
-			The [SceneMultiplayer] this session wraps. It owns the [MultiplayerPeer], the connection and authentication. Never [code]null[/code].
-		</member>
-		<member name="is_local_client" type="bool" setter="" getter="get_is_local_client" default="false">
-			[code]true[/code] when this peer has its own player, which is at [constant NetwSession.ROLE_CLIENT] and [constant NetwSession.ROLE_LISTEN_SERVER]. It reads the same for every entity, so ask [member NetwEntity.is_controlled_locally] whether an entity is this player's.
-		</member>
-		<member name="is_online" type="bool" setter="" getter="get_is_online" default="false">
-			[code]true[/code] when [member state] is [constant NetwSession.STATE_ONLINE].
-		</member>
-		<member name="local_player" type="NetwPlayer" setter="" getter="player_local">
-			The accepted [NetwPlayer] for this peer, or [code]null[/code] before its join is accepted.
-		</member>
 		<member name="max_delta_packet_size" type="int" setter="set_max_delta_packet_size" getter="get_max_delta_packet_size" default="65535">
-			Same as [member SceneMultiplayer.max_delta_packet_size], applied to [member inner].
+			Same as [member SceneMultiplayer.max_delta_packet_size].
 		</member>
 		<member name="max_sync_packet_size" type="int" setter="set_max_sync_packet_size" getter="get_max_sync_packet_size" default="1350">
 			Same as [member SceneMultiplayer.max_sync_packet_size]. Networked also keeps its own synchronization packets under this size.
 		</member>
-		<member name="player_entities" type="NetwEntity[]" setter="" getter="scene_player_entities_all" default="[]">
-			Every entity spawned for a player with [method Netw.spawn_player], in every scene. Entities in different scenes can share a [member NetwEntity.name].
-		</member>
-		<member name="players" type="NetwPlayer[]" setter="" getter="player_joined_all" default="[]">
-			Every player whose join was accepted. A connected peer that has not joined is not here.
-		</member>
 		<member name="refuse_new_connections" type="bool" setter="set_refuse_new_connections" getter="is_refusing_new_connections" default="false">
 			Same as [member SceneMultiplayer.refuse_new_connections]. [LocalMultiplayerPeer] ignores it. Use [method Netw.configure_admission] to decide who can join.
 		</member>
-		<member name="relay_sender" type="int" setter="" getter="rpc_get_relay_sender" default="0">
-			The peer that sent the RPC being run, like [method MultiplayerAPI.get_remote_sender_id].
-		</member>
-		<member name="role" type="int" setter="" getter="session_get_role" enum="NetwSession.Role" default="0">
-			What this peer is in the session. [method MultiplayerAPI.is_server] and [member is_local_client] are usually what a game wants.
-			- [constant NetwSession.ROLE_NONE] no session
-			- [constant NetwSession.ROLE_CLIENT] a client
-			- [constant NetwSession.ROLE_DEDICATED_SERVER] a server with no player
-			- [constant NetwSession.ROLE_LISTEN_SERVER] a server that also plays
-		</member>
-		<member name="root" type="Node" setter="" getter="session_root">
-			The node at [member root_path], which is the root window or a [MultiplayerViewport]. [method session_set_root] can change how it is found.
-		</member>
 		<member name="root_path" type="NodePath" setter="set_root_path" getter="get_root_path" default="NodePath(&quot;/root&quot;)">
-			Same as [member SceneMultiplayer.root_path], applied to [member inner]. It starts at [code]/root[/code], the path [method SceneTree.set_multiplayer] gives a session that covers the whole tree.
+			Same as [member SceneMultiplayer.root_path]. It starts at [code]/root[/code], the path [method SceneTree.set_multiplayer] gives a session that covers the whole tree.
 		</member>
 		<member name="server_relay" type="bool" setter="set_server_relay_enabled" getter="is_server_relay_enabled" default="true">
-			Same as [member SceneMultiplayer.server_relay], applied to [member inner].
-		</member>
-		<member name="state" type="int" setter="" getter="session_get_state" enum="NetwSession.State" default="0">
-			Same as [member NetwSession.state].
+			Same as [member SceneMultiplayer.server_relay].
 		</member>
 	</members>
 	<signals>
 		<signal name="peer_authenticating">
 			<param index="0" name="id" type="int" />
 			<description>
-				Same as [signal SceneMultiplayer.peer_authenticating], from [member inner].
+				Same as [signal SceneMultiplayer.peer_authenticating].
 			</description>
 		</signal>
 		<signal name="peer_authentication_failed">
 			<param index="0" name="id" type="int" />
 			<description>
-				Same as [signal SceneMultiplayer.peer_authentication_failed], from [member inner].
+				Same as [signal SceneMultiplayer.peer_authentication_failed].
 			</description>
 		</signal>
 		<signal name="peer_packet">
@@ -2575,10 +2423,10 @@
 			A peer stopped seeing an entity through a layer.
 		</constant>
 		<constant name="EVENT_OBSERVER_ENTERED" value="18" enum="Event">
-			A peer started seeing an entity, along with [signal NetwInterest.observer_entered].
+			A peer started seeing an entity through a layer. It is recorded wherever [signal NetwInterest.observer_entered] is emitted, even when nothing is connected to that signal.
 		</constant>
 		<constant name="EVENT_OBSERVER_LEFT" value="19" enum="Event">
-			A peer stopped seeing an entity, along with [signal NetwInterest.observer_exited].
+			A peer stopped seeing an entity through a layer. It is recorded wherever [signal NetwInterest.observer_exited] is emitted, even when nothing is connected to that signal.
 		</constant>
 		<constant name="EVENT_INTEREST_COMMIT" value="20" enum="Event">
 			Pending layer changes were applied.
@@ -2712,15 +2560,6 @@
 		<constant name="TABLE_PARAM_RELIABLE" value="0" enum="TableParam">
 			[bool]. Sends [method table_commit] reliably. Use it for a table that changes rarely, not for one committed every tick.
 		</constant>
-		<constant name="RECORD_KIND_STATE" value="1" enum="RecordKind">
-			State the server owns and sends to everyone, such as a position. It is kept for rewinding.
-		</constant>
-		<constant name="RECORD_KIND_INPUT" value="2" enum="RecordKind">
-			Input a client sends to the server only, such as movement keys. It is kept for rewinding.
-		</constant>
-		<constant name="RECORD_KIND_BROADCAST" value="3" enum="RecordKind">
-			Cosmetic values sent to everyone and not kept, such as an aim direction.
-		</constant>
 		<constant name="ENTITY_STATE_UNKNOWN" value="0" enum="EntityState">
 			This peer has never heard of the route.
 		</constant>
@@ -2735,6 +2574,33 @@
 		</constant>
 		<constant name="ENTITY_STATE_ABSENT" value="4" enum="EntityState">
 			The entity still exists, but this client does not see it. It can become visible again. See [signal NetwEntity.hidden].
+		</constant>
+		<constant name="ENTITY_PARAM_AUTHORITY" value="0" enum="EntityParam">
+			The entity's [enum NetwEntity.Authority]. Can only be set before the node enters the tree. See [member NetwEntity.authority].
+		</constant>
+		<constant name="ENTITY_PARAM_TRANSFER" value="1" enum="EntityParam">
+			The entity's [enum NetwEntity.Transfer]. See [member NetwEntity.transfer].
+		</constant>
+		<constant name="ENTITY_PARAM_ON_CONTROLLER_DISCONNECT" value="2" enum="EntityParam">
+			The entity's [enum NetwEntity.DisconnectRule]. See [member NetwEntity.on_controller_disconnect].
+		</constant>
+		<constant name="ENTITY_PARAM_ON_PARENT_DESPAWN" value="3" enum="EntityParam">
+			The entity's [enum NetwEntity.ParentDespawnRule]. See [member NetwEntity.on_parent_despawn].
+		</constant>
+		<constant name="ENTITY_PARAM_HOLD" value="4" enum="EntityParam">
+			The [enum NetwEntity.Hold] of the entity's controller. It can only be read, and [method entity_request_control] changes it. See [member NetwEntity.hold].
+		</constant>
+		<constant name="ENTITY_PARAM_REPLICATION_PRIORITY" value="5" enum="EntityParam">
+			[float] weight above zero. See [member NetwEntity.replication_priority].
+		</constant>
+		<constant name="CONTROL_STATE_SETTLED" value="0" enum="ControlState">
+			No request or release from this peer is waiting, and the controller holds the entity with [constant NetwEntity.HOLD_NONE].
+		</constant>
+		<constant name="CONTROL_STATE_PENDING" value="1" enum="ControlState">
+			A request or release from this peer is waiting for the server's decision. See [member NetwEntity.is_control_pending].
+		</constant>
+		<constant name="CONTROL_STATE_HELD" value="2" enum="ControlState">
+			No request or release from this peer is waiting, and the controller holds the entity with [constant NetwEntity.HOLD_SOFT] or [constant NetwEntity.HOLD_EXCLUSIVE].
 		</constant>
 		<constant name="LAYER_PARAM_POLICY" value="0" enum="LayerParam">
 			The layer's [enum NetwInterestLayer.LayerPolicy].
@@ -2779,10 +2645,13 @@
 			The address of the endpoint. Read-only.
 		</constant>
 		<constant name="ENDPOINT_PARAM_DISPLAY_NAME" value="2" enum="EndpointParam">
-			The name shown in a server browser. The only property [method endpoint_set_param] can change.
+			The name shown in a server browser. Read-only.
 		</constant>
 		<constant name="ENDPOINT_PARAM_SOURCE" value="3" enum="EndpointParam">
 			The display name of the [LobbyDirectory] that listed the endpoint, or [code]""[/code] when the game added it. Read-only.
+		</constant>
+		<constant name="ENDPOINT_PARAM_INVITED_BY" value="4" enum="EndpointParam">
+			The sender's display name while [constant ENDPOINT_FLAG_INVITED] is set, or [code]""[/code]. Read-only.
 		</constant>
 		<constant name="ENDPOINT_STATE_FLAGS" value="0" enum="EndpointState">
 			A bitmask of [enum EndpointFlags].
@@ -2801,6 +2670,9 @@
 		</constant>
 		<constant name="ENDPOINT_FLAG_OBSERVED" value="4" enum="EndpointFlags">
 			The row has an answer, from a probe or from its [LobbyDirectory]. Can be set together with [constant ENDPOINT_FLAG_CALLER].
+		</constant>
+		<constant name="ENDPOINT_FLAG_INVITED" value="8" enum="EndpointFlags">
+			An invitation from [method endpoint_invite] is pending, even one with no sender name. Cleared when joining this endpoint reaches [constant NetwSession.STATE_ONLINE].
 		</constant>
 		<constant name="SCENE_PARAM_LABEL" value="0" enum="SceneParam">
 			[StringName] name of the scene. See [member NetwScene.label].
@@ -2845,13 +2717,13 @@
 			[int] number of recent pings averaged.
 		</constant>
 		<constant name="CLOCK_PARAM_JITTER_STABILITY_THRESHOLD" value="11" enum="ClockParam">
-			[float] seconds of jitter under which [method clock_ingest_pong] reports [code]is_stable[/code].
+			[float] seconds of jitter under which the clock counts the connection as stable.
 		</constant>
 		<constant name="CLOCK_PARAM_USE_PHYSICS_INTERPOLATION" value="12" enum="ClockParam">
 			[bool]. Whether [method clock_get_tick_factor] follows [method Engine.get_physics_interpolation_fraction].
 		</constant>
 		<constant name="CLOCK_PARAM_MANUAL_TICK" value="14" enum="ClockParam">
-			[bool]. When [code]true[/code], ticks only run through [method clock_step].
+			[bool]. When [code]true[/code], ticks only run through [method clock_step]. [member NetwClock.manual_tick] sets it.
 		</constant>
 		<constant name="CLOCK_PARAM_TICK_FACTOR_OVERRIDE" value="15" enum="ClockParam">
 			[float]. A fixed value for [method clock_get_tick_factor]. Negative turns it off.
@@ -2949,71 +2821,17 @@
 		<constant name="SIMULATION_PARAM_MAX_RESTORE_TICKS" value="4" enum="SimulationParam">
 			[int] ticks. [member NetwSimulation.max_restore_ticks].
 		</constant>
-		<constant name="COLUMN_F32" value="0" enum="ColumnType">
-			32-bit float.
+		<constant name="SIMULATION_PARAM_CLAIM_ON_CONTACT" value="5" enum="SimulationParam">
+			[bool]. [member NetwSimulation.claim_on_contact].
 		</constant>
-		<constant name="COLUMN_F64" value="1" enum="ColumnType">
-			64-bit float.
+		<constant name="SIMULATION_PARAM_RELEASE_ON_REST" value="6" enum="SimulationParam">
+			[float] seconds. [member NetwSimulation.release_on_rest].
 		</constant>
-		<constant name="COLUMN_I8" value="2" enum="ColumnType">
-			8-bit signed integer.
+		<constant name="SIM_PICK_CHOSEN" value="0" enum="SimPick">
+			Selects the entity or layer.
 		</constant>
-		<constant name="COLUMN_U8" value="3" enum="ColumnType">
-			8-bit unsigned integer.
-		</constant>
-		<constant name="COLUMN_I16" value="4" enum="ColumnType">
-			16-bit signed integer.
-		</constant>
-		<constant name="COLUMN_U16" value="5" enum="ColumnType">
-			16-bit unsigned integer.
-		</constant>
-		<constant name="COLUMN_I32" value="6" enum="ColumnType">
-			32-bit integer.
-		</constant>
-		<constant name="COLUMN_I64" value="7" enum="ColumnType">
-			64-bit integer.
-		</constant>
-		<constant name="COLUMN_BOOL" value="8" enum="ColumnType">
-			[bool], sent as one bit.
-		</constant>
-		<constant name="COLUMN_VECTOR2" value="9" enum="ColumnType">
-			[Vector2].
-		</constant>
-		<constant name="COLUMN_VECTOR3" value="10" enum="ColumnType">
-			[Vector3].
-		</constant>
-		<constant name="COLUMN_VECTOR4" value="11" enum="ColumnType">
-			[Vector4].
-		</constant>
-		<constant name="COLUMN_COLOR" value="12" enum="ColumnType">
-			[Color].
-		</constant>
-		<constant name="COLUMN_QUATERNION" value="13" enum="ColumnType">
-			[Quaternion], sent compressed.
-		</constant>
-		<constant name="COLUMN_ENTITY" value="14" enum="ColumnType">
-			An entity route. Use [method entity_from_route] to get the entity.
-		</constant>
-		<constant name="COLUMN_VARIANT" value="15" enum="ColumnType">
-			Any [Variant], such as a [Dictionary]. Not allowed in tables.
-		</constant>
-		<constant name="COLUMN_STRING" value="16" enum="ColumnType">
-			[String]. Not allowed in tables.
-		</constant>
-		<constant name="DATABASE_CLOSED" value="0" enum="DatabaseState">
-			No slot is open.
-		</constant>
-		<constant name="DATABASE_OPENING" value="1" enum="DatabaseState">
-			[method database_open] has not finished.
-		</constant>
-		<constant name="DATABASE_OPEN" value="2" enum="DatabaseState">
-			A slot is open.
-		</constant>
-		<constant name="DATABASE_CLOSING" value="3" enum="DatabaseState">
-			[method database_close] is waiting for pending operations.
-		</constant>
-		<constant name="DATABASE_FAULTED" value="4" enum="DatabaseState">
-			The storage is unavailable, and [method database_open] fails with [constant @GlobalScope.ERR_CANT_ACQUIRE_RESOURCE].
+		<constant name="SIM_PICK_FORGET" value="1" enum="SimPick">
+			Drops a selection made with [constant SIM_PICK_CHOSEN]. In [method simulation_select_layer] it clears every layer pick whatever the layer, and also turns off the default every-layer selection of a predicted entity.
 		</constant>
 		<constant name="STAT_DROPS_UNKNOWN_ROUTE" value="0" enum="Stat">
 			Counter. Packets for an unknown route.
@@ -3136,7 +2954,7 @@
 			Counter. Acknowledgements sent in a packet of their own.
 		</constant>
 		<constant name="STAT_PENDING_LIVE" value="40" enum="Stat">
-			Gauge. Callbacks from [method liveness_when_live] still waiting.
+			Gauge. Packets waiting for the entity they name to spawn on this peer.
 		</constant>
 		<constant name="STAT_INTEREST_LAYERS" value="41" enum="Stat">
 			Gauge. Interest layers.
@@ -3307,7 +3125,7 @@
 			Counter. Bytes written but never sent, for example because the peer disconnected.
 		</constant>
 		<constant name="STAT_ROW_FRAMES_DEFERRED" value="97" enum="Stat">
-			Counter. Property updates delayed because the bandwidth limit in [method peer_link_stats] was reached.
+			Counter. Property updates delayed because the bandwidth limit in [method peer_get_link_stats] was reached.
 		</constant>
 		<constant name="STAT_PREDICT_INSTALLS" value="98" enum="Stat">
 			Counter. Server states written onto entities this peer simulates but does not control.

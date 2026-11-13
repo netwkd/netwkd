@@ -20,6 +20,10 @@
 #include "netw/repl/property_binding.hpp"
 #include "netw/session/frames.hpp"
 
+namespace netw_test {
+struct Internals;
+} // namespace netw_test
+
 namespace netw {
 
 class NetwDisplay;
@@ -30,10 +34,6 @@ class NetwPrediction;
 class NetwSimulation;
 class ReplicationCore;
 struct PeerRename;
-
-namespace spawn {
-class Record;
-} // namespace spawn
 
 class NetwEntity : public godot::RefCounted {
     GDCLASS(NetwEntity, godot::RefCounted)
@@ -79,32 +79,18 @@ public:
     using Hold = entity::Control::Hold;
 
 private:
-    struct ControlClaim {
-        uint64_t op = 0;
-        godot::Ref<NetwPromise> promise;
-    };
+    friend class NetwMultiplayer;
+#if defined(NETW_TESTS)
+    friend struct netw_test::Internals;
+#endif
 
-    struct StructureOp {
-        uint64_t base = 0;
-        godot::Ref<NetwPromise> promise;
-    };
-
-    struct HeldClaimImage {
-        int64_t sender = 0;
-        uint64_t observed_revision = 0;
-        int64_t received_tick = -1;
-        godot::PackedByteArray state;
-    };
-
-    NetwEntityRecord *record = nullptr;
-    HeldClaimImage held_claim_image;
-    int64_t claim_image_tick = -1;
-    int64_t claim_image_until = -1;
-    godot::LocalVector<ControlClaim> control_claims;
-    godot::LocalVector<StructureOp> structure_ops;
+    NetwEntityRecord *draft = nullptr;
+    NetwMultiplayer *home = nullptr;
+    godot::RID attached;
     godot::ObjectID owner_id;
     godot::ObjectID session_id;
-    godot::Ref<NetwPlayer> written_player;
+    godot::Ref<NetwPlayer> written_view;
+    int64_t written_player = 0;
     godot::TypedArray<godot::MultiplayerSynchronizer> synchronizers_cache;
     bool synchronizers_dirty = true;
     bool synchronizers_absent = false;
@@ -112,99 +98,18 @@ private:
     bool owner_exiting_tree = false;
     bool despawning_watched = false;
     godot::RID scene_subject;
-    spawn::Record *readmission = nullptr;
-    bool predicted_at_departure = false;
 
-    bool readmit();
+    NetwEntityRecord *get_record() const;
     void readmitted_ready();
-    double replication_priority = 1.0;
     int64_t action_spawn_tick = -1;
     int64_t action_requester = 0;
 
     entity::Control *control() const;
     NetwMultiplayer *session_core() const;
+    void unwrite_player();
     int64_t local_peer() const;
-    ReplicationCore *get_replication_plane() const;
-    void announce_control(int64_t p_was, int64_t p_peer);
-    int64_t resolve_default_controller() const;
-    void project_control(godot::Object *p_announcer);
-    void adopt_controller(int64_t p_peer);
-    void apply_control_change(int64_t p_peer);
-    void decide_control(
-        int64_t p_peer,
-        int64_t p_hold,
-        int64_t p_issuer,
-        uint64_t p_op,
-        const godot::PackedByteArray &p_final_state = godot::PackedByteArray(),
-        bool p_sends_owner = false
-    );
-    entity::Control::Outcome decide_request(
-        int64_t p_requester,
-        uint64_t p_op,
-        int64_t p_hold,
-        int64_t p_source_route = 0
-    );
-    bool controls_source(int64_t p_requester, int64_t p_source_route) const;
-    godot::Ref<NetwPromise> issue_claim(Hold p_hold, int64_t p_source_route);
-    entity::Control::Outcome decide_release(
-        int64_t p_requester,
-        uint64_t p_op,
-        int64_t p_successor,
-        const godot::PackedByteArray &p_final_state
-    );
-    bool holds_copy(int64_t p_peer);
-    godot::LocalVector<repl::PropertyBindingPtr> image_bindings();
-    godot::PackedByteArray state_image(int64_t p_tick, int64_t &r_size);
-    godot::PackedByteArray final_image(int64_t p_tick);
-    int64_t install_final_image(
-        const godot::PackedByteArray &p_final_state,
-        int64_t p_after_tick = -2
-    );
-    void start_claim_images();
-    bool claim_image_admits(int64_t p_sender, uint64_t p_observed) const;
-    void install_claim_image(const godot::PackedByteArray &p_state);
-    void install_held_claim_image(bool p_tenure_changed);
-    void refuse_control(
-        int64_t p_requester,
-        uint64_t p_op,
-        entity::Control::Outcome p_outcome
-    );
-    bool deciding_locally() const;
-    bool immediate_unavailable();
-    godot::Error local_refusal(int64_t p_local, int64_t p_hold);
-    godot::String refusal_detail(int64_t p_hold) const;
-    void send_control_op(
-        const entity::Control::Pending &p_op,
-        int64_t p_successor = 0,
-        const godot::PackedByteArray &p_final_state = godot::PackedByteArray(),
-        int64_t p_source_route = 0
-    );
-    void settle_control(uint64_t p_op, entity::Control::Outcome p_outcome);
-    void settle_claim(
-        const godot::Ref<NetwPromise> &p_promise,
-        const entity::Control::Pending &p_taken,
-        entity::Control::Outcome p_outcome
-    );
-    godot::LocalVector<repl::PropertyBindingPtr> authored_bindings();
-    void follow_claim(bool p_was_ahead);
-    void control_moved();
-    godot::Ref<NetwPromise> take_claim(uint64_t p_op);
     void transition(int64_t p_stage);
-    void linger_then_free(const godot::Ref<NetwDespawnOpts> &p_opts);
     repl::PropertyBindingPtr derived_binding(int64_t p_record) const;
-
-#if defined(NETW_TESTS)
-public:
-    godot::PackedByteArray final_image_under_test(int64_t p_tick) {
-        return final_image(p_tick);
-    }
-    int64_t pending_ops_under_test() const {
-        const entity::Control *held = control();
-        return held == nullptr ? 0 : int64_t(held->pending.size());
-    }
-
-private:
-#endif
 
 protected:
     static void _bind_methods();
@@ -213,19 +118,11 @@ public:
     NetwEntity();
     ~NetwEntity();
 
-    static NetwMultiplayer *session_core_for(godot::Node *p_node);
-
     static godot::Ref<NetwEntity> of(godot::Node *p_node);
     static godot::Ref<NetwEntity> ensure(godot::Node *p_root);
     static godot::Ref<NetwEntity> resolve(godot::Node *p_node);
     static godot::Ref<NetwEntity> declare(godot::Node *p_node);
     static void settle_parts(godot::Node *p_root, bool p_spawned);
-
-    void attach_to(godot::Node *p_root);
-
-    NetwEntityRecord *get_record() const {
-        return record;
-    }
 
     godot::Node *get_owner() const;
     void set_owner(godot::Node *p_owner);
@@ -239,7 +136,6 @@ public:
     int64_t get_route() const;
     void set_route(int64_t p_route);
     godot::RID get_rid_handle() const;
-    void set_rid_handle(const godot::RID &p_handle);
 
     godot::Ref<godot::MultiplayerAPI> get_multiplayer() const;
 
@@ -255,21 +151,11 @@ public:
     void set_on_parent_despawn(ParentDespawnRule p_value);
     Lifecycle get_lifecycle() const;
     void set_lifecycle(Lifecycle p_value);
-    void structure_op_issue(
-        uint64_t p_base,
-        const godot::Ref<NetwPromise> &p_promise
-    );
-    void structure_ops_accept(uint64_t p_revision);
-    bool structure_ops_refuse(
-        uint64_t p_base,
-        godot::Error p_code,
-        const godot::String &p_detail
-    );
     bool has_structure_ops() const {
-        return !structure_ops.is_empty();
+        return !get_record()->get_control_book().structure_ops.is_empty();
     }
     uint32_t structure_ops_outstanding() const {
-        return structure_ops.size();
+        return get_record()->get_control_book().structure_ops.size();
     }
     bool get_declares_scene() const;
     void set_declares_scene(bool p_value);
@@ -281,7 +167,6 @@ public:
     int64_t get_controller() const;
     int64_t steering() const;
     void set_controller(int64_t p_value);
-    void record_controller(int64_t p_value);
     bool get_is_controlled_locally() const;
     godot::Ref<NetwPlayer> get_controller_player() const;
     void set_controller_player(const godot::Ref<NetwPlayer> &p_player);
@@ -301,35 +186,27 @@ public:
     godot::Ref<NetwPromise> claim_control(
         Hold p_hold = entity::Control::HOLD_EXCLUSIVE
     );
-    godot::Ref<NetwPromise> claim_by_contact(
-        const godot::Ref<NetwEntity> &p_source
+    godot::Ref<NetwPromise> release_control(
+        int64_t p_successor = entity::Control::SERVER
     );
-    godot::Ref<NetwPromise> release_control(int64_t p_successor = SERVER_PEER);
     godot::Error transfer_control(int64_t p_peer);
-    godot::Error transfer_steering(int64_t p_steering);
     bool is_controller_here() const;
     bool is_claim_pending() const;
     bool is_claim_running_ahead() const;
-    void apply_control();
     Hold get_hold() const;
     bool get_is_control_pending() const;
     uint64_t get_control_revision() const;
     uint64_t get_control_tenure() const;
-    void seed_control(uint64_t p_revision, uint64_t p_tenure, int64_t p_hold);
-    bool expire_control(int64_t p_tick, int64_t p_deadline);
-    void abandon_claims();
-    void reject_claims(const char *p_detail);
 
     void set_replication_priority(double p_weight);
-    double get_replication_priority() const {
-        return replication_priority;
-    }
+    double get_replication_priority() const;
 
     bool is_on_server() const;
     godot::Ref<NetwPlayer> get_player() const;
     void set_player(const godot::Ref<NetwPlayer> &p_player);
-    const godot::Ref<NetwPlayer> &unbound_player() const {
-        return written_player;
+    godot::Ref<NetwPlayer> unbound_player() const;
+    bool has_unbound_player() const {
+        return written_player != 0;
     }
     bool get_is_player() const;
 
@@ -341,7 +218,6 @@ public:
     void arm(const godot::Ref<NetwMultiplayer> &p_api);
 
     void despawn(const godot::Ref<NetwDespawnOpts> &p_opts);
-    void despawn_here(const godot::Ref<NetwDespawnOpts> &p_opts);
 
     void register_component(godot::Node *p_component);
     godot::NodePath relative_path(
@@ -383,14 +259,7 @@ public:
     bool get_ready_fired() const {
         return ready_once_fired;
     }
-    void descendant_entered(godot::Node *p_node);
-    void tree_entered_edge();
-    void tree_exiting_edge();
     bool belongs_to(NetwMultiplayer *p_branch) const;
-    void keep_readmission(const spawn::Record &p_recipe);
-    void note_departed_prediction(bool p_predicted) {
-        predicted_at_departure = p_predicted;
-    }
     void watch_scene_edges(const godot::RID &p_subject);
     void watch_despawning(bool p_watched);
     bool watches_despawning() const {
@@ -400,34 +269,10 @@ public:
 
     void hydrate_components();
     int64_t comp_structure_hash(const godot::PackedStringArray &p_paths) const;
-    void _handle_control_request(
-        int64_t p_sender,
-        const session::ControlRequest &p_request
-    );
-    void _handle_control_apply(const session::ControlApply &p_applied);
-    void reassign(int64_t p_peer, int64_t p_player_id, int64_t p_controller);
-    void revert_to_server(int64_t p_departed);
-    void restate_control(int64_t p_peer);
-    void _handle_claim_image(
-        int64_t p_sender,
-        const session::ClaimImage &p_image
-    );
-    bool sends_claim_image(int64_t p_tick) const;
-    godot::PackedByteArray claim_image(int64_t p_tick);
-    void _go_live_if_armed();
-    void _remote_despawn(
-        const godot::StringName &p_reason,
-        double p_linger_seconds
-    );
     void _remote_hide();
     void _handle_tree_entered();
     void _handle_tree_exiting();
     void _on_owner_ready();
-    void _on_peer_disconnected(int64_t p_peer_id);
-    bool rename_peers(const PeerRename &p_rename);
-    void follow_rename();
-    void forget_server_claims();
-    void raise_control(uint64_t p_floor);
 };
 
 } // namespace netw

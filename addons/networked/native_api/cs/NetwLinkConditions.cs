@@ -277,6 +277,10 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindSetSeed =
         NetwApi.MethodBind("NetwLinkConditions", "set_seed", 1286410249UL);
 
+    /// <summary>
+    /// The random seed for loss, duplication, reordering, jitter and stalls, so
+    /// the same seed drops and delays the same packets every run.
+    /// </summary>
     public long Seed
     {
         get

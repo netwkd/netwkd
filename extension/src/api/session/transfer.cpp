@@ -124,9 +124,6 @@ void NetwMultiplayer::session_rename_peers(
             continue;
         }
         row.value.peer = renamed;
-        if (row.value.row.is_valid()) {
-            row.value.row->rebind_peer(renamed);
-        }
     }
     p_rename.rekey(player_id_of_peer);
     p_rename.rekey(peer_buckets);
@@ -140,7 +137,7 @@ void NetwMultiplayer::session_rename_peers(
     LocalVector<Ref<NetwEntity>> live;
     transfer_live_entities(live);
     for (const Ref<NetwEntity> &entity : live) {
-        if (entity->rename_peers(p_rename)) {
+        if (control_rename_peers(entity.ptr(), p_rename)) {
             r_renamed.push_back(entity);
         }
     }
@@ -185,16 +182,17 @@ void NetwMultiplayer::session_follow_relabel(
     int64_t p_successor_was,
     int64_t p_former_now
 ) {
-    if (session_get_state() == SESSION_STATE_CONNECTING && !has_server_role()) {
+    if (session_get_stored_state() == SESSION_STATE_CONNECTING
+        && !has_server_role()) {
         session_follow_relabel_pending(p_successor_was);
         return;
     }
-    if (session_get_state() != SESSION_STATE_ONLINE) {
+    if (session_get_stored_state() != SESSION_STATE_ONLINE) {
         NETW_TRACE(
             sys::SESSION,
             "A server transfer arrived while the session is in state %d, so "
             "it was ignored.",
-            session_get_state()
+            session_get_stored_state()
         );
         return;
     }
@@ -268,7 +266,7 @@ void NetwMultiplayer::session_follow_relabel(
     }
 
     for (const Ref<NetwEntity> &entity : renamed) {
-        entity->follow_rename();
+        control_follow_rename(entity.ptr());
         sim_follow_steering(entity.ptr());
     }
     interest_refresh_compat_intents();
@@ -281,7 +279,7 @@ void NetwMultiplayer::session_follow_relabel(
         }
         entity_slots.each([](uint64_t, const EntitySlot &p_slot) {
             if (p_slot.live.is_valid()) {
-                p_slot.live->forget_server_claims();
+                control_forget_server_claims(p_slot.live.ptr());
             }
         });
         scene_viewers_server_generation = 0;
@@ -345,8 +343,8 @@ void NetwMultiplayer::transfer_follow_scenes(bool p_succeeds) {
 }
 
 void NetwMultiplayer::transfer_follow_interest(bool p_succeeds) {
-    for (const KeyValue<int64_t, Ref<NetwInterestLayer>> &view : layer_views) {
-        const StringName layer = view.value->get_layer_id();
+    for (const KeyValue<StringName, RID> &named : layer_by_name) {
+        const StringName layer = named.key;
         const PackedInt64Array held = interest_engine.roster(layer);
         for (int at = 0; at < held.size(); ++at) {
             interest_engine.roster_remove(layer, held[at]);
@@ -418,11 +416,8 @@ void NetwMultiplayer::transfer_follow_players(
             return;
         }
         for (KeyValue<int64_t, PlayerRow> &row : players) {
-            if (row.value.row.is_valid() && row.value.peer != own) {
-                row.value.row->bind_account(
-                    String(),
-                    row.value.row->get_account_name()
-                );
+            if (row.value.peer != own) {
+                row.value.account = String();
             }
         }
         return;
@@ -430,18 +425,13 @@ void NetwMultiplayer::transfer_follow_players(
     LobbyDirectory *directory = session_serving_directory();
     for (KeyValue<int64_t, PlayerRow> &row : players) {
         row.value.handled = row.value.handled || row.value.admitted;
-        if (row.key >= player_incarnation_next) {
-            player_incarnation_next = row.key + 1;
-        }
-        if (directory == nullptr || row.value.row.is_null()) {
+        if (directory == nullptr) {
             continue;
         }
         const String account = directory->account_of(row.value.peer);
         if (!account.is_empty()) {
-            row.value.row->bind_account(
-                account,
-                directory->member_name(row.value.peer)
-            );
+            row.value.account = account;
+            row.value.account_name = directory->member_name(row.value.peer);
         }
     }
 }
@@ -462,12 +452,11 @@ void NetwMultiplayer::session_announce_transfer() {
     if (session_core.is_server_role()) {
         player_despawn_heard_kept();
     }
-    if (session_handle.is_valid()) {
-        session_handle->announce_server_transferred(
-            installed.successor_was,
-            installed.former_now
-        );
-    }
+    Announcement row;
+    row.kind = AnnouncementKind::SERVER_TRANSFERRED;
+    row.successor_was = installed.successor_was;
+    row.former_now = installed.former_now;
+    announce(row);
     if (session_core.is_server_role() && transfer_rejoins()) {
         transfer_run_keep(installed.promoted);
     }
@@ -1000,28 +989,66 @@ void NetwMultiplayer::transfer_raise_reported() {
         }
         const Ref<NetwEntity> entity = NetwEntity::of(node);
         if (noted.value.revision > 0 && entity.is_valid()) {
-            entity->raise_control(noted.value.revision);
+            control_raise(entity.ptr(), noted.value.revision);
         }
     }
     resync_raises.clear();
     spawns->schedule_carrier_flush();
 }
 
-Error NetwMultiplayer::session_transfer_server(int64_t p_peer) {
-    if (!is_online()) {
+Error NetwMultiplayer::session_transfer_server(int64_t p_player) {
+    return session_transfer_from(p_player, false);
+}
+
+Error NetwMultiplayer::session_transfer_from(int64_t p_player, bool p_door) {
+    const String verb = p_door
+        ? String("{NetwSession.transfer_server}")
+        : String("{NetwMultiplayer.session_transfer_server}");
+    const Error ready = session_transfer_ready(verb);
+    if (ready != OK) {
+        return ready;
+    }
+    const bool active = player_is_active(p_player);
+    const int64_t peer = player_get_peer(p_player);
+    if (active && peer == SERVER_PEER) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {verb,
+             "the server's own player",
+             p_door ? String("a client's player")
+                    : String("the id of a client's player")}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    if (!active || !gd::api_peer_ids(inner).has(int32_t(peer))) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {verb,
+             p_door ? String("a player that is not in this session")
+                    : vformat("player %d", p_player),
+             p_door ? String("a connected client's player from "
+                             "{NetwSession.players}")
+                    : String("the id of a connected client's player, such "
+                             "as one from {NetwMultiplayer.player_list}")}
+        );
+        return ERR_INVALID_PARAMETER;
+    }
+    return session_transfer_send(peer);
+}
+
+Error NetwMultiplayer::session_transfer_ready(const String &p_verb) {
+    if (!session_is_online()) {
         fault::raise(
             this,
             NETW_FAULT_NOT_RUNNING,
-            {"{NetwSession.transfer_server}", String(), "the session"}
+            {p_verb, String(), "the session"}
         );
         return ERR_UNAUTHORIZED;
     }
     if (!session_core.is_server_role()) {
-        fault::raise(
-            this,
-            NETW_FAULT_SERVER_ONLY,
-            {"{NetwSession.transfer_server}"}
-        );
+        fault::raise(this, NETW_FAULT_SERVER_ONLY, {p_verb});
         return ERR_UNAUTHORIZED;
     }
     const Ref<MultiplayerPeer> transport = assigned_peer;
@@ -1029,31 +1056,18 @@ Error NetwMultiplayer::session_transfer_server(int64_t p_peer) {
         || !transport->has_method(StringName(VERB_TRANSFER_SERVER))) {
         return ERR_UNAVAILABLE;
     }
-    if (p_peer == SERVER_PEER) {
-        fault::raise(
-            this,
-            NETW_FAULT_BAD_VALUE,
-            {"{NetwSession.transfer_server}",
-             "the server's own peer id",
-             "the peer id of a client"}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
-    if (!gd::api_peer_ids(inner).has(int32_t(p_peer))) {
-        fault::raise(
-            this,
-            NETW_FAULT_UNKNOWN_PEER,
-            {"{NetwSession.transfer_server}", String(), String(), p_peer}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
+    return OK;
+}
+
+Error NetwMultiplayer::session_transfer_send(int64_t p_peer) {
     if (databases.holds_writes()) {
         return ERR_BUSY;
     }
     player_despawn_kept();
     transfer_called = true;
-    const Error answered
-        = Error(int(transport->call(StringName(VERB_TRANSFER_SERVER), p_peer)));
+    const Error answered = Error(
+        int(assigned_peer->call(StringName(VERB_TRANSFER_SERVER), p_peer))
+    );
     if (answered != OK) {
         transfer_called = false;
     }

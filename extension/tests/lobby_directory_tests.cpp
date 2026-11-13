@@ -178,6 +178,9 @@ LawVerdict social_invite(const Stand &) {
         || String(lobby.recorded("invited_by")[0]) != String("Ada")) {
         return law_broken("an invite was not announced with its sender");
     }
+    if (!again->get_is_invited() || !again->get_invited_by().is_empty()) {
+        return law_broken("an invite with no sender name was not pending");
+    }
     if (lobby.connection->endpoints().size() != 1 || !refused) {
         return law_broken("an invite with no address or transport listed");
     }
@@ -285,7 +288,8 @@ const Row ROWS[] = {
      &directory_invite},
     {"a social service invites twice to one ENet address, and once with "
      "no address or transport",
-     "one row is announced each time, and the bad invites list nothing",
+     "one row is announced each time and stays invited with no sender name, "
+     "and the bad invites list nothing",
      &social_invite},
     {"a join the directory refuses with ERR_UNAUTHORIZED",
      "failed and the promise carry the directory's error and reason",

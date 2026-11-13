@@ -14,7 +14,11 @@ namespace Networked;
 /// <see cref="NetwEntity.Scene"/>. An entity declared with
 /// <see cref="Netw.ConfigureScene"/> resolves to itself, any other entity to
 /// its closest scene ancestor. Each scene has one handle, so <c>==</c> compares
-/// scenes. A scene replicates to a player while one of their
+/// scenes. A removed scene, as <see cref="NetwSession.SceneRemoved"/> passes
+/// it, still answers <see cref="NetwScene.Rid"/> and
+/// <see cref="NetwScene.Label"/>, and its <see cref="NetwScene.Root"/>,
+/// <see cref="NetwScene.World"/> and <see cref="NetwScene.Entity"/> are
+/// <c>null</c>. A scene replicates to a player while one of their
 /// <see cref="NetwPlayer.Entities"/> is in it, or while the player watches it
 /// with <see cref="NetwScene.Watch"/>. <see cref="NetwScene.Unwatch"/> does not
 /// remove a player whose entity is still in the scene.
@@ -47,26 +51,6 @@ public sealed class NetwScene : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
-    public enum SceneEvent : long
-    {
-        /// <summary>
-        /// A player started or stopped seeing the scene. The
-        /// <see cref="NetwMultiplayer.SceneObserve"/> callback receives
-        /// <c>(present, peer_id)</c>.
-        /// </summary>
-        Viewer = 0,
-        /// <summary>
-        /// An entity in <see cref="NetwScene.PlayerEntities"/> entered or left.
-        /// The callback receives <c>(present, entity)</c>.
-        /// </summary>
-        PlayerEntity = 1,
-        /// <summary>
-        /// Any entity, player entities included, entered or left. The callback
-        /// receives <c>(present, entity)</c>.
-        /// </summary>
-        Entity = 2,
-    }
-
     public enum SceneIsolation : long
     {
         /// <summary>
@@ -82,7 +66,11 @@ public sealed class NetwScene : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted after <c>entity</c> enters the tree inside this scene.
+    /// Emitted when <c>entity</c> enters the tree inside this scene, at the
+    /// same tree edge as <c>SceneTree.node_added</c>. An entity added while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick
+    /// runs, such as a client building an entity the server spawned, is
+    /// reported when that poll or tick ends.
     /// </summary>
     public event Action<NetwEntity> EntityEntered
     {
@@ -98,7 +86,13 @@ public sealed class NetwScene : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted after <c>entity</c> leaves the tree inside this scene.
+    /// Emitted when <c>entity</c> leaves the tree inside this scene, at the
+    /// same tree edge as <c>SceneTree.node_removed</c>, so
+    /// <see cref="NetwEntity.Root"/> still exists. An entity removed while
+    /// <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/> tick runs
+    /// is reported when that poll or tick ends. An entity removed because the
+    /// session ended can report it with <see cref="NetwEntity.Root"/> already
+    /// freed.
     /// </summary>
     public event Action<NetwEntity> EntityExited
     {
@@ -114,7 +108,8 @@ public sealed class NetwScene : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when <c>entity</c> joins <see cref="NetwScene.PlayerEntities"/>.
+    /// Emitted when <c>entity</c> joins <see cref="NetwScene.PlayerEntities"/>,
+    /// together with <see cref="NetwScene.EntityEntered"/>.
     /// </summary>
     public event Action<NetwEntity> PlayerEntityEntered
     {
@@ -131,7 +126,8 @@ public sealed class NetwScene : NetwRefCounted
 
     /// <summary>
     /// Emitted when <c>entity</c> leaves
-    /// <see cref="NetwScene.PlayerEntities"/>.
+    /// <see cref="NetwScene.PlayerEntities"/>, together with
+    /// <see cref="NetwScene.EntityExited"/>.
     /// </summary>
     public event Action<NetwEntity> PlayerEntityLeft
     {
@@ -148,7 +144,9 @@ public sealed class NetwScene : NetwRefCounted
 
     /// <summary>
     /// Emitted when this scene starts replicating to <c>player</c>.
-    /// <see cref="NetwScene.Viewers"/> already includes them.
+    /// <see cref="NetwScene.Viewers"/> already includes them. A change made
+    /// while <see cref="MultiplayerApi.Poll"/> or a <see cref="NetwClock"/>
+    /// tick runs is reported when that poll or tick ends.
     /// </summary>
     public event Action<NetwPlayer> ViewerEntered
     {
@@ -164,7 +162,10 @@ public sealed class NetwScene : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted when this scene stops replicating to <c>player</c>.
+    /// Emitted when this scene stops replicating to <c>player</c>. A change
+    /// made while <see cref="MultiplayerApi.Poll"/> or a
+    /// <see cref="NetwClock"/> tick runs is reported when that poll or tick
+    /// ends.
     /// </summary>
     public event Action<NetwPlayer> ViewerExited
     {
@@ -183,8 +184,9 @@ public sealed class NetwScene : NetwRefCounted
         NetwApi.MethodBind("NetwScene", "get_rid", 2944877500UL);
 
     /// <summary>
-    /// The <see cref="Rid"/> of the scene's entity, invalid outside a session.
-    /// The <c>scene_*</c> methods of <see cref="NetwMultiplayer"/> take it.
+    /// The <see cref="Rid"/> of the scene, which is also the <see cref="Rid"/>
+    /// of <see cref="NetwScene.Entity"/>, invalid outside a session. The
+    /// <c>scene_*</c> methods of <see cref="NetwMultiplayer"/> take it.
     /// </summary>
     public Rid Rid
     {
@@ -201,7 +203,8 @@ public sealed class NetwScene : NetwRefCounted
 
     /// <summary>
     /// The <see cref="NetwEntity"/> on <see cref="NetwScene.Root"/>, or
-    /// <c>null</c> once the scene is freed.
+    /// <c>null</c> while <see cref="NetwScene.Root"/> is <c>null</c> and once
+    /// the scene is removed.
     /// </summary>
     public NetwEntity Entity
     {
@@ -217,10 +220,11 @@ public sealed class NetwScene : NetwRefCounted
         NetwApi.MethodBind("NetwScene", "get_root", 3160264692UL);
 
     /// <summary>
-    /// The node the scene was declared on, <c>null</c> outside a session. When
-    /// the scene is <see cref="NetwSceneConfig.Isolated"/>,
-    /// <see cref="Netw.Spawn"/> returns the
-    /// <see cref="StretchViewportContainer"/> holding
+    /// The node the scene was declared on, <c>null</c> outside a session and
+    /// before the scene is live, which includes the root's own
+    /// <c>Node._enter_tree</c>. When the scene is
+    /// <see cref="NetwSceneConfig.Isolated"/>, <see cref="Netw.Spawn"/> returns
+    /// the <see cref="StretchViewportContainer"/> holding
     /// <see cref="NetwScene.World"/>, and this is the node inside
     /// <see cref="NetwScene.World"/>.
     /// </summary>
@@ -242,7 +246,8 @@ public sealed class NetwScene : NetwRefCounted
     /// <summary>
     /// The <see cref="SubViewport"/> above <see cref="NetwScene.Root"/> that
     /// gives an <see cref="NetwSceneConfig.Isolated"/> scene its own
-    /// <see cref="World2D"/> and <see cref="World3D"/>, <c>null</c> otherwise.
+    /// <see cref="World2D"/> and <see cref="World3D"/>, <c>null</c> for any
+    /// other scene and while <see cref="NetwScene.Root"/> is <c>null</c>.
     /// </summary>
     public Node World
     {
@@ -369,69 +374,6 @@ public sealed class NetwScene : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindObserve =
-        NetwApi.MethodBind("NetwScene", "observe", 131833578UL);
-
-    /// <summary>
-    /// Calls <paramref name="callback"/> whenever this scene gains or loses a
-    /// subject of <paramref name="event"/>. Registering the same
-    /// <paramref name="callback"/> twice does nothing.
-    /// <code>
-    /// arena.observe(SCENE_EVENT_PLAYER_ENTITY, on_car_edge)
-    ///
-    /// func on_car_edge(present: bool, car: NetwEntity) -&gt; bool:
-    ///         reshuffle(car)
-    ///         return false        # true drops the subscription
-    /// </code>
-    /// <para>
-    /// <see cref="NetwScene.SceneEvent.Viewer"/> passes a
-    /// <see cref="NetwPlayer"/>.
-    /// <see cref="NetwScene.SceneEvent.PlayerEntity"/> and
-    /// <see cref="NetwScene.SceneEvent.Entity"/> pass a
-    /// <see cref="NetwEntity"/>.
-    /// </para>
-    /// </summary>
-    public void Observe(NetwScene.SceneEvent @event, Callable callback)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)@event);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindObserve,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindUnobserve =
-        NetwApi.MethodBind("NetwScene", "unobserve", 131833578UL);
-
-    /// <summary>
-    /// Removes a <paramref name="callback"/> registered with
-    /// <see cref="NetwScene.Observe"/>. It must be the same
-    /// <see cref="Callable"/> that was passed to
-    /// <see cref="NetwScene.Observe"/>.
-    /// </summary>
-    public void Unobserve(NetwScene.SceneEvent @event, Callable callback)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)@event);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindUnobserve,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
-    }
-
     private static readonly IntPtr _bindWatch =
         NetwApi.MethodBind("NetwScene", "watch", 1229657424UL);
 
@@ -478,9 +420,10 @@ public sealed class NetwScene : NetwRefCounted
     /// <see cref="NetwPlayer.Entities"/> is in it.
     /// <code>
     /// Error
-    /// ┠╴OK                      the watch is withdrawn
+    /// ┠╴OK                      the watch is withdrawn, or there was none
+    /// ┠╴ERR_UNAUTHORIZED        this peer is not the server
     /// ┠╴ERR_INVALID_PARAMETER   a null player, or one this session no longer holds
-    /// ┖╴ERR_DOES_NOT_EXIST      this player was not watching
+    /// ┖╴ERR_DOES_NOT_EXIST      this scene names no live node
     /// </code>
     /// <para>
     /// <b>Server Only.</b>

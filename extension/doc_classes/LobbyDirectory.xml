@@ -147,7 +147,7 @@
 			<param index="0" name="address" type="String" />
 			<param index="1" name="from_name" type="String" />
 			<description>
-				Calls [method NetwConnection.invite] for this directory's [MultiplayerPeer] class and emits [signal NetwConnection.invited].
+				Calls [method NetwMultiplayer.endpoint_invite] with the transport for this directory's [MultiplayerPeer] class, which emits [signal NetwConnection.invited] unless the session is already on that server.
 			</description>
 		</method>
 		<method name="publish_lobbies">

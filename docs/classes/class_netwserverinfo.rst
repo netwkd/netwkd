@@ -19,7 +19,7 @@ What a server tells a server browser about itself.
 Description
 -----------
 
-A server browser can check a server without joining it, and gets one of these back. By default it is :ref:`from_session()<class_NetwServerInfo_method_from_session>`. Use :ref:`Netw.configure_server_info()<class_Netw_method_configure_server_info>` to change it.
+A server browser can check a server without joining it, and gets one of these back. By default it is :ref:`NetwMultiplayer.session_get_server_info()<class_NetwMultiplayer_method_session_get_server_info>`. Use :ref:`Netw.configure_server_info()<class_Netw_method_configure_server_info>` to change it.
 
 ::
 
@@ -71,13 +71,11 @@ Methods
 .. table::
    :widths: auto
 
-   +---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwServerInfo<class_NetwServerInfo>` | :ref:`from_payload<class_NetwServerInfo_method_from_payload>`\ (\ bytes\: :godot:`PackedByteArray`\ ) |static|                    |
-   +---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwServerInfo<class_NetwServerInfo>` | :ref:`from_session<class_NetwServerInfo_method_from_session>`\ (\ api\: :ref:`NetwMultiplayer<class_NetwMultiplayer>`\ ) |static| |
-   +---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`PackedByteArray`                    | :ref:`to_payload<class_NetwServerInfo_method_to_payload>`\ (\ info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ ) |static|      |
-   +---------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+   +---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwServerInfo<class_NetwServerInfo>` | :ref:`from_payload<class_NetwServerInfo_method_from_payload>`\ (\ bytes\: :godot:`PackedByteArray`\ ) |static|               |
+   +---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`PackedByteArray`                    | :ref:`to_payload<class_NetwServerInfo_method_to_payload>`\ (\ info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ ) |static| |
+   +---------------------------------------------+------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -309,18 +307,6 @@ Method Descriptions
 :ref:`NetwServerInfo<class_NetwServerInfo>` **from_payload**\ (\ bytes\: :godot:`PackedByteArray`\ ) |static| :ref:`🔗<class_NetwServerInfo_method_from_payload>`
 
 Reads a **NetwServerInfo** from ``bytes``, or returns ``null``.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwServerInfo_method_from_session:
-
-.. rst-class:: classref-method
-
-:ref:`NetwServerInfo<class_NetwServerInfo>` **from_session**\ (\ api\: :ref:`NetwMultiplayer<class_NetwMultiplayer>`\ ) |static| :ref:`🔗<class_NetwServerInfo_method_from_session>`
-
-Returns a copy of :ref:`NetwSessionConfig.server_info<class_NetwSessionConfig_property_server_info>` with :ref:`players<class_NetwServerInfo_property_players>`, :ref:`app_id<class_NetwServerInfo_property_app_id>` and :ref:`is_local_listener<class_NetwServerInfo_property_is_local_listener>` filled in from the session.
 
 .. rst-class:: classref-item-separator
 

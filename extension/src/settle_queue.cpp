@@ -84,6 +84,18 @@ PackedStringArray SettleQueue::drain() {
     LocalVector<Row> batch;
     LocalVector<Row> held;
     while (has_due()) {
+        if (passes >= MAX_PASSES) {
+            PackedStringArray carried;
+            for (const Row &row : rows) {
+                if (row.pumps <= 0) {
+                    carried.push_back(
+                        row.key.is_empty() ? String("<unkeyed>")
+                                           : String(row.key)
+                    );
+                }
+            }
+            return carried;
+        }
         batch.clear();
         held.clear();
         for (const Row &row : rows) {
@@ -92,19 +104,6 @@ PackedStringArray SettleQueue::drain() {
             } else {
                 batch.push_back(row);
             }
-        }
-        if (passes >= MAX_PASSES) {
-            PackedStringArray pending;
-            for (const Row &row : batch) {
-                pending.push_back(
-                    row.key.is_empty() ? String("<unkeyed>") : String(row.key)
-                );
-            }
-            rows.clear();
-            for (const Row &row : held) {
-                rows.push_back(row);
-            }
-            return pending;
         }
         passes++;
         rows.clear();
@@ -118,10 +117,6 @@ PackedStringArray SettleQueue::drain() {
         }
     }
     return PackedStringArray();
-}
-
-void SettleQueue::clear() {
-    rows.clear();
 }
 
 } // namespace netw

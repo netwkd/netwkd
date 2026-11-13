@@ -8,8 +8,6 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/enums.hpp"
-#include "netw/interest/engine.hpp"
-#include "netw/object_port.hpp"
 
 namespace netw {
 
@@ -19,42 +17,19 @@ class NetwInterestLayer : public godot::RefCounted,
                           public enums::NetwInterestLayer {
     GDCLASS(NetwInterestLayer, godot::RefCounted)
 
+    friend class NetwMultiplayer;
+
 private:
     godot::StringName layer_id;
-    interest::Engine standalone;
-    interest::Engine *engine = &standalone;
-    ObjectPort session;
+    godot::RID layer;
+    godot::ObjectID session;
 
-    NetwMultiplayer *host();
-    godot::Ref<NetwEntity> entity_for(int64_t p_slot);
-    bool holds_authority();
-    int64_t local_peer_id();
-    void dispatch_enter(
-        const godot::Ref<NetwEntity> &p_entity,
-        int64_t p_peer_id
-    );
-    void dispatch_leave(
-        const godot::Ref<NetwEntity> &p_entity,
-        int64_t p_peer_id
-    );
-    int64_t adopt_slot(const godot::Ref<NetwEntity> &p_entity);
-    void track_membership(
-        const godot::Ref<NetwEntity> &p_entity,
-        bool p_joined
-    );
-    void request_flush();
-    void join_label(const godot::Ref<NetwEntity> &p_entity);
-    void refresh_perception(const godot::Ref<NetwEntity> &p_entity);
+    godot::Ref<NetwMultiplayer> host() const;
 
 protected:
     static void _bind_methods();
 
 public:
-    static int64_t slot_of(const godot::Ref<NetwEntity> &p_entity);
-
-    void bind_session(NetwMultiplayer *p_host);
-
-    void set_layer_id(const godot::StringName &p_id);
     godot::StringName get_layer_id() const {
         return layer_id;
     }
@@ -84,25 +59,13 @@ public:
     bool remove_entity(const godot::Ref<NetwEntity> &p_entity);
     bool has_entity(const godot::Ref<NetwEntity> &p_entity) const;
 
-    void client_admit(const godot::Ref<NetwEntity> &p_entity);
-    void client_revoke(const godot::Ref<NetwEntity> &p_entity);
-    void client_untrack_entity(const godot::Ref<NetwEntity> &p_entity);
-
-    void apply_server_transition(
-        const godot::Ref<NetwEntity> &p_entity,
-        int64_t p_peer_id,
-        bool p_visible
-    );
-
     bool is_visible_to(
         const godot::Ref<NetwEntity> &p_entity,
         int64_t p_peer_id
     );
-    bool verdict_for(int64_t p_peer_id) const;
 
     godot::Array viewer_ids() const;
     godot::Dictionary monitor_snapshot() const;
-    godot::Dictionary debug_dump(int64_t p_peer_id = 0);
     void set_driver(const godot::Callable &p_driver);
     godot::Callable get_driver();
     void set_monitor(const godot::Callable &p_monitor);

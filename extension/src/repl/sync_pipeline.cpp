@@ -365,7 +365,7 @@ void SyncPipeline::register_state_timeline(Node *p_node) {
     }
     const Ref<NetwEntity> entity = NetwEntity::of(p_node);
     if (entity.is_valid()) {
-        plane->lagcomp_timeline_declare(plane->entity_of(entity->get_owner()));
+        plane->lagcomp_timeline_declare(plane->liveness_adopt(entity.ptr()));
     }
 }
 
@@ -449,8 +449,7 @@ LocalVector<SyncPipeline::IndexedBinding> *SyncPipeline::held_by(
     }
     NetwEntity *entity
         = Object::cast_to<NetwEntity>(gd::object_of(ObjectID(p_entity)));
-    NetwEntityRecord *record
-        = entity != nullptr ? entity->get_record() : nullptr;
+    NetwEntityRecord *record = NetwMultiplayer::find_record(core(), entity);
     return record != nullptr ? &record->get_held_bindings() : nullptr;
 }
 
@@ -458,11 +457,12 @@ void SyncPipeline::seat_record(PropertyBinding *p_binding) {
     Node *node = p_binding->node();
     const Ref<NetwEntity> entity = NetwEntity::of(node);
     const PropertySet *set = p_binding->get_set();
-    if (entity.is_null() || set == nullptr || entity->get_owner() != node
-        || entity->get_record() == nullptr) {
+    NetwEntityRecord *record
+        = NetwMultiplayer::find_record(core(), entity.ptr());
+    if (record == nullptr || set == nullptr || entity->get_owner() != node) {
         return;
     }
-    entity->get_record()->set_record_binding(set->get_record(), p_binding->id);
+    record->set_record_binding(set->get_record(), p_binding->id);
 }
 
 void SyncPipeline::unseat_record(
@@ -472,8 +472,7 @@ void SyncPipeline::unseat_record(
     NetwEntity *entity = p_entity != 0
         ? Object::cast_to<NetwEntity>(gd::object_of(ObjectID(p_entity)))
         : NetwEntity::of(p_binding->node()).ptr();
-    NetwEntityRecord *record
-        = entity != nullptr ? entity->get_record() : nullptr;
+    NetwEntityRecord *record = NetwMultiplayer::find_record(core(), entity);
     const PropertySet *set = p_binding->get_set();
     if (record == nullptr || set == nullptr
         || record->get_record_binding(set->get_record()) != p_binding->id) {
@@ -731,8 +730,9 @@ void SyncPipeline::clear_bindings() {
         NetwEntity *entity = entity_key != 0
             ? Object::cast_to<NetwEntity>(gd::object_of(ObjectID(entity_key)))
             : nullptr;
-        if (entity != nullptr && entity->get_record() != nullptr) {
-            entity->get_record()->forget_bindings();
+        if (NetwEntityRecord *record
+            = NetwMultiplayer::find_record(plane, entity)) {
+            record->forget_bindings();
         }
     }
     bindings.clear();
@@ -1146,7 +1146,7 @@ void SyncPipeline::send_entity_event(
         plane->has_server_role(),
         plane->get_unique_id(),
         0,
-        plane->rpc_get_recipients(entity)
+        plane->rpc_recipients(entity)
     );
     for (int at = 0; at < recipients.size(); ++at) {
         plane->send_to(
@@ -1559,7 +1559,7 @@ void SyncPipeline::apply_row(
 #if defined(NETW_TESTS)
     const ReceiveAllocations counted(books->idle);
 #endif
-    const int64_t route = plane->liveness_route_of(p_entity.ptr());
+    const int64_t route = books->liveness->route_of(p_entity->get_rid_handle());
     if (!plane->is_host() && p_sender == SERVER_PEER && p_ordinal >= 0
         && sync_model->binding_of(route, p_ordinal) != nullptr
         && !sync_model->admits_schema(route, p_ordinal)) {
@@ -2032,7 +2032,7 @@ void SyncPipeline::handle_property_sync(
     }
 
     NETW_NETWORK_PROFILE(books->profiler->name_arrival(plane->profiler_member(
-        plane->liveness_route_of(p_entity.ptr()),
+        books->liveness->route_of(p_entity->get_rid_handle()),
         channel_property,
         p_comp_node,
         prop
@@ -2110,12 +2110,13 @@ void SyncPipeline::handle_property_sync(
     }
 
     if (plane->has_server_role()) {
-        const int64_t route = plane->liveness_route_of(p_entity.ptr());
+        const int64_t route
+            = books->liveness->route_of(p_entity->get_rid_handle());
         const PackedInt32Array recipients = NetwSyncModel::event_recipients(
             true,
             plane->get_unique_id(),
             p_sender,
-            plane->rpc_get_recipients(p_entity)
+            plane->rpc_recipients(p_entity)
         );
         for (int at = 0; at < recipients.size(); ++at) {
             plane->send_to(
@@ -2161,7 +2162,7 @@ void SyncPipeline::handle_signal(
     }
 
     NETW_NETWORK_PROFILE(books->profiler->name_arrival(plane->profiler_member(
-        plane->liveness_route_of(p_entity.ptr()),
+        books->liveness->route_of(p_entity->get_rid_handle()),
         channel_signal,
         p_comp_node,
         signal_name
@@ -2214,12 +2215,13 @@ void SyncPipeline::handle_signal(
     Callable(p_comp_node, StringName("emit_signal")).callv(call_args);
 
     if (plane->has_server_role()) {
-        const int64_t route = plane->liveness_route_of(p_entity.ptr());
+        const int64_t route
+            = books->liveness->route_of(p_entity->get_rid_handle());
         const PackedInt32Array recipients = NetwSyncModel::event_recipients(
             true,
             plane->get_unique_id(),
             p_sender,
-            plane->rpc_get_recipients(p_entity)
+            plane->rpc_recipients(p_entity)
         );
         for (int at = 0; at < recipients.size(); ++at) {
             plane->send_to(

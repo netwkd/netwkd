@@ -144,7 +144,7 @@ While a peer loses packets its budget halves, and each round trip without loss a
 - |void| **set_desired_role**\ (\ value\: :ref:`Role<enum_NetwSession_Role>`\ )
 - :ref:`Role<enum_NetwSession_Role>` **get_desired_role**\ (\ )
 
-The role this peer takes when it hosts, which becomes :ref:`NetwMultiplayer.role<class_NetwMultiplayer_property_role>`.
+The role this peer takes when it hosts, which becomes :ref:`NetwSession.role<class_NetwSession_property_role>`.
 
 .. rst-class:: classref-item-separator
 

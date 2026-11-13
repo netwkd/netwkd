@@ -11,7 +11,7 @@
 		for entity: NetwEntity in player.entities:
 		    follow(entity.root)
 		[/codeblock]
-		A player is not a peer. After the player leaves, [member is_active] is [code]false[/code], even if a new player connects with the same [member peer_id].
+		A player is not a peer. After the player leaves, [member is_active] is [code]false[/code], even if a new player connects with the same [member peer_id]. Its [member id], [member peer_id], [member username], [member account] and [member account_name] still read while [signal NetwSession.player_left] runs. After that, or once the session ends, every property reads empty, and [member id] reads [code]0[/code].
 		Every join is a new player, including a join with an [member account] that joined before. A game that wants to recognise a returning player keys its own data by [member account] on the server, which is empty for a guest.
 		[codeblock]
 		var scores := {}
@@ -33,7 +33,10 @@
 			The display name admission verified with [member account]. Every peer reads it. Empty for a guest.
 		</member>
 		<member name="entities" type="NetwEntity[]" setter="" getter="get_entities">
-			The entities spawned for this player with [method Netw.spawn_player], in no particular order. Empty for a spectator. On the server a player who dropped or stepped away still lists the entities kept for it, and a returning player lists them when it joins.
+			The entities spawned for this player with [method Netw.spawn_player], in no particular order. Empty for a spectator. On the server a player who dropped or stepped away lists the entities kept for it while [signal NetwSession.player_left] runs, and a returning player lists them when it joins.
+		</member>
+		<member name="id" type="int" setter="" getter="get_id">
+			The player's id, which the [NetwMultiplayer] [code]player_*[/code] methods such as [method NetwMultiplayer.player_get_peer] take. It stays the same across a server transfer, and reads [code]0[/code] after [signal NetwSession.player_left] has run or once the session ends.
 		</member>
 		<member name="is_active" type="bool" setter="" getter="get_is_active">
 			[code]false[/code] once the player has left. Check it before using a player you stored.
@@ -46,7 +49,7 @@
 			A client only knows about the scenes it receives.
 		</member>
 		<member name="username" type="StringName" setter="" getter="get_username">
-			The username from [method Netw.prepare_join]. It is empty for a peer that never called [method Netw.prepare_join]. It is kept after the player leaves. Two players may join with the same name, unless [method Netw.configure_admission] refuses it.
+			The username from [method Netw.prepare_join]. It is empty for a peer that never called [method Netw.prepare_join]. It still reads while [signal NetwSession.player_left] runs. Two players may join with the same name, unless [method Netw.configure_admission] refuses it.
 		</member>
 	</members>
 	<signals>
@@ -54,7 +57,7 @@
 			<param index="0" name="from" type="NetwScene" />
 			<param index="1" name="to" type="NetwScene" />
 			<description>
-				Emitted when [member scene] changes. Either may be [code]null[/code]. Only [member NetwSession.local_player] emits it.
+				Emitted when [member scene] changes. Either may be [code]null[/code]. Only [member NetwSession.local_player] emits it. A change while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 				[codeblock]
 				func _ready() -&gt; void:
 				    Netw.session(self).local_joined.connect(on_local_joined)

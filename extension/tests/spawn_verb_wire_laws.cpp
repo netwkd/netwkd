@@ -49,7 +49,7 @@ TEST_CASE(
         one_arg(),
         one_type(),
         arena,
-        Variant(),
+        0,
         true
     );
     rig.pump(10);

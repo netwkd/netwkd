@@ -13,45 +13,41 @@
 
 namespace netw {
 
+class Netw;
 class NetwEntity;
 class NetwMultiplayer;
 
 class NetwPlayer : public godot::RefCounted, public enums::NetwPlayer {
     GDCLASS(NetwPlayer, godot::RefCounted)
 
-    godot::ObjectID core_id;
-    int64_t peer_id = 0;
-    int64_t incarnation = 0;
-    godot::StringName username;
-    godot::String account;
-    godot::String account_name;
+    friend class Netw;
+    friend class NetwEntity;
+    friend class NetwMultiplayer;
 
-    NetwMultiplayer *core() const;
+    godot::ObjectID session_id;
+    int64_t incarnation = 0;
+    bool row_dropped = false;
 
 protected:
     static void _bind_methods();
 
 public:
-    void bind_to(
-        NetwMultiplayer *p_core,
-        int64_t p_peer,
-        int64_t p_incarnation = 0,
-        const godot::StringName &p_username = godot::StringName()
-    );
-    void rebind_peer(int64_t p_peer);
-    void bind_account(
-        const godot::String &p_account,
-        const godot::String &p_account_name
-    );
+    NetwMultiplayer *core() const;
+    int64_t get_id() const;
+    bool belongs_to(const NetwMultiplayer *p_session) const;
 
     int64_t get_peer_id() const;
-    int64_t player_id() const;
     bool get_is_active() const;
     godot::StringName get_username() const;
     godot::String get_account() const;
     godot::String get_account_name() const;
     godot::TypedArray<NetwEntity> get_entities() const;
     godot::Ref<NetwScene> get_scene() const;
+
+    void announce_scene_changed(
+        const godot::Ref<NetwScene> &p_from,
+        const godot::Ref<NetwScene> &p_to
+    );
 };
 
 } // namespace netw

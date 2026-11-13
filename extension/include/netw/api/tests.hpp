@@ -44,6 +44,8 @@ public:
     static godot::Dictionary prediction_stats(godot::Object *handle);
     static void attribution_arm(NetwMultiplayer *session);
     static godot::Dictionary attribution_snapshot(NetwMultiplayer *session);
+    static void predict_tap_flush(NetwMultiplayer *session);
+    static godot::Dictionary predict_tap_cost(NetwMultiplayer *session);
     static godot::TypedArray<godot::StringName> property_set_keys_of_script(
         const godot::Ref<godot::Script> &script,
         int64_t record
@@ -119,68 +121,6 @@ public:
         NetwMultiplayer *session,
         const godot::Variant &node_ref
     );
-    static bool interest_is_visible(NetwEntity *entity, int64_t peer_id);
-    static godot::TypedArray<godot::StringName> interest_layer_ids(
-        NetwEntity *entity
-    );
-    static int64_t interest_leave_policy_for(
-        NetwEntity *entity,
-        const godot::StringName &layer_id,
-        int64_t fallback
-    );
-    static godot::Callable interest_custom_leave_for(
-        NetwEntity *entity,
-        const godot::StringName &layer_id
-    );
-    static int64_t interest_perception_policy_for(
-        NetwEntity *entity,
-        const godot::StringName &layer_id,
-        int64_t fallback
-    );
-    static godot::Callable interest_custom_perception_for(
-        NetwEntity *entity,
-        const godot::StringName &layer_id
-    );
-    static void interest_set_report_observers(NetwEntity *entity, bool enabled);
-    static bool interest_reports_observers(NetwEntity *entity);
-    static void interest_on_observed(
-        NetwEntity *entity,
-        const godot::Callable &callback
-    );
-    static void interest_on_enter(
-        NetwEntity *entity,
-        const godot::StringName &layer_id,
-        const godot::Callable &callback
-    );
-    static void interest_on_leave(
-        NetwEntity *entity,
-        const godot::StringName &layer_id,
-        const godot::Callable &callback
-    );
-    static void interest_set_leave_policy(
-        NetwEntity *entity,
-        const godot::StringName &layer_id,
-        int64_t policy,
-        const godot::Callable &custom
-    );
-    static void interest_set_perception_policy(
-        NetwEntity *entity,
-        const godot::StringName &layer_id,
-        int64_t policy,
-        const godot::Callable &custom
-    );
-    static void interest_on_unobserved(
-        NetwEntity *entity,
-        const godot::Callable &callback
-    );
-    static void interest_queue_observer_awareness(
-        NetwMultiplayer *session,
-        const godot::StringName &layer_id,
-        NetwEntity *entity,
-        int64_t observer_peer,
-        int kind
-    );
-    static godot::Array interest_awareness_drain(NetwMultiplayer *session);
 
     godot::Dictionary wire_spec() const;
 };

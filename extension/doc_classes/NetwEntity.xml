@@ -107,9 +107,9 @@
 		</method>
 		<method name="release_control">
 			<return type="NetwPromise" />
-			<param index="0" name="successor" type="int" default="1" />
+			<param index="0" name="successor" type="int" default="0" />
 			<description>
-				Hands control of this entity to [param successor], which is the server by default. The returned [NetwPromise] resolves with this entity once the decision reaches this peer.
+				Hands control of this entity to [param successor], which is the server by default. [code]0[/code] is the server and [code]1[/code] is the host's player, as in [method NetwMultiplayer.entity_set_controller]. The returned [NetwPromise] resolves with this entity once the decision reaches this peer.
 				The request carries this peer's latest [method NetwPropertyConfig.broadcast] values, and [param successor] starts from them. Values larger than 1024 bytes are not sent, and [param successor] starts from its own copy.
 				[codeblock lang=text]
 				Error
@@ -198,7 +198,7 @@
 			Relative priority when a peer's bandwidth cannot carry every property update. [code]4.0[/code] sends about four times as often as [code]1.0[/code] when both keep changing. Must be greater than zero. [member interest] determines which peers receive updates.
 		</member>
 		<member name="rid" type="RID" setter="" getter="get_rid">
-			The [RID] that [NetwMultiplayer] methods take for this entity.
+			The [RID] that [NetwMultiplayer] methods take for this entity. It is valid once the node has entered a session, and empty before.
 			[codeblock]
 			var state := Netw.of(self).entity_get_state(entity.rid)
 			[/codeblock]
@@ -226,7 +226,7 @@
 			<param index="0" name="previous_peer" type="int" />
 			<param index="1" name="peer" type="int" />
 			<description>
-				Emitted once on each peer when [member controller] changes, after the multiplayer authority has moved under [constant AUTHORITY_CONTROLLER].
+				Emitted once on each peer when [member controller] changes, after the multiplayer authority has moved under [constant AUTHORITY_CONTROLLER]. A change made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends. An entity that is not in a session yet reports it at once.
 			</description>
 		</signal>
 		<signal name="control_requested">
@@ -239,25 +239,25 @@
 		</signal>
 		<signal name="despawned">
 			<description>
-				Emitted once the entity has been freed, by [method despawn] or by freeing [member root] directly. [member root] may already be [code]null[/code], so cleanup that needs the node belongs in [signal despawning].
+				Emitted once the entity has been freed, by [method despawn] or by freeing [member root] directly. [member root] may already be [code]null[/code], so cleanup that needs the node belongs in [signal despawning]. An entity freed while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported after its [signal despawning], at the latest when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="despawning">
 			<param index="0" name="reason" type="StringName" />
 			<description>
-				Emitted right before [method despawn] frees the entity, with its [param reason], while [member root] can still be read. Freeing [member root] directly does not emit it. Every entity that goes with a despawned parent emits it too, on every peer, before its parent does.
+				Emitted right before [method despawn] frees the entity, with its [param reason], while [member root] can still be read. Freeing [member root] directly does not emit it. Every entity that goes with a despawned parent emits it too, on every peer, before its parent does. A despawn made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends, and [member root] can still be read then.
 			</description>
 		</signal>
 		<signal name="hidden">
 			<description>
 				Emitted on a client that loses its copy of the entity without the entity being despawned, such as a hide under [constant NetwInterestLayer.LEAVE_POLICY_HIDE]. The entity may come back later with the same [member rid].
-				Neither [signal despawning] nor [signal despawned] is emitted, so anything tied to an entity that may return connects here.
+				Neither [signal despawning] nor [signal despawned] is emitted, so anything tied to an entity that may return connects here. A copy lost while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="lifecycle_refused">
 			<param index="0" name="request" type="NetwLifecycleRequest" />
 			<description>
-				Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused spawn or move is undone after it, and a refused despawn puts the same [member root] back before it. [member NetwLifecycleRequest.reason] is what the server passed to [method NetwLifecycleRequest.deny], or empty when the server refused for another reason.
+				Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused move is already undone and a refused despawn has already put the same [member root] back. A refusal heard while [method MultiplayerAPI.poll] runs is reported when that poll ends. [member NetwLifecycleRequest.destination] is the parent the move asked for. [member NetwLifecycleRequest.reason] is what the server passed to [method NetwLifecycleRequest.deny], or empty when the server refused for another reason.
 			</description>
 		</signal>
 		<signal name="lifecycle_requested">
@@ -294,7 +294,7 @@
 		</signal>
 		<signal name="reparented">
 			<description>
-				Emitted once after the entity moves to a new parent, by [method Node.reparent], [method Netw.reparent], or [method Node.remove_child] followed by [method Node.add_child]. Read the new parent from [member root].
+				Emitted once after the entity moves to a new parent, by [method Node.reparent], [method Netw.reparent], or [method Node.remove_child] followed by [method Node.add_child]. Read the new parent from [member root]. A move made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 				[code]_exit_tree[/code] also runs during a move, so teardown that must happen once belongs in [signal despawning] or [signal hidden].
 				[codeblock]
 				NetwEntity.of(self).reparented.connect(reset_smoothing)

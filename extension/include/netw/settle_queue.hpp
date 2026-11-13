@@ -39,8 +39,6 @@ public:
     bool has(const godot::StringName &key) const;
 
     godot::PackedStringArray drain();
-
-    void clear();
 };
 
 } // namespace netw

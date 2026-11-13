@@ -4,7 +4,7 @@
 		The scene an entity belongs to, reached as [member NetwEntity.scene].
 	</brief_description>
 	<description>
-		A multiplayer scene is a [NetwEntity], available as [member entity]. Reach it with [method Netw.scene] or [member NetwEntity.scene]. An entity declared with [method Netw.configure_scene] resolves to itself, any other entity to its closest scene ancestor. Each scene has one handle, so [code]==[/code] compares scenes.
+		A multiplayer scene is a [NetwEntity], available as [member entity]. Reach it with [method Netw.scene] or [member NetwEntity.scene]. An entity declared with [method Netw.configure_scene] resolves to itself, any other entity to its closest scene ancestor. Each scene has one handle, so [code]==[/code] compares scenes. A removed scene, as [signal NetwSession.scene_removed] passes it, still answers [member rid] and [member label], and its [member root], [member world] and [member entity] are [code]null[/code].
 		A scene replicates to a player while one of their [member NetwPlayer.entities] is in it, or while the player watches it with [method watch]. [method unwatch] does not remove a player whose entity is still in the scene.
 		[codeblock]
 		lobby.watch(player)
@@ -24,30 +24,6 @@
 				Whether this scene replicates to [param player], either because one of their [member NetwPlayer.entities] is in it or because of [method watch].
 			</description>
 		</method>
-		<method name="observe">
-			<return type="void" />
-			<param index="0" name="event" type="int" enum="NetwScene.SceneEvent" />
-			<param index="1" name="callback" type="Callable" />
-			<description>
-				Calls [param callback] whenever this scene gains or loses a subject of [param event]. Registering the same [param callback] twice does nothing.
-				[codeblock]
-				arena.observe(SCENE_EVENT_PLAYER_ENTITY, on_car_edge)
-
-				func on_car_edge(present: bool, car: NetwEntity) -&gt; bool:
-				        reshuffle(car)
-				        return false        # true drops the subscription
-				[/codeblock]
-				[constant SCENE_EVENT_VIEWER] passes a [NetwPlayer]. [constant SCENE_EVENT_PLAYER_ENTITY] and [constant SCENE_EVENT_ENTITY] pass a [NetwEntity].
-			</description>
-		</method>
-		<method name="unobserve">
-			<return type="void" />
-			<param index="0" name="event" type="int" enum="NetwScene.SceneEvent" />
-			<param index="1" name="callback" type="Callable" />
-			<description>
-				Removes a [param callback] registered with [method observe]. It must be the same [Callable] that was passed to [method observe].
-			</description>
-		</method>
 		<method name="unwatch">
 			<return type="int" enum="Error" />
 			<param index="0" name="player" type="NetwPlayer" />
@@ -55,9 +31,10 @@
 				Undoes [method watch]. The scene keeps replicating to [param player] while one of their [member NetwPlayer.entities] is in it.
 				[codeblock lang=text]
 				Error
-				┠╴OK                      the watch is withdrawn
+				┠╴OK                      the watch is withdrawn, or there was none
+				┠╴ERR_UNAUTHORIZED        this peer is not the server
 				┠╴ERR_INVALID_PARAMETER   a null player, or one this session no longer holds
-				┖╴ERR_DOES_NOT_EXIST      this player was not watching
+				┖╴ERR_DOES_NOT_EXIST      this scene names no live node
 				[/codeblock]
 				[b]Server Only.[/b]
 			</description>
@@ -87,7 +64,7 @@
 			Every entity in this scene.
 		</member>
 		<member name="entity" type="NetwEntity" setter="" getter="get_entity">
-			The [NetwEntity] on [member root], or [code]null[/code] once the scene is freed.
+			The [NetwEntity] on [member root], or [code]null[/code] while [member root] is [code]null[/code] and once the scene is removed.
 		</member>
 		<member name="label" type="StringName" setter="" getter="get_label">
 			The name [method NetwSession.find_scene] finds this scene by. See [method NetwSceneConfig.labeled].
@@ -99,16 +76,16 @@
 			Every entity spawned for a player with [method Netw.spawn_player] that is in this scene, in no particular order. An entity is removed as soon as it is despawned, before its node is freed.
 		</member>
 		<member name="rid" type="RID" setter="" getter="get_rid">
-			The [RID] of the scene's entity, invalid outside a session. The [code]scene_*[/code] methods of [NetwMultiplayer] take it.
+			The [RID] of the scene, which is also the [RID] of [member entity], invalid outside a session. The [code]scene_*[/code] methods of [NetwMultiplayer] take it.
 		</member>
 		<member name="root" type="Node" setter="" getter="get_root">
-			The node the scene was declared on, [code]null[/code] outside a session. When the scene is [method NetwSceneConfig.isolated], [method Netw.spawn] returns the [StretchViewportContainer] holding [member world], and this is the node inside [member world].
+			The node the scene was declared on, [code]null[/code] outside a session and before the scene is live, which includes the root's own [method Node._enter_tree]. When the scene is [method NetwSceneConfig.isolated], [method Netw.spawn] returns the [StretchViewportContainer] holding [member world], and this is the node inside [member world].
 		</member>
 		<member name="viewers" type="NetwPlayer[]" setter="" getter="get_viewers">
 			Every player this scene replicates to, see [method is_watching].
 		</member>
 		<member name="world" type="Node" setter="" getter="get_world">
-			The [SubViewport] above [member root] that gives an [method NetwSceneConfig.isolated] scene its own [World2D] and [World3D], [code]null[/code] otherwise.
+			The [SubViewport] above [member root] that gives an [method NetwSceneConfig.isolated] scene its own [World2D] and [World3D], [code]null[/code] for any other scene and while [member root] is [code]null[/code].
 		</member>
 	</members>
 	<signals>
@@ -121,7 +98,7 @@
 		<signal name="entity_exited">
 			<param index="0" name="entity" type="NetwEntity" />
 			<description>
-				Emitted when [param entity] leaves the tree inside this scene, at the same tree edge as [signal SceneTree.node_removed], so [member NetwEntity.root] still exists. An entity removed while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
+				Emitted when [param entity] leaves the tree inside this scene, at the same tree edge as [signal SceneTree.node_removed], so [member NetwEntity.root] still exists. An entity removed while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends. An entity removed because the session ended can report it with [member NetwEntity.root] already freed.
 			</description>
 		</signal>
 		<signal name="player_entity_entered">
@@ -139,26 +116,17 @@
 		<signal name="viewer_entered">
 			<param index="0" name="player" type="NetwPlayer" />
 			<description>
-				Emitted when this scene starts replicating to [param player]. [member viewers] already includes them.
+				Emitted when this scene starts replicating to [param player]. [member viewers] already includes them. A change made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="viewer_exited">
 			<param index="0" name="player" type="NetwPlayer" />
 			<description>
-				Emitted when this scene stops replicating to [param player].
+				Emitted when this scene stops replicating to [param player]. A change made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 	</signals>
 	<constants>
-		<constant name="SCENE_EVENT_VIEWER" value="0" enum="SceneEvent">
-			A player started or stopped seeing the scene. The [method NetwMultiplayer.scene_observe] callback receives [code](present, peer_id)[/code].
-		</constant>
-		<constant name="SCENE_EVENT_PLAYER_ENTITY" value="1" enum="SceneEvent">
-			An entity in [member player_entities] entered or left. The callback receives [code](present, entity)[/code].
-		</constant>
-		<constant name="SCENE_EVENT_ENTITY" value="2" enum="SceneEvent">
-			Any entity, player entities included, entered or left. The callback receives [code](present, entity)[/code].
-		</constant>
 		<constant name="SCENE_ISOLATION_NONE" value="0" enum="SceneIsolation">
 			The scene shares the physics and rendering world with the rest of the game.
 		</constant>

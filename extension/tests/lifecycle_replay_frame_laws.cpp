@@ -133,13 +133,13 @@ class ReplayScenario final : public netw_test::FrameScenario {
         stand->pump(4);
         NetwMultiplayer *server = stand->session(-1);
         const Ref<netw::NetwPlayer> owner
-            = server->peer_get_player(stand->peer_id(A));
+            = server->player_joined_of(stand->peer_id(A));
         Array args;
         args.push_back(String("Avatar"));
         const RID made = server->spawn_registered(
             StringName(AVATAR_ID),
             args,
-            owner.ptr()
+            owner->get_id()
         );
         Node *built = server->entity_get_node(made);
         if (built == nullptr || host_arena == nullptr) {
@@ -171,7 +171,7 @@ class ReplayScenario final : public netw_test::FrameScenario {
                 trigger,
                 Dictionary(),
                 PackedStringArray(),
-                Callable()
+                nullptr
             );
         }
     }

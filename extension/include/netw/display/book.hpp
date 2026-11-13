@@ -68,7 +68,7 @@ public:
     int64_t route_of(const godot::RID &p_entity) const;
 
     void mark_dirty(const godot::RID &p_entity, int p_dirt);
-    int write_param(
+    godot::Error write_param(
         const godot::RID &p_entity,
         Decl &p_fallback,
         int p_param,

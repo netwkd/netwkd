@@ -17,6 +17,7 @@
 
 #if defined(NETW_TIER_HOSTED)
 
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 
@@ -506,6 +507,7 @@ TEST_CASE(
 using netw::Netw;
 using netw::NetwMultiplayer;
 using netw_test::EntityDecl;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
@@ -606,7 +608,7 @@ struct Wake {
     Dictionary stats(int p_client, int64_t p_peer) const {
         NetwMultiplayer *api
             = p_client < 0 ? rig.server() : rig.client(p_client);
-        return api->peer_link_stats(p_peer);
+        return api->peer_get_link_stats(p_peer);
     }
 
     LocalVector<double> mirrored_heights(int p_client) const {
@@ -615,7 +617,7 @@ struct Wake {
         for (const RID &entity : entities) {
             const int64_t route = rig.server()->entity_get_route(entity);
             const Node2D *mirror = Object::cast_to<Node2D>(
-                client->entity_get_node(client->entity_from_route(route))
+                client->entity_get_node(Internals::entity_at(client, route))
             );
             REQUIRE(mirror != nullptr);
             out.push_back(mirror->get_position().y);

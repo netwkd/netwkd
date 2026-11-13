@@ -9,7 +9,6 @@
 #include "netw/api/entity_record.hpp"
 #include "netw/api/link_conditions.hpp"
 #include "netw/api/native_api.hpp"
-#include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
 #include "netw/connect/transport.hpp"
 #include "netw/decl_sites.hpp"
@@ -117,32 +116,6 @@ Ref<T> declare_config(Node *p_node, session_decl::Kind p_kind) {
     return draft;
 }
 
-NetwMultiplayer *sole_session(const char *p_verb) {
-    const TypedArray<MultiplayerAPI> live = NetwMultiplayer::session_get_all();
-    if (live.is_empty()) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_SESSION_NOT_FOUND,
-            {vformat("{Netw.%s}", p_verb), String(), String(), 0, 0}
-        );
-        return nullptr;
-    }
-    if (live.size() > 1) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_SESSION_NOT_FOUND,
-            {vformat("{Netw.%s}", p_verb),
-             String(),
-             String(),
-             0,
-             int64_t(live.size())}
-        );
-        return nullptr;
-    }
-    const Ref<MultiplayerAPI> only = live[0];
-    return Object::cast_to<NetwMultiplayer>(only.ptr());
-}
-
 struct CallSession {
     NetwMultiplayer *api = nullptr;
     Error code = OK;
@@ -161,7 +134,7 @@ CallSession call_session(Node *p_node, const StringName &p_member) {
         );
         return out;
     }
-    out.api = NetwMultiplayer::of(p_node);
+    out.api = NetwMultiplayer::session_holding(p_node);
     if (out.api != nullptr) {
         return out;
     }
@@ -273,13 +246,17 @@ void register_derived_now(const Variant &p_node) {
     if (node == nullptr) {
         return;
     }
-    if (NetwMultiplayer *api = NetwMultiplayer::of(node)) {
+    if (NetwMultiplayer *api = NetwMultiplayer::session_holding(node)) {
         api->sync_register_derived(node);
     }
 }
 
 void unregister_derived_leaving(Node *p_node) {
-    if (NetwMultiplayer *api = NetwMultiplayer::of_leaving(p_node)) {
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(
+        p_node,
+        NetwMultiplayer::TreeState::EXITING
+    );
+    if (api != nullptr) {
         api->sync_unregister_derived(p_node);
     }
 }
@@ -384,11 +361,11 @@ Dictionary Netw::native_api() {
 }
 
 Ref<NetwMultiplayer> Netw::of(Node *p_node) {
-    return NetwMultiplayer::core_of(p_node);
+    return Ref<NetwMultiplayer>(NetwMultiplayer::session_holding(p_node));
 }
 
 Ref<NetwSession> Netw::session(Node *p_node) {
-    const Ref<NetwMultiplayer> api = NetwMultiplayer::core_of(p_node);
+    const Ref<NetwMultiplayer> api = NetwMultiplayer::session_holding(p_node);
     if (api.is_null()) {
         return Ref<NetwSession>();
     }
@@ -400,7 +377,7 @@ Ref<NetwPromise> Netw::prepare_join(
     const StringName &p_username,
     const Array &p_args
 ) {
-    const Ref<NetwMultiplayer> api = NetwMultiplayer::core_of(p_node);
+    const Ref<NetwMultiplayer> api = NetwMultiplayer::session_holding(p_node);
     const uint64_t node_id
         = p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0;
     if (api.is_null()) {
@@ -413,7 +390,7 @@ Ref<NetwPromise> Netw::prepare_join(
         );
         return NetwPromise::resolved(ERR_UNCONFIGURED);
     }
-    if (api->is_online()) {
+    if (api->session_is_online()) {
         fault::raise(
             api.ptr(),
             NETW_FAULT_DECLARED_ONLINE,
@@ -429,7 +406,7 @@ Ref<NetwPromise> Netw::prepare_join(
 
 Ref<NetwScene> Netw::scene(Node *p_node) {
     Node *inner = NetwMultiplayer::scene_inner_of(p_node);
-    if (NetwMultiplayer::core_of(inner).is_null()) {
+    if (NetwMultiplayer::session_holding(inner) == nullptr) {
         return Ref<NetwScene>();
     }
     const Ref<NetwEntity> record = NetwEntity::of(inner);
@@ -850,7 +827,7 @@ Ref<NetwPromise> Netw::request_id(
         );
         Node *asker = Object::cast_to<Node>(p_callable.get_object());
         fault::raise(
-            asker != nullptr ? NetwMultiplayer::of(asker) : nullptr,
+            NetwMultiplayer::session_holding(asker),
             NETW_FAULT_BAD_VALUE,
             {String("Netw.request_id"),
              String("peer id 0"),
@@ -904,10 +881,12 @@ void Netw::sync_property(Node *p_node, const StringName &p_property) {
     if (api == nullptr) {
         return;
     }
-    ReplicationCore *plane = api->get_replication_plane();
-    if (plane != nullptr) {
-        plane->send_property(p_node, p_property);
-    }
+    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
+    api->sync_send_property(
+        entity.is_valid() ? entity->get_rid_handle() : RID(),
+        p_node,
+        p_property
+    );
 }
 
 void Netw::emit_entity_signal(const Signal &p_signal, const Array &p_args) {
@@ -919,10 +898,13 @@ void Netw::emit_entity_signal(const Signal &p_signal, const Array &p_args) {
     if (api == nullptr) {
         return;
     }
-    ReplicationCore *plane = api->get_replication_plane();
-    if (plane != nullptr) {
-        plane->send_signal(node, p_signal.get_name(), p_args);
-    }
+    const Ref<NetwEntity> entity = NetwEntity::of(node);
+    api->sync_send_signal(
+        entity.is_valid() ? entity->get_rid_handle() : RID(),
+        node,
+        p_signal.get_name(),
+        p_args
+    );
 }
 
 Ref<NetwChannel> Netw::channel(Node *p_node, int64_t p_channel_id) {
@@ -978,7 +960,7 @@ Node *Netw::spawn_player(
         );
         return nullptr;
     }
-    NetwMultiplayer *api = NetwMultiplayer::of(host);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(host);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -988,17 +970,28 @@ Node *Netw::spawn_player(
         );
         return nullptr;
     }
-    ReplicationCore *plane = api->get_replication_plane();
-    return plane != nullptr ? plane->spawn(p_fn, p_args, p_player) : nullptr;
+    if (p_player.is_valid() && !p_player->belongs_to(api)) {
+        fault::raise(
+            api,
+            NETW_FAULT_BAD_VALUE,
+            {"{Netw.spawn_player}",
+             "a player that is not in this session",
+             "a player from {NetwSession.players}"}
+        );
+        return nullptr;
+    }
+    const RID entity = api->spawn_call(
+        p_fn,
+        p_args,
+        p_player.is_valid() ? p_player->incarnation : 0
+    );
+    return NetwMultiplayer::scene_outer_of(api->entity_get_node(entity));
 }
 
 Ref<NetwPromise> Netw::spawn_async(const Callable &p_fn, const Array &p_args) {
     Node *host = Object::cast_to<Node>(p_fn.get_object());
-    NetwMultiplayer *api
-        = host != nullptr ? NetwMultiplayer::of(host) : nullptr;
-    ReplicationCore *plane
-        = api != nullptr ? api->get_replication_plane() : nullptr;
-    if (plane == nullptr) {
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(host);
+    if (api == nullptr) {
         const String refusal(
             "Netw.spawn_async needs a spawn function on a node inside a "
             "session. Pass a method of a node under a MultiplayerViewport."
@@ -1014,8 +1007,7 @@ Ref<NetwPromise> Netw::spawn_async(const Callable &p_fn, const Array &p_args) {
         );
         return NetwPromise::refused(ERR_UNCONFIGURED, refusal);
     }
-    return plane->get_spawn_pipeline()
-        ->spawn_async(p_fn, p_args, Ref<NetwPlayer>());
+    return api->spawn_call_async(p_fn, p_args);
 }
 
 Error Netw::despawn(Node *p_node, const Ref<NetwDespawnOpts> &p_opts) {
@@ -1031,7 +1023,7 @@ Error Netw::despawn(Node *p_node, const Ref<NetwDespawnOpts> &p_opts) {
         );
         return ERR_DOES_NOT_EXIST;
     }
-    NetwMultiplayer *api = NetwEntity::session_core_for(p_node);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_node);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -1060,7 +1052,7 @@ Ref<NetwPromise> Netw::reparent(Node *p_node, Node *p_new_parent) {
             String("Netw.reparent: the node is no entity of any session")
         );
     }
-    NetwMultiplayer *api = NetwEntity::session_core_for(p_node);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_node);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -1086,7 +1078,7 @@ Ref<NetwAction> Netw::action(const Callable &p_authority) {
         );
         return Ref<NetwAction>();
     }
-    NetwMultiplayer *api = NetwMultiplayer::of(host);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(host);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -1111,7 +1103,8 @@ Ref<DictionaryRecord> Netw::sample(
         );
         return Ref<DictionaryRecord>();
     }
-    NetwMultiplayer *api = NetwEntity::session_core_for(p_entity->get_owner());
+    NetwMultiplayer *api
+        = NetwMultiplayer::session_holding(p_entity->get_owner());
     if (api == nullptr) {
         Node *owner = p_entity->get_owner();
         fault::raise(
@@ -1143,7 +1136,7 @@ Variant Netw::rewind(
     for (int at = 0; at < p_entities.size() && api == nullptr; ++at) {
         const Ref<NetwEntity> entity = p_entities[at];
         if (entity.is_valid()) {
-            api = NetwEntity::session_core_for(entity->get_owner());
+            api = NetwMultiplayer::session_holding(entity->get_owner());
         }
     }
     if (api == nullptr) {

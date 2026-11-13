@@ -17,13 +17,14 @@
 		        show_message("Kicked: %s" % detail)
 		[/codeblock]
 		There is one handle per session, so it is safe to keep it across an await.
+		Signals reported when a [method MultiplayerAPI.poll] or a [NetwClock] tick ends arrive in the order the changes happened, so a kick or a pause made inside one of their handlers is reported after that handler returns.
 		Connecting is done as you would normally do with [SceneMultiplayer], by assigning [member MultiplayerAPI.multiplayer_peer]. [member connection] finds servers and joins or hosts one, and [method Netw.prepare_join] names the player who joins.
 		[b]Moving the server[/b]
 		[method transfer_server] makes another peer the server, and [signal server_transferred] reports it on every peer. The session also survives the server leaving when its [MultiplayerPeer] can promote a client by itself. ENet, WebRTC, Steam and [OfflineMultiplayerPeer] cannot, so losing the server ends them.
 		On a peer that can, closing the server's window moves the server. The server calling [method leave] ends every client's session, even on a peer that can promote a client, so a server that wants the game to go on without it moves the server first.
 		[codeblock]
 		func hand_over(successor: NetwPlayer) -&gt; void:
-		    if session.transfer_server(successor.peer_id) == OK:
+		    if session.transfer_server(successor) == OK:
 		        await session.server_transferred
 		    await session.leave().wait()
 		[/codeblock]
@@ -102,7 +103,7 @@
 			<param index="0" name="player" type="NetwPlayer" />
 			<param index="1" name="reason" type="String" default="&quot;&quot;" />
 			<description>
-				Removes [param player] from the session and disconnects their peer with [param reason]. The server's own player cannot be kicked, use [method leave] instead.
+				Removes [param player] from the session and disconnects their peer with [param reason]. The server's own player cannot be kicked. Use [method leave] to end the session.
 				[b]Server Only.[/b]
 			</description>
 		</method>
@@ -151,7 +152,7 @@
 		</method>
 		<method name="register_service">
 			<return type="void" />
-			<param index="0" name="service" type="Object" />
+			<param index="0" name="service" type="Node" />
 			<param index="1" name="type" type="Object" default="null" />
 			<description>
 				Registers [param service] so [method service] returns it. [param type] defaults to the script of [param service]. A [NetwService] registers itself.
@@ -237,9 +238,9 @@
 		</method>
 		<method name="transfer_server">
 			<return type="int" enum="Error" />
-			<param index="0" name="peer_id" type="int" />
+			<param index="0" name="player" type="NetwPlayer" />
 			<description>
-				Asks the [MultiplayerPeer] to make [param peer_id] the server and this peer a client under a new id. [signal server_transferred] follows on every peer. A peer supports this when it declares a [code]server_relabelled[/code] signal and a [code skip-lint]transfer_server[/code] method. It emits the signal once [method MultiplayerPeer.get_unique_id] already answers the new id. A peer with only the signal can still promote a client when the server is lost.
+				Asks the [MultiplayerPeer] to make the peer of [param player] the server and this peer a client under a new id. [signal server_transferred] follows on every peer. A peer supports this when it declares a [code]server_relabelled[/code] signal and a [code skip-lint]transfer_server[/code] method, which receives the player's [member NetwPlayer.peer_id]. It emits the signal once [method MultiplayerPeer.get_unique_id] already answers the new id. A peer with only the signal can still promote a client when the server is lost.
 				[codeblock]
 				extends MultiplayerPeerExtension
 
@@ -258,7 +259,7 @@
 				Error
 				┠╴ERR_UNAUTHORIZED        called on a client
 				┠╴ERR_UNAVAILABLE         the transport cannot move the server
-				┠╴ERR_INVALID_PARAMETER   peer_id is not a connected client
+				┠╴ERR_INVALID_PARAMETER   player is not a connected client's player
 				┖╴ERR_BUSY                a database still has writes to settle
 				[/codeblock]
 				[b]Server Only.[/b]
@@ -273,7 +274,7 @@
 		</method>
 		<method name="unregister_service">
 			<return type="void" />
-			<param index="0" name="service" type="Object" />
+			<param index="0" name="service" type="Node" />
 			<param index="1" name="type" type="Object" default="null" />
 			<description>
 				Undoes [method register_service].
@@ -303,7 +304,7 @@
 			Whether the server has paused the session with [method pause].
 		</member>
 		<member name="players" type="NetwPlayer[]" setter="" getter="get_players">
-			Every [NetwPlayer] whose join was accepted and who has not left, sorted by peer id. A leaving player is already gone from it when [signal player_left] is emitted, while [member NetwMultiplayer.connected_players] still holds that player then.
+			Every [NetwPlayer] whose join was accepted and who has not left, sorted by peer id. A leaving player is already gone from it when [signal player_left] is emitted.
 		</member>
 		<member name="role" type="int" setter="" getter="get_role" enum="NetwSession.Role">
 			What this peer is in the session.
@@ -329,7 +330,7 @@
 	<signals>
 		<signal name="entered">
 			<description>
-				Emitted when this peer is online. A client goes online once the server admits its player, so [signal player_joined] for each player already present and then [signal local_joined] follow in the same frame.
+				Emitted when this peer is online. A client goes online once the server admits its player, so [signal player_joined] for each player already present and then [signal local_joined] follow in the same frame. A peer that goes online while [method MultiplayerAPI.poll] runs emits it when that poll ends.
 			</description>
 		</signal>
 		<signal name="exited">
@@ -343,14 +344,14 @@
 			<param index="0" name="reason" type="int" enum="NetwSession.ExitReason" />
 			<param index="1" name="detail" type="String" />
 			<description>
-				Emitted before the session is cleaned up, so [member players] and [member scenes] can still be read. [param detail] is the message the server gave, if any.
+				Emitted before the session is cleaned up, so [member players] and [member scenes] can still be read. [param detail] is the message the server gave, if any. Every signal the session still owed from the same poll or [NetwClock] tick is emitted before it.
 			</description>
 		</signal>
 		<signal name="join_failed">
 			<param index="0" name="code" type="int" enum="Error" />
 			<param index="1" name="reason" type="String" />
 			<description>
-				This peer's join was refused with [param code] and the [param reason] the server gave. [member local_player] stays [code]null[/code]. A client refused while connecting closes its peer and never goes online, so neither [signal entered] nor [signal exited] fires.
+				This peer's join was refused with [param code] and the [param reason] the server gave. [member local_player] stays [code]null[/code]. A client refused while connecting closes its peer and never goes online, so neither [signal entered] nor [signal exited] fires. A refusal heard while [method MultiplayerAPI.poll] runs is emitted when that poll ends.
 				Networked refuses with three codes, and any other [param code] is the one the admission handler or a [NetwAccountProvider] returned.
 				- [constant @GlobalScope.ERR_UNCONFIGURED] the two peers are set up differently, such as another build, another Networked version or other [method Netw.configure_join] arguments
 				- [constant @GlobalScope.ERR_TIMEOUT] the player was not admitted before [method NetwAdmissionConfig.timeout] or [member NetwMultiplayer.auth_timeout] passed
@@ -362,39 +363,39 @@
 			<param index="1" name="target" type="NetwPlayer" />
 			<param index="2" name="reason" type="String" />
 			<description>
-				Emitted on the server when [param requester] asks to kick [param target] with [method request_kick]. [method kick] performs it.
+				Emitted on the server when [param requester] asks to kick [param target] with [method request_kick]. [method kick] performs it. A request read while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="local_joined">
 			<param index="0" name="player" type="NetwPlayer" />
 			<description>
-				The [NetwPlayer] of this peer has joined. [member local_player] is set from here on.
+				The [NetwPlayer] of this peer has joined. [member local_player] is set from here on. It is emitted before [signal player_joined] for the same player, at the same point in the frame.
 			</description>
 		</signal>
 		<signal name="paused_changed">
 			<param index="0" name="paused" type="bool" />
 			<param index="1" name="reason" type="String" />
 			<description>
-				Emitted when [member paused] changes. [param reason] is what the server passed to [method pause]. A session that ends while paused emits it with [code]false[/code].
+				Emitted when [member paused] changes. [param reason] is what the server passed to [method pause]. A session that ends while paused emits it with [code]false[/code]. A change made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is emitted when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="player_joined">
 			<param index="0" name="player" type="NetwPlayer" />
 			<description>
-				A [NetwPlayer] has joined, including this peer's own.
+				A [NetwPlayer] has joined, including this peer's own. A player admitted while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="player_left">
 			<param index="0" name="player" type="NetwPlayer" />
 			<param index="1" name="reason" type="int" enum="NetwPlayer.LeaveReason" />
 			<description>
-				A [NetwPlayer] has left for [param reason]. [member NetwPlayer.is_active] is already [code]false[/code].
+				A [NetwPlayer] has left for [param reason]. [member NetwPlayer.is_active] is already [code]false[/code], and every property of [param player] reads empty once the handlers return. A player who leaves while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="scene_ready">
 			<param index="0" name="scene" type="NetwScene" />
 			<description>
-				Emitted after the root of [param scene] is ready, so the whole scene can be accessed.
+				Emitted after the root of [param scene] is ready, so the whole scene can be accessed. A scene that becomes ready while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 				[codeblock]
 				func on_scene_ready(arena: NetwScene) -&gt; void:
 				    arena.root.get_node(^"Spawns").arrange()
@@ -404,7 +405,7 @@
 		<signal name="scene_removed">
 			<param index="0" name="scene" type="NetwScene" />
 			<description>
-				Emitted after [param scene] leaves [member scenes].
+				Emitted after [param scene] leaves [member scenes]. A scene removed while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends.
 			</description>
 		</signal>
 		<signal name="server_transferred">
@@ -412,7 +413,7 @@
 			<param index="1" name="former_now" type="int" />
 			<description>
 				Emitted on every peer once the peer that was [param successor_was] has become the server at id [code]1[/code], and the old server, if it stayed, has become [param former_now].
-				[param former_now] is [code]0[/code] when the old server is gone, and its player leaves after this signal.
+				[param former_now] is [code]0[/code] when the old server is gone, and its player leaves after this signal. It is emitted when the [method MultiplayerAPI.poll] that moved the server ends.
 				[codeblocks]
 				[gdscript]
 				func _ready() -&gt; void:
@@ -443,7 +444,7 @@
 		<signal name="state_changed">
 			<param index="0" name="state" type="int" enum="NetwSession.State" />
 			<description>
-				Emitted when [member state] changes. A server transfer does not change it.
+				Emitted when [member state] changes. A server transfer does not change it. A change made while [method MultiplayerAPI.poll] runs is emitted when that poll ends, so [member state] can already read a later state.
 			</description>
 		</signal>
 	</signals>

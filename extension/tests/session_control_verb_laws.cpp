@@ -1,3 +1,4 @@
+#include "support/fault_log.h"
 #include "support/internals.h"
 #include "support/netw_test.h"
 
@@ -24,14 +25,6 @@ Ref<NetwMultiplayer> authority() {
     return core;
 }
 
-Ref<NetwPlayer> seat(const Ref<NetwMultiplayer> &p_core, int64_t p_peer) {
-    Ref<NetwPlayer> player;
-    player.instantiate();
-    p_core->player_adopt(p_peer, player);
-    REQUIRE(p_core->player_admit(p_peer));
-    return player;
-}
-
 int64_t kick_request_channel() {
     const netw::wire::WireRegistry registry
         = netw::wire::WireRegistry::create_default();
@@ -42,26 +35,43 @@ int64_t kick_request_channel() {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] SC2 a kick request reaches the server as "
-    "kick_requested at the next poll, naming the player who asked and the "
-    "player named, whether the host asked or a client's frame did"
+    "[Networked][Session][Hosted] SC2 a kick request read outside a step "
+    "reaches the server as kick_requested at once, naming the player who "
+    "asked and the player named, whether the host asked or a client's frame "
+    "did, and not at all when the player named already left or belongs to "
+    "another session"
 ) {
     struct Row {
         const char *label;
         bool from_client;
+        bool target_leaves;
+        bool foreign;
     };
-    const Row rows[] = {{"host asks", false}, {"client frame", true}};
+    const Row rows[] = {
+        {"host asks", false, false, false},
+        {"client frame", true, false, false},
+        {"target already left", true, true, false},
+        {"another session's player", false, false, true},
+    };
     for (const Row &row : rows) {
         INFO(row.label);
+        netw_test::FaultWatch faults;
+        faults.expect_error("*request_kick*[NW0032]*", row.foreign ? 1 : 0);
         const Ref<NetwMultiplayer> core = authority();
-        const Ref<NetwPlayer> host = seat(core, 1);
-        const Ref<NetwPlayer> client = seat(core, 4);
-        const Ref<NetwPlayer> named = seat(core, 9);
+        const Ref<NetwMultiplayer> other = authority();
+        const Ref<NetwPlayer> host = Internals::seat_player(core, 1);
+        const Ref<NetwPlayer> client = Internals::seat_player(core, 4);
+        const Ref<NetwPlayer> named
+            = Internals::seat_player(row.foreign ? other : core, 9);
         const CallLog seen;
         core->get_session()->connect(
             StringName("kick_requested"),
             seen.callable("kick")
         );
+        const int64_t named_id = named->get_id();
+        if (row.target_leaves) {
+            core->session_settle_peer_loss(9);
+        }
 
         if (row.from_client) {
             const int64_t channel = kick_request_channel();
@@ -69,7 +79,10 @@ TEST_CASE(
                 channel,
                 4,
                 netw::session::frame_write(
-                    netw::session::KickRequest{9, String("griefing")}
+                    netw::session::KickRequest{
+                        uint64_t(named_id),
+                        String("griefing")
+                    }
                 )
             );
             core->session_publish_control(
@@ -82,8 +95,11 @@ TEST_CASE(
         } else {
             core->get_session()->request_kick(named, String("griefing"));
         }
-        core->NETW_API_VIRTUAL(poll)();
 
+        if (row.target_leaves || row.foreign) {
+            NETW_CHECK_EQ(seen.count("kick"), 0);
+            continue;
+        }
         NETW_CHECK_EQ(seen.count("kick"), 1);
         const Array heard = seen.args("kick");
         REQUIRE(heard.size() == 3);
@@ -97,7 +113,7 @@ TEST_CASE(
 TEST_CASE(
     "[Networked][Session][Hosted] SC4 a client whose tickrate differs from "
     "the server's emits tickrate_mismatch with the server's tickrate when "
-    "the game chose to decide, at the end of the next tick"
+    "the game chose to decide, at once when the reply is read outside a step"
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
@@ -118,7 +134,6 @@ TEST_CASE(
         netw::session::frame_write(netw::session::ClockRate{30}),
         1
     );
-    core->clock_step(1);
 
     NETW_CHECK_EQ(seen.count("mismatch"), 1);
     const Array heard = seen.args("mismatch");

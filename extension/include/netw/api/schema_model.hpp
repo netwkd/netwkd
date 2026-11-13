@@ -11,7 +11,7 @@
 
 namespace netw {
 
-class NetwSchema : public godot::RefCounted {
+class NetwSchema : public godot::RefCounted, public enums::NetwSchema {
     GDCLASS(NetwSchema, godot::RefCounted)
 
 public:

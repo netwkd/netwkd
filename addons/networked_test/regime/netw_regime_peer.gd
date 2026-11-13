@@ -260,8 +260,8 @@ func _finish(code: int, exit_kind: String) -> void:
 		return
 	_completed = true
 	_write_summary(exit_kind)
-	if api and api:
-		api.predict_flush_tap()
+	if api and _test_classes:
+		ClassDB.class_call_static(&"NetwNativeTests", &"predict_tap_flush", api)
 	print("[regime] %s %s" % [role, exit_kind])
 	get_tree().quit(code)
 
@@ -327,10 +327,15 @@ func _write_summary(exit_kind: String) -> void:
 		"condition": _condition_report(),
 		"clock": _clock_report(),
 		"entities": _entity_snapshots,
-		"stats": api.stats_snapshot() if api else { },
-		"instrument_cost": { "tap": api.predict_get_tap_cost() },
+		"stats": api.session_get_stats() if api else { },
+		"instrument_cost": { "tap": { } },
 	}
 	if api and _test_classes:
+		summary["instrument_cost"]["tap"] = ClassDB.class_call_static(
+			&"NetwNativeTests",
+			&"predict_tap_cost",
+			api,
+		)
 		summary["attribution"] = ClassDB.class_call_static(
 			&"NetwNativeTests",
 			&"attribution_snapshot",

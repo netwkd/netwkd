@@ -1,4 +1,5 @@
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/scripted_loads.h"
 #include "support/stock_stand.h"
@@ -36,7 +37,7 @@ Node *build_body(const Variant &p_name) {
     NetwMultiplayer *client = client_build.client;
     Node *root = client != nullptr
         ? client->entity_get_node(
-              client->entity_from_route(client_build.root_route)
+              Internals::entity_at(client, client_build.root_route)
           )
         : nullptr;
     if (root != nullptr) {
@@ -121,7 +122,7 @@ struct LoadStand {
 
     Node *received(int p_route) const {
         NetwMultiplayer *client = rig.client(0);
-        return client->entity_get_node(client->entity_from_route(p_route));
+        return client->entity_get_node(Internals::entity_at(client, p_route));
     }
 
     void despawn(Node *p_root) {

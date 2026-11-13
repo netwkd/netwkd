@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
@@ -29,6 +30,7 @@ using netw::NetwEntity;
 using netw::NetwInterestLayer;
 using netw::NetwMultiplayer;
 using netw_test::FaultWatch;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawVerdict;
@@ -237,7 +239,7 @@ struct Watching {
             one_string("Watched"),
             string_type(),
             arena,
-            Variant(),
+            0,
             false
         );
         gate = rig.server()->interest_layer(StringName(GATE_LAYER));
@@ -247,7 +249,7 @@ struct Watching {
         watcher = rig.peer_id(CLIENT);
         show();
         REQUIRE(held() != nullptr);
-        standing = client()->entity_from_route(route);
+        standing = Internals::entity_at(client(), route);
         wrapper = NetwEntity::of(held());
     }
 
@@ -291,7 +293,7 @@ struct Watching {
         if (state() != LIVE || held() == nullptr) {
             return law_broken("the shown entity is not live with a node");
         }
-        if (client()->entity_from_route(route) != standing) {
+        if (Internals::entity_at(client(), route) != standing) {
             return law_broken("the shown entity is a new identity");
         }
         return law_held();
@@ -310,7 +312,8 @@ LawVerdict hidden_copy(const Stand &) {
     if (stand.layer_holds()) {
         return law_broken("the client's layer still holds the hidden copy");
     }
-    if (stand.client()->entity_from_route(stand.route) != stand.standing) {
+    if (Internals::entity_at(stand.client(), stand.route)
+        != stand.standing) {
         return law_broken("the route lost the hidden identity");
     }
     if (!stand.server_holds()) {
@@ -326,7 +329,8 @@ LawVerdict deleted_copy(const Stand &) {
     if (stand.state() != ABSENT) {
         return law_broken("the deleted copy is not absent");
     }
-    if (stand.client()->entity_from_route(stand.route) != stand.standing) {
+    if (Internals::entity_at(stand.client(), stand.route)
+        != stand.standing) {
         return law_broken("the route lost the deleted identity");
     }
     if (!stand.server_holds()) {

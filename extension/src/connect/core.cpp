@@ -122,7 +122,7 @@ void release_waiter(Waiter *p_waiter, NetwMultiplayer *) {
     if (p_waiter->out.is_valid() && !p_waiter->out->get_is_settled()) {
         p_waiter->out->reject(ERR_SKIP, "the connect flow was released.");
     }
-    free_creation(p_waiter->creation);
+    p_waiter->core->free_creation(p_waiter->creation);
     delete p_waiter;
 }
 
@@ -253,7 +253,34 @@ Ref<NetwServerInfo> info_of(const Variant &p_value) {
     );
 }
 
-void assign_created(
+void heard_through_failed(int64_t, const String &) {
+}
+
+} // namespace
+
+ConnectCore::ConnectCore() {
+    tickets.set_description("netw::connect peer creation");
+}
+
+ConnectCore::~ConnectCore() {
+    dispose();
+}
+
+RID ConnectCore::mint_creation(const Creation &p_seed) {
+    return tickets.make_rid(p_seed);
+}
+
+Creation *ConnectCore::creation_of(const RID &p_ticket) const {
+    return tickets.get_or_null(p_ticket);
+}
+
+void ConnectCore::free_creation(const RID &p_ticket) {
+    if (tickets.owns(p_ticket)) {
+        tickets.free(p_ticket);
+    }
+}
+
+void ConnectCore::assign_created(
     const Ref<MultiplayerPeer> &p_peer,
     int64_t p_error,
     const String &,
@@ -265,16 +292,7 @@ void assign_created(
         || !session->connect_plane().answers_attempt()) {
         return;
     }
-    session->NETW_API_VIRTUAL(set_multiplayer_peer)(p_peer);
-}
-
-void heard_through_failed(int64_t, const String &) {
-}
-
-} // namespace
-
-ConnectCore::~ConnectCore() {
-    dispose();
+    session->peer_assign(p_peer);
 }
 
 void ConnectCore::bind_session(NetwMultiplayer *p_session) {
@@ -317,27 +335,53 @@ void ConnectCore::adopt_live(Transport *p_transport) {
     if (live == p_transport) {
         return;
     }
-    release_live();
+    forget_target(release_live());
     live = p_transport;
     announce_join_address();
 }
 
 void ConnectCore::drop_live() {
-    release_live();
+    forget_target(release_live());
     announce_join_address();
 }
 
-void ConnectCore::release_live() {
+RID ConnectCore::release_live() {
     joined_target = RID();
     joined_address = String();
     advertised_address = String();
     advertised_players = 0;
-    if (live == nullptr) {
-        return;
+    const RID dropped = rows.drop_current();
+    if (live != nullptr) {
+        live->close();
+        delete live;
+        live = nullptr;
     }
-    live->close();
-    delete live;
-    live = nullptr;
+    return dropped;
+}
+
+void ConnectCore::forget_target(const RID &p_target) {
+    if (session != nullptr && p_target.is_valid()) {
+        session->endpoint_view_drop(p_target);
+    }
+}
+
+RID ConnectCore::current_target() {
+    const String address = endpoint_address();
+    if (address.is_empty()) {
+        return RID();
+    }
+    const RID transport = session->transport_find(live->peer_class());
+    if (!transport.is_valid()) {
+        return RID();
+    }
+    const RID listed = rows.find(transport, address);
+    if (listed.is_valid()) {
+        return listed;
+    }
+    RID dropped;
+    const RID held = rows.hold_current(transport, address, dropped);
+    forget_target(dropped);
+    return held;
 }
 
 void ConnectCore::announce_join_address() {
@@ -347,7 +391,7 @@ void ConnectCore::announce_join_address() {
     }
     announced_address = now;
     if (session != nullptr) {
-        session->connection_emit_join_address_changed(now);
+        session->connection_announce_join_address(now);
     }
 }
 
@@ -430,7 +474,10 @@ RID ConnectCore::target_add(
     const RID standing = rows.find(p_transport, address);
     const RID minted = rows.add(p_transport, address, p_display_name);
     if (!standing.is_valid() && minted.is_valid() && session != nullptr) {
-        session->endpoint_emit_added(minted);
+        session->endpoint_announce(
+            NetwMultiplayer::AnnouncementKind::ENDPOINT_ADDED,
+            minted
+        );
     }
     return minted;
 }
@@ -461,7 +508,10 @@ String ConnectCore::target_address(
 
 void ConnectCore::target_remove(const RID &p_target) {
     if (rows.remove(p_target) && session != nullptr) {
-        session->endpoint_emit_removed(p_target);
+        session->endpoint_announce(
+            NetwMultiplayer::AnnouncementKind::ENDPOINT_REMOVED,
+            p_target
+        );
     }
 }
 
@@ -564,26 +614,12 @@ Dictionary ConnectCore::defaults_of(const RID &p_transport) const {
     return preset != nullptr ? preset->duplicate(true) : Dictionary();
 }
 
-Ref<NetwPromise> ConnectCore::join(
-    const RID &p_transport,
-    const String &p_address,
-    const Dictionary &p_settings
-) {
-    return start_attempt(
-        p_transport,
-        PEER_MODE_CLIENT,
-        p_address,
-        Dictionary(),
-        p_settings
-    );
-}
-
 Ref<NetwPromise> ConnectCore::join_target(
     const RID &p_target,
     const Dictionary &p_settings
 ) {
     const TargetRow *held = rows.row(p_target);
-    if (held == nullptr) {
+    if (held == nullptr || !rows.holds(p_target)) {
         return NetwPromise::rejected(
             ERR_DOES_NOT_EXIST,
             "This endpoint is no longer listed."
@@ -668,7 +704,7 @@ void ConnectCore::move_attempt(int p_state) {
     }
     attempt.state = p_state;
     if (session != nullptr) {
-        session->connection_attempt_moved(p_state);
+        session->connection_attempt_moved();
     }
 }
 
@@ -682,7 +718,7 @@ void ConnectCore::release_attempt(const Attempt &p_ended) {
     if (p_ended.state == ATTEMPT_CREATING) {
         cancel_peer_creation(p_ended.ticket);
     } else if (p_ended.state == ATTEMPT_CONNECTING && session != nullptr) {
-        session->NETW_API_VIRTUAL(set_multiplayer_peer)(Ref<MultiplayerPeer>());
+        session->peer_assign(Ref<MultiplayerPeer>());
     }
 }
 
@@ -693,9 +729,9 @@ void ConnectCore::announce_end(
 ) {
     const bool heard = session != nullptr && p_error != OK
         && p_error != ERR_SKIP
-        && session->connection_emit_failed(p_error, p_reason);
+        && session->connection_announce_failed(p_error, p_reason);
     if (session != nullptr && p_ended.state != ATTEMPT_OFFLINE) {
-        session->connection_attempt_moved(ATTEMPT_OFFLINE);
+        session->connection_attempt_moved();
     }
     if (p_ended.promise.is_valid()) {
         if (heard) {
@@ -742,7 +778,7 @@ void ConnectCore::tick_attempt(double p_delta) {
         return;
     }
     if (!attempt.reported && session != nullptr) {
-        session->connection_emit_progressed(
+        session->connection_announce_progressed(
             String(),
             attempt.elapsed / attempt.deadline
         );
@@ -763,7 +799,7 @@ void ConnectCore::on_progress(
         attempt.reported = true;
     }
     if (session != nullptr) {
-        session->connection_emit_progressed(p_message, p_ratio);
+        session->connection_announce_progressed(p_message, p_ratio);
     }
 }
 
@@ -810,7 +846,10 @@ void ConnectCore::on_session_online() {
     }
     move_attempt(ATTEMPT_ONLINE);
     if (acknowledged) {
-        session->endpoint_emit_updated(joined_target);
+        session->endpoint_announce(
+            NetwMultiplayer::AnnouncementKind::ENDPOINT_CHANGED,
+            joined_target
+        );
     }
     announce_join_address();
     if (outcome.is_valid()) {
@@ -841,7 +880,7 @@ void ConnectCore::on_join_refused(Error p_error, const String &p_reason) {
         return;
     }
     if (session != nullptr) {
-        session->connection_emit_failed(p_error, p_reason);
+        session->connection_announce_failed(p_error, p_reason);
     }
 }
 
@@ -1054,7 +1093,8 @@ bool ConnectCore::claim_offer(const Ref<MultiplayerPeer> &p_peer) {
 }
 
 bool ConnectCore::live_online() const {
-    return live != nullptr && session != nullptr && session->is_online();
+    return live != nullptr && session != nullptr
+        && session->session_is_online();
 }
 
 String ConnectCore::endpoint_address() const {
@@ -1219,7 +1259,10 @@ void ConnectCore::on_poll(double p_delta) {
                 }
                 rows.probe_settled(step->target, code, answer);
                 if (session != nullptr && rows.row(step->target) != nullptr) {
-                    session->endpoint_emit_updated(step->target);
+                    session->endpoint_announce(
+                        NetwMultiplayer::AnnouncementKind::ENDPOINT_CHANGED,
+                        step->target
+                    );
                 }
             } break;
             case WAIT_CREATE_PEER: {
@@ -1352,43 +1395,55 @@ Transport *ConnectCore::transport_of_directory(int64_t p_directory) const {
     return nullptr;
 }
 
-void ConnectCore::on_directory_delivered(
-    const Ref<MultiplayerPeer> &p_peer,
-    int64_t p_directory
-) {
-    Transport *reached = transport_of_directory(p_directory);
-    if (reached != nullptr) {
-        reached->deliver(p_peer);
-    }
+RID ConnectCore::directory_ticket(int64_t p_directory) const {
+    const Transport *reached = transport_of_directory(p_directory);
+    return reached != nullptr ? reached->ticket() : RID();
 }
 
-void ConnectCore::on_directory_failed(
-    int64_t p_error,
-    const String &p_message,
-    int64_t p_directory
-) {
-    Transport *reached = transport_of_directory(p_directory);
-    if (reached != nullptr) {
-        reached->fail(Error(p_error), p_message);
-    }
+StringName ConnectCore::directory_peer_class(int64_t p_directory) const {
+    const Transport *reached = transport_of_directory(p_directory);
+    return reached != nullptr ? reached->peer_class() : StringName();
 }
 
-void ConnectCore::on_directory_listed(
-    const PackedStringArray &p_addresses,
-    const PackedStringArray &p_names,
-    const Array &p_infos,
-    int64_t p_directory
-) {
-    Transport *reached = transport_of_directory(p_directory);
-    if (reached != nullptr) {
-        publish_targets(
-            reached->peer_class(),
-            ObjectID(uint64_t(p_directory)),
-            p_addresses,
-            p_names,
-            p_infos
-        );
+Transport *ConnectCore::transport_of_ticket(const RID &p_ticket) const {
+    const Creation *asked = creation_of(p_ticket);
+    if (asked != nullptr && asked->provider != nullptr && session != nullptr
+        && asked->session == gd::instance_id(session)) {
+        return asked->provider;
     }
+    for (uint32_t at = 0; at < waiters.size(); at++) {
+        const Waiter *held = waiters[at];
+        if (held->core == this && held->creation == p_ticket
+            && held->scratch != nullptr) {
+            return held->scratch;
+        }
+    }
+    return nullptr;
+}
+
+void ConnectCore::complete(
+    const RID &p_ticket,
+    Error p_error,
+    const Variant &p_result,
+    const String &p_message
+) {
+    Transport *reached = transport_of_ticket(p_ticket);
+    if (reached == nullptr || reached->ticket() != p_ticket) {
+        return;
+    }
+    if (p_error != OK) {
+        reached->fail(p_error, p_message);
+        return;
+    }
+    Object *held = gd::live_object(p_result);
+    NetwServerInfo *info = Object::cast_to<NetwServerInfo>(held);
+    if (info != nullptr) {
+        reached->deliver_probe(Ref<NetwServerInfo>(info));
+        return;
+    }
+    reached->deliver(
+        Ref<MultiplayerPeer>(Object::cast_to<MultiplayerPeer>(held))
+    );
 }
 
 RID ConnectCore::invite(
@@ -1410,6 +1465,7 @@ RID ConnectCore::invite(
             break;
         }
     }
+    using Kind = NetwMultiplayer::AnnouncementKind;
     bool minted = false;
     const RID target
         = rows.invite(named, source, p_transport, p_address, minted);
@@ -1417,7 +1473,7 @@ RID ConnectCore::invite(
         && (p_address == endpoint_address() || p_address == join_address());
     if (already_there) {
         if (minted) {
-            session->endpoint_emit_added(target);
+            session->endpoint_announce(Kind::ENDPOINT_ADDED, target);
         }
         return target;
     }
@@ -1426,12 +1482,11 @@ RID ConnectCore::invite(
         held->invite_pending = true;
         held->invited_by = p_from_name;
     }
-    if (minted) {
-        session->endpoint_emit_added(target);
-    } else {
-        session->endpoint_emit_updated(target);
-    }
-    session->connection_emit_invited(target);
+    session->endpoint_announce(
+        minted ? Kind::ENDPOINT_ADDED : Kind::ENDPOINT_CHANGED,
+        target
+    );
+    session->endpoint_announce(Kind::INVITED, target);
     return target;
 }
 
@@ -1448,43 +1503,46 @@ void ConnectCore::forget_directory(ObjectID p_directory) {
     LocalVector<RID> dropped;
     rows.forget_source(p_directory, dropped);
     for (uint32_t at = 0; session != nullptr && at < dropped.size(); at++) {
-        session->endpoint_emit_removed(dropped[at]);
+        session->endpoint_announce(
+            NetwMultiplayer::AnnouncementKind::ENDPOINT_REMOVED,
+            dropped[at]
+        );
     }
 }
 
 void ConnectCore::publish_targets(
-    const StringName &p_peer_class,
+    const RID &p_transport,
     ObjectID p_source,
-    const PackedStringArray &p_addresses,
-    const PackedStringArray &p_names,
-    const Array &p_infos
+    const TypedArray<Dictionary> &p_targets
 ) {
     if (session == nullptr) {
         return;
     }
-    const RID transport = session->transport_find(p_peer_class);
+    const StringName named = session->transport_class_of(p_transport);
+    if (named.is_empty()) {
+        return;
+    }
     LocalVector<RID> dropped;
     LocalVector<RID> added;
     LocalVector<RID> updated;
     rows.publish_directory(
-        p_peer_class,
+        named,
         p_source,
-        transport,
-        p_addresses,
-        p_names,
-        p_infos,
+        p_transport,
+        p_targets,
         dropped,
         added,
         updated
     );
+    using Kind = NetwMultiplayer::AnnouncementKind;
     for (uint32_t at = 0; at < dropped.size(); at++) {
-        session->endpoint_emit_removed(dropped[at]);
+        session->endpoint_announce(Kind::ENDPOINT_REMOVED, dropped[at]);
     }
     for (uint32_t at = 0; at < added.size(); at++) {
-        session->endpoint_emit_added(added[at]);
+        session->endpoint_announce(Kind::ENDPOINT_ADDED, added[at]);
     }
     for (uint32_t at = 0; at < updated.size(); at++) {
-        session->endpoint_emit_updated(updated[at]);
+        session->endpoint_announce(Kind::ENDPOINT_CHANGED, updated[at]);
     }
 }
 

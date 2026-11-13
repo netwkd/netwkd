@@ -103,7 +103,7 @@ TEST_CASE(
     const Ref<Script> script = script_from(SERVER_DECLARED_SINK);
     REQUIRE(script.is_valid());
     const Seated seated = seat_star(rig, script);
-    rig.server()->entity_grant_control(seated.at_hub, rig.peer_id(0));
+    rig.server()->entity_set_controller(seated.at_hub, rig.peer_id(0));
     rig.pump(4);
 
     Array args;

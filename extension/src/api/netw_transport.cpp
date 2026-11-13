@@ -1,51 +1,14 @@
 #include "netw/api/netw_transport.hpp"
 
-#include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "godot/object.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/connect/creation.hpp"
-#include "netw/connect/probe_client.hpp"
+#include "netw/connect/browse_list.hpp"
 #include "netw/connect/transport.hpp"
 
 using namespace godot;
 
 namespace netw {
-
-NetwTransport::~NetwTransport() {
-    if (probing != nullptr) {
-        probing->close();
-        memdelete(probing);
-        probing = nullptr;
-    }
-}
-
-void NetwTransport::probe_authenticating(int64_t p_peer_id) {
-    if (probing != nullptr) {
-        probing->on_authenticating(p_peer_id);
-    }
-}
-
-void NetwTransport::probe_auth_received(
-    int64_t p_peer_id,
-    const PackedByteArray &p_data
-) {
-    if (probing != nullptr) {
-        probing->on_auth_received(p_peer_id, p_data);
-    }
-}
-
-void NetwTransport::probe_connection_failed() {
-    if (probing != nullptr) {
-        probing->on_connection_failed();
-    }
-}
-
-void NetwTransport::probe_authentication_failed(int64_t p_peer_id) {
-    if (probing != nullptr) {
-        probing->on_authentication_failed(p_peer_id);
-    }
-}
 
 void NetwTransport::_bind_methods() {
     ClassDB::bind_method(D_METHOD("peer_class"), &NetwTransport::peer_class);
@@ -144,7 +107,7 @@ void NetwTransport::_bind_methods() {
             Variant::OBJECT,
             "session",
             PROPERTY_HINT_RESOURCE_TYPE,
-            "NetwMultiplayer"
+            "NetwSession"
         ),
         "",
         "get_session"
@@ -184,10 +147,13 @@ void NetwTransport::bind_session(NetwMultiplayer *p_session) {
     session_id = gd::instance_id(p_session);
 }
 
-Ref<NetwMultiplayer> NetwTransport::get_session() const {
-    return Ref<NetwMultiplayer>(
-        Object::cast_to<NetwMultiplayer>(gd::object_of(session_id))
-    );
+NetwMultiplayer *NetwTransport::session() const {
+    return Object::cast_to<NetwMultiplayer>(gd::object_of(session_id));
+}
+
+Ref<NetwSession> NetwTransport::get_session() const {
+    NetwMultiplayer *owner = session();
+    return owner != nullptr ? owner->get_session() : Ref<NetwSession>();
 }
 
 void NetwTransport::report(
@@ -196,33 +162,19 @@ void NetwTransport::report(
     const String &p_message,
     double p_ratio
 ) {
-    const Ref<NetwMultiplayer> owner = get_session();
-    if (speaks_for(p_ticket) && owner.is_valid()) {
-        owner->connect_plane().on_progress(p_ticket, p_message, p_ratio);
+    NetwMultiplayer *owner = session();
+    if (owner != nullptr) {
+        owner->transport_report_progress(p_ticket, p_message, p_ratio);
     }
-}
-
-bool NetwTransport::speaks_for(const RID &p_ticket) const {
-    return armed_ticket.is_valid() && p_ticket == armed_ticket;
-}
-
-void NetwTransport::arm(
-    const RID &p_ticket,
-    const Ref<NetwPromise> &p_outcome
-) {
-    armed_ticket = p_ticket;
-    outcome = p_outcome;
 }
 
 void NetwTransport::deliver(
     const RID &p_ticket,
     const Ref<MultiplayerPeer> &p_peer
 ) {
-    if (!speaks_for(p_ticket)) {
-        return;
-    }
-    if (outcome.is_valid() && !outcome->get_is_settled()) {
-        outcome->resolve(p_peer);
+    NetwMultiplayer *owner = session();
+    if (owner != nullptr) {
+        owner->transport_complete(p_ticket, OK, p_peer, String());
     }
 }
 
@@ -230,11 +182,9 @@ void NetwTransport::deliver_probe(
     const RID &p_ticket,
     const Ref<NetwServerInfo> &p_info
 ) {
-    if (!speaks_for(p_ticket)) {
-        return;
-    }
-    if (outcome.is_valid() && !outcome->get_is_settled()) {
-        outcome->resolve(p_info);
+    NetwMultiplayer *owner = session();
+    if (owner != nullptr) {
+        owner->transport_complete(p_ticket, OK, p_info, String());
     }
 }
 
@@ -243,38 +193,10 @@ void NetwTransport::fail(
     Error p_error,
     const String &p_message
 ) {
-    if (!speaks_for(p_ticket)) {
-        return;
+    NetwMultiplayer *owner = session();
+    if (owner != nullptr) {
+        owner->transport_complete(p_ticket, p_error, Variant(), p_message);
     }
-    if (outcome.is_valid() && !outcome->get_is_settled()) {
-        outcome->reject(p_error, p_message);
-    }
-}
-
-void NetwTransport::probe_by_connecting(
-    const RID &p_ticket,
-    const String &p_address
-) {
-    const Ref<MultiplayerPeer> peer = make_probe_peer(p_address);
-    if (peer.is_null()) {
-        fail(p_ticket, ERR_UNAVAILABLE, "this transport does not probe");
-        return;
-    }
-    if (probing == nullptr) {
-        probing = memnew(connect::ProbeClient);
-    } else {
-        probing->close();
-    }
-    connect::ProbeHooks hooks;
-    hooks.authenticating
-        = callable_mp(this, &NetwTransport::probe_authenticating);
-    hooks.auth_received
-        = callable_mp(this, &NetwTransport::probe_auth_received);
-    hooks.connection_failed
-        = callable_mp(this, &NetwTransport::probe_connection_failed);
-    hooks.authentication_failed
-        = callable_mp(this, &NetwTransport::probe_authentication_failed);
-    probing->open(peer, timeout_hint(), outcome, hooks);
 }
 
 StringName NetwTransport::peer_class() {
@@ -373,16 +295,13 @@ Dictionary NetwTransport::client_settings() {
     return Dictionary();
 }
 
-void NetwTransport::make_peer(
+bool NetwTransport::make_peer(
     const RID &p_ticket,
     NetwMultiplayer::TransportMode p_mode,
     const String &p_address,
     const Dictionary &p_settings
 ) {
-    if (GDVIRTUAL_CALL(_make_peer, p_ticket, p_mode, p_address, p_settings)) {
-        return;
-    }
-    fail(p_ticket, ERR_UNCONFIGURED, "this transport cannot create a peer");
+    return GDVIRTUAL_CALL(_make_peer, p_ticket, p_mode, p_address, p_settings);
 }
 
 void NetwTransport::cancel_peer_creation(const RID &p_ticket) {
@@ -406,18 +325,17 @@ void NetwTransport::publish_targets(
     const PackedStringArray &p_names,
     const Array &p_infos
 ) {
-    const Ref<NetwMultiplayer> api = get_session();
-    if (api.is_null()) {
-        return;
+    NetwMultiplayer *owner = session();
+    if (owner != nullptr) {
+        owner->transport_publish_targets(
+            owner->transport_find(peer_class()),
+            connect::targets_of(p_addresses, p_names, p_infos)
+        );
     }
-    api->discovery_publish(peer_class(), p_addresses, p_names, p_infos);
 }
 
-void NetwTransport::probe(const RID &p_ticket, const String &p_address) {
-    if (GDVIRTUAL_CALL(_probe, p_ticket, p_address)) {
-        return;
-    }
-    probe_by_connecting(p_ticket, p_address);
+bool NetwTransport::probe(const RID &p_ticket, const String &p_address) {
+    return GDVIRTUAL_CALL(_probe, p_ticket, p_address);
 }
 
 Ref<MultiplayerPeer> NetwTransport::make_probe_peer(const String &p_address) {

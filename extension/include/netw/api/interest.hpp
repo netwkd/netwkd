@@ -23,11 +23,6 @@ protected:
 
 public:
     void bind(NetwEntity *p_entity);
-    void announce_observer(
-        const godot::StringName &p_layer_id,
-        int64_t p_peer,
-        bool p_entered
-    );
 
     static godot::Ref<NetwInterest> of(godot::Node *p_node);
 
@@ -40,7 +35,6 @@ public:
     );
     godot::Ref<NetwInterest> leave(const godot::StringName &p_layer_id);
     godot::TypedArray<godot::StringName> layer_ids() const;
-    bool is_visible_to(int64_t p_peer_id) const;
 
     godot::Ref<NetwInterest> on_enter(
         const godot::Callable &p_callback,
@@ -63,8 +57,6 @@ public:
         const godot::Callable &p_custom
     );
 
-    void set_report_observers(bool p_enabled);
-    bool reports_observers() const;
     int64_t leave_policy_for(
         const godot::StringName &p_layer_id,
         int64_t p_fallback
@@ -81,9 +73,6 @@ public:
     void dispatch_enter(const godot::StringName &p_layer_id, int64_t p_peer);
     void dispatch_leave(const godot::StringName &p_layer_id, int64_t p_peer);
 
-    void activate();
-    void deactivate();
-
     godot::Ref<NetwEntity> entity() const;
     interest::Decl *declaration();
 
@@ -93,10 +82,6 @@ private:
     NetwMultiplayer *core() const;
     NetwMultiplayer *attached_core() const;
     interest::Facet *facet() const;
-    bool is_authority() const;
-    godot::RID layer_ensure(const godot::StringName &p_layer_id);
-    void layer_join_live(const godot::StringName &p_layer_id);
-    void layer_leave_live(const godot::StringName &p_layer_id);
     godot::Ref<NetwInterest> bind_layer_callback(
         const godot::Callable &p_callback,
         const godot::StringName &p_layer_id,

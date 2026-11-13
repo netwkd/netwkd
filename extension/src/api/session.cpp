@@ -94,8 +94,15 @@ void NetwSession::announce_join_failed(int64_t p_code, const String &p_reason) {
 
 Error NetwSession::kick(const Ref<NetwPlayer> &p_who, const String &p_reason) {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->player_kick(p_who, p_reason)
-                          : ERR_UNCONFIGURED;
+    if (api == nullptr) {
+        return ERR_UNCONFIGURED;
+    }
+    const bool ours = p_who.is_valid() && p_who->belongs_to(api);
+    return api->player_kick_from(
+        ours ? p_who->get_id() : 0,
+        p_reason,
+        true
+    );
 }
 
 void NetwSession::request_kick(
@@ -114,7 +121,17 @@ void NetwSession::request_kick(
         );
         return;
     }
-    api->peer_request_kick(p_player->get_peer_id(), p_reason);
+    if (!api->player_holds(p_player)) {
+        fault::raise(
+            api,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwSession.request_kick}",
+             "a player that is not in this session",
+             "a player from {NetwSession.players}"}
+        );
+        return;
+    }
+    api->player_request_kick(p_player->get_id(), p_reason);
 }
 
 void NetwSession::announce_kick_requested(
@@ -134,10 +151,16 @@ void NetwSession::announce_scene_removed(const Ref<NetwScene> &p_scene) {
     emit_signal(StringName(SIG_SCENE_REMOVED), p_scene);
 }
 
-Error NetwSession::transfer_server(int64_t p_peer) {
+Error NetwSession::transfer_server(const Ref<NetwPlayer> &p_player) {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->session_transfer_server(p_peer)
-                          : ERR_UNCONFIGURED;
+    if (api == nullptr) {
+        return ERR_UNCONFIGURED;
+    }
+    const bool ours = p_player.is_valid() && p_player->belongs_to(api);
+    return api->session_transfer_from(
+        ours ? p_player->get_id() : 0,
+        true
+    );
 }
 
 void NetwSession::announce_scene_ready(const Ref<NetwScene> &p_scene) {
@@ -167,13 +190,16 @@ Ref<NetwPlayer> NetwSession::get_local_player() const {
 
 Ref<NetwPlayer> NetwSession::player_of(int64_t p_peer) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->peer_get_player(p_peer) : Ref<NetwPlayer>();
+    return api != nullptr ? api->player_joined_of(p_peer) : Ref<NetwPlayer>();
 }
 
 Ref<NetwPlayer> NetwSession::find_player(const String &p_account) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->player_find_account(p_account)
-                          : Ref<NetwPlayer>();
+    if (api == nullptr) {
+        return Ref<NetwPlayer>();
+    }
+    const int64_t found = api->player_find_account(p_account);
+    return found != 0 ? api->player_view(found) : Ref<NetwPlayer>();
 }
 
 Variant NetwSession::bucket_of(int64_t p_peer, const Variant &p_type) const {
@@ -183,7 +209,7 @@ Variant NetwSession::bucket_of(int64_t p_peer, const Variant &p_type) const {
 
 NetwSession::State NetwSession::get_state() const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->session_get_computed_state()
+    return api != nullptr ? api->session_get_state()
                           : NetwSession::STATE_OFFLINE;
 }
 
@@ -194,7 +220,7 @@ NetwSession::Role NetwSession::get_role() const {
 
 bool NetwSession::get_is_online() const {
     NetwMultiplayer *api = session();
-    return api != nullptr && api->is_online();
+    return api != nullptr && api->session_is_online();
 }
 
 bool NetwSession::is_paused() const {
@@ -204,12 +230,12 @@ bool NetwSession::is_paused() const {
 
 bool NetwSession::get_is_local_client() const {
     NetwMultiplayer *api = session();
-    return api != nullptr && api->is_local_client();
+    return api != nullptr && api->session_is_local_client();
 }
 
 Node *NetwSession::get_root() const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->session_root() : nullptr;
+    return api != nullptr ? api->session_get_root() : nullptr;
 }
 
 TypedArray<NetwScene> NetwSession::get_scenes() const {
@@ -247,13 +273,13 @@ int64_t NetwSession::stat(enums::NetwMultiplayer::Stat p_stat) const {
 void NetwSession::set_peer_bandwidth(int64_t p_peer, int64_t p_kbps) {
     NetwMultiplayer *api = session();
     if (api != nullptr) {
-        api->session_set_peer_bandwidth(p_peer, p_kbps);
+        api->peer_set_bandwidth(p_peer, p_kbps);
     }
 }
 
 Dictionary NetwSession::link_stats(int64_t p_peer) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->peer_link_stats(p_peer) : Dictionary();
+    return api != nullptr ? api->peer_get_link_stats(p_peer) : Dictionary();
 }
 
 Ref<NetwPromise> NetwSession::leave() {
@@ -369,18 +395,17 @@ Ref<NetwInterestLayer> NetwSession::interest_layer(
 
 Node *NetwSession::service(Object *p_type) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? Object::cast_to<Node>(api->get_service(p_type))
-                          : nullptr;
+    return api != nullptr ? api->service_get(p_type) : nullptr;
 }
 
-void NetwSession::register_service(Object *p_service, Object *p_type) {
+void NetwSession::register_service(Node *p_service, Object *p_type) {
     NetwMultiplayer *api = session();
     if (api != nullptr) {
         api->service_register(p_service, p_type);
     }
 }
 
-void NetwSession::unregister_service(Object *p_service, Object *p_type) {
+void NetwSession::unregister_service(Node *p_service, Object *p_type) {
     NetwMultiplayer *api = session();
     if (api != nullptr) {
         api->service_unregister(p_service, p_type);
@@ -530,7 +555,7 @@ void NetwSession::_bind_methods() {
         &NetwSession::link_stats
     );
     ClassDB::bind_method(
-        D_METHOD("transfer_server", "peer_id"),
+        D_METHOD("transfer_server", "player"),
         &NetwSession::transfer_server
     );
 

@@ -62,7 +62,7 @@ Ref<NetwDatabase> NetwDatabase::over(
 }
 
 Ref<NetwDatabase> NetwDatabase::of(Node *p_node, const StringName &p_name) {
-    NetwMultiplayer *api = NetwMultiplayer::of(p_node);
+    NetwMultiplayer *api = NetwMultiplayer::session_holding(p_node);
     if (api == nullptr) {
         fault::raise(
             nullptr,
@@ -80,7 +80,7 @@ Ref<NetwDatabase> NetwDatabase::named(
     NetwMultiplayer *p_session,
     const StringName &p_name
 ) {
-    const RID found = p_session->database_lookup(p_name);
+    const RID found = p_session->database_find(p_name);
     if (!found.is_valid()) {
         fault::raise(
             p_session,
@@ -119,8 +119,7 @@ Ref<NetwPromise> NetwDatabase::read(
             "this database handle outlived the session that issued it"
         ));
     }
-    return api
-        ->database_read(database, api->schema_of_declaration(p_schema), p_id);
+    return api->database_read(database, api->schema_declare(p_schema), p_id);
 }
 
 Ref<NetwPromise> NetwDatabase::write(
@@ -131,7 +130,7 @@ Ref<NetwPromise> NetwDatabase::write(
     NetwMultiplayer *api = session();
     return api != nullptr ? api->database_write(
                                 database,
-                                api->schema_of_declaration(p_schema),
+                                api->schema_declare(p_schema),
                                 p_id,
                                 p_values
                             )
@@ -146,7 +145,7 @@ Ref<NetwPromise> NetwDatabase::patch(
     NetwMultiplayer *api = session();
     return api != nullptr ? api->database_patch(
                                 database,
-                                api->schema_of_declaration(p_schema),
+                                api->schema_declare(p_schema),
                                 p_id,
                                 p_values
                             )
@@ -160,7 +159,7 @@ Ref<NetwPromise> NetwDatabase::erase(
     NetwMultiplayer *api = session();
     return api != nullptr ? api->database_erase(
                                 database,
-                                api->schema_of_declaration(p_schema),
+                                api->schema_declare(p_schema),
                                 p_id
                             )
                           : no_session();
@@ -181,7 +180,7 @@ Ref<NetwPromise> NetwDatabase::scan(
     }
     return api->database_scan(
         database,
-        api->schema_of_declaration(p_schema),
+        api->schema_declare(p_schema),
         p_filter,
         p_cursor,
         p_limit
@@ -219,10 +218,9 @@ StringName NetwDatabase::get_slot() const {
     return api != nullptr ? api->database_get_slot(database) : StringName();
 }
 
-NetwMultiplayer::DatabaseState NetwDatabase::get_state() const {
+NetwDatabase::State NetwDatabase::get_state() const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->database_get_state(database)
-                          : NetwMultiplayer::DATABASE_CLOSED;
+    return api != nullptr ? api->database_get_state(database) : STATE_CLOSED;
 }
 
 bool NetwDatabase::get_is_valid() const {
@@ -231,6 +229,10 @@ bool NetwDatabase::get_is_valid() const {
 }
 
 void NetwDatabase::_bind_methods() {
+    BIND_ENUM_CONSTANT(STATE_CLOSED);
+    BIND_ENUM_CONSTANT(STATE_OPENING);
+    BIND_ENUM_CONSTANT(STATE_OPEN);
+    BIND_ENUM_CONSTANT(STATE_CLOSING);
     ClassDB::bind_method(D_METHOD("open", "slot"), &NetwDatabase::open);
     ClassDB::bind_method(D_METHOD("close"), &NetwDatabase::close);
     ClassDB::bind_method(D_METHOD("flush"), &NetwDatabase::flush);
@@ -331,7 +333,7 @@ Error NetwWriteBatch::write(
     }
     const Error added = api->database_batch_write(
         operations,
-        api->schema_of_declaration(p_schema),
+        api->schema_declare(p_schema),
         p_id,
         p_values
     );
@@ -363,7 +365,7 @@ Error NetwWriteBatch::erase(
     }
     const Error added = api->database_batch_erase(
         operations,
-        api->schema_of_declaration(p_schema),
+        api->schema_declare(p_schema),
         p_id
     );
     if (added != OK && first_fault == OK) {

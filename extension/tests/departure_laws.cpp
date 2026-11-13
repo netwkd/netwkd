@@ -58,7 +58,7 @@ int seat_body(LoopbackRig &p_rig, Node *p_parent, const char *p_name) {
     const RID entity = p_rig.server()->spawn_registered(
         StringName(BODY_ID),
         named(p_name),
-        p_rig.player(0).ptr()
+        p_rig.player(0)->get_id()
     );
     REQUIRE_MESSAGE(entity.is_valid(), "the spawn verb minted no entity");
     Node *node = p_rig.server()->entity_get_node(entity);
@@ -109,7 +109,7 @@ struct Streaming {
     }
 
     bool addresses(int64_t p_peer) const {
-        return rig.server()->rpc_get_recipients(body()).has(int32_t(p_peer));
+        return rig.server()->rpc_recipients(body()).has(int32_t(p_peer));
     }
 
     bool streams() {

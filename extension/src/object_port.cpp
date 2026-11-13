@@ -286,7 +286,7 @@ void report_missing_resource(
 ) {
     Node *node = Object::cast_to<Node>(p_owner);
     fault::raise(
-        NetwMultiplayer::of(node),
+        NetwMultiplayer::session_holding(node),
         NETW_FAULT_RESOURCE_MISSING,
         {String(p_key),
          node != nullptr ? String(node->get_name()) : String(),

@@ -114,6 +114,9 @@ func _exit_tree() -> void:
 
 
 func on_endpoint_added(endpoint: NetwEndpoint) -> void:
+	if rows.has(endpoint):
+		return
+
 	var row: ConnectBrowserRow = ROW.instantiate()
 	row.endpoint = endpoint
 	rows[endpoint] = row
@@ -125,6 +128,9 @@ func on_endpoint_added(endpoint: NetwEndpoint) -> void:
 
 
 func on_endpoint_removed(endpoint: NetwEndpoint) -> void:
+	if not rows.has(endpoint):
+		return
+
 	rows[endpoint].queue_free()
 	rows.erase(endpoint)
 	empty_state.visible = rows.is_empty()

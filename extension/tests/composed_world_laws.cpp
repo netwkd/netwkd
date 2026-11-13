@@ -287,7 +287,7 @@ struct ComposedWorld {
         const RID made = host->spawn_registered(
             StringName(PLAYER_ID),
             named(p_name),
-            host->player_of(p_only_viewer).ptr()
+            host->player_of(p_only_viewer)->get_id()
         );
         REQUIRE(made.is_valid());
         Node *body = host->entity_get_node(made);
@@ -323,7 +323,7 @@ struct ComposedWorld {
         const RID made = host->spawn_registered(
             StringName(BODY_ID),
             named(p_name),
-            host->player_of(p_peer).ptr()
+            host->player_of(p_peer)->get_id()
         );
         REQUIRE(made.is_valid());
         Node *body = host->entity_get_node(made);
@@ -353,7 +353,7 @@ struct ComposedWorld {
         const RID made = host->spawn_registered(
             StringName(p_constructor),
             named(p_name),
-            host->player_of(p_peer).ptr()
+            host->player_of(p_peer)->get_id()
         );
         REQUIRE(made.is_valid());
         Node *body = host->entity_get_node(made);
@@ -413,11 +413,16 @@ TEST_CASE(
     REQUIRE(at_seven != nullptr);
     REQUIRE(at_nine != nullptr);
 
-    NETW_CHECK_EQ(int(cw.host->entity_get_peer(seated)), MEMBER);
+    CHECK(cw.host->player_incarnation(MEMBER) > 0);
+    NETW_CHECK_EQ(
+        cw.host->entity_get_player(seated),
+        cw.host->player_incarnation(MEMBER)
+    );
     NETW_CHECK_EQ(int(NetwEntity::of(at_seven)->get_route()), int(route));
     NETW_CHECK_EQ(int(NetwEntity::of(at_nine)->get_route()), int(route));
     NETW_CHECK_EQ(int(NetwEntity::of(at_seven)->get_controller()), MEMBER);
     NETW_CHECK_EQ(int(NetwEntity::of(at_nine)->get_controller()), MEMBER);
+    NETW_CHECK_EQ(int(cw.host->entity_get_controller(seated)), MEMBER);
 
     declare_state_stream(cw.host, at_host);
     declare_state_stream(cw.seven, at_seven);

@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include "godot/callable.hpp"
-#include "godot/hash_map.hpp"
 #include "godot/multiplayer.hpp"
 #include "godot/object.hpp"
 #include "godot/ref_counted.hpp"
@@ -24,8 +23,6 @@ class NetwConnection : public godot::RefCounted, public enums::NetwConnection {
     GDCLASS(NetwConnection, godot::RefCounted)
 
     godot::ObjectID session_id;
-    godot::Ref<NetwEndpoint> current_endpoint;
-    godot::HashMap<godot::RID, godot::Ref<NetwEndpoint>> endpoints_by_row;
 
     NetwMultiplayer *session() const;
 
@@ -35,7 +32,7 @@ class NetwConnection : public godot::RefCounted, public enums::NetwConnection {
         const godot::String &p_address
     ) const;
     godot::Dictionary transport_snapshot(const godot::RID &p_transport) const;
-    godot::Ref<NetwEndpoint> remember_endpoint(const godot::RID &p_target);
+    godot::Ref<NetwEndpoint> view_of(const godot::RID &p_endpoint) const;
 
 protected:
     static void _bind_methods();
@@ -43,14 +40,14 @@ protected:
 public:
     void bind_session(NetwMultiplayer *p_session);
 
-    void announce_endpoint_added(const godot::RID &p_target);
-    void announce_endpoint_removed(const godot::RID &p_target);
-    void announce_endpoint_updated(const godot::RID &p_target);
-    void announce_attempt_moved(int64_t p_state);
+    void announce_endpoint_added(const godot::Ref<NetwEndpoint> &p_endpoint);
+    void announce_endpoint_removed(const godot::Ref<NetwEndpoint> &p_endpoint);
+    void announce_endpoint_updated(const godot::Ref<NetwEndpoint> &p_endpoint);
     void announce_progressed(const godot::String &p_message, double p_ratio);
-    bool announce_failed(int64_t p_error, const godot::String &p_reason);
+    bool hears_failed() const;
+    void announce_failed(int64_t p_error, const godot::String &p_reason);
     void announce_join_address_changed(const godot::String &p_address);
-    void announce_invited(const godot::RID &p_target);
+    void announce_invited(const godot::Ref<NetwEndpoint> &p_endpoint);
 
     godot::RID create_peer(
         const godot::Variant &p_transport,

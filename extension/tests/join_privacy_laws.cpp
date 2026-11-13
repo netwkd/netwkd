@@ -31,22 +31,22 @@ TEST_CASE(
     const int first = rig.peer_id(0);
     NetwMultiplayer *watcher = rig.client(1);
 
-    const Ref<netw::NetwPlayer> seen = watcher->peer_get_player(first);
+    const Ref<netw::NetwPlayer> seen = watcher->player_joined_of(first);
     REQUIRE(seen.is_valid());
-    CHECK(bool(watcher->peer_get_player(first) == seen));
+    CHECK(bool(watcher->player_joined_of(first) == seen));
 
     const int watching = rig.peer_id(1);
     watcher->session_receive_roster(
         rig.server()->session_roster_bytes(watching),
         1
     );
-    CHECK(bool(watcher->peer_get_player(first) == seen));
+    CHECK(bool(watcher->player_joined_of(first) == seen));
 
     watcher->session_receive_accept(
         rig.server()->session_accept_bytes(first, watching),
         1
     );
-    CHECK(bool(watcher->peer_get_player(first) == seen));
+    CHECK(bool(watcher->player_joined_of(first) == seen));
 }
 
 TEST_CASE(

@@ -202,7 +202,8 @@ void NetwMultiplayer::sim_rest_pass(
     }
     rest.asleep_since = -1;
     rest.releasing = true;
-    r_row.view->release_control(SERVER_PEER)->mark_failure_observed();
+    r_row.view->release_control(entity::Control::SERVER)
+        ->mark_failure_observed();
 }
 
 void NetwMultiplayer::sim_settle_walk(int64_t p_local_peer, int64_t p_tick) {
@@ -335,7 +336,10 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
                     continue;
                 }
                 const Ref<NetwEntity> touched(other->view);
-                touched->claim_by_contact(Ref<NetwEntity>(row->view))
+                control_claim_by_contact(
+                    touched.ptr(),
+                    Ref<NetwEntity>(row->view)
+                )
                     ->mark_failure_observed();
                 if (sim::steered_locally(other->steering, local)
                     && sim_sources.find(target) < 0) {
