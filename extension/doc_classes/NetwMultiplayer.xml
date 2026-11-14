@@ -1282,65 +1282,6 @@
 				Returns one prediction setting of [param entity], or [code]null[/code].
 			</description>
 		</method>
-		<method name="predict_get_reachability">
-			<return type="Dictionary" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns, property by property, whether the prediction settings of [param entity] take effect, or an empty [Dictionary] before it is predicted. A row's [code]class[/code] names a [enum NetwPropertyConfig.PropertyClass] value.
-				[codeblock lang=text]
-				Dictionary
-				┠╴entity      StringName  the entity's name
-				┠╴schedule    StringName  TICK or FRAME
-				┠╴breach      Dictionary
-				┃ ┠╴response     StringName  DEMOTE or PREDICT_THROUGH
-				┃ ┖╴declared_by  StringName  what set the breach response
-				┠╴domain      Dictionary
-				┃ ┠╴island                StringName  exact, approximate or none
-				┃ ┖╴contact_window_ticks  int         ticks a contact holds corrections off
-				┠╴transport   bool        true when a correction path callback is set
-				┠╴fields      Dictionary  one row per state property, keyed by its name
-				┃ ┖╴row
-				┃   ┠╴class                 StringName         the property class
-				┃   ┠╴triggers              bool               whether it can force a correction alone
-				┃   ┠╴tolerance             float              the divergence epsilon in force
-				┃   ┠╴tolerance_declared    bool               true when the property set its own
-				┃   ┠╴teleport_at           float              the teleport distance in force
-				┃   ┠╴teleport_at_declared  bool               true when the property set its own
-				┃   ┠╴in_tier               bool               whether it is in the tier being compared
-				┃   ┠╴operators             PackedStringArray  what may write it during a recovery
-				┃   ┖╴forward_model         Dictionary         kind, live and why
-				┖╴findings    Array       one entry per problem found in the settings
-				  ┖╴finding
-				    ┠╴code      StringName         which check found it, such as unobserved
-				    ┠╴severity  StringName         debug, warning or error
-				    ┠╴fields    PackedStringArray  the state properties it applies to
-				    ┖╴message   String             what is wrong and how to fix it
-				[/codeblock]
-			</description>
-		</method>
-		<method name="predict_get_recovery_policy">
-			<return type="int" enum="NetwPrediction.RecoveryPolicy" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns the [enum NetwPrediction.RecoveryPolicy] that [param entity] actually uses, with [constant NetwPrediction.RECOVERY_POLICY_AUTO] resolved from its body and schedule.
-			</description>
-		</method>
-		<method name="predict_get_sensor">
-			<return type="Variant" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="name" type="StringName" />
-			<param index="2" name="default" type="Variant" default="null" />
-			<description>
-				Returns the value the sensor [param name] of [param entity] sampled before the current step, or [param default] when nothing sampled it.
-			</description>
-		</method>
-		<method name="predict_get_stats">
-			<return type="NetwPredictStats" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns the [member NetwPrediction.stats] of [param entity], or [code]null[/code] when it does not predict.
-			</description>
-		</method>
 		<method name="predict_is_declared" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="entity" type="RID" />
@@ -1348,11 +1289,11 @@
 				Returns [code]true[/code] while [param entity] is declared with [method predict_declare], whichever peer controls it.
 			</description>
 		</method>
-		<method name="predict_notify_contact">
+		<method name="predict_notify_collision">
 			<return type="void" />
 			<param index="0" name="entity" type="RID" />
 			<description>
-				Holds off small corrections of [param entity] for [member NetwPrediction.collision_cooldown_ticks]. Call it on the controlling client when the predicted body collides.
+				Holds off small corrections of [param entity] for [member NetwPrediction.correction_cooldown_ticks]. Call it on the controlling client when the predicted body collides.
 			</description>
 		</method>
 		<method name="predict_set_correction_path_callback">
@@ -1384,23 +1325,6 @@
 				┠╴ERR_DOES_NOT_EXIST     entity is not in this session
 				┖╴ERR_INVALID_PARAMETER  param is unknown
 				[/codeblock]
-			</description>
-		</method>
-		<method name="predict_set_sensor_callback">
-			<return type="void" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="name" type="StringName" />
-			<param index="2" name="callback" type="Callable" />
-			<description>
-				Adds [param callback] to [member NetwPrediction.sensors] of [param entity] under [param name]. An empty [Callable] removes it.
-			</description>
-		</method>
-		<method name="predict_set_witness_callback">
-			<return type="void" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="callback" type="Callable" />
-			<description>
-				Sets [member NetwPrediction.witness_contacts] on [param entity].
 			</description>
 		</method>
 		<method name="predict_stepper_install">
@@ -1881,12 +1805,12 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="simulation_set_step_callback">
+		<method name="simulation_set_network_process_callback">
 			<return type="void" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="callback" type="Callable" />
 			<description>
-				Sets [member NetwSimulation.step] on [param entity].
+				Sets [member NetwSimulation.network_process] on [param entity].
 			</description>
 		</method>
 		<method name="spawn_call">
@@ -2453,10 +2377,10 @@
 			A misprediction was corrected.
 		</constant>
 		<constant name="EVENT_DIVERGENCE" value="39" enum="Event">
-			A prediction differed from the server's state by more than the tolerance, along with [signal NetwPrediction.divergence_detected].
+			A prediction differed from the server's state by more than the tolerance.
 		</constant>
 		<constant name="EVENT_RECOVERY" value="40" enum="Event">
-			A predicted entity was corrected, along with [signal NetwPrediction.recovered].
+			A predicted entity was corrected, along with [signal NetwPrediction.corrected].
 		</constant>
 		<constant name="EVENT_GATE_SYNC" value="48" enum="Event">
 			An incoming synchronization packet was accepted or rejected. The verdict is the result.
@@ -2761,50 +2685,41 @@
 		<constant name="DISPLAY_PARAM_VISUAL_ROOT" value="13" enum="DisplayParam">
 			[NodePath]. The node the interpolated transform is written to. It may be set before the node exists.
 		</constant>
-		<constant name="PREDICT_PARAM_ARCHETYPE" value="0" enum="PredictParam">
-			[enum NetwPrediction.Archetype]. A preset, such as a character or a vehicle, that sets the other values. Set it first.
+		<constant name="PREDICT_PARAM_REPEAT_MISSING_INPUT" value="2" enum="PredictParam">
+			[bool]. See [member NetwPrediction.repeat_missing_input].
 		</constant>
-		<constant name="PREDICT_PARAM_MISSING_POLICY" value="2" enum="PredictParam">
-			[enum NetwPrediction.MissingInput]. What the server does when an input never arrives.
-		</constant>
-		<constant name="PREDICT_PARAM_RECOVERY_POLICY" value="3" enum="PredictParam">
-			[enum NetwPrediction.RecoveryPolicy]. How a misprediction is corrected.
+		<constant name="PREDICT_PARAM_MODE" value="3" enum="PredictParam">
+			[enum NetwPrediction.Mode]. How a misprediction is corrected.
 		</constant>
 		<constant name="PREDICT_PARAM_TELEPORT_THRESHOLD" value="6" enum="PredictParam">
-			[float]. An error larger than this teleports instead of smoothing. Used for properties with no threshold of their own.
+			[float]. See [member NetwPrediction.teleport_threshold].
 		</constant>
-		<constant name="PREDICT_PARAM_DIVERGENCE_EPSILON" value="7" enum="PredictParam">
-			[float]. How far a prediction may differ from the server before it counts as a misprediction.
+		<constant name="PREDICT_PARAM_CORRECTION_THRESHOLD" value="7" enum="PredictParam">
+			[float]. See [member NetwPrediction.correction_threshold].
 		</constant>
-		<constant name="PREDICT_PARAM_BREACH_RESPONSE" value="8" enum="PredictParam">
-			[enum NetwPrediction.BreachResponse]. What happens when a client's state cannot be corrected.
+		<constant name="PREDICT_PARAM_PAUSE_ON_UNPREDICTED_CONTACT" value="8" enum="PredictParam">
+			[bool]. See [member NetwPrediction.pause_on_unpredicted_contact].
 		</constant>
-		<constant name="PREDICT_PARAM_COLLISION_COOLDOWN_TICKS" value="10" enum="PredictParam">
-			[int] ticks after a collision during which corrections replace every property.
+		<constant name="PREDICT_PARAM_CORRECTION_COOLDOWN_TICKS" value="10" enum="PredictParam">
+			[int] ticks. See [member NetwPrediction.correction_cooldown_ticks].
 		</constant>
-		<constant name="PREDICT_PARAM_MAX_CONSUME_PER_TICK" value="11" enum="PredictParam">
+		<constant name="PREDICT_PARAM_MAX_INPUTS_PER_TICK" value="11" enum="PredictParam">
 			[int]. The most queued inputs the server runs in one tick.
 		</constant>
-		<constant name="PREDICT_PARAM_MAX_CONSUME_LAG_TICKS" value="12" enum="PredictParam">
+		<constant name="PREDICT_PARAM_MAX_INPUT_LAG_TICKS" value="12" enum="PredictParam">
 			[int] ticks the server may fall behind a client's inputs before it skips ahead.
 		</constant>
-		<constant name="PREDICT_PARAM_CONSUME_BUFFER_TICKS" value="13" enum="PredictParam">
-			[int] inputs the server keeps queued before running one, as [member NetwPrediction.consume_buffer_ticks]. [code]0[/code] by default.
+		<constant name="PREDICT_PARAM_INPUT_BUFFER_TICKS" value="13" enum="PredictParam">
+			[int] inputs the server keeps queued before running one, as [member NetwPrediction.input_buffer_ticks]. [code]0[/code] by default.
 		</constant>
-		<constant name="PREDICT_PARAM_REPLAY_BUFFER_DEPTH" value="14" enum="PredictParam">
-			[int]. How many past inputs are kept for replaying after a correction.
+		<constant name="PREDICT_PARAM_ROLLBACK_TOGETHER" value="15" enum="PredictParam">
+			[bool]. See [member NetwPrediction.rollback_together].
 		</constant>
-		<constant name="PREDICT_PARAM_RECONCILE_MODE" value="15" enum="PredictParam">
-			[int]. See [member NetwPrediction.reconcile_mode].
+		<constant name="PREDICT_PARAM_WORLD_VERSION" value="17" enum="PredictParam">
+			[int]. See [member NetwPrediction.world_version].
 		</constant>
-		<constant name="PREDICT_PARAM_ACK_AGE_TICKS" value="16" enum="PredictParam">
-			[int]. See [member NetwPrediction.ack_age_ticks].
-		</constant>
-		<constant name="PREDICT_PARAM_EPOCH" value="17" enum="PredictParam">
-			[int]. See [member NetwPrediction.epoch].
-		</constant>
-		<constant name="PREDICT_PARAM_SLEEPING" value="18" enum="PredictParam">
-			[bool]. See [member NetwPrediction.sleeping].
+		<constant name="PREDICT_PARAM_CORRECTION_COUNT" value="19" enum="PredictParam">
+			[int]. See [member NetwPrediction.correction_count]. It is read with [method predict_get_param] and cannot be set.
 		</constant>
 		<constant name="SIMULATION_PARAM_BODIES" value="0" enum="SimulationParam">
 			[code]Array[NodePath][/code]. [member NetwSimulation.bodies].
@@ -2826,6 +2741,9 @@
 		</constant>
 		<constant name="SIMULATION_PARAM_RELEASE_ON_REST" value="6" enum="SimulationParam">
 			[float] seconds. [member NetwSimulation.release_on_rest].
+		</constant>
+		<constant name="SIMULATION_PARAM_PHYSICS_DRIVEN" value="7" enum="SimulationParam">
+			[bool]. [member NetwSimulation.physics_driven].
 		</constant>
 		<constant name="SIM_PICK_CHOSEN" value="0" enum="SimPick">
 			Selects the entity or layer.
@@ -2990,7 +2908,7 @@
 			Counter. Inputs the server ran.
 		</constant>
 		<constant name="STAT_PREDICT_MISSING" value="52" enum="Stat">
-			Counter. Inputs that never arrived. See [constant PREDICT_PARAM_MISSING_POLICY].
+			Counter. Inputs that never arrived. See [constant PREDICT_PARAM_REPEAT_MISSING_INPUT].
 		</constant>
 		<constant name="STAT_PREDICT_PENDING_ACTIONS" value="53" enum="Stat">
 			Gauge. Actions waiting to run.
@@ -3086,7 +3004,7 @@
 			Counter. Replays of bodies simulated together.
 		</constant>
 		<constant name="STAT_JOINT_MEMBERS" value="84" enum="Stat">
-			Gauge. Bodies in the last joint replay.
+			Gauge. Bodies in the last replay of bodies simulated together.
 		</constant>
 		<constant name="STAT_JOINT_CELLS_RELAYED" value="85" enum="Stat">
 			Counter. Replayed ticks that used another player's received input.

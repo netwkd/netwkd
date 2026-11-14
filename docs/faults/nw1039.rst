@@ -1,0 +1,46 @@
+:github_url: hide
+
+.. _fault_nw1039:
+
+NW1039. Properties in different units share one threshold
+=========================================================
+
+Reported as a warning when a predicted entity leaves a per-property
+threshold unset where the entity-wide one is unlikely to fit. The log line
+lists the properties and gives one of two reasons.
+
+- **Two or more properties declared with**
+  :ref:`extrapolate <class_NetwPropertyConfig_method_extrapolate>` **set no**
+  :ref:`teleport_threshold <class_NetwPropertyConfig_method_teleport_threshold>`.
+  They share
+  :ref:`NetwPrediction.teleport_threshold <class_NetwPrediction_property_teleport_threshold>`,
+  so a distance and an angle are held to the same number.
+- **A property that another one extrapolates by sets no**
+  :ref:`correction_threshold <class_NetwPropertyConfig_method_correction_threshold>`.
+  It uses
+  :ref:`NetwPrediction.correction_threshold <class_NetwPrediction_property_correction_threshold>`,
+  which is usually sized for a position.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state() \
+                .extrapolate(&"velocity")
+        Netw.configure_property(self, &"heading").state() \
+                .extrapolate(&"angular_speed")
+        Netw.configure_property(self, &"velocity").state()
+        Netw.configure_property(self, &"angular_speed").state()
+
+Set the threshold on each property, in that property's own units.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state() \
+                .extrapolate(&"velocity").teleport_threshold(3.0)
+        Netw.configure_property(self, &"heading").state() \
+                .extrapolate(&"angular_speed").teleport_threshold(1.0)
+        Netw.configure_property(self, &"velocity").state() \
+                .correction_threshold(0.5)
+        Netw.configure_property(self, &"angular_speed").state() \
+                .correction_threshold(0.2)

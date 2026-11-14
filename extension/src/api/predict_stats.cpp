@@ -1,6 +1,5 @@
 #include "netw/api/predict_stats.hpp"
 
-#include "godot/class_db.hpp"
 #include "godot/object.hpp"
 
 using namespace godot;
@@ -442,48 +441,6 @@ Dictionary NetwPredictStats::Book::to_dictionary() const {
         out[StringName(FACTS[at].name)] = read(FACTS[at]);
     }
     return out;
-}
-
-void NetwPredictStats::view(Book *p_book) {
-    book = p_book != nullptr ? p_book : &own;
-}
-
-void NetwPredictStats::keep(const Book &p_book) {
-    own = p_book;
-    book = &own;
-}
-
-Dictionary NetwPredictStats::to_dictionary() const {
-    return book->to_dictionary();
-}
-
-int64_t NetwPredictStats::get_corrections() const {
-    return get_int_fact(FACT_CORRECTIONS);
-}
-
-int64_t NetwPredictStats::get_installs() const {
-    return get_int_fact(FACT_INSTALLS);
-}
-
-void NetwPredictStats::_bind_methods() {
-    ClassDB::bind_method(
-        D_METHOD("get_corrections"),
-        &NetwPredictStats::get_corrections
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_installs"),
-        &NetwPredictStats::get_installs
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::INT, "corrections"),
-        godot::String(),
-        "get_corrections"
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::INT, "installs"),
-        godot::String(),
-        "get_installs"
-    );
 }
 
 } // namespace netw

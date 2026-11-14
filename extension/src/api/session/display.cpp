@@ -1,3 +1,4 @@
+#include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "godot/display_server.hpp"
 #include "godot/engine.hpp"
@@ -15,6 +16,7 @@
 #include "netw/display/pump.hpp"
 #include "netw/display/roles.hpp"
 #include "netw/display/timing.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/repl/sync_pipeline.hpp"
@@ -43,6 +45,21 @@ bool display_renders_here() {
     }
     DisplayServer *display = DisplayServer::get_singleton();
     return display != nullptr && display->get_name() != String("headless");
+}
+
+void report_type_change(NetwMultiplayer *p_session, display::Channel *p_state) {
+    const Variant held = p_state->get_target_obj();
+    Object *target = held;
+    fault::raise(
+        p_session,
+        NETW_FAULT_INTERPOLATION_IGNORED,
+        {String(p_state->get_target_prop()),
+         String(),
+         String(),
+         0,
+         NETW_INTERPOLATION_TYPE_CHANGED},
+        target != nullptr ? uint64_t(gd::instance_id(target)) : 0
+    );
 }
 
 } // namespace
@@ -381,7 +398,9 @@ void NetwMultiplayer::display_land(
     if (p_owner != 0) {
         history.follow(&store_world, p_owner, p_lane, p_column);
     }
-    history.record(p_tick, p_value, p_authoring_tick);
+    if (!history.record(p_tick, p_value, p_authoring_tick)) {
+        report_type_change(this, p_state);
+    }
     display_book->wake(p_runtime);
 
     event_record(EventPlane::DISPLAY_RECORD, RID(), p_route, 0, OK, p_tick);
@@ -538,7 +557,9 @@ bool NetwMultiplayer::display_record_runtime(
 #if defined(NETW_TESTS)
         idle_work.sampled += 1;
 #endif
-        history.record_every_tick(p_tick, port_get(from, prop));
+        if (!history.record_every_tick(p_tick, port_get(from, prop))) {
+            report_type_change(this, state);
+        }
         history.set_source_rested(rests);
         display_book->wake(p_runtime);
         busy = busy || !rests;

@@ -4,34 +4,13 @@
 #include "godot/class_db.hpp"
 #include "godot/node.hpp"
 #include "netw/fault_book.hpp"
-#include "netw/game_call.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
-#include "netw/script/model.hpp"
 
 using namespace godot;
 
 namespace netw {
 
 using repl::PropertySet;
-
-namespace {
-
-const GameCall CARRY_STEP
-    = {"NetwPropertyConfig.carry_step",
-       "func(value: Variant, ctx: NetwPredictCarryContext) -> Variant",
-       2};
-
-Callable &carry_binder() {
-    static Callable binder;
-    return binder;
-}
-
-} // namespace
-
-void NetwPropertyConfig::set_carry_binder(const Callable &p_binder) {
-    carry_binder() = p_binder;
-}
 
 void NetwPropertyConfig::warn_double_set(
     bool p_replaces,
@@ -79,58 +58,20 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::retained() {
     return Ref<NetwPropertyConfig>(this);
 }
 
-Ref<NetwPropertyConfig> NetwPropertyConfig::causal() {
-    property_class = PropertySet::CAUSAL;
+Ref<NetwPropertyConfig> NetwPropertyConfig::unchecked() {
+    is_unchecked = true;
     return Ref<NetwPropertyConfig>(this);
 }
 
-Ref<NetwPropertyConfig> NetwPropertyConfig::derived() {
-    property_class = PropertySet::DERIVED;
+Ref<NetwPropertyConfig> NetwPropertyConfig::correction_weight(double p_weight) {
+    weight = p_weight;
     return Ref<NetwPropertyConfig>(this);
 }
 
-Ref<NetwPropertyConfig> NetwPropertyConfig::cosmetic() {
-    property_class = PropertySet::COSMETIC;
-    return Ref<NetwPropertyConfig>(this);
-}
-
-Ref<NetwPropertyConfig> NetwPropertyConfig::converge(double p_stiffness) {
-    converge_stiffness = p_stiffness;
-    return Ref<NetwPropertyConfig>(this);
-}
-
-Ref<NetwPropertyConfig> NetwPropertyConfig::carry_along(
-    const StringName &p_channel
+Ref<NetwPropertyConfig> NetwPropertyConfig::extrapolate(
+    const StringName &p_rate_property
 ) {
-    carry_channel = p_channel;
-    return Ref<NetwPropertyConfig>(this);
-}
-
-Ref<NetwPropertyConfig> NetwPropertyConfig::carry_step(const Callable &p_step) {
-    Node *owner = Object::cast_to<Node>(p_step.get_object());
-    if (!p_step.is_valid() || owner == nullptr) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_BAD_CALLABLE,
-            {vformat("{NetwPropertyConfig.carry_step} on '%s'",
-                     String(get_context_name())),
-             String(),
-             String("a method of the node it moves")},
-            owner != nullptr ? uint64_t(gd::instance_id(owner)) : 0
-        );
-        return Ref<NetwPropertyConfig>(this);
-    }
-    game_call_declared(p_step, CARRY_STEP);
-    const Callable &binder = carry_binder();
-    if (binder.is_valid()) {
-        binder.call(owner, get_context_name(), p_step);
-    } else {
-        netw::script::model::bind_node_property_carry(
-            owner,
-            get_context_name(),
-            p_step
-        );
-    }
+    rate_property = p_rate_property;
     return Ref<NetwPropertyConfig>(this);
 }
 
@@ -139,18 +80,17 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::teleport_only() {
     return Ref<NetwPropertyConfig>(this);
 }
 
-Ref<NetwPropertyConfig> NetwPropertyConfig::epsilon(double p_threshold) {
-    epsilon_override = p_threshold;
+Ref<NetwPropertyConfig> NetwPropertyConfig::correction_threshold(
+    double p_threshold
+) {
+    correction_threshold_override = p_threshold;
     return Ref<NetwPropertyConfig>(this);
 }
 
-Ref<NetwPropertyConfig> NetwPropertyConfig::teleport_at(double p_distance) {
-    teleport_at_override = p_distance;
-    return Ref<NetwPropertyConfig>(this);
-}
-
-Ref<NetwPropertyConfig> NetwPropertyConfig::reconcile_only() {
-    explicit_reconcile_only = true;
+Ref<NetwPropertyConfig> NetwPropertyConfig::teleport_threshold(
+    double p_distance
+) {
+    teleport_threshold_override = p_distance;
     return Ref<NetwPropertyConfig>(this);
 }
 
@@ -211,36 +151,26 @@ void NetwPropertyConfig::_bind_methods() {
         &NetwPropertyConfig::volatile_lane
     );
     ClassDB::bind_method(D_METHOD("retained"), &NetwPropertyConfig::retained);
-    ClassDB::bind_method(D_METHOD("causal"), &NetwPropertyConfig::causal);
-    ClassDB::bind_method(D_METHOD("derived"), &NetwPropertyConfig::derived);
-    ClassDB::bind_method(D_METHOD("cosmetic"), &NetwPropertyConfig::cosmetic);
+    ClassDB::bind_method(D_METHOD("unchecked"), &NetwPropertyConfig::unchecked);
     ClassDB::bind_method(
-        D_METHOD("converge", "stiffness"),
-        &NetwPropertyConfig::converge
+        D_METHOD("correction_weight", "weight"),
+        &NetwPropertyConfig::correction_weight
     );
     ClassDB::bind_method(
-        D_METHOD("carry_along", "channel"),
-        &NetwPropertyConfig::carry_along
-    );
-    ClassDB::bind_method(
-        D_METHOD("carry_step", "step"),
-        &NetwPropertyConfig::carry_step
+        D_METHOD("extrapolate", "rate_property"),
+        &NetwPropertyConfig::extrapolate
     );
     ClassDB::bind_method(
         D_METHOD("teleport_only"),
         &NetwPropertyConfig::teleport_only
     );
     ClassDB::bind_method(
-        D_METHOD("epsilon", "threshold"),
-        &NetwPropertyConfig::epsilon
+        D_METHOD("correction_threshold", "threshold"),
+        &NetwPropertyConfig::correction_threshold
     );
     ClassDB::bind_method(
-        D_METHOD("teleport_at", "distance"),
-        &NetwPropertyConfig::teleport_at
-    );
-    ClassDB::bind_method(
-        D_METHOD("reconcile_only"),
-        &NetwPropertyConfig::reconcile_only
+        D_METHOD("teleport_threshold", "distance"),
+        &NetwPropertyConfig::teleport_threshold
     );
     ClassDB::bind_method(D_METHOD("on_change"), &NetwPropertyConfig::on_change);
     ClassDB::bind_method(
@@ -299,25 +229,6 @@ void NetwPropertyConfig::_bind_methods() {
         "get_set_audience"
     );
 
-    ClassDB::bind_method(
-        D_METHOD("set_property_class", "property_class"),
-        &NetwPropertyConfig::set_property_class
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_property_class"),
-        &NetwPropertyConfig::get_property_class
-    );
-    ADD_PROPERTY(
-        PropertyInfo(
-            Variant::INT,
-            "property_class",
-            PROPERTY_HINT_ENUM,
-            "Causal,Derived,Cosmetic"
-        ),
-        "set_property_class",
-        "get_property_class"
-    );
-
 #define NETW_PROPERTY_CONFIG_PROPERTY(m_type, m_name) \
     ClassDB::bind_method( \
         D_METHOD("set_" #m_name, #m_name), \
@@ -334,8 +245,6 @@ void NetwPropertyConfig::_bind_methods() {
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, in_state_set);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, in_input_set);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, in_broadcast_set);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::FLOAT, epsilon_override);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::FLOAT, teleport_at_override);
     ClassDB::bind_method(
         D_METHOD("set_set_trigger", "set_trigger"),
         &NetwPropertyConfig::set_set_trigger
@@ -359,10 +268,6 @@ void NetwPropertyConfig::_bind_methods() {
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::INT, set_heartbeat_ticks);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::INT, set_window);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, set_masked);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::FLOAT, converge_stiffness);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::STRING_NAME, carry_channel);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, explicit_teleport_only);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, explicit_reconcile_only);
 
 #undef NETW_PROPERTY_CONFIG_PROPERTY
 
@@ -371,9 +276,6 @@ void NetwPropertyConfig::_bind_methods() {
     BIND_ENUM_CONSTANT(TRIGGER_ON_DEMAND);
     BIND_ENUM_CONSTANT(VOLATILE);
     BIND_ENUM_CONSTANT(RETAINED);
-    BIND_ENUM_CONSTANT(CAUSAL);
-    BIND_ENUM_CONSTANT(DERIVED);
-    BIND_ENUM_CONSTANT(COSMETIC);
     BIND_ENUM_CONSTANT(AUDIENCE_PUBLIC);
     BIND_ENUM_CONSTANT(AUDIENCE_SERVER_ONLY);
     BIND_CONSTANT(UNSET);

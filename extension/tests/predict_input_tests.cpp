@@ -4,8 +4,8 @@
 
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/predict_stats.hpp"
 #include "netw/api/prediction.hpp"
+#include "netw/predict/drive.hpp"
 #include "support/internals.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
@@ -37,13 +37,12 @@ var motion := 0
 
 
 func _init() -> void:
-	var e := Netw.configure_entity(self)
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+	Netw.configure_entity(self)
 	Netw.configure_property(self, &"beat").state()
 	Netw.configure_property(self, &"motion").input()
 
 
-func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
+func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
 	beat += motion
 )";
 
@@ -65,13 +64,12 @@ var inputs: Resource:
 
 
 func _init() -> void:
-	var e := Netw.configure_entity(self)
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+	Netw.configure_entity(self)
 	Netw.configure_property(self, &"beat").state()
 	Netw.configure_property(self, &"inputs:move").input()
 
 
-func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 	if is_fresh:
 		fresh[tick] = inputs.move
 	else:
@@ -171,7 +169,7 @@ struct Walk {
     }
 
     int64_t corrections(int p_at) const {
-        return prediction(p_at)->get_stats()->get_corrections();
+        return prediction(p_at)->get_correction_count();
     }
 
     void step(int p_at, int p_motion) {
@@ -182,7 +180,7 @@ struct Walk {
 
 LawVerdict burst_is_caught_up(const World &) {
     Walk walk(0, false, true);
-    const int per_tick = walk.prediction(SERVER)->get_max_consume_per_tick();
+    const int per_tick = walk.prediction(SERVER)->get_max_inputs_per_tick();
     if (per_tick <= 1) {
         return law_broken("the server consumes %d input a tick", per_tick);
     }
@@ -221,8 +219,8 @@ LawVerdict burst_is_caught_up(const World &) {
 }
 
 LawVerdict late_spawn_moves(const World &) {
-    Walk walk(NetwPrediction::ACK_AGE_MAX + 16, false, true);
-    walk.prediction(SERVER)->set_consume_buffer_ticks(2);
+    Walk walk(netw::predict::ACK_AGE_MAX + 16, false, true);
+    walk.prediction(SERVER)->set_input_buffer_ticks(2);
     for (int tick = 0; tick < SETTLE_TICKS; ++tick) {
         walk.step(0, 1);
     }
@@ -311,7 +309,7 @@ LawVerdict server_body_moves(const World &) {
 const Row ROWS[] = {
     {"a burst of input the server held arrives at once",
      "the server runs it as extra steps, is back at its lead within what "
-     "max_consume_per_tick allows, and the client is never corrected",
+     "max_inputs_per_tick allows, and the client is never corrected",
      &burst_is_caught_up},
     {"an entity spawned after the session ran past the acknowledgement "
      "horizon",

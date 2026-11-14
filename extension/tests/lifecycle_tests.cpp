@@ -1644,9 +1644,7 @@ void take_standing(LoopbackRig &p_rig, const Refusal &p_row, int p_route) {
     host->set_controller(p_rig.peer_id(0));
     p_rig.pump(6);
     if (p_row.standing == STANDING_PREDICTED) {
-        here->get_prediction()->set_archetype(
-            netw::NetwPrediction::ARCHETYPE_SCRIPTED
-        );
+        p_rig.client(0)->predict_declare(here->get_rid_handle());
     }
     if (p_row.standing == STANDING_NATIVE) {
         MultiplayerSynchronizer *native = memnew(MultiplayerSynchronizer);

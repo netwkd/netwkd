@@ -55,13 +55,12 @@ var motion := 0
 
 
 func _init() -> void:
-	var e := Netw.configure_entity(self)
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+	Netw.configure_entity(self)
 	Netw.configure_property(self, &"beat").state()
 	Netw.configure_property(self, &"motion").input()
 
 
-func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
+func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
 	beat += motion
 )";
 
@@ -229,9 +228,9 @@ struct Session {
             return -1;
         }
         NetwMultiplayer *api = seat(p_at);
-        const Ref<netw::NetwPredictStats> stats
-            = api->predict_get_stats(Internals::entity_of(api, node));
-        return stats.is_valid() ? stats->get_corrections() : int64_t(-1);
+        const Ref<netw::NetwPrediction> handle
+            = api->prediction_handle(Internals::entity_of(api, node));
+        return handle.is_valid() ? handle->get_correction_count() : int64_t(-1);
     }
 };
 
@@ -581,7 +580,7 @@ class WorldRun {
         }
         evidence.backlog = pool->newest_authored_input(slot) - cursor;
         evidence.consume_per_tick
-            = entity->get_prediction()->get_max_consume_per_tick();
+            = entity->get_prediction()->get_max_inputs_per_tick();
     }
 
     void settle(Exit p_exit) {

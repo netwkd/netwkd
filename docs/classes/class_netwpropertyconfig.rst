@@ -28,7 +28,7 @@ Description
         Netw.configure_property(self, &"move_dir").input()
         Netw.configure_property(self, &"aim_dir").broadcast()
 
-\ :ref:`volatile()<class_NetwPropertyConfig_method_volatile>`, :ref:`retained()<class_NetwPropertyConfig_method_retained>`, :ref:`epsilon()<class_NetwPropertyConfig_method_epsilon>` and :ref:`persisted()<class_NetwPropertyConfig_method_persisted>` apply to one property. :ref:`on_change()<class_NetwPropertyConfig_method_on_change>`, :ref:`heartbeat()<class_NetwPropertyConfig_method_heartbeat>`, :ref:`windowed()<class_NetwPropertyConfig_method_windowed>`, :ref:`audience()<class_NetwPropertyConfig_method_audience>` and :ref:`masked()<class_NetwPropertyConfig_method_masked>` apply to every property of the same kind on the script. Give them consistent values.
+\ :ref:`volatile()<class_NetwPropertyConfig_method_volatile>`, :ref:`retained()<class_NetwPropertyConfig_method_retained>`, :ref:`correction_threshold()<class_NetwPropertyConfig_method_correction_threshold>` and :ref:`persisted()<class_NetwPropertyConfig_method_persisted>` apply to one property. :ref:`on_change()<class_NetwPropertyConfig_method_on_change>`, :ref:`heartbeat()<class_NetwPropertyConfig_method_heartbeat>`, :ref:`windowed()<class_NetwPropertyConfig_method_windowed>`, :ref:`audience()<class_NetwPropertyConfig_method_audience>` and :ref:`masked()<class_NetwPropertyConfig_method_masked>` apply to every property of the same kind on the script. Give them consistent values.
 
 \ :ref:`NetwMemberConfig.interpolate()<class_NetwMemberConfig_method_interpolate>` smooths received values. It returns a :ref:`NetwMemberConfig<class_NetwMemberConfig>`, so chain it after the methods of this class.
 
@@ -51,43 +51,29 @@ Properties
 .. table::
    :widths: auto
 
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`StringName`                                         | :ref:`carry_channel<class_NetwPropertyConfig_property_carry_channel>`                     |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`float`                                              | :ref:`converge_stiffness<class_NetwPropertyConfig_property_converge_stiffness>`           |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`float`                                              | :ref:`epsilon_override<class_NetwPropertyConfig_property_epsilon_override>`               |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`explicit_reconcile_only<class_NetwPropertyConfig_property_explicit_reconcile_only>` |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`explicit_teleport_only<class_NetwPropertyConfig_property_explicit_teleport_only>`   |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`in_broadcast_set<class_NetwPropertyConfig_property_in_broadcast_set>`               |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`in_input_set<class_NetwPropertyConfig_property_in_input_set>`                       |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`in_state_set<class_NetwPropertyConfig_property_in_state_set>`                       |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`is_property<class_NetwPropertyConfig_property_is_property>`                         |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`is_spawn_state<class_NetwPropertyConfig_property_is_spawn_state>`                   |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :ref:`Lane<enum_NetwPropertyConfig_Lane>`                   | :ref:`lane<class_NetwPropertyConfig_property_lane>`                                       |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>` | :ref:`property_class<class_NetwPropertyConfig_property_property_class>`                   |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :ref:`Audience<enum_NetwPropertyConfig_Audience>`           | :ref:`set_audience<class_NetwPropertyConfig_property_set_audience>`                       |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`int`                                                | :ref:`set_heartbeat_ticks<class_NetwPropertyConfig_property_set_heartbeat_ticks>`         |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                               | :ref:`set_masked<class_NetwPropertyConfig_property_set_masked>`                           |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :ref:`Trigger<enum_NetwPropertyConfig_Trigger>`             | :ref:`set_trigger<class_NetwPropertyConfig_property_set_trigger>`                         |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`int`                                                | :ref:`set_window<class_NetwPropertyConfig_property_set_window>`                           |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
-   | :godot:`float`                                              | :ref:`teleport_at_override<class_NetwPropertyConfig_property_teleport_at_override>`       |
-   +-------------------------------------------------------------+-------------------------------------------------------------------------------------------+
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`in_broadcast_set<class_NetwPropertyConfig_property_in_broadcast_set>`       |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`in_input_set<class_NetwPropertyConfig_property_in_input_set>`               |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`in_state_set<class_NetwPropertyConfig_property_in_state_set>`               |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`is_property<class_NetwPropertyConfig_property_is_property>`                 |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`is_spawn_state<class_NetwPropertyConfig_property_is_spawn_state>`           |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :ref:`Lane<enum_NetwPropertyConfig_Lane>`         | :ref:`lane<class_NetwPropertyConfig_property_lane>`                               |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :ref:`Audience<enum_NetwPropertyConfig_Audience>` | :ref:`set_audience<class_NetwPropertyConfig_property_set_audience>`               |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`int`                                      | :ref:`set_heartbeat_ticks<class_NetwPropertyConfig_property_set_heartbeat_ticks>` |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`set_masked<class_NetwPropertyConfig_property_set_masked>`                   |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :ref:`Trigger<enum_NetwPropertyConfig_Trigger>`   | :ref:`set_trigger<class_NetwPropertyConfig_property_set_trigger>`                 |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
+   | :godot:`int`                                      | :ref:`set_window<class_NetwPropertyConfig_property_set_window>`                   |
+   +---------------------------------------------------+-----------------------------------------------------------------------------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -97,51 +83,43 @@ Methods
 .. table::
    :widths: auto
 
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`audience<class_NetwPropertyConfig_method_audience>`\ (\ server_only\: :godot:`bool` = true\ )              |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`broadcast<class_NetwPropertyConfig_method_broadcast>`\ (\ )                                                |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`carry_along<class_NetwPropertyConfig_method_carry_along>`\ (\ channel\: :godot:`StringName`\ )             |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`carry_step<class_NetwPropertyConfig_method_carry_step>`\ (\ step\: :godot:`Callable`\ )                    |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`causal<class_NetwPropertyConfig_method_causal>`\ (\ )                                                      |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`converge<class_NetwPropertyConfig_method_converge>`\ (\ stiffness\: :godot:`float`\ )                      |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`cosmetic<class_NetwPropertyConfig_method_cosmetic>`\ (\ )                                                  |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`derived<class_NetwPropertyConfig_method_derived>`\ (\ )                                                    |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`epsilon<class_NetwPropertyConfig_method_epsilon>`\ (\ threshold\: :godot:`float`\ )                        |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`heartbeat<class_NetwPropertyConfig_method_heartbeat>`\ (\ ticks\: :godot:`int`\ )                          |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`input<class_NetwPropertyConfig_method_input>`\ (\ )                                                        |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`masked<class_NetwPropertyConfig_method_masked>`\ (\ )                                                      |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`on_change<class_NetwPropertyConfig_method_on_change>`\ (\ )                                                |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`on_spawn<class_NetwPropertyConfig_method_on_spawn>`\ (\ )                                                  |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`persisted<class_NetwPropertyConfig_method_persisted>`\ (\ saved_column_name\: :godot:`StringName` = &""\ ) |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`reconcile_only<class_NetwPropertyConfig_method_reconcile_only>`\ (\ )                                      |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`retained<class_NetwPropertyConfig_method_retained>`\ (\ )                                                  |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`state<class_NetwPropertyConfig_method_state>`\ (\ )                                                        |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`teleport_at<class_NetwPropertyConfig_method_teleport_at>`\ (\ distance\: :godot:`float`\ )                 |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`teleport_only<class_NetwPropertyConfig_method_teleport_only>`\ (\ )                                        |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`volatile<class_NetwPropertyConfig_method_volatile>`\ (\ )                                                  |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`windowed<class_NetwPropertyConfig_method_windowed>`\ (\ samples\: :godot:`int`\ )                          |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------------------------------+
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`audience<class_NetwPropertyConfig_method_audience>`\ (\ server_only\: :godot:`bool` = true\ )                 |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`broadcast<class_NetwPropertyConfig_method_broadcast>`\ (\ )                                                   |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`correction_threshold<class_NetwPropertyConfig_method_correction_threshold>`\ (\ threshold\: :godot:`float`\ ) |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`correction_weight<class_NetwPropertyConfig_method_correction_weight>`\ (\ weight\: :godot:`float`\ )          |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`extrapolate<class_NetwPropertyConfig_method_extrapolate>`\ (\ rate_property\: :godot:`StringName`\ )          |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`heartbeat<class_NetwPropertyConfig_method_heartbeat>`\ (\ ticks\: :godot:`int`\ )                             |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`input<class_NetwPropertyConfig_method_input>`\ (\ )                                                           |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`masked<class_NetwPropertyConfig_method_masked>`\ (\ )                                                         |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`on_change<class_NetwPropertyConfig_method_on_change>`\ (\ )                                                   |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`on_spawn<class_NetwPropertyConfig_method_on_spawn>`\ (\ )                                                     |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`persisted<class_NetwPropertyConfig_method_persisted>`\ (\ saved_column_name\: :godot:`StringName` = &""\ )    |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`retained<class_NetwPropertyConfig_method_retained>`\ (\ )                                                     |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`state<class_NetwPropertyConfig_method_state>`\ (\ )                                                           |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`teleport_only<class_NetwPropertyConfig_method_teleport_only>`\ (\ )                                           |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`teleport_threshold<class_NetwPropertyConfig_method_teleport_threshold>`\ (\ distance\: :godot:`float`\ )      |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`unchecked<class_NetwPropertyConfig_method_unchecked>`\ (\ )                                                   |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`volatile<class_NetwPropertyConfig_method_volatile>`\ (\ )                                                     |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`windowed<class_NetwPropertyConfig_method_windowed>`\ (\ samples\: :godot:`int`\ )                             |
+   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -212,40 +190,6 @@ Sent reliably, only when it changes.
 
 ----
 
-.. _enum_NetwPropertyConfig_PropertyClass:
-
-.. rst-class:: classref-enumeration
-
-enum **PropertyClass**: :ref:`🔗<enum_NetwPropertyConfig_PropertyClass>`
-
-.. _class_NetwPropertyConfig_constant_CAUSAL:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>` **CAUSAL** = ``0``
-
-Affects the next step, so it is compared and corrected.
-
-.. _class_NetwPropertyConfig_constant_DERIVED:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>` **DERIVED** = ``1``
-
-Computed from other properties each step, so it is not compared.
-
-.. _class_NetwPropertyConfig_constant_COSMETIC:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>` **COSMETIC** = ``2``
-
-Only affects display, so it is not compared.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _enum_NetwPropertyConfig_Audience:
 
 .. rst-class:: classref-enumeration
@@ -293,91 +237,6 @@ A setting no call has written yet.
 
 Property Descriptions
 ---------------------
-
-.. _class_NetwPropertyConfig_property_carry_channel:
-
-.. rst-class:: classref-property
-
-:godot:`StringName` **carry_channel** :ref:`🔗<class_NetwPropertyConfig_property_carry_channel>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_carry_channel**\ (\ value\: :godot:`StringName`\ )
-- :godot:`StringName` **get_carry_channel**\ (\ )
-
-Set by :ref:`carry_along()<class_NetwPropertyConfig_method_carry_along>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_property_converge_stiffness:
-
-.. rst-class:: classref-property
-
-:godot:`float` **converge_stiffness** :ref:`🔗<class_NetwPropertyConfig_property_converge_stiffness>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_converge_stiffness**\ (\ value\: :godot:`float`\ )
-- :godot:`float` **get_converge_stiffness**\ (\ )
-
-Set by :ref:`converge()<class_NetwPropertyConfig_method_converge>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_property_epsilon_override:
-
-.. rst-class:: classref-property
-
-:godot:`float` **epsilon_override** :ref:`🔗<class_NetwPropertyConfig_property_epsilon_override>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_epsilon_override**\ (\ value\: :godot:`float`\ )
-- :godot:`float` **get_epsilon_override**\ (\ )
-
-Set by :ref:`epsilon()<class_NetwPropertyConfig_method_epsilon>`. A negative value uses :ref:`NetwPrediction.divergence_epsilon<class_NetwPrediction_property_divergence_epsilon>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_property_explicit_reconcile_only:
-
-.. rst-class:: classref-property
-
-:godot:`bool` **explicit_reconcile_only** :ref:`🔗<class_NetwPropertyConfig_property_explicit_reconcile_only>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_explicit_reconcile_only**\ (\ value\: :godot:`bool`\ )
-- :godot:`bool` **get_explicit_reconcile_only**\ (\ )
-
-Set by :ref:`reconcile_only()<class_NetwPropertyConfig_method_reconcile_only>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_property_explicit_teleport_only:
-
-.. rst-class:: classref-property
-
-:godot:`bool` **explicit_teleport_only** :ref:`🔗<class_NetwPropertyConfig_property_explicit_teleport_only>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_explicit_teleport_only**\ (\ value\: :godot:`bool`\ )
-- :godot:`bool` **get_explicit_teleport_only**\ (\ )
-
-Set by :ref:`teleport_only()<class_NetwPropertyConfig_method_teleport_only>`.
-
-.. rst-class:: classref-item-separator
-
-----
 
 .. _class_NetwPropertyConfig_property_in_broadcast_set:
 
@@ -481,23 +340,6 @@ Whether changes are sent unreliably or reliably. Set by :ref:`volatile()<class_N
 
 ----
 
-.. _class_NetwPropertyConfig_property_property_class:
-
-.. rst-class:: classref-property
-
-:ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>` **property_class** :ref:`🔗<class_NetwPropertyConfig_property_property_class>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_property_class**\ (\ value\: :ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>`\ )
-- :ref:`PropertyClass<enum_NetwPropertyConfig_PropertyClass>` **get_property_class**\ (\ )
-
-Whether a difference in the value causes a correction. Set by :ref:`causal()<class_NetwPropertyConfig_method_causal>`, :ref:`derived()<class_NetwPropertyConfig_method_derived>` and :ref:`cosmetic()<class_NetwPropertyConfig_method_cosmetic>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwPropertyConfig_property_set_audience:
 
 .. rst-class:: classref-property
@@ -579,23 +421,6 @@ Set by :ref:`on_change()<class_NetwPropertyConfig_method_on_change>`, or :ref:`U
 
 Set by :ref:`windowed()<class_NetwPropertyConfig_method_windowed>`, or :ref:`UNSET<class_NetwPropertyConfig_constant_UNSET>`.
 
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_property_teleport_at_override:
-
-.. rst-class:: classref-property
-
-:godot:`float` **teleport_at_override** :ref:`🔗<class_NetwPropertyConfig_property_teleport_at_override>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_teleport_at_override**\ (\ value\: :godot:`float`\ )
-- :godot:`float` **get_teleport_at_override**\ (\ )
-
-Set by :ref:`teleport_at()<class_NetwPropertyConfig_method_teleport_at>`. A negative value uses :ref:`NetwPrediction.teleport_threshold<class_NetwPrediction_property_teleport_threshold>`.
-
 .. rst-class:: classref-section-separator
 
 ----
@@ -623,7 +448,7 @@ Sends the :ref:`state()<class_NetwPropertyConfig_method_state>` properties of th
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **broadcast**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_broadcast>`
 
-The controlling peer owns the value and every peer sees it, with no server check. Use it for cosmetic values such as an aim direction. The server keeps no history of it. When a client controls the entity, or the entity is kept for a dropped player who controlled it, a spawn carries the value, so a controller that receives the node again starts from the value the server holds.
+The controlling peer owns the value and every peer sees it, with no server check. Use it for values that only change how the entity looks, such as an aim direction. The server keeps no history of it. When a client controls the entity, or the entity is kept for a dropped player who controlled it, a spawn includes the value, so a controller that receives the node again starts from the value the server holds.
 
 ::
 
@@ -637,123 +462,53 @@ The controlling peer owns the value and every peer sees it, with no server check
 
 ----
 
-.. _class_NetwPropertyConfig_method_carry_along:
+.. _class_NetwPropertyConfig_method_correction_threshold:
 
 .. rst-class:: classref-method
 
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **carry_along**\ (\ channel\: :godot:`StringName`\ ) :ref:`🔗<class_NetwPropertyConfig_method_carry_along>`
+:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **correction_threshold**\ (\ threshold\: :godot:`float`\ ) :ref:`🔗<class_NetwPropertyConfig_method_correction_threshold>`
 
-When a correction restores this value, advances it to the present using the rate in ``channel``.
+How far this value may drift from the server's before it is corrected, in its own units. Without it, the value uses :ref:`NetwPrediction.correction_threshold<class_NetwPrediction_property_correction_threshold>`. ``0.0`` corrects any error.
 
 ::
 
-    Netw.configure_property(self, &"position").state().carry_along(&"velocity")
+    Netw.configure_property(self, &"velocity").state().correction_threshold(0.05)
 
-\ ``channel`` must be another :ref:`state()<class_NetwPropertyConfig_method_state>` property of the same node. Use :ref:`carry_step()<class_NetwPropertyConfig_method_carry_step>` instead when the rate changes quickly. Declaring both on one property is an error, and neither is used.
+\ Use :ref:`unchecked()<class_NetwPropertyConfig_method_unchecked>` for a value that should never cause a correction.
 
 .. rst-class:: classref-item-separator
 
 ----
 
-.. _class_NetwPropertyConfig_method_carry_step:
+.. _class_NetwPropertyConfig_method_correction_weight:
 
 .. rst-class:: classref-method
 
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **carry_step**\ (\ step\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPropertyConfig_method_carry_step>`
+:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **correction_weight**\ (\ weight\: :godot:`float`\ ) :ref:`🔗<class_NetwPropertyConfig_method_correction_weight>`
 
-When a correction restores this value, advances it to the present by calling ``step`` once for each tick the server has not acknowledged yet. Use it for a value only your code changes. A value the physics engine also changes cannot be advanced this way, and the rule is disabled.
+Moves the value part of the way toward the server's value during a correction, by ``weight``. ``0.0`` writes it outright. A value with no midpoint, such as a :godot:`bool`, is always written outright.
 
 ::
 
-    func _init() -> void:
-        Netw.configure_property(self, &"spin").state().carry_step(carry_spin)
-
-    func carry_spin(value: Vector3, ctx: NetwPredictCarryContext) -> Vector3:
-        return value + drive_axis(ctx.state) * ctx.state[&"speed"] * ctx.delta
-
-\ ``step`` must be a method or lambda of a :godot:`Node`, may read only its :ref:`NetwPredictCarryContext<class_NetwPredictCarryContext>`, and must not write anything. A result that does not reproduce the recorded ticks is rejected. Declaring both this and :ref:`carry_along()<class_NetwPropertyConfig_method_carry_along>` on one property is an error, and neither is used. :ref:`NetwPrediction.reachability()<class_NetwPrediction_method_reachability>` reports whether the rule is in use.
+    Netw.configure_property(self, &"heading").state().correction_weight(0.4)
 
 .. rst-class:: classref-item-separator
 
 ----
 
-.. _class_NetwPropertyConfig_method_causal:
+.. _class_NetwPropertyConfig_method_extrapolate:
 
 .. rst-class:: classref-method
 
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **causal**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_causal>`
+:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **extrapolate**\ (\ rate_property\: :godot:`StringName`\ ) :ref:`🔗<class_NetwPropertyConfig_method_extrapolate>`
 
-Marks the value as one the next step reads, so it is compared and corrected. This is the default.
-
-::
-
-    Netw.configure_property(self, &"velocity").state().causal()
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_method_converge:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **converge**\ (\ stiffness\: :godot:`float`\ ) :ref:`🔗<class_NetwPropertyConfig_method_converge>`
-
-Moves the value part of the way toward the server's value during a correction, by ``stiffness``, instead of writing it outright. ``0.0`` writes it outright. A value with no midpoint, such as a :godot:`bool`, is always written outright.
+When a correction restores this value, advances it to the present using the rate in ``rate_property``.
 
 ::
 
-    Netw.configure_property(self, &"heading").state().causal().converge(0.4)
+    Netw.configure_property(self, &"position").state().extrapolate(&"velocity")
 
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_method_cosmetic:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **cosmetic**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_cosmetic>`
-
-Marks the value as display only, so a difference in it never causes a correction. A correction still writes it.
-
-::
-
-    Netw.configure_property(self, &"skid_intensity").state().cosmetic()
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_method_derived:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **derived**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_derived>`
-
-Marks the value as one the body recomputes each step from other properties, so a difference in it never causes a correction. A correction still writes it.
-
-::
-
-    Netw.configure_property(self, &"speed").state().derived()
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_method_epsilon:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **epsilon**\ (\ threshold\: :godot:`float`\ ) :ref:`🔗<class_NetwPropertyConfig_method_epsilon>`
-
-How far this value may drift from the server's before it is corrected, in its own units. Without it, the value uses :ref:`NetwPrediction.divergence_epsilon<class_NetwPrediction_property_divergence_epsilon>`. ``0.0`` corrects any error.
-
-::
-
-    Netw.configure_property(self, &"velocity").state().epsilon(0.05)
-
-\ Use :ref:`reconcile_only()<class_NetwPropertyConfig_method_reconcile_only>` for a value that should never cause a correction.
+\ ``rate_property`` must be another :ref:`state()<class_NetwPropertyConfig_method_state>` property of the same node.
 
 .. rst-class:: classref-item-separator
 
@@ -793,7 +548,7 @@ The controlling peer owns the value and only the server sees it. Use it for play
             move_dir = Input.get_vector("left", "right", "up", "down")
         velocity = move_dir * SPEED
 
-\ Each send also carries the last two ticks of input, so a lost packet is recovered from the next one. :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` changes how many. Correction settings such as :ref:`carry_along()<class_NetwPropertyConfig_method_carry_along>` are ignored on an input.
+\ Each send also includes the last two ticks of input, so the next packet makes up for a lost one. :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` changes how many. Correction settings such as :ref:`extrapolate()<class_NetwPropertyConfig_method_extrapolate>` are ignored on an input.
 
 .. rst-class:: classref-item-separator
 
@@ -863,22 +618,6 @@ Saves the server's value of this property into the :ref:`NetwEntity<class_NetwEn
 
 ----
 
-.. _class_NetwPropertyConfig_method_reconcile_only:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **reconcile_only**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_reconcile_only>`
-
-A difference in this value never causes a correction, but a correction caused by another value still restores it.
-
-::
-
-    Netw.configure_property(self, &"heading").state().reconcile_only()
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwPropertyConfig_method_retained:
 
 .. rst-class:: classref-method
@@ -901,7 +640,7 @@ Sends changes reliably. Use it for a value that changes rarely and must not be m
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **state**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_state>`
 
-The server owns the value, every peer sees it, and lag compensation can rewind it. A client predicting this :ref:`NetwEntity<class_NetwEntity>` is corrected against it, within :ref:`epsilon()<class_NetwPropertyConfig_method_epsilon>`.
+The server owns the value, every peer sees it, and lag compensation can rewind it. :ref:`NetwPrediction<class_NetwPrediction>` says when an entity with a state property is predicted, and a predicted entity is corrected against this value within :ref:`correction_threshold()<class_NetwPropertyConfig_method_correction_threshold>`.
 
 ::
 
@@ -915,36 +654,52 @@ The server owns the value, every peer sees it, and lag compensation can rewind i
 
 ----
 
-.. _class_NetwPropertyConfig_method_teleport_at:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **teleport_at**\ (\ distance\: :godot:`float`\ ) :ref:`🔗<class_NetwPropertyConfig_method_teleport_at>`
-
-How large this value's error may be before a correction teleports the body, in its own units. Without it, the value uses :ref:`NetwPrediction.teleport_threshold<class_NetwPrediction_property_teleport_threshold>`. ``0.0`` teleports on every correction this value causes.
-
-::
-
-    Netw.configure_property(self, &"position").state() \
-            .carry_along(&"velocity").teleport_at(3.0)
-    Netw.configure_property(self, &"heading").state() \
-            .carry_along(&"angular_speed").teleport_at(1.0)
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwPropertyConfig_method_teleport_only:
 
 .. rst-class:: classref-method
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **teleport_only**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_teleport_only>`
 
-Only a teleport writes this value, and an ordinary correction leaves it alone. Pair it with :ref:`carry_along()<class_NetwPropertyConfig_method_carry_along>` or :ref:`carry_step()<class_NetwPropertyConfig_method_carry_step>` so the teleport restores it at the present, or with :ref:`reconcile_only()<class_NetwPropertyConfig_method_reconcile_only>` so it never causes a correction.
+Only a teleport writes this value, and an ordinary correction leaves it alone. Pair it with :ref:`extrapolate()<class_NetwPropertyConfig_method_extrapolate>` so the teleport restores it at the present, or with :ref:`unchecked()<class_NetwPropertyConfig_method_unchecked>` so it never causes a correction.
 
 ::
 
     Netw.configure_property(self, &"angular_velocity").state().teleport_only()
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwPropertyConfig_method_teleport_threshold:
+
+.. rst-class:: classref-method
+
+:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **teleport_threshold**\ (\ distance\: :godot:`float`\ ) :ref:`🔗<class_NetwPropertyConfig_method_teleport_threshold>`
+
+How large this value's error may be before a correction teleports the body, in its own units. Without it, the value uses :ref:`NetwPrediction.teleport_threshold<class_NetwPrediction_property_teleport_threshold>`. ``0.0`` teleports on every correction this value causes.
+
+::
+
+    Netw.configure_property(self, &"position").state() \
+            .extrapolate(&"velocity").teleport_threshold(3.0)
+    Netw.configure_property(self, &"heading").state() \
+            .extrapolate(&"angular_speed").teleport_threshold(1.0)
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwPropertyConfig_method_unchecked:
+
+.. rst-class:: classref-method
+
+:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **unchecked**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_unchecked>`
+
+A difference in this value never causes a correction, but a correction caused by another value still restores it. Use it for a value the body recomputes each tick or one that only affects display.
+
+::
+
+    Netw.configure_property(self, &"heading").state().unchecked()
 
 .. rst-class:: classref-item-separator
 
@@ -968,7 +723,7 @@ Enabled by default.
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **windowed**\ (\ samples\: :godot:`int`\ ) :ref:`🔗<class_NetwPropertyConfig_method_windowed>`
 
-Each send also carries the last ``samples`` ticks of values, so a lost packet is recovered from the next one.
+Each send also includes the last ``samples`` ticks of values, so the next packet makes up for a lost one.
 
 ::
 

@@ -1,0 +1,34 @@
+:github_url: hide
+
+.. _fault_nw1033:
+
+NW1033. Entities that cannot replay were asked to roll back together
+====================================================================
+
+Reported as a warning on the client that predicts an entity with
+:ref:`NetwPrediction.rollback_together <class_NetwPrediction_property_rollback_together>`
+set, when that entity or one it selects cannot replay a tick. Each entity is
+corrected alone. The log line lists the entities that cannot replay and the
+schedule of each.
+
+An entity can replay a tick when it has a ``_network_process`` at
+:ref:`SCHEDULE_TICK <class_NetwSimulation_constant_SCHEDULE_TICK>`, or when
+it runs at
+:ref:`SCHEDULE_STEPPED <class_NetwSimulation_constant_SCHEDULE_STEPPED>` on a
+Godot build that can step physics.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_FRAME
+        entity.prediction.rollback_together = true
+
+Run it at a schedule that can replay, or leave ``rollback_together`` unset.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_TICK
+        entity.prediction.rollback_together = true

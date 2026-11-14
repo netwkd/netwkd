@@ -158,8 +158,10 @@ bool interpolators_fit_types(
             nullptr,
             NETW_FAULT_INTERPOLATION_IGNORED,
             {vformat("%s:%s", script_file(p_script), String(p_member)),
-             vformat("an interpolator that cannot blend a %s", type_label(type)),
-             vformat("an interpolator that supports %s", type_label(type))}
+             String(),
+             type_label(type),
+             0,
+             NETW_INTERPOLATION_TYPE_UNSUPPORTED}
         );
         return false;
     }

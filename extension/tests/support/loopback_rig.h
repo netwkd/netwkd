@@ -261,7 +261,7 @@ class LoopbackRig {
             p_api->property_set_set_column_param(
                 state,
                 0,
-                netw::NetwMultiplayer::COLUMN_PARAM_CARRY_CHANNEL,
+                netw::NetwMultiplayer::COLUMN_PARAM_EXTRAPOLATE,
                 p_decl.projection()
             );
         }
@@ -357,13 +357,6 @@ class LoopbackRig {
             return;
         }
         netw::NetwMultiplayer *p_api = core_of(p_shell);
-        if (p_decl.archetype() >= 0) {
-            p_api->predict_set_param(
-                p_entity,
-                netw::NetwMultiplayer::PREDICT_PARAM_ARCHETYPE,
-                p_decl.archetype()
-            );
-        }
         p_api->simulation_set_param(
             p_entity,
             netw::NetwMultiplayer::SIMULATION_PARAM_SCHEDULE,
@@ -371,35 +364,28 @@ class LoopbackRig {
         );
         p_api->predict_set_param(
             p_entity,
-            netw::NetwMultiplayer::PREDICT_PARAM_DIVERGENCE_EPSILON,
+            netw::NetwMultiplayer::PREDICT_PARAM_CORRECTION_THRESHOLD,
             p_decl.prediction_epsilon()
         );
         p_api->predict_set_param(
             p_entity,
-            netw::NetwMultiplayer::PREDICT_PARAM_MISSING_POLICY,
-            int(p_decl.missing_input_policy())
+            netw::NetwMultiplayer::PREDICT_PARAM_REPEAT_MISSING_INPUT,
+            p_decl.missing_input_policy() == netw::MissingInput::REPEAT_LAST
         );
         p_api->predict_set_param(
             p_entity,
-            netw::NetwMultiplayer::PREDICT_PARAM_REPLAY_BUFFER_DEPTH,
-            p_decl.replay_buffer_depth()
+            netw::NetwMultiplayer::PREDICT_PARAM_INPUT_BUFFER_TICKS,
+            p_decl.input_buffer_ticks()
         );
         p_api->predict_set_param(
             p_entity,
-            netw::NetwMultiplayer::PREDICT_PARAM_RECOVERY_POLICY,
+            netw::NetwMultiplayer::PREDICT_PARAM_MODE,
             int(p_decl.recovery())
         );
-        if (p_decl.teleport_at() > 0.0) {
-            p_api->predict_set_param(
-                p_entity,
-                netw::NetwMultiplayer::PREDICT_PARAM_TELEPORT_THRESHOLD,
-                p_decl.teleport_at()
-            );
-        }
         if (p_decl.consume_lag_ticks() > 0) {
             p_api->predict_set_param(
                 p_entity,
-                netw::NetwMultiplayer::PREDICT_PARAM_MAX_CONSUME_LAG_TICKS,
+                netw::NetwMultiplayer::PREDICT_PARAM_MAX_INPUT_LAG_TICKS,
                 p_decl.consume_lag_ticks()
             );
         }
@@ -428,14 +414,6 @@ class LoopbackRig {
             for (const godot::StringName &field : p_decl.synced_columns()) {
                 owner->set(field, p_decl.initial_pose());
             }
-        }
-        if (p_decl.carries()) {
-            owner->set_carry_gain(p_decl.carry_gain());
-            netw::script::model::bind_node_property_carry(
-                owner,
-                godot::StringName("position"),
-                godot::Callable(owner, godot::StringName("carry_position"))
-            );
         }
         if (!p_decl.is_mounted()) {
             owned_nodes.push_back(netw::gd::instance_id(owner));
@@ -1294,8 +1272,8 @@ public:
                 p_api->entity_get_view(entity_of(member, p_client))
             );
         }
-        p_api->prediction_handle(owner)->set_reconcile_mode(
-            netw::NetwPrediction::Reconcile(p_row.reconcile)
+        p_api->prediction_handle(owner)->set_rollback_together(
+            p_row.reconcile == int(WorldDecl::JOINT)
         );
     }
 

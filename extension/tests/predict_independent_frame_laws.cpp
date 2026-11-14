@@ -36,15 +36,14 @@ func _init() -> void:
 	collision_layer = 0
 	collision_mask = 0
 	var e := Netw.configure_entity(self)
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
-	e.prediction.recovery_policy = NetwPrediction.RECOVERY_POLICY_REBASE_REPLAY
+	e.prediction.mode = NetwPrediction.MODE_ROLLBACK
 	Netw.configure_property(self, &"position").state()
 	Netw.configure_property(self, &"motion").input()
 
 var queries_refused := 0
 var motions_refused := 0
 
-func _network_tick(_delta: float, _tick: int, is_fresh: bool) -> void:
+func _network_process(_delta: float, _tick: int, is_fresh: bool) -> void:
 	if not is_fresh:
 		replays += 1
 		if Engine.is_in_physics_frame():

@@ -77,7 +77,7 @@ const std::string BROADCAST_SOURCE = std::string(BODY)
 
 const std::string CARRY_SOURCE = std::string(BODY)
     + "\tNetw.configure_property(self, &\"body_position\").state()"
-      ".carry_along(&\"body_velocity\")\n"
+      ".extrapolate(&\"body_velocity\")\n"
       "\tNetw.configure_property(self, &\"body_velocity\").state()\n";
 
 struct Stand {
@@ -315,7 +315,7 @@ TEST_CASE(
     REQUIRE(handle != nullptr);
     Vector<StringName> watched;
     watched.push_back(StringName("state_evaluated"));
-    netw_test::Recorder judged(handle, watched);
+    netw_test::PredictionReports judged(handle, watched);
     stand.body(0)->set_position(Vector2());
     const int64_t writes = stand.writes(0);
 

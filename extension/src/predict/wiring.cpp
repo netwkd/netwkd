@@ -324,8 +324,9 @@ void Wiring::resize(int p_count) {
     vote_exclude.resize(count);
     angle.resize(count);
     causal.resize(count);
+    wrote_epsilon.resize(count);
     property_class.resize(count);
-    carry_channel.resize(count);
+    rate_property.resize(count);
     for (uint32_t at = 0; at < count; ++at) {
         projection[at] = -1;
         state_family[at] = int(StateFamily::CONTROLLER);
@@ -338,8 +339,9 @@ void Wiring::resize(int p_count) {
         vote_exclude[at] = 0;
         angle[at] = 0;
         causal[at] = 0;
+        wrote_epsilon[at] = 0;
         property_class[at] = int(PropertyClass::CAUSAL);
-        carry_channel[at] = godot::StringName();
+        rate_property[at] = godot::StringName();
     }
 }
 
@@ -371,14 +373,14 @@ Wiring compile(const LocalVector<FieldDecl> &p_declaration) {
         out.vote_exclude[slot] = causal ? 0 : 1;
         out.angle[slot] = decl.angle ? 1 : 0;
         out.property_class[slot] = decl.property_class;
-        out.carry_channel[slot] = decl.carry_channel;
+        out.rate_property[slot] = decl.rate_property;
     }
 
     for (uint32_t at = 0; at < p_declaration.size(); ++at) {
         const FieldDecl &decl = p_declaration[at];
         const int slot = out.fields.index_of(decl.key);
-        const int channel = out.fields.index_of(decl.carry_channel);
-        if (slot < 0 || decl.carry_channel == StringName() || channel < 0) {
+        const int channel = out.fields.index_of(decl.rate_property);
+        if (slot < 0 || decl.rate_property == StringName() || channel < 0) {
             continue;
         }
         out.state_family[slot] = int(StateFamily::POSE);
@@ -393,21 +395,22 @@ Wiring compile(const LocalVector<FieldDecl> &p_declaration) {
         if (slot < 0) {
             continue;
         }
-        if (decl.converge_stiffness > 0.0) {
-            out.converge_rate[slot] = decl.converge_stiffness;
+        if (decl.correction_weight > 0.0) {
+            out.converge_rate[slot] = decl.correction_weight;
         }
         if (decl.teleport_only) {
             out.withheld[slot] = 1;
         }
-        if (decl.reconcile_only) {
+        if (decl.trigger_exclude) {
             out.trigger_exclude[slot] = 1;
             out.vote_exclude[slot] = 1;
         }
-        if (decl.epsilon_override >= 0.0) {
-            out.epsilon[slot] = decl.epsilon_override;
+        if (decl.correction_threshold >= 0.0) {
+            out.epsilon[slot] = decl.correction_threshold;
+            out.wrote_epsilon[slot] = 1;
         }
-        if (decl.teleport_at >= 0.0) {
-            out.teleport[slot] = decl.teleport_at;
+        if (decl.teleport_threshold >= 0.0) {
+            out.teleport[slot] = decl.teleport_threshold;
             out.pose[slot] = 1;
         }
     }

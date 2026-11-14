@@ -38,9 +38,9 @@ Array projected(
     for (int at = 0; at < p_keys.size(); ++at) {
         const StringName key = p_keys[at];
         payload[key] = p_values[at];
-        const StringName carry = p_binding->carry_channel_of(key);
-        if (carry != StringName()) {
-            projection[key] = carry;
+        const StringName rate = p_binding->rate_property_of(key);
+        if (rate != StringName()) {
+            projection[key] = rate;
         }
     }
     if (projection.is_empty()) {
@@ -132,13 +132,13 @@ void NetwMultiplayer::sim_install_target_row(
         return;
     }
     for (uint32_t at = 0; at < count && at < p_keys.size(); ++at) {
-        const StringName carry = p_binding->carry_channel_of(p_keys[at]);
-        if (carry == StringName()) {
+        const StringName rate = p_binding->rate_property_of(p_keys[at]);
+        if (rate == StringName()) {
             continue;
         }
         int channel = -1;
         for (uint32_t other = 0; other < p_keys.size(); ++other) {
-            if (p_keys[other] == carry) {
+            if (p_keys[other] == rate) {
                 channel = int(other);
                 break;
             }

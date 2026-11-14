@@ -148,15 +148,14 @@ public:
     ) const;
     godot::Dictionary canonicalize_payload(const godot::Dictionary &p_payload);
 
-    int64_t property_class_of(const godot::StringName &p_property) const;
-    double converge_stiffness_of(const godot::StringName &p_property) const;
-    godot::StringName carry_channel_of(
+    bool unchecked_of(const godot::StringName &p_property) const;
+    double correction_weight_of(const godot::StringName &p_property) const;
+    godot::StringName rate_property_of(
         const godot::StringName &p_property
     ) const;
     bool teleport_only_of(const godot::StringName &p_property) const;
-    bool reconcile_only_of(const godot::StringName &p_property) const;
-    double epsilon_override_of(const godot::StringName &p_property) const;
-    double teleport_at_of(const godot::StringName &p_property) const;
+    double correction_threshold_of(const godot::StringName &p_property) const;
+    double teleport_threshold_of(const godot::StringName &p_property) const;
     const PropertyColumn *field_of(const godot::StringName &p_property) const;
 
     void clear_peer(int64_t p_peer);

@@ -17,7 +17,6 @@ func _init() -> void:
 	var declared := Netw.configure_entity(self)
 	declared.authority = NetwEntity.AUTHORITY_CONTROLLER
 	declared.display.visual_root = ^"Icon"
-	declared.prediction.consume_buffer_ticks = 0
 
 	Netw.configure_property(self, &"position").on_spawn() \
 			.interpolate(NetwInterpolate.new().lerp())

@@ -34,7 +34,11 @@ double epsilon_at(const Wiring &p_wiring, int p_field, double p_fallback) {
     return declared >= 0.0 ? declared : p_fallback;
 }
 
-double teleport_at(const Wiring &p_wiring, int p_field, double p_fallback) {
+double teleport_distance(
+    const Wiring &p_wiring,
+    int p_field,
+    double p_fallback
+) {
     const double declared = p_wiring.teleport[uint32_t(p_field)];
     return declared >= 0.0 ? declared : p_fallback;
 }
@@ -186,7 +190,11 @@ bool teleport_reached(
         const double error = teleport_error(p_wiring, p_request, at);
         if (p_wiring.pose[uint32_t(at)] != 0 && error >= 0.0
             && error
-                >= teleport_at(p_wiring, at, p_request.fallback_teleport)) {
+                >= teleport_distance(
+                    p_wiring,
+                    at,
+                    p_request.fallback_teleport
+                )) {
             return true;
         }
     }
@@ -321,7 +329,7 @@ void track_recovery(
     if (p_plan.escalated) {
         r_state.reset_trackers();
         r_state.cooldown_until = p_request.current_label
-            + std::max(0, p_request.collision_cooldown_ticks);
+            + std::max(0, p_request.correction_cooldown_ticks);
         return;
     }
     if (p_plan.skip || p_config.correction == int(CorrectionMode::REPLAY)) {

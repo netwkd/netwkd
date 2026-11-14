@@ -5,23 +5,39 @@
 NW1013. Prediction on an entity is off
 ======================================
 
-Reported as an error when an entity declares prediction and the declaration
-leaves nothing to predict, such as an entity with no state property, a
-session with no lag compensation, or an entity whose state properties were
-lost.
+Reported as an error when an entity that would be predicted has nothing the
+server can correct. The entity runs without prediction.
 
-The entity runs without prediction. The log line gives the reason.
+The log line gives one of three reasons.
+
+- **It has no state property.** The entity set a
+  :ref:`NetwPrediction <class_NetwPrediction>` value and has a
+  ``_network_process`` or a physics body, and none of its properties is
+  declared with :ref:`state <class_NetwPropertyConfig_method_state>`.
+- **It entered the tree again with no state property.** The entity was
+  predicted, left the tree, and came back without its state properties.
+- **Lag compensation did not start when it entered the tree again.** An
+  earlier error in the log says why.
+
+This entity sets a prediction value and declares no state.
 
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_property(self, &"position").broadcast()
+        var entity := Netw.configure_entity(self)
+        entity.prediction.correction_threshold = 0.5
+        Netw.configure_property(self, &"move").input()
 
-Declare what the log line asks for, such as
-:ref:`state <class_NetwPropertyConfig_method_state>` on the properties
-prediction restores.
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+        position += move * SPEED * delta
+
+Call :ref:`state <class_NetwPropertyConfig_method_state>` on the properties
+the server corrects.
 
 .. code-block:: gdscript
 
     func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.prediction.correction_threshold = 0.5
+        Netw.configure_property(self, &"move").input()
         Netw.configure_property(self, &"position").state()

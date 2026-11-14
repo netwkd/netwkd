@@ -143,7 +143,7 @@ bool NetwMultiplayer::store_rests(
         const Variant live = port_get(p_node, declared->key);
         const Variant pushed = pushed_value(table, p_at.row, p_age, column);
         const double declared_epsilon = p_binding != nullptr
-            ? p_binding->epsilon_override_of(declared->key)
+            ? p_binding->correction_threshold_of(declared->key)
             : -1.0;
         const wire::ColumnPlan &slot = table.plan.column(column);
         if (declared_epsilon < 0.0 && declared->quantizer.is_valid()

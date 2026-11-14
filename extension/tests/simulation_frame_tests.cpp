@@ -147,7 +147,7 @@ class Car extends Counter:
 	func activate() -> void:
 		NetwEntity.of(self).simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
 
-	func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 		count(tick, is_fresh)
 		if is_fresh:
 			sphere.linear_velocity = Vector3(3, 0, 0)
@@ -158,11 +158,10 @@ class Beat extends Counter:
 	var beat := 0
 
 	func _init() -> void:
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"beat").state()
 
-	func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 		count(tick, is_fresh)
 		beat += 1
 
@@ -181,7 +180,6 @@ class Solver extends RigidBody3D:
 		hull.shape = SphereShape3D.new()
 		add_child(hull)
 		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
 		entity.simulation.schedule = NetwSimulation.SCHEDULE_FRAME
 		Netw.configure_property(self, &"position").state()
 
@@ -208,6 +206,7 @@ class Ball extends RigidBody3D:
 		add_child(hull)
 		var entity := Netw.configure_entity(self)
 		entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		entity.simulation.physics_driven = false
 		Netw.configure_property(self, &"position").state().heartbeat(30)
 		Netw.configure_property(self, &"linear_velocity").state()
 

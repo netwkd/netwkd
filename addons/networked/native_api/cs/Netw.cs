@@ -42,6 +42,8 @@ namespace Networked;
 /// single node has a class of its own.
 /// - <see cref="NetwPropertyConfig"/> how a declared property is sent, from
 /// <see cref="Netw.ConfigureProperty"/>
+/// - <see cref="NetwPrediction"/> how the client that controls an entity runs
+/// it ahead of the server, from <see cref="NetwEntity.Prediction"/>
 /// - <see cref="NetwTable"/> rows of values a <see cref="NetwSchema"/>
 /// declares, from <see cref="NetwSession.Table"/>
 /// - <see cref="NetwChannel"/> raw bytes sent in batches, from

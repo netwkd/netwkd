@@ -144,12 +144,11 @@ class Runner extends CharacterBody3D:
 		hull.shape = BoxShape3D.new()
 		add_child(hull)
 		collision_mask = 0
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"motion").input()
 
-	func _network_tick(_delta: float, _tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, _tick: int, is_fresh: bool) -> void:
 		if is_fresh:
 			strides += motion
 		else:
@@ -498,12 +497,11 @@ class Runner extends Node3D:
 			return beat == last_moved - first_moved + 1
 
 	func _init() -> void:
-		var e := Netw.configure_entity(self)
-		e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"beat").state()
 		Netw.configure_property(self, &"motion").input()
 
-	func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 		beat += motion
 		if motion > 0 and is_fresh:
 			last_moved = tick
@@ -674,12 +672,11 @@ class Runner extends Node3D:
 	var motion := 0
 
 	func _init() -> void:
-		var e := Netw.configure_entity(self)
-		e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"motion").input()
 
-	func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
+	func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
 		position.x += motion
 )";
 

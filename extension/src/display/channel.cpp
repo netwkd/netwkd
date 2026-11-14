@@ -44,11 +44,10 @@ void Channel::write(const Variant &p_value) {
             nullptr,
             NETW_FAULT_INTERPOLATION_IGNORED,
             {String(port.get_target_prop()),
-             vformat(
-                 "global space, which a %s has no setter for",
-                 String(Variant::get_type_name(p_value.get_type()))
-             ),
-             String("a value with a global setter")}
+             String(),
+             String(Variant::get_type_name(p_value.get_type())),
+             0,
+             NETW_INTERPOLATION_NO_GLOBAL_SETTER}
         );
     }
     refused_global = true;

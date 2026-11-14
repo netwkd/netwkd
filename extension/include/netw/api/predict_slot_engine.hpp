@@ -111,7 +111,7 @@ class NetwPredictSlotEngine {
     int resolve_correction() const;
     int resolve_axes();
     int pool_island() const;
-    void admit_reconcile_mode();
+    void admit_rollback_together();
     void clear_island_promotions();
     sim::Mode resolved_mode() const;
 
@@ -257,7 +257,7 @@ public:
     void receive_command_frame(const godot::PackedByteArray &p_payload);
     void receive_relayed_command_frame(const godot::PackedByteArray &p_payload);
     void receive_ack_frame(const godot::PackedByteArray &p_payload);
-    void notify_contact();
+    void notify_collision();
 
     int64_t native_slot() const;
     NetwPredictionEngine *seated_pool() const;
@@ -275,7 +275,7 @@ public:
     bool holds_recovery() const {
         return held_recovery.held;
     }
-    void network_tick(const NetwPredictTiming &p_timing);
+    void network_process(const NetwPredictTiming &p_timing);
     void simulate_tick(const NetwPredictTiming &p_timing);
     void simulate_frame(const NetwPredictTiming &p_timing);
     void simulate_stepped(const NetwPredictTiming &p_timing);

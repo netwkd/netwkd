@@ -19,7 +19,7 @@ Steps a physics space on demand, for a physics server without ``space_step``.
 Description
 -----------
 
-Networked steps a space through ``PhysicsServer3D.space_step`` when the server has it, so a game installs a stepper only for a server that does not. An installed stepper outranks that built-in stepping. While an entity with :ref:`NetwSimulation.SCHEDULE_STEPPED<class_NetwSimulation_constant_SCHEDULE_STEPPED>` is in that space, Networked stops the engine from stepping it and calls :ref:`_step()<class_NetwPhysicsStepper_private_method__step>` once per tick instead, and again for each tick it replays.
+Networked steps a space through ``PhysicsServer3D.space_step`` when the server has it, so a game installs a stepper only for a server that does not. The `Networked engine build <https://github.com/diejor/godot/releases>`__ has it. An installed stepper outranks that built-in stepping. While an entity with :ref:`NetwSimulation.SCHEDULE_STEPPED<class_NetwSimulation_constant_SCHEDULE_STEPPED>` is in that space, Networked stops the engine from stepping it and calls :ref:`_step()<class_NetwPhysicsStepper_private_method__step>` once per tick instead, and again for each tick it replays.
 
 ::
 
@@ -35,7 +35,7 @@ Networked steps a space through ``PhysicsServer3D.space_step`` when the server h
 
 \ Install it with :ref:`NetwSession.install_physics_stepper()<class_NetwSession_method_install_physics_stepper>`, and install ``null`` to remove it. Without a stepper or ``space_step``, a :ref:`NetwSimulation.SCHEDULE_STEPPED<class_NetwSimulation_constant_SCHEDULE_STEPPED>` entity runs as :ref:`NetwSimulation.SCHEDULE_FRAME<class_NetwSimulation_constant_SCHEDULE_FRAME>`. Once no such entity is left in the space, the engine steps it again as usual.
 
-Each tick, every entity in the space applies its input first, then :ref:`_step()<class_NetwPhysicsStepper_private_method__step>` and :ref:`_snapshot()<class_NetwPhysicsStepper_private_method__snapshot>` run once for the whole space. Under :ref:`NetwPrediction.RECONCILE_JOINT<class_NetwPrediction_constant_RECONCILE_JOINT>` a replay restores every entity, calls :ref:`_restore()<class_NetwPhysicsStepper_private_method__restore>` once, then steps each replayed tick the same way.
+Each tick, every entity in the space applies its input first, then :ref:`_step()<class_NetwPhysicsStepper_private_method__step>` and :ref:`_snapshot()<class_NetwPhysicsStepper_private_method__snapshot>` run once for the whole space. Under :ref:`NetwPrediction.rollback_together<class_NetwPrediction_property_rollback_together>` a replay restores every entity, calls :ref:`_restore()<class_NetwPhysicsStepper_private_method__restore>` once, then steps each replayed tick the same way.
 
 Implement :ref:`_snapshot()<class_NetwPhysicsStepper_private_method__snapshot>` and :ref:`_restore()<class_NetwPhysicsStepper_private_method__restore>` only when the space holds bodies that are not entities, such as loose debris. Entities are restored by Networked.
 

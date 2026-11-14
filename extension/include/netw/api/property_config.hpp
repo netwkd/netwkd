@@ -16,7 +16,6 @@ class NetwPropertyConfig : public NetwMemberConfig {
 public:
     using Trigger = repl::PropertySet::Trigger;
     using Lane = repl::PropertySet::Lane;
-    using PropertyClass = repl::PropertySet::PropertyClass;
     using Audience = repl::PropertySet::Audience;
 
     static constexpr Trigger TRIGGER_TICK = repl::PropertySet::TRIGGER_TICK;
@@ -26,9 +25,6 @@ public:
         = repl::PropertySet::TRIGGER_ON_DEMAND;
     static constexpr Lane VOLATILE = repl::PropertySet::VOLATILE;
     static constexpr Lane RETAINED = repl::PropertySet::RETAINED;
-    static constexpr PropertyClass CAUSAL = repl::PropertySet::CAUSAL;
-    static constexpr PropertyClass DERIVED = repl::PropertySet::DERIVED;
-    static constexpr PropertyClass COSMETIC = repl::PropertySet::COSMETIC;
     static constexpr Audience AUDIENCE_PUBLIC
         = repl::PropertySet::AUDIENCE_PUBLIC;
     static constexpr Audience AUDIENCE_SERVER_ONLY
@@ -43,8 +39,8 @@ private:
     bool in_state_set = false;
     bool in_input_set = false;
     bool in_broadcast_set = false;
-    double epsilon_override = -1.0;
-    double teleport_at_override = -1.0;
+    double correction_threshold_override = -1.0;
+    double teleport_threshold_override = -1.0;
     int64_t set_trigger = UNSET;
     int64_t set_heartbeat_ticks = UNSET;
     int64_t set_window = UNSET;
@@ -53,11 +49,10 @@ private:
     bool set_masked = false;
     godot::StringName saved_column;
     bool persist = false;
-    repl::PropertySet::PropertyClass property_class = repl::PropertySet::CAUSAL;
-    double converge_stiffness = 0.0;
-    godot::StringName carry_channel;
+    bool is_unchecked = false;
+    double weight = 0.0;
+    godot::StringName rate_property;
     bool explicit_teleport_only = false;
-    bool explicit_reconcile_only = false;
 
     void warn_double_set(bool p_replaces, const char *p_axis) const;
 
@@ -71,8 +66,6 @@ public:
     void set_declared_type(int p_type) {
         declared_type = p_type;
     }
-
-    static void set_carry_binder(const godot::Callable &p_binder);
 
     void set_is_property(bool p_is_property) {
         is_property = p_is_property;
@@ -116,18 +109,11 @@ public:
         return in_broadcast_set;
     }
 
-    void set_epsilon_override(double p_epsilon_override) {
-        epsilon_override = p_epsilon_override;
+    double get_correction_threshold() const {
+        return correction_threshold_override;
     }
-    double get_epsilon_override() const {
-        return epsilon_override;
-    }
-
-    void set_teleport_at_override(double p_teleport_at_override) {
-        teleport_at_override = p_teleport_at_override;
-    }
-    double get_teleport_at_override() const {
-        return teleport_at_override;
+    double get_teleport_threshold() const {
+        return teleport_threshold_override;
     }
 
     void set_set_trigger(repl::PropertySet::Trigger p_set_trigger) {
@@ -172,39 +158,17 @@ public:
         return saved_column;
     }
 
-    void set_property_class(repl::PropertySet::PropertyClass p_property_class) {
-        property_class = p_property_class;
+    bool get_unchecked() const {
+        return is_unchecked;
     }
-    repl::PropertySet::PropertyClass get_property_class() const {
-        return property_class;
+    double get_correction_weight() const {
+        return weight;
     }
-
-    void set_converge_stiffness(double p_converge_stiffness) {
-        converge_stiffness = p_converge_stiffness;
-    }
-    double get_converge_stiffness() const {
-        return converge_stiffness;
-    }
-
-    void set_carry_channel(const godot::StringName &p_carry_channel) {
-        carry_channel = p_carry_channel;
-    }
-    godot::StringName get_carry_channel() const {
-        return carry_channel;
-    }
-
-    void set_explicit_teleport_only(bool p_explicit_teleport_only) {
-        explicit_teleport_only = p_explicit_teleport_only;
+    godot::StringName get_rate_property() const {
+        return rate_property;
     }
     bool get_explicit_teleport_only() const {
         return explicit_teleport_only;
-    }
-
-    void set_explicit_reconcile_only(bool p_explicit_reconcile_only) {
-        explicit_reconcile_only = p_explicit_reconcile_only;
-    }
-    bool get_explicit_reconcile_only() const {
-        return explicit_reconcile_only;
     }
 
     godot::Ref<NetwPropertyConfig> state();
@@ -212,18 +176,14 @@ public:
     godot::Ref<NetwPropertyConfig> broadcast();
     godot::Ref<NetwPropertyConfig> volatile_lane();
     godot::Ref<NetwPropertyConfig> retained();
-    godot::Ref<NetwPropertyConfig> causal();
-    godot::Ref<NetwPropertyConfig> derived();
-    godot::Ref<NetwPropertyConfig> cosmetic();
-    godot::Ref<NetwPropertyConfig> converge(double p_stiffness);
-    godot::Ref<NetwPropertyConfig> carry_along(
-        const godot::StringName &p_channel
+    godot::Ref<NetwPropertyConfig> unchecked();
+    godot::Ref<NetwPropertyConfig> correction_weight(double p_weight);
+    godot::Ref<NetwPropertyConfig> extrapolate(
+        const godot::StringName &p_rate_property
     );
-    godot::Ref<NetwPropertyConfig> carry_step(const godot::Callable &p_step);
     godot::Ref<NetwPropertyConfig> teleport_only();
-    godot::Ref<NetwPropertyConfig> epsilon(double p_threshold);
-    godot::Ref<NetwPropertyConfig> teleport_at(double p_distance);
-    godot::Ref<NetwPropertyConfig> reconcile_only();
+    godot::Ref<NetwPropertyConfig> correction_threshold(double p_threshold);
+    godot::Ref<NetwPropertyConfig> teleport_threshold(double p_distance);
     godot::Ref<NetwPropertyConfig> on_change();
     godot::Ref<NetwPropertyConfig> heartbeat(int64_t p_ticks);
     godot::Ref<NetwPropertyConfig> windowed(int64_t p_samples);
@@ -239,5 +199,4 @@ public:
 
 VARIANT_ENUM_CAST(netw::NetwPropertyConfig::Trigger);
 VARIANT_ENUM_CAST(netw::NetwPropertyConfig::Lane);
-VARIANT_ENUM_CAST(netw::NetwPropertyConfig::PropertyClass);
 VARIANT_ENUM_CAST(netw::NetwPropertyConfig::Audience);

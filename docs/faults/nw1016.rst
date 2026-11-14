@@ -5,25 +5,50 @@
 NW1016. A property is not interpolated as declared
 ==================================================
 
-Reported as a warning when an interpolation cannot run as declared, such as a
-second interpolation of the same property, or a node that simulates on this
-peer.
+Reported as a warning when an interpolation declared with
+:ref:`interpolate <class_NetwMemberConfig_method_interpolate>` cannot draw its
+property. The log line names the property, as a path such as
+``Car:position`` when its node is known, and gives one of nine reasons.
 
-The property is not interpolated the way it was declared. The log line names
-the node and property as a path, such as ``Car:position``, and the reason.
+- **Its NetwInterpolate cannot blend the type.** Remove ``interpolate`` from
+  the property, or give the property a type the interpolation supports.
+- **This peer simulates it and the interpolation writes the property it
+  reads.** Set
+  :ref:`NetwDisplay.visual_root <class_NetwDisplay_property_visual_root>` or
+  :ref:`NetwInterpolate.to <class_NetwInterpolate_method_to>`.
+- **Two interpolations write it.** Keep one interpolation for each property.
+- **The visual root is not a node under the entity.** Set ``visual_root`` to
+  the path of a child node.
+- **It would write a body this entity simulates.** Set ``visual_root`` to
+  draw it on a child node.
+- **It is written to the visual root in local space, so the body still moves
+  it.** Turn on ``top_level`` on that node, or interpolate position and
+  rotation.
+- **The visual root cannot take the value in global space.** Use a
+  ``Node2D`` or a ``Node3D`` as ``visual_root``.
+- **Two interpolations on one entity write a property of the same name.** A
+  call that names it reaches only one. Interpolate one property of that name
+  on each entity.
+- **The property changed its type.** Give the property a static type.
+
+This interpolation reads ``position`` and writes ``global_position`` on the
+body the entity simulates.
+
+.. code-block:: gdscript
+
+    extends RigidBody3D
+
+    func _init() -> void:
+        Netw.configure_entity(self)
+        Netw.configure_property(self, &"position").state().interpolate(
+                NetwInterpolate.new().lerp().to(&"global_position"))
+
+Draw it on a child node.
 
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_property(self, &"position").interpolate(
-                NetwInterpolate.new().lerp().to(&"position"))
-        Netw.configure_property(self, &"position").interpolate(
-                NetwInterpolate.new().lerp().to(&"position"))
-
-Use one interpolation for each property.
-
-.. code-block:: gdscript
-
-    func _init() -> void:
-        Netw.configure_property(self, &"position").interpolate(
-                NetwInterpolate.new().lerp().to(&"position"))
+        var entity := Netw.configure_entity(self)
+        entity.display.visual_root = ^"Model"
+        Netw.configure_property(self, &"position").state().interpolate(
+                NetwInterpolate.new().lerp())

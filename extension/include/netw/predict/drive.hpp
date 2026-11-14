@@ -7,7 +7,6 @@
 #include "netw/object_port.hpp"
 #include "netw/predict/arrival.hpp"
 #include "netw/predict/books.hpp"
-#include "netw/predict/carry.hpp"
 #include "netw/predict/compare.hpp"
 #include "netw/predict/episode.hpp"
 #include "netw/predict/joint.hpp"
@@ -136,7 +135,7 @@ ConsumeInputPlan plan_consume_input(
     bool p_has_input,
     bool p_has_later_input,
     bool p_has_last_input,
-    MissingInput p_missing_policy
+    MissingInput p_missing_input
 );
 
 struct DriveStats {
@@ -333,10 +332,8 @@ struct Slot {
     StateRow pulled;
     bool owner_solves = false;
     godot::Callable simulate;
-    godot::Callable witness;
     godot::Callable corridor;
     godot::HashMap<godot::StringName, godot::Callable> sensors;
-    godot::HashMap<godot::StringName, godot::Callable> carry_rules;
     Journal journal;
     Tape tape;
     ClaimBook owner_claims;
@@ -393,14 +390,11 @@ struct Slot {
     StateRow state;
     Episode episode;
     sim::Selection joint_roster;
-    int reconcile_own = 0;
-    bool reconcile_joined = false;
+    bool rollback_together_own = false;
+    bool rollback_together_joined = false;
     JointTrack joint;
     JointStats joint_stats;
     Quarantine quarantine;
-    CarryTrack carry;
-    CarryDirty carry_dirty;
-    godot::LocalVector<CarryAttempt> carry_attempts;
     WitnessSummary last_witness;
     godot::Dictionary last_samples;
     PendingProvenance pending_provenance;
@@ -485,8 +479,6 @@ struct Slot {
     int command_depth_from(int64_t p_cursor) const;
     godot::PackedInt64Array command_keys() const;
 
-    void mark_carry_dirty(int64_t p_transition);
-    bool carry_judgeable(int64_t p_transition) const;
     void record_input(int64_t p_tick, int32_t p_c_hash);
 
     void trim_history(int64_t p_ack);

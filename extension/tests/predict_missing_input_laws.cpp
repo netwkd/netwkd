@@ -61,11 +61,12 @@ struct Lane {
     int64_t hole = -1;
 
     int64_t fact(const char *p_name) const {
-        const Ref<netw::NetwPredictStats> stats
-            = rig->prediction_handle(StringName("P"))->get_stats();
-        return int64_t(
-            stats->to_dictionary().get(StringName(p_name), int64_t(-1))
-        );
+        const Dictionary facts
+            = Internals::predict_declaration(
+                  rig->prediction_handle(StringName("P"))
+            )
+                  .facts.to_dictionary();
+        return int64_t(facts.get(StringName(p_name), int64_t(-1)));
     }
 
     int64_t cursor() const {
@@ -236,7 +237,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Lane] L5 a missing input inside replay_buffer_depth "
+    "[Networked][Predict][Lane] L5 a missing input inside input_buffer_ticks "
     "is run as missing rather than held, so consumption continues down to "
     "the buffer"
 ) {
@@ -244,7 +245,7 @@ TEST_CASE(
     LoopbackRig rig(scenario.clients);
     ScenarioRun::session(rig, scenario);
     Lane lane = open_hole(rig);
-    rig.prediction_handle(StringName("P"))->set_replay_buffer_depth(2);
+    rig.prediction_handle(StringName("P"))->set_input_buffer_ticks(2);
 
     REQUIRE(lane.admit(lane.hole, HELD_MOTION));
     for (int64_t queued = 2; queued <= QUEUED + 1; ++queued) {

@@ -84,7 +84,7 @@ func test_a_proxy_uses_relayed_turn_rate_for_its_tire_trails() -> void:
 
 	var own := await client.await_player(&"luigi", 2.0)
 	var watcher_view := await watcher.await_player(&"luigi", 2.0)
-	own.entity.simulation.step = hold
+	own.entity.simulation.network_process = hold
 	own.linear_speed = 1.0
 	own.acceleration = 1.0
 	own.angular_speed = 4.0

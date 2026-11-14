@@ -52,10 +52,11 @@
 		func _init() -&gt; void:
 		    var entity := Netw.configure_entity(self)
 		    entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
-		    entity.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
+		    entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
 		[/codeblock]
 	</description>
 	<tutorials>
+		<link title="Prediction guide">https://networked.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
 	<methods>
 		<method name="claim_control">
@@ -151,7 +152,7 @@
 		<member name="lifecycle" type="int" setter="set_lifecycle" getter="get_lifecycle" enum="NetwEntity.Lifecycle">
 			Who may spawn, move and despawn this entity. Set it in [code]_init[/code] beside [member transfer].
 			A refused call pushes an error and returns its failure value. [method Node.reparent] cannot be refused, so it warns and the move stays on this peer.
-			During a prediction replay these calls return [constant @GlobalScope.ERR_BUSY] with no error, so a predicted step spawns only on a fresh tick.
+			During a rollback these calls return [constant @GlobalScope.ERR_BUSY] with no error, so [member NetwSimulation.network_process] spawns only the first time a tick runs.
 			[codeblock]
 			func _init() -&gt; void:
 			    var entity := Netw.configure_entity(self)

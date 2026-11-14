@@ -111,9 +111,8 @@ lifecycle::Facts NetwMultiplayer::lifecycle_entity_facts(
     }
     facts.declared
         = p_entity->get_lifecycle() == NetwEntity::LIFECYCLE_CONTROLLER;
-    const Ref<NetwPrediction> prediction = p_entity->prediction_if_minted();
-    facts.predicted = prediction.is_valid()
-        && prediction->get_archetype() != NetwPrediction::ARCHETYPE_NONE;
+    facts.predicted = predict_implied(p_entity)
+        || predict_is_declared(p_entity->get_rid_handle());
     const int64_t route = liveness_route_of(p_entity);
     spawn::Pipeline *spawns = spawn_plane();
     facts.native = !p_entity->synchronizers().is_empty()

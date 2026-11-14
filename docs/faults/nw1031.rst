@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1031:
+
+NW1031. A frame took longer than the clock allows
+=================================================
+
+Reported as a warning when one physics frame takes longer than
+:ref:`NetwClockConfig.stall_threshold <class_NetwClockConfig_property_stall_threshold>`,
+such as while a level loads. The ticks that frame missed were skipped, and
+the clock goes on from the present. The log line gives the frame time and
+the threshold in milliseconds.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).stall_threshold = 0.25
+
+Raise the threshold when frames this long are expected.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_clock(self).stall_threshold = 1.0

@@ -89,6 +89,12 @@ The addon includes generated C# bindings under
 changes.
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Guides
+
+   guides/prediction
+
+.. toctree::
    :maxdepth: 2
    :caption: Class reference
    :name: toc-class-ref

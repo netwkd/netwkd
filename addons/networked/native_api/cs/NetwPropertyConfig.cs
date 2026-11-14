@@ -22,7 +22,7 @@ namespace Networked;
 /// <para>
 /// <see cref="NetwPropertyConfig.Volatile"/>,
 /// <see cref="NetwPropertyConfig.Retained"/>,
-/// <see cref="NetwPropertyConfig.Epsilon"/> and
+/// <see cref="NetwPropertyConfig.CorrectionThreshold"/> and
 /// <see cref="NetwPropertyConfig.Persisted"/> apply to one property.
 /// <see cref="NetwPropertyConfig.OnChange"/>,
 /// <see cref="NetwPropertyConfig.Heartbeat"/>,
@@ -90,22 +90,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         /// Sent reliably, only when it changes.
         /// </summary>
         Retained = 1,
-    }
-
-    public enum PropertyClassEnum : long
-    {
-        /// <summary>
-        /// Affects the next step, so it is compared and corrected.
-        /// </summary>
-        Causal = 0,
-        /// <summary>
-        /// Computed from other properties each step, so it is not compared.
-        /// </summary>
-        Derived = 1,
-        /// <summary>
-        /// Only affects display, so it is not compared.
-        /// </summary>
-        Cosmetic = 2,
     }
 
     public enum AudienceEnum : long
@@ -189,47 +173,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
             long discarded = default;
             NetwThunks.Ptrcall1_Long_Long(
                 _bindSetSetAudience,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetPropertyClass =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_property_class",
-            1973673595UL);
-
-    private static readonly IntPtr _bindSetPropertyClass =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_property_class",
-            1424893448UL);
-
-    /// <summary>
-    /// Whether a difference in the value causes a correction. Set by
-    /// <see cref="NetwPropertyConfig.Causal"/>,
-    /// <see cref="NetwPropertyConfig.Derived"/> and
-    /// <see cref="NetwPropertyConfig.Cosmetic"/>.
-    /// </summary>
-    public NetwPropertyConfig.PropertyClassEnum PropertyClass
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindGetPropertyClass,
-                Checked,
-                ref answered);
-            return (NetwPropertyConfig.PropertyClassEnum)answered;
-        }
-        set
-        {
-            long slot0 = (long)value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetPropertyClass,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -414,84 +357,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         }
     }
 
-    private static readonly IntPtr _bindGetEpsilonOverride =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_epsilon_override",
-            1740695150UL);
-
-    private static readonly IntPtr _bindSetEpsilonOverride =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_epsilon_override",
-            373806689UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.Epsilon"/>. A negative value uses
-    /// <see cref="NetwPrediction.DivergenceEpsilon"/>.
-    /// </summary>
-    public double EpsilonOverride
-    {
-        get
-        {
-            double answered = default;
-            NetwThunks.Ptrcall0_Double(
-                _bindGetEpsilonOverride,
-                Checked,
-                ref answered);
-            return answered;
-        }
-        set
-        {
-            double slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Double_Long(
-                _bindSetEpsilonOverride,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetTeleportAtOverride =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_teleport_at_override",
-            1740695150UL);
-
-    private static readonly IntPtr _bindSetTeleportAtOverride =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_teleport_at_override",
-            373806689UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.TeleportAt"/>. A negative value
-    /// uses <see cref="NetwPrediction.TeleportThreshold"/>.
-    /// </summary>
-    public double TeleportAtOverride
-    {
-        get
-        {
-            double answered = default;
-            NetwThunks.Ptrcall0_Double(
-                _bindGetTeleportAtOverride,
-                Checked,
-                ref answered);
-            return answered;
-        }
-        set
-        {
-            double slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Double_Long(
-                _bindSetTeleportAtOverride,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
     private static readonly IntPtr _bindGetSetTrigger =
         NetwApi.MethodBind(
             "NetwPropertyConfig",
@@ -635,166 +500,14 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         }
     }
 
-    private static readonly IntPtr _bindGetConvergeStiffness =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_converge_stiffness",
-            1740695150UL);
-
-    private static readonly IntPtr _bindSetConvergeStiffness =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_converge_stiffness",
-            373806689UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.Converge"/>.
-    /// </summary>
-    public double ConvergeStiffness
-    {
-        get
-        {
-            double answered = default;
-            NetwThunks.Ptrcall0_Double(
-                _bindGetConvergeStiffness,
-                Checked,
-                ref answered);
-            return answered;
-        }
-        set
-        {
-            double slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Double_Long(
-                _bindSetConvergeStiffness,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetCarryChannel =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_carry_channel",
-            2002593661UL);
-
-    private static readonly IntPtr _bindSetCarryChannel =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_carry_channel",
-            3304788590UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.CarryAlong"/>.
-    /// </summary>
-    public StringName CarryChannel
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetCarryChannel, Checked, ref answered);
-            StringName result = VariantUtils.ConvertToStringName(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromStringName(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(
-                _bindSetCarryChannel,
-                Checked,
-                in slot0,
-                ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
-    }
-
-    private static readonly IntPtr _bindGetExplicitTeleportOnly =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_explicit_teleport_only",
-            36873697UL);
-
-    private static readonly IntPtr _bindSetExplicitTeleportOnly =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_explicit_teleport_only",
-            2586408642UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.TeleportOnly"/>.
-    /// </summary>
-    public bool ExplicitTeleportOnly
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(
-                _bindGetExplicitTeleportOnly,
-                Checked,
-                ref answered);
-            return answered != 0;
-        }
-        set
-        {
-            byte slot0 = value ? (byte)1 : (byte)0;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Byte_Long(
-                _bindSetExplicitTeleportOnly,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetExplicitReconcileOnly =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_explicit_reconcile_only",
-            36873697UL);
-
-    private static readonly IntPtr _bindSetExplicitReconcileOnly =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_explicit_reconcile_only",
-            2586408642UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.ReconcileOnly"/>.
-    /// </summary>
-    public bool ExplicitReconcileOnly
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(
-                _bindGetExplicitReconcileOnly,
-                Checked,
-                ref answered);
-            return answered != 0;
-        }
-        set
-        {
-            byte slot0 = value ? (byte)1 : (byte)0;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Byte_Long(
-                _bindSetExplicitReconcileOnly,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
     private static readonly IntPtr _bindState =
         NetwApi.MethodBind("NetwPropertyConfig", "state", 1162647290UL);
 
     /// <summary>
     /// The server owns the value, every peer sees it, and lag compensation can
-    /// rewind it. A client predicting this <see cref="NetwEntity"/> is
-    /// corrected against it, within <see cref="NetwPropertyConfig.Epsilon"/>.
+    /// rewind it. <see cref="NetwPrediction"/> says when an entity with a state
+    /// property is predicted, and a predicted entity is corrected against this
+    /// value within <see cref="NetwPropertyConfig.CorrectionThreshold"/>.
     /// <code>
     /// func _init() -&gt; void:
     ///     Netw.configure_property(self, &amp;"position").state().quantize(pos_q)
@@ -826,10 +539,10 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     ///     velocity = move_dir * SPEED
     /// </code>
     /// <para>
-    /// Each send also carries the last two ticks of input, so a lost packet is
-    /// recovered from the next one. <see cref="NetwPropertyConfig.Windowed"/>
+    /// Each send also includes the last two ticks of input, so the next packet
+    /// makes up for a lost one. <see cref="NetwPropertyConfig.Windowed"/>
     /// changes how many. Correction settings such as
-    /// <see cref="NetwPropertyConfig.CarryAlong"/> are ignored on an input.
+    /// <see cref="NetwPropertyConfig.Extrapolate"/> are ignored on an input.
     /// </para>
     /// </summary>
     public NetwPropertyConfig Input()
@@ -844,11 +557,11 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
 
     /// <summary>
     /// The controlling peer owns the value and every peer sees it, with no
-    /// server check. Use it for cosmetic values such as an aim direction. The
-    /// server keeps no history of it. When a client controls the entity, or the
-    /// entity is kept for a dropped player who controlled it, a spawn carries
-    /// the value, so a controller that receives the node again starts from the
-    /// value the server holds.
+    /// server check. Use it for values that only change how the entity looks,
+    /// such as an aim direction. The server keeps no history of it. When a
+    /// client controls the entity, or the entity is kept for a dropped player
+    /// who controlled it, a spawn includes the value, so a controller that
+    /// receives the node again starts from the value the server holds.
     /// <code>
     /// func _init() -&gt; void:
     ///     Netw.configure_property(self, &amp;"aim_dir").broadcast()
@@ -895,145 +608,69 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         return NetwPropertyConfig.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindCausal =
-        NetwApi.MethodBind("NetwPropertyConfig", "causal", 1162647290UL);
+    private static readonly IntPtr _bindUnchecked =
+        NetwApi.MethodBind("NetwPropertyConfig", "unchecked", 1162647290UL);
 
     /// <summary>
-    /// Marks the value as one the next step reads, so it is compared and
-    /// corrected. This is the default.
+    /// A difference in this value never causes a correction, but a correction
+    /// caused by another value still restores it. Use it for a value the body
+    /// recomputes each tick or one that only affects display.
     /// <code>
-    /// Netw.configure_property(self, &amp;"velocity").state().causal()
+    /// Netw.configure_property(self, &amp;"heading").state().unchecked()
     /// </code>
     /// </summary>
-    public NetwPropertyConfig Causal()
+    public NetwPropertyConfig Unchecked()
     {
         IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindCausal, Checked, ref answered);
+        NetwThunks.Ptrcall0_IntPtr(_bindUnchecked, Checked, ref answered);
         return NetwPropertyConfig.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindDerived =
-        NetwApi.MethodBind("NetwPropertyConfig", "derived", 1162647290UL);
-
-    /// <summary>
-    /// Marks the value as one the body recomputes each step from other
-    /// properties, so a difference in it never causes a correction. A
-    /// correction still writes it.
-    /// <code>
-    /// Netw.configure_property(self, &amp;"speed").state().derived()
-    /// </code>
-    /// </summary>
-    public NetwPropertyConfig Derived()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindDerived, Checked, ref answered);
-        return NetwPropertyConfig.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindCosmetic =
-        NetwApi.MethodBind("NetwPropertyConfig", "cosmetic", 1162647290UL);
-
-    /// <summary>
-    /// Marks the value as display only, so a difference in it never causes a
-    /// correction. A correction still writes it.
-    /// <code>
-    /// Netw.configure_property(self, &amp;"skid_intensity").state().cosmetic()
-    /// </code>
-    /// </summary>
-    public NetwPropertyConfig Cosmetic()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindCosmetic, Checked, ref answered);
-        return NetwPropertyConfig.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindConverge =
-        NetwApi.MethodBind("NetwPropertyConfig", "converge", 3192356254UL);
+    private static readonly IntPtr _bindCorrectionWeight =
+        NetwApi.MethodBind(
+            "NetwPropertyConfig",
+            "correction_weight",
+            3192356254UL);
 
     /// <summary>
     /// Moves the value part of the way toward the server's value during a
-    /// correction, by <paramref name="stiffness"/>, instead of writing it
-    /// outright. <c>0.0</c> writes it outright. A value with no midpoint, such
-    /// as a [bool], is always written outright.
+    /// correction, by <paramref name="weight"/>. <c>0.0</c> writes it outright.
+    /// A value with no midpoint, such as a [bool], is always written outright.
     /// <code>
-    /// Netw.configure_property(self, &amp;"heading").state().causal().converge(0.4)
+    /// Netw.configure_property(self, &amp;"heading").state().correction_weight(0.4)
     /// </code>
     /// </summary>
-    public NetwPropertyConfig Converge(double stiffness)
+    public NetwPropertyConfig CorrectionWeight(double weight)
     {
-        double slot0 = stiffness;
+        double slot0 = weight;
         IntPtr answered = default;
         NetwThunks.Ptrcall1_Double_IntPtr(
-            _bindConverge,
+            _bindCorrectionWeight,
             Checked,
             in slot0,
             ref answered);
         return NetwPropertyConfig.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindCarryAlong =
-        NetwApi.MethodBind("NetwPropertyConfig", "carry_along", 187488283UL);
+    private static readonly IntPtr _bindExtrapolate =
+        NetwApi.MethodBind("NetwPropertyConfig", "extrapolate", 187488283UL);
 
     /// <summary>
     /// When a correction restores this value, advances it to the present using
-    /// the rate in <paramref name="channel"/>.
+    /// the rate in <paramref name="rateProperty"/>.
     /// <code>
-    /// Netw.configure_property(self, &amp;"position").state().carry_along(&amp;"velocity")
+    /// Netw.configure_property(self, &amp;"position").state().extrapolate(&amp;"velocity")
     /// </code>
     /// <para>
-    /// <paramref name="channel"/> must be another
-    /// <see cref="NetwPropertyConfig.State"/> property of the same node. Use
-    /// <see cref="NetwPropertyConfig.CarryStep"/> instead when the rate changes
-    /// quickly. Declaring both on one property is an error, and neither is
-    /// used.
+    /// <paramref name="rateProperty"/> must be another
+    /// <see cref="NetwPropertyConfig.State"/> property of the same node.
     /// </para>
     /// </summary>
-    public NetwPropertyConfig CarryAlong(StringName channel)
+    public NetwPropertyConfig Extrapolate(StringName rateProperty)
     {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(channel);
+        godot_variant slot0 = VariantUtils.CreateFromStringName(rateProperty);
         godot_variant answered = default;
-        NetwThunks.Call1(_bindCarryAlong, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        NetwPropertyConfig result =
-            NetwPropertyConfig.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindCarryStep =
-        NetwApi.MethodBind("NetwPropertyConfig", "carry_step", 3770852400UL);
-
-    /// <summary>
-    /// When a correction restores this value, advances it to the present by
-    /// calling <paramref name="step"/> once for each tick the server has not
-    /// acknowledged yet. Use it for a value only your code changes. A value the
-    /// physics engine also changes cannot be advanced this way, and the rule is
-    /// disabled.
-    /// <code>
-    /// func _init() -&gt; void:
-    ///     Netw.configure_property(self, &amp;"spin").state().carry_step(carry_spin)
-    ///
-    /// func carry_spin(value: Vector3, ctx: NetwPredictCarryContext) -&gt; Vector3:
-    ///     return value + drive_axis(ctx.state) * ctx.state[&amp;"speed"] * ctx.delta
-    /// </code>
-    /// <para>
-    /// <paramref name="step"/> must be a method or lambda of a
-    /// <see cref="Node"/>, may read only its
-    /// <see cref="NetwPredictCarryContext"/>, and must not write anything. A
-    /// result that does not reproduce the recorded ticks is rejected. Declaring
-    /// both this and <see cref="NetwPropertyConfig.CarryAlong"/> on one
-    /// property is an error, and neither is used.
-    /// <see cref="NetwPrediction.Reachability"/> reports whether the rule is in
-    /// use.
-    /// </para>
-    /// </summary>
-    public NetwPropertyConfig CarryStep(Callable step)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(step);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindCarryStep, Checked, in slot0, ref answered);
+        NetwThunks.Call1(_bindExtrapolate, Checked, in slot0, ref answered);
         slot0.Dispose();
         NetwPropertyConfig result =
             NetwPropertyConfig.Adopt(
@@ -1048,10 +685,10 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
 
     /// <summary>
     /// Only a teleport writes this value, and an ordinary correction leaves it
-    /// alone. Pair it with <see cref="NetwPropertyConfig.CarryAlong"/> or
-    /// <see cref="NetwPropertyConfig.CarryStep"/> so the teleport restores it
-    /// at the present, or with <see cref="NetwPropertyConfig.ReconcileOnly"/>
-    /// so it never causes a correction.
+    /// alone. Pair it with <see cref="NetwPropertyConfig.Extrapolate"/> so the
+    /// teleport restores it at the present, or with
+    /// <see cref="NetwPropertyConfig.Unchecked"/> so it never causes a
+    /// correction.
     /// <code>
     /// Netw.configure_property(self, &amp;"angular_velocity").state().teleport_only()
     /// </code>
@@ -1063,36 +700,42 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         return NetwPropertyConfig.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindEpsilon =
-        NetwApi.MethodBind("NetwPropertyConfig", "epsilon", 3192356254UL);
+    private static readonly IntPtr _bindCorrectionThreshold =
+        NetwApi.MethodBind(
+            "NetwPropertyConfig",
+            "correction_threshold",
+            3192356254UL);
 
     /// <summary>
     /// How far this value may drift from the server's before it is corrected,
     /// in its own units. Without it, the value uses
-    /// <see cref="NetwPrediction.DivergenceEpsilon"/>. <c>0.0</c> corrects any
-    /// error.
+    /// <see cref="NetwPrediction.CorrectionThreshold"/>. <c>0.0</c> corrects
+    /// any error.
     /// <code>
-    /// Netw.configure_property(self, &amp;"velocity").state().epsilon(0.05)
+    /// Netw.configure_property(self, &amp;"velocity").state().correction_threshold(0.05)
     /// </code>
     /// <para>
-    /// Use <see cref="NetwPropertyConfig.ReconcileOnly"/> for a value that
-    /// should never cause a correction.
+    /// Use <see cref="NetwPropertyConfig.Unchecked"/> for a value that should
+    /// never cause a correction.
     /// </para>
     /// </summary>
-    public NetwPropertyConfig Epsilon(double threshold)
+    public NetwPropertyConfig CorrectionThreshold(double threshold)
     {
         double slot0 = threshold;
         IntPtr answered = default;
         NetwThunks.Ptrcall1_Double_IntPtr(
-            _bindEpsilon,
+            _bindCorrectionThreshold,
             Checked,
             in slot0,
             ref answered);
         return NetwPropertyConfig.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindTeleportAt =
-        NetwApi.MethodBind("NetwPropertyConfig", "teleport_at", 3192356254UL);
+    private static readonly IntPtr _bindTeleportThreshold =
+        NetwApi.MethodBind(
+            "NetwPropertyConfig",
+            "teleport_threshold",
+            3192356254UL);
 
     /// <summary>
     /// How large this value's error may be before a correction teleports the
@@ -1101,40 +744,20 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     /// every correction this value causes.
     /// <code>
     /// Netw.configure_property(self, &amp;"position").state() \
-    ///         .carry_along(&amp;"velocity").teleport_at(3.0)
+    ///         .extrapolate(&amp;"velocity").teleport_threshold(3.0)
     /// Netw.configure_property(self, &amp;"heading").state() \
-    ///         .carry_along(&amp;"angular_speed").teleport_at(1.0)
+    ///         .extrapolate(&amp;"angular_speed").teleport_threshold(1.0)
     /// </code>
     /// </summary>
-    public NetwPropertyConfig TeleportAt(double distance)
+    public NetwPropertyConfig TeleportThreshold(double distance)
     {
         double slot0 = distance;
         IntPtr answered = default;
         NetwThunks.Ptrcall1_Double_IntPtr(
-            _bindTeleportAt,
+            _bindTeleportThreshold,
             Checked,
             in slot0,
             ref answered);
-        return NetwPropertyConfig.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindReconcileOnly =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "reconcile_only",
-            1162647290UL);
-
-    /// <summary>
-    /// A difference in this value never causes a correction, but a correction
-    /// caused by another value still restores it.
-    /// <code>
-    /// Netw.configure_property(self, &amp;"heading").state().reconcile_only()
-    /// </code>
-    /// </summary>
-    public NetwPropertyConfig ReconcileOnly()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindReconcileOnly, Checked, ref answered);
         return NetwPropertyConfig.Adopt(answered);
     }
 
@@ -1178,8 +801,8 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         NetwApi.MethodBind("NetwPropertyConfig", "windowed", 1358280359UL);
 
     /// <summary>
-    /// Each send also carries the last <paramref name="samples"/> ticks of
-    /// values, so a lost packet is recovered from the next one.
+    /// Each send also includes the last <paramref name="samples"/> ticks of
+    /// values, so the next packet makes up for a lost one.
     /// <code>
     /// Netw.configure_property(self, &amp;"motion").input().windowed(3)
     /// </code>

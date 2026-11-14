@@ -148,7 +148,7 @@ Emitted when :ref:`is_synchronized<class_NetwClock_property_is_synchronized>` be
 
 **ticked**\ (\ delta\: :godot:`float`, tick\: :godot:`int`\ ) :ref:`🔗<class_NetwClock_signal_ticked>`
 
-Emitted after every entity ran ``_network_tick`` for ``tick``. Read results here.
+Emitted after every entity ran ``_network_process`` for ``tick``. Read results here.
 
 .. rst-class:: classref-item-separator
 

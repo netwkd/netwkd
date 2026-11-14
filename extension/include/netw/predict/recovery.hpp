@@ -20,7 +20,7 @@ struct RecoveryRequest {
     double fallback_teleport = 0.0;
     int max_restore_ticks = 0;
     int ack_age_ticks = 0;
-    int collision_cooldown_ticks = 0;
+    int correction_cooldown_ticks = 0;
     double tick_delta = 1.0 / 60.0;
     Domain domain = Domain::OUT_OF_DOMAIN;
     Attribution attribution = Attribution::UNKNOWN;

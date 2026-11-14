@@ -1,159 +1,60 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="NetwPrediction" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Prediction settings and diagnostics for one [NetwEntity].
+		Client-side prediction for one [NetwEntity].
 	</brief_description>
 	<description>
-		Reached by [member NetwEntity.prediction]. The client predicts its entity ahead of the server and corrects it when the server's state disagrees. This handle sets how that happens.
+		Reached by [member NetwEntity.prediction]. An entity with a [method NetwPropertyConfig.state] property, a [method NetwPropertyConfig.input] property and a [member NetwSimulation.network_process] is predicted. A [RigidBody2D] or [RigidBody3D] needs only the two properties. The client that controls the entity runs that function on its own input each tick, and the server runs it on the same input when it arrives.
 		[codeblock]
-		var pred := NetwEntity.of(self).prediction
-		pred.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
-		pred.witness_contacts = _sample_contacts
-		pred.breach_response = NetwPrediction.BREACH_RESPONSE_DEMOTE
+		func _init() -&gt; void:
+		    Netw.configure_property(self, &amp;"move").input()
+		    Netw.configure_property(self, &amp;"position").state()
+
+		func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
+		    velocity = move * SPEED
+		    move_and_slide()
+		    if is_fresh and is_on_floor():
+		        footstep.play()
 		[/codeblock]
-		Only an entity with a [method NetwPropertyConfig.state] property is predicted, because that state is what gets compared and restored. Per-property tolerances are set with [NetwPropertyConfig]. The schedule and the simulation mode are on [member NetwEntity.simulation].
-		An entity keeps predicting through [method Netw.reparent], and one taken out of the tree with [method Node.remove_child] and added back later predicts again.
-		Values set on a [MultiplayerSynchronizer] in the scene act as defaults, and values set in code override them.
-		[b]Settings[/b]
-		- [enum Archetype] a preset for the other settings
-		- [enum RecoveryPolicy] how a misprediction is corrected
-		- [enum MissingInput] what the server does when an input never arrives
-		- [enum BreachResponse] what happens on an unpredicted contact
-		- [enum Reconcile] whether entities are corrected alone or together
-		[b]Reports[/b]
-		- [enum DriveKind] which input drove the last step
-		- [enum ConsumeAction] what the server did with its input queue
-		- [enum ContactClass] what the body touched
-		- [enum CommandOrigin] where a replayed input came from
-		- [enum ExactVerdict] whether two peers produced the same result
-		- [enum Domain] whether a step is compared exactly or by tolerance
-		- [enum TriggerShape] what asked for a correction
-		- [enum Attribution] what a misprediction is blamed on
-		- [enum Operator] how a correction wrote the body
-		- [enum OperatorOutcome] whether a correction helped
-		- [enum EpisodeState] whether a misprediction is still being corrected
-		[b]Seeing prediction[/b]
-		Debug &gt; Networked &gt; Prediction Rings draws rings around every entity the client predicts.
-		- [b]cyan[/b] where the entity is drawn
+		A rollback runs this function again for past ticks. Anything it reads besides input and state is not put back, and anything it plays would play twice without the [code]is_fresh[/code] check.
+		[b]When the client is wrong[/b]
+		The client corrects its entity when a state property differs from the server's by more than [member correction_threshold]. Past [member teleport_threshold] the entity jumps straight to the server's state.
+		[member mode] picks the correction. [constant MODE_ROLLBACK] returns to the server's state and runs the newer inputs again. [constant MODE_OFFSET] moves the entity by the difference. [constant MODE_DISABLED] stops predicting and shows the server's state.
+		[b]Rigid bodies[/b]
+		An official Godot build cannot run physics again for a past tick, so a [RigidBody2D] or [RigidBody3D] uses [constant MODE_OFFSET].
+		The [url=https://github.com/diejor/godot/releases]Networked engine build[/url] can roll one back. It adds [url=https://github.com/godotengine/godot/pull/76462]physics stepping[/url] and [url=https://github.com/godotengine/godot/pull/113784]kinematic body updates[/url] to Godot. On another build, install a [NetwPhysicsStepper].
+		Rigid bodies in the same [NetwInterestLayer] roll back together when the engine can step physics. Turn off [member rollback_together] to correct each one alone.
+		[b]Late and lost input[/b]
+		Raise [member input_buffer_ticks] when a player on a bad connection stutters. The server waits that many ticks before it uses input, so each one adds a tick of delay.
+		[member repeat_missing_input] reuses the last input when one is lost.
+		[b]Debugging[/b]
+		Debug &gt; Networked &gt; Prediction Rings draws rings around each predicted entity.
+		- [b]cyan[/b] where it is drawn
 		- [b]green[/b] where it is simulated
-		- [b]orange[/b] where the server says it was, at the last tick it confirmed
-		- [b]dashed magenta[/b] where this client predicted it would be at that tick
-		- [b]white line[/b] the gap between orange and magenta, when it exceeds the tolerance
-		Text beside the entity names its [enum EpisodeState], its last [enum Operator] and the [enum OperatorOutcome]. A replica the client only simulates shows how old the server's state is instead.
+		- [b]orange[/b] where the server last said it was
+		- [b]dashed magenta[/b] where the client predicted it would be
+		- [b]white line[/b] the gap between orange and magenta
 	</description>
 	<tutorials>
+		<link title="Prediction guide">https://networked.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
 	<methods>
-		<method name="bind_entity">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Binds the entity this handle belongs to. Called by Networked when it creates the handle.
-			</description>
-		</method>
-		<method name="entity" qualifiers="const">
-			<return type="NetwEntity" />
-			<description>
-				The entity this handle belongs to, or [code]null[/code] once that entity is gone.
-			</description>
-		</method>
-		<method name="is_registered" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Whether the entity is being predicted, as opposed to only configured.
-				It is already false when [signal NetwSimulation.mode_changed] reports [constant NetwSimulation.MODE_NONE] as the entity stops being predicted.
-			</description>
-		</method>
-		<method name="notify_contact">
+		<method name="notify_collision">
 			<return type="void" />
 			<description>
-				Holds off small corrections for [member collision_cooldown_ticks]. Call it on the controlling client when the predicted body collides, so the correction does not fight the collision.
-			</description>
-		</method>
-		<method name="reachability" qualifiers="const">
-			<return type="Dictionary" />
-			<description>
-				Reports, property by property, whether this entity's prediction settings take effect. Returns an empty [Dictionary] before the entity is predicted. Use it while wiring an entity to find settings that are accepted but do nothing.
-				[codeblock]
-				var report := entity.prediction.reachability()
-				for key: StringName in report[&amp;"fields"]:
-				    var row: Dictionary = report[&amp;"fields"][key]
-				    var model: Dictionary = row[&amp;"forward_model"]
-				    if not model[&amp;"live"] and model[&amp;"kind"] != &amp;"none":
-				        print(key, " forward model is not live, ", model[&amp;"why"])
-
-				print(report[&amp;"breach"])
-				print(report[&amp;"findings"])
-				[/codeblock]
-				[code]fields[/code] is keyed by property, and each row carries the following.
-				[codeblock lang=text]
-				Dictionary
-				┠╴class          which NetwPropertyConfig.PropertyClass it is
-				┠╴triggers       whether it can force a correction on its own
-				┠╴tolerance      the epsilon in force, and who declared it
-				┠╴teleport_at    the teleport distance, and who declared it
-				┠╴in_tier        whether it is in the tier being compared
-				┠╴operators      what may write it during a recovery
-				┖╴forward_model  {kind, live, why}
-				[/codeblock]
-				[code]findings[/code] lists the same warnings printed when the entity is set up.
-			</description>
-		</method>
-		<method name="resolved_recovery_policy" qualifiers="const">
-			<return type="int" enum="NetwPrediction.RecoveryPolicy" />
-			<description>
-				The [enum NetwPrediction.RecoveryPolicy] this entity actually uses. [constant NetwPrediction.RECOVERY_POLICY_AUTO] is resolved from the body, and a physics body at [constant NetwSimulation.SCHEDULE_FRAME] resolves [constant NetwPrediction.RECOVERY_POLICY_REBASE_REPLAY] to [constant NetwPrediction.RECOVERY_POLICY_REBASE_RECOVER].
-			</description>
-		</method>
-		<method name="sensor" qualifiers="const">
-			<return type="Variant" />
-			<param index="0" name="name" type="StringName" />
-			<param index="1" name="default" type="Variant" default="null" />
-			<description>
-				The value sampled for the sensor [param name] before the current step, or [param default] when nothing sampled it. Read the world through this in your step, so a misprediction can be blamed on the world.
-				[codeblock]
-				func _init() -&gt; void:
-				    entity.prediction.sensors[&amp;"ground"] = _sample_ground
-
-				func _network_tick(delta: float, tick: int, fresh: bool) -&gt; void:
-				    var ground: Dictionary = entity.prediction.sensor(&amp;"ground", {})
-				[/codeblock]
-			</description>
-		</method>
-		<method name="simulate_frame">
-			<return type="void" />
-			<param index="0" name="delta" type="float" />
-			<description>
-				Steps an entity at [constant NetwSimulation.SCHEDULE_FRAME] once, as the session would. Does nothing for an entity at [constant NetwSimulation.SCHEDULE_TICK] or one that is not predicted.
-			</description>
-		</method>
-		<method name="simulate_tick">
-			<return type="void" />
-			<param index="0" name="delta" type="float" />
-			<param index="1" name="tick" type="int" />
-			<description>
-				Steps the entity for [param tick]. Does nothing for an entity that is not predicted.
+				Holds off small corrections for [member correction_cooldown_ticks], so a correction does not fight a collision. Call it on the client that controls the entity when its body collides. A rollback is not held off.
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="ack_age_ticks" type="int" setter="set_ack_age_ticks" getter="get_ack_age_ticks">
-			How many ticks the last input the server acknowledged is behind the newest input. On a healthy connection it stays near zero, and a growing value means the server is falling behind. [member NetwSimulation.max_restore_ticks] caps it on the client.
+		<member name="correction_cooldown_ticks" type="int" setter="set_correction_cooldown_ticks" getter="get_correction_cooldown_ticks">
+			How many ticks [method notify_collision] holds off small corrections. An error past [member teleport_threshold] still teleports.
 		</member>
-		<member name="archetype" type="int" setter="set_archetype" getter="get_archetype" enum="NetwPrediction.Archetype">
-			A preset for this entity's prediction settings and [member NetwSimulation.schedule]. Settings written afterwards override the preset. No preset sets [member breach_response].
-		</member>
-		<member name="breach_response" type="int" setter="set_breach_response" getter="get_breach_response" enum="NetwPrediction.BreachResponse">
-			What this entity does when it touches a moving body this peer does not simulate. It only takes effect once [member witness_contacts] is set.
-		</member>
-		<member name="collision_cooldown_ticks" type="int" setter="set_collision_cooldown_ticks" getter="get_collision_cooldown_ticks">
-			How many ticks [method notify_contact] holds off corrections. An error past [member teleport_threshold] still corrects.
-		</member>
-		<member name="consume_buffer_ticks" type="int" setter="set_consume_buffer_ticks" getter="get_consume_buffer_ticks">
-			How many ticks of input the server waits for before it starts running them. It then runs one every tick, so late inputs do not stall the entity. Each tick adds a tick of input latency.
+		<member name="correction_count" type="int" setter="" getter="get_correction_count">
+			How many times this peer has corrected the entity.
 		</member>
 		<member name="correction_path_clear" type="Callable" setter="set_correction_path_clear" getter="get_correction_path_clear">
-			Checks whether an eligible correction can carry the body to its proposed present pose. Return [code]true[/code] only when the swept path is clear. The engine moves the body. An unset callback disables this correction.
+			Checks whether a correction can move the body straight to its proposed state. Return [code]true[/code] only when the swept path is clear. The engine moves the body. An unset callback disables this correction.
 			Both [Dictionary] arguments contain state declared with [method NetwPropertyConfig.state]. This example sweeps an unscaled [RigidBody3D] with [member Node3D.position] and [member Node3D.quaternion] state. It refuses rotation changes because [method PhysicsServer3D.body_test_motion] sweeps translation only.
 			[codeblock lang=text]
 			Dictionary
@@ -216,20 +117,23 @@
 			[/csharp]
 			[/codeblocks]
 		</member>
-		<member name="divergence_epsilon" type="float" setter="set_divergence_epsilon" getter="get_divergence_epsilon">
-			How far the predicted state may drift from the server's before it is corrected. [method NetwPropertyConfig.epsilon] overrides it for one property. A [constant ARCHETYPE_SOLVER_BODY] tolerates one and a half quantizer steps on each quantized property.
+		<member name="correction_threshold" type="float" setter="set_correction_threshold" getter="get_correction_threshold">
+			How far the predicted state may drift from the server's before it is corrected. [method NetwPropertyConfig.correction_threshold] overrides it for one property. An entity with [member NetwSimulation.physics_driven] tolerates one and a half quantizer steps on each quantized property.
 		</member>
-		<member name="epoch" type="int" setter="set_epoch" getter="get_epoch">
-			The version of the static world this entity simulates against, or [code]-1[/code] when unset. Raise it when the level changes, so the next mispredictions are tolerated while peers catch up.
+		<member name="input_buffer_ticks" type="int" setter="set_input_buffer_ticks" getter="get_input_buffer_ticks">
+			How many ticks of input the server keeps queued before it runs them. It then runs one every tick, so an input that arrives late is still in time. Each tick adds a tick of delay.
 		</member>
-		<member name="max_consume_lag_ticks" type="int" setter="set_max_consume_lag_ticks" getter="get_max_consume_lag_ticks">
+		<member name="max_input_lag_ticks" type="int" setter="set_max_input_lag_ticks" getter="get_max_input_lag_ticks">
 			How far the server may fall behind the newest input before it skips ahead to it. Without this, a client that joins a running session can leave the server behind for good. [code]0[/code] disables skipping.
 		</member>
-		<member name="max_consume_per_tick" type="int" setter="set_max_consume_per_tick" getter="get_max_consume_per_tick">
-			How many queued inputs the server may run in one tick to catch up to [member consume_buffer_ticks] behind the newest input. Extra inputs run as extra steps and are never skipped. It applies to [constant NetwSimulation.SCHEDULE_TICK], and an entity at [constant NetwSimulation.SCHEDULE_FRAME] catches up by running one input per physics frame.
+		<member name="max_inputs_per_tick" type="int" setter="set_max_inputs_per_tick" getter="get_max_inputs_per_tick">
+			How many queued inputs the server may run in one tick to catch up to [member input_buffer_ticks] behind the newest input. Each extra input runs [member NetwSimulation.network_process] once more, and none is skipped. It applies to [constant NetwSimulation.SCHEDULE_TICK], and an entity at [constant NetwSimulation.SCHEDULE_FRAME] catches up by running one input per physics frame.
 		</member>
-		<member name="missing_policy" type="int" setter="set_missing_policy" getter="get_missing_policy" enum="NetwPrediction.MissingInput">
-			What the server does when an input never arrives.
+		<member name="mode" type="int" setter="set_mode" getter="get_mode" enum="NetwPrediction.Mode">
+			How a misprediction is corrected. Defaults to [constant MODE_AUTO].
+		</member>
+		<member name="pause_on_unpredicted_contact" type="bool" setter="set_pause_on_unpredicted_contact" getter="get_pause_on_unpredicted_contact">
+			If [code]true[/code], this entity stops predicting and follows the server while it touches a moving body this peer does not simulate. It still sends input. It only takes effect on an entity with [member NetwSimulation.physics_driven], whose contacts are read from its bodies.
 		</member>
 		<member name="predict_input" type="Callable" setter="set_predict_input" getter="get_predict_input">
 			Guesses input for an entity selected by [member NetwEntity.simulation] that this peer does not control. Relayed input replaces the guess. Unset callbacks and omitted properties repeat the newest relayed input, and zero before any arrives.
@@ -267,329 +171,51 @@
 			[/csharp]
 			[/codeblocks]
 		</member>
-		<member name="reconcile_mode" type="int" setter="set_reconcile_mode" getter="get_reconcile_mode" enum="NetwPrediction.Reconcile">
-			Whether this entity is corrected alone or together with the entities its [member NetwEntity.simulation] selects.
+		<member name="repeat_missing_input" type="bool" setter="set_repeat_missing_input" getter="get_repeat_missing_input">
+			If [code]true[/code], the server repeats the last input when one is lost. If [code]false[/code], it runs nothing for that input at [constant NetwSimulation.SCHEDULE_TICK] and runs with zeroed input at the other schedules. Defaults to [code]true[/code] on an entity with [member NetwSimulation.physics_driven].
 		</member>
-		<member name="recovery_policy" type="int" setter="set_recovery_policy" getter="get_recovery_policy" enum="NetwPrediction.RecoveryPolicy">
-			How this entity is corrected. Defaults to [constant RECOVERY_POLICY_AUTO], and [constant ARCHETYPE_SCRIPTED] sets [constant RECOVERY_POLICY_REBASE_REPLAY]. [method resolved_recovery_policy] returns the policy in use.
-		</member>
-		<member name="replay_buffer_depth" type="int" setter="set_replay_buffer_depth" getter="get_replay_buffer_depth">
-			How many inputs the server keeps queued before running them, for an entity at [constant NetwSimulation.SCHEDULE_FRAME]. Each one adds a tick of latency, so leave it at [code]0[/code] unless you need it.
-		</member>
-		<member name="sensors" type="Dictionary" setter="set_sensors" getter="get_sensors">
-			Callables that sample the world this entity reads, by name. Each is called once before each step, and [method sensor] reads the sample back. A misprediction can then be blamed on the world.
-		</member>
-		<member name="sleeping" type="bool" setter="set_sleeping" getter="get_sleeping">
-			Set it while the server's body is asleep. Corrections pause, so they do not wake it.
-		</member>
-		<member name="stats" type="NetwPredictStats" setter="" getter="get_stats">
-			This entity's prediction counters.
+		<member name="rollback_together" type="bool" setter="set_rollback_together" getter="get_rollback_together">
+			If [code]true[/code], this entity is corrected together with the entities its [member NetwEntity.simulation] selects, rolling them back from the same tick. If [code]false[/code], each entity is corrected on its own. Defaults to [code]true[/code] on an entity with [member NetwSimulation.physics_driven] that runs at [constant NetwSimulation.SCHEDULE_STEPPED], and [code]false[/code] otherwise.
 		</member>
 		<member name="teleport_threshold" type="float" setter="set_teleport_threshold" getter="get_teleport_threshold">
-			How large an error may be before a correction teleports the body, restoring every property including [method NetwPropertyConfig.teleport_only] ones. It applies to properties declared with [method NetwPropertyConfig.carry_along], and [method NetwPropertyConfig.teleport_at] overrides it per property. An entity with no such property teleports on every correction.
+			How large an error may be before a [constant MODE_OFFSET] correction teleports the entity, writing every state property including [method NetwPropertyConfig.teleport_only] ones. It is measured on properties declared with [method NetwPropertyConfig.extrapolate], and [method NetwPropertyConfig.teleport_threshold] overrides it for one property. An entity with neither teleports on every such correction. A rollback writes the server's state at any size of error. Defaults to [code]3.0[/code] on an entity with [member NetwSimulation.physics_driven] and [code]2.0[/code] otherwise.
 		</member>
-		<member name="witness_contacts" type="Callable" setter="set_witness_contacts" getter="get_witness_contacts">
-			Returns the colliders this peer's body touched in the step just solved. Set it so a misprediction can be blamed on a contact and [member breach_response] can take effect.
+		<member name="world_version" type="int" setter="set_world_version" getter="get_world_version">
+			The version of the level this entity moves in, or [code]-1[/code] when unset. Change it when the level changes. For [member correction_cooldown_ticks] after that, a correction writes the server's state outright.
 		</member>
 	</members>
 	<signals>
-		<signal name="divergence_detected">
-			<param index="0" name="entry" type="int" />
-			<param index="1" name="attribution" type="int" enum="NetwPrediction.Attribution" />
-			<description>
-				Emitted when a predicted tick disagrees with the server, with what the disagreement is blamed on. It is emitted whether or not a correction follows. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that found it ends, so a handler reads the entity as that poll or tick left it.
-				[codeblock]
-				entity.prediction.divergence_detected.connect(
-				    func(entry: int, attribution: NetwPrediction.Attribution):
-				        if attribution == NetwPrediction.ATTRIBUTION_CLOSURE:
-				            push_warning("transition %d diverged" % entry)
-				)
-				[/codeblock]
-			</description>
-		</signal>
-		<signal name="episode_changed">
-			<param index="0" name="change" type="int" enum="NetwPrediction.EpisodeChange" />
-			<param index="1" name="report" type="Dictionary" />
-			<description>
-				Emitted when a misprediction episode opens, falls back or closes, as [param change] says. An episode holds the corrections from one misprediction until the peers agree again. [param report] is the whole episode so far. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that changed the episode ends, so a handler reads the entity as that poll or tick left it.
-				[codeblock lang=text]
-				Dictionary
-				┠╴id            int
-				┠╴generator     Dictionary
-				┃ ┠╴transition  int
-				┃ ┠╴boundary    NetwPrediction.Attribution
-				┃ ┖╴row         Dictionary
-				┠╴operators     Array[Dictionary]
-				┃ ┠╴operator    NetwPrediction.Operator
-				┃ ┠╴basis       int
-				┃ ┠╴eligible    bool
-				┃ ┠╴applied     bool
-				┃ ┠╴eligibility Dictionary
-				┃ ┠╴outcome     NetwPrediction.OperatorOutcome
-				┃ ┖╴write       Dictionary
-				┠╴contraction   Array[Dictionary]
-				┃ ┖╴            transition, meter, agrees, write_id
-				┠╴disposition   Dictionary
-				┃ ┠╴state                 NetwPrediction.EpisodeState
-				┃ ┠╴non_contraction_used  int
-				┃ ┠╴closure_used          int
-				┃ ┠╴closed_transition     int
-				┃ ┠╴fallback_transition   int
-				┃ ┠╴demoted               bool
-				┃ ┠╴breach_transition     int
-				┃ ┠╴breach_witness        Dictionary
-				┃ ┠╴resume_ack_age        int
-				┃ ┠╴quarantine_target     int
-				┃ ┠╴quarantine_clean_run  int
-				┃ ┠╴reseed_transition     int
-				┃ ┠╴aligned_transition    int
-				┃ ┖╴evidence_dropped      int
-				┖╴reopen_chain  Array[int]
-				[/codeblock]
-				[code]generator[/code] is the tick where the peers first disagreed, or [constant GENERATOR_UNKNOWN_BEYOND_RETENTION] when it is too old to be kept. An operator that was rejected has [code]outcome = -1[/code] and an empty [code]write[/code]. Long series are trimmed to the newest entries, and [code]evidence_dropped[/code] counts what was trimmed.
-			</description>
-		</signal>
-		<signal name="recovered">
-			<param index="0" name="entry" type="int" />
+		<signal name="corrected">
+			<param index="0" name="tick" type="int" />
 			<param index="1" name="deltas" type="Dictionary" />
 			<param index="2" name="teleported" type="bool" />
-			<param index="3" name="attribution" type="int" enum="NetwPrediction.Attribution" />
 			<description>
-				Emitted after a correction moved the body. [param deltas] holds how far each property moved, as [code]after - before[/code], with angles taken the short way around. [param teleported] is [code]true[/code] when the correction was a teleport. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that corrected the body ends, so a handler reads the body as that poll or tick left it.
+				Emitted after a correction moved the entity. [param tick] is the tick of the server's state it was corrected against, or the present tick when entities rolled back together. [param teleported] is [code]true[/code] when the correction was a teleport. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that corrected the entity ends, so a handler reads the entity as that poll or tick left it.
+				[param deltas] holds how far each [float], [Vector2] and [Vector3] state property moved, as [code]after - before[/code], with angles taken the short way around.
+				[codeblock lang=text]
+				Dictionary
+				┖╴property_name  Variant  how far that state property moved
+				[/codeblock]
 				Under [constant NetwDisplay.LIVE_MODE_CHASE] the display already smooths the correction away.
 				[codeblock]
 				entity.display.live_mode = NetwDisplay.LIVE_MODE_CHASE
-				api.display_set_param(entity.rid,
-				        NetwMultiplayer.DISPLAY_PARAM_CHASE_GLIDE_TIME, 0.15)
+				entity.display.chase_glide_time = 0.15
 				[/codeblock]
-			</description>
-		</signal>
-		<signal name="state_evaluated">
-			<param index="0" name="recv_tick" type="int" />
-			<param index="1" name="ack" type="int" />
-			<param index="2" name="divergence" type="float" />
-			<param index="3" name="diverged" type="bool" />
-			<description>
-				Emitted on the controlling client each time server state arrives. [param divergence] is the largest error of any property, including errors under [member divergence_epsilon]. [param diverged] is whether the error was large enough to act on, even when no correction was written. Connect to [signal recovered] to know when the body actually moved. It is emitted when the [method MultiplayerAPI.poll] or [NetwClock] tick that compared the state ends, so a handler reads the entity as that poll or tick left it.
 			</description>
 		</signal>
 	</signals>
 	<constants>
-		<constant name="GENERATOR_UNKNOWN_BEYOND_RETENTION" value="0">
-			The tick where the peers first disagreed is older than the kept history.
+		<constant name="MODE_ROLLBACK" value="0" enum="Mode">
+			Return to the server's state and run the newer inputs again. A [RigidBody2D] or [RigidBody3D] at [constant NetwSimulation.SCHEDULE_FRAME] cannot run a past tick again, so it uses [constant MODE_OFFSET] and warns once.
 		</constant>
-		<constant name="ACK_AGE_MAX" value="64">
-			The most ticks a client may predict ahead of the last input the server acknowledged. Past it, prediction holds. See [member ack_age_ticks].
+		<constant name="MODE_OFFSET" value="1" enum="Mode">
+			Move the entity by the difference between the server's state and what the client predicted, and run nothing again.
 		</constant>
-		<constant name="CONTACT_CLASS_NONE" value="0" enum="ContactClass">
-			The body touched nothing.
+		<constant name="MODE_DISABLED" value="2" enum="Mode">
+			Do not predict. The client that controls the entity does not run [member NetwSimulation.network_process] and shows the server's state.
 		</constant>
-		<constant name="CONTACT_CLASS_DECLARED_SUPPORT" value="1" enum="ContactClass">
-			The ground reported by the ground sensor.
-		</constant>
-		<constant name="CONTACT_CLASS_OTHER_STATIC" value="2" enum="ContactClass">
-			Static geometry other than the ground.
-		</constant>
-		<constant name="CONTACT_CLASS_PREDICTED_DYNAMIC" value="3" enum="ContactClass">
-			A moving entity this peer predicts or simulates.
-		</constant>
-		<constant name="CONTACT_CLASS_UNPREDICTED_DYNAMIC" value="4" enum="ContactClass">
-			A moving entity this peer does not simulate.
-		</constant>
-		<constant name="CONTACT_CLASS_KINEMATIC_PROXY" value="5" enum="ContactClass">
-			A kinematic or animated body.
-		</constant>
-		<constant name="COMMAND_ORIGIN_PREDICTED" value="0" enum="CommandOrigin">
-			This peer guessed the input with [member predict_input].
-		</constant>
-		<constant name="COMMAND_ORIGIN_RELAYED" value="1" enum="CommandOrigin">
-			The controlling peer's own input, relayed through the server.
-		</constant>
-		<constant name="DRIVE_KIND_NONE" value="0" enum="DriveKind">
-			Nothing has stepped yet.
-		</constant>
-		<constant name="DRIVE_KIND_FRESH" value="1" enum="DriveKind">
-			A new input drove the step.
-		</constant>
-		<constant name="DRIVE_KIND_REPEAT" value="2" enum="DriveKind">
-			The previous input drove the step again.
-		</constant>
-		<constant name="DRIVE_KIND_HOLD" value="3" enum="DriveKind">
-			The server held its input buffer, so nothing stepped this tick.
-		</constant>
-		<constant name="DRIVE_KIND_STARVED" value="4" enum="DriveKind">
-			The server had no input queued, so nothing stepped this tick.
-		</constant>
-		<constant name="DRIVE_KIND_FOLD_DRIVE" value="5" enum="DriveKind">
-			A new input drove the step after older ones were skipped.
-		</constant>
-		<constant name="DRIVE_KIND_MISSING" value="6" enum="DriveKind">
-			The input never arrived, and [member missing_policy] drove the step.
-		</constant>
-		<constant name="DRIVE_KIND_SUBSTITUTED" value="7" enum="DriveKind">
-			An input this peer guessed for an entity it does not control drove the step.
-		</constant>
-		<constant name="TRIGGER_SHAPE_NONE" value="0" enum="TriggerShape">
-			No property was past its tolerance.
-		</constant>
-		<constant name="TRIGGER_SHAPE_MIXED" value="1" enum="TriggerShape">
-			At least one property past its tolerance can be written by an ordinary correction.
-		</constant>
-		<constant name="TRIGGER_SHAPE_ALL_WITHHELD" value="2" enum="TriggerShape">
-			Every property past its tolerance is [method NetwPropertyConfig.teleport_only], so only a teleport can write it.
-		</constant>
-		<constant name="CONSUME_ACTION_REPLAY" value="0" enum="ConsumeAction">
-			The server ran a queued input.
-		</constant>
-		<constant name="CONSUME_ACTION_HOLD" value="1" enum="ConsumeAction">
-			The server kept its queued inputs in the buffer.
-		</constant>
-		<constant name="CONSUME_ACTION_STARVED" value="2" enum="ConsumeAction">
-			The server had no input queued.
-		</constant>
-		<constant name="EXACT_VERDICT_UNJUDGED" value="0" enum="ExactVerdict">
-			Not compared yet.
-		</constant>
-		<constant name="EXACT_VERDICT_EQUAL" value="1" enum="ExactVerdict">
-			Both peers produced the same result.
-		</constant>
-		<constant name="EXACT_VERDICT_UNEQUAL" value="2" enum="ExactVerdict">
-			The peers produced different results.
-		</constant>
-		<constant name="MISSING_INPUT_STALL" value="0" enum="MissingInput">
-			The entity gets no input.
-		</constant>
-		<constant name="MISSING_INPUT_REPEAT_LAST" value="1" enum="MissingInput">
-			The last input is repeated.
-		</constant>
-		<constant name="ARCHETYPE_NONE" value="0" enum="Archetype">
-			No preset. Every setting keeps its default. Settings written after an archetype override it, and no archetype sets [member breach_response].
-		</constant>
-		<constant name="ARCHETYPE_SCRIPTED" value="1" enum="Archetype">
-			A body moved by your own code, such as a [CharacterBody3D]. Sets [constant NetwSimulation.SCHEDULE_TICK], [constant MISSING_INPUT_STALL] and [constant RECOVERY_POLICY_REBASE_REPLAY].
-		</constant>
-		<constant name="ARCHETYPE_SOLVER_BODY" value="2" enum="Archetype">
-			A body moved by the physics engine, such as a [RigidBody3D]. Sets [constant NetwSimulation.SCHEDULE_AUTO], [constant MISSING_INPUT_REPEAT_LAST], [constant RECOVERY_POLICY_AUTO] and [constant NetwSimulation.RESTORE_EXTRAPOLATED].
-		</constant>
-		<constant name="RECOVERY_POLICY_REBASE_REPLAY" value="0" enum="RecoveryPolicy">
-			Restore the server's state and replay every input the server has not acknowledged yet. A [RigidBody3D] or [RigidBody2D] at [constant NetwSimulation.SCHEDULE_FRAME] cannot replay, so it uses [constant RECOVERY_POLICY_REBASE_RECOVER] and warns once.
-		</constant>
-		<constant name="RECOVERY_POLICY_REBASE_RECOVER" value="1" enum="RecoveryPolicy">
-			Add the difference between the server's state and the prediction to the present state, without replaying.
-		</constant>
-		<constant name="RECOVERY_POLICY_DELAY_CLOSED" value="2" enum="RecoveryPolicy">
-			Do not predict. The controlling client does not run the step and draws the server's state.
-		</constant>
-		<constant name="RECOVERY_POLICY_OBSERVE" value="3" enum="RecoveryPolicy">
-			Report mispredictions and correct nothing.
-		</constant>
-		<constant name="RECOVERY_POLICY_AUTO" value="4" enum="RecoveryPolicy">
-			[constant RECOVERY_POLICY_REBASE_RECOVER] for a [RigidBody3D] or [RigidBody2D] on any schedule but [constant NetwSimulation.SCHEDULE_STEPPED], and [constant RECOVERY_POLICY_REBASE_REPLAY] otherwise. [method resolved_recovery_policy] returns the result.
-		</constant>
-		<constant name="RECONCILE_INDEPENDENT" value="0" enum="Reconcile">
-			Correct each entity on its own.
-		</constant>
-		<constant name="RECONCILE_JOINT" value="1" enum="Reconcile">
-			Correct this entity together with the entities its [member NetwEntity.simulation] selects, restoring and replaying them from the same tick.
-		</constant>
-		<constant name="BREACH_RESPONSE_PREDICT_THROUGH" value="0" enum="BreachResponse">
-			Keep predicting and correct as usual. A breach is a contact with a moving body this peer does not simulate. Touching static geometry is not a breach.
-		</constant>
-		<constant name="BREACH_RESPONSE_DEMOTE" value="1" enum="BreachResponse">
-			Stop predicting and follow the server, while still sending input.
-		</constant>
-		<constant name="EPISODE_STATE_OPEN" value="0" enum="EpisodeState">
-			The misprediction is still being corrected.
-		</constant>
-		<constant name="EPISODE_STATE_CLOSED" value="1" enum="EpisodeState">
-			The peers agree again.
-		</constant>
-		<constant name="EPISODE_STATE_FALLBACK" value="2" enum="EpisodeState">
-			Corrections did not help, and the entity follows the server.
-		</constant>
-		<constant name="EPISODE_CHANGE_OPENED" value="0" enum="EpisodeChange">
-			A misprediction is large enough to act on.
-		</constant>
-		<constant name="EPISODE_CHANGE_FALLBACK" value="1" enum="EpisodeChange">
-			Corrections stopped helping and the entity follows the server. It keeps sending input.
-		</constant>
-		<constant name="EPISODE_CHANGE_CLOSED" value="2" enum="EpisodeChange">
-			The peers agreed again for long enough.
-		</constant>
-		<constant name="OPERATOR_OUTCOME_PENDING" value="0" enum="OperatorOutcome">
-			Not judged yet.
-		</constant>
-		<constant name="OPERATOR_OUTCOME_CONTRACTED" value="1" enum="OperatorOutcome">
-			The error shrank or closed.
-		</constant>
-		<constant name="OPERATOR_OUTCOME_FAILED_TO_CONTRACT" value="2" enum="OperatorOutcome">
-			The error held or grew.
-		</constant>
-		<constant name="OPERATOR_OUTCOME_INTRODUCED_BOUNDARY" value="3" enum="OperatorOutcome">
-			The correction caused a contact the server did not have.
-		</constant>
-		<constant name="OPERATOR_OUTCOME_WITHHELD" value="4" enum="OperatorOutcome">
-			Every property that asked for the correction is [method NetwPropertyConfig.teleport_only], so the correction could not write it.
-		</constant>
-		<constant name="ATTRIBUTION_UNKNOWN" value="0" enum="Attribution">
-			Nothing to blame was found. [signal divergence_detected] carries an [enum Attribution].
-		</constant>
-		<constant name="ATTRIBUTION_PRE_STATE" value="1" enum="Attribution">
-			The peers started the tick from different state.
-		</constant>
-		<constant name="ATTRIBUTION_COMMAND" value="2" enum="Attribution">
-			The server ran an input the controlling peer did not send.
-		</constant>
-		<constant name="ATTRIBUTION_ENVIRONMENT" value="3" enum="Attribution">
-			The [member sensors] read different values.
-		</constant>
-		<constant name="ATTRIBUTION_TOPOLOGY" value="4" enum="Attribution">
-			The peers simulated the entity in different ways.
-		</constant>
-		<constant name="ATTRIBUTION_EXECUTION" value="5" enum="Attribution">
-			The state agreed but the raw results differed.
-		</constant>
-		<constant name="ATTRIBUTION_CONTACT" value="6" enum="Attribution">
-			The same input produced a different contact.
-		</constant>
-		<constant name="ATTRIBUTION_CLOSURE" value="7" enum="Attribution">
-			Everything going in agreed, and the result still differed.
-		</constant>
-		<constant name="OPERATOR_NONE" value="0" enum="Operator">
-			Nothing wrote the body.
-		</constant>
-		<constant name="OPERATOR_REBASE_PROJECTED" value="1" enum="Operator">
-			The server's state was restored, advanced to the present.
-		</constant>
-		<constant name="OPERATOR_REBASE_EXACT" value="2" enum="Operator">
-			The server's state, or its difference from the prediction, was written as is.
-		</constant>
-		<constant name="OPERATOR_FULL_CLOSURE" value="3" enum="Operator">
-			A teleport restored every property.
-		</constant>
-		<constant name="OPERATOR_TRANSPORT_DELTA" value="4" enum="Operator">
-			The body was moved to where it should be now, along a path [member correction_path_clear] allowed.
-		</constant>
-		<constant name="OPERATOR_RESEED" value="5" enum="Operator">
-			The body was reset to the server's state after a fallback.
-		</constant>
-		<constant name="OPERATOR_RESEED_ALIGN" value="6" enum="Operator">
-			The first comparison after a reset caught up with the server.
-		</constant>
-		<constant name="OPERATOR_DEMOTE" value="7" enum="Operator">
-			A breach stopped prediction while input keeps being sent.
-		</constant>
-		<constant name="OPERATOR_DISSIPATE" value="8" enum="Operator">
-			Only the velocity differed, and it was left to fade.
-		</constant>
-		<constant name="OPERATOR_JOINT_REBASE" value="9" enum="Operator">
-			The whole [constant RECONCILE_JOINT] group was restored to the same tick.
-		</constant>
-		<constant name="DOMAIN_IN" value="0" enum="Domain">
-			Every input to the step is known equal on both peers, so the results must match exactly.
-		</constant>
-		<constant name="DOMAIN_OUT" value="1" enum="Domain">
-			Some input to the step may differ between peers, so the results are compared by tolerance.
+		<constant name="MODE_AUTO" value="4" enum="Mode">
+			[constant MODE_OFFSET] for a [RigidBody3D] or [RigidBody2D] on any schedule but [constant NetwSimulation.SCHEDULE_STEPPED], and [constant MODE_ROLLBACK] otherwise.
 		</constant>
 	</constants>
 </class>

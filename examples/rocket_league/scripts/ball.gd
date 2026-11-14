@@ -16,39 +16,34 @@ var goal_team := -1
 
 
 func _init() -> void:
-	Netw.configure_property(self, &"position").state().masked().causal() \
-			.on_spawn().teleport_at(1.5) \
+	Netw.configure_property(self, &"position").state() \
+			.on_spawn().teleport_threshold(1.5) \
 			.quantize(NetwQuantizeScalar.new().bits(19).limits(-128.0, 128.0)) \
 			.interpolate(
 				NetwInterpolate.new().lerp().snap_at(3.0) \
 						.project_by(&"linear_velocity"),
 			)
-	Netw.configure_property(self, &"quaternion").state().masked().causal() \
+	Netw.configure_property(self, &"quaternion").state() \
 			.on_spawn() \
 			.quantize(NetwQuantizeQuaternion.new().bits(16)) \
 			.interpolate(NetwInterpolate.new().slerp())
-	Netw.configure_property(self, &"linear_velocity").state().masked() \
-			.causal().teleport_only() \
+	Netw.configure_property(self, &"linear_velocity").state() \
+			.teleport_only() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-128.0, 128.0))
-	Netw.configure_property(self, &"angular_velocity").state().masked() \
-			.causal().teleport_only() \
+	Netw.configure_property(self, &"angular_velocity").state() \
+			.teleport_only() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-64.0, 64.0))
-	Netw.configure_property(self, &"sleeping").state().masked().causal()
-	Netw.configure_property(self, &"goal_team").state().masked().causal() \
+	Netw.configure_property(self, &"sleeping").state()
+	Netw.configure_property(self, &"goal_team").state() \
 			.quantize(NetwQuantizeScalar.new().bits(2).limits(-1.0, 1.0))
 
 	Netw.configure_rpc(announce_goal).authority().reliable()
 	var e := Netw.configure_entity(self)
 	e.name = &"ball"
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
-	e.prediction.sensors[&"goal"] = sample_goal
-	e.prediction.witness_contacts = sample_contacts
 	e.display.visual_root = ^"MeshInstance3D"
 
 
 func _ready() -> void:
-	contact_monitor = true
-	max_contacts_reported = 8
 	state.transform = transform
 
 
@@ -56,8 +51,8 @@ func _process(_delta: float) -> void:
 	visible = clock.tick >= game.kickoff_tick
 
 
-func _network_tick(_delta: float, tick: int, _is_fresh: bool) -> void:
-	goal_team = entity.prediction.sensor(&"goal", -1)
+func _network_process(_delta: float, tick: int, _is_fresh: bool) -> void:
+	goal_team = sample_goal()
 
 	if not multiplayer.is_server():
 		return
@@ -88,12 +83,3 @@ func sample_goal() -> int:
 		if goal.overlaps_body(self):
 			return int(String(goal.name).right(1))
 	return -1
-
-
-func sample_contacts() -> Dictionary:
-	return {
-		colliders = get_colliding_bodies(),
-		sleeping = state.sleeping,
-		collision_layer = collision_layer,
-		collision_mask = collision_mask,
-	}

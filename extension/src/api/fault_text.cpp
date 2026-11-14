@@ -4,6 +4,193 @@ using namespace godot;
 
 namespace netw {
 
+namespace {
+
+FaultText prediction_off_text(const FaultValues &v) {
+    switch (netw_prediction_off(v.a)) {
+        case NETW_OFF_NO_STATE:
+            return {
+                vformat(
+                    "Prediction on '%s' is off, because it has no state "
+                    "property.",
+                    v.name
+                ),
+                "Call {NetwPropertyConfig.state} on the properties the "
+                "server corrects."
+            };
+        case NETW_OFF_STATE_LOST:
+            return {
+                vformat(
+                    "Prediction on '%s' is off, because it entered the tree "
+                    "again with no state property.",
+                    v.name
+                ),
+                "Keep its {NetwPropertyConfig.state} properties while it is "
+                "out of the tree."
+            };
+        case NETW_OFF_LAGCOMP_FAILED:
+            return {
+                vformat(
+                    "Prediction on '%s' is off, because lag compensation did "
+                    "not start when it entered the tree again.",
+                    v.name
+                ),
+                "Fix the error reported before this one."
+            };
+    }
+    return {};
+}
+
+FaultText rewind_misuse_text(const FaultValues &v) {
+    switch (netw_rewind_misuse(v.a)) {
+        case NETW_REWIND_SYNC_TO_PHYSICS:
+            return {
+                vformat(
+                    "A rewind cannot move '%s' for a physics query, because "
+                    "it has sync_to_physics on.",
+                    v.name
+                ),
+                "Turn sync_to_physics off and move the node in "
+                "_network_process."
+            };
+        case NETW_REWIND_UNDER_VISUAL_ROOT:
+            return {
+                vformat(
+                    "'%s' is under {NetwDisplay.visual_root}, so a rewind "
+                    "leaves it where the body is drawn.",
+                    v.name
+                ),
+                "Move it to a parent outside {NetwDisplay.visual_root}."
+            };
+        case NETW_REWIND_CHANGED_INSIDE:
+            return {
+                vformat(
+                    "'%s' was changed inside a {Netw.rewind} body, and the "
+                    "rewind put it back.",
+                    v.name
+                ),
+                "Change it after {Netw.rewind} returns."
+            };
+        case NETW_REWIND_AWAITED:
+            return {
+                vformat(
+                    "'%s' awaited inside a {Netw.rewind} body, so the rest of "
+                    "it ran after the rewind ended.",
+                    v.name
+                ),
+                "Remove the await from the body."
+            };
+        case NETW_REWIND_EFFECT_NOT_ARMED:
+            return {
+                vformat(
+                    "{NetwMultiplayer.lagcomp_effect_watch} got '%s', which "
+                    "is not an armed effect, so it watches nothing.",
+                    v.name
+                ),
+                "Call {NetwMultiplayer.lagcomp_effect_arm} with that key "
+                "first."
+            };
+    }
+    return {};
+}
+
+FaultText interpolation_ignored_text(const FaultValues &v) {
+    switch (netw_interpolation_ignored(v.a)) {
+        case NETW_INTERPOLATION_TYPE_UNSUPPORTED:
+            return {
+                vformat(
+                    "'%s' is not interpolated, because its {NetwInterpolate} "
+                    "cannot blend a %s.",
+                    v.name,
+                    v.detail
+                ),
+                "Remove {NetwMemberConfig.interpolate} from it, or give the "
+                "property a type the interpolation supports."
+            };
+        case NETW_INTERPOLATION_SIMULATED_HERE:
+            return {
+                vformat(
+                    "'%s' is not interpolated, because this peer simulates it "
+                    "and the interpolation writes the property it reads.",
+                    v.name
+                ),
+                "Set {NetwDisplay.visual_root} or {NetwInterpolate.to}, so it "
+                "is drawn on another node or property."
+            };
+        case NETW_INTERPOLATION_WRITTEN_TWICE:
+            return {
+                vformat(
+                    "'%s' is written by two interpolations, so they overwrite "
+                    "each other.",
+                    v.name
+                ),
+                "Keep one interpolation for each property."
+            };
+        case NETW_INTERPOLATION_VISUAL_ROOT_MISSING:
+            return {
+                vformat(
+                    "'%s' is not interpolated, because "
+                    "{NetwDisplay.visual_root} '%s' is not a node under '%s'.",
+                    v.name,
+                    v.detail,
+                    v.owner
+                ),
+                "Set {NetwDisplay.visual_root} to the path of a child node."
+            };
+        case NETW_INTERPOLATION_WRITES_BODY:
+            return {
+                vformat(
+                    "'%s' is not interpolated, because it would write a body "
+                    "this entity simulates.",
+                    v.name
+                ),
+                "Set {NetwDisplay.visual_root} to draw it on a child node."
+            };
+        case NETW_INTERPOLATION_LOCAL_SPACE:
+            return {
+                vformat(
+                    "'%s' is written to {NetwDisplay.visual_root} in local "
+                    "space, so the body still moves it.",
+                    v.name
+                ),
+                "Turn on top_level on that node, or interpolate position and "
+                "rotation."
+            };
+        case NETW_INTERPOLATION_NO_GLOBAL_SETTER:
+            return {
+                vformat(
+                    "'%s' is written to {NetwDisplay.visual_root} in local "
+                    "space, because that node cannot take a %s in global "
+                    "space.",
+                    v.name,
+                    v.detail
+                ),
+                "Use a Node2D or a Node3D as {NetwDisplay.visual_root}."
+            };
+        case NETW_INTERPOLATION_NAME_SHARED:
+            return {
+                vformat(
+                    "Two interpolations on one entity both write a property "
+                    "named '%s', so a call that names it reaches only one.",
+                    v.name
+                ),
+                "Interpolate one property of that name on each entity."
+            };
+        case NETW_INTERPOLATION_TYPE_CHANGED:
+            return {
+                vformat(
+                    "'%s' changed its type, so the new value was not "
+                    "interpolated.",
+                    v.name
+                ),
+                "Give the property a static type."
+            };
+    }
+    return {};
+}
+
+} // namespace
+
 FaultText bug_text(const String &p_where) {
     return {
         vformat(
@@ -433,12 +620,11 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_BUSY_APPLYING:
             return {
                 vformat(
-                    "%s ran while the session applied its {Netw} settings or "
-                    "ran a simulation step, so it did nothing.",
+                    "%s ran while the session applied its {Netw} settings, so "
+                    "it did nothing.",
                     v.name
                 ),
-                "Call it outside the callbacks that react to those settings "
-                "and outside the simulation step."
+                "Call it outside the callbacks that react to those settings."
             };
         case NETW_FAULT_PEER_REFUSED:
             return {
@@ -482,53 +668,43 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 "Choose who holds it with {NetwEntity.authority}."
             };
         case NETW_FAULT_PREDICTION_OFF:
-            return {
-                vformat(
-                    "Prediction on '%s' is off, because of %s.",
-                    v.name,
-                    v.owner
-                ),
-                vformat("Declare %s.", v.detail)
-            };
+            return prediction_off_text(v);
         case NETW_FAULT_PREDICTION_DOWNGRADED:
             return {
                 vformat(
-                    "'%s' runs a weaker prediction mode than it declares, "
-                    "because of %s.",
-                    v.name,
-                    v.owner
+                    "The physics server moves '%s' at "
+                    "{NetwSimulation.SCHEDULE_FRAME}, which cannot replay, so "
+                    "{NetwPrediction.MODE_ROLLBACK} runs as "
+                    "{NetwPrediction.MODE_OFFSET}.",
+                    v.name
                 ),
-                vformat("Use %s.", v.detail)
+                "Set {NetwSimulation.schedule} to "
+                "{NetwSimulation.SCHEDULE_STEPPED}, or {NetwPrediction.mode} "
+                "to {NetwPrediction.MODE_OFFSET}."
             };
         case NETW_FAULT_REWIND_MISUSE:
-            return {
-                vformat(
-                    "A rewind does not handle '%s' as declared, because of %s.",
-                    v.name,
-                    v.owner
-                ),
-                vformat("Use %s.", v.detail)
-            };
+            return rewind_misuse_text(v);
         case NETW_FAULT_INTERPOLATION_IGNORED:
-            return {
-                vformat(
-                    "'%s' is not interpolated as declared, because of %s.",
-                    v.name,
-                    v.owner
-                ),
-                vformat("Use %s.", v.detail)
-            };
+            return interpolation_ignored_text(v);
         case NETW_FAULT_ENGINE_LACKS:
             return {
-                vformat(
-                    "'%s' needs %s, which this Godot build cannot do, so it "
-                    "runs a simpler mode.",
-                    v.name,
-                    v.detail
-                ),
-                "Install a {NetwPhysicsStepper} with "
-                "{NetwSession.install_physics_stepper}, or use the Networked "
-                "engine build."
+                v.a == NETW_LACKS_REWIND_MOVE
+                    ? vformat(
+                          "This Godot build cannot move the %s '%s' during a "
+                          "rewind, so a physics query in {Netw.rewind} finds "
+                          "it where it is now.",
+                          v.detail,
+                          v.name
+                      )
+                    : vformat(
+                          "This Godot build cannot restore the %s '%s' in a "
+                          "replay, so its entity runs at "
+                          "{NetwSimulation.SCHEDULE_FRAME}.",
+                          v.detail,
+                          v.name
+                      ),
+                "Use the Networked build of Godot, which adds "
+                "flush_kinematic_transform."
             };
         case NETW_FAULT_LIMIT_EXCEEDED:
             return {
@@ -658,6 +834,134 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 ),
                 "Turn on {Resource.resource_local_to_scene} for that "
                 "resource, so each entity gets its own copy."
+            };
+        case NETW_FAULT_CHANGED_IN_STEP:
+            return {
+                "A predicted entity was added, removed or changed while a "
+                "_network_process ran, so the change was dropped.",
+                "Make the change after the step, such as with "
+                "{Object.call_deferred}."
+            };
+        case NETW_FAULT_ACTION_UNREADY:
+            return {
+                vformat(
+                    "Peer %d requested an action on '%s', but lag "
+                    "compensation is off on the server, so the request was "
+                    "dropped.",
+                    v.peer,
+                    v.name
+                ),
+                "Call {Netw.configure_lagcomp} on the server before the "
+                "session starts."
+            };
+        case NETW_FAULT_FRAME_TOO_LONG:
+            return {
+                vformat(
+                    "A frame took %d ms, which is over "
+                    "{NetwClockConfig.stall_threshold} at %d ms, so the ticks "
+                    "it missed were skipped.",
+                    v.a,
+                    v.b
+                ),
+                "Raise {NetwClockConfig.stall_threshold} if frames this long "
+                "are expected."
+            };
+        case NETW_FAULT_CANNOT_STEP_PHYSICS:
+            return {
+                vformat(
+                    "'%s' sets {NetwSimulation.SCHEDULE_STEPPED}, and this "
+                    "Godot build cannot step physics on demand, so it runs at "
+                    "{NetwSimulation.SCHEDULE_FRAME}.",
+                    v.name
+                ),
+                "Install a {NetwPhysicsStepper} with "
+                "{NetwSession.install_physics_stepper}, or use the Networked "
+                "build of Godot."
+            };
+        case NETW_FAULT_TOGETHER_REFUSED:
+            return {
+                vformat(
+                    "'%s' sets {NetwPrediction.rollback_together}, but %s "
+                    "cannot replay a tick, so each entity is corrected alone.",
+                    v.name,
+                    v.detail
+                ),
+                "Give each of them a _network_process at "
+                "{NetwSimulation.SCHEDULE_TICK}, or use "
+                "{NetwSimulation.SCHEDULE_STEPPED} on a Godot build that can "
+                "step physics."
+            };
+        case NETW_FAULT_COLLISION_UNSIMULATED:
+            return {
+                vformat(
+                    "'%s' called {NetwPrediction.notify_collision}, but it "
+                    "simulates no other entity on this peer.",
+                    v.name
+                ),
+                "If it hit an entity, add that entity to one of its "
+                "{NetwInterestLayer} layers or pass it to "
+                "{NetwSimulation.simulate}."
+            };
+        case NETW_FAULT_BROADCAST_UNCORRECTED:
+            return {
+                vformat(
+                    "'%s' is predicted, and the server does not correct its "
+                    "{NetwPropertyConfig.broadcast} properties [%s].",
+                    v.name,
+                    v.detail
+                ),
+                "Use {NetwPropertyConfig.state} on any of them that changes "
+                "how it moves."
+            };
+        case NETW_FAULT_INPUT_UNTYPED:
+            return {
+                vformat(
+                    "'%s' has {NetwPropertyConfig.input} properties with no "
+                    "type, so its input cannot be sent for prediction.",
+                    v.name
+                ),
+                "Give each one a static type, or {NetwMemberConfig.quantize}."
+            };
+        case NETW_FAULT_STEPPED_UNPREDICTED:
+            return {
+                vformat(
+                    "'%s' sets {NetwSimulation.SCHEDULE_STEPPED} but is not "
+                    "predicted, so it runs at {NetwSimulation.SCHEDULE_FRAME}.",
+                    v.name
+                ),
+                "Give it a {NetwPropertyConfig.state} property so it is "
+                "predicted, or set another {NetwSimulation.schedule}."
+            };
+        case NETW_FAULT_INPUT_UNPREDICTED:
+            return {
+                vformat(
+                    "'%s' has {NetwPropertyConfig.state} and "
+                    "{NetwPropertyConfig.input} properties but is not "
+                    "predicted.",
+                    v.name
+                ),
+                "Move the code that reads its input into "
+                "_network_process(delta, tick, is_fresh)."
+            };
+        case NETW_FAULT_THRESHOLD_SHARED:
+            return {
+                v.a == NETW_SHARED_TELEPORT
+                    ? vformat(
+                          "'%s' sets no "
+                          "{NetwPropertyConfig.teleport_threshold} on [%s], "
+                          "so they share {NetwPrediction.teleport_threshold}.",
+                          v.owner,
+                          v.name
+                      )
+                    : vformat(
+                          "'%s' sets no "
+                          "{NetwPropertyConfig.correction_threshold} on [%s], "
+                          "so each uses "
+                          "{NetwPrediction.correction_threshold}.",
+                          v.owner,
+                          v.name
+                      ),
+                "Set it on each one in that property's own units."
             };
     }
     return {};

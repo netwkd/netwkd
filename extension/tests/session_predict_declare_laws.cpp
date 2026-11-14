@@ -32,8 +32,6 @@ using netw_test::LawRowFor;
 using netw_test::LawVerdict;
 using netw_test::Internals;
 
-const char *SENSOR_KEY = "ground";
-
 enum Plant {
     PLANT_NONE,
     PLANT_A_DECLARATION_THAT_NEVER_HAPPENED,
@@ -84,7 +82,6 @@ class PredictRun {
     bool engine_after_declare = false;
     bool engine_after_undeclare = true;
     Variant schedule_read;
-    bool sensor_is_the_one_installed = false;
     bool step_is_the_one_installed = false;
     bool selection_holds_the_other = false;
 
@@ -124,15 +121,9 @@ public:
             NetwMultiplayer::SIMULATION_PARAM_SCHEDULE
         );
 
-        const Callable sensor = log.answering("sensor", 17);
         const Callable step = log.callable("step");
         if (declared.installs_callbacks) {
-            session->predict_set_sensor_callback(
-                entity,
-                StringName(SENSOR_KEY),
-                sensor
-            );
-            session->simulation_set_step_callback(entity, step);
+            session->simulation_set_network_process_callback(entity, step);
         }
 
         const Ref<NetwSimulation> simulation
@@ -144,11 +135,6 @@ public:
 
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         if (handle.is_valid()) {
-            sensor_is_the_one_installed = Variant(handle->get_sensors().get(
-                                              StringName(SENSOR_KEY),
-                                              Variant()
-                                          ))
-                == Variant(sensor);
             step_is_the_one_installed
                 = NetwMultiplayer::sim_step_of(handle->get_entity().ptr())
                 == step;
@@ -190,10 +176,6 @@ public:
 
     const Variant &schedule() const {
         return schedule_read;
-    }
-
-    bool sensor_kept() const {
-        return sensor_is_the_one_installed;
     }
 
     bool step_kept() const {
@@ -247,9 +229,6 @@ LawVerdict law_parameterised(const PredictRun &p_run) {
 LawVerdict law_addressed(const PredictRun &p_run) {
     if (!p_run.scenario().installs_callbacks) {
         return law_held();
-    }
-    if (!p_run.sensor_kept()) {
-        return law_broken("the handle holds a sensor nobody installed");
     }
     if (!p_run.step_kept()) {
         return law_broken("the handle holds a step nobody installed");
@@ -402,8 +381,7 @@ ReplayScenario a_tick_solver_body() {
 
 class ReplayRun {
     ReplayScenario declared;
-    NetwPrediction::RecoveryPolicy policy
-        = NetwPrediction::RECOVERY_POLICY_OBSERVE;
+    NetwPrediction::Mode policy = NetwPrediction::MODE_OBSERVE;
     int correction = int(netw::CorrectionMode::AUTO);
 
 public:
@@ -418,11 +396,6 @@ public:
         const Ref<NetwEntity> wrapper = NetwEntity::ensure(body);
         const RID entity = Internals::entity_of(session, body);
         REQUIRE(session->predict_declare(entity) == OK);
-        session->predict_set_param(
-            entity,
-            NetwMultiplayer::PREDICT_PARAM_ARCHETYPE,
-            NetwPrediction::ARCHETYPE_SOLVER_BODY
-        );
         session->simulation_set_param(
             entity,
             NetwMultiplayer::SIMULATION_PARAM_SCHEDULE,
@@ -430,22 +403,23 @@ public:
         );
         session->predict_set_param(
             entity,
-            NetwMultiplayer::PREDICT_PARAM_RECOVERY_POLICY,
-            NetwPrediction::RECOVERY_POLICY_REBASE_REPLAY
+            NetwMultiplayer::PREDICT_PARAM_MODE,
+            NetwPrediction::MODE_ROLLBACK
         );
 
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         REQUIRE(handle.is_valid());
-        policy = handle->resolved_recovery_policy();
+        policy = NetwMultiplayer::predict_resolve_mode(
+            handle->get_entity().ptr()
+        );
         netw::NetwPredictionEngine *pool
             = Internals::get_prediction_engine(session);
         REQUIRE(pool != nullptr);
         const int64_t slot = pool->slot_register(wrapper);
         REQUIRE(slot >= 0);
-        const int declared
-            = netw::NetwPredictionEngine::correction_for_recovery_policy(
-                handle->get_recovery_policy()
-            );
+        const int declared = netw::NetwPredictionEngine::correction_for_mode(
+            handle->get_mode()
+        );
         pool->settle_correction(slot, declared);
         correction = pool->settle_correction(slot, declared);
 
@@ -458,7 +432,7 @@ public:
         return declared;
     }
 
-    NetwPrediction::RecoveryPolicy recovery() const {
+    NetwPrediction::Mode recovery() const {
         return policy;
     }
 
@@ -470,8 +444,7 @@ public:
 typedef LawRowFor<ReplayRun> ReplayLaw;
 
 LawVerdict law_integrated(const ReplayRun &p_run) {
-    const bool replays
-        = p_run.recovery() == NetwPrediction::RECOVERY_POLICY_REBASE_REPLAY;
+    const bool replays = p_run.recovery() == NetwPrediction::MODE_ROLLBACK;
     const bool corrects_by_replay
         = p_run.mode() == int(netw::CorrectionMode::REPLAY);
     if (replays != corrects_by_replay) {
@@ -488,7 +461,7 @@ LawVerdict law_integrated(const ReplayRun &p_run) {
         );
     }
     if (!p_run.scenario().integrates
-        && p_run.recovery() != NetwPrediction::RECOVERY_POLICY_REBASE_RECOVER) {
+        && p_run.recovery() != NetwPrediction::MODE_OFFSET) {
         return law_broken(
             "a FRAME solver body declaring REPLAY resolves %d",
             int(p_run.recovery())
@@ -509,7 +482,7 @@ TEST_CASE(
     "resolves to recovery"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*physics body on SCHEDULE_FRAME*[NW1014]*", 1);
+    expected_faults.expect_warning("*[NW1014]*", 1);
 
     const ReplayScenario CORPUS[] = {
         a_frame_solver_body(),
@@ -538,15 +511,15 @@ void check_auto_resolution(bool p_rigid) {
     REQUIRE(handle.is_valid());
 
     const int expected = p_rigid && !netw::gd::can_step_space(3)
-        ? NetwPrediction::RECOVERY_POLICY_REBASE_RECOVER
-        : NetwPrediction::RECOVERY_POLICY_REBASE_REPLAY;
+        ? NetwPrediction::MODE_OFFSET
+        : NetwPrediction::MODE_ROLLBACK;
     const int expected_correction
-        = netw::NetwPredictionEngine::correction_for_recovery_policy(expected);
-    NETW_CHECK_EQ(
-        int(handle->get_recovery_policy()),
-        int(NetwPrediction::RECOVERY_POLICY_AUTO)
-    );
-    NETW_CHECK_EQ(int(handle->resolved_recovery_policy()), expected);
+        = netw::NetwPredictionEngine::correction_for_mode(expected);
+    NETW_CHECK_EQ(int(handle->get_mode()), int(NetwPrediction::MODE_AUTO));
+    const auto resolved = [&wrapper]() {
+        return int(NetwMultiplayer::predict_resolve_mode(wrapper.ptr()));
+    };
+    NETW_CHECK_EQ(resolved(), expected);
 
     netw::NetwPredictionEngine *pool
         = Internals::get_prediction_engine(session);
@@ -554,14 +527,14 @@ void check_auto_resolution(bool p_rigid) {
     const int64_t slot = pool->slot_register(wrapper);
     REQUIRE(slot >= 0);
     const int automatic = int(netw::CorrectionMode::AUTO);
-    NETW_CHECK_EQ(int(handle->resolved_recovery_policy()), expected);
+    NETW_CHECK_EQ(resolved(), expected);
     NETW_CHECK_EQ(
         pool->resolve_correction(slot, automatic),
         expected_correction
     );
 
     pool->unbind_owner(slot);
-    NETW_CHECK_EQ(int(handle->resolved_recovery_policy()), expected);
+    NETW_CHECK_EQ(resolved(), expected);
     NETW_CHECK_EQ(
         pool->resolve_correction(slot, automatic),
         expected_correction
@@ -595,63 +568,40 @@ TEST_CASE(
     const Ref<NetwPrediction> typed = session->prediction_handle(entity);
     REQUIRE(typed.is_valid());
 
-    typed->set_reconcile_mode(NetwPrediction::RECONCILE_JOINT);
-    typed->set_ack_age_ticks(5);
-    typed->set_epoch(3);
-    typed->set_sleeping(true);
+    typed->set_rollback_together(true);
+    typed->set_world_version(3);
+    CHECK(bool(session->predict_get_param(
+        entity,
+        NetwMultiplayer::PREDICT_PARAM_ROLLBACK_TOGETHER
+    )));
     NETW_CHECK_EQ(
         int(session->predict_get_param(
             entity,
-            NetwMultiplayer::PREDICT_PARAM_RECONCILE_MODE
-        )),
-        int(NetwPrediction::RECONCILE_JOINT)
-    );
-    NETW_CHECK_EQ(
-        int(session->predict_get_param(
-            entity,
-            NetwMultiplayer::PREDICT_PARAM_ACK_AGE_TICKS
-        )),
-        5
-    );
-    NETW_CHECK_EQ(
-        int(session->predict_get_param(
-            entity,
-            NetwMultiplayer::PREDICT_PARAM_EPOCH
+            NetwMultiplayer::PREDICT_PARAM_WORLD_VERSION
         )),
         3
     );
-    CHECK(
-        bool(session->predict_get_param(
-            entity,
-            NetwMultiplayer::PREDICT_PARAM_SLEEPING
-        ))
-    );
 
     session->predict_set_param(
         entity,
-        NetwMultiplayer::PREDICT_PARAM_RECONCILE_MODE,
-        int(NetwPrediction::RECONCILE_INDEPENDENT)
-    );
-    session->predict_set_param(
-        entity,
-        NetwMultiplayer::PREDICT_PARAM_ACK_AGE_TICKS,
-        9
-    );
-    session->predict_set_param(entity, NetwMultiplayer::PREDICT_PARAM_EPOCH, 4);
-    session->predict_set_param(
-        entity,
-        NetwMultiplayer::PREDICT_PARAM_SLEEPING,
+        NetwMultiplayer::PREDICT_PARAM_ROLLBACK_TOGETHER,
         false
     );
-    NETW_CHECK_EQ(
-        int(typed->get_reconcile_mode()),
-        int(NetwPrediction::RECONCILE_INDEPENDENT)
+    session->predict_set_param(
+        entity,
+        NetwMultiplayer::PREDICT_PARAM_WORLD_VERSION,
+        4
     );
-    NETW_CHECK_EQ(typed->get_ack_age_ticks(), 9);
-    NETW_CHECK_EQ(typed->get_epoch(), int64_t(4));
-    CHECK_FALSE(typed->get_sleeping());
+    CHECK_FALSE(typed->get_rollback_together());
+    NETW_CHECK_EQ(typed->get_world_version(), int64_t(4));
 
-    CHECK(session->predict_get_stats(entity) == typed->get_stats());
+    NETW_CHECK_EQ(
+        int64_t(session->predict_get_param(
+            entity,
+            NetwMultiplayer::PREDICT_PARAM_CORRECTION_COUNT
+        )),
+        typed->get_correction_count()
+    );
 
     session->predict_undeclare(entity);
     session->clear_session_state();

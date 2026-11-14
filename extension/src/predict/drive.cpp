@@ -15,7 +15,7 @@ ConsumeInputPlan plan_consume_input(
     bool p_has_input,
     bool p_has_later_input,
     bool p_has_last_input,
-    MissingInput p_missing_policy
+    MissingInput p_missing_input
 ) {
     ConsumeInputPlan out;
     if (p_has_input) {
@@ -31,7 +31,7 @@ ConsumeInputPlan plan_consume_input(
     out.missing = true;
     out.kind = DriveKind::MISSING;
     out.use_last
-        = p_missing_policy == MissingInput::REPEAT_LAST && p_has_last_input;
+        = p_missing_input == MissingInput::REPEAT_LAST && p_has_last_input;
     out.run = p_schedule != Schedule::TICK || out.use_last;
     return out;
 }
@@ -445,18 +445,6 @@ uint32_t RelayWindow::at_oldest(uint32_t p_offset) const {
     return (next + SIZE - count + p_offset) % SIZE;
 }
 
-void Slot::mark_carry_dirty(int64_t p_transition) {
-    if (carry_rules.is_empty()) {
-        return;
-    }
-    carry_dirty.mark(p_transition);
-}
-
-bool Slot::carry_judgeable(int64_t p_transition) const {
-    return !carry_dirty.holds(p_transition)
-        && !carry_dirty.holds(p_transition + 1);
-}
-
 void Slot::trim_history(int64_t p_ack) {
     book.trim_before(p_ack);
     if (lane_open) {
@@ -623,10 +611,7 @@ void Slot::rewire(const Wiring &p_wiring) {
     quarantine.witnesses.clear();
     quarantine.last_basis = -1;
     quarantine.wait_anchor = -1;
-    carry_rules.clear();
-    carry_dirty.clear();
     episode.retire_agreement_run();
-    carry.resize(wiring.count());
     last_witness = WitnessSummary();
     last_write_plan = WritePlan();
     last_drive_frame = -1;

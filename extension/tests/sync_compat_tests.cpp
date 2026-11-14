@@ -400,7 +400,7 @@ TEST_CASE(
 
     Stand keyed;
     keyed.declare("name", SceneReplicationConfig::REPLICATION_MODE_ALWAYS);
-    keyed.sync->set_meta(StringName("netw_max_consume_per_tick"), 3);
+    keyed.sync->set_meta(StringName("netw_max_inputs_per_tick"), 3);
     keyed.sync->set_meta(StringName("netw_live_smooth_time"), 0.25);
     keyed.arm();
     CHECK(minted(keyed.entity, NetwEntityRecord::PART_PREDICTION));

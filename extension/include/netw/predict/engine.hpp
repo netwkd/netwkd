@@ -7,6 +7,7 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/physics_stepper.hpp"
+#include "netw/predict/axes.hpp"
 #include "netw/predict/drive.hpp"
 #include "netw/predict/episode_report.hpp"
 #include "netw/predict/feed.hpp"
@@ -33,7 +34,7 @@ using table::SchemaRecord;
 class NetwMultiplayer;
 class NetwPrediction;
 class NetwPredictSlotEngine;
-class NetwPredictStats;
+struct NetwPredictStats;
 
 predict::EvidenceRow evidence_row(
     int64_t p_pre_fp,
@@ -66,7 +67,7 @@ predict::RecoveryRequest recovery_request(
     double p_fallback_teleport,
     int p_max_restore_ticks,
     int p_ack_age_ticks,
-    int p_collision_cooldown_ticks,
+    int p_correction_cooldown_ticks,
     double p_tick_delta,
     int p_domain,
     int p_attribution,
@@ -78,12 +79,12 @@ predict::RecoveryRequest recovery_request(
 predict::FieldDecl field_decl(
     const godot::StringName &p_key,
     int p_property_class,
-    const godot::StringName &p_carry_channel = godot::StringName(),
-    double p_converge_stiffness = 0.0,
+    const godot::StringName &p_rate_property = godot::StringName(),
+    double p_correction_weight = 0.0,
     bool p_teleport_only = false,
-    bool p_reconcile_only = false,
-    double p_epsilon_override = -1.0,
-    double p_teleport_at = -1.0,
+    bool p_trigger_exclude = false,
+    double p_correction_threshold = -1.0,
+    double p_teleport_threshold = -1.0,
     bool p_angle = false,
     const godot::Ref<NetwQuantize> &p_quantizer = godot::Ref<NetwQuantize>(),
     int p_type = int(godot::Variant::NIL)
@@ -155,37 +156,6 @@ public:
     }
 };
 
-class NetwPredictCarryContext : public godot::RefCounted {
-    GDCLASS(NetwPredictCarryContext, godot::RefCounted)
-
-    friend class NetwPredictionEngine;
-
-    godot::Dictionary state_at;
-    godot::Dictionary input_at;
-    double step_delta = 0.0;
-    int64_t authored_label = -1;
-
-protected:
-    static void _bind_methods();
-
-public:
-    godot::Dictionary get_state() const {
-        return state_at;
-    }
-
-    godot::Dictionary get_input() const {
-        return input_at;
-    }
-
-    double get_delta() const {
-        return step_delta;
-    }
-
-    int64_t get_label() const {
-        return authored_label;
-    }
-};
-
 class NetwPredictionEngine {
     godot::LocalVector<predict::Slot *> rows;
     mutable godot::LocalVector<int64_t> order_keys;
@@ -225,7 +195,7 @@ class NetwPredictionEngine {
     );
     static void close_space_replay(SpaceReplay &r_replay);
 
-    bool roster_open(const char *p_verb);
+    bool roster_open();
     void call_step(
         const godot::Callable &p_step,
         double p_delta,
@@ -263,33 +233,6 @@ class NetwPredictionEngine {
     static void resolve_reach(
         predict::Slot &p_row,
         const godot::Object *p_owner
-    );
-    godot::Variant call_carry(
-        int64_t p_slot,
-        const godot::Callable &p_rule,
-        const godot::Variant &p_value,
-        const predict::ReplayEntry &p_entry,
-        int64_t p_state_key
-    );
-    void replay_carry(
-        predict::CarryAttempt &r_attempt,
-        int64_t p_slot,
-        const godot::Callable &p_rule,
-        const godot::StringName &p_field,
-        int p_field_slot,
-        const godot::LocalVector<predict::ReplayEntry> &p_entries,
-        bool p_angle,
-        double p_divergence_epsilon
-    );
-    void fold_carry(
-        predict::CarryAttempt &r_attempt,
-        int64_t p_slot,
-        const godot::Callable &p_rule,
-        int p_field_slot,
-        const godot::Variant &p_start,
-        const godot::LocalVector<predict::ReplayEntry> &p_entries,
-        bool p_angle,
-        double p_teleport_default
     );
     static bool pull_state(predict::Slot &p_row);
     static bool push_state(predict::Slot &p_row);
@@ -450,7 +393,6 @@ public:
     );
 
     void set_simulate(int64_t p_slot, const godot::Callable &p_callable);
-    void set_witness(int64_t p_slot, const godot::Callable &p_callable);
     void set_corridor(int64_t p_slot, const godot::Callable &p_callable);
     void set_sensor(
         int64_t p_slot,
@@ -546,10 +488,7 @@ public:
         int64_t p_slot,
         const predict::Decl *p_decl
     );
-    godot::Dictionary normalize_witness_sample(
-        int64_t p_slot,
-        const godot::Variant &p_value
-    );
+    bool samples_contacts(int64_t p_slot) const;
     bool predict_command(
         int64_t p_slot,
         const godot::Ref<NetwEntity> &p_entity,
@@ -636,7 +575,7 @@ public:
         int64_t p_slot,
         bool p_corrected,
         int64_t p_ack,
-        double p_divergence_epsilon
+        double p_correction_threshold
     );
     void ledger_seed(int64_t p_slot, const godot::StringName &p_key);
     void ledger_bump_triggered(int64_t p_slot, const godot::StringName &p_key);
@@ -680,17 +619,7 @@ public:
     void note_reconciling(int64_t p_slot, bool p_value);
     bool reconciling(int64_t p_slot) const;
 
-    int carry_rule_count(int64_t p_slot) const;
-    bool has_carry_rule(int64_t p_slot, const godot::StringName &p_field) const;
-    godot::Array carry_rule_fields(int64_t p_slot) const;
-
-    void push_carry_rules(int64_t p_slot);
     predict::Feed role_feed(int p_role, bool p_fallback_latched) const;
-    void set_carry(
-        int64_t p_slot,
-        const godot::StringName &p_field,
-        const godot::Callable &p_callable
-    );
     bool has_simulate(int64_t p_slot) const;
 
     void set_order_key(int64_t p_slot, int64_t p_order_key);
@@ -752,9 +681,9 @@ public:
         int p_island = 0
     ) const;
 
-    static godot::Dictionary archetype_axes(int p_archetype);
+    predict::KindDefaults slot_kind(int64_t p_slot) const;
     static int role_for_axes(int p_input_source, int p_sim_mode);
-    static int correction_for_recovery_policy(int p_policy);
+    static int correction_for_mode(int p_policy);
 
     bool reconfigure_from(
         int64_t p_slot,
@@ -773,12 +702,12 @@ public:
         bool p_island_approximate = false,
         double p_epsilon = 0.01,
         double p_teleport_threshold = 2.0,
-        int p_collision_cooldown_ticks = 6
+        int p_correction_cooldown_ticks = 6
     );
 
     double epsilon_of_slot(int64_t p_slot) const;
     double teleport_threshold_of(int64_t p_slot) const;
-    int collision_cooldown_of(int64_t p_slot) const;
+    int correction_cooldown_of(int64_t p_slot) const;
 
     int schedule_of(int64_t p_slot) const;
     int role_of(int64_t p_slot) const;
@@ -860,7 +789,7 @@ public:
         bool p_has_input,
         bool p_has_later_input,
         bool p_has_last_input,
-        int p_missing_policy
+        bool p_repeat_missing_input
     ) const;
 
     int field_count(int64_t p_slot) const;
@@ -1063,7 +992,7 @@ public:
         int p_meter,
         int p_domain,
         bool p_escalated,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         bool p_observing,
         const godot::StringName &p_target,
         int p_ack_age_ticks
@@ -1099,7 +1028,7 @@ public:
         int64_t p_slot,
         const predict::CommandFrameRecord &p_frame,
         const godot::Array &p_keys,
-        bool p_reconcile_joint
+        bool p_rollback_together
     );
 
     godot::PackedByteArray build_command_frame_for(int64_t p_slot);
@@ -1174,11 +1103,10 @@ public:
     void refresh_simulation_gate(int64_t p_slot, bool p_force_release);
     void host_local_step(int64_t p_slot, double p_delta, int64_t p_tick);
     int64_t sibling_slot(const godot::Ref<NetwEntity> &p_member);
-    int admitted_reconcile_mode(int64_t p_slot);
+    bool admits_rollback_together(int64_t p_slot);
     godot::PackedStringArray joint_refusals(int64_t p_slot);
-    void admit_reconcile_mode(int64_t p_slot);
-    int reconcile_of(int64_t p_slot) const;
-    void set_reconcile_own(int64_t p_slot, int p_mode);
+    void admit_rollback_together(int64_t p_slot);
+    bool rolls_back_together(int64_t p_slot) const;
     void leave_joint(int64_t p_slot);
     void follow_relay_subscription(int64_t p_slot, bool p_selected);
     void resend_relay_subscription(int64_t p_slot);
@@ -1208,7 +1136,7 @@ public:
     godot::PackedInt64Array receive_relayed_command_frame(
         int64_t p_slot,
         const godot::PackedByteArray &p_payload,
-        bool p_reconcile_joint
+        bool p_rollback_together
     );
 
     int64_t drive_frontier(int64_t p_slot) const;
@@ -1291,7 +1219,7 @@ public:
         int64_t p_provenance_slot,
         const godot::StringName &p_target,
         int p_ack_age_ticks,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         bool p_evidence_free,
         bool p_pool_planned,
         int64_t p_entry = -1
@@ -1304,7 +1232,7 @@ public:
         int64_t p_provenance_slot,
         const godot::StringName &p_target,
         int p_ack_age_ticks,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         bool p_evidence_free,
         bool p_pool_planned,
         int64_t p_entry = -1
@@ -1331,8 +1259,8 @@ public:
         bool p_escalated,
         const godot::Callable &p_corridor,
         double p_teleport_default,
-        double p_divergence_epsilon,
-        int p_recovery_policy
+        double p_correction_threshold,
+        int p_mode
     );
 
     godot::Dictionary solve_evidence(
@@ -1348,36 +1276,6 @@ public:
         const godot::String &p_support,
         const godot::PackedStringArray &p_participants
     ) const;
-
-    int judge_carry(
-        int64_t p_slot,
-        const godot::StringName &p_field,
-        bool p_same_type,
-        bool p_finite,
-        bool p_within_envelope,
-        bool p_pure,
-        bool p_faithful
-    );
-    int decline_carry(int64_t p_slot, const godot::StringName &p_field);
-
-    bool carry_eligible(int64_t p_slot, const godot::StringName &p_field) const;
-    bool carry_retired(int64_t p_slot, const godot::StringName &p_field) const;
-    godot::PackedInt64Array carry_stats(
-        int64_t p_slot,
-        const godot::StringName &p_field
-    ) const;
-
-    void mark_carry_dirty(int64_t p_slot, int64_t p_transition);
-    bool carry_judgeable(int64_t p_slot, int64_t p_transition) const;
-
-    predict::CarryAttempt attempt_carry(
-        int64_t p_slot,
-        const godot::StringName &p_field,
-        const godot::Variant &p_acknowledged,
-        int64_t p_basis,
-        double p_teleport_default,
-        double p_divergence_epsilon
-    );
 
     godot::LocalVector<predict::ReplayEntry> replay_entries(
         int64_t p_slot,
@@ -1498,7 +1396,7 @@ public:
         const predict::StateRow &p_predicted,
         const predict::StateRow &p_authority,
         int p_domain,
-        double p_divergence_epsilon
+        double p_correction_threshold
     );
     const predict::StateRow &compared_row(int64_t p_slot) const;
     const predict::StateRow &received_row(int64_t p_slot) const;
@@ -1530,11 +1428,11 @@ public:
         const godot::Dictionary &p_current,
         const godot::Dictionary &p_tier_errors,
         int p_policy,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         double p_teleport_threshold,
         int p_max_restore_ticks,
         int p_ack_age_ticks,
-        int p_collision_cooldown_ticks,
+        int p_correction_cooldown_ticks,
         int p_domain,
         int p_attribution,
         bool p_suppressed
@@ -1548,11 +1446,11 @@ public:
         const predict::StateRow &p_current,
         const godot::LocalVector<double> &p_tier_errors,
         int p_policy,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         double p_teleport_threshold,
         int p_max_restore_ticks,
         int p_ack_age_ticks,
-        int p_collision_cooldown_ticks,
+        int p_correction_cooldown_ticks,
         int p_domain,
         int p_attribution,
         bool p_suppressed
@@ -1592,13 +1490,6 @@ public:
         bool p_escalated,
         int p_domain,
         int p_attribution
-    );
-    void carry_rows(
-        int64_t p_slot,
-        const predict::StateRow &p_payload,
-        int64_t p_basis,
-        double p_teleport_default,
-        double p_divergence_epsilon
     );
     void guard_projection_rows(int64_t p_slot, int p_ack_age_ticks);
     void pose_errors_rows(
@@ -1685,7 +1576,7 @@ public:
     );
     int release_lingering(int64_t p_slot, int64_t p_floor_transition);
     bool contact_is_equivalent(int64_t p_slot, bool p_has_witness);
-    void notify_contact(
+    void notify_collision(
         int64_t p_slot,
         bool p_has_witness,
         int p_cooldown_ticks
@@ -1741,16 +1632,6 @@ public:
         ISLAND_NONE = 0,
         ISLAND_DECLARED = 1,
         ISLAND_JOINT = 2,
-    };
-
-    enum CarryVerdictBits {
-        CARRY_CARRIED = 0,
-        CARRY_DECLINED = 1,
-        CARRY_UNFAITHFUL = 2,
-        CARRY_RETIRED_ALREADY = 3,
-        CARRY_RETIRED_SCHEDULE = 4,
-        CARRY_RETIRED_IMPURE = 5,
-        CARRY_RETIRED_INFIDELITY = 6,
     };
 
     enum JointFloorSource {
@@ -1860,7 +1741,7 @@ public:
         int p_snap_restore,
         int p_max_restore_ticks,
         double p_teleport_threshold,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         predict::StateRow &r_seed
     );
 
@@ -1886,9 +1767,9 @@ public:
     godot::Dictionary reachability_report(
         int64_t p_slot,
         const godot::StringName &p_entity_id,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         double p_teleport_threshold,
-        int p_breach_response,
+        bool p_pause_on_unpredicted_contact,
         const godot::StringName &p_breach_source,
         int p_island_claim,
         int p_contact_window_ticks,
@@ -2156,7 +2037,7 @@ public:
         int64_t p_provenance_slot,
         const godot::StringName &p_target,
         int p_ack_age_ticks,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         bool p_evidence_free,
         bool p_pool_planned
     );
@@ -2168,15 +2049,10 @@ public:
         int64_t p_provenance_slot,
         const godot::StringName &p_target,
         int p_ack_age_ticks,
-        double p_divergence_epsilon,
+        double p_correction_threshold,
         bool p_evidence_free,
         bool p_pool_planned
     );
-
-    godot::LocalVector<predict::CarryAttempt> carry_attempts(
-        int64_t p_slot
-    ) const;
-    void report_carry_retirements(int64_t p_slot);
 
     void reset_for_rewire(
         int64_t p_slot,
@@ -2324,7 +2200,6 @@ VARIANT_ENUM_CAST(netw::NetwPredictionEngine::DriveCursor);
 VARIANT_ENUM_CAST(netw::NetwPredictionEngine::CompareStat);
 VARIANT_ENUM_CAST(netw::NetwPredictionEngine::IslandMode);
 VARIANT_ENUM_CAST(netw::NetwPredictionEngine::PassPhase);
-VARIANT_ENUM_CAST(netw::NetwPredictionEngine::CarryVerdictBits);
 VARIANT_ENUM_CAST(netw::NetwPredictionEngine::DissipateDecision);
 VARIANT_ENUM_CAST(netw::NetwPredictionEngine::DeferVerdict);
 VARIANT_ENUM_CAST(netw::NetwPredictionEngine::AckRunColumn);

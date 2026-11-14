@@ -37,11 +37,10 @@ void warn_self_feedback(Runtime *p_runtime) {
             NetwMultiplayer::session_holding(owner),
             NETW_FAULT_INTERPOLATION_IGNORED,
             {named + String(":") + String(state->get_target_prop()),
-             String("simulation on this peer"),
-             String(
-                 "{NetwInterpolate.to} or {NetwDisplay.visual_root} to write "
-                 "it elsewhere"
-             )},
+             String(),
+             String(),
+             0,
+             NETW_INTERPOLATION_SIMULATED_HERE},
             gd::instance_id(owner)
         );
         return;

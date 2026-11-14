@@ -11,26 +11,27 @@ namespace Networked;
 /// <remarks>
 /// Reached through <see cref="NetwEntity.Simulation"/>. Each peer runs the
 /// entity in one <see cref="NetwSimulation.Mode"/>, which decides whether
-/// <see cref="NetwSimulation.Step"/> runs and whether the body is frozen. A
-/// game sets the members below and reads <see cref="NetwSimulation.Mode"/>.
+/// <see cref="NetwSimulation.NetworkProcess"/> runs and whether the body is
+/// frozen. A game sets the members below and reads
+/// <see cref="NetwSimulation.Mode"/>.
 /// <code>
 /// public Car()
 /// {
 ///     var entity = Netw.ConfigureEntity(this);
 ///     entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
 ///     entity.Simulation.Replicas = NetwSimulation.ReplicasEnum.Active;
-///     entity.Simulation.Step = Callable.From&lt;double, long, bool&gt;(Step);
+///     entity.Simulation.NetworkProcess = Callable.From&lt;double, long, bool&gt;(NetworkProcess);
 /// }
 ///
-/// private void Step(double delta, long tick, bool isFresh)
+/// private void NetworkProcess(double delta, long tick, bool isFresh)
 /// {
 ///     if (isFresh)
 ///         Steer(delta);
 /// }
 /// </code>
 /// <para>
-/// An entity is simulated once it sets or calls anything here, declares
-/// <see cref="NetwPrediction.Archetype"/>, or has a <see cref="RigidBody2D"/>
+/// An entity is simulated once it sets or calls anything here, is predicted as
+/// <see cref="NetwPrediction"/> describes, or has a <see cref="RigidBody2D"/>
 /// or <see cref="RigidBody3D"/> root drawn by <see cref="NetwEntity.Display"/>.
 /// Other entities stay <see cref="NetwSimulation.ModeEnum.None"/>. <b>Modes</b>
 /// The peer writing replicated state runs
@@ -76,8 +77,9 @@ public sealed class NetwSimulation : NetwRefCounted
         /// </summary>
         None = 0,
         /// <summary>
-        /// This peer has authority over the entity. The step runs and the
-        /// samples go out from here.
+        /// This peer has authority over the entity.
+        /// <see cref="NetwSimulation.NetworkProcess"/> runs and the samples go
+        /// out from here.
         /// </summary>
         Authority = 1,
         /// <summary>
@@ -98,21 +100,23 @@ public sealed class NetwSimulation : NetwRefCounted
     public enum ScheduleEnum : long
     {
         /// <summary>
-        /// The step moves the entity once per tick.
+        /// <see cref="NetwSimulation.NetworkProcess"/> moves the entity once
+        /// per tick.
         /// </summary>
         Tick = 0,
         /// <summary>
         /// The physics server moves the bodies in each frame that brings a
-        /// tick, and the step runs once in that frame.
+        /// tick, and <see cref="NetwSimulation.NetworkProcess"/> runs once in
+        /// that frame.
         /// </summary>
         Frame = 1,
         /// <summary>
-        /// Needs a Godot build with <c>PhysicsServer3D.space_step</c>, or a
+        /// The physics space is stepped once per tick, and again for each tick
+        /// of a rollback. It needs the Networked engine build or a
         /// <see cref="NetwPhysicsStepper"/> installed with
-        /// <see cref="NetwSession.InstallPhysicsStepper"/>. Otherwise it runs
-        /// as <see cref="NetwSimulation.ScheduleEnum.Frame"/>, and so does an
-        /// entity that does not declare prediction. Each fallback is reported
-        /// once.
+        /// <see cref="NetwSession.InstallPhysicsStepper"/>. Without either it
+        /// runs as <see cref="NetwSimulation.ScheduleEnum.Frame"/>, and so does
+        /// an entity that is not predicted. Each case warns once.
         /// </summary>
         Stepped = 2,
         /// <summary>
@@ -135,8 +139,9 @@ public sealed class NetwSimulation : NetwRefCounted
         Proxy = 0,
         /// <summary>
         /// Copies whose state comes from another peer are
-        /// <see cref="NetwSimulation.ModeEnum.Active"/>. A sample that matches
-        /// the copy is not written, so a resting copy can sleep.
+        /// <see cref="NetwSimulation.ModeEnum.Active"/>. On an entity that is
+        /// not predicted, a sample that matches the copy is not written, so a
+        /// resting copy can sleep.
         /// </summary>
         Active = 1,
     }
@@ -228,8 +233,8 @@ public sealed class NetwSimulation : NetwRefCounted
         NetwApi.MethodBind("NetwSimulation", "set_schedule", 2897485363UL);
 
     /// <summary>
-    /// When <see cref="NetwSimulation.Step"/> runs and when the physics server
-    /// moves the bodies.
+    /// When <see cref="NetwSimulation.NetworkProcess"/> runs and when the
+    /// physics server moves the bodies.
     /// </summary>
     public NetwSimulation.ScheduleEnum Schedule
     {
@@ -292,7 +297,9 @@ public sealed class NetwSimulation : NetwRefCounted
     /// <see cref="NetwSimulation.ModeEnum.Active"/> copy. Under
     /// <see cref="NetwDisplay.LiveModeEnum.Chase"/> the body snaps to it and
     /// the drawn position glides, up to
-    /// <see cref="NetwPrediction.TeleportThreshold"/>.
+    /// <see cref="NetwPrediction.TeleportThreshold"/>. Defaults to
+    /// <see cref="NetwSimulation.RestoreEnum.Extrapolated"/> on a predicted
+    /// entity with <see cref="NetwSimulation.PhysicsDriven"/>.
     /// </summary>
     public NetwSimulation.RestoreEnum Restore
     {
@@ -445,28 +452,76 @@ public sealed class NetwSimulation : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetStep =
-        NetwApi.MethodBind("NetwSimulation", "get_step", 1307783378UL);
+    private static readonly IntPtr _bindGetPhysicsDriven =
+        NetwApi.MethodBind("NetwSimulation", "get_physics_driven", 36873697UL);
 
-    private static readonly IntPtr _bindSetStep =
-        NetwApi.MethodBind("NetwSimulation", "set_step", 1611583062UL);
+    private static readonly IntPtr _bindSetPhysicsDriven =
+        NetwApi.MethodBind(
+            "NetwSimulation",
+            "set_physics_driven",
+            2586408642UL);
+
+    /// <summary>
+    /// If <c>true</c>, the physics server moves this entity, so one with a
+    /// <see cref="NetwPropertyConfig.State"/> property is predicted without a
+    /// <see cref="NetwSimulation.NetworkProcess"/>. Defaults to <c>true</c>
+    /// when the root or a body in <see cref="NetwSimulation.Bodies"/> is a
+    /// <see cref="RigidBody2D"/> or <see cref="RigidBody3D"/>. While such an
+    /// entity is predicted, <c>RigidBody3D.max_contacts_reported</c> is raised
+    /// to <c>8</c> on its bodies so their contacts can be read.
+    /// </summary>
+    public bool PhysicsDriven
+    {
+        get
+        {
+            byte answered = default;
+            NetwThunks.Ptrcall0_Byte(
+                _bindGetPhysicsDriven,
+                Checked,
+                ref answered);
+            return answered != 0;
+        }
+        set
+        {
+            byte slot0 = value ? (byte)1 : (byte)0;
+            long discarded = default;
+            NetwThunks.Ptrcall1_Byte_Long(
+                _bindSetPhysicsDriven,
+                Checked,
+                in slot0,
+                ref discarded);
+        }
+    }
+
+    private static readonly IntPtr _bindGetNetworkProcess =
+        NetwApi.MethodBind(
+            "NetwSimulation",
+            "get_network_process",
+            1307783378UL);
+
+    private static readonly IntPtr _bindSetNetworkProcess =
+        NetwApi.MethodBind(
+            "NetwSimulation",
+            "set_network_process",
+            1611583062UL);
 
     /// <summary>
     /// Called each tick as <c>(delta: float, tick: int, is_fresh: bool)</c>
     /// while <see cref="NetwSimulation.Mode"/> runs the body. Defaults to the
-    /// root's <c>_network_tick</c>. <c>is_fresh</c> is <c>false</c> in a replay
-    /// and on a <see cref="NetwSimulation.ModeEnum.Active"/> copy, so read
-    /// input only when it is <c>true</c>. A step asks the physics space with a
-    /// query. An <see cref="Area3D"/>'s overlaps and signals and
+    /// root's <c>_network_process</c>. <c>is_fresh</c> is <c>true</c> the first
+    /// time a tick runs. It is <c>false</c> when a rollback runs the tick again
+    /// and on a <see cref="NetwSimulation.ModeEnum.Active"/> copy, so play
+    /// sounds and spawn nodes only when it is <c>true</c>. Ask the physics
+    /// space with a query. An <see cref="Area3D"/>'s overlaps and signals and
     /// <c>CharacterBody3D.is_on_floor</c> come from the last physics step, and
-    /// a replay restores neither.
+    /// a rollback restores neither.
     /// </summary>
-    public Callable Step
+    public Callable NetworkProcess
     {
         get
         {
             godot_variant answered = default;
-            NetwThunks.Call0(_bindGetStep, Checked, ref answered);
+            NetwThunks.Call0(_bindGetNetworkProcess, Checked, ref answered);
             Callable result = VariantUtils.ConvertToCallable(answered);
             answered.Dispose();
             return result;
@@ -475,7 +530,11 @@ public sealed class NetwSimulation : NetwRefCounted
         {
             godot_variant slot0 = VariantUtils.CreateFromCallable(value);
             godot_variant answered = default;
-            NetwThunks.Call1(_bindSetStep, Checked, in slot0, ref answered);
+            NetwThunks.Call1(
+                _bindSetNetworkProcess,
+                Checked,
+                in slot0,
+                ref answered);
             slot0.Dispose();
             answered.Dispose();
         }

@@ -33,6 +33,7 @@
 #include "netw/game_call.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
+#include "netw/predict/decl.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
 #include "netw/repl/set_model.hpp"
@@ -1348,11 +1349,11 @@ double NetwMultiplayer::display_default_chase_clamp(const RID &p_entity) {
     if (entity.is_null()) {
         return INFINITY;
     }
-    const Ref<NetwPrediction> handle = entity->prediction_if_minted();
-    if (handle.is_null()) {
+    const predict::Decl *decl = predict_find_declaration(entity.ptr());
+    if (decl == nullptr) {
         return NetwPrediction::DEFAULT_TELEPORT_THRESHOLD;
     }
-    return MAX(handle->get_teleport_threshold(), 0.0);
+    return MAX(decl->teleport_threshold, 0.0);
 }
 
 bool NetwMultiplayer::display_absorbs_recovery(const RID &p_entity) const {
@@ -1944,9 +1945,10 @@ bool NetwMultiplayer::lagcomp_effect_watch(
             this,
             NETW_FAULT_REWIND_MISUSE,
             {String(p_key),
-             String("an effect that is not armed"),
-             String("{NetwMultiplayer.lagcomp_effect_arm} before "
-                    "lagcomp_effect_watch")}
+             String(),
+             String(),
+             0,
+             NETW_REWIND_EFFECT_NOT_ARMED}
         );
     }
     return watching;
@@ -2323,31 +2325,28 @@ void NetwMultiplayer::property_set_set_column_param(
     }
     PropertyColumn &target = record->columns[uint32_t(p_field)];
     switch (p_param) {
-        case COLUMN_PARAM_CLASS:
-            target.property_class = int64_t(p_value);
+        case COLUMN_PARAM_UNCHECKED:
+            target.unchecked = bool(p_value);
             return;
-        case COLUMN_PARAM_EPSILON:
-            target.epsilon_override = double(p_value);
+        case COLUMN_PARAM_CORRECTION_THRESHOLD:
+            target.correction_threshold = double(p_value);
             return;
-        case COLUMN_PARAM_TELEPORT_AT:
-            target.teleport_at_override = double(p_value);
+        case COLUMN_PARAM_TELEPORT_THRESHOLD:
+            target.teleport_threshold = double(p_value);
             return;
-        case COLUMN_PARAM_CARRY_CHANNEL:
-            target.carry_channel = StringName(p_value);
+        case COLUMN_PARAM_EXTRAPOLATE:
+            target.rate_property = StringName(p_value);
             return;
         case COLUMN_PARAM_TELEPORT_ONLY:
             target.explicit_teleport_only = bool(p_value);
-            return;
-        case COLUMN_PARAM_RECONCILE_ONLY:
-            target.explicit_reconcile_only = bool(p_value);
             return;
         case COLUMN_PARAM_LANE:
             target.lane = int64_t(p_value);
             target.watch = target.lane == PropertySet::RETAINED;
             record->reproject_lanes();
             return;
-        case COLUMN_PARAM_CONVERGE_STIFFNESS:
-            target.converge_stiffness = double(p_value);
+        case COLUMN_PARAM_CORRECTION_WEIGHT:
+            target.correction_weight = double(p_value);
             return;
         default:
             fault::raise(
@@ -2516,26 +2515,26 @@ RID NetwMultiplayer::adopt_property_set(
         property_set_set_column_param(
             set,
             at,
-            COLUMN_PARAM_CLASS,
-            member.property_class
+            COLUMN_PARAM_UNCHECKED,
+            member.unchecked
         );
         property_set_set_column_param(
             set,
             at,
-            COLUMN_PARAM_EPSILON,
-            member.epsilon_override
+            COLUMN_PARAM_CORRECTION_THRESHOLD,
+            member.correction_threshold
         );
         property_set_set_column_param(
             set,
             at,
-            COLUMN_PARAM_TELEPORT_AT,
-            member.teleport_at_override
+            COLUMN_PARAM_TELEPORT_THRESHOLD,
+            member.teleport_threshold
         );
         property_set_set_column_param(
             set,
             at,
-            COLUMN_PARAM_CARRY_CHANNEL,
-            member.carry_channel
+            COLUMN_PARAM_EXTRAPOLATE,
+            member.rate_property
         );
         property_set_set_column_param(
             set,
@@ -2543,18 +2542,12 @@ RID NetwMultiplayer::adopt_property_set(
             COLUMN_PARAM_TELEPORT_ONLY,
             member.explicit_teleport_only
         );
-        property_set_set_column_param(
-            set,
-            at,
-            COLUMN_PARAM_RECONCILE_ONLY,
-            member.explicit_reconcile_only
-        );
         property_set_set_column_param(set, at, COLUMN_PARAM_LANE, member.lane);
         property_set_set_column_param(
             set,
             at,
-            COLUMN_PARAM_CONVERGE_STIFFNESS,
-            member.converge_stiffness
+            COLUMN_PARAM_CORRECTION_WEIGHT,
+            member.correction_weight
         );
     }
     property_set_seal(set);

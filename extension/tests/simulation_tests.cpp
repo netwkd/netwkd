@@ -337,7 +337,7 @@ Resolved resolve_through_prediction(const Concrete &p_point) {
     );
     pool.set_fallback_latched(slot, p_point.closure == FALLBACK);
     if (p_point.closure == DELAY_CLOSED) {
-        decl.recovery_policy = NetwPrediction::RECOVERY_POLICY_DELAY_CLOSED;
+        decl.mode = NetwPrediction::MODE_DISABLED;
     }
     Facts facts = pool.resolution_facts(slot, &decl);
     facts.selection_count = p_point.selection == SELECTED ? 1 : 0;
@@ -527,7 +527,7 @@ var fresh_steps := 0
 func _init() -> void:
 	Netw.configure_property(self, &"crate_position").broadcast()
 
-func _network_tick(_delta: float, _tick: int, fresh: bool) -> void:
+func _network_process(_delta: float, _tick: int, fresh: bool) -> void:
 	steps += 1
 	if fresh:
 		fresh_steps += 1

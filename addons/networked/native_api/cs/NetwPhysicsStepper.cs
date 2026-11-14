@@ -12,7 +12,8 @@ namespace Networked;
 /// <remarks>
 /// Networked steps a space through <c>PhysicsServer3D.space_step</c> when the
 /// server has it, so a game installs a stepper only for a server that does not.
-/// An installed stepper outranks that built-in stepping. While an entity with
+/// The Networked engine build has it. An installed stepper outranks that
+/// built-in stepping. While an entity with
 /// <see cref="NetwSimulation.ScheduleEnum.Stepped"/> is in that space,
 /// Networked stops the engine from stepping it and calls <c>_step</c> once per
 /// tick instead, and again for each tick it replays.
@@ -35,11 +36,11 @@ namespace Networked;
 /// in the space, the engine steps it again as usual. Each tick, every entity in
 /// the space applies its input first, then <c>_step</c> and <c>_snapshot</c>
 /// run once for the whole space. Under
-/// <see cref="NetwPrediction.Reconcile.Joint"/> a replay restores every entity,
-/// calls <c>_restore</c> once, then steps each replayed tick the same way.
-/// Implement <c>_snapshot</c> and <c>_restore</c> only when the space holds
-/// bodies that are not entities, such as loose debris. Entities are restored by
-/// Networked.
+/// <see cref="NetwPrediction.RollbackTogether"/> a replay restores every
+/// entity, calls <c>_restore</c> once, then steps each replayed tick the same
+/// way. Implement <c>_snapshot</c> and <c>_restore</c> only when the space
+/// holds bodies that are not entities, such as loose debris. Entities are
+/// restored by Networked.
 /// </para>
 /// </remarks>
 public sealed class NetwPhysicsStepper : NetwRefCounted

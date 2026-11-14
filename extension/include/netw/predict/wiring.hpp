@@ -26,15 +26,15 @@ enum class PropertyClass : int {
 
 struct FieldDecl {
     godot::StringName key;
-    godot::StringName carry_channel;
+    godot::StringName rate_property;
     godot::Ref<NetwQuantize> quantizer;
     int property_class = int(PropertyClass::CAUSAL);
     int type = int(godot::Variant::NIL);
-    double converge_stiffness = 0.0;
-    double epsilon_override = -1.0;
-    double teleport_at = -1.0;
+    double correction_weight = 0.0;
+    double correction_threshold = -1.0;
+    double teleport_threshold = -1.0;
     bool teleport_only = false;
-    bool reconcile_only = false;
+    bool trigger_exclude = false;
     bool angle = false;
     int column_type = -1;
 };
@@ -112,8 +112,9 @@ struct Wiring {
     godot::LocalVector<uint8_t> vote_exclude;
     godot::LocalVector<uint8_t> angle;
     godot::LocalVector<uint8_t> causal;
+    godot::LocalVector<uint8_t> wrote_epsilon;
     godot::LocalVector<int> property_class;
-    godot::LocalVector<godot::StringName> carry_channel;
+    godot::LocalVector<godot::StringName> rate_property;
 
     void resize(int p_count);
 
@@ -138,7 +139,7 @@ struct Config {
     bool witness = false;
     double epsilon = 0.01;
     double teleport_threshold = 2.0;
-    int collision_cooldown_ticks = 6;
+    int correction_cooldown_ticks = 6;
 };
 
 } // namespace netw::predict

@@ -1,0 +1,48 @@
+:github_url: hide
+
+.. _fault_nw1032:
+
+NW1032. This Godot build cannot step physics on demand
+======================================================
+
+Reported as a warning when an entity sets
+:ref:`SCHEDULE_STEPPED <class_NetwSimulation_constant_SCHEDULE_STEPPED>` and
+nothing can step its physics world. The Godot build has no
+``PhysicsServer3D.space_step``, and no
+:ref:`NetwPhysicsStepper <class_NetwPhysicsStepper>` is installed for that
+world. The entity runs at
+:ref:`SCHEDULE_FRAME <class_NetwSimulation_constant_SCHEDULE_FRAME>`.
+
+.. code-block:: gdscript
+
+    extends RigidBody3D
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
+        Netw.configure_property(self, &"position").state()
+
+Use the Networked build of Godot, published at
+https://github.com/diejor/godot/releases. When the game's own physics can
+advance a world on demand, install a stepper that calls it with
+:ref:`NetwSession.install_physics_stepper <class_NetwSession_method_install_physics_stepper>`.
+The first argument is the world, and a stepper that does not override
+``_can_step`` is refused.
+
+.. code-block:: gdscript
+
+    class MyStepper extends NetwPhysicsStepper:
+        func _can_step() -> bool:
+            return true
+
+        func _step(space: RID, delta: float) -> void:
+            my_physics.advance(space, delta)
+
+    func _ready() -> void:
+        var session: NetwSession = Netw.session(self)
+        session.install_physics_stepper(get_world_3d(), MyStepper.new())
+
+Here ``my_physics`` is the game's own physics. On an official Godot build with
+nothing to call, leave the schedule unset, so
+:ref:`SCHEDULE_AUTO <class_NetwSimulation_constant_SCHEDULE_AUTO>` picks one
+the build can run.

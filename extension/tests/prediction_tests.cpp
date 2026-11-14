@@ -12,6 +12,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/simulation.hpp"
+#include "netw/predict/drive.hpp"
 
 namespace TestPrediction {
 
@@ -26,14 +27,16 @@ using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
+using netw_test::PredictionReports;
 using netw_test::Recorder;
 using netw_test::WorldDecl;
 
 constexpr int SERVER = -1;
 constexpr int SETTLE_TICKS = 30;
 constexpr int RECOVER_TICKS = 70;
-constexpr int PAST_HORIZON = NetwPrediction::ACK_AGE_MAX + 16;
+constexpr int PAST_HORIZON = netw::predict::ACK_AGE_MAX + 16;
 
 struct World {
     String label;
@@ -64,6 +67,13 @@ Ref<NetwPrediction> prediction(
     return NetwEntity::of(body(p_rig, p_name, p_at))->get_prediction();
 }
 
+int ack_age(LoopbackRig &p_rig, const char *p_name, int p_at) {
+    return Internals::predict_declaration(
+               NetwEntity::of(body(p_rig, p_name, p_at)).ptr()
+    )
+        .ack_age_ticks;
+}
+
 void run(LoopbackRig &p_rig, const char *p_name, int p_at) {
     body(p_rig, p_name, p_at)->set("motion", Vector2(1.0, 0.0));
 }
@@ -92,7 +102,7 @@ LawVerdict horizon_resumes(const World &) {
     rig.conditions(0, deaf);
     rig.step_ticks(PAST_HORIZON);
     const double stalled = body(rig, "P", 0)->get_position().x;
-    const int age = prediction(rig, "P", 0)->get_ack_age_ticks();
+    const int age = ack_age(rig, "P", 0);
     rig.step_ticks(8);
     if (body(rig, "P", 0)->get_position().x != stalled) {
         return law_broken(
@@ -100,7 +110,7 @@ LawVerdict horizon_resumes(const World &) {
             stalled
         );
     }
-    if (age != NetwPrediction::ACK_AGE_MAX) {
+    if (age != netw::predict::ACK_AGE_MAX) {
         return law_broken("the client stalled at an ack age of %d", age);
     }
 
@@ -109,8 +119,7 @@ LawVerdict horizon_resumes(const World &) {
     if (body(rig, "P", 0)->get_position().x <= stalled) {
         return law_broken("the client never resumed from x %g", stalled);
     }
-    if (prediction(rig, "P", 0)->get_ack_age_ticks()
-        >= NetwPrediction::ACK_AGE_MAX) {
+    if (ack_age(rig, "P", 0) >= netw::predict::ACK_AGE_MAX) {
         return law_broken("the server answered and the ack age stayed full");
     }
     return law_held();
@@ -128,8 +137,11 @@ LawVerdict signals_in_order(const World &) {
     Vector<StringName> signals;
     signals.push_back(StringName("divergence_detected"));
     signals.push_back(StringName("episode_changed"));
-    signals.push_back(StringName("recovered"));
-    const Recorder heard(prediction(rig, "P", 0).ptr(), signals);
+    signals.push_back(StringName("corrected"));
+    Vector<StringName> published;
+    published.push_back(signals[2]);
+    const PredictionReports heard(prediction(rig, "P", 0).ptr(), signals);
+    const Recorder corrected(prediction(rig, "P", 0).ptr(), published);
     shove(rig, "P");
     rig.step_ticks(RECOVER_TICKS);
 
@@ -143,7 +155,10 @@ LawVerdict signals_in_order(const World &) {
         );
     }
     const int64_t diverged = heard.args(signals[0])[0];
-    const int64_t moved = heard.args(signals[2])[0];
+    if (corrected.count(signals[2]) < 1) {
+        return law_broken("the corrected signal never reached a listener");
+    }
+    const int64_t moved = corrected.args(signals[2])[0];
     if (diverged != moved) {
         return law_broken(
             "the divergence names tick %d and the recovery tick %d",
@@ -158,10 +173,10 @@ LawVerdict signals_in_order(const World &) {
             != NetwPrediction::EPISODE_CHANGE_CLOSED) {
         return law_broken("the episode did not open first and close last");
     }
-    if (heard.count(signals[2]) != 1) {
+    if (corrected.count(signals[2]) != 1) {
         return law_broken(
             "one shove moved the client %d time(s)",
-            heard.count(signals[2])
+            corrected.count(signals[2])
         );
     }
     return law_held();
@@ -192,9 +207,7 @@ LawVerdict refused_joint_once(bool p_spawned) {
     for (const auto &copy : copies) {
         const int at = String(copy[1]).to_int();
         const Ref<NetwEntity> entity = NetwEntity::of(body(rig, copy[0], at));
-        entity->get_prediction()->set_reconcile_mode(
-            NetwPrediction::RECONCILE_JOINT
-        );
+        entity->get_prediction()->set_rollback_together(true);
         entity->get_simulation()->set_schedule(
             NetwSimulation::SCHEDULE_STEPPED
         );
@@ -213,10 +226,10 @@ LawVerdict refused_joint_once(bool p_spawned) {
             );
         }
     }
-    if (faults.warnings_containing("[NW1014]") != 2) {
+    if (faults.warnings_containing("[NW1033]") != 2) {
         return law_broken(
-            "%d NW1014 warning(s) for two refused groups",
-            int(faults.warnings_containing("[NW1014]"))
+            "%d NW1033 warning(s) for two refused groups",
+            int(faults.warnings_containing("[NW1033]"))
         );
     }
     return law_held();
@@ -232,18 +245,18 @@ LawVerdict refused_joint_spawned(const World &) {
 
 const Row ROWS[] = {
     {"a client whose server stops answering",
-     "it stops predicting when ack_age_ticks reaches ACK_AGE_MAX, and "
-     "resumes once the server answers again",
+     "it stops predicting once the server has been silent for ACK_AGE_MAX "
+     "ticks, and resumes once the server answers again",
      &horizon_resumes},
     {"a client the server shoves once",
-     "it hears divergence_detected, episode_changed opening, recovered for "
-     "the same tick, and episode_changed closing, and is moved once",
+     "it reports a divergence, an episode opening, a correction for the "
+     "same tick, and the episode closing, and hears corrected once",
      &signals_in_order},
-    {"RECONCILE_JOINT on placed runners whose schedule cannot replay",
-     "each is reported once with NW1014, by the peer that predicts it",
+    {"rollback_together on placed runners whose schedule cannot replay",
+     "each is reported once with NW1033, by the peer that predicts it",
      &refused_joint_placed},
-    {"RECONCILE_JOINT on spawned runners whose schedule cannot replay",
-     "each is reported once with NW1014, by the peer that predicts it",
+    {"rollback_together on spawned runners whose schedule cannot replay",
+     "each is reported once with NW1033, by the peer that predicts it",
      &refused_joint_spawned},
 };
 

@@ -9,4 +9,4 @@ models and sound effects are CC0, the skid sound effect is by
 `vehicle.gd` is mostly unchanged. The port adds six
 `Netw.configure_property` broadcast declarations, an interest join, and a
 `simulation.bodies` declaration. The upstream `_physics_process` runs as
-`_network_tick`, which only runs on the peer that controls the car.
+`_network_process`, which only runs on the peer that controls the car.

@@ -16,8 +16,8 @@ namespace netw {
 
 namespace {
 
-const StringName &network_tick_name() {
-    static const StringName name("_network_tick");
+const StringName &network_process_name() {
+    static const StringName name("_network_process");
     return name;
 }
 
@@ -85,10 +85,8 @@ sim::Schedule NetwMultiplayer::sim_runs_on(sim::Row &r_row, Node *p_owner) {
         r_row.stepped_refused = true;
         fault::raise(
             this,
-            NETW_FAULT_PREDICTION_DOWNGRADED,
-            {String(p_owner->get_name()),
-             "SCHEDULE_STEPPED without prediction",
-             "prediction declared on it, or another schedule"},
+            NETW_FAULT_STEPPED_UNPREDICTED,
+            {String(p_owner->get_name())},
             gd::instance_id(p_owner)
         );
     }
@@ -129,10 +127,10 @@ void NetwMultiplayer::sim_step(
     }
     Callable step = row->declaration.step;
     if (!step.is_valid()) {
-        if (!owner->has_method(network_tick_name())) {
+        if (!owner->has_method(network_process_name())) {
             return;
         }
-        step = Callable(owner, network_tick_name());
+        step = Callable(owner, network_process_name());
     }
     step.call(p_delta, p_tick, sim::leads(mode));
 }

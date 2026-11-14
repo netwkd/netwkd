@@ -297,7 +297,7 @@ Input a client sends to the server only, such as movement keys. It is kept for r
 
 :ref:`RecordKind<enum_NetwSchema_RecordKind>` **RECORD_KIND_BROADCAST** = ``3``
 
-Cosmetic values sent to everyone and not kept, such as an aim direction.
+Values that only change how an entity looks, sent to everyone and not kept, such as an aim direction.
 
 .. rst-class:: classref-section-separator
 

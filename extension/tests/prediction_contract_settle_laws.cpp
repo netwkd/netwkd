@@ -81,7 +81,7 @@ TEST_CASE(
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning(
-        "*'PredictedWithoutComponent'*[NW1014]*",
+        "*'PredictedWithoutComponent'*[NW1038]*",
         1
     );
 
@@ -107,8 +107,8 @@ TEST_CASE(
     "losing its turn to the second"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning("*'FirstCovered'*[NW1014]*", 1);
-    expected_faults.expect_warning("*'SecondCovered'*[NW1014]*", 1);
+    expected_faults.expect_warning("*'FirstCovered'*[NW1038]*", 1);
+    expected_faults.expect_warning("*'SecondCovered'*[NW1038]*", 1);
 
     Stand stand;
     Node *first = declaring(netw_test::gdsrc::STATE_AND_INPUT, "FirstCovered");
@@ -183,7 +183,7 @@ TEST_CASE(
         int(netw::NetwSimulation::SCHEDULE_STEPPED)
     );
     sync->set_meta(
-        StringName("netw_snap_restore"),
+        StringName("netw_restore"),
         int(netw::NetwSimulation::RESTORE_EXTRAPOLATED)
     );
     sync->set_meta(StringName("netw_max_restore_ticks"), 4);

@@ -133,8 +133,8 @@ public sealed class NetwSchema : NetwRefCounted
         /// </summary>
         Input = 2,
         /// <summary>
-        /// Cosmetic values sent to everyone and not kept, such as an aim
-        /// direction.
+        /// Values that only change how an entity looks, sent to everyone and
+        /// not kept, such as an aim direction.
         /// </summary>
         Broadcast = 3,
     }

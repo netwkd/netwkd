@@ -182,8 +182,10 @@ void push(Node *p_node) {
             nullptr,
             NETW_FAULT_REWIND_MISUSE,
             {String(p_node->get_name()),
-             "sync_to_physics",
-             "sync_to_physics off and the node moved in _network_tick"},
+             String(),
+             String(),
+             0,
+             NETW_REWIND_SYNC_TO_PHYSICS},
             gd::instance_id(p_node)
         );
     }
@@ -345,7 +347,9 @@ void report_unseen(Object *p_owner) {
         NETW_FAULT_ENGINE_LACKS,
         {String(kinematic->get_name()),
          String(),
-         vformat("to move its %s in a rewind", kinematic->get_class())},
+         String(kinematic->get_class()),
+         0,
+         NETW_LACKS_REWIND_MOVE},
         gd::instance_id(kinematic)
     );
 }
@@ -375,8 +379,10 @@ void exclude_visual_root(Node *p_owner, Node *p_visual) {
              String(p_owner->get_name()),
              String(p_owner->get_path_to(inside))
          ),
-         "a place under the visual root",
-         "a parent outside {NetwDisplay.visual_root}"},
+         String(),
+         String(),
+         0,
+         NETW_REWIND_UNDER_VISUAL_ROOT},
         gd::instance_id(inside)
     );
 }

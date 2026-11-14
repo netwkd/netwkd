@@ -89,8 +89,7 @@ var await_local_ready: Callable
 var gestures: Dictionary[String, Callable] = { }
 
 ## [code]() -> Dictionary[/code] of display id to prediction handle, the
-## entities whose [member
-## NetwPrediction.stats] the summary carries.
+## entities whose prediction counters the summary carries.
 var summary_handles: Callable
 
 ## Optional [code]() -> Dictionary[/code] merged into the summary's condition

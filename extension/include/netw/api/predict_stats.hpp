@@ -9,10 +9,7 @@
 
 namespace netw {
 
-class NetwPredictStats : public godot::RefCounted {
-    GDCLASS(NetwPredictStats, godot::RefCounted)
-
-public:
+struct NetwPredictStats {
     enum {
         ARRIVAL_BUCKETS = 9,
         REPLAY_DEPTH_BUCKETS = 33,
@@ -111,34 +108,6 @@ public:
 
         godot::Dictionary to_dictionary() const;
     };
-
-private:
-    Book own;
-    Book *book = &own;
-
-protected:
-    static void _bind_methods();
-
-public:
-    void view(Book *p_book);
-    void keep(const Book &p_book);
-
-    int64_t get_int_fact(int index) const {
-        return book->get_int_fact(index);
-    }
-    godot::Dictionary get_dict_fact(int index) const {
-        return book->get_dict_fact(index);
-    }
-    godot::PackedInt32Array get_buckets_fact(int index) const {
-        return book->get_buckets_fact(index);
-    }
-    godot::PackedStringArray get_names_fact(int index) const {
-        return book->get_names_fact(index);
-    }
-
-    int64_t get_corrections() const;
-    int64_t get_installs() const;
-    godot::Dictionary to_dictionary() const;
 
     static const Fact *facts();
     static int fact_count();

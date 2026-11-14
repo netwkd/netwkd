@@ -192,8 +192,8 @@ public:
     bool stream_finished(int64_t p_tick) const;
     void notice();
 
-    void record(int64_t tick, const godot::Variant &value, bool authoring_tick);
-    void record_every_tick(int64_t tick, const godot::Variant &value);
+    bool record(int64_t tick, const godot::Variant &value, bool authoring_tick);
+    bool record_every_tick(int64_t tick, const godot::Variant &value);
     void clear();
     bool is_empty() const;
     int64_t size() const;

@@ -299,12 +299,12 @@ LawVerdict settled_with_parameter(const Stand &) {
 
 LawVerdict step_with_wrong_parameters(const Stand &) {
     FaultWatch watch;
-    watch.expect_error("*NetwSimulation.step*[NW1002]*", 1);
+    watch.expect_error("*NetwSimulation.network_process*[NW1002]*", 1);
     const Ref<RefCounted> on = handlers();
     Ref<netw::NetwSimulation> simulation;
     simulation.instantiate();
 
-    simulation->set_step(Callable(on.ptr(), StringName("none")));
+    simulation->set_network_process(Callable(on.ptr(), StringName("none")));
     return law_held();
 }
 
@@ -339,7 +339,7 @@ const Row ROWS[] = {
      "it never runs and one NW1002 names NetwPromise.when_settled",
      &settled_with_parameter},
     {"a simulation step with the wrong parameters",
-     "one NW1002 names NetwSimulation.step when the step is set",
+     "one NW1002 names NetwSimulation.network_process when the step is set",
      &step_with_wrong_parameters},
 };
 

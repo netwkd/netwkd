@@ -1,0 +1,24 @@
+:github_url: hide
+
+.. _fault_nw1029:
+
+NW1029. A predicted entity changed while a step ran
+===================================================
+
+Reported as an error when a ``_network_process`` adds a predicted entity to
+the tree, removes one, or changes the properties one declares. The change
+was dropped, so an entity added this way is not predicted.
+
+.. code-block:: gdscript
+
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+        if is_fresh and firing:
+            add_sibling(ROCKET.instantiate())
+
+Make the change after the step.
+
+.. code-block:: gdscript
+
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+        if is_fresh and firing:
+            add_sibling.call_deferred(ROCKET.instantiate())

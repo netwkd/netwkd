@@ -53,6 +53,8 @@ A node's property replicates once :ref:`configure_property()<class_Netw_method_c
 
 - :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` how a declared property is sent, from :ref:`configure_property()<class_Netw_method_configure_property>`\ 
 
+- :ref:`NetwPrediction<class_NetwPrediction>` how the client that controls an entity runs it ahead of the server, from :ref:`NetwEntity.prediction<class_NetwEntity_property_prediction>`\ 
+
 - :ref:`NetwTable<class_NetwTable>` rows of values a :ref:`NetwSchema<class_NetwSchema>` declares, from :ref:`NetwSession.table()<class_NetwSession_method_table>`\ 
 
 - :ref:`NetwChannel<class_NetwChannel>` raw bytes sent in batches, from :ref:`channel()<class_Netw_method_channel>`\ 

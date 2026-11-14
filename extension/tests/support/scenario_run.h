@@ -390,11 +390,11 @@ inline void ScenarioRun::seed_tracks(const Scenario &p_scenario) {
         track.authority = track.predicted;
         track.lane.name = track.name;
         track.lane.lane_epsilon = p_scenario.epsilon;
-        track.lane.lane_buffer_declared = decl.replay_buffer_depth();
+        track.lane.lane_buffer_declared = decl.input_buffer_ticks();
         godot::LocalVector<netw::predict::FieldDecl> fields;
         netw::predict::FieldDecl field;
         field.key = track.field;
-        field.converge_stiffness = CONVERGE_RATE;
+        field.correction_weight = CONVERGE_RATE;
         fields.push_back(field);
         track.planner.open = true;
         track.planner.rewire(netw::predict::compile(fields));
@@ -645,31 +645,31 @@ inline ScenarioRun ScenarioRun::session(
         }
     }
 
-    std::vector<std::unique_ptr<Recorder>> recorders;
+    std::vector<std::unique_ptr<PredictionReports>> recorders;
     for (int index = 0; index < run.tracks.size(); ++index) {
         const godot::StringName &name = run.tracks[index].name;
         const int client = run.tracks[index].client;
-        godot::Object *handle = p_rig.prediction_handle(name, client);
+        netw::NetwPrediction *handle = p_rig.prediction_handle(name, client);
         netw::NetwMultiplayer *owner_api
             = client < 0 ? p_rig.server() : p_rig.client(client);
         if (p_plant == PLANT_NO_RECOVER) {
             owner_api->predict_set_param(
                 p_rig.entity_of(name, client),
-                netw::NetwMultiplayer::PREDICT_PARAM_RECOVERY_POLICY,
+                netw::NetwMultiplayer::PREDICT_PARAM_MODE,
                 3
             );
         }
         if (p_plant == PLANT_UNBUFFERED) {
             p_rig.server()->predict_set_param(
                 p_rig.entity_of(name),
-                netw::NetwMultiplayer::PREDICT_PARAM_REPLAY_BUFFER_DEPTH,
+                netw::NetwMultiplayer::PREDICT_PARAM_INPUT_BUFFER_TICKS,
                 0
             );
         }
         if (p_plant == PLANT_REPLAY_UNDER_SNAP) {
             owner_api->predict_set_param(
                 p_rig.entity_of(name, client),
-                netw::NetwMultiplayer::PREDICT_PARAM_RECOVERY_POLICY,
+                netw::NetwMultiplayer::PREDICT_PARAM_MODE,
                 int(netw::RecoveryPolicy::REBASE_REPLAY)
             );
         }
@@ -684,7 +684,9 @@ inline ScenarioRun ScenarioRun::session(
         }
         godot::Vector<godot::StringName> signals;
         signals.push_back("state_evaluated");
-        recorders.push_back(std::make_unique<Recorder>(handle, signals));
+        recorders.push_back(
+            std::make_unique<PredictionReports>(handle, signals)
+        );
     }
 
     for (int tick = 1; tick <= p_scenario.run_ticks; ++tick) {
@@ -825,14 +827,12 @@ inline ScenarioRun ScenarioRun::session(
             = p_rig.prediction_handle(track.name, track.client);
         netw::NetwPrediction *server_handle
             = p_rig.prediction_handle(track.name);
-        const godot::Ref<netw::NetwPredictStats> client_stats
-            = client_handle->get_stats();
-        const godot::Ref<netw::NetwPredictStats> server_stats
-            = server_handle->get_stats();
-        REQUIRE(client_stats.is_valid());
-        REQUIRE(server_stats.is_valid());
-        const godot::Dictionary client_facts = client_stats->to_dictionary();
-        const godot::Dictionary server_facts = server_stats->to_dictionary();
+        const godot::Dictionary client_facts
+            = Internals::predict_declaration(client_handle)
+                  .facts.to_dictionary();
+        const godot::Dictionary server_facts
+            = Internals::predict_declaration(server_handle)
+                  .facts.to_dictionary();
         const auto client_fact = [&](const char *p_name) {
             return client_facts[godot::StringName(p_name)];
         };
@@ -880,7 +880,7 @@ inline ScenarioRun ScenarioRun::session(
         track.lane.lane_joint_members = int(client_fact("joint_members"));
         track.lane.lane_epsilon = p_scenario.epsilon;
 
-        Recorder &recorder = *recorders[size_t(index)];
+        const Recorder &recorder = *recorders[size_t(index)];
         const int decisions = recorder.count("state_evaluated");
         run.judged += decisions;
         for (int emission = 0; emission < decisions; ++emission) {

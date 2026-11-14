@@ -254,7 +254,7 @@ public:
     explicit FlowRun(const FlowScenario &p_scenario) : declared(p_scenario) {
         netw_test::FaultWatch faults;
         if (p_scenario.body == netw_test::gdsrc::STATE_AND_INPUT) {
-            faults.expect_warning("*[NW1014]*", p_scenario.clients + 1);
+            faults.expect_warning("*[NW1038]*", p_scenario.clients + 1);
         }
         LoopbackRig rig(p_scenario.clients);
         rig.mount();

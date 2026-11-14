@@ -4,6 +4,7 @@
 
 #include "godot/local_vector.hpp"
 #include "godot/object.hpp"
+#include "godot/variant.hpp"
 #include "netw/sim/body.hpp"
 
 namespace netw::sim {
@@ -35,6 +36,10 @@ bool reports_contacts(const Bodies &p_bodies);
 void touching(
     const Bodies &p_bodies,
     godot::LocalVector<godot::ObjectID> &r_colliders
+);
+
+godot::Dictionary sample_contacts(
+    const godot::LocalVector<godot::ObjectID> &p_bodies
 );
 
 bool thawed(const Bodies &p_bodies);

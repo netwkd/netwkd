@@ -45,7 +45,7 @@ bool corrects(const Column &p_column, const Variant &p_predicted) {
     FieldDecl field;
     field.key = key;
     field.type = int(p_column.type);
-    field.epsilon_override = p_column.tolerance;
+    field.correction_threshold = p_column.tolerance;
     field.angle = p_column.angle;
     declared.push_back(field);
     const int64_t slot = pool.open(declared);

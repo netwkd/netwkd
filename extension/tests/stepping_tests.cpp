@@ -1,5 +1,7 @@
 #include "tests/compliance/laws.h"
 
+#include "godot/physics_body.hpp"
+
 #if defined(NETW_TIER_HOSTED)
 
 namespace TestStepping {
@@ -55,17 +57,13 @@ class Rock extends RigidBody3D:
 
 class Ball extends RigidBody3D:
 	var motion := 0
-	var policy: int:
-		get:
-			return NetwEntity.of(self).prediction.resolved_recovery_policy()
 
 	func _init() -> void:
 		gravity_scale = 0.0
 		var hull := CollisionShape3D.new()
 		hull.shape = SphereShape3D.new()
 		add_child(hull)
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"motion").input()
 
@@ -79,10 +77,12 @@ class Walker extends CharacterBody3D:
 		add_child(hull)
 		collision_layer = 0
 		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
 		entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
 		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"motion").input()
+
+	func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
+		pass
 )";
 
 constexpr int DRIVER = 0;
@@ -96,12 +96,20 @@ constexpr int LEFT = 40;
 constexpr int RELEASED = 42;
 constexpr int GONE = 60;
 
+Variant policy(Node *p_ball) {
+    return int(
+        netw::NetwMultiplayer::predict_resolve_mode(
+            netw::NetwEntity::of(p_ball).ptr()
+        )
+    );
+}
+
 World yard() {
     World world = World(YARD, 1)
                       .paced(60)
                       .watch("Level", "steps")
                       .watch("Rock", "height")
-                      .watch("Ball", "policy");
+                      .watch("Ball", "policy", &policy);
     for (const char *name : {"Ball", "Walker"}) {
         world.at(1, spawn(name, name))
             .at(1, control(name, DRIVER))
@@ -162,12 +170,17 @@ LawVerdict steps(const Seen &p_seen, int p_from, int p_to, int p_steps) {
     return law_held();
 }
 
-LawVerdict warned(const Seen &p_seen, const char *p_pattern, int p_times) {
+LawVerdict warned(
+    const Seen &p_seen,
+    const char *p_pattern,
+    int p_times,
+    int p_others
+) {
     int matched = 0;
     for (const String &line : p_seen.faults) {
         matched += line.match(p_pattern);
     }
-    if (matched != p_times || p_seen.faults.size() != p_times) {
+    if (matched != p_times || p_seen.faults.size() != p_times + p_others) {
         return law_broken(
             "%d of %d faults matched '%s', not %d",
             matched,
@@ -187,8 +200,9 @@ TEST_CASE(
     const bool steps_alone = netw::gd::can_step_space(3);
     NETW_HOLDS(warned(
         seen,
-        "*'Walker'*step physics on demand*[NW1017]*",
-        steps_alone ? 0 : PEERS
+        "*'Walker'*[NW1032]*",
+        steps_alone ? 0 : PEERS,
+        netw::gd::can_flush_kinematic() ? 0 : PEERS
     ));
     NETW_HOLDS(rock(seen, 2, BARE, true));
     for (int peer : {SERVER, DRIVER}) {
@@ -197,8 +211,8 @@ TEST_CASE(
             peer,
             "Ball",
             "policy",
-            steps_alone ? netw::NetwPrediction::RECOVERY_POLICY_REBASE_REPLAY
-                        : netw::NetwPrediction::RECOVERY_POLICY_REBASE_RECOVER,
+            steps_alone ? netw::NetwPrediction::MODE_ROLLBACK
+                        : netw::NetwPrediction::MODE_OFFSET,
             BARE
         ));
     }
@@ -216,7 +230,7 @@ TEST_CASE(
             peer,
             "Ball",
             "policy",
-            netw::NetwPrediction::RECOVERY_POLICY_REBASE_REPLAY,
+            netw::NetwPrediction::MODE_ROLLBACK,
             SETTLED
         ));
         NETW_HOLDS(reads(seen, peer, "Rock", "height", 8000, LEFT));
@@ -232,6 +246,87 @@ TEST_CASE(
     const Seen &seen = yard_frames.seen();
     NETW_HOLDS(rock(seen, LEFT, GONE, true));
     NETW_HOLDS(steps(seen, RELEASED, GONE, 0));
+}
+
+constexpr const char *PIT = R"(
+var rock := Rock.new()
+
+
+func _ready() -> void:
+	add_child(rock)
+
+
+class Rock extends RigidBody3D:
+	func _init() -> void:
+		name = &"Rock"
+		can_sleep = false
+		position = Vector3(0, 8, 0)
+		var hull := CollisionShape3D.new()
+		hull.shape = SphereShape3D.new()
+		add_child(hull)
+
+
+class Car extends RigidBody3D:
+	var motion := 0
+	var mode: int:
+		get:
+			return NetwEntity.of(self).simulation.mode
+
+	func _init() -> void:
+		gravity_scale = 0.0
+		var hull := CollisionShape3D.new()
+		hull.shape = SphereShape3D.new()
+		add_child(hull)
+		var entity := Netw.configure_entity(self)
+		entity.prediction.pause_on_unpredicted_contact = true
+		Netw.configure_property(self, &"position").state()
+		Netw.configure_property(self, &"motion").input()
+)";
+
+constexpr int FALLING = 20;
+constexpr int LANDED = 80;
+
+World pit() {
+    return World(PIT, 1)
+        .paced(60)
+        .watch("Car", "mode")
+        .at(1, spawn("Car", "Car"))
+        .at(1, control("Car", DRIVER));
+}
+
+NETW_FRAME_SCENARIO(WorldFrames, pit_frames, &pit, LANDED);
+
+LawVerdict pauses(const Seen &p_seen, int p_peer, const char *p_name) {
+    for (const Sight &held : p_seen.sights) {
+        if (held.peer == p_peer && held.name == String(p_name)
+            && held.tick > FALLING
+            && int(held.facts.get("mode", 0))
+                == netw::NetwSimulation::MODE_PROXY) {
+            return law_held();
+        }
+    }
+    return law_broken(
+        "%s kept predicting '%s' through the contact",
+        who(p_peer).c_str(),
+        p_name
+    );
+}
+
+TEST_CASE(
+    "[Networked][Predict][Frame] T4 a predicted body that pauses on an "
+    "unpredicted contact follows the server once a body no peer replicates "
+    "lands on it"
+) {
+    const Seen &seen = pit_frames.seen();
+    NETW_HOLDS(reads(
+        seen,
+        DRIVER,
+        "Car",
+        "mode",
+        netw::NetwSimulation::MODE_PREDICT,
+        FALLING
+    ));
+    NETW_HOLDS(pauses(seen, DRIVER, "Car"));
 }
 
 } // namespace TestStepping

@@ -1,0 +1,35 @@
+:github_url: hide
+
+.. _fault_nw1035:
+
+NW1035. A predicted entity has broadcast properties
+===================================================
+
+Reported as a warning when a predicted entity declares a property with
+:ref:`broadcast <class_NetwPropertyConfig_method_broadcast>`. The server
+keeps no history of such a property and never corrects it. The log line
+lists the properties.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state()
+        Netw.configure_property(self, &"velocity").broadcast()
+        Netw.configure_property(self, &"move").input()
+
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+        velocity = velocity.move_toward(move * SPEED, ACCELERATION * delta)
+        position += velocity * delta
+
+Use :ref:`state <class_NetwPropertyConfig_method_state>` on a property that
+changes how the entity moves.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state()
+        Netw.configure_property(self, &"velocity").state()
+        Netw.configure_property(self, &"move").input()
+
+A property that only changes how the entity looks, such as an aim direction,
+can stay ``broadcast``.

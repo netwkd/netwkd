@@ -1,0 +1,30 @@
+:github_url: hide
+
+.. _fault_nw1030:
+
+NW1030. A client requested an action and the server has no lag compensation
+===========================================================================
+
+Reported as a warning on the server when a client sends a
+:ref:`NetwAction <class_NetwAction>` request and lag compensation never
+started there. The request was dropped. The log line names the peer and the
+entity.
+
+Lag compensation starts by itself on a peer that predicts an entity or
+requests an action. A server that does neither starts it with
+:ref:`Netw.configure_lagcomp <class_Netw_method_configure_lagcomp>`.
+
+.. code-block:: gdscript
+
+    @onready var fire := Netw.action(_fire)
+
+    func _unhandled_input(event: InputEvent) -> void:
+        if event.is_action_pressed("fire"):
+            fire.request(session.clock.tick)
+
+Call it on the server before the session starts.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_lagcomp(self)

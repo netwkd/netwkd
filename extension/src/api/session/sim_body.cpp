@@ -17,8 +17,8 @@ namespace netw {
 
 namespace {
 
-const StringName &network_tick_name() {
-    static const StringName name("_network_tick");
+const StringName &network_process_name() {
+    static const StringName name("_network_process");
     return name;
 }
 
@@ -87,7 +87,7 @@ void NetwMultiplayer::sim_settle_body(const Ref<NetwEntity> &p_entity) {
             display_config_for(p_entity).visual_root
         );
         row.bodies.residents = &store().residents;
-        row.owner_ticks = owner->has_method(network_tick_name());
+        row.owner_ticks = owner->has_method(network_process_name());
         row.follows_control = true;
         sim_watch_sleep(row, true);
         if (display::Runtime *runtime = display_book->runtime_of(entity)) {

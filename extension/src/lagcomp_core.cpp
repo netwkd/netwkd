@@ -60,8 +60,10 @@ void report_write_inside(Object *p_owner, const Dictionary &p_wrote) {
             nullptr,
             NETW_FAULT_REWIND_MISUSE,
             {vformat("%s.%s", String(node->get_name()), String(key)),
-             "a change inside the rewind",
-             "a change after the rewind returns"},
+             String(),
+             String(),
+             0,
+             NETW_REWIND_CHANGED_INSIDE},
             gd::instance_id(node)
         );
         return;

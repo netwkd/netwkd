@@ -2,15 +2,48 @@
 
 .. _fault_nw1015:
 
-NW1015. A rewind does not handle a node as declared
-===================================================
+NW1015. A rewind or an effect was used in a way that does not work
+==================================================================
 
-Reported as a warning when a rewind meets a node, property or effect it
-cannot handle the way it was declared. The reasons include ``sync_to_physics``,
-a change made inside the rewind, and an ``await`` in the rewind body.
+Reported as a warning by :ref:`Netw.rewind <class_Netw_method_rewind>` and by
+:ref:`lagcomp_effect_watch <class_NetwMultiplayer_method_lagcomp_effect_watch>`.
+The log line names the node, property or effect and gives one of five
+reasons.
 
-The rewind handles it another way. The log line names the node and the reason.
+- **A node has sync_to_physics on.** A rewind cannot move it for a physics
+  query. Turn ``sync_to_physics`` off and move the node in
+  ``_network_process``.
+- **A collider is under the visual root.** A rewind leaves it where the body
+  is drawn. Move it to a parent outside
+  :ref:`NetwDisplay.visual_root <class_NetwDisplay_property_visual_root>`.
+- **A state property was changed inside the body.** The rewind put it back.
+  Change it after ``Netw.rewind`` returns.
+- **The body awaited.** The rest of it ran after the rewind ended. Remove the
+  ``await``.
+- **An effect is not armed.** ``lagcomp_effect_watch`` watches nothing. Call
+  :ref:`lagcomp_effect_arm <class_NetwMultiplayer_method_lagcomp_effect_arm>`
+  with that key first.
 
-Use what the log line asks for. For a display node that sits under the node
-it follows, use a parent outside
-:ref:`NetwDisplay.visual_root <class_NetwDisplay_property_visual_root>`.
+This body changes ``health``, a state property, while the targets stand in
+the past.
+
+.. code-block:: gdscript
+
+    func _fire(ctx: NetwActionContext, origin: Vector3, aim: Vector3) -> void:
+        var ray := PhysicsRayQueryParameters3D.create(origin, origin + aim)
+        Netw.rewind(targets, ctx.view_tick, func() -> void:
+            var hit := get_world_3d().direct_space_state.intersect_ray(ray)
+            if hit:
+                (hit.collider.owner as Player).health -= DAMAGE)
+
+Return what the query found, and change the property afterwards.
+
+.. code-block:: gdscript
+
+    func _fire(ctx: NetwActionContext, origin: Vector3, aim: Vector3) -> void:
+        var ray := PhysicsRayQueryParameters3D.create(origin, origin + aim)
+        var hit: Dictionary = Netw.rewind(targets, ctx.view_tick,
+                func() -> Dictionary:
+                    return get_world_3d().direct_space_state.intersect_ray(ray))
+        if hit:
+            (hit.collider.owner as Player).health -= DAMAGE

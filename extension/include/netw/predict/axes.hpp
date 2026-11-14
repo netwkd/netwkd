@@ -17,34 +17,26 @@ enum class SimMode : int {
     DISPLAY = 2,
 };
 
-enum class Archetype : int {
-    NONE = 0,
-    KINEMATIC = 1,
-    SOLVER_BODY = 2,
+struct KindDefaults {
+    bool repeat_missing_input = false;
+    double teleport_threshold = 2.0;
+    bool restore_extrapolated = false;
+    bool tolerates_quantizer_steps = false;
+    bool gates_physics = false;
+    bool samples_contacts = false;
 };
 
-struct ArchetypeAxes {
-    bool declared = false;
-    int schedule = int(Schedule::TICK);
-    int missing_policy = int(MissingInput::STALL);
-    int recovery_policy = int(RecoveryPolicy::REBASE_REPLAY);
-    int snap_restore = int(RestoreMode::EXACT);
-    double teleport_threshold = 0.0;
-    bool declares_snap_restore = false;
-    bool declares_teleport_threshold = false;
-};
-
-ArchetypeAxes archetype_axes(int p_archetype);
+KindDefaults kind_defaults(bool p_physics_driven);
 
 int role_for_axes(int p_input_source, int p_sim_mode);
 
-int correction_for_recovery_policy(int p_policy);
+int correction_for_mode(int p_policy);
 
-int resolve_recovery_policy(int p_policy, bool p_solves, int p_schedule);
+int resolve_mode(int p_policy, bool p_solves, int p_schedule);
 
 bool replays_without_integration(int p_schedule, bool p_solves);
 
-int integrable_recovery_policy(int p_policy, int p_schedule, bool p_solves);
+int integrable_mode(int p_policy, int p_schedule, bool p_solves);
 
 int integrable_correction(int p_correction, int p_schedule, bool p_solves);
 

@@ -6,10 +6,14 @@ NW1008. A call ran while the session applied its settings
 =========================================================
 
 Reported as an error when a call runs from a callback that reacts to the
-session applying its ``Netw`` settings, or from inside a simulation step that
-adds or removes a predicted entity.
+session applying its ``Netw`` settings.
 
 The call did nothing. The log line names the call.
+
+.. code-block:: gdscript
+
+    func _on_scene_ready() -> void:
+        reconfigure()
 
 Call it outside the callbacks that react to those settings.
 

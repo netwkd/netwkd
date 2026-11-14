@@ -111,25 +111,17 @@ class Runner extends Node3D:
 	var beat := 0
 
 	func _init() -> void:
-		var entity := Netw.configure_entity(self)
-		if scripted():
-			entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"motion").input()
 
-	func scripted() -> bool:
-		return true
-
-	func _network_tick(_delta: float, _tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, _tick: int, is_fresh: bool) -> void:
 		if is_fresh:
 			beat += 1
 		position.x += 0.25 * motion
 
 
 class Declared extends Runner:
-	func scripted() -> bool:
-		return false
-
 	func _ready() -> void:
 		var session := multiplayer as NetwMultiplayer
 		if session.predict_declare(session.entity_attach(self)) != OK:

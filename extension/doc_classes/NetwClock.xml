@@ -115,7 +115,7 @@
 			<param index="0" name="delta" type="float" />
 			<param index="1" name="tick" type="int" />
 			<description>
-				Emitted after every entity ran [code]_network_tick[/code] for [param tick]. Read results here.
+				Emitted after every entity ran [code]_network_process[/code] for [param tick]. Read results here.
 			</description>
 		</signal>
 		<signal name="tickrate_mismatch">

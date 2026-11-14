@@ -787,10 +787,10 @@ void NetwNativeTests::tracker_book_clear() {
 
 Dictionary NetwNativeTests::prediction_stats(Object *p_handle) {
     const NetwPrediction *handle = Object::cast_to<NetwPrediction>(p_handle);
-    if (handle == nullptr || handle->get_stats().is_null()) {
-        return Dictionary();
-    }
-    return handle->get_stats()->to_dictionary();
+    const predict::Decl *decl = handle != nullptr
+        ? NetwMultiplayer::predict_find_declaration(handle->get_entity().ptr())
+        : nullptr;
+    return decl != nullptr ? decl->facts.to_dictionary() : Dictionary();
 }
 
 void NetwNativeTests::attribution_arm(NetwMultiplayer *p_session) {

@@ -1,32 +1,18 @@
 #include "netw/predict/axes.hpp"
 
-#include "netw/sim/row.hpp"
-
 namespace netw::predict {
 
-ArchetypeAxes archetype_axes(int p_archetype) {
-    ArchetypeAxes axes;
-    switch (Archetype(p_archetype)) {
-        case Archetype::KINEMATIC: {
-            axes.declared = true;
-            axes.schedule = int(Schedule::TICK);
-            axes.missing_policy = int(MissingInput::STALL);
-            axes.recovery_policy = int(RecoveryPolicy::REBASE_REPLAY);
-        } break;
-        case Archetype::SOLVER_BODY: {
-            axes.declared = true;
-            axes.schedule = int(sim::Schedule::AUTO);
-            axes.missing_policy = int(MissingInput::REPEAT_LAST);
-            axes.recovery_policy = int(RecoveryPolicy::AUTO);
-            axes.snap_restore = int(RestoreMode::EXTRAPOLATED);
-            axes.declares_snap_restore = true;
-            axes.teleport_threshold = 3.0;
-            axes.declares_teleport_threshold = true;
-        } break;
-        default:
-            break;
+KindDefaults kind_defaults(bool p_physics_driven) {
+    KindDefaults defaults;
+    if (p_physics_driven) {
+        defaults.repeat_missing_input = true;
+        defaults.teleport_threshold = 3.0;
+        defaults.restore_extrapolated = true;
+        defaults.tolerates_quantizer_steps = true;
+        defaults.gates_physics = true;
+        defaults.samples_contacts = true;
     }
-    return axes;
+    return defaults;
 }
 
 int role_for_axes(int p_input_source, int p_sim_mode) {
@@ -52,7 +38,7 @@ int role_for_axes(int p_input_source, int p_sim_mode) {
     return int(Role::REMOTE);
 }
 
-int correction_for_recovery_policy(int p_policy) {
+int correction_for_mode(int p_policy) {
     switch (RecoveryPolicy(p_policy)) {
         case RecoveryPolicy::AUTO:
             return int(CorrectionMode::AUTO);
@@ -63,7 +49,7 @@ int correction_for_recovery_policy(int p_policy) {
     }
 }
 
-int resolve_recovery_policy(int p_policy, bool p_solves, int p_schedule) {
+int resolve_mode(int p_policy, bool p_solves, int p_schedule) {
     if (p_policy != int(RecoveryPolicy::AUTO)) {
         return p_policy;
     }
@@ -76,7 +62,7 @@ bool replays_without_integration(int p_schedule, bool p_solves) {
     return p_solves && p_schedule == int(Schedule::FRAME);
 }
 
-int integrable_recovery_policy(int p_policy, int p_schedule, bool p_solves) {
+int integrable_mode(int p_policy, int p_schedule, bool p_solves) {
     return p_policy == int(RecoveryPolicy::REBASE_REPLAY)
             && replays_without_integration(p_schedule, p_solves)
         ? int(RecoveryPolicy::REBASE_RECOVER)

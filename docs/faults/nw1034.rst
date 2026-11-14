@@ -1,0 +1,28 @@
+:github_url: hide
+
+.. _fault_nw1034:
+
+NW1034. A collision was reported by an entity that simulates nothing else
+=========================================================================
+
+Reported as a warning the first time a predicting client calls
+:ref:`NetwPrediction.notify_collision <class_NetwPrediction_method_notify_collision>`
+on an entity that selects no other entity. When the body it hit is an
+entity, this client does not simulate that entity, so the collision is
+predicted against a frozen copy.
+
+.. code-block:: gdscript
+
+    func _on_body_entered(body: Node) -> void:
+        entity.prediction.notify_collision()
+
+When it hit an entity, select that entity. Put both in one
+:ref:`NetwInterestLayer <class_NetwInterestLayer>`, or pass it to
+:ref:`NetwSimulation.simulate <class_NetwSimulation_method_simulate>`.
+
+.. code-block:: gdscript
+
+    func _ready() -> void:
+        entity.simulation.simulate(NetwEntity.of(ball))
+
+A collision with level geometry needs no change.

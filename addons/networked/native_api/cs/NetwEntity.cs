@@ -91,7 +91,7 @@ namespace Networked;
 /// func _init() -&gt; void:
 ///     var entity := Netw.configure_entity(self)
 ///     entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
-///     entity.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
+///     entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
 /// </code>
 /// </para>
 /// </remarks>
@@ -663,9 +663,10 @@ public sealed class NetwEntity : NetwRefCounted
     /// Who may spawn, move and despawn this entity. Set it in <c>_init</c>
     /// beside <see cref="NetwEntity.Transfer"/>. A refused call pushes an error
     /// and returns its failure value. <see cref="Node.Reparent"/> cannot be
-    /// refused, so it warns and the move stays on this peer. During a
-    /// prediction replay these calls return <c>@GlobalScope.ERR_BUSY</c> with
-    /// no error, so a predicted step spawns only on a fresh tick.
+    /// refused, so it warns and the move stays on this peer. During a rollback
+    /// these calls return <c>@GlobalScope.ERR_BUSY</c> with no error, so
+    /// <see cref="NetwSimulation.NetworkProcess"/> spawns only the first time a
+    /// tick runs.
     /// <code>
     /// func _init() -&gt; void:
     ///     var entity := Netw.configure_entity(self)

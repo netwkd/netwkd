@@ -6,7 +6,6 @@
 #include "godot/math.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/colors.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/project.hpp"
@@ -266,54 +265,46 @@ void History::notice() {
     }
 }
 
-void History::record(int64_t tick, const Variant &value, bool authoring_tick) {
+bool History::record(int64_t tick, const Variant &value, bool authoring_tick) {
     NETW_ZONE_LEAF(
         "Display history record",
         colors::INTERP,
         profile::SUBSYSTEM_INTERPOLATION
     );
     if (world != nullptr) {
-        return;
+        return true;
     }
     source_rested = false;
     const int domain = authoring_tick ? 1 : 0;
     if (tick_domain == -1) {
         tick_domain = domain;
     } else {
-        NETW_BUG_COND(tick_domain != domain);
+        NETW_BUG_COND_V(tick_domain != domain, true);
     }
 
     const int type = value.get_type();
     if (value_type == Variant::NIL) {
         value_type = type;
-    } else {
-        if (value_type != type) {
-            fault::raise(
-                nullptr,
-                NETW_FAULT_INTERPOLATION_IGNORED,
-                {String("An interpolated property"),
-                 String("a change of its type"),
-                 String("a static type on the property")}
-            );
-            return;
-        }
+    } else if (value_type != type) {
+        return false;
     }
 
     if (has_recorded && value == last_recorded) {
-        return;
+        return true;
     }
     ring.record(tick, value);
     last_recorded = value;
     has_recorded = true;
     sleeping = false;
+    return true;
 }
 
-void History::record_every_tick(int64_t tick, const Variant &value) {
+bool History::record_every_tick(int64_t tick, const Variant &value) {
     if (world == nullptr && has_recorded && value != last_recorded
         && ring.size() > 0 && ring.tick_of_age(0) < tick - 1) {
         ring.record(tick - 1, last_recorded);
     }
-    record(tick, value, false);
+    return record(tick, value, false);
 }
 
 void History::clear() {

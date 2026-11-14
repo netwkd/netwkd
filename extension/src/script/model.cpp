@@ -16,7 +16,6 @@ namespace {
 
 struct NodeOverlay {
     Dictionary configs;
-    Dictionary carry;
     Ref<NetwPersistenceConfig> persistence;
     uint64_t property_revision = 1;
 };
@@ -194,18 +193,6 @@ void declare_scene(const Ref<Script> &p_script, const SceneDecl &p_decl) {
     registry::declare_scene(p_script, p_decl);
 }
 
-void bind_node_property_carry(
-    Node *p_node,
-    const StringName &p_property,
-    const Callable &p_step
-) {
-    NodeOverlay *overlay = overlay_for(p_node, true);
-    if (overlay == nullptr) {
-        return;
-    }
-    overlay->carry[p_property] = p_step;
-}
-
 Ref<NetwMemberConfig> get_rpc_options(
     const Ref<Script> &p_script,
     const StringName &p_method
@@ -338,14 +325,6 @@ Ref<NetwInterpolate> get_node_property_interpolator(
         }
     }
     return get_property_interpolator(script_of(p_node), p_property);
-}
-
-Callable get_node_property_carry(Node *p_node, const StringName &p_property) {
-    const NodeOverlay *overlay = overlay_for(p_node, false);
-    if (overlay == nullptr) {
-        return Callable();
-    }
-    return overlay->carry.get(p_property, Callable());
 }
 
 void clear_node_overlay(Node *p_node) {

@@ -35,19 +35,17 @@ const char *KEY_LAG_ADAPT_RATE = "netw_lag_adapt_rate";
 const char *KEY_FLOOR_SMOOTHING = "netw_floor_smoothing";
 const char *KEY_TRACE_INTERVAL = "netw_trace_interval";
 
-const char *KEY_ARCHETYPE = "netw_archetype";
 const char *KEY_SCHEDULE = "netw_schedule";
-const char *KEY_RECOVERY_POLICY = "netw_recovery_policy";
-const char *KEY_SNAP_RESTORE = "netw_snap_restore";
-const char *KEY_MISSING_POLICY = "netw_missing_policy";
+const char *KEY_MODE = "netw_mode";
+const char *KEY_RESTORE = "netw_restore";
+const char *KEY_REPEAT_MISSING_INPUT = "netw_repeat_missing_input";
 const char *KEY_MAX_RESTORE_TICKS = "netw_max_restore_ticks";
-const char *KEY_DIVERGENCE_EPSILON = "netw_divergence_epsilon";
+const char *KEY_CORRECTION_THRESHOLD = "netw_correction_threshold";
 const char *KEY_TELEPORT_THRESHOLD = "netw_teleport_threshold";
-const char *KEY_COLLISION_COOLDOWN = "netw_collision_cooldown_ticks";
-const char *KEY_MAX_CONSUME_PER_TICK = "netw_max_consume_per_tick";
-const char *KEY_MAX_CONSUME_LAG_TICKS = "netw_max_consume_lag_ticks";
-const char *KEY_CONSUME_BUFFER_TICKS = "netw_consume_buffer_ticks";
-const char *KEY_REPLAY_BUFFER_DEPTH = "netw_replay_buffer_depth";
+const char *KEY_CORRECTION_COOLDOWN = "netw_correction_cooldown_ticks";
+const char *KEY_MAX_INPUTS_PER_TICK = "netw_max_inputs_per_tick";
+const char *KEY_MAX_INPUT_LAG_TICKS = "netw_max_input_lag_ticks";
+const char *KEY_INPUT_BUFFER_TICKS = "netw_input_buffer_ticks";
 
 const char *KEY_TRANSFER = "netw_control_transfer";
 const char *KEY_ON_DISCONNECT = "netw_on_controller_disconnect";
@@ -150,19 +148,17 @@ void apply_timeline(
 }
 
 const char *PREDICTION_KEYS[] = {
-    KEY_ARCHETYPE,
     KEY_SCHEDULE,
-    KEY_RECOVERY_POLICY,
-    KEY_SNAP_RESTORE,
-    KEY_MISSING_POLICY,
+    KEY_MODE,
+    KEY_RESTORE,
+    KEY_REPEAT_MISSING_INPUT,
     KEY_MAX_RESTORE_TICKS,
-    KEY_DIVERGENCE_EPSILON,
+    KEY_CORRECTION_THRESHOLD,
     KEY_TELEPORT_THRESHOLD,
-    KEY_COLLISION_COOLDOWN,
-    KEY_MAX_CONSUME_PER_TICK,
-    KEY_MAX_CONSUME_LAG_TICKS,
-    KEY_CONSUME_BUFFER_TICKS,
-    KEY_REPLAY_BUFFER_DEPTH,
+    KEY_CORRECTION_COOLDOWN,
+    KEY_MAX_INPUTS_PER_TICK,
+    KEY_MAX_INPUT_LAG_TICKS,
+    KEY_INPUT_BUFFER_TICKS,
 };
 
 bool prediction_declared(Object *p_sync) {
@@ -179,31 +175,19 @@ void apply_prediction(Object *p_sync, const Ref<NetwEntity> &p_entity) {
     if (predict.is_null()) {
         return;
     }
-    if (declared(p_sync, KEY_MAX_CONSUME_PER_TICK)) {
-        predict->set_max_consume_per_tick(
-            int(whole(p_sync, KEY_MAX_CONSUME_PER_TICK))
+    if (declared(p_sync, KEY_MAX_INPUTS_PER_TICK)) {
+        predict->set_max_inputs_per_tick(
+            int(whole(p_sync, KEY_MAX_INPUTS_PER_TICK))
         );
     }
-    if (declared(p_sync, KEY_MAX_CONSUME_LAG_TICKS)) {
-        predict->set_max_consume_lag_ticks(
-            int(whole(p_sync, KEY_MAX_CONSUME_LAG_TICKS))
+    if (declared(p_sync, KEY_MAX_INPUT_LAG_TICKS)) {
+        predict->set_max_input_lag_ticks(
+            int(whole(p_sync, KEY_MAX_INPUT_LAG_TICKS))
         );
     }
-    if (declared(p_sync, KEY_CONSUME_BUFFER_TICKS)) {
-        predict->set_consume_buffer_ticks(
-            int(whole(p_sync, KEY_CONSUME_BUFFER_TICKS))
-        );
-    }
-    if (declared(p_sync, KEY_REPLAY_BUFFER_DEPTH)) {
-        predict->set_replay_buffer_depth(
-            int(whole(p_sync, KEY_REPLAY_BUFFER_DEPTH))
-        );
-    }
-    if (declared(p_sync, KEY_ARCHETYPE)) {
-        predict->set_archetype(
-            static_cast<NetwPrediction::Archetype>(
-                int(whole(p_sync, KEY_ARCHETYPE))
-            )
+    if (declared(p_sync, KEY_INPUT_BUFFER_TICKS)) {
+        predict->set_input_buffer_ticks(
+            int(whole(p_sync, KEY_INPUT_BUFFER_TICKS))
         );
     }
     const Ref<NetwSimulation> simulation = p_entity->get_simulation();
@@ -212,23 +196,19 @@ void apply_prediction(Object *p_sync, const Ref<NetwEntity> &p_entity) {
             NetwSimulation::Schedule(whole(p_sync, KEY_SCHEDULE))
         );
     }
-    if (declared(p_sync, KEY_RECOVERY_POLICY)) {
-        predict->set_recovery_policy(
-            static_cast<NetwPrediction::RecoveryPolicy>(
-                int(whole(p_sync, KEY_RECOVERY_POLICY))
-            )
+    if (declared(p_sync, KEY_MODE)) {
+        predict->set_mode(
+            static_cast<NetwPrediction::Mode>(int(whole(p_sync, KEY_MODE)))
         );
     }
-    if (declared(p_sync, KEY_SNAP_RESTORE) && simulation.is_valid()) {
+    if (declared(p_sync, KEY_RESTORE) && simulation.is_valid()) {
         simulation->set_restore(
-            NetwSimulation::Restore(whole(p_sync, KEY_SNAP_RESTORE))
+            NetwSimulation::Restore(whole(p_sync, KEY_RESTORE))
         );
     }
-    if (declared(p_sync, KEY_MISSING_POLICY)) {
-        predict->set_missing_policy(
-            static_cast<NetwPrediction::MissingInput>(
-                int(whole(p_sync, KEY_MISSING_POLICY))
-            )
+    if (declared(p_sync, KEY_REPEAT_MISSING_INPUT)) {
+        predict->set_repeat_missing_input(
+            bool(p_sync->get_meta(StringName(KEY_REPEAT_MISSING_INPUT)))
         );
     }
     if (declared(p_sync, KEY_MAX_RESTORE_TICKS) && simulation.is_valid()) {
@@ -236,15 +216,17 @@ void apply_prediction(Object *p_sync, const Ref<NetwEntity> &p_entity) {
             int(whole(p_sync, KEY_MAX_RESTORE_TICKS))
         );
     }
-    if (declared(p_sync, KEY_DIVERGENCE_EPSILON)) {
-        predict->set_divergence_epsilon(real(p_sync, KEY_DIVERGENCE_EPSILON));
+    if (declared(p_sync, KEY_CORRECTION_THRESHOLD)) {
+        predict->set_correction_threshold(
+            real(p_sync, KEY_CORRECTION_THRESHOLD)
+        );
     }
     if (declared(p_sync, KEY_TELEPORT_THRESHOLD)) {
         predict->set_teleport_threshold(real(p_sync, KEY_TELEPORT_THRESHOLD));
     }
-    if (declared(p_sync, KEY_COLLISION_COOLDOWN)) {
-        predict->set_collision_cooldown_ticks(
-            int(whole(p_sync, KEY_COLLISION_COOLDOWN))
+    if (declared(p_sync, KEY_CORRECTION_COOLDOWN)) {
+        predict->set_correction_cooldown_ticks(
+            int(whole(p_sync, KEY_CORRECTION_COOLDOWN))
         );
     }
 }

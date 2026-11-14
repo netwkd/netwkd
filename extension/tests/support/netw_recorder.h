@@ -1,5 +1,6 @@
 #pragma once
 
+#include "internals.h"
 #include "netw_test.h"
 
 #include <memory>
@@ -8,7 +9,11 @@
 #include "godot/object.hpp"
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
+#include "netw/api/entity.hpp"
+#include "netw/api/entity_record.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/prediction.hpp"
+#include "netw/predict/decl.hpp"
 
 namespace netw_test {
 
@@ -88,7 +93,11 @@ public:
 
 class Recorder {
     godot::Object *source = nullptr;
+
+protected:
     std::shared_ptr<RecorderLog> log;
+
+private:
     godot::Vector<godot::StringName> signals;
     godot::Vector<godot::Callable> callables;
 
@@ -162,6 +171,44 @@ public:
 
     void clear() {
         log->emissions.clear();
+    }
+};
+
+class PredictionReports : public Recorder {
+    godot::ObjectID reported;
+
+public:
+    PredictionReports(
+        netw::NetwPrediction *p_handle,
+        const godot::Vector<godot::StringName> &p_reports
+    )
+        : Recorder(p_handle, godot::Vector<godot::StringName>()) {
+        const godot::Ref<netw::NetwEntity> entity = p_handle->get_entity();
+        REQUIRE(entity.is_valid());
+        reported = entity->get_instance_id();
+        const std::shared_ptr<RecorderLog> into = log;
+        Internals::record(entity.ptr())->predict_declaration().test_report
+            = [into, p_reports](
+                  const godot::StringName &p_name,
+                  const godot::Array &p_facts
+              ) {
+                  if (p_reports.has(p_name)) {
+                      into->emissions.push_back({p_name, p_facts});
+                  }
+              };
+    }
+
+    ~PredictionReports() {
+        const netw::NetwEntity *entity
+            = godot::Object::cast_to<netw::NetwEntity>(
+                netw::gd::object_of(reported)
+            );
+        netw::predict::Decl *decl = entity != nullptr
+            ? Internals::record(entity)->find_predict_declaration()
+            : nullptr;
+        if (decl != nullptr) {
+            decl->test_report = nullptr;
+        }
     }
 };
 

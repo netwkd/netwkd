@@ -98,24 +98,24 @@ func _init() -> void:
 	)
 	Netw.configure_property(self, &"jumping").input()
 
-	Netw.configure_property(self, &"position").state().masked().causal() \
-			.on_spawn().teleport_at(1.5) \
+	Netw.configure_property(self, &"position").state() \
+			.on_spawn().teleport_threshold(1.5) \
 			.quantize(NetwQuantizeScalar.new().bits(19).limits(-128.0, 128.0)) \
 			.interpolate(
 				NetwInterpolate.new().lerp().snap_at(3.0) \
 						.project_by(&"linear_velocity"),
 			)
-	Netw.configure_property(self, &"quaternion").state().masked().causal() \
+	Netw.configure_property(self, &"quaternion").state() \
 			.on_spawn() \
 			.quantize(NetwQuantizeQuaternion.new().bits(16)) \
 			.interpolate(NetwInterpolate.new().slerp())
-	Netw.configure_property(self, &"linear_velocity").state().masked() \
-			.causal().teleport_only() \
+	Netw.configure_property(self, &"linear_velocity").state() \
+			.teleport_only() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-128.0, 128.0))
-	Netw.configure_property(self, &"angular_velocity").state().masked() \
-			.causal().teleport_only() \
+	Netw.configure_property(self, &"angular_velocity").state() \
+			.teleport_only() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-64.0, 64.0))
-	Netw.configure_property(self, &"sleeping").state().masked().causal()
+	Netw.configure_property(self, &"sleeping").state()
 
 	for spring: StringName in [
 		&"spring_fl",
@@ -123,27 +123,20 @@ func _init() -> void:
 		&"spring_rl",
 		&"spring_rr",
 	]:
-		Netw.configure_property(self, spring).state().masked().causal() \
-				.reconcile_only() \
+		Netw.configure_property(self, spring).state() \
+				.unchecked() \
 				.quantize(NetwQuantizeScalar.new().bits(12).limits(0.0, 1.0))
-	Netw.configure_property(self, &"steer_angle").state().masked().causal() \
-			.reconcile_only() \
+	Netw.configure_property(self, &"steer_angle").state() \
+			.unchecked() \
 			.quantize(NetwQuantizeAngle.new().bits(12).centered())
 
 	e.interest.join(&"arena")
-
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
-	if PhysicsServer3D.has_method(&"space_step"):
-		e.prediction.reconcile_mode = NetwPrediction.RECONCILE_JOINT
-	e.prediction.witness_contacts = sample_contacts
 	e.display.visual_root = ^"Car_model"
 
 
 func _ready() -> void:
 	var clock: NetwClock = session.clock
 	clock.before_tick.connect(gather_input)
-	contact_monitor = true
-	max_contacts_reported = 8
 
 	set_color(TEAM_COLORS[team])
 
@@ -177,7 +170,7 @@ func _process(_delta: float) -> void:
 		wheels[i].sync_visual(wheel_visuals[i])
 
 
-func _network_tick(delta: float, tick: int, _is_fresh: bool) -> void:
+func _network_process(delta: float, tick: int, _is_fresh: bool) -> void:
 	if tick < game.kickoff_tick:
 		take_kickoff_position()
 		return
@@ -238,12 +231,3 @@ func set_color(color: Color) -> void:
 			as StandardMaterial3D
 	painted.albedo_color = color
 	mesh.set_surface_override_material(0, painted)
-
-
-func sample_contacts() -> Dictionary:
-	return {
-		colliders = get_colliding_bodies(),
-		sleeping = state.sleeping,
-		collision_layer = collision_layer,
-		collision_mask = collision_mask,
-	}

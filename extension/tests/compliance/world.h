@@ -479,6 +479,7 @@ class World {
     };
 
     typedef std::pair<godot::String, godot::String> Named;
+    typedef godot::Variant (*Reader)(godot::Node *);
 
     const char *game = nullptr;
     int clients = 0;
@@ -487,6 +488,7 @@ class World {
     int mode = -1;
     std::vector<Timed> steps;
     std::vector<Named> watched;
+    std::vector<std::pair<Named, Reader>> read;
     std::vector<Named> listened;
     std::shared_ptr<Live> live;
     Seen evidence;
@@ -554,6 +556,11 @@ class World {
                 sight.facts[row.second] = p_node->get(row.second);
             }
         }
+        for (const std::pair<Named, Reader> &row : read) {
+            if (row.first.first == sight.name) {
+                sight.facts[row.first.second] = row.second(p_node);
+            }
+        }
         if (rooted) {
             const godot::Ref<netw::NetwPlayer> controller
                 = entity->get_controller_player();
@@ -581,6 +588,11 @@ public:
 
     World &watch(const char *p_node, const char *p_property) {
         watched.push_back({p_node, p_property});
+        return *this;
+    }
+
+    World &watch(const char *p_node, const char *p_fact, Reader p_read) {
+        read.push_back({{p_node, p_fact}, p_read});
         return *this;
     }
 

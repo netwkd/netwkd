@@ -151,9 +151,7 @@ Other classes
     class_netwpersistenceconfig
     class_netwphysicsstepper
     class_netwplayer
-    class_netwpredictcarrycontext
     class_netwprediction
-    class_netwpredictstats
     class_netwproberesult
     class_netwpromise
     class_netwpropertyconfig

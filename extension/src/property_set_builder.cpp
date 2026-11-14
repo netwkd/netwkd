@@ -182,13 +182,12 @@ bool from_property_configs(
             config->get_lane() == PropertySet::RETAINED,
             NetwMultiplayer::ColumnType(SchemaCore::VARIANT)
         );
-        column.property_class = config->get_property_class();
-        column.converge_stiffness = config->get_converge_stiffness();
-        column.carry_channel = config->get_carry_channel();
+        column.unchecked = config->get_unchecked();
+        column.correction_weight = config->get_correction_weight();
+        column.rate_property = config->get_rate_property();
         column.explicit_teleport_only = config->get_explicit_teleport_only();
-        column.explicit_reconcile_only = config->get_explicit_reconcile_only();
-        column.epsilon_override = config->get_epsilon_override();
-        column.teleport_at_override = config->get_teleport_at_override();
+        column.correction_threshold = config->get_correction_threshold();
+        column.teleport_threshold = config->get_teleport_threshold();
         set->bind_column(column);
 
         if (config->is_policy_declared()) {

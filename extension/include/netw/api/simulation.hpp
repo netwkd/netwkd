@@ -74,8 +74,10 @@ public:
     void set_claim_on_contact(bool p_value);
     double get_release_on_rest() const;
     void set_release_on_rest(double p_value);
-    godot::Callable get_step() const;
-    void set_step(const godot::Callable &p_value);
+    bool get_physics_driven() const;
+    void set_physics_driven(bool p_value);
+    godot::Callable get_network_process() const;
+    void set_network_process(const godot::Callable &p_value);
     Mode get_mode() const;
     godot::TypedArray<NetwEntity> get_selected() const;
 

@@ -16,6 +16,7 @@
 #include "netw/interest/decl.hpp"
 #include "netw/log.hpp"
 #include "netw/persist/binding.hpp"
+#include "netw/predict/decl.hpp"
 #include "netw/profile.hpp"
 #include "netw/spawn/record.hpp"
 #include "netw/tree_hook.hpp"
@@ -155,35 +156,48 @@ void NetwMultiplayer::prediction_emit(
     if (p_prediction == nullptr) {
         return;
     }
-    if (p_row.kind == AnnouncementKind::STATE_EVALUATED) {
+    if (p_row.kind == AnnouncementKind::RECOVERED) {
         p_prediction->emit_signal(
-            StringName("state_evaluated"),
-            p_row.from,
-            p_row.to,
-            p_row.amount,
-            p_row.flag
-        );
-    } else if (p_row.kind == AnnouncementKind::EPISODE_CHANGED) {
-        p_prediction->emit_signal(
-            StringName("episode_changed"),
-            p_row.code,
-            p_row.report
-        );
-    } else if (p_row.kind == AnnouncementKind::RECOVERED) {
-        p_prediction->emit_signal(
-            StringName("recovered"),
+            StringName("corrected"),
             p_row.from,
             p_row.report,
-            p_row.flag,
-            p_row.code
-        );
-    } else {
-        p_prediction->emit_signal(
-            StringName("divergence_detected"),
-            p_row.from,
-            p_row.code
+            p_row.flag
         );
     }
+#if defined(NETW_TESTS)
+    const predict::Decl *decl
+        = predict_find_declaration(p_prediction->get_entity().ptr());
+    if (decl == nullptr || !decl->test_report) {
+        return;
+    }
+    Array said;
+    switch (p_row.kind) {
+        case AnnouncementKind::STATE_EVALUATED:
+            said.push_back(p_row.from);
+            said.push_back(p_row.to);
+            said.push_back(p_row.amount);
+            said.push_back(p_row.flag);
+            decl->test_report(StringName("state_evaluated"), said);
+            break;
+        case AnnouncementKind::EPISODE_CHANGED:
+            said.push_back(p_row.code);
+            said.push_back(p_row.report);
+            decl->test_report(StringName("episode_changed"), said);
+            break;
+        case AnnouncementKind::RECOVERED:
+            said.push_back(p_row.from);
+            said.push_back(p_row.report);
+            said.push_back(p_row.flag);
+            said.push_back(p_row.code);
+            decl->test_report(StringName("corrected"), said);
+            break;
+        default:
+            said.push_back(p_row.from);
+            said.push_back(p_row.code);
+            decl->test_report(StringName("divergence_detected"), said);
+            break;
+    }
+#endif
 }
 
 NetwEntity *NetwMultiplayer::entity_holder(uint64_t p_id) const {
@@ -389,9 +403,10 @@ void NetwMultiplayer::entity_owner_ready(NetwEntity *p_entity) {
             NETW_FAULT_PREDICTION_OFF,
             {owner != nullptr ? String(owner->get_path())
                               : String(p_entity->get_name()),
-             String("no state property"),
-             String("{NetwPropertyConfig.state} on the properties it "
-                    "restores")},
+             String(),
+             String(),
+             0,
+             NETW_OFF_NO_STATE},
             uint64_t(gd::instance_id(owner))
         );
     }

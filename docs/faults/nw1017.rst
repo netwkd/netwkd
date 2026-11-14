@@ -2,19 +2,49 @@
 
 .. _fault_nw1017:
 
-NW1017. This Godot build cannot run the declared mode
-=====================================================
+NW1017. This Godot build cannot move a kinematic body on demand
+===============================================================
 
-Reported as a warning when an entity needs something the engine in use cannot
-do.
+Reported as a warning when a ``CharacterBody3D`` or an ``AnimatableBody3D``
+must be moved outside a physics step, and the Godot build in use has no
+``flush_kinematic_transform``. The log line names the body and
+gives one of two reasons.
 
-The entity runs a simpler mode. The log line names the entity and what it
-needs.
+- **It cannot be moved during a rewind.** The body is the only collider of
+  an entity passed to :ref:`Netw.rewind <class_Netw_method_rewind>`, so a
+  physics query in the rewind finds it where it is now.
+- **It cannot be restored in a replay.** The body belongs to an entity at
+  :ref:`SCHEDULE_STEPPED <class_NetwSimulation_constant_SCHEDULE_STEPPED>`,
+  so that entity runs at
+  :ref:`SCHEDULE_FRAME <class_NetwSimulation_constant_SCHEDULE_FRAME>`.
 
-Install a :ref:`NetwPhysicsStepper <class_NetwPhysicsStepper>` with
-``NetwSession.install_physics_stepper``, or use the Networked engine build.
+This kinematic entity sets ``SCHEDULE_STEPPED`` in a world that a
+:ref:`NetwPhysicsStepper <class_NetwPhysicsStepper>` steps.
 
 .. code-block:: gdscript
 
-    func _ready() -> void:
-        session.install_physics_stepper(NetwPhysicsStepper.new())
+    extends CharacterBody3D
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
+        Netw.configure_property(self, &"position").state()
+
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+        move_and_slide()
+
+Use the Networked build of Godot, which adds ``flush_kinematic_transform``.
+It is published at https://github.com/diejor/godot/releases. On an official
+Godot build, leave the schedule unset, so
+:ref:`SCHEDULE_AUTO <class_NetwSimulation_constant_SCHEDULE_AUTO>` picks one
+the build can run.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self)
+        Netw.configure_property(self, &"position").state()
+
+A stepper steps a world and does not move a kinematic body, so installing
+one does not fix this fault. :ref:`NW1032 <fault_nw1032>` is the fault a
+stepper fixes.

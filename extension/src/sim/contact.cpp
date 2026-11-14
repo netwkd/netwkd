@@ -35,7 +35,60 @@ void note_colliders(const State *p_state, LocalVector<ObjectID> &r_colliders) {
     }
 }
 
+template <typename Body, typename Server>
+bool sample_body(
+    Body *p_body,
+    Server *p_server,
+    LocalVector<ObjectID> &r_colliders
+) {
+    if (p_body->get_max_contacts_reported() < CLAIM_CONTACTS_REPORTED) {
+        p_body->set_max_contacts_reported(CLAIM_CONTACTS_REPORTED);
+    }
+    const auto *state = p_server->body_get_direct_state(p_body->get_rid());
+    note_colliders(state, r_colliders);
+    return state != nullptr ? state->is_sleeping() : p_body->is_sleeping();
+}
+
 } // namespace
+
+Dictionary sample_contacts(const LocalVector<ObjectID> &p_bodies) {
+    static const StringName layer("collision_layer");
+    static const StringName mask("collision_mask");
+    Dictionary sample;
+    LocalVector<ObjectID> touched;
+    bool sleeping = true;
+    for (const ObjectID &id : p_bodies) {
+        Object *body = gd::object_of(id);
+        bool asleep = false;
+        if (RigidBody3D *solid = Object::cast_to<RigidBody3D>(body)) {
+            asleep
+                = sample_body(solid, PhysicsServer3D::get_singleton(), touched);
+        } else if (RigidBody2D *flat = Object::cast_to<RigidBody2D>(body)) {
+            asleep
+                = sample_body(flat, PhysicsServer2D::get_singleton(), touched);
+        } else {
+            continue;
+        }
+        sleeping = sleeping && asleep;
+        if (sample.is_empty()) {
+            sample[layer] = body->get(layer);
+            sample[mask] = body->get(mask);
+        }
+    }
+    if (sample.is_empty()) {
+        return sample;
+    }
+    Array colliders;
+    for (const ObjectID &id : touched) {
+        Object *collider = gd::object_of(id);
+        if (collider != nullptr) {
+            colliders.push_back(collider);
+        }
+    }
+    sample[StringName("colliders")] = colliders;
+    sample[StringName("sleeping")] = sleeping;
+    return sample;
+}
 
 void monitor_contacts(const Bodies &p_bodies) {
     for (const AuthoredBody &held : p_bodies.held) {

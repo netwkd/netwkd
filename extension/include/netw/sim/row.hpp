@@ -55,6 +55,9 @@ struct Declaration {
     godot::Callable step;
     bool claim_on_contact = false;
     double release_on_rest = 0.0;
+    bool physics_driven = false;
+    bool wrote_physics_driven = false;
+    bool wrote_restore = false;
 };
 
 struct Decl {

@@ -1,0 +1,28 @@
+:github_url: hide
+
+.. _fault_nw1036:
+
+NW1036. An input property has no type
+=====================================
+
+Reported as a warning when a predicted entity declares a property with
+:ref:`input <class_NetwPropertyConfig_method_input>` and the property has no
+static type. Prediction sends input in a packed form that needs the type of
+every input property.
+
+.. code-block:: gdscript
+
+    var move
+
+    func _init() -> void:
+        Netw.configure_property(self, &"move").input()
+
+Give the property a static type, or a quantizer with
+:ref:`quantize <class_NetwMemberConfig_method_quantize>`.
+
+.. code-block:: gdscript
+
+    var move: Vector2
+
+    func _init() -> void:
+        Netw.configure_property(self, &"move").input()

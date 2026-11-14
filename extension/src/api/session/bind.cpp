@@ -720,21 +720,18 @@ void NetwMultiplayer::_bind_methods() {
     BIND_ENUM_CONSTANT(DISPLAY_PARAM_FLOOR_SMOOTHING);
     BIND_ENUM_CONSTANT(DISPLAY_PARAM_TRACE_INTERVAL);
     BIND_ENUM_CONSTANT(DISPLAY_PARAM_VISUAL_ROOT);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_ARCHETYPE);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_MISSING_POLICY);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_RECOVERY_POLICY);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_REPEAT_MISSING_INPUT);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_MODE);
     BIND_ENUM_CONSTANT(PREDICT_PARAM_TELEPORT_THRESHOLD);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_DIVERGENCE_EPSILON);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_BREACH_RESPONSE);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_COLLISION_COOLDOWN_TICKS);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_MAX_CONSUME_PER_TICK);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_MAX_CONSUME_LAG_TICKS);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_CONSUME_BUFFER_TICKS);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_REPLAY_BUFFER_DEPTH);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_RECONCILE_MODE);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_ACK_AGE_TICKS);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_EPOCH);
-    BIND_ENUM_CONSTANT(PREDICT_PARAM_SLEEPING);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_CORRECTION_THRESHOLD);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_PAUSE_ON_UNPREDICTED_CONTACT);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_CORRECTION_COOLDOWN_TICKS);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_MAX_INPUTS_PER_TICK);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_MAX_INPUT_LAG_TICKS);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_INPUT_BUFFER_TICKS);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_ROLLBACK_TOGETHER);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_WORLD_VERSION);
+    BIND_ENUM_CONSTANT(PREDICT_PARAM_CORRECTION_COUNT);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_BODIES);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_SCHEDULE);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_REPLICAS);
@@ -742,6 +739,7 @@ void NetwMultiplayer::_bind_methods() {
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_MAX_RESTORE_TICKS);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_CLAIM_ON_CONTACT);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_RELEASE_ON_REST);
+    BIND_ENUM_CONSTANT(SIMULATION_PARAM_PHYSICS_DRIVEN);
     BIND_ENUM_CONSTANT(SIM_PICK_CHOSEN);
     BIND_ENUM_CONSTANT(SIM_PICK_FORGET);
 #define NETW_SESSION_STAT_BIND(m_name, m_key) BIND_ENUM_CONSTANT(STAT_##m_name);
@@ -1044,18 +1042,6 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::predict_get_param
     );
     ClassDB::bind_method(
-        D_METHOD("predict_get_stats", "entity"),
-        &NetwMultiplayer::predict_get_stats
-    );
-    ClassDB::bind_method(
-        D_METHOD("predict_set_sensor_callback", "entity", "name", "callback"),
-        &NetwMultiplayer::predict_set_sensor_callback
-    );
-    ClassDB::bind_method(
-        D_METHOD("predict_set_witness_callback", "entity", "callback"),
-        &NetwMultiplayer::predict_set_witness_callback
-    );
-    ClassDB::bind_method(
         D_METHOD("predict_set_correction_path_callback", "entity", "callback"),
         &NetwMultiplayer::predict_set_correction_path_callback
     );
@@ -1064,21 +1050,8 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::predict_set_input_callback
     );
     ClassDB::bind_method(
-        D_METHOD("predict_get_sensor", "entity", "name", "default"),
-        &NetwMultiplayer::predict_get_sensor,
-        DEFVAL(Variant())
-    );
-    ClassDB::bind_method(
-        D_METHOD("predict_notify_contact", "entity"),
-        &NetwMultiplayer::predict_notify_contact
-    );
-    ClassDB::bind_method(
-        D_METHOD("predict_get_reachability", "entity"),
-        &NetwMultiplayer::predict_get_reachability
-    );
-    ClassDB::bind_method(
-        D_METHOD("predict_get_recovery_policy", "entity"),
-        &NetwMultiplayer::predict_get_recovery_policy
+        D_METHOD("predict_notify_collision", "entity"),
+        &NetwMultiplayer::predict_notify_collision
     );
     ClassDB::bind_method(
         D_METHOD("simulation_set_param", "entity", "param", "value"),
@@ -1089,8 +1062,12 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::simulation_get_param
     );
     ClassDB::bind_method(
-        D_METHOD("simulation_set_step_callback", "entity", "callback"),
-        &NetwMultiplayer::simulation_set_step_callback
+        D_METHOD(
+            "simulation_set_network_process_callback",
+            "entity",
+            "callback"
+        ),
+        &NetwMultiplayer::simulation_set_network_process_callback
     );
     ClassDB::bind_method(
         D_METHOD("simulation_get_mode", "entity"),

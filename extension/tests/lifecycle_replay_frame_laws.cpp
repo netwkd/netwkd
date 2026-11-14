@@ -34,8 +34,7 @@ var sparks := 0
 var fresh_sparks := 0
 
 func _init() -> void:
-	var e := Netw.configure_entity(self)
-	e.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+	Netw.configure_entity(self)
 	Netw.configure_property(self, &"beat").state()
 	Netw.configure_property(self, &"aim").input()
 	Netw.configure_spawn(make_spark)
@@ -45,7 +44,7 @@ func make_spark() -> Node:
 	Netw.configure_entity(spark).lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
 	return spark
 
-func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 	beat += 1
 	if tick != trigger:
 		return
@@ -229,7 +228,7 @@ NETW_FRAME_SCENARIO(ReplayScenario, lifecycle_replay_scenario);
 
 TEST_CASE(
     "[Networked][Lifecycle][Frame] replay, a predicted avatar that calls "
-    "Netw.spawn in _network_tick spawns once, on the fresh tick, whatever "
+    "Netw.spawn in _network_process spawns once, on the fresh tick, whatever "
     "the replay depth"
 ) {
     const ReplayEvidence &evidence = replay_evidence();

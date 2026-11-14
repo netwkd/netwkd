@@ -4,7 +4,10 @@
 
 #include "godot/rid.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/entity_record.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/prediction.hpp"
+#include "netw/predict/decl.hpp"
 #include "netw/session/books.hpp"
 
 namespace netw_test {
@@ -12,6 +15,18 @@ namespace netw_test {
 struct Internals {
     static netw::NetwEntityRecord *record(const netw::NetwEntity *p_entity) {
         return p_entity->get_record();
+    }
+
+    static netw::predict::Decl &predict_declaration(
+        const netw::NetwEntity *p_entity
+    ) {
+        return p_entity->get_record()->predict_declaration();
+    }
+
+    static netw::predict::Decl &predict_declaration(
+        const netw::NetwPrediction *p_handle
+    ) {
+        return predict_declaration(p_handle->get_entity().ptr());
     }
 
     static void adopt_handle(

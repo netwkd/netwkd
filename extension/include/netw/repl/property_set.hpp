@@ -28,13 +28,12 @@ struct PropertyColumn {
     Delta delta_mode = DELTA_AUTO;
     bool watch = false;
     int64_t lane = 0;
-    int64_t property_class = 0;
-    double converge_stiffness = 0.0;
-    godot::StringName carry_channel;
+    bool unchecked = false;
+    double correction_weight = 0.0;
+    godot::StringName rate_property;
     bool explicit_teleport_only = false;
-    bool explicit_reconcile_only = false;
-    double epsilon_override = -1.0;
-    double teleport_at_override = -1.0;
+    double correction_threshold = -1.0;
+    double teleport_threshold = -1.0;
 
     static PropertyColumn create(
         const godot::StringName &p_key,
@@ -104,12 +103,6 @@ public:
     enum Lane {
         VOLATILE = 0,
         RETAINED = 1,
-    };
-
-    enum PropertyClass {
-        CAUSAL = 0,
-        DERIVED = 1,
-        COSMETIC = 2,
     };
 
     enum Audience {

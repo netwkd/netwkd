@@ -177,7 +177,7 @@ public sealed class NetwClock : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted after every entity ran <c>_network_tick</c> for <c>tick</c>.
+    /// Emitted after every entity ran <c>_network_process</c> for <c>tick</c>.
     /// Read results here.
     /// </summary>
     public event Action<double, long> Ticked

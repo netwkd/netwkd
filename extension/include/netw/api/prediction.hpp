@@ -17,7 +17,6 @@ class NetwPrediction : public godot::RefCounted {
 
 public:
     static constexpr double DEFAULT_TELEPORT_THRESHOLD = 2.0;
-    static constexpr int ACK_AGE_MAX = 64;
 
     enum Role {
         ROLE_PREDICT = 0,
@@ -83,33 +82,12 @@ public:
         EXACT_VERDICT_UNEQUAL = 2,
     };
 
-    enum MissingInput {
-        MISSING_INPUT_STALL = 0,
-        MISSING_INPUT_REPEAT_LAST = 1,
-    };
-
-    enum Archetype {
-        ARCHETYPE_NONE = 0,
-        ARCHETYPE_SCRIPTED = 1,
-        ARCHETYPE_SOLVER_BODY = 2,
-    };
-
-    enum RecoveryPolicy {
-        RECOVERY_POLICY_REBASE_REPLAY = 0,
-        RECOVERY_POLICY_REBASE_RECOVER = 1,
-        RECOVERY_POLICY_DELAY_CLOSED = 2,
-        RECOVERY_POLICY_OBSERVE = 3,
-        RECOVERY_POLICY_AUTO = 4,
-    };
-
-    enum Reconcile {
-        RECONCILE_INDEPENDENT = 0,
-        RECONCILE_JOINT = 1,
-    };
-
-    enum BreachResponse {
-        BREACH_RESPONSE_PREDICT_THROUGH = 0,
-        BREACH_RESPONSE_DEMOTE = 1,
+    enum Mode {
+        MODE_ROLLBACK = 0,
+        MODE_OFFSET = 1,
+        MODE_DISABLED = 2,
+        MODE_OBSERVE = 3,
+        MODE_AUTO = 4,
     };
 
     enum EpisodeState {
@@ -171,64 +149,40 @@ protected:
     static void _bind_methods();
 
 public:
-    static const char *GENERATOR_UNKNOWN_BEYOND_RETENTION;
-
     void bind_entity(const godot::Ref<NetwEntity> &p_entity);
 
     godot::Ref<NetwEntity> get_entity() const;
     bool is_registered() const;
 
-    void set_recovery_policy(NetwPrediction::RecoveryPolicy p_value);
-    void set_breach_response(NetwPrediction::BreachResponse p_value);
-    void set_sensors(const godot::Dictionary &p_value);
-    void set_epoch(int64_t p_value);
-    void set_witness_contacts(const godot::Callable &p_value);
+    void set_mode(NetwPrediction::Mode p_value);
+    void set_pause_on_unpredicted_contact(bool p_value);
+    void set_world_version(int64_t p_value);
     void set_correction_path_clear(const godot::Callable &p_value);
     void set_teleport_threshold(double p_value);
-    void set_collision_cooldown_ticks(int p_value);
-    void set_sleeping(bool p_value);
-    void set_missing_policy(NetwPrediction::MissingInput p_value);
-    void set_max_consume_per_tick(int p_value);
-    void set_consume_buffer_ticks(int p_value);
-    void set_replay_buffer_depth(int p_value);
-    void set_max_consume_lag_ticks(int p_value);
-    void set_ack_age_ticks(int p_value);
-    void set_divergence_epsilon(double p_value);
-    void set_reconcile_mode(NetwPrediction::Reconcile p_value);
-    void set_archetype(NetwPrediction::Archetype p_value);
+    void set_correction_cooldown_ticks(int p_value);
+    void set_repeat_missing_input(bool p_value);
+    void set_max_inputs_per_tick(int p_value);
+    void set_input_buffer_ticks(int p_value);
+    void set_max_input_lag_ticks(int p_value);
+    void set_correction_threshold(double p_value);
+    void set_rollback_together(bool p_value);
 
-    NetwPrediction::RecoveryPolicy get_recovery_policy() const;
-    NetwPrediction::BreachResponse get_breach_response() const;
-    godot::Dictionary get_sensors() const;
-    int64_t get_epoch() const;
-    godot::Callable get_witness_contacts() const;
+    NetwPrediction::Mode get_mode() const;
+    bool get_pause_on_unpredicted_contact() const;
+    int64_t get_world_version() const;
     godot::Callable get_correction_path_clear() const;
     double get_teleport_threshold() const;
-    int get_collision_cooldown_ticks() const;
-    bool get_sleeping() const;
-    NetwPrediction::MissingInput get_missing_policy() const;
-    int get_max_consume_per_tick() const;
-    int get_consume_buffer_ticks() const;
-    int get_replay_buffer_depth() const;
-    int get_max_consume_lag_ticks() const;
-    int get_ack_age_ticks() const;
-    double get_divergence_epsilon() const;
-    NetwPrediction::Reconcile get_reconcile_mode() const;
-    NetwPrediction::Archetype get_archetype() const;
+    int get_correction_cooldown_ticks() const;
+    bool get_repeat_missing_input() const;
+    int get_max_inputs_per_tick() const;
+    int get_input_buffer_ticks() const;
+    int get_max_input_lag_ticks() const;
+    double get_correction_threshold() const;
+    bool get_rollback_together() const;
 
-    godot::Ref<NetwPredictStats> get_stats() const;
+    int64_t get_correction_count() const;
 
-    godot::Variant sensor(
-        const godot::StringName &p_name,
-        const godot::Variant &p_default = godot::Variant()
-    ) const;
-    NetwPrediction::RecoveryPolicy resolved_recovery_policy() const;
-
-    void simulate_tick(double p_delta, int64_t p_tick);
-    void simulate_frame(double p_delta);
-
-    godot::Dictionary reachability() const;
-    void notify_contact();
+    void notify_collision();
 
     void set_predict_input(const godot::Callable &p_predictor);
     godot::Callable get_predict_input() const;
@@ -238,20 +192,4 @@ godot::Ref<NetwPrediction> build_prediction_handle(godot::Object *p_entity);
 
 } // namespace netw
 
-VARIANT_ENUM_CAST(netw::NetwPrediction::ContactClass);
-VARIANT_ENUM_CAST(netw::NetwPrediction::CommandOrigin);
-VARIANT_ENUM_CAST(netw::NetwPrediction::DriveKind);
-VARIANT_ENUM_CAST(netw::NetwPrediction::TriggerShape);
-VARIANT_ENUM_CAST(netw::NetwPrediction::ConsumeAction);
-VARIANT_ENUM_CAST(netw::NetwPrediction::ExactVerdict);
-VARIANT_ENUM_CAST(netw::NetwPrediction::MissingInput);
-VARIANT_ENUM_CAST(netw::NetwPrediction::Archetype);
-VARIANT_ENUM_CAST(netw::NetwPrediction::RecoveryPolicy);
-VARIANT_ENUM_CAST(netw::NetwPrediction::Reconcile);
-VARIANT_ENUM_CAST(netw::NetwPrediction::BreachResponse);
-VARIANT_ENUM_CAST(netw::NetwPrediction::EpisodeState);
-VARIANT_ENUM_CAST(netw::NetwPrediction::EpisodeChange);
-VARIANT_ENUM_CAST(netw::NetwPrediction::OperatorOutcome);
-VARIANT_ENUM_CAST(netw::NetwPrediction::Attribution);
-VARIANT_ENUM_CAST(netw::NetwPrediction::Operator);
-VARIANT_ENUM_CAST(netw::NetwPrediction::Domain);
+VARIANT_ENUM_CAST(netw::NetwPrediction::Mode);

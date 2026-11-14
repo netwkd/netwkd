@@ -141,7 +141,7 @@ LawVerdict stall_discards_the_bank(const Stand &) {
             int(discarded_ran)
         );
     }
-    const int64_t warned = faults.warnings_containing("NW1018");
+    const int64_t warned = faults.warnings_containing("NW1031");
     if (warned != 1) {
         return law_broken("the stall warned %d times", int(warned));
     }

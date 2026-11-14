@@ -71,6 +71,17 @@ Fault index
 - :doc:`nw1026`, MISUSE
 - :doc:`nw1027`, PRACTICE
 - :doc:`nw1028`, MISUSE
+- :doc:`nw1029`, MISUSE
+- :doc:`nw1030`, REMOTE
+- :doc:`nw1031`, PRACTICE
+- :doc:`nw1032`, ENVIRONMENT
+- :doc:`nw1033`, PRACTICE
+- :doc:`nw1034`, PRACTICE
+- :doc:`nw1035`, PRACTICE
+- :doc:`nw1036`, PRACTICE
+- :doc:`nw1037`, PRACTICE
+- :doc:`nw1038`, PRACTICE
+- :doc:`nw1039`, PRACTICE
 
 .. toctree::
    :hidden:
@@ -145,3 +156,14 @@ Fault index
    nw1026
    nw1027
    nw1028
+   nw1029
+   nw1030
+   nw1031
+   nw1032
+   nw1033
+   nw1034
+   nw1035
+   nw1036
+   nw1037
+   nw1038
+   nw1039

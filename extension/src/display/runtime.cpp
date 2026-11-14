@@ -2,6 +2,8 @@
 
 #include <limits>
 
+#include "godot/object.hpp"
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/display/history.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
@@ -70,12 +72,16 @@ Node *Runtime::owner() {
 
 Channel *Runtime::channel_named(const StringName &p_name) const {
     if (tracks.is_ambiguous(p_name)) {
+        Node *held = Object::cast_to<Node>(gd::object_of(owner_port.id));
         fault::raise(
-            nullptr,
+            NetwMultiplayer::session_holding(held),
             NETW_FAULT_INTERPOLATION_IGNORED,
             {String(p_name),
-             String("a second interpolation with the same name"),
-             String("a unique name for each interpolation")}
+             String(),
+             String(),
+             0,
+             NETW_INTERPOLATION_NAME_SHARED},
+            uint64_t(owner_port.id)
         );
     }
     const int at = tracks.by_name(p_name);

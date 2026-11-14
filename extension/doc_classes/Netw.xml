@@ -32,6 +32,7 @@
 		[b]Replication[/b]
 		A node's property replicates once [method configure_property] declares it. Data that belongs to no single node has a class of its own.
 		- [NetwPropertyConfig] how a declared property is sent, from [method configure_property]
+		- [NetwPrediction] how the client that controls an entity runs it ahead of the server, from [member NetwEntity.prediction]
 		- [NetwTable] rows of values a [NetwSchema] declares, from [method NetwSession.table]
 		- [NetwChannel] raw bytes sent in batches, from [method channel]
 		- [NetwDatabase] saved records, from [method NetwSession.database]

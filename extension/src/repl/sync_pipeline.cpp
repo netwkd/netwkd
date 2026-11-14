@@ -342,11 +342,8 @@ void SyncPipeline::report_missing_prediction_component(
     }
     fault::raise(
         core(),
-        NETW_FAULT_PREDICTION_DOWNGRADED,
-        {contract_subject_name(node),
-         String("state and input properties with no prediction"),
-         String("a prediction block on its MultiplayerSynchronizer, or "
-                "{NetwMultiplayer.predict_declare}")},
+        NETW_FAULT_INPUT_UNPREDICTED,
+        {contract_subject_name(node)},
         gd::instance_id(node)
     );
 }

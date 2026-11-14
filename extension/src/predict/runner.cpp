@@ -234,7 +234,7 @@ void NetwPredictRunner::tick_step(const NetwPredictTiming &p_timing) {
         for (uint32_t at = 0; at < roster.size(); ++at) {
             NetwPredictSlotEngine *engine = roster[at];
             if (engine != nullptr) {
-                engine->network_tick(p_timing);
+                engine->network_process(p_timing);
             }
         }
     }

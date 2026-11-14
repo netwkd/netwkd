@@ -11,7 +11,7 @@
 		    Netw.configure_property(self, &amp;"move_dir").input()
 		    Netw.configure_property(self, &amp;"aim_dir").broadcast()
 		[/codeblock]
-		[method volatile], [method retained], [method epsilon] and [method persisted] apply to one property. [method on_change], [method heartbeat], [method windowed], [method audience] and [method masked] apply to every property of the same kind on the script. Give them consistent values.
+		[method volatile], [method retained], [method correction_threshold] and [method persisted] apply to one property. [method on_change], [method heartbeat], [method windowed], [method audience] and [method masked] apply to every property of the same kind on the script. Give them consistent values.
 		[method NetwMemberConfig.interpolate] smooths received values. It returns a [NetwMemberConfig], so chain it after the methods of this class.
 		[b]Rigid bodies[/b]
 		When the [NetwEntity] root is a [RigidBody3D] or a [RigidBody2D], [code]position[/code], [code]quaternion[/code] ([code]rotation[/code] in 2D), [code]linear_velocity[/code], [code]angular_velocity[/code] and [code]sleeping[/code] read and write the body's physics state. [code]position[/code] stays relative to the parent. While [member RigidBody3D.freeze] is on, position and rotation use the node transform. A write to a body that stays asleep reaches peers within 30 ticks.
@@ -35,7 +35,7 @@
 		<method name="broadcast">
 			<return type="NetwPropertyConfig" />
 			<description>
-				The controlling peer owns the value and every peer sees it, with no server check. Use it for cosmetic values such as an aim direction. The server keeps no history of it. When a client controls the entity, or the entity is kept for a dropped player who controlled it, a spawn carries the value, so a controller that receives the node again starts from the value the server holds.
+				The controlling peer owns the value and every peer sees it, with no server check. Use it for values that only change how the entity looks, such as an aim direction. The server keeps no history of it. When a client controls the entity, or the entity is kept for a dropped player who controlled it, a spawn includes the value, so a controller that receives the node again starts from the value the server holds.
 				[codeblock]
 				func _init() -&gt; void:
 				    Netw.configure_property(self, &amp;"aim_dir").broadcast()
@@ -45,78 +45,36 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="carry_along">
-			<return type="NetwPropertyConfig" />
-			<param index="0" name="channel" type="StringName" />
-			<description>
-				When a correction restores this value, advances it to the present using the rate in [param channel].
-				[codeblock]
-				Netw.configure_property(self, &amp;"position").state().carry_along(&amp;"velocity")
-				[/codeblock]
-				[param channel] must be another [method state] property of the same node. Use [method carry_step] instead when the rate changes quickly. Declaring both on one property is an error, and neither is used.
-			</description>
-		</method>
-		<method name="carry_step">
-			<return type="NetwPropertyConfig" />
-			<param index="0" name="step" type="Callable" />
-			<description>
-				When a correction restores this value, advances it to the present by calling [param step] once for each tick the server has not acknowledged yet. Use it for a value only your code changes. A value the physics engine also changes cannot be advanced this way, and the rule is disabled.
-				[codeblock]
-				func _init() -&gt; void:
-				    Netw.configure_property(self, &amp;"spin").state().carry_step(carry_spin)
-
-				func carry_spin(value: Vector3, ctx: NetwPredictCarryContext) -&gt; Vector3:
-				    return value + drive_axis(ctx.state) * ctx.state[&amp;"speed"] * ctx.delta
-				[/codeblock]
-				[param step] must be a method or lambda of a [Node], may read only its [NetwPredictCarryContext], and must not write anything. A result that does not reproduce the recorded ticks is rejected. Declaring both this and [method carry_along] on one property is an error, and neither is used. [method NetwPrediction.reachability] reports whether the rule is in use.
-			</description>
-		</method>
-		<method name="causal">
-			<return type="NetwPropertyConfig" />
-			<description>
-				Marks the value as one the next step reads, so it is compared and corrected. This is the default.
-				[codeblock]
-				Netw.configure_property(self, &amp;"velocity").state().causal()
-				[/codeblock]
-			</description>
-		</method>
-		<method name="converge">
-			<return type="NetwPropertyConfig" />
-			<param index="0" name="stiffness" type="float" />
-			<description>
-				Moves the value part of the way toward the server's value during a correction, by [param stiffness], instead of writing it outright. [code]0.0[/code] writes it outright. A value with no midpoint, such as a [bool], is always written outright.
-				[codeblock]
-				Netw.configure_property(self, &amp;"heading").state().causal().converge(0.4)
-				[/codeblock]
-			</description>
-		</method>
-		<method name="cosmetic">
-			<return type="NetwPropertyConfig" />
-			<description>
-				Marks the value as display only, so a difference in it never causes a correction. A correction still writes it.
-				[codeblock]
-				Netw.configure_property(self, &amp;"skid_intensity").state().cosmetic()
-				[/codeblock]
-			</description>
-		</method>
-		<method name="derived">
-			<return type="NetwPropertyConfig" />
-			<description>
-				Marks the value as one the body recomputes each step from other properties, so a difference in it never causes a correction. A correction still writes it.
-				[codeblock]
-				Netw.configure_property(self, &amp;"speed").state().derived()
-				[/codeblock]
-			</description>
-		</method>
-		<method name="epsilon">
+		<method name="correction_threshold">
 			<return type="NetwPropertyConfig" />
 			<param index="0" name="threshold" type="float" />
 			<description>
-				How far this value may drift from the server's before it is corrected, in its own units. Without it, the value uses [member NetwPrediction.divergence_epsilon]. [code]0.0[/code] corrects any error.
+				How far this value may drift from the server's before it is corrected, in its own units. Without it, the value uses [member NetwPrediction.correction_threshold]. [code]0.0[/code] corrects any error.
 				[codeblock]
-				Netw.configure_property(self, &amp;"velocity").state().epsilon(0.05)
+				Netw.configure_property(self, &amp;"velocity").state().correction_threshold(0.05)
 				[/codeblock]
-				Use [method reconcile_only] for a value that should never cause a correction.
+				Use [method unchecked] for a value that should never cause a correction.
+			</description>
+		</method>
+		<method name="correction_weight">
+			<return type="NetwPropertyConfig" />
+			<param index="0" name="weight" type="float" />
+			<description>
+				Moves the value part of the way toward the server's value during a correction, by [param weight]. [code]0.0[/code] writes it outright. A value with no midpoint, such as a [bool], is always written outright.
+				[codeblock]
+				Netw.configure_property(self, &amp;"heading").state().correction_weight(0.4)
+				[/codeblock]
+			</description>
+		</method>
+		<method name="extrapolate">
+			<return type="NetwPropertyConfig" />
+			<param index="0" name="rate_property" type="StringName" />
+			<description>
+				When a correction restores this value, advances it to the present using the rate in [param rate_property].
+				[codeblock]
+				Netw.configure_property(self, &amp;"position").state().extrapolate(&amp;"velocity")
+				[/codeblock]
+				[param rate_property] must be another [method state] property of the same node.
 			</description>
 		</method>
 		<method name="heartbeat">
@@ -142,7 +100,7 @@
 				        move_dir = Input.get_vector("left", "right", "up", "down")
 				    velocity = move_dir * SPEED
 				[/codeblock]
-				Each send also carries the last two ticks of input, so a lost packet is recovered from the next one. [method windowed] changes how many. Correction settings such as [method carry_along] are ignored on an input.
+				Each send also includes the last two ticks of input, so the next packet makes up for a lost one. [method windowed] changes how many. Correction settings such as [method extrapolate] are ignored on an input.
 			</description>
 		</method>
 		<method name="masked">
@@ -183,15 +141,6 @@
 				How often the row is saved is set with [method NetwPersistenceConfig.interval].
 			</description>
 		</method>
-		<method name="reconcile_only">
-			<return type="NetwPropertyConfig" />
-			<description>
-				A difference in this value never causes a correction, but a correction caused by another value still restores it.
-				[codeblock]
-				Netw.configure_property(self, &amp;"heading").state().reconcile_only()
-				[/codeblock]
-			</description>
-		</method>
 		<method name="retained">
 			<return type="NetwPropertyConfig" />
 			<description>
@@ -204,7 +153,7 @@
 		<method name="state">
 			<return type="NetwPropertyConfig" />
 			<description>
-				The server owns the value, every peer sees it, and lag compensation can rewind it. A client predicting this [NetwEntity] is corrected against it, within [method epsilon].
+				The server owns the value, every peer sees it, and lag compensation can rewind it. [NetwPrediction] says when an entity with a state property is predicted, and a predicted entity is corrected against this value within [method correction_threshold].
 				[codeblock]
 				func _init() -&gt; void:
 				    Netw.configure_property(self, &amp;"position").state().quantize(pos_q)
@@ -214,25 +163,34 @@
 				[/codeblock]
 			</description>
 		</method>
-		<method name="teleport_at">
+		<method name="teleport_only">
+			<return type="NetwPropertyConfig" />
+			<description>
+				Only a teleport writes this value, and an ordinary correction leaves it alone. Pair it with [method extrapolate] so the teleport restores it at the present, or with [method unchecked] so it never causes a correction.
+				[codeblock]
+				Netw.configure_property(self, &amp;"angular_velocity").state().teleport_only()
+				[/codeblock]
+			</description>
+		</method>
+		<method name="teleport_threshold">
 			<return type="NetwPropertyConfig" />
 			<param index="0" name="distance" type="float" />
 			<description>
 				How large this value's error may be before a correction teleports the body, in its own units. Without it, the value uses [member NetwPrediction.teleport_threshold]. [code]0.0[/code] teleports on every correction this value causes.
 				[codeblock]
 				Netw.configure_property(self, &amp;"position").state() \
-				        .carry_along(&amp;"velocity").teleport_at(3.0)
+				        .extrapolate(&amp;"velocity").teleport_threshold(3.0)
 				Netw.configure_property(self, &amp;"heading").state() \
-				        .carry_along(&amp;"angular_speed").teleport_at(1.0)
+				        .extrapolate(&amp;"angular_speed").teleport_threshold(1.0)
 				[/codeblock]
 			</description>
 		</method>
-		<method name="teleport_only">
+		<method name="unchecked">
 			<return type="NetwPropertyConfig" />
 			<description>
-				Only a teleport writes this value, and an ordinary correction leaves it alone. Pair it with [method carry_along] or [method carry_step] so the teleport restores it at the present, or with [method reconcile_only] so it never causes a correction.
+				A difference in this value never causes a correction, but a correction caused by another value still restores it. Use it for a value the body recomputes each tick or one that only affects display.
 				[codeblock]
-				Netw.configure_property(self, &amp;"angular_velocity").state().teleport_only()
+				Netw.configure_property(self, &amp;"heading").state().unchecked()
 				[/codeblock]
 			</description>
 		</method>
@@ -246,7 +204,7 @@
 			<return type="NetwPropertyConfig" />
 			<param index="0" name="samples" type="int" />
 			<description>
-				Each send also carries the last [param samples] ticks of values, so a lost packet is recovered from the next one.
+				Each send also includes the last [param samples] ticks of values, so the next packet makes up for a lost one.
 				[codeblock]
 				Netw.configure_property(self, &amp;"motion").input().windowed(3)
 				[/codeblock]
@@ -254,21 +212,6 @@
 		</method>
 	</methods>
 	<members>
-		<member name="carry_channel" type="StringName" setter="set_carry_channel" getter="get_carry_channel">
-			Set by [method carry_along].
-		</member>
-		<member name="converge_stiffness" type="float" setter="set_converge_stiffness" getter="get_converge_stiffness">
-			Set by [method converge].
-		</member>
-		<member name="epsilon_override" type="float" setter="set_epsilon_override" getter="get_epsilon_override">
-			Set by [method epsilon]. A negative value uses [member NetwPrediction.divergence_epsilon].
-		</member>
-		<member name="explicit_reconcile_only" type="bool" setter="set_explicit_reconcile_only" getter="get_explicit_reconcile_only">
-			Set by [method reconcile_only].
-		</member>
-		<member name="explicit_teleport_only" type="bool" setter="set_explicit_teleport_only" getter="get_explicit_teleport_only">
-			Set by [method teleport_only].
-		</member>
 		<member name="in_broadcast_set" type="bool" setter="set_in_broadcast_set" getter="get_in_broadcast_set">
 			Set by [method broadcast].
 		</member>
@@ -287,9 +230,6 @@
 		<member name="lane" type="int" setter="set_lane" getter="get_lane" enum="NetwPropertyConfig.Lane">
 			Whether changes are sent unreliably or reliably. Set by [method volatile] and [method retained].
 		</member>
-		<member name="property_class" type="int" setter="set_property_class" getter="get_property_class" enum="NetwPropertyConfig.PropertyClass">
-			Whether a difference in the value causes a correction. Set by [method causal], [method derived] and [method cosmetic].
-		</member>
 		<member name="set_audience" type="int" setter="set_set_audience" getter="get_set_audience" enum="NetwPropertyConfig.Audience">
 			Set by [method audience] and [method input].
 		</member>
@@ -304,9 +244,6 @@
 		</member>
 		<member name="set_window" type="int" setter="set_set_window" getter="get_set_window">
 			Set by [method windowed], or [constant UNSET].
-		</member>
-		<member name="teleport_at_override" type="float" setter="set_teleport_at_override" getter="get_teleport_at_override">
-			Set by [method teleport_at]. A negative value uses [member NetwPrediction.teleport_threshold].
 		</member>
 	</members>
 	<constants>
@@ -324,15 +261,6 @@
 		</constant>
 		<constant name="RETAINED" value="1" enum="Lane">
 			Sent reliably, only when it changes.
-		</constant>
-		<constant name="CAUSAL" value="0" enum="PropertyClass">
-			Affects the next step, so it is compared and corrected.
-		</constant>
-		<constant name="DERIVED" value="1" enum="PropertyClass">
-			Computed from other properties each step, so it is not compared.
-		</constant>
-		<constant name="COSMETIC" value="2" enum="PropertyClass">
-			Only affects display, so it is not compared.
 		</constant>
 		<constant name="AUDIENCE_PUBLIC" value="0" enum="Audience">
 			Sent to every peer that sees the [NetwEntity].

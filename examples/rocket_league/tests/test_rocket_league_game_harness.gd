@@ -50,9 +50,7 @@ func test_every_peer_holds_the_other_peers_car() -> void:
 	var host_view := await host.await_player(&"luigi", 2.0)
 	var mario_on_client := await client.await_player(&"mario", 2.0)
 	assert_that(client.local_player).is_equal(own)
-	assert_int(own.entity.prediction.archetype).is_equal(
-		NetwPrediction.ARCHETYPE_SOLVER_BODY,
-	)
+	assert_bool(own.entity.simulation.physics_driven).is_true()
 
 	await await_kickoff(own)
 	quiet_ai(host)
@@ -146,12 +144,11 @@ func test_the_ball_holds_one_route_on_every_peer_and_keeps_its_own_body() -> voi
 	assert_str(String(host_ball.entity.name)).is_equal("ball")
 	assert_str(String(client_ball.entity.name)).is_equal("ball")
 
-	assert_int(host_ball.entity.prediction.archetype).override_failure_message(
-		"the ball keeps its own prediction body on every peer",
-	).is_equal(NetwPrediction.ARCHETYPE_SOLVER_BODY)
-	assert_int(client_ball.entity.prediction.archetype).is_equal(
-		NetwPrediction.ARCHETYPE_SOLVER_BODY,
-	)
+	assert_bool(host_ball.entity.simulation.physics_driven) \
+			.override_failure_message(
+				"the ball keeps its own prediction body on every peer",
+			).is_true()
+	assert_bool(client_ball.entity.simulation.physics_driven).is_true()
 	assert_that(client_ball.entity.scene.root).override_failure_message(
 		"the client's ball answers the arena its route was published under",
 	).is_equal(arena_level(client))
@@ -188,14 +185,14 @@ func test_a_clean_client_drive_opens_no_correction() -> void:
 	await await_kickoff(own)
 	quiet_ai(host)
 	quiet_ai(client)
-	var at_kickoff: int = own.entity.prediction.stats.corrections
+	var at_kickoff: int = own.entity.prediction.correction_count
 	await game.sync_ticks(16)
-	var corrections: int = own.entity.prediction.stats.corrections
+	var corrections: int = own.entity.prediction.correction_count
 	client.simulate_action_press("forward")
 	await game.sync_ticks(120)
 	client.simulate_action_release("forward")
 
-	var opened: int = own.entity.prediction.stats.corrections
+	var opened: int = own.entity.prediction.correction_count
 	assert_int(opened) \
 			.override_failure_message(
 				"a straight drive with no contact must reconcile clean: "
@@ -237,6 +234,7 @@ func test_a_clients_ball_responds_in_the_frame_its_car_touches_it() -> void:
 	var own := await client.await_player(&"luigi", 2.0)
 	var host_ball := arena_ball(host)
 	var client_ball := arena_ball(client)
+	own.contact_monitor = true
 	await await_kickoff(own)
 	quiet_ai(host)
 	quiet_ai(client)
@@ -290,6 +288,7 @@ func test_a_clients_hit_on_a_bouncing_ball_takes_effect_at_once() -> void:
 	var own := await client.await_player(&"luigi", 2.0)
 	var host_ball := arena_ball(host)
 	var client_ball := arena_ball(client)
+	own.contact_monitor = true
 	await await_kickoff(own)
 	quiet_ai(host)
 	quiet_ai(client)

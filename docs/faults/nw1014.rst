@@ -2,26 +2,38 @@
 
 .. _fault_nw1014:
 
-NW1014. Prediction runs in a weaker mode than declared
-======================================================
+NW1014. A rollback runs as an offset
+====================================
 
-Reported as a warning when an entity declares a prediction mode that its
-setup cannot run, such as a physics body on ``SCHEDULE_FRAME``.
+Reported as a warning when an entity sets
+:ref:`MODE_ROLLBACK <class_NetwPrediction_constant_MODE_ROLLBACK>` and the
+physics server moves it at
+:ref:`SCHEDULE_FRAME <class_NetwSimulation_constant_SCHEDULE_FRAME>`. Such a
+body cannot replay a tick, so it is corrected with
+:ref:`MODE_OFFSET <class_NetwPrediction_constant_MODE_OFFSET>`.
 
-The entity runs in a weaker mode. The log line gives the reason and the
-setting that fixes it.
+.. code-block:: gdscript
+
+    extends RigidBody3D
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_FRAME
+        entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
+        Netw.configure_property(self, &"position").state()
+
+Run the body at
+:ref:`SCHEDULE_STEPPED <class_NetwSimulation_constant_SCHEDULE_STEPPED>`, or
+set :ref:`mode <class_NetwPrediction_property_mode>` to ``MODE_OFFSET``.
 
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_entity(self).simulation.schedule = (
-                NetwSimulation.SCHEDULE_FRAME)
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
+        entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
+        Netw.configure_property(self, &"position").state()
 
-Use what the log line asks for. A physics body needs ``SCHEDULE_STEPPED`` to
-get ``RECOVERY_POLICY_REBASE_REPLAY``.
-
-.. code-block:: gdscript
-
-    func _init() -> void:
-        Netw.configure_entity(self).simulation.schedule = (
-                NetwSimulation.SCHEDULE_STEPPED)
+A body that sets ``SCHEDULE_STEPPED`` on a Godot build that cannot step
+physics also runs at ``SCHEDULE_FRAME``. :ref:`NW1032 <fault_nw1032>` reports
+that.

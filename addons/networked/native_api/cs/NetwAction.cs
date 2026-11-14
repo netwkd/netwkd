@@ -19,7 +19,7 @@ namespace Networked;
 /// func _ready() -&gt; void:
 ///     place_bomb.predict = _predict_bomb
 ///
-/// func _network_tick(delta, tick, is_fresh) -&gt; void:
+/// func _network_process(delta, tick, is_fresh) -&gt; void:
 ///     if is_fresh and inputs.bombing:
 ///         place_bomb.request(tick)
 ///

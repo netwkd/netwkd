@@ -322,10 +322,10 @@ LawVerdict write_inside_warns(const World &) {
     if (Math::abs(range.offset() - double(TICKS)) > 0.0001) {
         return law_broken("the write %f stayed", range.offset());
     }
-    if (faults.warnings_containing("a change inside the rewind") != 1) {
+    if (faults.warnings_containing("[NW1015]") != 1) {
         return law_broken(
             "%d warning(s) for two writes",
-            int(faults.warnings_containing("a change inside the rewind"))
+            int(faults.warnings_containing("[NW1015]"))
         );
     }
     return law_held();
@@ -335,7 +335,7 @@ LawVerdict basis_read_back_quiet(const World &) {
     Range range(TURRET);
     const FaultWatch faults;
     range.body->call(StringName("look"), range.entities, range.past);
-    if (faults.warnings_containing("a change inside the rewind") != 0) {
+    if (faults.warnings_containing("[NW1015]") != 0) {
         return law_broken("a body that wrote nothing warned");
     }
     return law_held();
@@ -397,8 +397,7 @@ LawVerdict child_state_rewound(const World &) {
 LawVerdict hitbox_under_visual(const World &) {
     const FaultWatch faults;
     Range range(GLIDER, 1);
-    const int64_t warned
-        = faults.warnings_containing("a place under the visual root");
+    const int64_t warned = faults.warnings_containing("[NW1015]");
     if (warned != 2) {
         return law_broken("%d warning(s) over two peers", int(warned));
     }
@@ -415,7 +414,7 @@ LawVerdict synced_platform_warns(const World &) {
             int(faults.warnings_containing("sync_to_physics"))
         );
     }
-    if (faults.warnings_containing("a change inside the rewind") != 0
+    if (faults.warnings_containing("[NW1015]") != 1
         || faults.warnings_containing("[NW1017]") != 0) {
         return law_broken("the platform drew a warning it did not earn");
     }

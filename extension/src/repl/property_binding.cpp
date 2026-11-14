@@ -649,24 +649,23 @@ const PropertyColumn *PropertyBinding::field_of(
     return set != nullptr ? set->column_named(p_property) : nullptr;
 }
 
-int64_t PropertyBinding::property_class_of(const StringName &p_property) const {
+bool PropertyBinding::unchecked_of(const StringName &p_property) const {
     const PropertyColumn *field = field_of(p_property);
-    return field != nullptr ? field->property_class
-                            : int64_t(PropertySet::CAUSAL);
+    return field != nullptr && field->unchecked;
 }
 
-double PropertyBinding::converge_stiffness_of(
+double PropertyBinding::correction_weight_of(
     const StringName &p_property
 ) const {
     const PropertyColumn *field = field_of(p_property);
-    return field != nullptr ? field->converge_stiffness : 0.0;
+    return field != nullptr ? field->correction_weight : 0.0;
 }
 
-StringName PropertyBinding::carry_channel_of(
+StringName PropertyBinding::rate_property_of(
     const StringName &p_property
 ) const {
     const PropertyColumn *field = field_of(p_property);
-    return field != nullptr ? field->carry_channel : StringName();
+    return field != nullptr ? field->rate_property : StringName();
 }
 
 bool PropertyBinding::teleport_only_of(const StringName &p_property) const {
@@ -674,21 +673,18 @@ bool PropertyBinding::teleport_only_of(const StringName &p_property) const {
     return field != nullptr && field->explicit_teleport_only;
 }
 
-bool PropertyBinding::reconcile_only_of(const StringName &p_property) const {
-    const PropertyColumn *field = field_of(p_property);
-    return field != nullptr && field->explicit_reconcile_only;
-}
-
-double PropertyBinding::epsilon_override_of(
+double PropertyBinding::correction_threshold_of(
     const StringName &p_property
 ) const {
     const PropertyColumn *field = field_of(p_property);
-    return field != nullptr ? field->epsilon_override : -1.0;
+    return field != nullptr ? field->correction_threshold : -1.0;
 }
 
-double PropertyBinding::teleport_at_of(const StringName &p_property) const {
+double PropertyBinding::teleport_threshold_of(
+    const StringName &p_property
+) const {
     const PropertyColumn *field = field_of(p_property);
-    return field != nullptr ? field->teleport_at_override : -1.0;
+    return field != nullptr ? field->teleport_threshold : -1.0;
 }
 
 void PropertyBinding::clear_peer(int64_t p_peer) {

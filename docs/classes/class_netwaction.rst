@@ -28,7 +28,7 @@ Shows the result of an action right away on the client that asked for it, then k
     func _ready() -> void:
         place_bomb.predict = _predict_bomb
 
-    func _network_tick(delta, tick, is_fresh) -> void:
+    func _network_process(delta, tick, is_fresh) -> void:
         if is_fresh and inputs.bombing:
             place_bomb.request(tick)
 

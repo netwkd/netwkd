@@ -86,7 +86,14 @@ Only the server spawns, moves and despawns an entity by default. When :ref:`life
     func _init() -> void:
         var entity := Netw.configure_entity(self)
         entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
-        entity.prediction.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
+        entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
+
+.. rst-class:: classref-introduction-group
+
+Tutorials
+---------
+
+- `Prediction guide <https://networked.readthedocs.io/en/latest/guides/prediction.html>`__
 
 .. rst-class:: classref-reftable-group
 
@@ -625,7 +632,7 @@ Who may spawn, move and despawn this entity. Set it in ``_init`` beside :ref:`tr
 
 A refused call pushes an error and returns its failure value. :godot:`Node.reparent() <Node#class_Node_method_reparent>` cannot be refused, so it warns and the move stays on this peer.
 
-During a prediction replay these calls return :godot:`@GlobalScope.ERR_BUSY <@GlobalScope#class_@GlobalScope_constant_ERR_BUSY>` with no error, so a predicted step spawns only on a fresh tick.
+During a rollback these calls return :godot:`@GlobalScope.ERR_BUSY <@GlobalScope#class_@GlobalScope_constant_ERR_BUSY>` with no error, so :ref:`NetwSimulation.network_process<class_NetwSimulation_property_network_process>` spawns only the first time a tick runs.
 
 ::
 

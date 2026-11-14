@@ -289,14 +289,9 @@ bool NetwMultiplayer::sim_selectable(const Ref<NetwEntity> &p_member) {
         return row != nullptr && row->facts.predicted && !sim::leads(row->mode);
     }
     Node *owner = p_member->get_owner();
-    if (owner == nullptr || authoring::declares_prediction(owner)) {
-        return false;
-    }
-    const NetwEntityRecord *record = record_of(p_member.ptr());
-    const sim::Decl *simulation
-        = record != nullptr ? record->find_sim_declaration() : nullptr;
-    const bool simulated = simulation != nullptr && simulation->declared;
-    if (!simulated && !sim::is_solver_body(owner)) {
+    if (owner == nullptr || authoring::declares_prediction(owner)
+        || predict_implied(p_member.ptr())
+        || !sim_simulated(p_member.ptr())) {
         return false;
     }
     const sim::Mode mode = row != nullptr

@@ -86,7 +86,7 @@ func _init() -> void:
 	var e := Netw.configure_entity(self)
 	e.simulation.bodies = [^"Sphere"]
 
-	Netw.configure_property(self, &"sphere_position").broadcast().masked() \
+	Netw.configure_property(self, &"sphere_position").broadcast() \
 			.quantize(NetwQuantizeScalar.new().bits(19).limits(-2048.0, 2048.0)) \
 			.on_spawn() \
 			.interpolate(
@@ -94,21 +94,20 @@ func _init() -> void:
 						.project_by(&"sphere_linear_velocity") \
 						.to(&"display_position"),
 			)
-	Netw.configure_property(self, &"sphere_linear_velocity") \
-			.broadcast().masked() \
+	Netw.configure_property(self, &"sphere_linear_velocity").broadcast() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-256.0, 256.0))
-	Netw.configure_property(self, &"heading").broadcast().masked() \
+	Netw.configure_property(self, &"heading").broadcast() \
 			.quantize(NetwQuantizeAngle.new().bits(16).centered()) \
 			.on_spawn() \
 			.interpolate(
 				NetwInterpolate.new().angle().smooth(DISPLAY_SMOOTH) \
 						.project_by(&"angular_speed").to(&"display_heading"),
 			)
-	Netw.configure_property(self, &"linear_speed").broadcast().masked() \
+	Netw.configure_property(self, &"linear_speed").broadcast() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-4.0, 4.0))
-	Netw.configure_property(self, &"angular_speed").broadcast().masked() \
+	Netw.configure_property(self, &"angular_speed").broadcast() \
 			.quantize(NetwQuantizeScalar.new().bits(16).limits(-16.0, 16.0))
-	Netw.configure_property(self, &"acceleration").broadcast().masked()
+	Netw.configure_property(self, &"acceleration").broadcast()
 
 	e.interest.join(&"race")
 
@@ -139,7 +138,7 @@ func displayed_position() -> Vector3:
 # Functions
 
 
-func _network_tick(delta: float, _tick: int, is_fresh: bool) -> void:
+func _network_process(delta: float, _tick: int, is_fresh: bool) -> void:
 	if not is_fresh:
 		return
 

@@ -1,0 +1,32 @@
+:github_url: hide
+
+.. _fault_nw1038:
+
+NW1038. An entity has state and input properties and is not predicted
+=====================================================================
+
+Reported as a warning when a node declares both
+:ref:`state <class_NetwPropertyConfig_method_state>` and
+:ref:`input <class_NetwPropertyConfig_method_input>` properties, and has
+neither a ``_network_process`` nor a body the physics server moves. Nothing
+predicts it on the client that controls it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state()
+        Netw.configure_property(self, &"move").input()
+
+    func _physics_process(delta: float) -> void:
+        position += move * SPEED * delta
+
+Move the code that reads the input into ``_network_process``.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"position").state()
+        Netw.configure_property(self, &"move").input()
+
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+        position += move * SPEED * delta

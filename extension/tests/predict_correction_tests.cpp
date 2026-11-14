@@ -29,12 +29,11 @@ class Kid extends Node3D:
 
 	func _init() -> void:
 		add_child(part)
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"beat").state()
 		Netw.configure_property(self, &"motion").input()
 
-	func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
+	func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
 		beat += 1
 		part.charge += 1
 
@@ -50,48 +49,21 @@ class Sled extends Node3D:
 			return roundi(position.y * 100000.0)
 	var corrections: int:
 		get:
-			return NetwEntity.of(self).prediction.stats.corrections
+			return NetwEntity.of(self).prediction.correction_count
 
 	func _init() -> void:
 		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
-		entity.prediction.recovery_policy = (
-				NetwPrediction.RECOVERY_POLICY_REBASE_RECOVER)
-		entity.prediction.divergence_epsilon = 0.01
+		entity.prediction.mode = NetwPrediction.MODE_OFFSET
+		entity.prediction.correction_threshold = 0.01
 		entity.simulation.schedule = NetwSimulation.SCHEDULE_FRAME
-		declare()
+		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"motion").input()
 
-	func declare() -> void:
-		Netw.configure_property(self, &"position").state()
-
-	func _network_tick(delta: float, _tick: int, _is_fresh: bool) -> void:
+	func _network_process(delta: float, _tick: int, _is_fresh: bool) -> void:
 		position.x += motion * 60.0 * delta
 
 	func nudge() -> void:
 		position.y += 0.05
-
-
-class Ruled extends Sled:
-	func declare() -> void:
-		Netw.configure_property(self, &"position").state().carry_step(advance)
-
-	func advance(value: Vector3, ctx: NetwPredictCarryContext) -> Vector3:
-		var pace: float = ctx.input.get(&"motion", 0.0)
-		return value + Vector3(pace * 60.0 * ctx.delta, 0, 0)
-
-
-class Warner extends Node3D:
-	var motion := 0.0
-
-	func _init() -> void:
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
-		Netw.configure_property(self, &"position").state().carry_step(advance)
-		Netw.configure_property(self, &"motion").input()
-
-	func advance(value: Vector3, _ctx: NetwPredictCarryContext) -> Vector3:
-		return value
 )";
 
 constexpr int DRIVER = 0;
@@ -100,15 +72,12 @@ constexpr int NUDGED = 30;
 constexpr int NUDGE = 5000;
 
 World sleds(World p_world) {
-    for (const char *name : {"Sled", "Ruled"}) {
-        p_world.watch(name, "lift")
-            .watch(name, "corrections")
-            .at(1, spawn(name, name))
-            .at(1, control(name, DRIVER))
-            .at(8, on(DRIVER, set(name, "motion", 1.0)))
-            .at(NUDGED, call(name, "nudge"));
-    }
-    return p_world;
+    return p_world.watch("Sled", "lift")
+        .watch("Sled", "corrections")
+        .at(1, spawn("Sled", "Sled"))
+        .at(1, control("Sled", DRIVER))
+        .at(8, on(DRIVER, set("Sled", "motion", 1.0)))
+        .at(NUDGED, call("Sled", "nudge"));
 }
 
 World relay() {
@@ -117,7 +86,6 @@ World relay() {
                      .watch("Kid", "gap")
                      .watch("Kid", "bumped")
                      .at(1, spawn("Kid", "Kid"))
-                     .at(1, spawn("Warner", "Warner"))
                      .at(1, control("Kid", DRIVER))
                      .at(2, impair(DRIVER, polls(6)))
                      .at(BUMPED, call("Kid", "bump")));
@@ -154,22 +122,6 @@ LawVerdict never_above(
     return law_held();
 }
 
-LawVerdict warned_once(const Seen &p_seen, const char *p_pattern) {
-    int matched = 0;
-    for (const String &line : p_seen.faults) {
-        matched += line.match(p_pattern);
-    }
-    if (matched != 1 || p_seen.faults.size() != 1) {
-        return law_broken(
-            "%d of %d faults matched '%s'",
-            matched,
-            int(p_seen.faults.size()),
-            p_pattern
-        );
-    }
-    return law_held();
-}
-
 TEST_CASE(
     "[Networked][Predict][Frame] C1 a client the server corrects agrees "
     "with it on a state property of a child node"
@@ -186,23 +138,11 @@ TEST_CASE(
     "the server, over a slow link and over none"
 ) {
     for (const Seen *seen : {&relay_frames.seen(), &swift_frames.seen()}) {
-        for (const char *name : {"Sled", "Ruled"}) {
-            NETW_HOLDS(reads(*seen, SERVER, name, "lift", NUDGE));
-            NETW_HOLDS(reads(*seen, DRIVER, name, "lift", NUDGE));
-            NETW_HOLDS(reads(*seen, DRIVER, name, "corrections", 1));
-            NETW_HOLDS(never_above(*seen, DRIVER, name, "lift", NUDGE));
-        }
+        NETW_HOLDS(reads(*seen, SERVER, "Sled", "lift", NUDGE));
+        NETW_HOLDS(reads(*seen, DRIVER, "Sled", "lift", NUDGE));
+        NETW_HOLDS(reads(*seen, DRIVER, "Sled", "corrections", 1));
+        NETW_HOLDS(never_above(*seen, DRIVER, "Sled", "lift", NUDGE));
     }
-}
-
-TEST_CASE(
-    "[Networked][Predict][Frame] C3 a carry_step under the tick schedule is "
-    "reported once, by the peer that drives the entity"
-) {
-    const Seen &seen = relay_frames.seen();
-    NETW_HOLDS(
-        warned_once(seen, "*'Warner'*carry_step under the tick schedule*")
-    );
 }
 
 constexpr const char *CONVOY = R"(
@@ -216,8 +156,7 @@ class Walker extends CharacterBody3D:
 		hull.shape = BoxShape3D.new()
 		add_child(hull)
 		motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state().on_spawn()
 		Netw.configure_property(self, &"speed").state().on_spawn()
 		Netw.configure_property(self, &"motion").input()
@@ -226,7 +165,7 @@ class Walker extends CharacterBody3D:
 		collision_layer = 1 if multiplayer.is_server() else 2
 		collision_mask = collision_layer
 
-	func _network_tick(_delta: float, tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 		velocity = Vector3(speed, 0.0, 0.0)
 		move_and_slide()
 		if not is_fresh:
@@ -236,7 +175,7 @@ class Walker extends CharacterBody3D:
 		var entity := NetwEntity.of(self)
 		var tail := get_parent().get_node(^"Tail")
 		entity.simulation.simulate(NetwEntity.of(tail))
-		entity.prediction.reconcile_mode = NetwPrediction.RECONCILE_JOINT
+		entity.prediction.rollback_together = true
 
 	func bump() -> void:
 		position.x += 0.05

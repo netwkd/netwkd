@@ -19,7 +19,7 @@ Where and how one :ref:`NetwEntity<class_NetwEntity>`'s body runs on each peer.
 Description
 -----------
 
-Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation>`. Each peer runs the entity in one :ref:`mode<class_NetwSimulation_property_mode>`, which decides whether :ref:`step<class_NetwSimulation_property_step>` runs and whether the body is frozen. A game sets the members below and reads :ref:`mode<class_NetwSimulation_property_mode>`.
+Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation>`. Each peer runs the entity in one :ref:`mode<class_NetwSimulation_property_mode>`, which decides whether :ref:`network_process<class_NetwSimulation_property_network_process>` runs and whether the body is frozen. A game sets the members below and reads :ref:`mode<class_NetwSimulation_property_mode>`.
 
 
 .. tabs::
@@ -31,7 +31,7 @@ Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation
         entity.simulation.bodies = [^"Sphere"]
         entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
 
-    func _network_tick(delta: float, tick: int, is_fresh: bool) -> void:
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
         if is_fresh:
             steer(delta)
 
@@ -42,10 +42,10 @@ Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation
         var entity = Netw.ConfigureEntity(this);
         entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
         entity.Simulation.Replicas = NetwSimulation.ReplicasEnum.Active;
-        entity.Simulation.Step = Callable.From<double, long, bool>(Step);
+        entity.Simulation.NetworkProcess = Callable.From<double, long, bool>(NetworkProcess);
     }
 
-    private void Step(double delta, long tick, bool isFresh)
+    private void NetworkProcess(double delta, long tick, bool isFresh)
     {
         if (isFresh)
             Steer(delta);
@@ -53,7 +53,7 @@ Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation
 
 \ 
 
-An entity is simulated once it sets or calls anything here, declares :ref:`NetwPrediction.archetype<class_NetwPrediction_property_archetype>`, or has a :godot:`RigidBody2D` or :godot:`RigidBody3D` root drawn by :ref:`NetwEntity.display<class_NetwEntity_property_display>`. Other entities stay :ref:`MODE_NONE<class_NetwSimulation_constant_MODE_NONE>`.
+An entity is simulated once it sets or calls anything here, is predicted as :ref:`NetwPrediction<class_NetwPrediction>` describes, or has a :godot:`RigidBody2D` or :godot:`RigidBody3D` root drawn by :ref:`NetwEntity.display<class_NetwEntity_property_display>`. Other entities stay :ref:`MODE_NONE<class_NetwSimulation_constant_MODE_NONE>`.
 
 \ **Modes**\ 
 
@@ -69,6 +69,13 @@ While this entity runs here as :ref:`MODE_AUTHORITY<class_NetwSimulation_constan
 
     func _ready() -> void:
         entity.simulation.simulate(ball)
+
+.. rst-class:: classref-introduction-group
+
+Tutorials
+---------
+
+- `Prediction guide <https://networked.readthedocs.io/en/latest/guides/prediction.html>`__
 
 .. rst-class:: classref-reftable-group
 
@@ -87,6 +94,8 @@ Properties
    +-------------------------------------------------------+---------------------------------------------------------------------------+
    | :ref:`Mode<enum_NetwSimulation_Mode>`                 | :ref:`mode<class_NetwSimulation_property_mode>`                           |
    +-------------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`bool`                                         | :ref:`physics_driven<class_NetwSimulation_property_physics_driven>`       |
+   +-------------------------------------------------------+---------------------------------------------------------------------------+
    | :godot:`float`                                        | :ref:`release_on_rest<class_NetwSimulation_property_release_on_rest>`     |
    +-------------------------------------------------------+---------------------------------------------------------------------------+
    | :ref:`Replicas<enum_NetwSimulation_Replicas>`         | :ref:`replicas<class_NetwSimulation_property_replicas>`                   |
@@ -97,7 +106,7 @@ Properties
    +-------------------------------------------------------+---------------------------------------------------------------------------+
    | :godot:`Array`\[:ref:`NetwEntity<class_NetwEntity>`\] | :ref:`selected<class_NetwSimulation_property_selected>`                   |
    +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`Callable`                                     | :ref:`step<class_NetwSimulation_property_step>`                           |
+   | :godot:`Callable`                                     | :ref:`network_process<class_NetwSimulation_property_network_process>`     |
    +-------------------------------------------------------+---------------------------------------------------------------------------+
 
 .. rst-class:: classref-reftable-group
@@ -164,7 +173,7 @@ Not simulated. The entity follows plain replication.
 
 :ref:`Mode<enum_NetwSimulation_Mode>` **MODE_AUTHORITY** = ``1``
 
-This peer has authority over the entity. The step runs and the samples go out from here.
+This peer has authority over the entity. :ref:`network_process<class_NetwSimulation_property_network_process>` runs and the samples go out from here.
 
 .. _class_NetwSimulation_constant_MODE_PREDICT:
 
@@ -206,7 +215,7 @@ enum **Schedule**: :ref:`🔗<enum_NetwSimulation_Schedule>`
 
 :ref:`Schedule<enum_NetwSimulation_Schedule>` **SCHEDULE_TICK** = ``0``
 
-The step moves the entity once per tick.
+:ref:`network_process<class_NetwSimulation_property_network_process>` moves the entity once per tick.
 
 .. _class_NetwSimulation_constant_SCHEDULE_FRAME:
 
@@ -214,7 +223,7 @@ The step moves the entity once per tick.
 
 :ref:`Schedule<enum_NetwSimulation_Schedule>` **SCHEDULE_FRAME** = ``1``
 
-The physics server moves the bodies in each frame that brings a tick, and the step runs once in that frame.
+The physics server moves the bodies in each frame that brings a tick, and :ref:`network_process<class_NetwSimulation_property_network_process>` runs once in that frame.
 
 .. _class_NetwSimulation_constant_SCHEDULE_STEPPED:
 
@@ -222,7 +231,7 @@ The physics server moves the bodies in each frame that brings a tick, and the st
 
 :ref:`Schedule<enum_NetwSimulation_Schedule>` **SCHEDULE_STEPPED** = ``2``
 
-Needs a Godot build with ``PhysicsServer3D.space_step``, or a :ref:`NetwPhysicsStepper<class_NetwPhysicsStepper>` installed with :ref:`NetwSession.install_physics_stepper()<class_NetwSession_method_install_physics_stepper>`. Otherwise it runs as :ref:`SCHEDULE_FRAME<class_NetwSimulation_constant_SCHEDULE_FRAME>`, and so does an entity that does not declare prediction. Each fallback is reported once.
+The physics space is stepped once per tick, and again for each tick of a rollback. It needs the `Networked engine build <https://github.com/diejor/godot/releases>`__ or a :ref:`NetwPhysicsStepper<class_NetwPhysicsStepper>` installed with :ref:`NetwSession.install_physics_stepper()<class_NetwSession_method_install_physics_stepper>`. Without either it runs as :ref:`SCHEDULE_FRAME<class_NetwSimulation_constant_SCHEDULE_FRAME>`, and so does an entity that is not predicted. Each case warns once.
 
 .. _class_NetwSimulation_constant_SCHEDULE_AUTO:
 
@@ -256,7 +265,7 @@ Copies whose state comes from another peer are :ref:`MODE_PROXY<class_NetwSimula
 
 :ref:`Replicas<enum_NetwSimulation_Replicas>` **REPLICAS_ACTIVE** = ``1``
 
-Copies whose state comes from another peer are :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`. A sample that matches the copy is not written, so a resting copy can sleep.
+Copies whose state comes from another peer are :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`. On an entity that is not predicted, a sample that matches the copy is not written, so a resting copy can sleep.
 
 .. rst-class:: classref-item-separator
 
@@ -372,6 +381,25 @@ The mode this entity runs in on this peer. :ref:`mode_changed<class_NetwSimulati
 
 ----
 
+.. _class_NetwSimulation_property_physics_driven:
+
+.. rst-class:: classref-property
+
+:godot:`bool` **physics_driven** :ref:`🔗<class_NetwSimulation_property_physics_driven>`
+
+.. rst-class:: classref-property-setget
+
+- |void| **set_physics_driven**\ (\ value\: :godot:`bool`\ )
+- :godot:`bool` **get_physics_driven**\ (\ )
+
+If ``true``, the physics server moves this entity, so one with a :ref:`NetwPropertyConfig.state()<class_NetwPropertyConfig_method_state>` property is predicted without a :ref:`network_process<class_NetwSimulation_property_network_process>`. Defaults to ``true`` when the root or a body in :ref:`bodies<class_NetwSimulation_property_bodies>` is a :godot:`RigidBody2D` or :godot:`RigidBody3D`.
+
+While such an entity is predicted, :godot:`RigidBody3D.max_contacts_reported <RigidBody3D#class_RigidBody3D_property_max_contacts_reported>` is raised to ``8`` on its bodies so their contacts can be read.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwSimulation_property_release_on_rest:
 
 .. rst-class:: classref-property
@@ -421,7 +449,7 @@ It can change at any time.
 - |void| **set_restore**\ (\ value\: :ref:`Restore<enum_NetwSimulation_Restore>`\ )
 - :ref:`Restore<enum_NetwSimulation_Restore>` **get_restore**\ (\ )
 
-How a sample from the authority lands on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy. Under :ref:`NetwDisplay.LIVE_MODE_CHASE<class_NetwDisplay_constant_LIVE_MODE_CHASE>` the body snaps to it and the drawn position glides, up to :ref:`NetwPrediction.teleport_threshold<class_NetwPrediction_property_teleport_threshold>`.
+How a sample from the authority lands on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy. Under :ref:`NetwDisplay.LIVE_MODE_CHASE<class_NetwDisplay_constant_LIVE_MODE_CHASE>` the body snaps to it and the drawn position glides, up to :ref:`NetwPrediction.teleport_threshold<class_NetwPrediction_property_teleport_threshold>`. Defaults to :ref:`RESTORE_EXTRAPOLATED<class_NetwSimulation_constant_RESTORE_EXTRAPOLATED>` on a predicted entity with :ref:`physics_driven<class_NetwSimulation_property_physics_driven>`.
 
 .. rst-class:: classref-item-separator
 
@@ -438,7 +466,7 @@ How a sample from the authority lands on a :ref:`MODE_ACTIVE<class_NetwSimulatio
 - |void| **set_schedule**\ (\ value\: :ref:`Schedule<enum_NetwSimulation_Schedule>`\ )
 - :ref:`Schedule<enum_NetwSimulation_Schedule>` **get_schedule**\ (\ )
 
-When :ref:`step<class_NetwSimulation_property_step>` runs and when the physics server moves the bodies.
+When :ref:`network_process<class_NetwSimulation_property_network_process>` runs and when the physics server moves the bodies.
 
 .. rst-class:: classref-item-separator
 
@@ -460,22 +488,22 @@ The entities this entity selects on this peer right now.
 
 ----
 
-.. _class_NetwSimulation_property_step:
+.. _class_NetwSimulation_property_network_process:
 
 .. rst-class:: classref-property
 
-:godot:`Callable` **step** :ref:`🔗<class_NetwSimulation_property_step>`
+:godot:`Callable` **network_process** :ref:`🔗<class_NetwSimulation_property_network_process>`
 
 .. rst-class:: classref-property-setget
 
-- |void| **set_step**\ (\ value\: :godot:`Callable`\ )
-- :godot:`Callable` **get_step**\ (\ )
+- |void| **set_network_process**\ (\ value\: :godot:`Callable`\ )
+- :godot:`Callable` **get_network_process**\ (\ )
 
-Called each tick as ``(delta: float, tick: int, is_fresh: bool)`` while :ref:`mode<class_NetwSimulation_property_mode>` runs the body. Defaults to the root's ``_network_tick``.
+Called each tick as ``(delta: float, tick: int, is_fresh: bool)`` while :ref:`mode<class_NetwSimulation_property_mode>` runs the body. Defaults to the root's ``_network_process``.
 
-\ ``is_fresh`` is ``false`` in a replay and on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy, so read input only when it is ``true``.
+\ ``is_fresh`` is ``true`` the first time a tick runs. It is ``false`` when a rollback runs the tick again and on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy, so play sounds and spawn nodes only when it is ``true``.
 
-A step asks the physics space with a query. An :godot:`Area3D`'s overlaps and signals and :godot:`CharacterBody3D.is_on_floor() <CharacterBody3D#class_CharacterBody3D_method_is_on_floor>` come from the last physics step, and a replay restores neither.
+Ask the physics space with a query. An :godot:`Area3D`'s overlaps and signals and :godot:`CharacterBody3D.is_on_floor() <CharacterBody3D#class_CharacterBody3D_method_is_on_floor>` come from the last physics step, and a rollback restores neither.
 
 .. rst-class:: classref-section-separator
 

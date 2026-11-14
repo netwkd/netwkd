@@ -16,19 +16,15 @@ class EntityDecl {
     int decl_controller = 0;
     bool decl_wants_owner = true;
     bool decl_predicts = false;
-    int decl_archetype = -1;
     double decl_prediction_epsilon = 0.0;
     netw::Schedule decl_schedule = netw::Schedule::TICK;
     netw::MissingInput decl_missing_input = netw::MissingInput::STALL;
     netw::RecoveryPolicy decl_recovery = netw::RecoveryPolicy::AUTO;
-    int decl_replay_buffer_depth = 0;
+    int decl_input_buffer_ticks = 0;
     int decl_input_window = -1;
     int decl_consume_lag = 0;
     bool decl_mounted = false;
     bool decl_spawned = false;
-    bool decl_carries = false;
-    double decl_carry_gain = 1.0;
-    double decl_teleport_at = 0.0;
     godot::Vector<godot::StringName> decl_synced;
     godot::Vector<godot::Ref<netw::NetwQuantize>> decl_quantizers;
     godot::Variant decl_initial_pose;
@@ -65,15 +61,6 @@ public:
         return *this;
     }
 
-    EntityDecl &archetyped(int p_archetype) {
-        decl_archetype = p_archetype;
-        return *this;
-    }
-
-    int archetype() const {
-        return decl_archetype;
-    }
-
     EntityDecl &quantized(const godot::Ref<netw::NetwQuantize> &p_quantizer) {
         if (!decl_quantizers.is_empty()) {
             decl_quantizers.set(decl_quantizers.size() - 1, p_quantizer);
@@ -103,7 +90,7 @@ public:
     }
 
     EntityDecl &buffered(int p_depth) {
-        decl_replay_buffer_depth = p_depth;
+        decl_input_buffer_ticks = p_depth;
         return *this;
     }
 
@@ -137,25 +124,6 @@ public:
 
     bool is_spawned() const {
         return decl_spawned;
-    }
-
-    EntityDecl &carried(double p_gain, double p_teleport_at) {
-        decl_carries = true;
-        decl_carry_gain = p_gain;
-        decl_teleport_at = p_teleport_at;
-        return *this;
-    }
-
-    bool carries() const {
-        return decl_carries;
-    }
-
-    double carry_gain() const {
-        return decl_carry_gain;
-    }
-
-    double teleport_at() const {
-        return decl_teleport_at;
     }
 
     EntityDecl &scheduled(netw::Schedule p_schedule) {
@@ -218,8 +186,8 @@ public:
         return decl_prediction_epsilon;
     }
 
-    int replay_buffer_depth() const {
-        return decl_replay_buffer_depth;
+    int input_buffer_ticks() const {
+        return decl_input_buffer_ticks;
     }
 
     int consume_lag_ticks() const {

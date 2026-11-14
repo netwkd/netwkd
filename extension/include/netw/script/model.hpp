@@ -44,11 +44,6 @@ void declare_scene(
     const godot::Ref<godot::Script> &p_script,
     const SceneDecl &p_decl
 );
-void bind_node_property_carry(
-    godot::Node *p_node,
-    const godot::StringName &p_property,
-    const godot::Callable &p_step
-);
 
 godot::Ref<NetwMemberConfig> get_rpc_options(
     const godot::Ref<godot::Script> &p_script,
@@ -88,10 +83,6 @@ godot::Ref<NetwPropertyConfig> configure_node_property(
 );
 godot::Dictionary get_node_property_configs(godot::Node *p_node);
 godot::Ref<NetwInterpolate> get_node_property_interpolator(
-    godot::Node *p_node,
-    const godot::StringName &p_property
-);
-godot::Callable get_node_property_carry(
     godot::Node *p_node,
     const godot::StringName &p_property
 );

@@ -6,66 +6,60 @@ using Godot.NativeInterop;
 namespace Networked;
 
 /// <summary>
-/// Prediction settings and diagnostics for one <see cref="NetwEntity"/>.
+/// Client-side prediction for one <see cref="NetwEntity"/>.
 /// </summary>
 /// <remarks>
-/// Reached by <see cref="NetwEntity.Prediction"/>. The client predicts its
-/// entity ahead of the server and corrects it when the server's state
-/// disagrees. This handle sets how that happens.
+/// Reached by <see cref="NetwEntity.Prediction"/>. An entity with a
+/// <see cref="NetwPropertyConfig.State"/> property, a
+/// <see cref="NetwPropertyConfig.Input"/> property and a
+/// <see cref="NetwSimulation.NetworkProcess"/> is predicted. A
+/// <see cref="RigidBody2D"/> or <see cref="RigidBody3D"/> needs only the two
+/// properties. The client that controls the entity runs that function on its
+/// own input each tick, and the server runs it on the same input when it
+/// arrives.
 /// <code>
-/// var pred := NetwEntity.of(self).prediction
-/// pred.archetype = NetwPrediction.ARCHETYPE_SOLVER_BODY
-/// pred.witness_contacts = _sample_contacts
-/// pred.breach_response = NetwPrediction.BREACH_RESPONSE_DEMOTE
+/// func _init() -&gt; void:
+///     Netw.configure_property(self, &amp;"move").input()
+///     Netw.configure_property(self, &amp;"position").state()
+///
+/// func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
+///     velocity = move * SPEED
+///     move_and_slide()
+///     if is_fresh and is_on_floor():
+///         footstep.play()
 /// </code>
 /// <para>
-/// Only an entity with a <see cref="NetwPropertyConfig.State"/> property is
-/// predicted, because that state is what gets compared and restored.
-/// Per-property tolerances are set with <see cref="NetwPropertyConfig"/>. The
-/// schedule and the simulation mode are on <see cref="NetwEntity.Simulation"/>.
-/// An entity keeps predicting through <see cref="Netw.Reparent"/>, and one
-/// taken out of the tree with <see cref="Node.RemoveChild"/> and added back
-/// later predicts again. Values set on a <see cref="MultiplayerSynchronizer"/>
-/// in the scene act as defaults, and values set in code override them.
-/// <b>Settings</b>
-/// - <see cref="NetwPrediction.ArchetypeEnum"/> a preset for the other settings
-/// - <see cref="NetwPrediction.RecoveryPolicyEnum"/> how a misprediction is
-/// corrected
-/// - <see cref="NetwPrediction.MissingInput"/> what the server does when an
-/// input never arrives
-/// - <see cref="NetwPrediction.BreachResponseEnum"/> what happens on an
-/// unpredicted contact
-/// - <see cref="NetwPrediction.Reconcile"/> whether entities are corrected
-/// alone or together
-/// <b>Reports</b>
-/// - <see cref="NetwPrediction.DriveKind"/> which input drove the last step
-/// - <see cref="NetwPrediction.ConsumeAction"/> what the server did with its
-/// input queue
-/// - <see cref="NetwPrediction.ContactClass"/> what the body touched
-/// - <see cref="NetwPrediction.CommandOrigin"/> where a replayed input came
-/// from
-/// - <see cref="NetwPrediction.ExactVerdict"/> whether two peers produced the
-/// same result
-/// - <see cref="NetwPrediction.Domain"/> whether a step is compared exactly or
-/// by tolerance
-/// - <see cref="NetwPrediction.TriggerShape"/> what asked for a correction
-/// - <see cref="NetwPrediction.Attribution"/> what a misprediction is blamed on
-/// - <see cref="NetwPrediction.Operator"/> how a correction wrote the body
-/// - <see cref="NetwPrediction.OperatorOutcome"/> whether a correction helped
-/// - <see cref="NetwPrediction.EpisodeState"/> whether a misprediction is still
-/// being corrected
-/// <b>Seeing prediction</b> Debug &gt; Networked &gt; Prediction Rings draws
-/// rings around every entity the client predicts.
-/// - <b>cyan</b> where the entity is drawn
+/// A rollback runs this function again for past ticks. Anything it reads
+/// besides input and state is not put back, and anything it plays would play
+/// twice without the <c>is_fresh</c> check. <b>When the client is wrong</b> The
+/// client corrects its entity when a state property differs from the server's
+/// by more than <see cref="NetwPrediction.CorrectionThreshold"/>. Past
+/// <see cref="NetwPrediction.TeleportThreshold"/> the entity jumps straight to
+/// the server's state. <see cref="NetwPrediction.Mode"/> picks the correction.
+/// <see cref="NetwPrediction.ModeEnum.Rollback"/> returns to the server's state
+/// and runs the newer inputs again.
+/// <see cref="NetwPrediction.ModeEnum.Offset"/> moves the entity by the
+/// difference. <see cref="NetwPrediction.ModeEnum.Disabled"/> stops predicting
+/// and shows the server's state. <b>Rigid bodies</b> An official Godot build
+/// cannot run physics again for a past tick, so a <see cref="RigidBody2D"/> or
+/// <see cref="RigidBody3D"/> uses <see cref="NetwPrediction.ModeEnum.Offset"/>.
+/// The Networked engine build can roll one back. It adds physics stepping and
+/// kinematic body updates to Godot. On another build, install a
+/// <see cref="NetwPhysicsStepper"/>. Rigid bodies in the same
+/// <see cref="NetwInterestLayer"/> roll back together when the engine can step
+/// physics. Turn off <see cref="NetwPrediction.RollbackTogether"/> to correct
+/// each one alone. <b>Late and lost input</b> Raise
+/// <see cref="NetwPrediction.InputBufferTicks"/> when a player on a bad
+/// connection stutters. The server waits that many ticks before it uses input,
+/// so each one adds a tick of delay.
+/// <see cref="NetwPrediction.RepeatMissingInput"/> reuses the last input when
+/// one is lost. <b>Debugging</b> Debug &gt; Networked &gt; Prediction Rings
+/// draws rings around each predicted entity.
+/// - <b>cyan</b> where it is drawn
 /// - <b>green</b> where it is simulated
-/// - <b>orange</b> where the server says it was, at the last tick it confirmed
-/// - <b>dashed magenta</b> where this client predicted it would be at that tick
-/// - <b>white line</b> the gap between orange and magenta, when it exceeds the
-/// tolerance
-/// Text beside the entity names its <see cref="NetwPrediction.EpisodeState"/>,
-/// its last <see cref="NetwPrediction.Operator"/> and the
-/// <see cref="NetwPrediction.OperatorOutcome"/>. A replica the client only
-/// simulates shows how old the server's state is instead.
+/// - <b>orange</b> where the server last said it was
+/// - <b>dashed magenta</b> where the client predicted it would be
+/// - <b>white line</b> the gap between orange and magenta
 /// </para>
 /// </remarks>
 public sealed class NetwPrediction : NetwRefCounted
@@ -84,553 +78,70 @@ public sealed class NetwPrediction : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
-    public enum ContactClass : long
+    public enum ModeEnum : long
     {
         /// <summary>
-        /// The body touched nothing.
-        /// </summary>
-        None = 0,
-        /// <summary>
-        /// The ground reported by the ground sensor.
-        /// </summary>
-        DeclaredSupport = 1,
-        /// <summary>
-        /// Static geometry other than the ground.
-        /// </summary>
-        OtherStatic = 2,
-        /// <summary>
-        /// A moving entity this peer predicts or simulates.
-        /// </summary>
-        PredictedDynamic = 3,
-        /// <summary>
-        /// A moving entity this peer does not simulate.
-        /// </summary>
-        UnpredictedDynamic = 4,
-        /// <summary>
-        /// A kinematic or animated body.
-        /// </summary>
-        KinematicProxy = 5,
-    }
-
-    public enum CommandOrigin : long
-    {
-        /// <summary>
-        /// This peer guessed the input with
-        /// <see cref="NetwPrediction.PredictInput"/>.
-        /// </summary>
-        Predicted = 0,
-        /// <summary>
-        /// The controlling peer's own input, relayed through the server.
-        /// </summary>
-        Relayed = 1,
-    }
-
-    public enum DriveKind : long
-    {
-        /// <summary>
-        /// Nothing has stepped yet.
-        /// </summary>
-        None = 0,
-        /// <summary>
-        /// A new input drove the step.
-        /// </summary>
-        Fresh = 1,
-        /// <summary>
-        /// The previous input drove the step again.
-        /// </summary>
-        Repeat = 2,
-        /// <summary>
-        /// The server held its input buffer, so nothing stepped this tick.
-        /// </summary>
-        Hold = 3,
-        /// <summary>
-        /// The server had no input queued, so nothing stepped this tick.
-        /// </summary>
-        Starved = 4,
-        /// <summary>
-        /// A new input drove the step after older ones were skipped.
-        /// </summary>
-        FoldDrive = 5,
-        /// <summary>
-        /// The input never arrived, and
-        /// <see cref="NetwPrediction.MissingPolicy"/> drove the step.
-        /// </summary>
-        Missing = 6,
-        /// <summary>
-        /// An input this peer guessed for an entity it does not control drove
-        /// the step.
-        /// </summary>
-        Substituted = 7,
-    }
-
-    public enum TriggerShape : long
-    {
-        /// <summary>
-        /// No property was past its tolerance.
-        /// </summary>
-        None = 0,
-        /// <summary>
-        /// At least one property past its tolerance can be written by an
-        /// ordinary correction.
-        /// </summary>
-        Mixed = 1,
-        /// <summary>
-        /// Every property past its tolerance is
-        /// <see cref="NetwPropertyConfig.TeleportOnly"/>, so only a teleport
-        /// can write it.
-        /// </summary>
-        AllWithheld = 2,
-    }
-
-    public enum ConsumeAction : long
-    {
-        /// <summary>
-        /// The server ran a queued input.
-        /// </summary>
-        Replay = 0,
-        /// <summary>
-        /// The server kept its queued inputs in the buffer.
-        /// </summary>
-        Hold = 1,
-        /// <summary>
-        /// The server had no input queued.
-        /// </summary>
-        Starved = 2,
-    }
-
-    public enum ExactVerdict : long
-    {
-        /// <summary>
-        /// Not compared yet.
-        /// </summary>
-        Unjudged = 0,
-        /// <summary>
-        /// Both peers produced the same result.
-        /// </summary>
-        Equal = 1,
-        /// <summary>
-        /// The peers produced different results.
-        /// </summary>
-        Unequal = 2,
-    }
-
-    public enum MissingInput : long
-    {
-        /// <summary>
-        /// The entity gets no input.
-        /// </summary>
-        Stall = 0,
-        /// <summary>
-        /// The last input is repeated.
-        /// </summary>
-        RepeatLast = 1,
-    }
-
-    public enum ArchetypeEnum : long
-    {
-        /// <summary>
-        /// No preset. Every setting keeps its default. Settings written after
-        /// an archetype override it, and no archetype sets
-        /// <see cref="NetwPrediction.BreachResponse"/>.
-        /// </summary>
-        None = 0,
-        /// <summary>
-        /// A body moved by your own code, such as a
-        /// <see cref="CharacterBody3D"/>. Sets
-        /// <see cref="NetwSimulation.ScheduleEnum.Tick"/>,
-        /// <see cref="NetwPrediction.MissingInput.Stall"/> and
-        /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseReplay"/>.
-        /// </summary>
-        Scripted = 1,
-        /// <summary>
-        /// A body moved by the physics engine, such as a
-        /// <see cref="RigidBody3D"/>. Sets
-        /// <see cref="NetwSimulation.ScheduleEnum.Auto"/>,
-        /// <see cref="NetwPrediction.MissingInput.RepeatLast"/>,
-        /// <see cref="NetwPrediction.RecoveryPolicyEnum.Auto"/> and
-        /// <see cref="NetwSimulation.RestoreEnum.Extrapolated"/>.
-        /// </summary>
-        SolverBody = 2,
-    }
-
-    public enum RecoveryPolicyEnum : long
-    {
-        /// <summary>
-        /// Restore the server's state and replay every input the server has not
-        /// acknowledged yet. A <see cref="RigidBody3D"/> or
-        /// <see cref="RigidBody2D"/> at
-        /// <see cref="NetwSimulation.ScheduleEnum.Frame"/> cannot replay, so it
-        /// uses <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseRecover"/>
+        /// Return to the server's state and run the newer inputs again. A
+        /// <see cref="RigidBody2D"/> or <see cref="RigidBody3D"/> at
+        /// <see cref="NetwSimulation.ScheduleEnum.Frame"/> cannot run a past
+        /// tick again, so it uses <see cref="NetwPrediction.ModeEnum.Offset"/>
         /// and warns once.
         /// </summary>
-        RebaseReplay = 0,
+        Rollback = 0,
         /// <summary>
-        /// Add the difference between the server's state and the prediction to
-        /// the present state, without replaying.
+        /// Move the entity by the difference between the server's state and
+        /// what the client predicted, and run nothing again.
         /// </summary>
-        RebaseRecover = 1,
+        Offset = 1,
         /// <summary>
-        /// Do not predict. The controlling client does not run the step and
-        /// draws the server's state.
+        /// Do not predict. The client that controls the entity does not run
+        /// <see cref="NetwSimulation.NetworkProcess"/> and shows the server's
+        /// state.
         /// </summary>
-        DelayClosed = 2,
+        Disabled = 2,
         /// <summary>
-        /// Report mispredictions and correct nothing.
-        /// </summary>
-        Observe = 3,
-        /// <summary>
-        /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseRecover"/> for a
+        /// <see cref="NetwPrediction.ModeEnum.Offset"/> for a
         /// <see cref="RigidBody3D"/> or <see cref="RigidBody2D"/> on any
         /// schedule but <see cref="NetwSimulation.ScheduleEnum.Stepped"/>, and
-        /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseReplay"/>
-        /// otherwise. <see cref="NetwPrediction.ResolvedRecoveryPolicy"/>
-        /// returns the result.
+        /// <see cref="NetwPrediction.ModeEnum.Rollback"/> otherwise.
         /// </summary>
         Auto = 4,
     }
 
-    public enum Reconcile : long
-    {
-        /// <summary>
-        /// Correct each entity on its own.
-        /// </summary>
-        Independent = 0,
-        /// <summary>
-        /// Correct this entity together with the entities its
-        /// <see cref="NetwEntity.Simulation"/> selects, restoring and replaying
-        /// them from the same tick.
-        /// </summary>
-        Joint = 1,
-    }
-
-    public enum BreachResponseEnum : long
-    {
-        /// <summary>
-        /// Keep predicting and correct as usual. A breach is a contact with a
-        /// moving body this peer does not simulate. Touching static geometry is
-        /// not a breach.
-        /// </summary>
-        PredictThrough = 0,
-        /// <summary>
-        /// Stop predicting and follow the server, while still sending input.
-        /// </summary>
-        Demote = 1,
-    }
-
-    public enum EpisodeState : long
-    {
-        /// <summary>
-        /// The misprediction is still being corrected.
-        /// </summary>
-        Open = 0,
-        /// <summary>
-        /// The peers agree again.
-        /// </summary>
-        Closed = 1,
-        /// <summary>
-        /// Corrections did not help, and the entity follows the server.
-        /// </summary>
-        Fallback = 2,
-    }
-
-    public enum EpisodeChange : long
-    {
-        /// <summary>
-        /// A misprediction is large enough to act on.
-        /// </summary>
-        Opened = 0,
-        /// <summary>
-        /// Corrections stopped helping and the entity follows the server. It
-        /// keeps sending input.
-        /// </summary>
-        Fallback = 1,
-        /// <summary>
-        /// The peers agreed again for long enough.
-        /// </summary>
-        Closed = 2,
-    }
-
-    public enum OperatorOutcome : long
-    {
-        /// <summary>
-        /// Not judged yet.
-        /// </summary>
-        Pending = 0,
-        /// <summary>
-        /// The error shrank or closed.
-        /// </summary>
-        Contracted = 1,
-        /// <summary>
-        /// The error held or grew.
-        /// </summary>
-        FailedToContract = 2,
-        /// <summary>
-        /// The correction caused a contact the server did not have.
-        /// </summary>
-        IntroducedBoundary = 3,
-        /// <summary>
-        /// Every property that asked for the correction is
-        /// <see cref="NetwPropertyConfig.TeleportOnly"/>, so the correction
-        /// could not write it.
-        /// </summary>
-        Withheld = 4,
-    }
-
-    public enum Attribution : long
-    {
-        /// <summary>
-        /// Nothing to blame was found.
-        /// <see cref="NetwPrediction.DivergenceDetected"/> carries an
-        /// <see cref="NetwPrediction.Attribution"/>.
-        /// </summary>
-        Unknown = 0,
-        /// <summary>
-        /// The peers started the tick from different state.
-        /// </summary>
-        PreState = 1,
-        /// <summary>
-        /// The server ran an input the controlling peer did not send.
-        /// </summary>
-        Command = 2,
-        /// <summary>
-        /// The <see cref="NetwPrediction.Sensors"/> read different values.
-        /// </summary>
-        Environment = 3,
-        /// <summary>
-        /// The peers simulated the entity in different ways.
-        /// </summary>
-        Topology = 4,
-        /// <summary>
-        /// The state agreed but the raw results differed.
-        /// </summary>
-        Execution = 5,
-        /// <summary>
-        /// The same input produced a different contact.
-        /// </summary>
-        Contact = 6,
-        /// <summary>
-        /// Everything going in agreed, and the result still differed.
-        /// </summary>
-        Closure = 7,
-    }
-
-    public enum Operator : long
-    {
-        /// <summary>
-        /// Nothing wrote the body.
-        /// </summary>
-        None = 0,
-        /// <summary>
-        /// The server's state was restored, advanced to the present.
-        /// </summary>
-        RebaseProjected = 1,
-        /// <summary>
-        /// The server's state, or its difference from the prediction, was
-        /// written as is.
-        /// </summary>
-        RebaseExact = 2,
-        /// <summary>
-        /// A teleport restored every property.
-        /// </summary>
-        FullClosure = 3,
-        /// <summary>
-        /// The body was moved to where it should be now, along a path
-        /// <see cref="NetwPrediction.CorrectionPathClear"/> allowed.
-        /// </summary>
-        TransportDelta = 4,
-        /// <summary>
-        /// The body was reset to the server's state after a fallback.
-        /// </summary>
-        Reseed = 5,
-        /// <summary>
-        /// The first comparison after a reset caught up with the server.
-        /// </summary>
-        ReseedAlign = 6,
-        /// <summary>
-        /// A breach stopped prediction while input keeps being sent.
-        /// </summary>
-        Demote = 7,
-        /// <summary>
-        /// Only the velocity differed, and it was left to fade.
-        /// </summary>
-        Dissipate = 8,
-        /// <summary>
-        /// The whole <see cref="NetwPrediction.Reconcile.Joint"/> group was
-        /// restored to the same tick.
-        /// </summary>
-        JointRebase = 9,
-    }
-
-    public enum Domain : long
-    {
-        /// <summary>
-        /// Every input to the step is known equal on both peers, so the results
-        /// must match exactly.
-        /// </summary>
-        In = 0,
-        /// <summary>
-        /// Some input to the step may differ between peers, so the results are
-        /// compared by tolerance.
-        /// </summary>
-        Out = 1,
-    }
-
     /// <summary>
-    /// The tick where the peers first disagreed is older than the kept history.
-    /// </summary>
-    public const long GeneratorUnknownBeyondRetention = 0;
-    /// <summary>
-    /// The most ticks a client may predict ahead of the last input the server
-    /// acknowledged. Past it, prediction holds. See
-    /// <see cref="NetwPrediction.AckAgeTicks"/>.
-    /// </summary>
-    public const long AckAgeMax = 64;
-
-    /// <summary>
-    /// Emitted when a predicted tick disagrees with the server, with what the
-    /// disagreement is blamed on. It is emitted whether or not a correction
-    /// follows. It is emitted when the <see cref="MultiplayerApi.Poll"/> or
-    /// <see cref="NetwClock"/> tick that found it ends, so a handler reads the
-    /// entity as that poll or tick left it.
-    /// <code>
-    /// entity.prediction.divergence_detected.connect(
-    ///     func(entry: int, attribution: NetwPrediction.Attribution):
-    ///         if attribution == NetwPrediction.ATTRIBUTION_CLOSURE:
-    ///             push_warning("transition %d diverged" % entry)
-    /// )
-    /// </code>
-    /// </summary>
-    public event Action<long, NetwPrediction.Attribution> DivergenceDetected
-    {
-        add => ConnectBridge(
-            "divergence_detected",
-            value,
-            Callable.From(
-                (long a0, long a1) =>
-                    value(a0, (NetwPrediction.Attribution)a1)
-            )
-        );
-        remove => DisconnectBridge("divergence_detected", value);
-    }
-
-    /// <summary>
-    /// Emitted when a misprediction episode opens, falls back or closes, as
-    /// <c>change</c> says. An episode holds the corrections from one
-    /// misprediction until the peers agree again. <c>report</c> is the whole
-    /// episode so far. It is emitted when the <see cref="MultiplayerApi.Poll"/>
-    /// or <see cref="NetwClock"/> tick that changed the episode ends, so a
-    /// handler reads the entity as that poll or tick left it.
+    /// Emitted after a correction moved the entity. <c>tick</c> is the tick of
+    /// the server's state it was corrected against, or the present tick when
+    /// entities rolled back together. <c>teleported</c> is <c>true</c> when the
+    /// correction was a teleport. It is emitted when the
+    /// <see cref="MultiplayerApi.Poll"/> or <see cref="NetwClock"/> tick that
+    /// corrected the entity ends, so a handler reads the entity as that poll or
+    /// tick left it. <c>deltas</c> holds how far each [float],
+    /// <see cref="Vector2"/> and <see cref="Vector3"/> state property moved, as
+    /// <c>after - before</c>, with angles taken the short way around.
     /// <code>
     /// Dictionary
-    /// ┠╴id            int
-    /// ┠╴generator     Dictionary
-    /// ┃ ┠╴transition  int
-    /// ┃ ┠╴boundary    NetwPrediction.Attribution
-    /// ┃ ┖╴row         Dictionary
-    /// ┠╴operators     Array[Dictionary]
-    /// ┃ ┠╴operator    NetwPrediction.Operator
-    /// ┃ ┠╴basis       int
-    /// ┃ ┠╴eligible    bool
-    /// ┃ ┠╴applied     bool
-    /// ┃ ┠╴eligibility Dictionary
-    /// ┃ ┠╴outcome     NetwPrediction.OperatorOutcome
-    /// ┃ ┖╴write       Dictionary
-    /// ┠╴contraction   Array[Dictionary]
-    /// ┃ ┖╴            transition, meter, agrees, write_id
-    /// ┠╴disposition   Dictionary
-    /// ┃ ┠╴state                 NetwPrediction.EpisodeState
-    /// ┃ ┠╴non_contraction_used  int
-    /// ┃ ┠╴closure_used          int
-    /// ┃ ┠╴closed_transition     int
-    /// ┃ ┠╴fallback_transition   int
-    /// ┃ ┠╴demoted               bool
-    /// ┃ ┠╴breach_transition     int
-    /// ┃ ┠╴breach_witness        Dictionary
-    /// ┃ ┠╴resume_ack_age        int
-    /// ┃ ┠╴quarantine_target     int
-    /// ┃ ┠╴quarantine_clean_run  int
-    /// ┃ ┠╴reseed_transition     int
-    /// ┃ ┠╴aligned_transition    int
-    /// ┃ ┖╴evidence_dropped      int
-    /// ┖╴reopen_chain  Array[int]
+    /// ┖╴property_name  Variant  how far that state property moved
     /// </code>
     /// <para>
-    /// <c>generator</c> is the tick where the peers first disagreed, or
-    /// <see cref="NetwPrediction.GeneratorUnknownBeyondRetention"/> when it is
-    /// too old to be kept. An operator that was rejected has <c>outcome =
-    /// -1</c> and an empty <c>write</c>. Long series are trimmed to the newest
-    /// entries, and <c>evidence_dropped</c> counts what was trimmed.
-    /// </para>
-    /// </summary>
-    public event Action<
-        NetwPrediction.EpisodeChange,
-        Godot.Collections.Dictionary> EpisodeChanged
-    {
-        add => ConnectBridge(
-            "episode_changed",
-            value,
-            Callable.From(
-                (long a0, Godot.Collections.Dictionary a1) =>
-                    value((NetwPrediction.EpisodeChange)a0, a1)
-            )
-        );
-        remove => DisconnectBridge("episode_changed", value);
-    }
-
-    /// <summary>
-    /// Emitted after a correction moved the body. <c>deltas</c> holds how far
-    /// each property moved, as <c>after - before</c>, with angles taken the
-    /// short way around. <c>teleported</c> is <c>true</c> when the correction
-    /// was a teleport. It is emitted when the <see cref="MultiplayerApi.Poll"/>
-    /// or <see cref="NetwClock"/> tick that corrected the body ends, so a
-    /// handler reads the body as that poll or tick left it. Under
-    /// <see cref="NetwDisplay.LiveModeEnum.Chase"/> the display already smooths
-    /// the correction away.
+    /// Under <see cref="NetwDisplay.LiveModeEnum.Chase"/> the display already
+    /// smooths the correction away.
     /// <code>
     /// entity.display.live_mode = NetwDisplay.LIVE_MODE_CHASE
-    /// api.display_set_param(entity.rid,
-    ///         NetwMultiplayer.DISPLAY_PARAM_CHASE_GLIDE_TIME, 0.15)
+    /// entity.display.chase_glide_time = 0.15
     /// </code>
+    /// </para>
     /// </summary>
-    public event Action<
-        long,
-        Godot.Collections.Dictionary,
-        bool,
-        NetwPrediction.Attribution> Recovered
+    public event Action<long, Godot.Collections.Dictionary, bool> Corrected
     {
         add => ConnectBridge(
-            "recovered",
+            "corrected",
             value,
             Callable.From(
-                (long a0, Godot.Collections.Dictionary a1, bool a2, long a3) =>
-                    value(a0, a1, a2, (NetwPrediction.Attribution)a3)
+                (long a0, Godot.Collections.Dictionary a1, bool a2) =>
+                    value(a0, a1, a2)
             )
         );
-        remove => DisconnectBridge("recovered", value);
-    }
-
-    /// <summary>
-    /// Emitted on the controlling client each time server state arrives.
-    /// <c>divergence</c> is the largest error of any property, including errors
-    /// under <see cref="NetwPrediction.DivergenceEpsilon"/>. <c>diverged</c> is
-    /// whether the error was large enough to act on, even when no correction
-    /// was written. Connect to <see cref="NetwPrediction.Recovered"/> to know
-    /// when the body actually moved. It is emitted when the
-    /// <see cref="MultiplayerApi.Poll"/> or <see cref="NetwClock"/> tick that
-    /// compared the state ends, so a handler reads the entity as that poll or
-    /// tick left it.
-    /// </summary>
-    public event Action<long, long, double, bool> StateEvaluated
-    {
-        add => ConnectBridge(
-            "state_evaluated",
-            value,
-            Callable.From(
-                (long a0, long a1, double a2, bool a3) =>
-                    value(a0, a1, a2, a3)
-            )
-        );
-        remove => DisconnectBridge("state_evaluated", value);
+        remove => DisconnectBridge("corrected", value);
     }
 
     private static readonly IntPtr _bindGetPredictInput =
@@ -693,138 +204,99 @@ public sealed class NetwPrediction : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetRecoveryPolicy =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "get_recovery_policy",
-            2128747286UL);
+    private static readonly IntPtr _bindGetMode =
+        NetwApi.MethodBind("NetwPrediction", "get_mode", 491398466UL);
 
-    private static readonly IntPtr _bindSetRecoveryPolicy =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "set_recovery_policy",
-            971215631UL);
+    private static readonly IntPtr _bindSetMode =
+        NetwApi.MethodBind("NetwPrediction", "set_mode", 1295054527UL);
 
     /// <summary>
-    /// How this entity is corrected. Defaults to
-    /// <see cref="NetwPrediction.RecoveryPolicyEnum.Auto"/>, and
-    /// <see cref="NetwPrediction.ArchetypeEnum.Scripted"/> sets
-    /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseReplay"/>.
-    /// <see cref="NetwPrediction.ResolvedRecoveryPolicy"/> returns the policy
-    /// in use.
+    /// How a misprediction is corrected. Defaults to
+    /// <see cref="NetwPrediction.ModeEnum.Auto"/>.
     /// </summary>
-    public NetwPrediction.RecoveryPolicyEnum RecoveryPolicy
+    public NetwPrediction.ModeEnum Mode
     {
         get
         {
             long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindGetRecoveryPolicy,
-                Checked,
-                ref answered);
-            return (NetwPrediction.RecoveryPolicyEnum)answered;
+            NetwThunks.Ptrcall0_Long(_bindGetMode, Checked, ref answered);
+            return (NetwPrediction.ModeEnum)answered;
         }
         set
         {
             long slot0 = (long)value;
             long discarded = default;
             NetwThunks.Ptrcall1_Long_Long(
-                _bindSetRecoveryPolicy,
+                _bindSetMode,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetBreachResponse =
+    private static readonly IntPtr _bindGetPauseOnUnpredictedContact =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_breach_response",
-            369457856UL);
+            "get_pause_on_unpredicted_contact",
+            36873697UL);
 
-    private static readonly IntPtr _bindSetBreachResponse =
+    private static readonly IntPtr _bindSetPauseOnUnpredictedContact =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_breach_response",
-            3789287672UL);
+            "set_pause_on_unpredicted_contact",
+            2586408642UL);
 
     /// <summary>
-    /// What this entity does when it touches a moving body this peer does not
-    /// simulate. It only takes effect once
-    /// <see cref="NetwPrediction.WitnessContacts"/> is set.
+    /// If <c>true</c>, this entity stops predicting and follows the server
+    /// while it touches a moving body this peer does not simulate. It still
+    /// sends input. It only takes effect on an entity with
+    /// <see cref="NetwSimulation.PhysicsDriven"/>, whose contacts are read from
+    /// its bodies.
     /// </summary>
-    public NetwPrediction.BreachResponseEnum BreachResponse
+    public bool PauseOnUnpredictedContact
+    {
+        get
+        {
+            byte answered = default;
+            NetwThunks.Ptrcall0_Byte(
+                _bindGetPauseOnUnpredictedContact,
+                Checked,
+                ref answered);
+            return answered != 0;
+        }
+        set
+        {
+            byte slot0 = value ? (byte)1 : (byte)0;
+            long discarded = default;
+            NetwThunks.Ptrcall1_Byte_Long(
+                _bindSetPauseOnUnpredictedContact,
+                Checked,
+                in slot0,
+                ref discarded);
+        }
+    }
+
+    private static readonly IntPtr _bindGetWorldVersion =
+        NetwApi.MethodBind("NetwPrediction", "get_world_version", 3905245786UL);
+
+    private static readonly IntPtr _bindSetWorldVersion =
+        NetwApi.MethodBind("NetwPrediction", "set_world_version", 1286410249UL);
+
+    /// <summary>
+    /// The version of the level this entity moves in, or <c>-1</c> when unset.
+    /// Change it when the level changes. For
+    /// <see cref="NetwPrediction.CorrectionCooldownTicks"/> after that, a
+    /// correction writes the server's state outright.
+    /// </summary>
+    public long WorldVersion
     {
         get
         {
             long answered = default;
             NetwThunks.Ptrcall0_Long(
-                _bindGetBreachResponse,
+                _bindGetWorldVersion,
                 Checked,
                 ref answered);
-            return (NetwPrediction.BreachResponseEnum)answered;
-        }
-        set
-        {
-            long slot0 = (long)value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetBreachResponse,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetSensors =
-        NetwApi.MethodBind("NetwPrediction", "get_sensors", 3102165223UL);
-
-    private static readonly IntPtr _bindSetSensors =
-        NetwApi.MethodBind("NetwPrediction", "set_sensors", 4155329257UL);
-
-    /// <summary>
-    /// Callables that sample the world this entity reads, by name. Each is
-    /// called once before each step, and <see cref="NetwPrediction.Sensor"/>
-    /// reads the sample back. A misprediction can then be blamed on the world.
-    /// </summary>
-    public Godot.Collections.Dictionary Sensors
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetSensors, Checked, ref answered);
-            Godot.Collections.Dictionary result =
-                VariantUtils.ConvertToDictionary(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromDictionary(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(_bindSetSensors, Checked, in slot0, ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
-    }
-
-    private static readonly IntPtr _bindGetEpoch =
-        NetwApi.MethodBind("NetwPrediction", "get_epoch", 3905245786UL);
-
-    private static readonly IntPtr _bindSetEpoch =
-        NetwApi.MethodBind("NetwPrediction", "set_epoch", 1286410249UL);
-
-    /// <summary>
-    /// The version of the static world this entity simulates against, or
-    /// <c>-1</c> when unset. Raise it when the level changes, so the next
-    /// mispredictions are tolerated while peers catch up.
-    /// </summary>
-    public long Epoch
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetEpoch, Checked, ref answered);
             return answered;
         }
         set
@@ -832,51 +304,10 @@ public sealed class NetwPrediction : NetwRefCounted
             long slot0 = value;
             long discarded = default;
             NetwThunks.Ptrcall1_Long_Long(
-                _bindSetEpoch,
+                _bindSetWorldVersion,
                 Checked,
                 in slot0,
                 ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetWitnessContacts =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "get_witness_contacts",
-            1307783378UL);
-
-    private static readonly IntPtr _bindSetWitnessContacts =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "set_witness_contacts",
-            1611583062UL);
-
-    /// <summary>
-    /// Returns the colliders this peer's body touched in the step just solved.
-    /// Set it so a misprediction can be blamed on a contact and
-    /// <see cref="NetwPrediction.BreachResponse"/> can take effect.
-    /// </summary>
-    public Callable WitnessContacts
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetWitnessContacts, Checked, ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(
-                _bindSetWitnessContacts,
-                Checked,
-                in slot0,
-                ref answered);
-            slot0.Dispose();
-            answered.Dispose();
         }
     }
 
@@ -893,9 +324,9 @@ public sealed class NetwPrediction : NetwRefCounted
             1611583062UL);
 
     /// <summary>
-    /// Checks whether an eligible correction can carry the body to its proposed
-    /// present pose. Return <c>true</c> only when the swept path is clear. The
-    /// engine moves the body. An unset callback disables this correction. Both
+    /// Checks whether a correction can move the body straight to its proposed
+    /// state. Return <c>true</c> only when the swept path is clear. The engine
+    /// moves the body. An unset callback disables this correction. Both
     /// <see cref="Godot.Collections.Dictionary"/> arguments contain state
     /// declared with <see cref="NetwPropertyConfig.State"/>. This example
     /// sweeps an unscaled <see cref="RigidBody3D"/> with <c>Node3D.position</c>
@@ -974,12 +405,16 @@ public sealed class NetwPrediction : NetwRefCounted
             373806689UL);
 
     /// <summary>
-    /// How large an error may be before a correction teleports the body,
-    /// restoring every property including
-    /// <see cref="NetwPropertyConfig.TeleportOnly"/> ones. It applies to
-    /// properties declared with <see cref="NetwPropertyConfig.CarryAlong"/>,
-    /// and <see cref="NetwPropertyConfig.TeleportAt"/> overrides it per
-    /// property. An entity with no such property teleports on every correction.
+    /// How large an error may be before a
+    /// <see cref="NetwPrediction.ModeEnum.Offset"/> correction teleports the
+    /// entity, writing every state property including
+    /// <see cref="NetwPropertyConfig.TeleportOnly"/> ones. It is measured on
+    /// properties declared with <see cref="NetwPropertyConfig.Extrapolate"/>,
+    /// and <see cref="NetwPropertyConfig.TeleportThreshold"/> overrides it for
+    /// one property. An entity with neither teleports on every such correction.
+    /// A rollback writes the server's state at any size of error. Defaults to
+    /// <c>3.0</c> on an entity with <see cref="NetwSimulation.PhysicsDriven"/>
+    /// and <c>2.0</c> otherwise.
     /// </summary>
     public double TeleportThreshold
     {
@@ -1004,30 +439,30 @@ public sealed class NetwPrediction : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetCollisionCooldownTicks =
+    private static readonly IntPtr _bindGetCorrectionCooldownTicks =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_collision_cooldown_ticks",
+            "get_correction_cooldown_ticks",
             3905245786UL);
 
-    private static readonly IntPtr _bindSetCollisionCooldownTicks =
+    private static readonly IntPtr _bindSetCorrectionCooldownTicks =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_collision_cooldown_ticks",
+            "set_correction_cooldown_ticks",
             1286410249UL);
 
     /// <summary>
-    /// How many ticks <see cref="NetwPrediction.NotifyContact"/> holds off
-    /// corrections. An error past
-    /// <see cref="NetwPrediction.TeleportThreshold"/> still corrects.
+    /// How many ticks <see cref="NetwPrediction.NotifyCollision"/> holds off
+    /// small corrections. An error past
+    /// <see cref="NetwPrediction.TeleportThreshold"/> still teleports.
     /// </summary>
-    public int CollisionCooldownTicks
+    public int CorrectionCooldownTicks
     {
         get
         {
             int answered = default;
             NetwThunks.Ptrcall0_Int(
-                _bindGetCollisionCooldownTicks,
+                _bindGetCorrectionCooldownTicks,
                 Checked,
                 ref answered);
             return answered;
@@ -1037,29 +472,41 @@ public sealed class NetwPrediction : NetwRefCounted
             int slot0 = value;
             long discarded = default;
             NetwThunks.Ptrcall1_Int_Long(
-                _bindSetCollisionCooldownTicks,
+                _bindSetCorrectionCooldownTicks,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetSleeping =
-        NetwApi.MethodBind("NetwPrediction", "get_sleeping", 36873697UL);
+    private static readonly IntPtr _bindGetRepeatMissingInput =
+        NetwApi.MethodBind(
+            "NetwPrediction",
+            "get_repeat_missing_input",
+            36873697UL);
 
-    private static readonly IntPtr _bindSetSleeping =
-        NetwApi.MethodBind("NetwPrediction", "set_sleeping", 2586408642UL);
+    private static readonly IntPtr _bindSetRepeatMissingInput =
+        NetwApi.MethodBind(
+            "NetwPrediction",
+            "set_repeat_missing_input",
+            2586408642UL);
 
     /// <summary>
-    /// Set it while the server's body is asleep. Corrections pause, so they do
-    /// not wake it.
+    /// If <c>true</c>, the server repeats the last input when one is lost. If
+    /// <c>false</c>, it runs nothing for that input at
+    /// <see cref="NetwSimulation.ScheduleEnum.Tick"/> and runs with zeroed
+    /// input at the other schedules. Defaults to <c>true</c> on an entity with
+    /// <see cref="NetwSimulation.PhysicsDriven"/>.
     /// </summary>
-    public bool Sleeping
+    public bool RepeatMissingInput
     {
         get
         {
             byte answered = default;
-            NetwThunks.Ptrcall0_Byte(_bindGetSleeping, Checked, ref answered);
+            NetwThunks.Ptrcall0_Byte(
+                _bindGetRepeatMissingInput,
+                Checked,
+                ref answered);
             return answered != 0;
         }
         set
@@ -1067,78 +514,41 @@ public sealed class NetwPrediction : NetwRefCounted
             byte slot0 = value ? (byte)1 : (byte)0;
             long discarded = default;
             NetwThunks.Ptrcall1_Byte_Long(
-                _bindSetSleeping,
+                _bindSetRepeatMissingInput,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetMissingPolicy =
+    private static readonly IntPtr _bindGetMaxInputsPerTick =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_missing_policy",
-            1790498113UL);
-
-    private static readonly IntPtr _bindSetMissingPolicy =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "set_missing_policy",
-            3891534490UL);
-
-    /// <summary>
-    /// What the server does when an input never arrives.
-    /// </summary>
-    public NetwPrediction.MissingInput MissingPolicy
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindGetMissingPolicy,
-                Checked,
-                ref answered);
-            return (NetwPrediction.MissingInput)answered;
-        }
-        set
-        {
-            long slot0 = (long)value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetMissingPolicy,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetMaxConsumePerTick =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "get_max_consume_per_tick",
+            "get_max_inputs_per_tick",
             3905245786UL);
 
-    private static readonly IntPtr _bindSetMaxConsumePerTick =
+    private static readonly IntPtr _bindSetMaxInputsPerTick =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_max_consume_per_tick",
+            "set_max_inputs_per_tick",
             1286410249UL);
 
     /// <summary>
     /// How many queued inputs the server may run in one tick to catch up to
-    /// <see cref="NetwPrediction.ConsumeBufferTicks"/> behind the newest input.
-    /// Extra inputs run as extra steps and are never skipped. It applies to
+    /// <see cref="NetwPrediction.InputBufferTicks"/> behind the newest input.
+    /// Each extra input runs <see cref="NetwSimulation.NetworkProcess"/> once
+    /// more, and none is skipped. It applies to
     /// <see cref="NetwSimulation.ScheduleEnum.Tick"/>, and an entity at
     /// <see cref="NetwSimulation.ScheduleEnum.Frame"/> catches up by running
     /// one input per physics frame.
     /// </summary>
-    public int MaxConsumePerTick
+    public int MaxInputsPerTick
     {
         get
         {
             int answered = default;
             NetwThunks.Ptrcall0_Int(
-                _bindGetMaxConsumePerTick,
+                _bindGetMaxInputsPerTick,
                 Checked,
                 ref answered);
             return answered;
@@ -1148,37 +558,37 @@ public sealed class NetwPrediction : NetwRefCounted
             int slot0 = value;
             long discarded = default;
             NetwThunks.Ptrcall1_Int_Long(
-                _bindSetMaxConsumePerTick,
+                _bindSetMaxInputsPerTick,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetConsumeBufferTicks =
+    private static readonly IntPtr _bindGetInputBufferTicks =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_consume_buffer_ticks",
+            "get_input_buffer_ticks",
             3905245786UL);
 
-    private static readonly IntPtr _bindSetConsumeBufferTicks =
+    private static readonly IntPtr _bindSetInputBufferTicks =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_consume_buffer_ticks",
+            "set_input_buffer_ticks",
             1286410249UL);
 
     /// <summary>
-    /// How many ticks of input the server waits for before it starts running
-    /// them. It then runs one every tick, so late inputs do not stall the
-    /// entity. Each tick adds a tick of input latency.
+    /// How many ticks of input the server keeps queued before it runs them. It
+    /// then runs one every tick, so an input that arrives late is still in
+    /// time. Each tick adds a tick of delay.
     /// </summary>
-    public int ConsumeBufferTicks
+    public int InputBufferTicks
     {
         get
         {
             int answered = default;
             NetwThunks.Ptrcall0_Int(
-                _bindGetConsumeBufferTicks,
+                _bindGetInputBufferTicks,
                 Checked,
                 ref answered);
             return answered;
@@ -1188,63 +598,23 @@ public sealed class NetwPrediction : NetwRefCounted
             int slot0 = value;
             long discarded = default;
             NetwThunks.Ptrcall1_Int_Long(
-                _bindSetConsumeBufferTicks,
+                _bindSetInputBufferTicks,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetReplayBufferDepth =
+    private static readonly IntPtr _bindGetMaxInputLagTicks =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_replay_buffer_depth",
+            "get_max_input_lag_ticks",
             3905245786UL);
 
-    private static readonly IntPtr _bindSetReplayBufferDepth =
+    private static readonly IntPtr _bindSetMaxInputLagTicks =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_replay_buffer_depth",
-            1286410249UL);
-
-    /// <summary>
-    /// How many inputs the server keeps queued before running them, for an
-    /// entity at <see cref="NetwSimulation.ScheduleEnum.Frame"/>. Each one adds
-    /// a tick of latency, so leave it at <c>0</c> unless you need it.
-    /// </summary>
-    public int ReplayBufferDepth
-    {
-        get
-        {
-            int answered = default;
-            NetwThunks.Ptrcall0_Int(
-                _bindGetReplayBufferDepth,
-                Checked,
-                ref answered);
-            return answered;
-        }
-        set
-        {
-            int slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Int_Long(
-                _bindSetReplayBufferDepth,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetMaxConsumeLagTicks =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "get_max_consume_lag_ticks",
-            3905245786UL);
-
-    private static readonly IntPtr _bindSetMaxConsumeLagTicks =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "set_max_consume_lag_ticks",
+            "set_max_input_lag_ticks",
             1286410249UL);
 
     /// <summary>
@@ -1252,13 +622,13 @@ public sealed class NetwPrediction : NetwRefCounted
     /// ahead to it. Without this, a client that joins a running session can
     /// leave the server behind for good. <c>0</c> disables skipping.
     /// </summary>
-    public int MaxConsumeLagTicks
+    public int MaxInputLagTicks
     {
         get
         {
             int answered = default;
             NetwThunks.Ptrcall0_Int(
-                _bindGetMaxConsumeLagTicks,
+                _bindGetMaxInputLagTicks,
                 Checked,
                 ref answered);
             return answered;
@@ -1268,70 +638,39 @@ public sealed class NetwPrediction : NetwRefCounted
             int slot0 = value;
             long discarded = default;
             NetwThunks.Ptrcall1_Int_Long(
-                _bindSetMaxConsumeLagTicks,
+                _bindSetMaxInputLagTicks,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetAckAgeTicks =
-        NetwApi.MethodBind("NetwPrediction", "get_ack_age_ticks", 3905245786UL);
-
-    private static readonly IntPtr _bindSetAckAgeTicks =
-        NetwApi.MethodBind("NetwPrediction", "set_ack_age_ticks", 1286410249UL);
-
-    /// <summary>
-    /// How many ticks the last input the server acknowledged is behind the
-    /// newest input. On a healthy connection it stays near zero, and a growing
-    /// value means the server is falling behind.
-    /// <see cref="NetwSimulation.MaxRestoreTicks"/> caps it on the client.
-    /// </summary>
-    public int AckAgeTicks
-    {
-        get
-        {
-            int answered = default;
-            NetwThunks.Ptrcall0_Int(_bindGetAckAgeTicks, Checked, ref answered);
-            return answered;
-        }
-        set
-        {
-            int slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Int_Long(
-                _bindSetAckAgeTicks,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetDivergenceEpsilon =
+    private static readonly IntPtr _bindGetCorrectionThreshold =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_divergence_epsilon",
+            "get_correction_threshold",
             1740695150UL);
 
-    private static readonly IntPtr _bindSetDivergenceEpsilon =
+    private static readonly IntPtr _bindSetCorrectionThreshold =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_divergence_epsilon",
+            "set_correction_threshold",
             373806689UL);
 
     /// <summary>
     /// How far the predicted state may drift from the server's before it is
-    /// corrected. <see cref="NetwPropertyConfig.Epsilon"/> overrides it for one
-    /// property. A <see cref="NetwPrediction.ArchetypeEnum.SolverBody"/>
-    /// tolerates one and a half quantizer steps on each quantized property.
+    /// corrected. <see cref="NetwPropertyConfig.CorrectionThreshold"/>
+    /// overrides it for one property. An entity with
+    /// <see cref="NetwSimulation.PhysicsDriven"/> tolerates one and a half
+    /// quantizer steps on each quantized property.
     /// </summary>
-    public double DivergenceEpsilon
+    public double CorrectionThreshold
     {
         get
         {
             double answered = default;
             NetwThunks.Ptrcall0_Double(
-                _bindGetDivergenceEpsilon,
+                _bindGetCorrectionThreshold,
                 Checked,
                 ref answered);
             return answered;
@@ -1341,305 +680,91 @@ public sealed class NetwPrediction : NetwRefCounted
             double slot0 = value;
             long discarded = default;
             NetwThunks.Ptrcall1_Double_Long(
-                _bindSetDivergenceEpsilon,
+                _bindSetCorrectionThreshold,
                 Checked,
                 in slot0,
                 ref discarded);
         }
     }
 
-    private static readonly IntPtr _bindGetReconcileMode =
+    private static readonly IntPtr _bindGetRollbackTogether =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "get_reconcile_mode",
-            1627431067UL);
+            "get_rollback_together",
+            36873697UL);
 
-    private static readonly IntPtr _bindSetReconcileMode =
+    private static readonly IntPtr _bindSetRollbackTogether =
         NetwApi.MethodBind(
             "NetwPrediction",
-            "set_reconcile_mode",
-            4250524326UL);
+            "set_rollback_together",
+            2586408642UL);
 
     /// <summary>
-    /// Whether this entity is corrected alone or together with the entities its
-    /// <see cref="NetwEntity.Simulation"/> selects.
+    /// If <c>true</c>, this entity is corrected together with the entities its
+    /// <see cref="NetwEntity.Simulation"/> selects, rolling them back from the
+    /// same tick. If <c>false</c>, each entity is corrected on its own.
+    /// Defaults to <c>true</c> on an entity with
+    /// <see cref="NetwSimulation.PhysicsDriven"/> that runs at
+    /// <see cref="NetwSimulation.ScheduleEnum.Stepped"/>, and <c>false</c>
+    /// otherwise.
     /// </summary>
-    public NetwPrediction.Reconcile ReconcileMode
+    public bool RollbackTogether
+    {
+        get
+        {
+            byte answered = default;
+            NetwThunks.Ptrcall0_Byte(
+                _bindGetRollbackTogether,
+                Checked,
+                ref answered);
+            return answered != 0;
+        }
+        set
+        {
+            byte slot0 = value ? (byte)1 : (byte)0;
+            long discarded = default;
+            NetwThunks.Ptrcall1_Byte_Long(
+                _bindSetRollbackTogether,
+                Checked,
+                in slot0,
+                ref discarded);
+        }
+    }
+
+    private static readonly IntPtr _bindGetCorrectionCount =
+        NetwApi.MethodBind(
+            "NetwPrediction",
+            "get_correction_count",
+            3905245786UL);
+
+    /// <summary>
+    /// How many times this peer has corrected the entity.
+    /// </summary>
+    public long CorrectionCount
     {
         get
         {
             long answered = default;
             NetwThunks.Ptrcall0_Long(
-                _bindGetReconcileMode,
+                _bindGetCorrectionCount,
                 Checked,
                 ref answered);
-            return (NetwPrediction.Reconcile)answered;
-        }
-        set
-        {
-            long slot0 = (long)value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetReconcileMode,
-                Checked,
-                in slot0,
-                ref discarded);
+            return answered;
         }
     }
 
-    private static readonly IntPtr _bindGetArchetype =
-        NetwApi.MethodBind("NetwPrediction", "get_archetype", 1318527196UL);
-
-    private static readonly IntPtr _bindSetArchetype =
-        NetwApi.MethodBind("NetwPrediction", "set_archetype", 3574791380UL);
-
-    /// <summary>
-    /// A preset for this entity's prediction settings and
-    /// <see cref="NetwSimulation.Schedule"/>. Settings written afterwards
-    /// override the preset. No preset sets
-    /// <see cref="NetwPrediction.BreachResponse"/>.
-    /// </summary>
-    public NetwPrediction.ArchetypeEnum Archetype
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetArchetype, Checked, ref answered);
-            return (NetwPrediction.ArchetypeEnum)answered;
-        }
-        set
-        {
-            long slot0 = (long)value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetArchetype,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetStats =
-        NetwApi.MethodBind("NetwPrediction", "get_stats", 4290843155UL);
-
-    /// <summary>
-    /// This entity's prediction counters.
-    /// </summary>
-    public NetwPredictStats Stats
-    {
-        get
-        {
-            IntPtr answered = default;
-            NetwThunks.Ptrcall0_IntPtr(_bindGetStats, Checked, ref answered);
-            return NetwPredictStats.Adopt(answered);
-        }
-    }
-
-    private static readonly IntPtr _bindBindEntity =
-        NetwApi.MethodBind("NetwPrediction", "bind_entity", 3949104711UL);
-
-    /// <summary>
-    /// Binds the entity this handle belongs to. Called by Networked when it
-    /// creates the handle.
-    /// </summary>
-    public void BindEntity(NetwEntity entity)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindBindEntity,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindEntity =
-        NetwApi.MethodBind("NetwPrediction", "entity", 1711071689UL);
-
-    /// <summary>
-    /// The entity this handle belongs to, or <c>null</c> once that entity is
-    /// gone.
-    /// </summary>
-    public NetwEntity Entity()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindEntity, Checked, ref answered);
-        return NetwEntity.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindIsRegistered =
-        NetwApi.MethodBind("NetwPrediction", "is_registered", 36873697UL);
-
-    /// <summary>
-    /// Whether the entity is being predicted, as opposed to only configured. It
-    /// is already false when <see cref="NetwSimulation.ModeChanged"/> reports
-    /// <see cref="NetwSimulation.ModeEnum.None"/> as the entity stops being
-    /// predicted.
-    /// </summary>
-    public bool IsRegistered()
-    {
-        byte answered = default;
-        NetwThunks.Ptrcall0_Byte(_bindIsRegistered, Checked, ref answered);
-        return answered != 0;
-    }
-
-    private static readonly IntPtr _bindSensor =
-        NetwApi.MethodBind("NetwPrediction", "sensor", 3990617847UL);
-
-    /// <summary>
-    /// The value sampled for the sensor <paramref name="name"/> before the
-    /// current step, or <paramref name="default"/> when nothing sampled it.
-    /// Read the world through this in your step, so a misprediction can be
-    /// blamed on the world.
-    /// <code>
-    /// func _init() -&gt; void:
-    ///     entity.prediction.sensors[&amp;"ground"] = _sample_ground
-    ///
-    /// func _network_tick(delta: float, tick: int, fresh: bool) -&gt; void:
-    ///     var ground: Dictionary = entity.prediction.sensor(&amp;"ground", {})
-    /// </code>
-    /// </summary>
-    public Variant Sensor(StringName name, Variant @default = default)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromStringName(name);
-        godot_variant slot1 = @default.CopyNativeVariant();
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindSensor,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        Variant result = Variant.CreateCopyingBorrowed(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindResolvedRecoveryPolicy =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "resolved_recovery_policy",
-            2128747286UL);
-
-    /// <summary>
-    /// The <see cref="NetwPrediction.RecoveryPolicyEnum"/> this entity actually
-    /// uses. <see cref="NetwPrediction.RecoveryPolicyEnum.Auto"/> is resolved
-    /// from the body, and a physics body at
-    /// <see cref="NetwSimulation.ScheduleEnum.Frame"/> resolves
-    /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseReplay"/> to
-    /// <see cref="NetwPrediction.RecoveryPolicyEnum.RebaseRecover"/>.
-    /// </summary>
-    public NetwPrediction.RecoveryPolicyEnum ResolvedRecoveryPolicy()
-    {
-        long answered = default;
-        NetwThunks.Ptrcall0_Long(
-            _bindResolvedRecoveryPolicy,
-            Checked,
-            ref answered);
-        return (NetwPrediction.RecoveryPolicyEnum)answered;
-    }
-
-    private static readonly IntPtr _bindSimulateTick =
-        NetwApi.MethodBind("NetwPrediction", "simulate_tick", 1005356550UL);
-
-    /// <summary>
-    /// Steps the entity for <paramref name="tick"/>. Does nothing for an entity
-    /// that is not predicted.
-    /// </summary>
-    public void SimulateTick(double delta, long tick)
-    {
-        double slot0 = delta;
-        long slot1 = tick;
-        long discarded = default;
-        NetwThunks.Ptrcall2_Double_Long_Long(
-            _bindSimulateTick,
-            Checked,
-            in slot0,
-            in slot1,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindSimulateFrame =
-        NetwApi.MethodBind("NetwPrediction", "simulate_frame", 373806689UL);
-
-    /// <summary>
-    /// Steps an entity at <see cref="NetwSimulation.ScheduleEnum.Frame"/> once,
-    /// as the session would. Does nothing for an entity at
-    /// <see cref="NetwSimulation.ScheduleEnum.Tick"/> or one that is not
-    /// predicted.
-    /// </summary>
-    public void SimulateFrame(double delta)
-    {
-        double slot0 = delta;
-        long discarded = default;
-        NetwThunks.Ptrcall1_Double_Long(
-            _bindSimulateFrame,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindReachability =
-        NetwApi.MethodBind("NetwPrediction", "reachability", 3102165223UL);
-
-    /// <summary>
-    /// Reports, property by property, whether this entity's prediction settings
-    /// take effect. Returns an empty <see cref="Godot.Collections.Dictionary"/>
-    /// before the entity is predicted. Use it while wiring an entity to find
-    /// settings that are accepted but do nothing.
-    /// <code>
-    /// var report := entity.prediction.reachability()
-    /// for key: StringName in report[&amp;"fields"]:
-    ///     var row: Dictionary = report[&amp;"fields"][key]
-    ///     var model: Dictionary = row[&amp;"forward_model"]
-    ///     if not model[&amp;"live"] and model[&amp;"kind"] != &amp;"none":
-    ///         print(key, " forward model is not live, ", model[&amp;"why"])
-    ///
-    /// print(report[&amp;"breach"])
-    /// print(report[&amp;"findings"])
-    /// </code>
-    /// <para>
-    /// <c>fields</c> is keyed by property, and each row carries the following.
-    /// <code>
-    /// Dictionary
-    /// ┠╴class          which NetwPropertyConfig.PropertyClass it is
-    /// ┠╴triggers       whether it can force a correction on its own
-    /// ┠╴tolerance      the epsilon in force, and who declared it
-    /// ┠╴teleport_at    the teleport distance, and who declared it
-    /// ┠╴in_tier        whether it is in the tier being compared
-    /// ┠╴operators      what may write it during a recovery
-    /// ┖╴forward_model  {kind, live, why}
-    /// </code>
-    /// </para>
-    /// <para>
-    /// <c>findings</c> lists the same warnings printed when the entity is set
-    /// up.
-    /// </para>
-    /// </summary>
-    public Godot.Collections.Dictionary Reachability()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindReachability, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindNotifyContact =
-        NetwApi.MethodBind("NetwPrediction", "notify_contact", 3218959716UL);
+    private static readonly IntPtr _bindNotifyCollision =
+        NetwApi.MethodBind("NetwPrediction", "notify_collision", 3218959716UL);
 
     /// <summary>
     /// Holds off small corrections for
-    /// <see cref="NetwPrediction.CollisionCooldownTicks"/>. Call it on the
-    /// controlling client when the predicted body collides, so the correction
-    /// does not fight the collision.
+    /// <see cref="NetwPrediction.CorrectionCooldownTicks"/>, so a correction
+    /// does not fight a collision. Call it on the client that controls the
+    /// entity when its body collides. A rollback is not held off.
     /// </summary>
-    public void NotifyContact()
+    public void NotifyCollision()
     {
         long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindNotifyContact, Checked, ref discarded);
+        NetwThunks.Ptrcall0_Long(_bindNotifyCollision, Checked, ref discarded);
     }
 }

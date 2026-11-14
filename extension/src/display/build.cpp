@@ -56,15 +56,22 @@ StringName state_key_for(Node *p_node, const StringName &p_prop) {
     );
 }
 
-static void warn_double_write(Channel *p_standing, Channel *p_fresh) {
+static void warn_double_write(
+    Node *p_owner,
+    Channel *p_standing,
+    Channel *p_fresh
+) {
     if (p_standing->get_target_obj() == p_fresh->get_target_obj()
         && p_standing->get_target_prop() == p_fresh->get_target_prop()) {
         fault::raise(
-            nullptr,
+            NetwMultiplayer::session_holding(p_owner),
             NETW_FAULT_INTERPOLATION_IGNORED,
             {String(p_fresh->get_target_prop()),
-             String("a second interpolation of it"),
-             String("one interpolation for each property")}
+             String(),
+             String(),
+             0,
+             NETW_INTERPOLATION_WRITTEN_TWICE},
+            gd::instance_id(p_owner)
         );
     }
 }
@@ -110,12 +117,10 @@ Channel *ensure_state(
                      String(p_node->get_name()),
                      String(p_target_prop)
                  ),
-                 vformat(
-                     "a visual root '%s' that is not a node under '%s'",
-                     String(config.visual_root),
-                     String(owner->get_name())
-                 ),
-                 String("a child node as {NetwDisplay.visual_root}")},
+                 String(owner->get_name()),
+                 String(config.visual_root),
+                 0,
+                 NETW_INTERPOLATION_VISUAL_ROOT_MISSING},
                 gd::instance_id(p_node)
             );
             return nullptr;
@@ -133,11 +138,10 @@ Channel *ensure_state(
                  String(p_node->get_name()),
                  String(p_target_prop)
              ),
-             vformat(
-                 "a write to '%s' on the simulated body itself",
-                 String(p_target_prop)
-             ),
-             String("{NetwDisplay.visual_root} to draw it on a child node")},
+             String(),
+             String(),
+             0,
+             NETW_INTERPOLATION_WRITES_BODY},
             gd::instance_id(p_node)
         );
         return nullptr;
@@ -163,12 +167,13 @@ Channel *ensure_state(
     if (visual != nullptr && target == visual && !port.get_global_space()
         && !bool(visual->get("top_level")) && is_spatial(p_target_prop)) {
         fault::raise(
-            nullptr,
+            NetwMultiplayer::session_holding(owner),
             NETW_FAULT_INTERPOLATION_IGNORED,
             {String(p_target_prop),
-             String("a write in local space, which the body drags"),
-             String("top_level on the visual node, or position and rotation "
-                    "interpolated")},
+             String(),
+             String(),
+             0,
+             NETW_INTERPOLATION_LOCAL_SPACE},
             gd::instance_id(visual)
         );
     }
@@ -191,7 +196,7 @@ Channel *ensure_state(
     *added = fresh;
     p_runtime->order_writes();
     if (claimant >= 0) {
-        warn_double_write(p_runtime->channels()[claimant], added);
+        warn_double_write(owner, p_runtime->channels()[claimant], added);
     }
     return added;
 }

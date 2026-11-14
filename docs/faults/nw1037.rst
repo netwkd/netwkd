@@ -1,0 +1,31 @@
+:github_url: hide
+
+.. _fault_nw1037:
+
+NW1037. An entity that is not predicted sets SCHEDULE_STEPPED
+=============================================================
+
+Reported as a warning when an entity sets
+:ref:`SCHEDULE_STEPPED <class_NetwSimulation_constant_SCHEDULE_STEPPED>` and
+is not predicted. Only a predicted entity is stepped on demand, so this one
+runs at
+:ref:`SCHEDULE_FRAME <class_NetwSimulation_constant_SCHEDULE_FRAME>`.
+
+.. code-block:: gdscript
+
+    extends RigidBody3D
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
+
+An entity is predicted when it has a
+:ref:`state <class_NetwPropertyConfig_method_state>` property. Declare one,
+or leave the schedule unset.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
+        Netw.configure_property(self, &"position").state()

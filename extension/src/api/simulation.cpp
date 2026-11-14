@@ -83,12 +83,12 @@ void NetwSimulation::set_max_restore_ticks(int p_value) {
     write(NetwMultiplayer::SIMULATION_PARAM_MAX_RESTORE_TICKS, p_value);
 }
 
-Callable NetwSimulation::get_step() const {
+Callable NetwSimulation::get_network_process() const {
     const Ref<NetwEntity> bound = entity();
     return NetwMultiplayer::sim_step_of(bound.ptr());
 }
 
-void NetwSimulation::set_step(const Callable &p_value) {
+void NetwSimulation::set_network_process(const Callable &p_value) {
     const Ref<NetwEntity> bound = entity();
     NetwMultiplayer::sim_write_step(bound.ptr(), p_value);
 }
@@ -107,6 +107,14 @@ double NetwSimulation::get_release_on_rest() const {
 
 void NetwSimulation::set_release_on_rest(double p_value) {
     write(NetwMultiplayer::SIMULATION_PARAM_RELEASE_ON_REST, p_value);
+}
+
+bool NetwSimulation::get_physics_driven() const {
+    return read(NetwMultiplayer::SIMULATION_PARAM_PHYSICS_DRIVEN);
+}
+
+void NetwSimulation::set_physics_driven(bool p_value) {
+    write(NetwMultiplayer::SIMULATION_PARAM_PHYSICS_DRIVEN, p_value);
 }
 
 NetwSimulation::Mode NetwSimulation::get_mode() const {
@@ -299,15 +307,31 @@ void NetwSimulation::_bind_methods() {
         "set_release_on_rest",
         "get_release_on_rest"
     );
-    ClassDB::bind_method(D_METHOD("get_step"), &NetwSimulation::get_step);
     ClassDB::bind_method(
-        D_METHOD("set_step", "value"),
-        &NetwSimulation::set_step
+        D_METHOD("get_physics_driven"),
+        &NetwSimulation::get_physics_driven
+    );
+    ClassDB::bind_method(
+        D_METHOD("set_physics_driven", "value"),
+        &NetwSimulation::set_physics_driven
     );
     ADD_PROPERTY(
-        PropertyInfo(Variant::CALLABLE, "step"),
-        "set_step",
-        "get_step"
+        PropertyInfo(Variant::BOOL, "physics_driven"),
+        "set_physics_driven",
+        "get_physics_driven"
+    );
+    ClassDB::bind_method(
+        D_METHOD("get_network_process"),
+        &NetwSimulation::get_network_process
+    );
+    ClassDB::bind_method(
+        D_METHOD("set_network_process", "value"),
+        &NetwSimulation::set_network_process
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::CALLABLE, "network_process"),
+        "set_network_process",
+        "get_network_process"
     );
     ClassDB::bind_method(D_METHOD("get_mode"), &NetwSimulation::get_mode);
     ADD_PROPERTY(

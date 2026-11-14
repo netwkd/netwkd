@@ -44,7 +44,6 @@
 #include "netw/api/persistence_config.hpp"
 #include "netw/api/physics_stepper.hpp"
 #include "netw/api/predict_slot_engine.hpp"
-#include "netw/api/predict_stats.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/probe_result.hpp"
 #include "netw/api/promise.hpp"
@@ -184,8 +183,6 @@ void initialize_networked_module(ModuleInitializationLevel level) {
     GDREGISTER_CLASS(netw::NetwQuantizeTransform3D);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwSimulation);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwPrediction);
-    GDREGISTER_ABSTRACT_CLASS(netw::NetwPredictCarryContext);
-    GDREGISTER_ABSTRACT_CLASS(netw::NetwPredictStats);
     GDREGISTER_ABSTRACT_CLASS(netw::Serde);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwRecord);
     GDREGISTER_CLASS(netw::DictionaryRecord);

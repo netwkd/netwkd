@@ -42,7 +42,6 @@ var pressed := {
 
 func _init() -> void:
 	entity = Netw.configure_entity(self)
-	entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
 	entity.display.visual_root = ^"sprite"
 	entity.display.live_mode = NetwDisplay.LIVE_MODE_BRACKETED
 	Netw.configure_property(self, &"motion").input().quantize(
@@ -50,20 +49,20 @@ func _init() -> void:
 	)
 	Netw.configure_property(self, &"bombing").input()
 
-	Netw.configure_property(self, &"position").state().masked().on_spawn() \
+	Netw.configure_property(self, &"position").state().on_spawn() \
 			.quantize(
 				NetwQuantizeScalar.new() \
 						.limits(POSITION_LIMITS.x, POSITION_LIMITS.y) \
 						.step(POSITION_STEP),
 			) \
-			.epsilon(POSITION_EPSILON) \
-			.teleport_at(TILE_SIZE) \
+			.correction_threshold(POSITION_EPSILON) \
+			.teleport_threshold(TILE_SIZE) \
 			.interpolate(NetwInterpolate.new().lerp())
-	Netw.configure_property(self, &"velocity").state().masked() \
+	Netw.configure_property(self, &"velocity").state() \
 			.quantize(
 				NetwQuantizeScalar.new().limits(-VELOCITY_LIMIT, VELOCITY_LIMIT),
 			) \
-			.derived().reconcile_only()
+			.unchecked()
 
 
 func _ready() -> void:
@@ -95,7 +94,7 @@ func gather_input(_delta: float, _tick: int) -> void:
 	bombing = pressed[&"set_bomb"]
 
 
-func _network_tick(delta: float, tick: int, is_fresh: bool) -> void:
+func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
 	last_bomb_time += delta
 	if is_fresh and entity.is_controlled_locally \
 			and not stunned and bombing:

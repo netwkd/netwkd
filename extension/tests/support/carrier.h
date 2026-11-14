@@ -27,7 +27,6 @@ class Carrier : public godot::Node2D {
     int rewind_visits = 0;
     bool count_replay_effects = false;
     double last_simulated_x = 0.0;
-    double carry_gain = 1.0;
     godot::Ref<netw::NetwAction> action;
     int ghost_count = 0;
     int confirmed_count = 0;
@@ -42,8 +41,8 @@ class Carrier : public godot::Node2D {
 protected:
     static void _bind_methods() {
         godot::ClassDB::bind_method(
-            D_METHOD("_network_tick", "delta", "tick", "fresh"),
-            &Carrier::network_tick
+            D_METHOD("_network_process", "delta", "tick", "fresh"),
+            &Carrier::network_process
         );
         godot::ClassDB::bind_method(
             D_METHOD("observe_self"),
@@ -52,18 +51,6 @@ protected:
         godot::ClassDB::bind_method(
             D_METHOD("sum_into_speed", "delta", "tick", "fresh"),
             &Carrier::sum_into_speed
-        );
-        godot::ClassDB::bind_method(
-            D_METHOD("carry_speed", "value", "ctx"),
-            &Carrier::carry_speed
-        );
-        godot::ClassDB::bind_method(
-            D_METHOD("carry_speed_and_write", "value", "ctx"),
-            &Carrier::carry_speed_and_write
-        );
-        godot::ClassDB::bind_method(
-            D_METHOD("carry_position", "value", "ctx"),
-            &Carrier::carry_position
         );
         godot::ClassDB::bind_method(
             D_METHOD("_predict_ghost"),
@@ -149,36 +136,6 @@ public:
 
     void sum_into_speed(double, int64_t, bool) {
         set("speed", double(get("speed")) + double(get("throttle")));
-    }
-
-    godot::Variant carry_speed(
-        const godot::Variant &p_value,
-        godot::Object *p_ctx
-    ) {
-        const godot::Dictionary input = p_ctx->get("input");
-        return double(p_value)
-            + double(input.get("throttle", 0.0)) * carry_gain;
-    }
-
-    godot::Variant carry_speed_and_write(
-        const godot::Variant &p_value,
-        godot::Object *p_ctx
-    ) {
-        const godot::Variant out = carry_speed(p_value, p_ctx);
-        set("speed", double(get("speed")) + 1.0);
-        return out;
-    }
-
-    godot::Variant carry_position(
-        const godot::Variant &p_value,
-        godot::Object *p_ctx
-    ) {
-        const godot::Dictionary input = p_ctx->get("input");
-        const godot::Variant motion
-            = input.get(godot::StringName("motion"), godot::Vector2());
-        return godot::Vector2(p_value)
-            + godot::Vector2(motion)
-            * godot::real_t(60.0 * double(p_ctx->get("delta")) * carry_gain);
     }
 
     godot::Node *predict_ghost() {
@@ -300,11 +257,7 @@ public:
         return last_execution_tick;
     }
 
-    void set_carry_gain(double p_gain) {
-        carry_gain = p_gain;
-    }
-
-    void network_tick(double p_delta, int64_t, bool p_fresh) {
+    void network_process(double p_delta, int64_t, bool p_fresh) {
         const godot::Variant value = get("motion");
         if (value.get_type() != godot::Variant::VECTOR2) {
             return;

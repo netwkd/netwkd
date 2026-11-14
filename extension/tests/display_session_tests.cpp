@@ -110,13 +110,12 @@ class Walker extends Node3D:
 		eye.name = &"Eye"
 		add_child(eye)
 		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
 		entity.display.visual_root = ^"Eye"
 		var glide := NetwInterpolate.new().lerp().smooth(0.0)
 		Netw.configure_property(self, &"position").state().interpolate(glide)
 		Netw.configure_property(self, &"motion").input()
 
-	func _network_tick(_delta: float, _tick: int, _is_fresh: bool) -> void:
+	func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
 		position.x += motion * 0.1
 
 	func bump() -> void:

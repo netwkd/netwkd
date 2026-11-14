@@ -83,15 +83,14 @@ class Runner extends Node3D:
 	var gaps := 0
 
 	func _init() -> void:
-		var entity := Netw.configure_entity(self)
-		entity.prediction.archetype = NetwPrediction.ARCHETYPE_SCRIPTED
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state()
 		Netw.configure_property(self, &"pressed").input().windowed(WINDOW)
 
 	func press() -> void:
 		pressed += 1
 
-	func _network_tick(_delta: float, _tick: int, is_fresh: bool) -> void:
+	func _network_process(_delta: float, _tick: int, is_fresh: bool) -> void:
 		if not multiplayer.is_server() or not is_fresh or pressed == last:
 			return
 		if last != 0:

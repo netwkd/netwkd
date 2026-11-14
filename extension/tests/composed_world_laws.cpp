@@ -94,6 +94,7 @@ Node *build_body(const Variant &p_name) {
         return nullptr;
     }
     made->set_name(String(p_name));
+    Netw::configure_entity(made)->get_simulation()->set_physics_driven(false);
     return made;
 }
 

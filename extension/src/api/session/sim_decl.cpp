@@ -17,12 +17,13 @@ namespace netw {
 namespace {
 
 const GameCall SIMULATION_STEP
-    = {"NetwSimulation.step",
-       "func(delta: float, tick: int, is_fresh: bool) -> void",
+    = {"NetwSimulation.network_process",
+       "func _network_process(delta: float, tick: int, is_fresh: bool) "
+       "-> void",
        3};
 
-const StringName &network_tick_name() {
-    static const StringName name("_network_tick");
+const StringName &network_process_name() {
+    static const StringName name("_network_process");
     return name;
 }
 
@@ -72,11 +73,6 @@ Error NetwMultiplayer::sim_write_param(
     Error verdict = OK;
     switch (p_param) {
         case SIMULATION_PARAM_BODIES: {
-            const Array bodies = p_value;
-            declared.bodies.clear();
-            for (int64_t at = 0; at < bodies.size(); ++at) {
-                declared.bodies.push_back(NodePath(bodies[at]));
-            }
             NetwMultiplayer *home = entity_home(p_wrapper);
             const sim::Row *row = home != nullptr
                 ? home->sim_rows.row_of(p_wrapper->get_rid_handle())
@@ -91,6 +87,12 @@ Error NetwMultiplayer::sim_write_param(
                     uint64_t(gd::instance_id(p_wrapper->get_owner()))
                 );
                 verdict = ERR_LOCKED;
+                break;
+            }
+            const Array bodies = p_value;
+            declared.bodies.clear();
+            for (int64_t at = 0; at < bodies.size(); ++at) {
+                declared.bodies.push_back(NodePath(bodies[at]));
             }
             break;
         }
@@ -102,6 +104,7 @@ Error NetwMultiplayer::sim_write_param(
             break;
         case SIMULATION_PARAM_RESTORE:
             declared.restore = sim::Restore(int(p_value));
+            declared.wrote_restore = true;
             break;
         case SIMULATION_PARAM_MAX_RESTORE_TICKS:
             declared.max_restore_ticks = int(p_value);
@@ -112,8 +115,15 @@ Error NetwMultiplayer::sim_write_param(
         case SIMULATION_PARAM_RELEASE_ON_REST:
             declared.release_on_rest = MAX(double(p_value), 0.0);
             break;
+        case SIMULATION_PARAM_PHYSICS_DRIVEN:
+            declared.physics_driven = bool(p_value);
+            declared.wrote_physics_driven = true;
+            break;
         default:
             return ERR_INVALID_PARAMETER;
+    }
+    if (predict_engine_of(p_wrapper) != nullptr) {
+        predict_settle_kind(p_wrapper);
     }
     sim_restate(p_wrapper, true);
     return verdict;
@@ -147,6 +157,8 @@ Variant NetwMultiplayer::sim_read_param(
             return declared.claim_on_contact;
         case SIMULATION_PARAM_RELEASE_ON_REST:
             return declared.release_on_rest;
+        case SIMULATION_PARAM_PHYSICS_DRIVEN:
+            return sim_physics_driven(p_wrapper);
         default:
             return Variant();
     }
@@ -184,28 +196,38 @@ Callable NetwMultiplayer::sim_step_of(const NetwEntity *p_wrapper) {
         return found->declaration.step;
     }
     Node *owner = p_wrapper != nullptr ? p_wrapper->get_owner() : nullptr;
-    if (owner != nullptr && owner->has_method(network_tick_name())) {
-        return Callable(owner, network_tick_name());
+    if (owner != nullptr && owner->has_method(network_process_name())) {
+        return Callable(owner, network_process_name());
     }
     return Callable();
 }
 
-void NetwMultiplayer::sim_preset(
-    NetwEntity *p_wrapper,
-    sim::Schedule p_schedule,
-    bool p_restores,
-    sim::Restore p_restore
-) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
+bool NetwMultiplayer::sim_physics_driven(const NetwEntity *p_wrapper) {
+    Node *owner = p_wrapper != nullptr ? p_wrapper->get_owner() : nullptr;
+    const sim::Decl *found = sim_find_declaration(p_wrapper);
+    if (found != nullptr && found->declaration.wrote_physics_driven) {
+        return found->declaration.physics_driven;
     }
-    sim::Declaration &declared = record->sim_declaration().declaration;
-    declared.schedule = p_schedule;
-    if (p_restores) {
-        declared.restore = p_restore;
+    if (owner == nullptr) {
+        return false;
     }
-    sim_restate(p_wrapper, false);
+    if (sim::is_solver_body(owner)) {
+        return true;
+    }
+    if (found == nullptr) {
+        return false;
+    }
+    for (const NodePath &path : found->declaration.bodies) {
+        if (sim::is_solver_body(owner->get_node_or_null(path))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool NetwMultiplayer::sim_simulated(const NetwEntity *p_wrapper) {
+    return p_wrapper != nullptr
+        && (sim_step_of(p_wrapper).is_valid() || sim_physics_driven(p_wrapper));
 }
 
 void NetwMultiplayer::sim_write_choice(
@@ -300,7 +322,7 @@ Variant NetwMultiplayer::simulation_get_param(
                               : Variant();
 }
 
-void NetwMultiplayer::simulation_set_step_callback(
+void NetwMultiplayer::simulation_set_network_process_callback(
     const RID &p_entity,
     const Callable &p_callback
 ) {

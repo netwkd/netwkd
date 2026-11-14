@@ -284,11 +284,10 @@ void ClockEngine::physics_step(double delta) {
     if (delta > stall_threshold) {
         fault::raise(
             Object::cast_to<NetwMultiplayer>(gd::object_of(sink.id)),
-            NETW_FAULT_LIMIT_EXCEEDED,
-            {"A frame in milliseconds",
-             "the time it banked",
-             "a higher {NetwClockConfig.stall_threshold} if frames this long "
-             "are expected",
+            NETW_FAULT_FRAME_TOO_LONG,
+            {String(),
+             String(),
+             String(),
              0,
              int64_t(delta * 1000.0),
              int64_t(stall_threshold * 1000.0)}

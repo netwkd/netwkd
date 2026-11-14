@@ -117,7 +117,6 @@ class Record;
 class LobbyDirectory;
 class NetwDatabase;
 class NetwPersistence;
-class NetwPredictStats;
 class NetwScene;
 class NetwSchema;
 class ReplicationCore;
@@ -2608,6 +2607,8 @@ public:
     void sim_announce(const godot::RID &p_entity);
     void sim_refresh_members(const godot::LocalVector<godot::RID> &p_members);
     static godot::Callable sim_step_of(const NetwEntity *p_wrapper);
+    static bool sim_physics_driven(const NetwEntity *p_wrapper);
+    static bool sim_simulated(const NetwEntity *p_wrapper);
     static NetwSimulation::Restore sim_snap_restore_of(
         const NetwEntity *p_wrapper
     );
@@ -2638,12 +2639,7 @@ private:
         NetwEntity *p_wrapper,
         const godot::Callable &p_step
     );
-    static void sim_preset(
-        NetwEntity *p_wrapper,
-        sim::Schedule p_schedule,
-        bool p_restores,
-        sim::Restore p_restore
-    );
+    static void predict_settle_kind(NetwEntity *p_wrapper);
     static void sim_write_choice(
         NetwEntity *p_wrapper,
         const godot::RID &p_other,
@@ -3047,13 +3043,14 @@ public:
         const NetwEntity *p_wrapper
     );
     static bool predict_body_solves(const NetwEntity *p_wrapper);
-    static NetwPrediction::RecoveryPolicy predict_resolve_recovery(
+    static NetwPrediction::Mode predict_resolve_mode(
         const NetwEntity *p_wrapper
     );
+    static bool predict_implied(const NetwEntity *p_wrapper);
+    static bool predict_rolls_back_together(const NetwEntity *p_wrapper);
 
 private:
     static NetwMultiplayer *entity_home(const NetwEntity *p_wrapper);
-    static bool predict_archetyped(const NetwEntity *p_wrapper);
     static godot::Error predict_write_param(
         NetwEntity *p_wrapper,
         PredictParam p_param,
@@ -3063,14 +3060,6 @@ private:
         const NetwEntity *p_wrapper,
         PredictParam p_param
     );
-    static void predict_write_sensors(
-        NetwEntity *p_wrapper,
-        const godot::Dictionary &p_sensors
-    );
-    static void predict_write_witness(
-        NetwEntity *p_wrapper,
-        const godot::Callable &p_callback
-    );
     static void predict_write_correction_path(
         NetwEntity *p_wrapper,
         const godot::Callable &p_callback
@@ -3079,17 +3068,8 @@ private:
         NetwEntity *p_wrapper,
         const godot::Callable &p_callback
     );
-    static godot::Ref<NetwPredictStats> predict_stats_of(
-        NetwEntity *p_wrapper
-    );
     static void predict_restate(const NetwEntity *p_wrapper);
     static void predict_step_changed(const NetwEntity *p_wrapper);
-    static void predict_simulate(
-        const NetwEntity *p_wrapper,
-        double p_delta,
-        int64_t p_tick,
-        bool p_frame
-    );
 
 public:
     godot::Error predict_set_param(
@@ -3100,16 +3080,6 @@ public:
     godot::Variant predict_get_param(
         const godot::RID &p_entity,
         PredictParam p_param
-    );
-    godot::Ref<NetwPredictStats> predict_get_stats(const godot::RID &p_entity);
-    void predict_set_sensor_callback(
-        const godot::RID &p_entity,
-        const godot::StringName &p_name,
-        const godot::Callable &p_callback
-    );
-    void predict_set_witness_callback(
-        const godot::RID &p_entity,
-        const godot::Callable &p_callback
     );
     void predict_set_correction_path_callback(
         const godot::RID &p_entity,
@@ -3136,7 +3106,7 @@ public:
         const godot::RID &p_entity,
         SimulationParam p_param
     );
-    void simulation_set_step_callback(
+    void simulation_set_network_process_callback(
         const godot::RID &p_entity,
         const godot::Callable &p_callback
     );
@@ -3157,16 +3127,7 @@ public:
     NetwSimulation::Schedule simulation_get_schedule(
         const godot::RID &p_entity
     );
-    godot::Variant predict_get_sensor(
-        const godot::RID &p_entity,
-        const godot::StringName &p_name,
-        const godot::Variant &p_default
-    );
-    void predict_notify_contact(const godot::RID &p_entity);
-    godot::Dictionary predict_get_reachability(const godot::RID &p_entity);
-    NetwPrediction::RecoveryPolicy predict_get_recovery_policy(
-        const godot::RID &p_entity
-    );
+    void predict_notify_collision(const godot::RID &p_entity);
 
     void peer_forget(int64_t p_peer);
     int64_t peer_get_player(int64_t p_peer) const;

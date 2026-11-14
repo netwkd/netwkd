@@ -157,13 +157,12 @@ public sealed class NetwMultiplayer : NetwRefCounted
         PredictRecover = 38,
         /// <summary>
         /// A prediction differed from the server's state by more than the
-        /// tolerance, along with
-        /// <see cref="NetwPrediction.DivergenceDetected"/>.
+        /// tolerance.
         /// </summary>
         Divergence = 39,
         /// <summary>
         /// A predicted entity was corrected, along with
-        /// <see cref="NetwPrediction.Recovered"/>.
+        /// <see cref="NetwPrediction.Corrected"/>.
         /// </summary>
         Recovery = 40,
         /// <summary>
@@ -703,76 +702,59 @@ public sealed class NetwMultiplayer : NetwRefCounted
     public enum PredictParam : long
     {
         /// <summary>
-        /// <see cref="NetwPrediction.ArchetypeEnum"/>. A preset, such as a
-        /// character or a vehicle, that sets the other values. Set it first.
+        /// [bool]. See <see cref="NetwPrediction.RepeatMissingInput"/>.
         /// </summary>
-        Archetype = 0,
+        RepeatMissingInput = 2,
         /// <summary>
-        /// <see cref="NetwPrediction.MissingInput"/>. What the server does when
-        /// an input never arrives.
+        /// <see cref="NetwPrediction.ModeEnum"/>. How a misprediction is
+        /// corrected.
         /// </summary>
-        MissingPolicy = 2,
+        Mode = 3,
         /// <summary>
-        /// <see cref="NetwPrediction.RecoveryPolicyEnum"/>. How a misprediction
-        /// is corrected.
-        /// </summary>
-        RecoveryPolicy = 3,
-        /// <summary>
-        /// [float]. An error larger than this teleports instead of smoothing.
-        /// Used for properties with no threshold of their own.
+        /// [float]. See <see cref="NetwPrediction.TeleportThreshold"/>.
         /// </summary>
         TeleportThreshold = 6,
         /// <summary>
-        /// [float]. How far a prediction may differ from the server before it
-        /// counts as a misprediction.
+        /// [float]. See <see cref="NetwPrediction.CorrectionThreshold"/>.
         /// </summary>
-        DivergenceEpsilon = 7,
+        CorrectionThreshold = 7,
         /// <summary>
-        /// <see cref="NetwPrediction.BreachResponseEnum"/>. What happens when a
-        /// client's state cannot be corrected.
+        /// [bool]. See <see cref="NetwPrediction.PauseOnUnpredictedContact"/>.
         /// </summary>
-        BreachResponse = 8,
+        PauseOnUnpredictedContact = 8,
         /// <summary>
-        /// [int] ticks after a collision during which corrections replace every
-        /// property.
+        /// [int] ticks. See
+        /// <see cref="NetwPrediction.CorrectionCooldownTicks"/>.
         /// </summary>
-        CollisionCooldownTicks = 10,
+        CorrectionCooldownTicks = 10,
         /// <summary>
         /// [int]. The most queued inputs the server runs in one tick.
         /// </summary>
-        MaxConsumePerTick = 11,
+        MaxInputsPerTick = 11,
         /// <summary>
         /// [int] ticks the server may fall behind a client's inputs before it
         /// skips ahead.
         /// </summary>
-        MaxConsumeLagTicks = 12,
+        MaxInputLagTicks = 12,
         /// <summary>
         /// [int] inputs the server keeps queued before running one, as
-        /// <see cref="NetwPrediction.ConsumeBufferTicks"/>. <c>0</c> by
-        /// default.
+        /// <see cref="NetwPrediction.InputBufferTicks"/>. <c>0</c> by default.
         /// </summary>
-        ConsumeBufferTicks = 13,
+        InputBufferTicks = 13,
         /// <summary>
-        /// [int]. How many past inputs are kept for replaying after a
-        /// correction.
+        /// [bool]. See <see cref="NetwPrediction.RollbackTogether"/>.
         /// </summary>
-        ReplayBufferDepth = 14,
+        RollbackTogether = 15,
         /// <summary>
-        /// [int]. See <see cref="NetwPrediction.ReconcileMode"/>.
+        /// [int]. See <see cref="NetwPrediction.WorldVersion"/>.
         /// </summary>
-        ReconcileMode = 15,
+        WorldVersion = 17,
         /// <summary>
-        /// [int]. See <see cref="NetwPrediction.AckAgeTicks"/>.
+        /// [int]. See <see cref="NetwPrediction.CorrectionCount"/>. It is read
+        /// with <see cref="NetwMultiplayer.PredictGetParam"/> and cannot be
+        /// set.
         /// </summary>
-        AckAgeTicks = 16,
-        /// <summary>
-        /// [int]. See <see cref="NetwPrediction.Epoch"/>.
-        /// </summary>
-        Epoch = 17,
-        /// <summary>
-        /// [bool]. See <see cref="NetwPrediction.Sleeping"/>.
-        /// </summary>
-        Sleeping = 18,
+        CorrectionCount = 19,
     }
 
     public enum SimulationParam : long
@@ -808,6 +790,10 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// [float] seconds. <see cref="NetwSimulation.ReleaseOnRest"/>.
         /// </summary>
         ReleaseOnRest = 6,
+        /// <summary>
+        /// [bool]. <see cref="NetwSimulation.PhysicsDriven"/>.
+        /// </summary>
+        PhysicsDriven = 7,
     }
 
     public enum SimPick : long
@@ -1052,7 +1038,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
         PredictConsumed = 51,
         /// <summary>
         /// Counter. Inputs that never arrived. See
-        /// <see cref="NetwMultiplayer.PredictParam.MissingPolicy"/>.
+        /// <see cref="NetwMultiplayer.PredictParam.RepeatMissingInput"/>.
         /// </summary>
         PredictMissing = 52,
         /// <summary>
@@ -1193,7 +1179,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         JointPasses = 83,
         /// <summary>
-        /// Gauge. Bodies in the last joint replay.
+        /// Gauge. Bodies in the last replay of bodies simulated together.
         /// </summary>
         JointMembers = 84,
         /// <summary>
@@ -6362,87 +6348,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindPredictGetStats =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_get_stats",
-            4032930066UL);
-
-    /// <summary>
-    /// Returns the <see cref="NetwPrediction.Stats"/> of
-    /// <paramref name="entity"/>, or <c>null</c> when it does not predict.
-    /// </summary>
-    public NetwPredictStats PredictGetStats(Rid entity)
-    {
-        Rid slot0 = entity;
-        IntPtr answered = default;
-        NetwThunks.Ptrcall1_Rid_IntPtr(
-            _bindPredictGetStats,
-            Checked,
-            in slot0,
-            ref answered);
-        return NetwPredictStats.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindPredictSetSensorCallback =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_set_sensor_callback",
-            2720850369UL);
-
-    /// <summary>
-    /// Adds <paramref name="callback"/> to <see cref="NetwPrediction.Sensors"/>
-    /// of <paramref name="entity"/> under <paramref name="name"/>. An empty
-    /// <see cref="Callable"/> removes it.
-    /// </summary>
-    public void PredictSetSensorCallback(
-        Rid entity,
-        StringName name,
-        Callable callback)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(name);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindPredictSetSensorCallback,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindPredictSetWitnessCallback =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_set_witness_callback",
-            3379118538UL);
-
-    /// <summary>
-    /// Sets <see cref="NetwPrediction.WitnessContacts"/> on
-    /// <paramref name="entity"/>.
-    /// </summary>
-    public void PredictSetWitnessCallback(Rid entity, Callable callback)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindPredictSetWitnessCallback,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        answered.Dispose();
-    }
-
     private static readonly IntPtr _bindPredictSetCorrectionPathCallback =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -6495,144 +6400,26 @@ public sealed class NetwMultiplayer : NetwRefCounted
         answered.Dispose();
     }
 
-    private static readonly IntPtr _bindPredictGetSensor =
+    private static readonly IntPtr _bindPredictNotifyCollision =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "predict_get_sensor",
-            1812703535UL);
-
-    /// <summary>
-    /// Returns the value the sensor <paramref name="name"/> of
-    /// <paramref name="entity"/> sampled before the current step, or
-    /// <paramref name="default"/> when nothing sampled it.
-    /// </summary>
-    public Variant PredictGetSensor(
-        Rid entity,
-        StringName name,
-        Variant @default = default)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(name);
-        godot_variant slot2 = @default.CopyNativeVariant();
-        godot_variant answered = default;
-        NetwThunks.Call3(
-            _bindPredictGetSensor,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        slot2.Dispose();
-        Variant result = Variant.CreateCopyingBorrowed(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindPredictNotifyContact =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_notify_contact",
+            "predict_notify_collision",
             2722037293UL);
 
     /// <summary>
     /// Holds off small corrections of <paramref name="entity"/> for
-    /// <see cref="NetwPrediction.CollisionCooldownTicks"/>. Call it on the
+    /// <see cref="NetwPrediction.CorrectionCooldownTicks"/>. Call it on the
     /// controlling client when the predicted body collides.
     /// </summary>
-    public void PredictNotifyContact(Rid entity)
+    public void PredictNotifyCollision(Rid entity)
     {
         Rid slot0 = entity;
         long discarded = default;
         NetwThunks.Ptrcall1_Rid_Long(
-            _bindPredictNotifyContact,
+            _bindPredictNotifyCollision,
             Checked,
             in slot0,
             ref discarded);
-    }
-
-    private static readonly IntPtr _bindPredictGetReachability =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_get_reachability",
-            3192676292UL);
-
-    /// <summary>
-    /// Returns, property by property, whether the prediction settings of
-    /// <paramref name="entity"/> take effect, or an empty
-    /// <see cref="Godot.Collections.Dictionary"/> before it is predicted. A
-    /// row's <c>class</c> names a
-    /// <see cref="NetwPropertyConfig.PropertyClassEnum"/> value.
-    /// <code>
-    /// Dictionary
-    /// ┠╴entity      StringName  the entity's name
-    /// ┠╴schedule    StringName  TICK or FRAME
-    /// ┠╴breach      Dictionary
-    /// ┃ ┠╴response     StringName  DEMOTE or PREDICT_THROUGH
-    /// ┃ ┖╴declared_by  StringName  what set the breach response
-    /// ┠╴domain      Dictionary
-    /// ┃ ┠╴island                StringName  exact, approximate or none
-    /// ┃ ┖╴contact_window_ticks  int         ticks a contact holds corrections off
-    /// ┠╴transport   bool        true when a correction path callback is set
-    /// ┠╴fields      Dictionary  one row per state property, keyed by its name
-    /// ┃ ┖╴row
-    /// ┃   ┠╴class                 StringName         the property class
-    /// ┃   ┠╴triggers              bool               whether it can force a correction alone
-    /// ┃   ┠╴tolerance             float              the divergence epsilon in force
-    /// ┃   ┠╴tolerance_declared    bool               true when the property set its own
-    /// ┃   ┠╴teleport_at           float              the teleport distance in force
-    /// ┃   ┠╴teleport_at_declared  bool               true when the property set its own
-    /// ┃   ┠╴in_tier               bool               whether it is in the tier being compared
-    /// ┃   ┠╴operators             PackedStringArray  what may write it during a recovery
-    /// ┃   ┖╴forward_model         Dictionary         kind, live and why
-    /// ┖╴findings    Array       one entry per problem found in the settings
-    ///   ┖╴finding
-    ///     ┠╴code      StringName         which check found it, such as unobserved
-    ///     ┠╴severity  StringName         debug, warning or error
-    ///     ┠╴fields    PackedStringArray  the state properties it applies to
-    ///     ┖╴message   String             what is wrong and how to fix it
-    /// </code>
-    /// </summary>
-    public Godot.Collections.Dictionary PredictGetReachability(Rid entity)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindPredictGetReachability,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindPredictGetRecoveryPolicy =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "predict_get_recovery_policy",
-            3901936362UL);
-
-    /// <summary>
-    /// Returns the <see cref="NetwPrediction.RecoveryPolicyEnum"/> that
-    /// <paramref name="entity"/> actually uses, with
-    /// <see cref="NetwPrediction.RecoveryPolicyEnum.Auto"/> resolved from its
-    /// body and schedule.
-    /// </summary>
-    public NetwPrediction.RecoveryPolicyEnum PredictGetRecoveryPolicy(
-        Rid entity)
-    {
-        Rid slot0 = entity;
-        long answered = default;
-        NetwThunks.Ptrcall1_Rid_Long(
-            _bindPredictGetRecoveryPolicy,
-            Checked,
-            in slot0,
-            ref answered);
-        return (NetwPrediction.RecoveryPolicyEnum)answered;
     }
 
     private static readonly IntPtr _bindSimulationSetParam =
@@ -6705,22 +6492,25 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindSimulationSetStepCallback =
+    private static readonly IntPtr _bindSimulationSetNetworkProcessCallback =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "simulation_set_step_callback",
+            "simulation_set_network_process_callback",
             3379118538UL);
 
     /// <summary>
-    /// Sets <see cref="NetwSimulation.Step"/> on <paramref name="entity"/>.
+    /// Sets <see cref="NetwSimulation.NetworkProcess"/> on
+    /// <paramref name="entity"/>.
     /// </summary>
-    public void SimulationSetStepCallback(Rid entity, Callable callback)
+    public void SimulationSetNetworkProcessCallback(
+        Rid entity,
+        Callable callback)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
         godot_variant answered = default;
         NetwThunks.Call2(
-            _bindSimulationSetStepCallback,
+            _bindSimulationSetNetworkProcessCallback,
             Checked,
             in slot0,
             in slot1,
