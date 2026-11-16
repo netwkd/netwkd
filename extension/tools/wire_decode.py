@@ -444,9 +444,10 @@ AGAINST_SPEC = [
     },
     {
         "record": "CommandHeader",
-        "bytes": bytes([0x01, 0x07, 0x05, 0x02]),
-        "values": {"ack_of_acks": -1, "epoch": 7, "base": 5, "count": 2},
-        "why": "svarint ack_of_acks zigzags -1 to 1, then u8, varuint, u8",
+        "bytes": bytes([0x15, 0x07, 0x05, 0x02]),
+        "values": {"acked": 21, "epoch": 7, "base": 5, "count": 2},
+        "why": "varuint acked is ack_of_acks 4 plus one, times four, with "
+               "asks_detail set and no hold, then u8, varuint, u8",
     },
     {
         "record": "FrameHeader",
@@ -474,9 +475,9 @@ AGAINST_SPEC = [
     },
     {
         "record": "ClockPong",
-        "bytes": bytes([0x78, 0x56, 0x34, 0x12, 0x2A, 0x00, 0x00, 0x00, 0x80]),
-        "values": {"origin": 0x12345678, "tick": 42, "phase": 128},
-        "why": "WIRE.md 12, the ping's origin echoed, then tick 42 at half phase",
+        "bytes": bytes([0x78, 0x56, 0x34, 0x12, 0x2A, 0x00, 0x00, 0x00, 0x80, 0xA0, 0x00]),
+        "values": {"origin": 0x12345678, "tick": 42, "phase": 128, "wait": 160},
+        "why": "WIRE.md 12, the ping's origin echoed, tick 42 at half phase, held 16 ms",
     },
     {
         "record": "ActionRequest",
@@ -718,7 +719,7 @@ AGAINST_SPEC = [
 ]
 
 
-# A capture names its own format, and a format owns its three datagram magics.
+# A capture names its own format, and a format owns its datagram magics.
 # Every other byte of the carrier is described by the header's own record sheet,
 # so this table and REPLY_FAILED_BIT_SINCE are the two things a format bump
 # moves that the sheet cannot say.
@@ -765,6 +766,36 @@ CAPTURE_MAGICS_BY_FORMAT = {
         0x58: "DatagramReliable",
         0x78: "DatagramUnreliable",
         0x98: "DatagramAcked",
+    },
+    18: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
+    },
+    19: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
+    },
+    20: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
+    },
+    21: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
+    },
+    22: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
     },
 }
 

@@ -444,7 +444,7 @@ If ``true``, this entity stops predicting and follows the server while it touche
 - |void| **set_predict_input**\ (\ value\: :godot:`Callable`\ )
 - :godot:`Callable` **get_predict_input**\ (\ )
 
-Guesses input for an entity selected by :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation>` that this peer does not control. Relayed input replaces the guess. Unset callbacks and omitted properties repeat the newest relayed input, and zero before any arrives.
+Guesses input for this entity on a peer that runs it as :ref:`NetwSimulation.MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`. Relayed input replaces the guess. Unset callbacks and omitted properties repeat the newest relayed input, and zero before any arrives.
 
 The returned :godot:`Dictionary` uses names declared with :ref:`NetwPropertyConfig.input()<class_NetwPropertyConfig_method_input>`.
 
@@ -518,7 +518,7 @@ If ``true``, the server repeats the last input when one is lost. If ``false``, i
 - |void| **set_rollback_together**\ (\ value\: :godot:`bool`\ )
 - :godot:`bool` **get_rollback_together**\ (\ )
 
-If ``true``, this entity is corrected together with the entities its :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation>` selects, rolling them back from the same tick. If ``false``, each entity is corrected on its own. Defaults to ``true`` on an entity with :ref:`NetwSimulation.physics_driven<class_NetwSimulation_property_physics_driven>` that runs at :ref:`NetwSimulation.SCHEDULE_STEPPED<class_NetwSimulation_constant_SCHEDULE_STEPPED>`, and ``false`` otherwise.
+If ``true``, this entity is corrected together with the predicted entities this peer runs as :ref:`NetwSimulation.MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`, rolling them back from the same tick. If ``false``, each entity is corrected on its own. Defaults to ``true`` on an entity with :ref:`NetwSimulation.physics_driven<class_NetwSimulation_property_physics_driven>` that runs at :ref:`NetwSimulation.SCHEDULE_STEPPED<class_NetwSimulation_constant_SCHEDULE_STEPPED>`, and ``false`` otherwise.
 
 .. rst-class:: classref-item-separator
 

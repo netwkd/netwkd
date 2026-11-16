@@ -24,6 +24,7 @@ constexpr int PORT_RANGE_SIZE = 40;
 constexpr int CLOSED_PORT_OFFSET = 50;
 constexpr int64_t STEP_BUDGET_MSEC = 5000;
 constexpr int SETTLE_FRAMES = 20;
+constexpr int PEER_PACKET_THROTTLE_DECELERATION = 12;
 constexpr int64_t OFFLINE = netw::NetwMultiplayer::SESSION_STATE_OFFLINE;
 constexpr int64_t CREATING = netw::NetwMultiplayer::SESSION_STATE_CREATING;
 constexpr int64_t CONNECTING = netw::NetwMultiplayer::SESSION_STATE_CONNECTING;
@@ -52,6 +53,7 @@ struct SideEvidence {
     int invited_here = 0;
     int invited_elsewhere = 0;
     bool here_answers_joined_endpoint = false;
+    int64_t throttle_deceleration = -1;
 };
 
 struct AttemptEvidence {
@@ -214,6 +216,7 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
         side.end_session_state = int(client->session_get_stored_state());
         side.walked = side.states;
         if (p_side == SIDE_INVITED) {
+            side.throttle_deceleration = throttle_deceleration();
             side.invite_pending = invited->get_is_invited();
             side.invited_by = invited->get_invited_by();
             side.other_pending = other->get_is_invited();
@@ -234,6 +237,22 @@ class ConnectAttemptScenario final : public netw_test::FrameScenario {
         if (link != nullptr) {
             link->call(StringName("set_timeout"), 32, 200, 500);
         }
+    }
+
+    int64_t throttle_deceleration() const {
+        const Ref<MultiplayerPeer> peer
+            = client->NETW_API_VIRTUAL(get_multiplayer_peer)();
+        if (peer.is_null()) {
+            return -1;
+        }
+        Object *link = peer->call(StringName("get_peer"), 1);
+        if (link == nullptr) {
+            return -1;
+        }
+        return link->call(
+            StringName("get_statistic"),
+            PEER_PACKET_THROTTLE_DECELERATION
+        );
     }
 
     bool connecting() const {
@@ -462,6 +481,15 @@ TEST_CASE(
     CHECK(side.here_answers_joined_endpoint);
     NETW_CHECK_EQ(side.invited_here, 0);
     NETW_CHECK_EQ(side.invited_elsewhere, 1);
+}
+
+TEST_CASE(
+    "[Networked][Connect][Frame] an ENet peer the session creates drops no "
+    "unreliable packet when its round trip slows"
+) {
+    const AttemptEvidence &evidence = attempt_evidence();
+    REQUIRE(evidence.driven);
+    NETW_CHECK_EQ(evidence.sides[SIDE_INVITED].throttle_deceleration, 0);
 }
 
 } // namespace NetwTests

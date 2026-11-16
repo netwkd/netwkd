@@ -1569,7 +1569,7 @@
 			<param index="2" name="mode" type="int" enum="MultiplayerPeer.TransferMode" default="2" />
 			<param index="3" name="channel" type="int" default="0" />
 			<description>
-				Same as [method SceneMultiplayer.send_bytes]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member MultiplayerAPI.multiplayer_peer]. Networked reserves twelve first bytes, [code]0x4E[/code], [code]0x56[/code], [code]0x57[/code], [code]0x58[/code], [code]0x6E[/code], [code]0x76[/code], [code]0x77[/code], [code]0x78[/code], [code]0x8E[/code], [code]0x96[/code], [code]0x97[/code] and [code]0x98[/code]. A packet that starts with one of them never reaches [signal peer_packet], so give a raw packet a first byte of your own.
+				Same as [method SceneMultiplayer.send_bytes]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member MultiplayerAPI.multiplayer_peer]. Networked reserves thirteen first bytes, [code]0x4E[/code], [code]0x56[/code], [code]0x57[/code], [code]0x58[/code], [code]0x6E[/code], [code]0x76[/code], [code]0x77[/code], [code]0x78[/code], [code]0x8E[/code], [code]0x96[/code], [code]0x97[/code], [code]0x98[/code] and [code]0xB8[/code]. A packet that starts with one of them never reaches [signal peer_packet], so give a raw packet a first byte of your own.
 			</description>
 		</method>
 		<method name="service_get" qualifiers="const">
@@ -1649,6 +1649,13 @@
 			<return type="Dictionary" />
 			<description>
 				Returns every [enum Stat] value, keyed by the lowercase constant name, such as [code]sent_bytes[/code].
+			</description>
+		</method>
+		<method name="session_get_traffic" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="peer" type="int" />
+			<description>
+				Returns what the session sent to [param peer] and received from it over the last second. [method NetwSession.traffic] lists the keys.
 			</description>
 		</method>
 		<method name="session_is_local_client" qualifiers="const">
@@ -1762,31 +1769,6 @@
 			<param index="0" name="entity" type="RID" />
 			<description>
 				Returns the schedule [param entity] runs on here, with [constant NetwSimulation.SCHEDULE_AUTO] resolved to the schedule it picked.
-			</description>
-		</method>
-		<method name="simulation_get_selected">
-			<return type="RID[]" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns the entities [param entity] simulates on this peer right now, the same set as [member NetwSimulation.selected].
-			</description>
-		</method>
-		<method name="simulation_select">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="other" type="RID" />
-			<param index="2" name="pick" type="int" enum="NetwMultiplayer.SimPick" />
-			<description>
-				Names [param other] as a body [param entity] simulates with [constant SIM_PICK_CHOSEN], or drops that name with [constant SIM_PICK_FORGET]. Both entities must be live in the same scene to choose. The choice is kept until it is forgotten, and [method simulation_get_selected] shows what it selects.
-			</description>
-		</method>
-		<method name="simulation_select_layer">
-			<return type="int" enum="Error" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="layer" type="RID" />
-			<param index="2" name="pick" type="int" enum="NetwMultiplayer.SimPick" />
-			<description>
-				With [constant SIM_PICK_CHOSEN], [param entity] simulates every entity it shares [param layer] with, or every layer it is in when [param layer] is an empty [RID]. With [constant SIM_PICK_FORGET], [param layer] is ignored and every layer pick is cleared. For a predicted entity, this also turns off the default selection of every layer it is in, even though that default was never made with [constant SIM_PICK_CHOSEN]. Entities named with [method simulation_select] stay selected. Returns [constant @GlobalScope.ERR_INVALID_PARAMETER] when [param entity] is not live or [param layer] is not in this session.
 			</description>
 		</method>
 		<method name="simulation_set_param">
@@ -2613,9 +2595,6 @@
 		<constant name="CLOCK_PARAM_SYNC_MODE" value="1" enum="ClockParam">
 			The [enum NetwClock.SyncMode].
 		</constant>
-		<constant name="CLOCK_PARAM_PING_INTERVAL" value="2" enum="ClockParam">
-			[float] seconds between pings.
-		</constant>
 		<constant name="CLOCK_PARAM_MAX_TICKS_PER_FRAME" value="3" enum="ClockParam">
 			[int] most ticks run in one frame. Leftover time carries to the next frame.
 		</constant>
@@ -2727,8 +2706,8 @@
 		<constant name="SIMULATION_PARAM_SCHEDULE" value="1" enum="SimulationParam">
 			[enum NetwSimulation.Schedule]. [member NetwSimulation.schedule].
 		</constant>
-		<constant name="SIMULATION_PARAM_REPLICAS" value="2" enum="SimulationParam">
-			[enum NetwSimulation.Replicas]. [member NetwSimulation.replicas].
+		<constant name="SIMULATION_PARAM_REMOTE_MODE" value="2" enum="SimulationParam">
+			[enum NetwSimulation.RemoteMode]. [member NetwSimulation.remote_mode].
 		</constant>
 		<constant name="SIMULATION_PARAM_RESTORE" value="3" enum="SimulationParam">
 			[enum NetwSimulation.Restore]. [member NetwSimulation.restore].
@@ -2744,12 +2723,6 @@
 		</constant>
 		<constant name="SIMULATION_PARAM_PHYSICS_DRIVEN" value="7" enum="SimulationParam">
 			[bool]. [member NetwSimulation.physics_driven].
-		</constant>
-		<constant name="SIM_PICK_CHOSEN" value="0" enum="SimPick">
-			Selects the entity or layer.
-		</constant>
-		<constant name="SIM_PICK_FORGET" value="1" enum="SimPick">
-			Drops a selection made with [constant SIM_PICK_CHOSEN]. In [method simulation_select_layer] it clears every layer pick whatever the layer, and also turns off the default every-layer selection of a predicted entity.
 		</constant>
 		<constant name="STAT_DROPS_UNKNOWN_ROUTE" value="0" enum="Stat">
 			Counter. Packets for an unknown route.

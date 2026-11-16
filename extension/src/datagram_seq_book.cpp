@@ -1,5 +1,7 @@
 #include "netw/datagram_seq_book.hpp"
 
+#include "netw/wire/registry.hpp"
+
 using namespace godot;
 
 namespace netw {
@@ -12,7 +14,11 @@ int64_t DatagramSeqBook::distance(uint16_t newer, uint16_t older) {
     return int64_t(uint16_t(newer - older));
 }
 
-uint16_t DatagramSeqBook::next_send_seq(int64_t peer, uint64_t now_usec) {
+uint16_t DatagramSeqBook::next_send_seq(
+    int64_t peer,
+    uint64_t now_usec,
+    bool carries_frames
+) {
     uint16_t *held = send_seqs.getptr(peer);
     const uint16_t next = uint16_t((held ? *held : uint16_t(0)) + 1);
     send_seqs[peer] = next;
@@ -20,7 +26,7 @@ uint16_t DatagramSeqBook::next_send_seq(int64_t peer, uint64_t now_usec) {
     const int slot = next % SENT_WINDOW;
     trip.seqs[slot] = next;
     trip.sent_usec[slot] = now_usec;
-    trip.stamped[slot] = true;
+    trip.stamped[slot] = carries_frames;
     return next;
 }
 
@@ -38,11 +44,17 @@ uint32_t DatagramSeqBook::inbound_delivery_history(int64_t peer) const {
     return held ? *held : uint32_t(0);
 }
 
-bool DatagramSeqBook::note_inbound(int64_t peer, uint16_t seq) {
+bool DatagramSeqBook::note_inbound(
+    int64_t peer,
+    uint16_t seq,
+    int64_t now_ms,
+    bool carries_frames
+) {
     const uint16_t *held = inbound_freshest.getptr(peer);
     if (held == nullptr) {
         inbound_freshest[peer] = seq;
         inbound_history[peer] = 0;
+        owe_echo(peer, seq, 1, now_ms, carries_frames);
         return true;
     }
     const uint16_t freshest = *held;
@@ -53,6 +65,7 @@ bool DatagramSeqBook::note_inbound(int64_t peer, uint16_t seq) {
                              : uint32_t((history << step) | (1u << (step - 1)));
         inbound_freshest[peer] = seq;
         inbound_history[peer] = history;
+        owe_echo(peer, seq, step, now_ms, carries_frames);
         return true;
     }
     const int64_t back = distance(freshest, seq);
@@ -86,7 +99,8 @@ bool DatagramSeqBook::note_peer_ack(
     int64_t peer,
     uint16_t ack,
     uint32_t history,
-    uint64_t now_usec
+    uint64_t now_usec,
+    bool echo_waited
 ) {
     const uint16_t *held = peer_acks.getptr(peer);
     if (held && !is_fresher(ack, *held)) {
@@ -94,6 +108,9 @@ bool DatagramSeqBook::note_peer_ack(
     }
     peer_acks[peer] = ack;
     peer_ack_histories[peer] = history;
+    if (echo_waited) {
+        return true;
+    }
 
     RoundTrip *trip = round_trips.getptr(peer);
     const int slot = ack % SENT_WINDOW;
@@ -137,8 +154,73 @@ double DatagramSeqBook::round_trip_jitter_ms(int64_t peer) const {
     return trip != nullptr && trip->measured ? trip->jitter_ms : 0.0;
 }
 
-void DatagramSeqBook::note_echoed(int64_t peer, uint16_t seq) {
+void DatagramSeqBook::owe_echo(
+    int64_t peer,
+    uint16_t seq,
+    int64_t step,
+    int64_t now_ms,
+    bool carries_frames
+) {
+    if (!carries_frames) {
+        if (!echo_debts.has(peer)) {
+            last_echoed[peer] = seq;
+        }
+        return;
+    }
+    EchoDebt &debt = echo_debts[peer];
+    if (debt.unechoed == 0) {
+        debt.since_ms = now_ms;
+    }
+    debt.unechoed += step;
+    debt.waited = false;
+}
+
+void DatagramSeqBook::note_echoed(int64_t peer, uint16_t seq, int64_t now_ms) {
     last_echoed[peer] = seq;
+    const EchoDebt *debt = echo_debts.getptr(peer);
+    if (debt != nullptr && !debt->waited) {
+        sampled_echo_ms[peer] = now_ms;
+    }
+    echo_debts.erase(peer);
+}
+
+bool DatagramSeqBook::echo_is_due(int64_t peer, int64_t now_ms) const {
+    const EchoDebt *debt = echo_debts.getptr(peer);
+    const int64_t *sampled = sampled_echo_ms.getptr(peer);
+    if (debt == nullptr) {
+        return true;
+    }
+    const bool samples = sampled == nullptr || now_ms < *sampled
+        || now_ms - *sampled >= SAMPLED_ECHO_PERIOD_MS;
+    if (samples && !debt->answer_follows) {
+        return true;
+    }
+    return debt->unechoed >= UNECHOED_LIMIT || now_ms < debt->since_ms
+        || now_ms - debt->since_ms >= wire::RIDE_DEADLINE_MS;
+}
+
+bool DatagramSeqBook::echo_is_over_limit(int64_t peer) const {
+    const EchoDebt *debt = echo_debts.getptr(peer);
+    return debt != nullptr && debt->unechoed >= UNECHOED_LIMIT;
+}
+
+void DatagramSeqBook::await_answer(int64_t peer) {
+    EchoDebt *debt = echo_debts.getptr(peer);
+    if (debt != nullptr) {
+        debt->answer_follows = true;
+    }
+}
+
+void DatagramSeqBook::note_echo_held(int64_t peer) {
+    EchoDebt *debt = echo_debts.getptr(peer);
+    if (debt != nullptr) {
+        debt->waited = true;
+    }
+}
+
+bool DatagramSeqBook::echo_waited(int64_t peer) const {
+    const EchoDebt *debt = echo_debts.getptr(peer);
+    return debt != nullptr && debt->waited;
 }
 
 PackedInt64Array DatagramSeqBook::peers_owed_echo() const {
@@ -161,6 +243,8 @@ void DatagramSeqBook::forget_peer(int64_t peer) {
     peer_acks.erase(peer);
     peer_ack_histories.erase(peer);
     last_echoed.erase(peer);
+    echo_debts.erase(peer);
+    sampled_echo_ms.erase(peer);
     reorders.erase(peer);
     duplicates.erase(peer);
 }
@@ -173,6 +257,8 @@ void DatagramSeqBook::clear() {
     peer_acks.clear();
     peer_ack_histories.clear();
     last_echoed.clear();
+    echo_debts.clear();
+    sampled_echo_ms.clear();
     reorders.clear();
     duplicates.clear();
 }

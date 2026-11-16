@@ -28,7 +28,7 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::repl::PropertySet;
 
-using netw_test::gdsrc::BROADCAST_MASKED_AIM;
+using netw_test::gdsrc::BROADCAST_AIM;
 
 constexpr int TICKRATE = 30;
 constexpr double TICK_MS = 1000.0 / TICKRATE;
@@ -119,7 +119,7 @@ TEST_CASE(
     const int b = rig.peer_id(1);
     rig.conditions(-1, latency_of(8, 21), a);
 
-    const FlowPair pair = stand_flow_pair(rig, BROADCAST_MASKED_AIM, "Crate");
+    const FlowPair pair = stand_flow_pair(rig, BROADCAST_AIM, "Crate");
     steer(pair, a);
     const Ref<NetwEntity> host = NetwEntity::of(pair.authored);
     const Ref<NetwEntity> at_a = NetwEntity::of(pair.mirror(0));
@@ -182,7 +182,7 @@ TEST_CASE(
     flow_clocks(rig, TICKRATE);
     const int a = rig.peer_id(0);
     const int b = rig.peer_id(1);
-    const FlowPair pair = stand_flow_pair(rig, BROADCAST_MASKED_AIM, "Crate");
+    const FlowPair pair = stand_flow_pair(rig, BROADCAST_AIM, "Crate");
     steer(pair, a);
     const Ref<NetwEntity> host = NetwEntity::of(pair.authored);
 
@@ -227,7 +227,7 @@ TEST_CASE(
     flow_clocks(rig, TICKRATE);
     const int a = rig.peer_id(0);
     const int b = rig.peer_id(1);
-    const FlowPair pair = stand_flow_pair(rig, BROADCAST_MASKED_AIM, "Crate");
+    const FlowPair pair = stand_flow_pair(rig, BROADCAST_AIM, "Crate");
     steer(pair, a);
     for (int step = 0; step < 10; ++step) {
         author_if_steering(rig, pair, 0, 0.0);
@@ -273,7 +273,7 @@ TEST_CASE(
 }
 
 Node *build_aimed(const Variant &p_name) {
-    return flow_body(BROADCAST_MASKED_AIM, String(p_name));
+    return flow_body(BROADCAST_AIM, String(p_name));
 }
 
 Array one_string() {
@@ -382,7 +382,7 @@ struct Regrant {
         flow_clocks(rig, TICKRATE);
         a = rig.peer_id(0);
         b = rig.peer_id(1);
-        pair = stand_flow_pair(rig, BROADCAST_MASKED_AIM, "Crate");
+        pair = stand_flow_pair(rig, BROADCAST_AIM, "Crate");
         host = NetwEntity::of(pair.authored);
         rig.step_ticks(10);
         lane = broadcast_lane(rig.client(0), pair.mirror(0));
@@ -468,13 +468,13 @@ TEST_CASE(
     "interval answers RESET, the writer opens again and the receiver seats "
     "the fresh request once the decisions land"
 ) {
-    Regrant stand(15);
+    Regrant stand(24);
     const uint64_t tenure = stand.host->get_control_tenure();
     stand.forge_open_at_b();
     netw::wire::StreamReaderBook &readers = readers_of(stand.rig.client(1));
     NETW_CHECK_EQ(readers.parked_count(), 1);
 
-    for (int step = 0; step < 40; ++step) {
+    for (int step = 0; step < 90; ++step) {
         author_if_steering(stand.rig, stand.pair, 0, 0.0);
         stand.rig.step_ticks(1);
     }

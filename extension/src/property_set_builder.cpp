@@ -90,7 +90,6 @@ void for_record(PropertySet &r_set, int64_t p_record) {
     set->policy = p_record == PropertySet::RECORD_STATE
         ? NetwMemberConfig::POLICY_AUTHORITY
         : NetwMemberConfig::POLICY_CONTROLLER;
-    set->trigger = PropertySet::TRIGGER_ON_CHANGE;
     set->window = p_record == PropertySet::RECORD_INPUT ? 2 : 0;
     set->audience = p_record == PropertySet::RECORD_INPUT
         ? PropertySet::AUDIENCE_SERVER_ONLY
@@ -104,7 +103,6 @@ void from_property_config(
 ) {
     PropertySet *set = &r_set;
     set->cadence = PropertySet::ON_DEMAND;
-    set->trigger = PropertySet::TRIGGER_ON_DEMAND;
     set->profile = PropertySet::PLAIN;
     set->channel = declared_channel("PROPERTY_SYNC");
     Ref<NetwQuantize> quantizer;
@@ -141,15 +139,12 @@ bool from_property_configs(
         ? NetwMemberConfig::POLICY_AUTHORITY
         : NetwMemberConfig::POLICY_CONTROLLER;
     StringName policy_owner;
-    int64_t trigger = PropertySet::TRIGGER_ON_CHANGE;
-    StringName trigger_owner;
     int64_t window = want_input ? 2 : 0;
     StringName window_owner;
     int64_t heartbeat = 0;
     StringName heartbeat_owner;
     int64_t audience = want_input ? PropertySet::AUDIENCE_SERVER_ONLY
                                   : PropertySet::AUDIENCE_PUBLIC;
-    bool masked = false;
 
     const Array declared = p_configs.keys();
     for (int index = 0; index < declared.size(); ++index) {
@@ -198,14 +193,6 @@ bool from_property_configs(
             policy = config->get_write_policy();
             policy_owner = property;
         }
-        if (config->get_set_trigger() != NetwPropertyConfig::UNSET) {
-            if (!String(trigger_owner).is_empty()
-                && config->get_set_trigger() != trigger) {
-                warn_set_conflict(p_record, "trigger", trigger_owner, property);
-            }
-            trigger = config->get_set_trigger();
-            trigger_owner = property;
-        }
         if (config->get_set_heartbeat_ticks() != NetwPropertyConfig::UNSET) {
             if (!String(heartbeat_owner).is_empty()
                 && config->get_set_heartbeat_ticks() != heartbeat) {
@@ -243,32 +230,16 @@ bool from_property_configs(
                 audience = PropertySet::AUDIENCE_SERVER_ONLY;
             }
         }
-        if (config->get_set_masked()) {
-            masked = true;
-        }
     }
 
     if (set->columns.is_empty()) {
         return false;
     }
 
-    if (masked && window > 0) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_CONFLICTING_SETTINGS,
-            {"{NetwPropertyConfig.masked}",
-             record_kind_name(p_record),
-             "{NetwPropertyConfig.windowed}"}
-        );
-        masked = false;
-    }
-
     set->policy = policy;
-    set->trigger = trigger;
     set->window = window;
     set->heartbeat = heartbeat;
     set->audience = audience;
-    set->masked = masked;
     return true;
 }
 

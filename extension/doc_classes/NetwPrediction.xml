@@ -136,7 +136,7 @@
 			If [code]true[/code], this entity stops predicting and follows the server while it touches a moving body this peer does not simulate. It still sends input. It only takes effect on an entity with [member NetwSimulation.physics_driven], whose contacts are read from its bodies.
 		</member>
 		<member name="predict_input" type="Callable" setter="set_predict_input" getter="get_predict_input">
-			Guesses input for an entity selected by [member NetwEntity.simulation] that this peer does not control. Relayed input replaces the guess. Unset callbacks and omitted properties repeat the newest relayed input, and zero before any arrives.
+			Guesses input for this entity on a peer that runs it as [constant NetwSimulation.MODE_ACTIVE]. Relayed input replaces the guess. Unset callbacks and omitted properties repeat the newest relayed input, and zero before any arrives.
 			The returned [Dictionary] uses names declared with [method NetwPropertyConfig.input].
 			[codeblock lang=text]
 			Dictionary
@@ -175,7 +175,7 @@
 			If [code]true[/code], the server repeats the last input when one is lost. If [code]false[/code], it runs nothing for that input at [constant NetwSimulation.SCHEDULE_TICK] and runs with zeroed input at the other schedules. Defaults to [code]true[/code] on an entity with [member NetwSimulation.physics_driven].
 		</member>
 		<member name="rollback_together" type="bool" setter="set_rollback_together" getter="get_rollback_together">
-			If [code]true[/code], this entity is corrected together with the entities its [member NetwEntity.simulation] selects, rolling them back from the same tick. If [code]false[/code], each entity is corrected on its own. Defaults to [code]true[/code] on an entity with [member NetwSimulation.physics_driven] that runs at [constant NetwSimulation.SCHEDULE_STEPPED], and [code]false[/code] otherwise.
+			If [code]true[/code], this entity is corrected together with the predicted entities this peer runs as [constant NetwSimulation.MODE_ACTIVE], rolling them back from the same tick. If [code]false[/code], each entity is corrected on its own. Defaults to [code]true[/code] on an entity with [member NetwSimulation.physics_driven] that runs at [constant NetwSimulation.SCHEDULE_STEPPED], and [code]false[/code] otherwise.
 		</member>
 		<member name="teleport_threshold" type="float" setter="set_teleport_threshold" getter="get_teleport_threshold">
 			How large an error may be before a [constant MODE_OFFSET] correction teleports the entity, writing every state property including [method NetwPropertyConfig.teleport_only] ones. It is measured on properties declared with [method NetwPropertyConfig.extrapolate], and [method NetwPropertyConfig.teleport_threshold] overrides it for one property. An entity with neither teleports on every such correction. A rollback writes the server's state at any size of error. Defaults to [code]3.0[/code] on an entity with [member NetwSimulation.physics_driven] and [code]2.0[/code] otherwise.

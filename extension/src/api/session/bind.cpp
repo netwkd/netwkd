@@ -425,6 +425,10 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::peer_get_link_stats
     );
     ClassDB::bind_method(
+        D_METHOD("session_get_traffic", "peer"),
+        &NetwMultiplayer::session_get_traffic
+    );
+    ClassDB::bind_method(
         D_METHOD("peer_set_bandwidth", "peer", "kbps"),
         &NetwMultiplayer::peer_set_bandwidth
     );
@@ -696,7 +700,6 @@ void NetwMultiplayer::_bind_methods() {
     BIND_ENUM_CONSTANT(SCENE_PARAM_PROCESSING);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_TICKRATE);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_SYNC_MODE);
-    BIND_ENUM_CONSTANT(CLOCK_PARAM_PING_INTERVAL);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_MAX_TICKS_PER_FRAME);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_STALL_THRESHOLD);
     BIND_ENUM_CONSTANT(CLOCK_PARAM_PANIC_SNAP_THRESHOLD);
@@ -734,14 +737,12 @@ void NetwMultiplayer::_bind_methods() {
     BIND_ENUM_CONSTANT(PREDICT_PARAM_CORRECTION_COUNT);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_BODIES);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_SCHEDULE);
-    BIND_ENUM_CONSTANT(SIMULATION_PARAM_REPLICAS);
+    BIND_ENUM_CONSTANT(SIMULATION_PARAM_REMOTE_MODE);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_RESTORE);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_MAX_RESTORE_TICKS);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_CLAIM_ON_CONTACT);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_RELEASE_ON_REST);
     BIND_ENUM_CONSTANT(SIMULATION_PARAM_PHYSICS_DRIVEN);
-    BIND_ENUM_CONSTANT(SIM_PICK_CHOSEN);
-    BIND_ENUM_CONSTANT(SIM_PICK_FORGET);
 #define NETW_SESSION_STAT_BIND(m_name, m_key) BIND_ENUM_CONSTANT(STAT_##m_name);
     NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_BIND)
 #undef NETW_SESSION_STAT_BIND
@@ -1072,18 +1073,6 @@ void NetwMultiplayer::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("simulation_get_mode", "entity"),
         &NetwMultiplayer::simulation_get_mode
-    );
-    ClassDB::bind_method(
-        D_METHOD("simulation_select", "entity", "other", "pick"),
-        &NetwMultiplayer::simulation_select
-    );
-    ClassDB::bind_method(
-        D_METHOD("simulation_select_layer", "entity", "layer", "pick"),
-        &NetwMultiplayer::simulation_select_layer
-    );
-    ClassDB::bind_method(
-        D_METHOD("simulation_get_selected", "entity"),
-        &NetwMultiplayer::simulation_get_selected
     );
     ClassDB::bind_method(
         D_METHOD("simulation_get_schedule", "entity"),

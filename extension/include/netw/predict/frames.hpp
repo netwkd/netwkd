@@ -41,9 +41,11 @@ constexpr uint8_t ACK_SUPERSEDED = 1U << 1;
 constexpr int ACK_WITNESS_SHIFT = 2;
 constexpr uint8_t ACK_WITNESS_MASK = 0x1c;
 constexpr uint8_t ACK_COMPACT = 1U << 5;
+constexpr uint8_t ACK_HELD = 1U << 6;
 constexpr int ACK_RECORD_MAX = 21;
 constexpr int ACK_FRAME_BYTES_MAX = 1150;
 constexpr int COMMAND_TRANSITION_MAX = 255;
+constexpr int64_t COMMAND_HOLD_MAX = 1023;
 
 struct TransitionWire {
     int64_t index = 0;
@@ -82,6 +84,8 @@ struct AckEvidenceWire {
 struct CommandFrame {
     uint8_t epoch = 0;
     int64_t ack_of_acks = -1;
+    bool asks_detail = false;
+    int64_t hold = 0;
     godot::LocalVector<TransitionWire> transitions;
     godot::LocalVector<wire::CodeRow> payloads;
     godot::LocalVector<CommandEvidenceWire> evidence;
@@ -115,6 +119,7 @@ bool decode_command(
     CommandFrame &r_frame
 );
 
+int ack_transitions_carried(const AckFrame &p_frame);
 godot::PackedByteArray encode_ack(const AckFrame &p_frame);
 bool decode_ack(const godot::PackedByteArray &p_bytes, AckFrame &r_frame);
 

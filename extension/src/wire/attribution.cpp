@@ -86,6 +86,7 @@ int64_t AttributionBook::commit(
         attributed_out += bytes;
         frames_out += 1;
         bytes_out[peer_channel_key(frame.peer, frame.channel)] += bytes;
+        channel_out[uint8_t(frame.channel)] += bytes;
         route_out[frame.route] += bytes;
     }
 #if defined(DEBUG_ENABLED)
@@ -155,6 +156,7 @@ void AttributionBook::forget_peer(int64_t p_peer) {
     erase_peer_rows(bytes_in, peer, 8);
     erase_peer_rows(frames_by_peer_channel_in, peer, 8);
     erase_peer_rows(refusals, peer, 16);
+    datagrams_by_peer.erase(p_peer);
 }
 
 void AttributionBook::discard_peer(int64_t p_peer) {
@@ -168,19 +170,81 @@ void AttributionBook::note_framing_out(int64_t p_bytes) {
     framing_out += p_bytes;
 }
 
-void AttributionBook::note_datagram(bool p_inbound, int64_t p_bytes) {
+void AttributionBook::note_datagram(
+    bool p_inbound,
+    int64_t p_peer,
+    int64_t p_bytes
+) {
     if (p_inbound) {
         wire_in += p_bytes;
         datagrams_in += 1;
+    } else {
+        wire_out += p_bytes;
+        datagrams_out += 1;
+    }
+    if (p_peer <= 0) {
         return;
     }
-    wire_out += p_bytes;
-    datagrams_out += 1;
+    Datagrams &seen = datagrams_by_peer[p_peer];
+    if (p_inbound) {
+        seen.bytes_in += p_bytes;
+        seen.count_in += 1;
+    } else {
+        seen.bytes_out += p_bytes;
+        seen.count_out += 1;
+    }
+}
+
+TrafficTotals AttributionBook::traffic_totals(
+    int64_t p_peer,
+    const WireRegistry &p_channels
+) const {
+    TrafficTotals out;
+    if (p_peer == 0) {
+        for (int channel = 0; channel < WireRegistry::MAX_CHANNELS; ++channel) {
+            const int cause = int(p_channels.cause_of(uint8_t(channel)));
+            out.sent[cause] += channel_out[channel];
+            out.received[cause] += channel_in[channel];
+        }
+        out.wire_out = wire_out;
+        out.wire_in = wire_in;
+        out.packets_out = datagrams_out;
+        out.packets_in = datagrams_in;
+        return out;
+    }
+    const uint64_t peer = uint64_t(uint32_t(p_peer));
+    for (const KeyValue<uint64_t, int64_t> &row : bytes_out) {
+        if ((row.key >> 8) == peer) {
+            out.sent[int(p_channels.cause_of(uint8_t(row.key)))] += row.value;
+        }
+    }
+    for (const KeyValue<uint64_t, int64_t> &row : bytes_in) {
+        if ((row.key >> 8) == peer) {
+            out.received[int(p_channels.cause_of(uint8_t(row.key)))]
+                += row.value;
+        }
+    }
+    const HashMap<int64_t, Datagrams>::ConstIterator seen
+        = datagrams_by_peer.find(p_peer);
+    if (seen != datagrams_by_peer.end()) {
+        out.wire_out = seen->value.bytes_out;
+        out.wire_in = seen->value.bytes_in;
+        out.packets_out = seen->value.count_out;
+        out.packets_in = seen->value.count_in;
+    }
+    return out;
+}
+
+void AttributionBook::traffic_peers(LocalVector<int64_t> &r_peers) const {
+    for (const KeyValue<int64_t, Datagrams> &row : datagrams_by_peer) {
+        r_peers.push_back(row.key);
+    }
 }
 
 void AttributionBook::observe_in(const Attribution &p_frame) {
     const int64_t bytes = p_frame.bits / 8;
     attributed_in += bytes;
+    channel_in[uint8_t(p_frame.channel)] += bytes;
     frames_in += 1;
     bytes_in[peer_channel_key(p_frame.peer, p_frame.channel)] += bytes;
     frames_by_peer_channel_in[peer_channel_key(p_frame.peer, p_frame.channel)]
@@ -325,6 +389,11 @@ void AttributionBook::clear() {
     frames_by_peer_channel_in.clear();
     refusals.clear();
     staged.clear();
+    datagrams_by_peer.clear();
+    for (int channel = 0; channel < WireRegistry::MAX_CHANNELS; ++channel) {
+        channel_out[channel] = 0;
+        channel_in[channel] = 0;
+    }
     refused_in = 0;
     wire_out = 0;
     wire_in = 0;

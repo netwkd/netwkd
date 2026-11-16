@@ -15,7 +15,7 @@ using godot::String;
 using netw::NetwMultiplayer;
 
 constexpr int64_t SYNC_CHANNEL = 19;
-constexpr int64_t CLOCK_PING_CHANNEL = 11;
+constexpr int64_t LAGCOMP_DENY_CHANNEL = 13;
 constexpr int64_t PEER = 5;
 
 PackedByteArray payload(int p_size) {
@@ -48,8 +48,7 @@ TEST_CASE(
             payload(4),
             false,
             0,
-            String(),
-            false
+            String()
         ),
         godot::OK
     );
@@ -66,10 +65,10 @@ TEST_CASE(
     Ref<NetwMultiplayer> core;
     core.instantiate();
 
-    core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), false, 0, String(), false);
+    core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), false, 0, String());
     NETW_CHECK_EQ(core->carrier_pending(PEER, false), 8);
 
-    core->send_to(PEER, 4, SYNC_CHANNEL, payload(4), false, 0, String(), false);
+    core->send_to(PEER, 4, SYNC_CHANNEL, payload(4), false, 0, String());
     const bool one_run_rather_than_two
         = core->carrier_pending(PEER, false) == 16;
     CHECK(one_run_rather_than_two);
@@ -84,12 +83,12 @@ TEST_CASE(
     core->send_to(
         PEER,
         0,
-        CLOCK_PING_CHANNEL,
+        LAGCOMP_DENY_CHANNEL,
         payload(4),
         false,
         0,
         String(),
-        true
+        netw::wire::Delivery::TICK
     );
 
     NETW_CHECK_EQ(core->carrier_pending(PEER, false), 0);
@@ -109,8 +108,7 @@ TEST_CASE(
             payload(4),
             false,
             0,
-            String(),
-            false
+            String()
         ),
         godot::ERR_INVALID_PARAMETER
     );
@@ -124,7 +122,7 @@ TEST_CASE(
 ) {
     const Ref<NetwMultiplayer> core = configured_core();
 
-    core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String(), false);
+    core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String());
 
     NETW_CHECK_EQ(core->carrier_pending(PEER, true), 8);
     NETW_CHECK_EQ(core->carrier_pending(PEER, false), 0);
@@ -137,18 +135,17 @@ TEST_CASE(
 ) {
     const Ref<NetwMultiplayer> core = configured_core();
 
-    core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String(), false);
+    core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String());
     NETW_CHECK_EQ(core->carrier_pending(PEER, true), 8);
 
     core->send_to(
         PEER,
         3,
-        CLOCK_PING_CHANNEL,
+        LAGCOMP_DENY_CHANNEL,
         payload(4),
         true,
         0,
-        String(),
-        false
+        String()
     );
 
     NETW_CHECK_EQ(core->carrier_pending(PEER, true), 0);

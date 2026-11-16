@@ -65,6 +65,7 @@ const char *const HEADER_MASKS[] = {"started"};
 const PayloadMask PAYLOAD_MASKS[] = {
     {"CLOCK_PING", 0, 4},
     {"CLOCK_PONG", 0, 4},
+    {"CLOCK_PONG", 9, 2},
 };
 
 inline String channel_name(const WireRegistry &p_registry, uint8_t p_channel) {

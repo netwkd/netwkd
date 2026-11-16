@@ -136,7 +136,12 @@ Error NetwMultiplayer::relay_subscribe(
         return ERR_UNAUTHORIZED;
     }
     relay_book.set_subscribed(slot, p_peer, true);
+    relay_book.audience_changed(slot);
     return OK;
+}
+
+uint32_t NetwMultiplayer::relay_generation(int64_t p_entity_slot) const {
+    return relay_book.generation(p_entity_slot);
 }
 
 PackedInt64Array NetwMultiplayer::relay_peers(int64_t p_entity_slot) const {
@@ -239,18 +244,19 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
         return header;
     }
     count_received(p_packet.size() - header.payload_offset);
-    attribution.note_datagram(true, int64_t(p_packet.size()));
+    attribution.note_datagram(true, p_peer, int64_t(p_packet.size()));
 #if defined(DEBUG_ENABLED)
-    const uint32_t subject = header.payload_offset == p_packet.size()
-        ? network_profiler.ack_subject()
-        : network_profiler.overhead_subject();
-    network_profiler.observe(
-        subject,
-        network_profiler.epoch(),
-        p_peer,
-        true,
-        header.payload_offset
-    );
+    const bool bare = header.payload_offset == p_packet.size();
+    if (bare) {
+        network_profiler.observe(
+            network_profiler.ack_subject(),
+            network_profiler.epoch(),
+            p_peer,
+            true,
+            header.payload_offset
+        );
+    }
+    profiler_datagram(true, p_peer, bare ? 0 : header.payload_offset);
 #endif
     event_record(
         EventPlane::DATAGRAM_RECEIVED,
@@ -616,14 +622,17 @@ int64_t NetwMultiplayer::datagram_budget() const {
     return ceiling > FLOOR ? ceiling : FLOOR;
 }
 
-bool NetwMultiplayer::channel_aggregates(
+wire::Delivery NetwMultiplayer::channel_delivery(
     int64_t p_channel,
-    bool p_requested
+    const wire::Delivery *p_requested
 ) const {
     if (p_channel < 0 || p_channel > 255) {
-        return false;
+        return wire::Delivery::IMMEDIATE;
     }
-    return channels.aggregates(uint8_t(p_channel), p_requested);
+    if (p_requested == nullptr) {
+        return channels.delivery_of(uint8_t(p_channel));
+    }
+    return channels.delivery_of(uint8_t(p_channel), *p_requested);
 }
 
 PackedByteArray NetwMultiplayer::frame_pack(
@@ -940,6 +949,24 @@ Dictionary NetwMultiplayer::lagcomp_metrics() const {
     out[StringName("gate_fallbacks")] = action_gate_fallbacks();
     out[StringName("effects_armed")] = lagcomp_effect_count();
     return out;
+}
+
+Dictionary NetwMultiplayer::session_get_traffic(int64_t p_peer) const {
+    return traffic.read(p_peer);
+}
+
+int64_t NetwMultiplayer::packet_overhead() const {
+    const connect::Transport *transport = connect_core.live_transport();
+    return transport != nullptr ? transport->packet_overhead()
+                                : connect::Transport::UDP_PACKET_OVERHEAD;
+}
+
+void NetwMultiplayer::traffic_advance(double p_seconds) {
+    traffic.advance(p_seconds, attribution, channels, packet_overhead());
+}
+
+void NetwMultiplayer::traffic_set_window(double p_seconds) {
+    traffic.set_window(p_seconds);
 }
 
 Dictionary NetwMultiplayer::session_get_stats() {
@@ -1302,8 +1329,7 @@ void NetwMultiplayer::rpc_call(
             payload,
             reliable,
             comp,
-            comp_path,
-            false
+            comp_path
         );
     }
 }
@@ -1431,8 +1457,7 @@ Ref<NetwPromise> NetwMultiplayer::rpc_request_call(
         payload,
         true,
         request.comp,
-        request.comp_path,
-        false
+        request.comp_path
     );
     return promise;
 }
@@ -1510,8 +1535,7 @@ Ref<NetwGroupPromise> NetwMultiplayer::rpc_request_call_group(
             payload,
             true,
             request.comp,
-            request.comp_path,
-            false
+            request.comp_path
         );
     }
     if (asks_caller) {
@@ -1658,8 +1682,7 @@ void NetwMultiplayer::rpc_post_reply(
         p_payload,
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -2203,7 +2226,6 @@ Error NetwMultiplayer::send_row_to(
     const PackedByteArray &p_payload,
     bool p_reliable,
     int64_t p_comp,
-    bool p_batched,
     const CarrierRow *p_row
 ) {
     return send_frame(
@@ -2214,7 +2236,7 @@ Error NetwMultiplayer::send_row_to(
         p_reliable,
         p_comp,
         String(),
-        p_batched,
+        nullptr,
         p_row,
         true
     );
@@ -2227,8 +2249,7 @@ Error NetwMultiplayer::send_to(
     const PackedByteArray &p_payload,
     bool p_reliable,
     int64_t p_comp,
-    const String &p_path,
-    bool p_batched
+    const String &p_path
 ) {
     return send_frame(
         p_peer,
@@ -2238,7 +2259,31 @@ Error NetwMultiplayer::send_to(
         p_reliable,
         p_comp,
         p_path,
-        p_batched,
+        nullptr,
+        nullptr,
+        false
+    );
+}
+
+Error NetwMultiplayer::send_to(
+    int64_t p_peer,
+    int64_t p_route,
+    int64_t p_channel,
+    const PackedByteArray &p_payload,
+    bool p_reliable,
+    int64_t p_comp,
+    const String &p_path,
+    wire::Delivery p_delivery
+) {
+    return send_frame(
+        p_peer,
+        p_route,
+        p_channel,
+        p_payload,
+        p_reliable,
+        p_comp,
+        p_path,
+        &p_delivery,
         nullptr,
         false
     );
@@ -2271,7 +2316,7 @@ Error NetwMultiplayer::rpc_send(
         p_reliable,
         0,
         String(),
-        p_batched
+        p_batched ? wire::Delivery::TICK : wire::Delivery::IMMEDIATE
     );
 }
 
@@ -2305,7 +2350,7 @@ Error NetwMultiplayer::send_frame(
     bool p_reliable,
     int64_t p_comp,
     const String &p_path,
-    bool p_batched,
+    const wire::Delivery *p_delivery,
     const CarrierRow *p_row,
     bool p_charged
 ) {
@@ -2386,8 +2431,12 @@ Error NetwMultiplayer::send_frame(
     }
 #endif
 
-    const bool aggregating = channel_aggregates(p_channel, p_batched);
-    if (!aggregating) {
+    const wire::Delivery delivery = channel_delivery(p_channel, p_delivery);
+    const int64_t deadline = p_reliable ? 0 : wire::ride_deadline_ms(delivery);
+    if (p_reliable && wire::ride_deadline_ms(delivery) > 0) {
+        NETW_BUG_REPORT();
+    }
+    if (delivery == wire::Delivery::IMMEDIATE) {
         if (p_reliable) {
             carrier_dispose(p_peer, true, carrier.take(p_peer, true));
         }
@@ -2401,7 +2450,7 @@ Error NetwMultiplayer::send_frame(
         return OK;
     }
 
-    carrier_append(p_peer, framed, p_reliable, p_row);
+    carrier_append(p_peer, framed, p_reliable, p_row, deadline);
     attribution.stage(p_reliable, true, outgoing);
     return OK;
 }
@@ -2453,11 +2502,9 @@ int64_t NetwMultiplayer::send_datagram(
                 frame.bits / 8
             );
         }
-        network_profiler.observe(
-            network_profiler.overhead_subject(),
-            network_profiler.epoch(),
-            p_peer,
+        profiler_datagram(
             false,
+            p_peer,
             datagram.bytes.size() - p_payload.size()
         );
     }
@@ -2480,7 +2527,7 @@ int64_t NetwMultiplayer::send_datagram(
     if (r_sent != nullptr) {
         *r_sent = true;
     }
-    attribution.note_datagram(false, int64_t(datagram.bytes.size()));
+    attribution.note_datagram(false, p_peer, int64_t(datagram.bytes.size()));
     capture_note(wire::CaptureDirection::OUT, p_peer, datagram.bytes);
     event_record(
         EventPlane::DATAGRAM_SENT,
@@ -2498,14 +2545,16 @@ int64_t NetwMultiplayer::carrier_append(
     int64_t p_peer,
     const PackedByteArray &p_frame,
     bool p_reliable,
-    const CarrierRow *p_row
+    const CarrierRow *p_row,
+    int64_t p_deadline_ms
 ) {
     const CarrierBatch owed = carrier.append(
         p_peer,
         p_frame,
         p_reliable,
         p_reliable ? 0 : datagram_budget(),
-        p_row
+        p_row,
+        p_deadline_ms
     );
     return carrier_dispose(p_peer, p_reliable, owed);
 }
@@ -2573,12 +2622,19 @@ void NetwMultiplayer::carrier_cancel(
     pipeline->close_carrier_batch();
 }
 
-PackedInt64Array NetwMultiplayer::carrier_flush() {
+PackedInt64Array NetwMultiplayer::carrier_flush(
+    int64_t p_now_ms,
+    bool p_upkeep_rides
+) {
 #if defined(NETW_TESTS)
     store::AllocationTally flushing(idle_work.carrier_allocations);
 #endif
     PackedInt64Array staged;
+    clock_board(p_now_ms, p_upkeep_rides);
     for (const int32_t peer : carrier.peers(false)) {
+        if (p_upkeep_rides && carrier.rides(peer, p_now_ms)) {
+            continue;
+        }
         NETW_STAGE(FLUSH, "Flush unreliable datagram", colors::TRANSPORT);
         NETW_ZONE_TEXT_F("peer %d", int(peer));
         CarrierBatch batch = carrier.take(peer, false);
@@ -2635,11 +2691,13 @@ NetwCarrierDatagram NetwMultiplayer::frame_datagram(
     int64_t seq = -1;
     int64_t ack = -1;
     uint32_t history = 0;
+    bool echo_waited = false;
     if (!p_reliable) {
         seq = next_send_seq(p_peer);
         if (has_inbound_seq(p_peer)) {
             ack = inbound_seq(p_peer);
             history = inbound_delivery_history(p_peer);
+            echo_waited = seq_book.echo_waited(p_peer);
             count_state_ack_out();
             note_echoed_seq(p_peer, ack);
         }
@@ -2661,7 +2719,8 @@ NetwCarrierDatagram NetwMultiplayer::frame_datagram(
         seq,
         ack,
         history,
-        datagram_base_tick()
+        datagram_base_tick(),
+        echo_waited
     );
     out.seq = seq;
     return out;
@@ -2679,10 +2738,11 @@ int64_t NetwMultiplayer::session_elapsed_ms() const {
     return int64_t(clock_engine().get_tick()) * 1000 / rate;
 }
 
-int64_t NetwMultiplayer::next_send_seq(int64_t p_peer) {
+int64_t NetwMultiplayer::next_send_seq(int64_t p_peer, bool p_carries_frames) {
     return seq_book.next_send_seq(
         p_peer,
-        Time::get_singleton()->get_ticks_usec()
+        Time::get_singleton()->get_ticks_usec(),
+        p_carries_frames
     );
 }
 
@@ -2710,20 +2770,31 @@ uint32_t NetwMultiplayer::peer_ack_history(int64_t p_peer) const {
     return seq_book.peer_ack_history(p_peer);
 }
 
-bool NetwMultiplayer::note_inbound_seq(int64_t p_peer, int64_t p_seq) {
-    return seq_book.note_inbound(p_peer, uint16_t(p_seq));
+bool NetwMultiplayer::note_inbound_seq(
+    int64_t p_peer,
+    int64_t p_seq,
+    bool p_carries_frames
+) {
+    return seq_book.note_inbound(
+        p_peer,
+        uint16_t(p_seq),
+        session_elapsed_ms(),
+        p_carries_frames
+    );
 }
 
 bool NetwMultiplayer::note_peer_ack(
     int64_t p_peer,
     int64_t p_ack,
-    uint32_t p_history
+    uint32_t p_history,
+    bool p_echo_waited
 ) {
     const bool advanced = seq_book.note_peer_ack(
         p_peer,
         uint16_t(p_ack),
         p_history,
-        Time::get_singleton()->get_ticks_usec()
+        Time::get_singleton()->get_ticks_usec(),
+        p_echo_waited
     );
     if (advanced) {
         event_record(EventPlane::ACK_ADVANCED, RID(), 0, p_peer, OK, p_ack);
@@ -2756,9 +2827,10 @@ void NetwMultiplayer::note_ack(int64_t p_peer, int64_t p_sequence) {
 void NetwMultiplayer::session_note_state_ack(
     int64_t p_peer,
     int64_t p_ack,
-    uint32_t p_history
+    uint32_t p_history,
+    bool p_echo_waited
 ) {
-    if (!note_peer_ack(p_peer, p_ack, p_history)) {
+    if (!note_peer_ack(p_peer, p_ack, p_history, p_echo_waited)) {
         return;
     }
     note_ack(p_peer, p_ack);
@@ -2779,12 +2851,23 @@ Error NetwMultiplayer::session_receive_inner_packet(
     if (header.kind == NetwCarrierFrame::RELIABLE) {
         return receive_carrier(framed, p_sender, true, -1, header.tick);
     }
-    if (header.kind == NetwCarrierFrame::UNRELIABLE_ACKED) {
+    if (header.is_acked()) {
         count_state_ack_in();
-        session_note_state_ack(p_sender, header.ack, header.history);
+        session_note_state_ack(
+            p_sender,
+            header.ack,
+            header.history,
+            header.kind == NetwCarrierFrame::UNRELIABLE_ACKED_HELD
+        );
     }
-    note_inbound_seq(p_sender, header.seq);
-    return receive_carrier(framed, p_sender, false, header.seq, header.tick);
+    note_inbound_seq(p_sender, header.seq, !framed.is_empty());
+    const Error verdict
+        = receive_carrier(framed, p_sender, false, header.seq, header.tick);
+    if (seq_book.echo_is_over_limit(p_sender) && session_link_is_connected()
+        && reachable_peer_ids().has(int32_t(p_sender))) {
+        send_echo(p_sender);
+    }
+    return verdict;
 }
 
 void NetwMultiplayer::session_on_inner_packet(
@@ -2817,7 +2900,7 @@ void NetwMultiplayer::note_sent(int64_t p_peer, int64_t p_sequence) {
 }
 
 void NetwMultiplayer::note_echoed_seq(int64_t p_peer, int64_t p_seq) {
-    seq_book.note_echoed(p_peer, uint16_t(p_seq));
+    seq_book.note_echoed(p_peer, uint16_t(p_seq), session_elapsed_ms());
 }
 
 PackedInt64Array NetwMultiplayer::peers_owed_echo() const {
@@ -2835,20 +2918,21 @@ bool NetwMultiplayer::count_verdict(Error p_verdict, int64_t p_route) {
 }
 
 void NetwMultiplayer::send_standalone_ack(int64_t p_peer, int64_t p_ack) {
-    const int64_t seq = next_send_seq(p_peer);
+    const int64_t seq = next_send_seq(p_peer, false);
     const PackedByteArray framed = NetwCarrierFrame::build(
         PackedByteArray(),
         false,
         seq,
         p_ack,
         inbound_delivery_history(p_peer),
-        datagram_base_tick()
+        datagram_base_tick(),
+        seq_book.echo_waited(p_peer)
     );
     note_echoed_seq(p_peer, p_ack);
     count_standalone_ack_out();
     count_sent(framed.size());
     attribution.note_framing_out(framed.size());
-    attribution.note_datagram(false, int64_t(framed.size()));
+    attribution.note_datagram(false, p_peer, int64_t(framed.size()));
     capture_note(wire::CaptureDirection::OUT, p_peer, framed);
     const Error delivered = inner->send_bytes(
         framed,
@@ -2865,6 +2949,7 @@ void NetwMultiplayer::send_standalone_ack(int64_t p_peer, int64_t p_ack) {
             false,
             framed.size()
         );
+        profiler_datagram(false, p_peer, 0);
     }
 #endif
     if (delivered != OK && session_link_is_connected()) {
@@ -2872,7 +2957,10 @@ void NetwMultiplayer::send_standalone_ack(int64_t p_peer, int64_t p_ack) {
     }
 }
 
-void NetwMultiplayer::flush_standalone_acks() {
+void NetwMultiplayer::flush_standalone_acks(
+    int64_t p_now_ms,
+    bool p_upkeep_rides
+) {
     if (!session_link_is_connected()) {
         return;
     }
@@ -2883,8 +2971,29 @@ void NetwMultiplayer::flush_standalone_acks() {
         if (peer != 0 && !live.has(int32_t(peer))) {
             continue;
         }
-        send_standalone_ack(peer, inbound_seq(peer));
+        if (p_upkeep_rides && !seq_book.echo_is_due(peer, p_now_ms)) {
+            seq_book.note_echo_held(peer);
+            continue;
+        }
+        send_echo(peer);
     }
+}
+
+void NetwMultiplayer::send_echo(int64_t p_peer) {
+    if (p_peer == SERVER_PEER && clock_exchange.ping_is_owed()) {
+        clock_board_ping();
+    }
+    if (carrier.pending(p_peer, false) > 0) {
+        CarrierBatch batch = carrier.take(p_peer, false);
+        carrier_dispose(p_peer, false, batch);
+        carrier.recycle(p_peer, false, batch);
+        return;
+    }
+    send_standalone_ack(p_peer, inbound_seq(p_peer));
+}
+
+void NetwMultiplayer::echo_await_answer(int64_t p_peer) {
+    seq_book.await_answer(p_peer);
 }
 
 Error NetwMultiplayer::send_bytes(
@@ -2921,8 +3030,7 @@ Error NetwMultiplayer::channel_send(
         p_payload,
         p_reliable,
         0,
-        String(),
-        false
+        String()
     );
 }
 

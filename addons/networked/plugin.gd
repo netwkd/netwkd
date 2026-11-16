@@ -7,14 +7,18 @@ extends EditorPlugin
 const _DebugMenu := preload("gdscript/editor/debug_menu.gd")
 
 const VendoredExport := preload("gdscript/editor/vendored_extension_export.gd")
+const TrafficDebugger := preload("gdscript/editor/traffic_debugger.gd")
 
 var vendored_export: EditorExportPlugin
+var traffic_debugger: TrafficDebugger
 var _debug_menu: _DebugMenu
 
 
 func _enter_tree() -> void:
 	vendored_export = VendoredExport.new()
 	add_export_plugin(vendored_export)
+	traffic_debugger = TrafficDebugger.new()
+	add_debugger_plugin(traffic_debugger)
 	if DisplayServer.get_name() == "headless":
 		return
 
@@ -25,6 +29,8 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	remove_export_plugin(vendored_export)
+	traffic_debugger.release()
+	remove_debugger_plugin(traffic_debugger)
 	if _debug_menu != null:
 		_debug_menu.detach()
 		_debug_menu = null

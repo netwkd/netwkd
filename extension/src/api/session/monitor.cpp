@@ -17,7 +17,7 @@ void NetwMultiplayer::monitor_sample(monitor::Sample &r_sample) {
     const PackedInt32Array peers = NETW_API_VIRTUAL(get_peer_ids)();
     ReplicationSend *send = row_send_of(get_replication_plane());
     const int64_t budget_bits = datagram_budget() * 8;
-    const double tickrate = double(ticking.get_tickrate());
+    const double send_rate = double(ticking.send_rate());
     r_sample.peers = peers.size();
     for (int at = 0; at < peers.size(); ++at) {
         const int64_t peer = peers[at];
@@ -40,7 +40,8 @@ void NetwMultiplayer::monitor_sample(monitor::Sample &r_sample) {
         monitor::Upload upload;
         upload.peer = peer;
         upload.sent_bytes = account->sent_bytes;
-        upload.budget_per_second = send->fill_of(peer, budget_bits) * tickrate;
+        upload.budget_per_second
+            = send->fill_of(peer, budget_bits) * send_rate;
         r_sample.uploads.push_back(upload);
     }
 

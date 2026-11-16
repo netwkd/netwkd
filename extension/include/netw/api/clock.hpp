@@ -44,8 +44,6 @@ public:
     void set_display_offset(int64_t p_ticks);
     enums::NetwClock::SyncMode get_sync_mode() const;
     void set_sync_mode(enums::NetwClock::SyncMode p_mode);
-    double get_ping_interval() const;
-    void set_ping_interval(double p_seconds);
     void auto_configure_offset();
 
     bool get_manual_tick() const;

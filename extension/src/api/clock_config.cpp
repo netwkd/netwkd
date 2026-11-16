@@ -27,6 +27,20 @@ void NetwClockConfig::_bind_methods() {
     );
 
     ClassDB::bind_method(
+        D_METHOD("set_send_rate", "send_rate"),
+        &NetwClockConfig::set_send_rate
+    );
+    ClassDB::bind_method(
+        D_METHOD("get_send_rate"),
+        &NetwClockConfig::get_send_rate
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::INT, "send_rate"),
+        "set_send_rate",
+        "get_send_rate"
+    );
+
+    ClassDB::bind_method(
         D_METHOD("set_max_ticks_per_frame", "max_ticks_per_frame"),
         &NetwClockConfig::set_max_ticks_per_frame
     );
@@ -135,25 +149,6 @@ void NetwClockConfig::_bind_methods() {
         ),
         "set_stretch_nudge_factor",
         "get_stretch_nudge_factor"
-    );
-
-    ClassDB::bind_method(
-        D_METHOD("set_ping_interval", "ping_interval"),
-        &NetwClockConfig::set_ping_interval
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_ping_interval"),
-        &NetwClockConfig::get_ping_interval
-    );
-    ADD_PROPERTY(
-        PropertyInfo(
-            Variant::FLOAT,
-            "ping_interval",
-            PROPERTY_HINT_NONE,
-            "suffix:s"
-        ),
-        "set_ping_interval",
-        "get_ping_interval"
     );
 
     ClassDB::bind_method(
@@ -270,6 +265,10 @@ void NetwClockConfig::_bind_methods() {
         &NetwClockConfig::ticks_per_second
     );
     ClassDB::bind_method(
+        D_METHOD("sends_per_second", "send_rate"),
+        &NetwClockConfig::sends_per_second
+    );
+    ClassDB::bind_method(
         D_METHOD("display_offset_ticks", "display_offset"),
         &NetwClockConfig::display_offset_ticks
     );
@@ -282,6 +281,11 @@ void NetwClockConfig::_bind_methods() {
 
 Ref<NetwClockConfig> NetwClockConfig::ticks_per_second(int64_t p_value) {
     set_tickrate(p_value);
+    return Ref<NetwClockConfig>(this);
+}
+
+Ref<NetwClockConfig> NetwClockConfig::sends_per_second(int64_t p_value) {
+    set_send_rate(p_value);
     return Ref<NetwClockConfig>(this);
 }
 

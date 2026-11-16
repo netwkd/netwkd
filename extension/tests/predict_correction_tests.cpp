@@ -150,6 +150,7 @@ class Walker extends CharacterBody3D:
 	var motion := 0
 	var speed := 0.0
 	var replayed := {}
+	var replayed_twice := false
 
 	func _init() -> void:
 		var hull := CollisionShape3D.new()
@@ -169,13 +170,13 @@ class Walker extends CharacterBody3D:
 		velocity = Vector3(speed, 0.0, 0.0)
 		move_and_slide()
 		if not is_fresh:
+			replayed_twice = replayed_twice or replayed.has(tick)
 			replayed[tick] = position.x
 
 	func join() -> void:
-		var entity := NetwEntity.of(self)
-		var tail := get_parent().get_node(^"Tail")
-		entity.simulation.simulate(NetwEntity.of(tail))
-		entity.prediction.rollback_together = true
+		var tail := NetwEntity.of(get_parent().get_node(^"Tail"))
+		tail.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
+		NetwEntity.of(self).prediction.rollback_together = true
 
 	func bump() -> void:
 		position.x += 0.05
@@ -202,6 +203,7 @@ World convoy() {
     return World(CONVOY, 1)
         .watch("Lead", "replayed")
         .watch("Tail", "replayed")
+        .watch("Tail", "replayed_twice")
         .at(1, spawn("Lead", "Lead"))
         .at(1, spawn("Tail", "Tail"))
         .at(1, control("Lead", DRIVER))
@@ -245,7 +247,66 @@ TEST_CASE(
 ) {
     const Seen &seen = convoy_frames.seen();
     NETW_HOLDS(replays_together(seen, DRIVER));
+    NETW_HOLDS(reads(seen, DRIVER, "Tail", "replayed_twice", true));
     NETW_HOLDS(quiet(seen));
+}
+
+constexpr const char *LOT = R"(
+func admit() -> void:
+	var lot := Netw.session(self).interest_layer(&"lot")
+	for peer: int in multiplayer.get_peers():
+		lot.add_viewer(peer)
+
+
+class Car extends RigidBody3D:
+	var motion := 0
+	var mode: int:
+		get:
+			return NetwEntity.of(self).simulation.mode
+
+	func _init() -> void:
+		gravity_scale = 0.0
+		collision_layer = 0
+		collision_mask = 0
+		var hull := CollisionShape3D.new()
+		hull.shape = SphereShape3D.new()
+		add_child(hull)
+		Netw.configure_entity(self).interest.join(&"lot")
+		Netw.configure_property(self, &"position").state()
+		Netw.configure_property(self, &"motion").input()
+
+
+class Parked extends Car:
+	func _init() -> void:
+		super()
+		var simulation := Netw.configure_entity(self).simulation
+		simulation.remote_mode = NetwSimulation.REMOTE_MODE_PROXY
+)";
+
+World lot() {
+    return World(LOT, 1)
+        .paced(60)
+        .watch("Rival", "mode")
+        .watch("Parked", "mode")
+        .at(1, call("Level", "admit"))
+        .at(3, spawn("Car", "Car"))
+        .at(3, spawn("Car", "Rival"))
+        .at(3, spawn("Parked", "Parked"))
+        .at(5, control("Car", DRIVER));
+}
+
+NETW_FRAME_SCENARIO(WorldFrames, lot_frames, &lot, 40);
+
+TEST_CASE(
+    "[Networked][Predict][Frame] C5 a client predicting a physics body runs "
+    "the other bodies it sees, and leaves one whose remote mode is proxy "
+    "interpolated"
+) {
+    const Seen &seen = lot_frames.seen();
+    const int active = netw::NetwSimulation::MODE_ACTIVE;
+    const int proxy = netw::NetwSimulation::MODE_PROXY;
+    NETW_HOLDS(reads(seen, DRIVER, "Rival", "mode", active));
+    NETW_HOLDS(reads(seen, DRIVER, "Parked", "mode", proxy));
 }
 
 } // namespace TestPredictCorrection

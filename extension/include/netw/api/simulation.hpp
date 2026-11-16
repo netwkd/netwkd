@@ -35,9 +35,10 @@ public:
         SCHEDULE_AUTO = int(sim::Schedule::AUTO),
     };
 
-    enum Replicas {
-        REPLICAS_PROXY = int(sim::Replicas::PROXY),
-        REPLICAS_ACTIVE = int(sim::Replicas::ACTIVE),
+    enum RemoteMode {
+        REMOTE_MODE_AUTO = int(sim::RemoteMode::AUTO),
+        REMOTE_MODE_ACTIVE = int(sim::RemoteMode::ACTIVE),
+        REMOTE_MODE_PROXY = int(sim::RemoteMode::PROXY),
     };
 
     enum Restore {
@@ -64,8 +65,8 @@ public:
     void set_bodies(const godot::TypedArray<godot::NodePath> &p_value);
     Schedule get_schedule() const;
     void set_schedule(Schedule p_value);
-    Replicas get_replicas() const;
-    void set_replicas(Replicas p_value);
+    RemoteMode get_remote_mode() const;
+    void set_remote_mode(RemoteMode p_value);
     Restore get_restore() const;
     void set_restore(Restore p_value);
     int get_max_restore_ticks() const;
@@ -79,12 +80,6 @@ public:
     godot::Callable get_network_process() const;
     void set_network_process(const godot::Callable &p_value);
     Mode get_mode() const;
-    godot::TypedArray<NetwEntity> get_selected() const;
-
-    void simulate(const godot::Ref<NetwEntity> &p_entity);
-    void forget(const godot::Ref<NetwEntity> &p_entity);
-    void simulate_all(const godot::StringName &p_layer = godot::StringName());
-    void simulate_none();
 };
 
 godot::Ref<NetwSimulation> build_simulation_handle(godot::Object *p_entity);
@@ -93,5 +88,5 @@ godot::Ref<NetwSimulation> build_simulation_handle(godot::Object *p_entity);
 
 VARIANT_ENUM_CAST(netw::NetwSimulation::Mode);
 VARIANT_ENUM_CAST(netw::NetwSimulation::Schedule);
-VARIANT_ENUM_CAST(netw::NetwSimulation::Replicas);
+VARIANT_ENUM_CAST(netw::NetwSimulation::RemoteMode);
 VARIANT_ENUM_CAST(netw::NetwSimulation::Restore);

@@ -23,9 +23,9 @@ bool steps(const Row &p_row) {
     return !p_row.facts.predicted && (declared || !p_row.bodies.recorded);
 }
 
-bool chooses(const Row &p_row) {
-    return !p_row.facts.predicted
-        && (p_row.choice.declared(false) || p_row.selecting.count() > 0);
+bool joins(const Row &p_row) {
+    return p_row.facts.predicted
+        && p_row.declaration.remote_mode == RemoteMode::ACTIVE;
 }
 
 bool contact_moded(const Row &p_row) {
@@ -59,7 +59,7 @@ void Rows::derive(Row &r_row) {
     const uint32_t at = r_row.index;
     bodied_bits.set(at, !r_row.bodies.held.is_empty());
     stepping_bits.set(at, steps(r_row));
-    chooser_bits.set(at, chooses(r_row));
+    joiner_bits.set(at, joins(r_row));
 }
 
 Row &Rows::ensure(const RID &p_entity) {
@@ -80,7 +80,7 @@ Row &Rows::ensure(const RID &p_entity) {
         due.resize(count);
         bodied_bits.resize(count);
         stepping_bits.resize(count);
-        chooser_bits.resize(count);
+        joiner_bits.resize(count);
         awake_bits.resize(count);
         resting_bits.resize(count);
     }
@@ -120,7 +120,7 @@ const Row *Rows::row_of(const RID &p_entity) const {
 Mode Rows::resolve(const RID &p_entity, const Facts &p_facts) {
     Row &row = ensure(p_entity);
     row.facts = p_facts;
-    row.facts.replicas = row.declaration.replicas;
+    row.facts.remote_mode = row.declaration.remote_mode;
     row.facts.selection_count = row.selected_by.count();
     row.mode = sim::resolve(row.facts);
     return row.mode;
@@ -136,7 +136,7 @@ LocalVector<RID> Rows::release(const RID &p_entity) {
         due.set(at, false);
         bodied_bits.set(at, false);
         stepping_bits.set(at, false);
-        chooser_bits.set(at, false);
+        joiner_bits.set(at, false);
         awake_bits.set(at, false);
         resting_bits.set(at, false);
         free_index.push_back(at);
@@ -238,9 +238,9 @@ void Rows::gather(const store::Bits &p_bits, LocalVector<RID> &r_out) {
     }
 }
 
-void Rows::choosers(LocalVector<RID> &r_out) {
+void Rows::joiners(LocalVector<RID> &r_out) {
     settle();
-    gather(chooser_bits, r_out);
+    gather(joiner_bits, r_out);
 }
 
 LocalVector<RID> Rows::follow_server(bool p_here) {
@@ -334,8 +334,8 @@ bool Rows::is_stepping(uint32_t p_index) const {
     return p_index < by_index.size() && stepping_bits.get(p_index);
 }
 
-bool Rows::is_chooser(uint32_t p_index) const {
-    return p_index < by_index.size() && chooser_bits.get(p_index);
+bool Rows::is_joiner(uint32_t p_index) const {
+    return p_index < by_index.size() && joiner_bits.get(p_index);
 }
 
 void Rows::set_awake(const Row &p_row, bool p_awake) {

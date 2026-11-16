@@ -371,6 +371,23 @@ LawVerdict jittered_arrivals(const Stand &) {
     if (far.min_lag(settings, 2, 2) != settings.max_arrival_lag) {
         return law_broken("a late stream's floor passed the cap");
     }
+
+    constexpr int SEND_INTERVAL = 3;
+    Playhead paced = playhead();
+    paced.set_send_interval_ticks(SEND_INTERVAL);
+    int64_t paced_tick = 100;
+    for (int at = 0; at < 400; ++at) {
+        paced_tick += SEND_INTERVAL;
+        paced.hear_newest(settings, paced_tick, double(paced_tick) + 1.0);
+    }
+    const double waited = 1.0 + double(SEND_INTERVAL);
+    if (std::abs(paced.min_lag(settings, 2, 2) - waited) > 0.01) {
+        return law_broken(
+            "the floor of a stream sent on every third tick read %f, not %f",
+            paced.min_lag(settings, 2, 2),
+            waited
+        );
+    }
     return law_held();
 }
 

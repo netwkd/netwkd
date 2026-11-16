@@ -3,8 +3,6 @@
 #include <cstdint>
 
 #include "godot/local_vector.hpp"
-#include "godot/rid.hpp"
-#include "godot/string_name.hpp"
 
 namespace netw::sim {
 
@@ -54,27 +52,6 @@ struct Selection {
     int promoted_count() const;
     int lingering_count() const;
 };
-
-struct Named {
-    godot::RID entity;
-    Pick pick = Pick::AUTOMATIC;
-};
-
-struct Choice {
-    godot::LocalVector<Named> named;
-    godot::LocalVector<godot::StringName> layers;
-    bool stated = false;
-
-    bool selects_all(bool p_predicted) const;
-    bool declared(bool p_predicted) const;
-    const Named *named_of(const godot::RID &p_entity) const;
-};
-
-bool claims_exact(const Choice &p_choice, bool p_stepped);
-bool choose(Choice &r_choice, const godot::RID &p_entity, Pick p_pick);
-bool forget(Choice &r_choice, const godot::RID &p_entity);
-void simulate_all(Choice &r_choice, const godot::StringName &p_layer);
-void simulate_none(Choice &r_choice);
 
 struct IdSet {
     godot::LocalVector<uint64_t> ids;

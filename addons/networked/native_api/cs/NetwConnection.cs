@@ -10,7 +10,11 @@ namespace Networked;
 /// </summary>
 /// <remarks>
 /// One attempt runs at a time, and <see cref="NetwSession.State"/> follows any
-/// peer the session is given, including one a game assigns itself.
+/// peer the session is given, including one a game assigns itself. An
+/// <see cref="ENetMultiplayerPeer"/> created here pings every 2 seconds. A lost
+/// connection is noticed up to 1.5 seconds later than on a peer the game
+/// creates. It sends every unreliable packet, where ENet's packet throttle
+/// drops some after a slow round trip.
 /// <code>
 /// @onready var connection: NetwConnection = Netw.session(self).connection
 ///

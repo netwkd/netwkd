@@ -21,6 +21,8 @@ Description
 
 One attempt runs at a time, and :ref:`NetwSession.state<class_NetwSession_property_state>` follows any peer the session is given, including one a game assigns itself.
 
+An :godot:`ENetMultiplayerPeer` created here pings every 2 seconds. A lost connection is noticed up to 1.5 seconds later than on a peer the game creates. It sends every unreliable packet, where ENet's packet throttle drops some after a slow round trip.
+
 ::
 
     @onready var connection: NetwConnection = Netw.session(self).connection

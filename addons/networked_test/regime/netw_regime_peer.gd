@@ -327,6 +327,7 @@ func _write_summary(exit_kind: String) -> void:
 		"clock": _clock_report(),
 		"entities": _entity_snapshots,
 		"stats": api.session_get_stats() if api else { },
+		"traffic": api.session_get_traffic(0) if api else { },
 		"instrument_cost": { "tap": { } },
 	}
 	if api and _test_classes:

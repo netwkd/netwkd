@@ -884,6 +884,44 @@ public sealed class NetwSession : NetwRefCounted
         return result;
     }
 
+    private static readonly IntPtr _bindTraffic =
+        NetwApi.MethodBind("NetwSession", "traffic", 1012633761UL);
+
+    /// <summary>
+    /// What the session sent to <paramref name="peer"/> and received from it
+    /// over the last second, in bytes a second. <c>0</c> counts every peer.
+    /// <code>
+    /// Dictionary
+    /// ┠╴sent                Dictionary  bytes a second sent, by cause
+    /// ┃ ┠╴state             float       state and broadcast properties
+    /// ┃ ┠╴input             float       input properties
+    /// ┃ ┠╴calls             float       RPCs, signals and actions
+    /// ┃ ┠╴spawns            float       spawns, despawns, control, scenes and joins
+    /// ┃ ┠╴upkeep            float       prediction acknowledgements and the clock
+    /// ┃ ┖╴headers           float       packet headers, an estimate for the transport
+    /// ┠╴received            Dictionary  the same causes, received
+    /// ┠╴sent_packets        float       packets a second sent
+    /// ┖╴received_packets    float       packets a second received
+    /// </code>
+    /// <para>
+    /// Every packet costs <c>headers</c> before it carries anything, so sending
+    /// fewer packets saves the most. A local session has no transport, so its
+    /// <c>headers</c> count only the session's own packet header. The
+    /// transport's own keepalive is not counted.
+    /// </para>
+    /// </summary>
+    public Godot.Collections.Dictionary Traffic(long peer = 0)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindTraffic, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        Godot.Collections.Dictionary result =
+            VariantUtils.ConvertToDictionary(answered);
+        answered.Dispose();
+        return result;
+    }
+
     private static readonly IntPtr _bindTransferServer =
         NetwApi.MethodBind("NetwSession", "transfer_server", 1229657424UL);
 

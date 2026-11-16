@@ -573,7 +573,7 @@ void NetwMultiplayer::lifecycle_send_to(
     const PackedByteArray &p_payload
 ) {
     attribution_note_subject(p_route);
-    send_to(p_peer, 0, p_channel, p_payload, true, 0, String(), true);
+    send_to(p_peer, 0, p_channel, p_payload, true, 0, String());
 }
 
 void NetwMultiplayer::lifecycle_seed_controller(
@@ -787,8 +787,7 @@ void NetwMultiplayer::lifecycle_decide(
         stream.to_bytes(),
         true,
         0,
-        String(),
-        true
+        String()
     );
 }
 

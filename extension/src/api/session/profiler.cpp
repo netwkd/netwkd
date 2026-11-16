@@ -14,6 +14,13 @@ using namespace godot;
 namespace {
 
 constexpr uint32_t SET_LABEL_COLUMNS = 3;
+constexpr uint64_t TRAFFIC_INTERVAL_MSEC = 250;
+constexpr int64_t BYTES_THE_ENGINE_COUNTS = 1;
+
+const StringName &bandwidth_profiler() {
+    static const StringName name("multiplayer:bandwidth");
+    return name;
+}
 
 String set_label(const repl::PropertyBinding *p_binding, int64_t p_record) {
     const String role = p_record == repl::PropertySet::RECORD_INPUT
@@ -86,6 +93,38 @@ void NetwMultiplayer::profiler_poll() {
     if (network_profiler.active() && network_profiler.row_count() == 0) {
         network_profiler.prepare(channels);
     }
+    profiler_bandwidth = gd::debugger_profiling(bandwidth_profiler());
+    if (profiler_bandwidth && profiler_bandwidth_in.is_empty()) {
+        profiler_bandwidth_in.resize(3);
+        profiler_bandwidth_in[0] = String("in");
+        profiler_bandwidth_out.resize(3);
+        profiler_bandwidth_out[0] = String("out");
+    }
+}
+
+void NetwMultiplayer::profiler_datagram(
+    bool p_incoming,
+    int64_t p_peer,
+    int64_t p_header_bytes
+) {
+    if (!network_profiler.active() && !profiler_bandwidth) {
+        return;
+    }
+    const int64_t overhead = packet_overhead();
+    network_profiler.observe(
+        network_profiler.overhead_subject(),
+        network_profiler.epoch(),
+        p_peer,
+        p_incoming,
+        p_header_bytes + overhead
+    );
+    if (!profiler_bandwidth || overhead <= BYTES_THE_ENGINE_COUNTS) {
+        return;
+    }
+    Array &frame = p_incoming ? profiler_bandwidth_in : profiler_bandwidth_out;
+    frame[1] = Time::get_singleton()->get_ticks_msec();
+    frame[2] = overhead - BYTES_THE_ENGINE_COUNTS;
+    gd::debugger_add_frame_data(bandwidth_profiler(), frame);
 }
 
 void NetwMultiplayer::profiler_publish() {
@@ -93,6 +132,11 @@ void NetwMultiplayer::profiler_publish() {
         return;
     }
     const uint64_t now = Time::get_singleton()->get_ticks_msec();
+    if (now - profiler_last_traffic >= TRAFFIC_INTERVAL_MSEC) {
+        profiler_last_traffic = now;
+        traffic.read_flat(0, profiler_traffic_payload);
+        gd::debugger_send("netw:traffic", profiler_traffic_payload);
+    }
     if (now - profiler_last_publish < 100) {
         return;
     }

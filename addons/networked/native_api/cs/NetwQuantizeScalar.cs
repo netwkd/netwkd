@@ -149,7 +149,7 @@ public sealed class NetwQuantizeScalar : NetwQuantize
             373806689UL);
 
     /// <summary>
-    /// The precision, <c>(max_limit - min_limit) / (2 ** bit_count - 1)</c>.
+    /// The precision, <c>(max_limit - min_limit) / (2 ** bit_count - 2)</c>.
     /// Setting it picks the smallest <see cref="NetwQuantizeScalar.BitCount"/>
     /// that is at least this precise. Must be above <c>0.0</c>.
     /// </summary>

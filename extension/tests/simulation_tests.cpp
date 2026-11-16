@@ -32,7 +32,7 @@ using netw::NetwPredictionEngine;
 using netw::NetwSimulation;
 using netw::sim::Facts;
 using netw::sim::Mode;
-using netw::sim::Replicas;
+using netw::sim::RemoteMode;
 
 const int64_t SESSION_AUTHORITY = 1;
 const int64_t NOBODY = 0;
@@ -406,14 +406,21 @@ Facts claimed_on_a_free_body() {
     return facts;
 }
 
-Facts active_replicas() {
+Facts active_remote() {
     Facts facts = declared();
-    facts.replicas = Replicas::ACTIVE;
+    facts.remote_mode = RemoteMode::ACTIVE;
     return facts;
 }
 
-Facts active_replicas_closed() {
-    Facts facts = active_replicas();
+Facts active_remote_predicted() {
+    Facts facts = active_remote();
+    facts.predicted = true;
+    facts.input_rows = true;
+    return facts;
+}
+
+Facts active_remote_closed() {
+    Facts facts = active_remote();
     facts.fallback_latched = true;
     return facts;
 }
@@ -500,9 +507,15 @@ TEST_CASE(
         {"a pending claim runs a free body the session was authoring",
          claimed_on_a_free_body(),
          Mode::AUTHORITY},
-        {"active replicas run every copy", active_replicas(), Mode::ACTIVE},
-        {"a closed active replica is a proxy",
-         active_replicas_closed(),
+        {"an active remote mode runs every copy",
+         active_remote(),
+         Mode::ACTIVE},
+        {"a predicted copy with an active remote mode is a proxy until "
+         "an entity predicted here selects it",
+         active_remote_predicted(),
+         Mode::PROXY},
+        {"a closed active copy is a proxy",
+         active_remote_closed(),
          Mode::PROXY},
     };
     for (const AuthorRow &row : AUTHORS) {
@@ -511,12 +524,6 @@ TEST_CASE(
         NETW_CHECK_EQ(int(netw::sim::resolve(row.facts)), int(row.mode));
     }
 }
-
-struct Stand {
-    String label;
-};
-
-typedef LawRowFor<Stand> Row;
 
 constexpr const char *CRATE = R"(extends Node2D
 
@@ -543,148 +550,33 @@ Ref<NetwSimulation> simulation_of(Node2D *p_node) {
     return entity->get_simulation();
 }
 
-struct Selecting {
-    LoopbackRig rig;
-    FlowPair subject;
-    FlowPair member;
-
-    Selecting() : rig(1) {
-        rig.mount();
-        flow_clocks(rig, 30, 3);
-        subject = stand_flow_pair(rig, CRATE, "Subject");
-        member = stand_flow_pair(rig, CRATE, "Member");
-        steer(subject, rig.peer_id(0));
-        rig.pump(2);
-    }
-};
-
 int64_t steps_over(LoopbackRig &p_rig, Node2D *p_node, int p_ticks) {
     const int64_t before = steps_of(p_node);
     p_rig.step_ticks(p_ticks);
     return steps_of(p_node) - before;
 }
 
-LawVerdict selected_until_forgotten(const Stand &) {
-    Selecting world;
-    Node2D *copy = world.member.mirror(0);
-    const Ref<NetwSimulation> chooser = simulation_of(world.subject.mirror(0));
-    if (steps_over(world.rig, copy, 3) != 0) {
-        return law_broken("an unselected copy stepped");
-    }
-
-    chooser->simulate(NetwEntity::of(copy));
-    world.rig.step_ticks(1);
-    const int64_t selected = steps_over(world.rig, copy, 5);
-    if (selected != 5) {
-        return law_broken(
-            "the selected copy stepped %lld times in 5 ticks",
-            (long long)selected
-        );
-    }
-    if (int64_t(copy->get(StringName("fresh_steps"))) != 0) {
-        return law_broken("the selected copy stepped as fresh");
-    }
-
-    chooser->forget(NetwEntity::of(copy));
-    world.rig.step_ticks(1);
-    const int64_t forgotten = steps_over(world.rig, copy, 5);
-    if (forgotten != 0) {
-        return law_broken(
-            "a forgotten copy stepped %lld times",
-            (long long)forgotten
-        );
-    }
-    return law_held();
-}
-
-LawVerdict subject_stops_authoring(const Stand &) {
-    Selecting world;
-    Node2D *chooser_copy = world.subject.mirror(0);
-    Node2D *copy = world.member.mirror(0);
-    simulation_of(chooser_copy)->simulate(NetwEntity::of(copy));
-    world.rig.step_ticks(2);
-    if (steps_over(world.rig, copy, 2) != 2) {
-        return law_broken("the selected copy did not step");
-    }
-
-    steer(world.subject, 0);
-    world.rig.step_ticks(1);
-    const int64_t released = steps_over(world.rig, copy, 3);
-    if (released != 0) {
-        return law_broken(
-            "a copy stepped %lld times after its subject stopped authoring",
-            (long long)released
-        );
-    }
-
-    simulation_of(copy)->simulate(NetwEntity::of(chooser_copy));
-    world.rig.step_ticks(1);
-    const int64_t chosen = steps_over(world.rig, chooser_copy, 3);
-    if (chosen != 0) {
-        return law_broken(
-            "a proxy's selection stepped %lld times",
-            (long long)chosen
-        );
-    }
-    return law_held();
-}
-
-LawVerdict another_scene(const Stand &) {
-    FaultWatch expected_faults;
-    expected_faults.expect_error("*NetwSimulation.simulate*[NW0032]*", 1);
-
-    Scenario scenario;
-    scenario.label = "two-scenes";
-    scenario.world.scene("Arena")
-        .scene("Annex")
-        .entity(
-            EntityDecl().named("Owner").on_route(91).placed_at(Vector2()),
-            "Arena"
-        )
-        .entity(
-            EntityDecl().named("Stranger").on_route(92).placed_at(Vector2()),
-            "Annex"
-        );
-    scenario.until(2);
-    LoopbackRig rig(scenario.clients);
-    const ScenarioRun run = ScenarioRun::scenes(rig, scenario);
-    REQUIRE(run.regime_reached());
-
-    NetwMultiplayer *core = rig.server();
-    const Ref<NetwEntity> owner = core->entity_get_view(rig.entity_of("Owner"));
-    const Ref<NetwEntity> stranger
-        = core->entity_get_view(rig.entity_of("Stranger"));
-    REQUIRE(owner.is_valid());
-    REQUIRE(stranger.is_valid());
-
-    owner->get_simulation()->simulate(stranger);
-    if (owner->get_simulation()->get_selected().size() != 0) {
-        return law_broken("the other scene's entity was selected");
-    }
-    return law_held();
-}
-
-const Row ROWS[] = {
-    {"a subject selects an inputless copy, then forgets it",
-     "the copy steps once a tick, never as fresh, and stops when forgotten",
-     &selected_until_forgotten},
-    {"a subject that stops authoring, then a proxy that selects",
-     "the selected copy stops stepping and the proxy's choice never steps",
-     &subject_stops_authoring},
-    {"a subject selecting an entity in another scene",
-     "it is refused with one error and selects nothing",
-     &another_scene},
-};
-
 TEST_CASE(
-    "[Networked][Sim] a selected body runs while its subject "
-    "holds it"
+    "[Networked][Sim] a copy runs once a tick, never as fresh, while its "
+    "remote mode is active"
 ) {
-    const Stand stand = {String("a client holding two crates")};
-    for (const Row &row : ROWS) {
-        NETW_CELL(row, stand);
-        NETW_LAW_HOLDS(row, stand);
-    }
+    LoopbackRig rig(1);
+    rig.mount();
+    flow_clocks(rig, 30, 3);
+    const FlowPair crate = stand_flow_pair(rig, CRATE, "Crate");
+    rig.pump(2);
+    Node2D *copy = crate.mirror(0);
+    const Ref<NetwSimulation> simulation = simulation_of(copy);
+    NETW_CHECK_EQ(steps_over(rig, copy, 3), 0);
+
+    simulation->set_remote_mode(NetwSimulation::REMOTE_MODE_ACTIVE);
+    rig.step_ticks(1);
+    NETW_CHECK_EQ(steps_over(rig, copy, 5), 5);
+    NETW_CHECK_EQ(int64_t(copy->get(StringName("fresh_steps"))), 0);
+
+    simulation->set_remote_mode(NetwSimulation::REMOTE_MODE_PROXY);
+    rig.step_ticks(1);
+    NETW_CHECK_EQ(steps_over(rig, copy, 5), 0);
 }
 
 } // namespace TestNetwSimulation

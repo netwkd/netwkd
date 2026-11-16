@@ -12,6 +12,7 @@ private:
     double smoothed_floor = 0.0;
     int32_t starvation_ticks = 0;
     int32_t expected_interval_ticks = 3;
+    int32_t send_interval_ticks = 1;
     int32_t display_tick = -1;
     int64_t newest_heard = -1;
     bool has_arrival_age = false;
@@ -70,6 +71,9 @@ public:
     }
     int get_expected_interval_ticks() const {
         return expected_interval_ticks;
+    }
+    void set_send_interval_ticks(int value) {
+        send_interval_ticks = value;
     }
     void set_display_tick(int value) {
         display_tick = value;

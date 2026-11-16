@@ -129,10 +129,11 @@ constexpr NetwPredictStats::Fact FACTS[] = {
      0},
     {"linger_held", NetwPredictStats::SOURCE_HELD, 29, 0},
     {"installs", NetwPredictStats::SOURCE_HELD, 30, 0},
+    {"relay_guessed_wrong", NetwPredictStats::SOURCE_HELD, 31, 0},
 };
 
 constexpr int FACT_COUNT = int(sizeof(FACTS) / sizeof(FACTS[0]));
-constexpr int HELD_COUNT = 31;
+constexpr int HELD_COUNT = 32;
 
 constexpr bool fact_named(int p_at, const char *p_name) {
     const char *held = FACTS[p_at].name;
@@ -176,6 +177,10 @@ static_assert(
 static_assert(fact_named(NetwPredictStats::FACT_JOINT_DEPTH, "joint_depth"));
 static_assert(fact_named(NetwPredictStats::FACT_LINGER_HELD, "linger_held"));
 static_assert(fact_named(NetwPredictStats::FACT_INSTALLS, "installs"));
+static_assert(fact_named(
+    NetwPredictStats::FACT_RELAY_GUESSED_WRONG,
+    "relay_guessed_wrong"
+));
 static_assert(fact_named(NetwPredictStats::FACT_TAPE_EPOCH, "tape_epoch"));
 static_assert(fact_named(NetwPredictStats::FACT_TAPE_INDEX, "tape_index"));
 static_assert(

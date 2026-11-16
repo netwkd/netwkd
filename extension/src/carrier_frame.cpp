@@ -59,7 +59,8 @@ PackedByteArray NetwCarrierFrame::build(
     int64_t p_seq,
     int64_t p_ack,
     uint32_t p_history,
-    int64_t p_tick
+    int64_t p_tick,
+    bool p_echo_waited
 ) {
     wire::WriteStream stream;
     return build(
@@ -69,7 +70,8 @@ PackedByteArray NetwCarrierFrame::build(
         p_seq,
         p_ack,
         p_history,
-        p_tick
+        p_tick,
+        p_echo_waited
     );
 }
 
@@ -80,7 +82,8 @@ PackedByteArray NetwCarrierFrame::build(
     int64_t p_seq,
     int64_t p_ack,
     uint32_t p_history,
-    int64_t p_tick
+    int64_t p_tick,
+    bool p_echo_waited
 ) {
     DatagramHead head;
     head.base_tick = p_tick < 0 ? uint64_t(0) : uint64_t(p_tick) + 1;
@@ -93,8 +96,11 @@ PackedByteArray NetwCarrierFrame::build(
             kind = UNRELIABLE;
             head.magic = uint64_t(MAGIC_UNRELIABLE);
         } else {
-            kind = UNRELIABLE_ACKED;
-            head.magic = uint64_t(MAGIC_UNRELIABLE_ACKED);
+            kind = p_echo_waited ? UNRELIABLE_ACKED_HELD : UNRELIABLE_ACKED;
+            head.magic = uint64_t(
+                p_echo_waited ? MAGIC_UNRELIABLE_ACKED_HELD
+                              : MAGIC_UNRELIABLE_ACKED
+            );
             head.ack = uint64_t(uint16_t(p_ack));
             head.history = uint64_t(p_history);
         }
@@ -125,6 +131,8 @@ NetwCarrierFrame NetwCarrierFrame::read(const PackedByteArray &p_packet) {
         out.kind = UNRELIABLE;
     } else if (magic == MAGIC_UNRELIABLE_ACKED) {
         out.kind = UNRELIABLE_ACKED;
+    } else if (magic == MAGIC_UNRELIABLE_ACKED_HELD) {
+        out.kind = UNRELIABLE_ACKED_HELD;
     } else if (magic_is_retired(magic)) {
         out.kind = MALFORMED;
         out.unreadable = true;
@@ -147,7 +155,7 @@ NetwCarrierFrame NetwCarrierFrame::read(const PackedByteArray &p_packet) {
     if (out.kind != RELIABLE) {
         out.seq = int64_t(head.seq);
     }
-    if (out.kind == UNRELIABLE_ACKED) {
+    if (out.is_acked()) {
         out.ack = int64_t(head.ack);
         out.history = uint32_t(head.history);
     }
@@ -161,6 +169,7 @@ Dictionary NetwCarrierFrame::spec_records() {
     out["DatagramReliable"] = DatagramHead::reliable_wire.spec_dump();
     out["DatagramUnreliable"] = DatagramHead::unreliable_wire.spec_dump();
     out["DatagramAcked"] = DatagramHead::acked_wire.spec_dump();
+    out["DatagramAckedHeld"] = DatagramHead::acked_wire.spec_dump();
     return out;
 }
 

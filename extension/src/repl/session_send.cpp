@@ -1070,6 +1070,38 @@ void SessionSend::close_route(int64_t p_route) {
     }
 }
 
+void SessionSend::restate(
+    uint64_t p_owner,
+    int p_peer,
+    int64_t p_tick,
+    int64_t p_now_ms
+) {
+    if (world == nullptr) {
+        return;
+    }
+    const uint32_t peer = world->peer_of(p_peer);
+    const int64_t wait
+        = wire::repair_interval_ms(int64_t(link.rtt_ms(p_peer)));
+    for (uint32_t lane = 0; lane < 2; ++lane) {
+        const store::RowAddress at = world->row_of(p_owner, lane);
+        if (!at.valid()) {
+            continue;
+        }
+        const store::Table &table = world->table(at.table);
+        if (table.family != store::Family::VOLATILE
+            || peer >= table.peers.size()) {
+            continue;
+        }
+        const store::PeerRows &rows = table.peers[peer];
+        if (!rows.sendable.get(at.row) || rows.owed.get(at.row)
+            || rows.acked_rev[at.row] == 0
+            || p_now_ms - rows.repair_at[at.row] < wait) {
+            continue;
+        }
+        world->arm_refresh(at, peer, p_tick);
+    }
+}
+
 AckReport SessionSend::acknowledge(
     int p_peer,
     uint16_t p_acked_seq,

@@ -161,14 +161,14 @@ TEST_CASE(
     NETW_REQUIRE_EQ(link.flight.size(), 1);
     link.drop_at(0);
 
-    link.now_ms += 300;
+    link.now_ms += 600;
     const uint64_t first_repair = link.repair();
     const bool the_repair_took_its_own_revision = first_repair != 0;
     CHECK(the_repair_took_its_own_revision);
     NETW_REQUIRE_EQ(link.flight.size(), 1);
     link.drop_at(0);
 
-    link.now_ms += 300;
+    link.now_ms += 600;
     NETW_CHECK_EQ(link.repair(), first_repair);
 
     const bool settled = link.settle(8);

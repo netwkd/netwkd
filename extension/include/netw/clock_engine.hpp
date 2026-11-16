@@ -32,6 +32,7 @@ private:
     };
 
     int32_t tickrate = 30;
+    int32_t send_interval = 1;
     bool configured = false;
     bool use_physics_interpolation = true;
     double tick_factor_override = -1.0;
@@ -50,10 +51,13 @@ private:
     bool enable_drift_logging = false;
 
     static constexpr int32_t NO_CLOSING_TICK = INT32_MIN;
-    static constexpr double SETTLED_PING_STRETCH = 5.0;
+    static constexpr int32_t NEVER_SENT = INT32_MIN / 2;
+    static constexpr double SETTLED_PING_PERIOD = 1.0;
 
     int32_t tick = 0;
     int32_t closing_tick = NO_CLOSING_TICK;
+    int32_t opened_tick = 0;
+    int32_t sent_tick = NEVER_SENT;
     bool is_synchronized = false;
     bool simulating = true;
     bool held = false;
@@ -114,6 +118,9 @@ public:
 
     void set_tickrate(int value);
     int get_tickrate() const;
+    void set_send_interval(int value);
+    int get_send_interval() const;
+    int send_rate() const;
     void set_max_ticks_per_frame(int value);
     int get_max_ticks_per_frame() const;
     void set_stall_threshold(double value);
@@ -153,6 +160,9 @@ public:
     bool is_closing_tick() const;
     bool closed_a_tick() const;
     int32_t get_send_tick() const;
+    bool is_send_tick() const;
+    bool sent_last_tick() const;
+    void mark_sent();
     void set_synchronized(bool value);
     bool get_synchronized() const;
 
@@ -199,6 +209,7 @@ public:
         bool apply_lead
     );
 
+    bool is_settled() const;
     bool consume_ping_due(double delta);
 
     void forget_rtt();

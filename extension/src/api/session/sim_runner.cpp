@@ -29,7 +29,6 @@ void NetwMultiplayer::sim_run(
     int64_t p_tick
 ) {
     NETW_ZONE_NC("Entity steps", colors::PREDICTION);
-    sim_select_unpredicted(p_tick, p_phase == sim::Schedule::TICK);
     sim_rows.stepping(sim_stepping);
     NETW_ZONE_VALUE(sim_stepping.size());
 #if defined(NETW_TESTS)

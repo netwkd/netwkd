@@ -153,7 +153,7 @@ void NetwMultiplayer::clock_on_physics_frame() {
     clock_physics_step(delta);
     clock_step_auto_config(delta);
     if (!hosting && clock_consume_ping_due(delta)) {
-        clock_send_ping();
+        clock_owe_ping(!clock_engine().is_settled());
     }
     --step_depth;
     announce_flush();

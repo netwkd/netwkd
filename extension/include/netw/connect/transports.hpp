@@ -35,7 +35,18 @@ class ENetTransport : public Transport {
 public:
     static const int64_t DEFAULT_PORT = 21253;
     static const int64_t DEFAULT_MAX_PLAYERS = 32;
+    static const int64_t PING_INTERVAL_MS = 2000;
+    static const int64_t THROTTLE_INTERVAL_MS = 5000;
+    static const int64_t THROTTLE_ACCELERATION = 32;
+    static const int64_t THROTTLE_DECELERATION = 0;
+    static constexpr int64_t ENET_HEADER_BYTES = 2;
+    static constexpr int64_t ENET_UNSEQUENCED_COMMAND_BYTES = 8;
+    static constexpr int64_t GODOT_PACKET_FLAG_BYTES = 1;
+    static constexpr int64_t ENET_PACKET_OVERHEAD
+        = UDP_PACKET_OVERHEAD + ENET_HEADER_BYTES
+        + ENET_UNSEQUENCED_COMMAND_BYTES + GODOT_PACKET_FLAG_BYTES;
 
+    int64_t packet_overhead() const override;
     godot::StringName peer_class() const override;
     godot::String display_name() const override;
     bool is_available() const override;
@@ -57,11 +68,13 @@ public:
     ) override;
 
     void adopt(const godot::Ref<godot::MultiplayerPeer> &p_peer) override;
+    void peer_connected(int64_t p_peer) override;
     godot::String join_address() const override;
     void close() override;
 
 private:
     godot::Ref<godot::MultiplayerPeer> live;
+    godot::Ref<godot::MultiplayerPeer> created;
 
     void host_peer(const godot::Dictionary &p_settings);
     void join_peer(
@@ -109,6 +122,7 @@ private:
 
 class LocalTransport : public Transport {
 public:
+    int64_t packet_overhead() const override;
     godot::StringName peer_class() const override;
     godot::String display_name() const override;
     bool can_probe() const override;

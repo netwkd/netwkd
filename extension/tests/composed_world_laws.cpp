@@ -339,9 +339,9 @@ struct ComposedWorld {
     void settle(int p_rounds) {
         for (int round = 0; round < p_rounds; ++round) {
             stand.step_ticks(1);
-            host->carrier_flush();
-            seven->carrier_flush();
-            nine->carrier_flush();
+            host->carrier_flush(0, false);
+            seven->carrier_flush(0, false);
+            nine->carrier_flush(0, false);
             stand.pump(2);
         }
     }

@@ -31,8 +31,21 @@ constexpr int TAPE_HISTORY_LIMIT = 256;
 
 constexpr int ACK_AGE_MAX = 64;
 
+constexpr int SEND_INTERVAL_MAX = ACK_AGE_MAX / 4;
+
 constexpr int ACK_DETAILED_SENDS = 2;
 
+constexpr int ACK_NEWS_SENDS = 3;
+
+constexpr int HOLD_HANDOFF_SENDS = 2;
+
+constexpr int64_t HOLD_SECONDS = 3;
+
+constexpr int HOLD_RENEW_TICKS_MAX = 20;
+
+constexpr int RELAY_REFRESH_TICKS_MAX = 64;
+
+static_assert(RELAY_REFRESH_TICKS_MAX * 3 < TAPE_HISTORY_LIMIT);
 static_assert((ACK_AGE_MAX & (ACK_AGE_MAX - 1)) == 0);
 static_assert(TransitionBook::DEPTH == uint32_t(TAPE_HISTORY_LIMIT));
 
@@ -183,8 +196,28 @@ struct LaneCursor {
     int64_t ack = -1;
     bool ack_advanced = false;
     int64_t ack_of_acks = -1;
+    int64_t ack_mismatched = -1;
+    int64_t tolerated_at = -1;
+    int32_t tolerated_local_fp = 0;
+    int32_t tolerated_peer_fp = 0;
+    bool tolerated_peer_known = false;
     bool ack_domain_confirmed = true;
     int64_t owner_ack_floor = -1;
+    bool owner_asks_detail = false;
+    int64_t input_heard = -1;
+    int64_t input_hold_through = -1;
+    int64_t input_stood_through = -1;
+    bool command_arrived = false;
+    int64_t ack_judged = -1;
+    int64_t ack_news = -1;
+    int64_t input_changed_at = -1;
+    int64_t input_confirmed = -1;
+    int64_t quiet_epoch = -1;
+    int64_t quiet_since = -1;
+    int64_t hold_sent_at = -1;
+    bool command_rides = false;
+    int64_t guess_wrong_at = -1;
+    int guess_sends = 0;
     int64_t ack_detailed[ACK_DETAILED_SENDS] = {-1, -1};
     int64_t command_epoch = -1;
     int64_t relayed_epoch = -1;
@@ -296,15 +329,25 @@ struct EvaluationRecord {
 };
 #endif
 
-struct RelayWindow {
-    static constexpr uint32_t SIZE = 4;
+bool same_command(const StateRow &p_left, const StateRow &p_right);
 
-    int64_t ticks[SIZE] = {-1, -1, -1, -1};
-    StateRow commands[SIZE];
+struct RelayWindow {
+    static constexpr uint32_t SENDS = 4;
+
+    godot::LocalVector<int64_t> ticks;
+    godot::LocalVector<StateRow> commands;
+    uint32_t send_interval = 1;
     uint32_t count = 0;
     uint32_t next = 0;
+    uint32_t stood_ticks = 0;
+    uint32_t generation = 0;
 
+    void pace(uint32_t p_send_interval);
     void record(int64_t p_tick, const StateRow &p_command);
+    void follow(uint32_t p_generation);
+    bool due(uint32_t p_refresh_ticks) const;
+    bool refreshes(uint32_t p_refresh_ticks) const;
+    bool passed(uint32_t p_stood_ticks) const;
     uint32_t at_oldest(uint32_t p_offset) const;
 };
 
@@ -373,10 +416,13 @@ struct Slot {
     StateRow frame_command;
     StateRow stall;
     StateRow last;
+    StateRow standing_input;
+    int64_t input_held_transition = -1;
     StateRow live;
     godot::Dictionary topology_fp_facts;
     int topology_fp_quantum = -1;
     int32_t topology_fp_value = 0;
+    bool roster_changed = false;
     int topology_schedule = -1;
     int64_t topology_epoch = -1;
     godot::PackedStringArray topology_participants;

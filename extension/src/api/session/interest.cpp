@@ -529,6 +529,7 @@ void NetwMultiplayer::interest_apply_delta(const interest::Delta &p_delta) {
             const int64_t peer_id = interest_engine.peer_of_bit(int(row[1]));
             if (visible) {
                 interest_leave_engine.release(slot, peer_id);
+                relay_book.audience_changed(slot);
             }
             const Ref<NetwInterest> facet = entity->held_interest();
             if (facet.is_valid() && peer_id != 0) {
@@ -1111,8 +1112,7 @@ void NetwMultiplayer::interest_send_awareness(
         interest::awareness_encode(p_wire),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 

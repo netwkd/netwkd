@@ -1009,6 +1009,9 @@ void SyncPipeline::pump(int64_t p_tick) {
         callable_mp(plane, &NetwMultiplayer::sync_pipeline_bind_declaration),
         tap_seam
     );
+    if (!books->clock->is_send_tick()) {
+        return;
+    }
     flush_rows();
     flush_row_control();
 }
@@ -1153,8 +1156,7 @@ void SyncPipeline::send_entity_event(
             p_payload,
             p_reliable,
             int64_t(p_frame[StringName("comp")]),
-            String(p_frame[StringName("path")]),
-            false
+            String(p_frame[StringName("path")])
         );
     }
 }
@@ -2123,8 +2125,7 @@ void SyncPipeline::handle_property_sync(
                 p_payload,
                 set->get_reliable(),
                 0,
-                String(),
-                false
+                String()
             );
         }
     }
@@ -2228,8 +2229,7 @@ void SyncPipeline::handle_signal(
                 p_payload,
                 reliable,
                 0,
-                String(),
-                false
+                String()
             );
         }
     }

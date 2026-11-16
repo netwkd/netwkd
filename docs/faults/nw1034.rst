@@ -7,7 +7,7 @@ NW1034. A collision was reported by an entity that simulates nothing else
 
 Reported as a warning the first time a predicting client calls
 :ref:`NetwPrediction.notify_collision <class_NetwPrediction_method_notify_collision>`
-on an entity that selects no other entity. When the body it hit is an
+on an entity that runs beside no other entity. When the body it hit is an
 entity, this client does not simulate that entity, so the collision is
 predicted against a frozen copy.
 
@@ -16,13 +16,14 @@ predicted against a frozen copy.
     func _on_body_entered(body: Node) -> void:
         entity.prediction.notify_collision()
 
-When it hit an entity, select that entity. Put both in one
-:ref:`NetwInterestLayer <class_NetwInterestLayer>`, or pass it to
-:ref:`NetwSimulation.simulate <class_NetwSimulation_method_simulate>`.
+When it hit an entity, run that entity on this client. Put both in one
+:ref:`NetwInterestLayer <class_NetwInterestLayer>`, or set its
+:ref:`NetwSimulation.remote_mode <class_NetwSimulation_property_remote_mode>`.
 
 .. code-block:: gdscript
 
-    func _ready() -> void:
-        entity.simulation.simulate(NetwEntity.of(ball))
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 
 A collision with level geometry needs no change.

@@ -10,7 +10,7 @@
 		func _init() -&gt; void:
 		    var entity := Netw.configure_entity(self)
 		    entity.simulation.bodies = [^"Sphere"]
-		    entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		    entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 
 		func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
 		    if is_fresh:
@@ -21,7 +21,7 @@
 		{
 		    var entity = Netw.ConfigureEntity(this);
 		    entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
-		    entity.Simulation.Replicas = NetwSimulation.ReplicasEnum.Active;
+		    entity.Simulation.RemoteMode = NetwSimulation.RemoteModeEnum.Active;
 		    entity.Simulation.NetworkProcess = Callable.From&lt;double, long, bool&gt;(NetworkProcess);
 		}
 
@@ -34,47 +34,11 @@
 		[/codeblocks]
 		An entity is simulated once it sets or calls anything here, is predicted as [NetwPrediction] describes, or has a [RigidBody2D] or [RigidBody3D] root drawn by [member NetwEntity.display]. Other entities stay [constant MODE_NONE].
 		[b]Modes[/b]
-		The peer writing replicated state runs [constant MODE_AUTHORITY]. A predicting client runs [constant MODE_PREDICT]. Every other copy is a frozen [constant MODE_PROXY], unless [member replicas] or a selection makes it [constant MODE_ACTIVE].
-		[b]Selection[/b]
-		While this entity runs here as [constant MODE_AUTHORITY] or [constant MODE_PREDICT], it can pick other entities to run here as [constant MODE_ACTIVE]. A predicted entity that declares no selection picks every simulated entity this peer holds in its [NetwInterestLayer] layers.
-		[method simulate] names one more, [method simulate_all] limits automatic selection to one layer, and [method simulate_none] drops it.
-		[codeblock]
-		func _ready() -&gt; void:
-		    entity.simulation.simulate(ball)
-		[/codeblock]
+		The peer writing replicated state runs [constant MODE_AUTHORITY]. A predicting client runs [constant MODE_PREDICT]. Every other copy is [constant MODE_PROXY] or [constant MODE_ACTIVE], as [member remote_mode] says.
 	</description>
 	<tutorials>
 		<link title="Prediction guide">https://networked.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
-	<methods>
-		<method name="forget">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Withdraws the selection [method simulate] made for [param entity]. Automatic selection may still include it.
-			</description>
-		</method>
-		<method name="simulate">
-			<return type="void" />
-			<param index="0" name="entity" type="NetwEntity" />
-			<description>
-				Selects [param entity], so it runs here as [constant MODE_ACTIVE] while this entity runs here as [constant MODE_AUTHORITY] or [constant MODE_PREDICT]. An entity in another scene is refused with an error.
-			</description>
-		</method>
-		<method name="simulate_all">
-			<return type="void" />
-			<param index="0" name="layer" type="StringName" default="&amp;&quot;&quot;" />
-			<description>
-				Selects every entity this peer holds in [param layer]. An empty [param layer] uses the [NetwInterestLayer] layers this entity is in.
-			</description>
-		</method>
-		<method name="simulate_none">
-			<return type="void" />
-			<description>
-				Stops automatic selection. Entities named with [method simulate] stay selected.
-			</description>
-		</method>
-	</methods>
 	<members>
 		<member name="bodies" type="NodePath[]" setter="set_bodies" getter="get_bodies">
 			The physics bodies this entity runs, as paths from the entity root. They are frozen on a [constant MODE_PROXY] copy. A root that is a [RigidBody2D] or [RigidBody3D] is always included, and a path to any other kind of node is skipped.
@@ -98,18 +62,14 @@
 			The seconds the bodies must sleep before this peer releases the entity with [method NetwEntity.release_control], or [code]0[/code] to never release. It only releases an entity this peer holds with [constant NetwEntity.HOLD_SOFT].
 			It needs [constant NetwEntity.TRANSFER_IMMEDIATE] on an entity with no [method NetwPropertyConfig.state] property and no prediction, and does nothing otherwise.
 		</member>
-		<member name="replicas" type="int" setter="set_replicas" getter="get_replicas" enum="NetwSimulation.Replicas">
-			How this peer simulates copies whose state it receives from another peer.
-			It can change at any time.
+		<member name="remote_mode" type="int" setter="set_remote_mode" getter="get_remote_mode" enum="NetwSimulation.RemoteMode">
+			Whether a copy whose state comes from another peer runs here or is interpolated. It can change at any time.
 		</member>
 		<member name="restore" type="int" setter="set_restore" getter="get_restore" enum="NetwSimulation.Restore">
 			How a sample from the authority lands on a [constant MODE_ACTIVE] copy. Under [constant NetwDisplay.LIVE_MODE_CHASE] the body snaps to it and the drawn position glides, up to [member NetwPrediction.teleport_threshold]. Defaults to [constant RESTORE_EXTRAPOLATED] on a predicted entity with [member physics_driven].
 		</member>
 		<member name="schedule" type="int" setter="set_schedule" getter="get_schedule" enum="NetwSimulation.Schedule">
 			When [member network_process] runs and when the physics server moves the bodies.
-		</member>
-		<member name="selected" type="NetwEntity[]" setter="" getter="get_selected">
-			The entities this entity selects on this peer right now.
 		</member>
 		<member name="network_process" type="Callable" setter="set_network_process" getter="get_network_process">
 			Called each tick as [code](delta: float, tick: int, is_fresh: bool)[/code] while [member mode] runs the body. Defaults to the root's [code]_network_process[/code].
@@ -154,11 +114,14 @@
 		<constant name="SCHEDULE_AUTO" value="3" enum="Schedule">
 			[constant SCHEDULE_STEPPED] when the entity has a physics body this Godot build can step and restore, [constant SCHEDULE_FRAME] for any other physics body, and [constant SCHEDULE_TICK] otherwise.
 		</constant>
-		<constant name="REPLICAS_PROXY" value="0" enum="Replicas">
-			Copies whose state comes from another peer are [constant MODE_PROXY], unless a selection makes them active.
+		<constant name="REMOTE_MODE_AUTO" value="0" enum="RemoteMode">
+			The copy is [constant MODE_ACTIVE] while this peer predicts an entity with [member physics_driven] that shares a [NetwInterestLayer] with it, and [constant MODE_PROXY] otherwise.
 		</constant>
-		<constant name="REPLICAS_ACTIVE" value="1" enum="Replicas">
-			Copies whose state comes from another peer are [constant MODE_ACTIVE]. On an entity that is not predicted, a sample that matches the copy is not written, so a resting copy can sleep.
+		<constant name="REMOTE_MODE_ACTIVE" value="1" enum="RemoteMode">
+			The copy is [constant MODE_ACTIVE].
+		</constant>
+		<constant name="REMOTE_MODE_PROXY" value="2" enum="RemoteMode">
+			The copy is [constant MODE_PROXY].
 		</constant>
 		<constant name="RESTORE_EXACT" value="0" enum="Restore">
 			A sample lands when it arrives, as it was sent.

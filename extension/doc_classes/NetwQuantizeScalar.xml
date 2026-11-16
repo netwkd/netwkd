@@ -49,7 +49,7 @@
 			The smallest value. Smaller values are clamped.
 		</member>
 		<member name="resolution_step" type="float" setter="set_resolution_step" getter="get_resolution_step" default="0.007874016">
-			The precision, [code](max_limit - min_limit) / (2 ** bit_count - 1)[/code]. Setting it picks the smallest [member bit_count] that is at least this precise. Must be above [code]0.0[/code].
+			The precision, [code](max_limit - min_limit) / (2 ** bit_count - 2)[/code]. Setting it picks the smallest [member bit_count] that is at least this precise. Must be above [code]0.0[/code].
 		</member>
 	</members>
 </class>

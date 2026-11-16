@@ -85,6 +85,7 @@ public:
     int64_t stat(enums::NetwMultiplayer::Stat p_stat) const;
     void set_peer_bandwidth(int64_t p_peer, int64_t p_kbps);
     godot::Dictionary link_stats(int64_t p_peer) const;
+    godot::Dictionary traffic(int64_t p_peer = 0) const;
 
     godot::Ref<NetwPromise> leave();
     godot::Ref<NetwPromise> step_away();

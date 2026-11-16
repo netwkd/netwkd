@@ -23,7 +23,7 @@ void RelayBook::set_subscribed(
             }
         }
         if (row->is_empty()) {
-            rows.erase(p_entity_slot);
+            release(p_entity_slot);
         }
         return;
     }
@@ -69,8 +69,21 @@ int RelayBook::peer_count(int64_t p_entity_slot) const {
     return row ? int(row->size()) : 0;
 }
 
+void RelayBook::audience_changed(int64_t p_entity_slot) {
+    if (rows.has(p_entity_slot)) {
+        newest_generation += 1;
+        generations[p_entity_slot] = newest_generation;
+    }
+}
+
+uint32_t RelayBook::generation(int64_t p_entity_slot) const {
+    const uint32_t *held = generations.getptr(p_entity_slot);
+    return held ? *held : 0;
+}
+
 void RelayBook::release(int64_t p_entity_slot) {
     rows.erase(p_entity_slot);
+    generations.erase(p_entity_slot);
 }
 
 int RelayBook::slot_count() const {

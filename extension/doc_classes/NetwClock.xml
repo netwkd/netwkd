@@ -16,10 +16,10 @@
 		Each physics frame adds its delta to an accumulator, and every [code]1 / tickrate[/code] seconds in it runs one tick. A slow frame can run two ticks and a fast one none. At a [member tickrate] of 30 with 60 physics ticks per second, a tick runs every second frame, and [member physics_factor] is [code]2.0[/code].
 		At most [constant NetwMultiplayer.CLOCK_PARAM_MAX_TICKS_PER_FRAME] ticks run in one frame, and only one while [method NetwMultiplayer.clock_set_gate] is on. [member behind_count] counts the frames that ended with a tick still waiting while the gate was on.
 		[b]How a client follows the server[/b]
-		The client pings the server every [member ping_interval] seconds. The server answers with its tick, and the client aims ahead of it by half the round trip plus [constant NetwMultiplayer.CLOCK_PARAM_LEAD_TICKS]. The first answer sets the tick directly. After that, [member sync_mode] decides.
+		The client pings the server, which answers with its tick, and the client aims ahead of it by half the round trip plus [constant NetwMultiplayer.CLOCK_PARAM_LEAD_TICKS]. The first answer sets the tick directly. After that, [member sync_mode] decides.
 		[constant SYNC_MODE_SNAP] sets the tick directly every time, which can move it backwards. [constant SYNC_MODE_STRETCH], the default, runs the clock slightly faster or slower each frame by [constant NetwMultiplayer.CLOCK_PARAM_STRETCH_NUDGE_FACTOR] of the difference, so the tick never jumps. A difference larger than [constant NetwMultiplayer.CLOCK_PARAM_PANIC_SNAP_THRESHOLD] ticks is snapped.
 		[b]Showing remote state[/b]
-		State from other peers arrives late, so remote entities are shown [member display_offset] ticks in the past. [member recommended_display_offset] is the offset the current connection needs, the one-way latency plus the jitter times [constant NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER], in ticks. It is not applied automatically. [method auto_configure_offset] applies it.
+		State from other peers arrives late, so remote entities are shown [member display_offset] ticks in the past. [member recommended_display_offset] is the offset the current connection needs. It is not applied automatically. [method auto_configure_offset] applies it.
 		[b]Ticking by hand[/b]
 		While [member manual_tick] is on, physics frames run no ticks, and each [method step] call is one frame that runs the ticks it is given. A replay or a test steps the clock this way to get an exact tick count.
 		[codeblock]
@@ -75,9 +75,6 @@
 		</member>
 		<member name="physics_factor" type="float" setter="" getter="get_physics_factor">
 			Physics frames per tick. Multiply a per-frame value by it to get a per-tick value.
-		</member>
-		<member name="ping_interval" type="float" setter="set_ping_interval" getter="get_ping_interval">
-			Seconds between pings. Shorter follows the connection more closely and sends more packets. The clock pings five times slower once [constant CLOCK_MONITOR_RTT_JITTER] is under half a tick.
 		</member>
 		<member name="recommended_display_offset" type="int" setter="" getter="get_recommended_display_offset">
 			The [member display_offset] the current connection needs, in ticks.

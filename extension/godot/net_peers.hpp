@@ -103,6 +103,47 @@ inline godot::Error enet_create_client(
     );
 }
 
+inline void enet_set_ping_interval(
+    const godot::Ref<godot::MultiplayerPeer> &p_peer,
+    int64_t p_peer_id,
+    int64_t p_milliseconds
+) {
+    if (p_peer.is_null()) {
+        return;
+    }
+    const godot::Variant link
+        = p_peer->call(godot::StringName("get_peer"), p_peer_id);
+    godot::Object *packet_peer = gd::live_object(link);
+    if (packet_peer == nullptr) {
+        return;
+    }
+    packet_peer->call(godot::StringName("ping_interval"), p_milliseconds);
+}
+
+inline void enet_configure_throttle(
+    const godot::Ref<godot::MultiplayerPeer> &p_peer,
+    int64_t p_peer_id,
+    int64_t p_interval_ms,
+    int64_t p_acceleration,
+    int64_t p_deceleration
+) {
+    if (p_peer.is_null()) {
+        return;
+    }
+    const godot::Variant link
+        = p_peer->call(godot::StringName("get_peer"), p_peer_id);
+    godot::Object *packet_peer = gd::live_object(link);
+    if (packet_peer == nullptr) {
+        return;
+    }
+    packet_peer->call(
+        godot::StringName("throttle_configure"),
+        p_interval_ms,
+        p_acceleration,
+        p_deceleration
+    );
+}
+
 inline int64_t enet_local_port(
     const godot::Ref<godot::MultiplayerPeer> &p_peer
 ) {

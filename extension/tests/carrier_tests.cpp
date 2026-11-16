@@ -14,6 +14,7 @@
 #include "netw/api/schema_core.hpp"
 #include "netw/call_args.hpp"
 #include "netw/carrier_frame.hpp"
+#include "netw/clock_exchange.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/datagram_seq_book.hpp"
 #include "netw/rate_window.hpp"
@@ -297,6 +298,157 @@ LawVerdict round_trip_per_peer(const Carrier &) {
             book.round_trip_ms(2),
             book.round_trip_ms(3),
             book.round_trip_ms(4)
+        );
+    }
+    return law_held();
+}
+
+LawVerdict echo_rides(const Carrier &) {
+    constexpr int64_t HEARD_MS = 1000;
+    constexpr int64_t DEADLINE = netw::wire::RIDE_DEADLINE_MS;
+    constexpr int64_t PERIOD = netw::DatagramSeqBook::SAMPLED_ECHO_PERIOD_MS;
+    netw::DatagramSeqBook book;
+    book.note_inbound(2, 1, HEARD_MS);
+    if (!book.echo_is_due(2, HEARD_MS)) {
+        return law_broken("the first echo to a peer waited");
+    }
+    book.note_echoed(2, 1, HEARD_MS);
+    book.note_inbound(2, 2, HEARD_MS);
+    if (book.echo_is_due(2, HEARD_MS + DEADLINE - 1)) {
+        return law_broken("an echo was due before its deadline");
+    }
+    if (!book.echo_is_due(2, HEARD_MS + DEADLINE)) {
+        return law_broken("an echo was not due at its deadline");
+    }
+    book.note_echo_held(2);
+    book.note_echoed(2, 2, HEARD_MS + DEADLINE);
+    book.note_inbound(2, 3, HEARD_MS + PERIOD - 1);
+    if (book.echo_is_due(2, HEARD_MS + PERIOD - 1)) {
+        return law_broken("an echo left unheld twice within a second");
+    }
+    if (!book.echo_is_due(2, HEARD_MS + PERIOD)) {
+        return law_broken("a second passed with no unheld echo");
+    }
+    book.note_echoed(2, 3, HEARD_MS + PERIOD);
+    for (uint16_t seq = 4; seq < 11; ++seq) {
+        book.note_inbound(2, seq, HEARD_MS + PERIOD);
+    }
+    if (book.echo_is_due(2, HEARD_MS + PERIOD) || book.echo_is_over_limit(2)) {
+        return law_broken("seven unechoed datagrams forced an echo");
+    }
+    book.note_inbound(2, 11, HEARD_MS + PERIOD);
+    if (!book.echo_is_due(2, HEARD_MS + PERIOD)
+        || !book.echo_is_over_limit(2)) {
+        return law_broken("eight unechoed datagrams forced no echo");
+    }
+    const uint16_t bare = book.next_send_seq(2, 1000000, false);
+    book.note_peer_ack(2, bare, 0, 1400000);
+    if (book.round_trip_ms(2) != 0.0) {
+        return law_broken(
+            "a datagram with no frames measured %g ms",
+            book.round_trip_ms(2)
+        );
+    }
+
+    const uint16_t sent = book.next_send_seq(2, 1000000);
+    if (!book.note_peer_ack(2, sent, 0, 1400000, true)
+        || book.peer_ack(2) != int64_t(sent)) {
+        return law_broken("an echo that waited did not advance the ack");
+    }
+    if (book.round_trip_ms(2) != 0.0) {
+        return law_broken(
+            "an echo that waited measured %g ms",
+            book.round_trip_ms(2)
+        );
+    }
+
+    Ref<NetwMultiplayer> session;
+    session.instantiate();
+    const int64_t carried = session->next_send_seq(PEER);
+    session->session_get_inner()->emit_signal(
+        "peer_packet",
+        PEER,
+        NetwCarrierFrame::build(
+            PackedByteArray(),
+            false,
+            1,
+            carried,
+            0,
+            -1,
+            true
+        )
+    );
+    if (session->peer_ack(PEER) != carried
+        || session->link_round_trip_ms(PEER) != 0.0) {
+        return law_broken(
+            "a session read ack %lld and %g ms from an echo that waited",
+            (long long)session->peer_ack(PEER),
+            session->link_round_trip_ms(PEER)
+        );
+    }
+    return law_held();
+}
+
+LawVerdict clock_pair_rides(const Carrier &) {
+    constexpr int64_t DUE_MS = 1000;
+    constexpr int64_t DEADLINE = netw::wire::RIDE_DEADLINE_MS;
+    constexpr uint64_t LEFT_USEC = 7000000;
+    netw::ClockExchange settled;
+    settled.owe_ping(false);
+    if (settled.ping_boards(DUE_MS, false)
+        || settled.ping_boards(DUE_MS + DEADLINE - 1, false)) {
+        return law_broken("a settled ping forced a datagram early");
+    }
+    if (!settled.ping_boards(DUE_MS + DEADLINE, false)) {
+        return law_broken("a settled ping forced no datagram at its deadline");
+    }
+    netw::ClockExchange riding;
+    riding.owe_ping(false);
+    if (!riding.ping_boards(DUE_MS, true)) {
+        return law_broken("a settled ping missed a datagram that was leaving");
+    }
+    netw::ClockExchange converging;
+    converging.owe_ping(true);
+    if (!converging.ping_boards(DUE_MS, false)) {
+        return law_broken("a ping from an unsettled clock waited");
+    }
+
+    const netw::session::ClockPing ping = settled.take_ping(LEFT_USEC);
+    if (ping.origin != LEFT_USEC || settled.ping_is_owed()) {
+        return law_broken(
+            "a ping that left at %lld was stamped %lld",
+            (long long)LEFT_USEC,
+            (long long)ping.origin
+        );
+    }
+
+    netw::session::ClockPing older;
+    older.origin = 111;
+    netw::ClockExchange server;
+    server.hear_ping(PEER, older, LEFT_USEC + 40000);
+    server.hear_ping(PEER, ping, LEFT_USEC + 50000);
+    const netw::session::ClockPong pong
+        = server.take_pong(PEER, LEFT_USEC + 150000);
+    if (pong.origin != ping.origin || pong.wait != 1000
+        || !server.peers_asking().is_empty()) {
+        return law_broken(
+            "the server answered origin %lld after %lld units",
+            (long long)pong.origin,
+            (long long)pong.wait
+        );
+    }
+    const double trip
+        = netw::ClockExchange::round_trip_seconds(pong, LEFT_USEC + 190000);
+    if (int64_t(trip * 1000000.0 + 0.5) != 90000) {
+        return law_broken("a pong held 100 ms read a round trip of %g s", trip);
+    }
+
+    server.hear_ping(PEER, ping, 0);
+    const uint64_t saturated = server.take_pong(PEER, 60000000).wait;
+    if (saturated != netw::ClockExchange::WAIT_LIMIT) {
+        return law_broken(
+            "a ping held a minute waited %lld units",
+            (long long)saturated
         );
     }
     return law_held();
@@ -734,6 +886,14 @@ const Row ROWS[] = {
     {"two peers on links of different latency",
      "each peer's round trip is measured on its own link",
      &round_trip_per_peer},
+    {"an echo with nothing to ride on",
+     "it waits for the deadline or eight datagrams, leaves unheld once a "
+     "second, is no round trip when it waited, and measures none itself",
+     &echo_rides},
+    {"a clock ping and the pong that answers it",
+     "a settled ping waits for a datagram or its deadline, is stamped when "
+     "it leaves, and the newest is answered with the time it was held",
+     &clock_pair_rides},
     {"a SPAWN carrying one field the server never wrote",
      "the client builds no node and warns",
      &spawn_extra_field},

@@ -123,6 +123,10 @@ String lan_address() {
     return pick_lan_address(gd::local_interface_addresses());
 }
 
+int64_t ENetTransport::packet_overhead() const {
+    return ENET_PACKET_OVERHEAD;
+}
+
 StringName ENetTransport::peer_class() const {
     return StringName("ENetMultiplayerPeer");
 }
@@ -193,6 +197,7 @@ void ENetTransport::host_peer(const Dictionary &p_settings) {
         fail(err, "failed to create ENet server");
         return;
     }
+    created = peer;
     live = peer;
     deliver(peer);
 }
@@ -211,6 +216,7 @@ void ENetTransport::join_peer(
         fail(err, "failed to create ENet client");
         return;
     }
+    created = peer;
     live = peer;
     deliver(peer);
 }
@@ -228,6 +234,24 @@ Ref<MultiplayerPeer> ENetTransport::make_probe_peer(const String &p_address) {
 
 void ENetTransport::adopt(const Ref<MultiplayerPeer> &p_peer) {
     live = p_peer;
+}
+
+void ENetTransport::peer_connected(int64_t p_peer) {
+    if (live.is_null() || live != created) {
+        return;
+    }
+    const bool is_direct_link = live->get_unique_id() == 1 || p_peer == 1;
+    if (!is_direct_link) {
+        return;
+    }
+    gd::enet_set_ping_interval(live, p_peer, PING_INTERVAL_MS);
+    gd::enet_configure_throttle(
+        live,
+        p_peer,
+        THROTTLE_INTERVAL_MS,
+        THROTTLE_ACCELERATION,
+        THROTTLE_DECELERATION
+    );
 }
 
 String ENetTransport::join_address() const {
@@ -249,6 +273,7 @@ void ENetTransport::close() {
         live->close();
     }
     live = Ref<MultiplayerPeer>();
+    created = Ref<MultiplayerPeer>();
 }
 
 StringName WebSocketTransport::peer_class() const {
@@ -360,6 +385,10 @@ void WebSocketTransport::close() {
     }
     live = Ref<MultiplayerPeer>();
     bound_port = 0;
+}
+
+int64_t LocalTransport::packet_overhead() const {
+    return 0;
 }
 
 StringName LocalTransport::peer_class() const {

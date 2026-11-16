@@ -44,7 +44,7 @@ func _init() -> void:
 	entity = Netw.configure_entity(self)
 	entity.authority = NetwEntity.AUTHORITY_CONTROLLER
 	entity.transfer = NetwEntity.TRANSFER_IMMEDIATE
-	entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+	entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 	entity.simulation.claim_on_contact = true
 	entity.display.visual_root = ^"Visual"
 	Netw.configure_property(self, &"position").broadcast().on_spawn() \

@@ -42,6 +42,7 @@ struct NetwCarrierFrame {
         MAGIC_RELIABLE = 0x58,
         MAGIC_UNRELIABLE = 0x78,
         MAGIC_UNRELIABLE_ACKED = 0x98,
+        MAGIC_UNRELIABLE_ACKED_HELD = 0xB8,
     };
 
     enum Kind {
@@ -50,6 +51,7 @@ struct NetwCarrierFrame {
         RELIABLE,
         UNRELIABLE,
         UNRELIABLE_ACKED,
+        UNRELIABLE_ACKED_HELD,
     };
 
     static bool magic_is_retired(uint8_t p_magic);
@@ -60,7 +62,8 @@ struct NetwCarrierFrame {
         int64_t p_seq,
         int64_t p_ack,
         uint32_t p_history,
-        int64_t p_tick
+        int64_t p_tick,
+        bool p_echo_waited = false
     );
 
     static godot::PackedByteArray build(
@@ -70,8 +73,13 @@ struct NetwCarrierFrame {
         int64_t p_seq,
         int64_t p_ack,
         uint32_t p_history,
-        int64_t p_tick
+        int64_t p_tick,
+        bool p_echo_waited = false
     );
+
+    bool is_acked() const {
+        return kind == UNRELIABLE_ACKED || kind == UNRELIABLE_ACKED_HELD;
+    }
 
     static NetwCarrierFrame read(const godot::PackedByteArray &p_packet);
 

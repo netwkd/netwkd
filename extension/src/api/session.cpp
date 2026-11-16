@@ -282,6 +282,11 @@ Dictionary NetwSession::link_stats(int64_t p_peer) const {
     return api != nullptr ? api->peer_get_link_stats(p_peer) : Dictionary();
 }
 
+Dictionary NetwSession::traffic(int64_t p_peer) const {
+    NetwMultiplayer *api = session();
+    return api != nullptr ? api->session_get_traffic(p_peer) : Dictionary();
+}
+
 Ref<NetwPromise> NetwSession::leave() {
     NetwMultiplayer *api = session();
     return api != nullptr ? api->session_leave()
@@ -553,6 +558,11 @@ void NetwSession::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("link_stats", "peer"),
         &NetwSession::link_stats
+    );
+    ClassDB::bind_method(
+        D_METHOD("traffic", "peer"),
+        &NetwSession::traffic,
+        DEFVAL(0)
     );
     ClassDB::bind_method(
         D_METHOD("transfer_server", "player"),

@@ -90,7 +90,7 @@ namespace Networked;
 /// <code>
 /// func _init() -&gt; void:
 ///     var entity := Netw.configure_entity(self)
-///     entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+///     entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 ///     entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
 /// </code>
 /// </para>

@@ -386,8 +386,8 @@ void NetwMultiplayer::sim_contact_validate(int64_t p_tick) {
         if (sim_rows.is_stepping(at) != sim::steps(*row)) {
             sim_contact_fault(*row, "stepping", p_tick);
         }
-        if (sim_rows.is_chooser(at) != sim::chooses(*row)) {
-            sim_contact_fault(*row, "choosers", p_tick);
+        if (sim_rows.is_joiner(at) != sim::joins(*row)) {
+            sim_contact_fault(*row, "joiners", p_tick);
         }
         const Ref<NetwEntity> view = entity_get_view(row->entity);
         if (row->view != view.ptr()) {

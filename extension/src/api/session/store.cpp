@@ -131,7 +131,7 @@ void NetwMultiplayer::store_admit(const PropertyBindingPtr &p_binding) {
     }
     const uint64_t owner = p_binding->id;
     const uint64_t set_id = set->id;
-    const bool windowed = p_binding->is_windowed() && !set->masked;
+    const bool windowed = p_binding->is_windowed();
     const table::SchemaRecord *lanes[2]
         = {&set->get_volatile_schema(), &set->get_retained_schema()};
     const store::Family families[2] = {
@@ -467,6 +467,18 @@ void NetwMultiplayer::store_work_route(int64_t p_route) {
             store_world.mark_working(store_world.row_of(binding->id, 0));
             store_world.mark_working(store_world.row_of(binding->id, 1));
         }
+    }
+}
+
+void NetwMultiplayer::store_restate(uint64_t p_binding, int64_t p_peer) {
+    ReplicationSend *send = row_send_of(get_replication_plane());
+    if (send != nullptr && p_binding != 0) {
+        send->restate(
+            p_binding,
+            p_peer,
+            datagram_base_tick(),
+            session_elapsed_ms()
+        );
     }
 }
 

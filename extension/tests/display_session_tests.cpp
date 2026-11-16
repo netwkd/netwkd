@@ -147,7 +147,7 @@ class Crate extends RigidBody3D:
 		eye.name = &"Eye"
 		add_child(eye)
 		var entity := Netw.configure_entity(self)
-		entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 		entity.display.visual_root = ^"Eye"
 		var glide := NetwInterpolate.new().lerp().smooth(0.0)
 		Netw.configure_property(self, &"position").broadcast().interpolate(glide)

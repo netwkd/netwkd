@@ -11,7 +11,7 @@
 		    Netw.configure_property(self, &amp;"move_dir").input()
 		    Netw.configure_property(self, &amp;"aim_dir").broadcast()
 		[/codeblock]
-		[method volatile], [method retained], [method correction_threshold] and [method persisted] apply to one property. [method on_change], [method heartbeat], [method windowed], [method audience] and [method masked] apply to every property of the same kind on the script. Give them consistent values.
+		[method volatile], [method retained], [method correction_threshold] and [method persisted] apply to one property. [method heartbeat], [method windowed] and [method audience] apply to every property of the same kind on the script. Give them consistent values.
 		[method NetwMemberConfig.interpolate] smooths received values. It returns a [NetwMemberConfig], so chain it after the methods of this class.
 		[b]Rigid bodies[/b]
 		When the [NetwEntity] root is a [RigidBody3D] or a [RigidBody2D], [code]position[/code], [code]quaternion[/code] ([code]rotation[/code] in 2D), [code]linear_velocity[/code], [code]angular_velocity[/code] and [code]sleeping[/code] read and write the body's physics state. [code]position[/code] stays relative to the parent. While [member RigidBody3D.freeze] is on, position and rotation use the node transform. A write to a body that stays asleep reaches peers within 30 ticks.
@@ -101,18 +101,6 @@
 				    velocity = move_dir * SPEED
 				[/codeblock]
 				Each send also includes the last two ticks of input, so the next packet makes up for a lost one. [method windowed] changes how many. Correction settings such as [method extrapolate] are ignored on an input.
-			</description>
-		</method>
-		<method name="masked">
-			<return type="NetwPropertyConfig" />
-			<description>
-				Changes nothing on a property with no window, because those already send each peer only the values that changed since a state it confirmed. With a window, as [method windowed] sets and [method input] sets by default, it is ignored with a warning. Sets [member set_masked].
-			</description>
-		</method>
-		<method name="on_change">
-			<return type="NetwPropertyConfig" />
-			<description>
-				Enabled by default.
 			</description>
 		</method>
 		<method name="on_spawn">
@@ -236,26 +224,11 @@
 		<member name="set_heartbeat_ticks" type="int" setter="set_set_heartbeat_ticks" getter="get_set_heartbeat_ticks">
 			Set by [method heartbeat], or [constant UNSET].
 		</member>
-		<member name="set_masked" type="bool" setter="set_set_masked" getter="get_set_masked">
-			Set by [method masked].
-		</member>
-		<member name="set_trigger" type="int" setter="set_set_trigger" getter="get_set_trigger" enum="NetwPropertyConfig.Trigger">
-			Set by [method on_change], or [constant UNSET].
-		</member>
 		<member name="set_window" type="int" setter="set_set_window" getter="get_set_window">
 			Set by [method windowed], or [constant UNSET].
 		</member>
 	</members>
 	<constants>
-		<constant name="TRIGGER_TICK" value="0" enum="Trigger">
-			Sent every tick.
-		</constant>
-		<constant name="TRIGGER_ON_CHANGE" value="1" enum="Trigger">
-			Sent when a value changed.
-		</constant>
-		<constant name="TRIGGER_ON_DEMAND" value="2" enum="Trigger">
-			Sent only by [method Netw.sync_property].
-		</constant>
 		<constant name="VOLATILE" value="0" enum="Lane">
 			Sent unreliably. Only the newest value counts.
 		</constant>

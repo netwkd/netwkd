@@ -20,7 +20,7 @@ public:
     bool declare_channel(
         int64_t p_id,
         const godot::StringName &p_name,
-        bool p_fitted
+        bool p_tick
     );
 
     const repl::SessionResult &run(
@@ -115,6 +115,15 @@ public:
     void hide(int64_t p_peer, const wire::StreamLane &p_lane);
     void forget_peer(int64_t p_peer);
     void close_route(int64_t p_route);
+
+    void restate(
+        uint64_t p_owner,
+        int64_t p_peer,
+        int64_t p_tick,
+        int64_t p_now_ms
+    ) {
+        impl.restate(p_owner, int(p_peer), p_tick, p_now_ms);
+    }
 
     void note_baseline_drop() {
         drops_baseline_unknown += 1;

@@ -7,7 +7,7 @@ NW1033. Entities that cannot replay were asked to roll back together
 
 Reported as a warning on the client that predicts an entity with
 :ref:`NetwPrediction.rollback_together <class_NetwPrediction_property_rollback_together>`
-set, when that entity or one it selects cannot replay a tick. Each entity is
+set, when that entity or one corrected with it cannot replay a tick. Each entity is
 corrected alone. The log line lists the entities that cannot replay and the
 schedule of each.
 

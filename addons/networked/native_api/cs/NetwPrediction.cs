@@ -151,12 +151,12 @@ public sealed class NetwPrediction : NetwRefCounted
         NetwApi.MethodBind("NetwPrediction", "set_predict_input", 1611583062UL);
 
     /// <summary>
-    /// Guesses input for an entity selected by
-    /// <see cref="NetwEntity.Simulation"/> that this peer does not control.
-    /// Relayed input replaces the guess. Unset callbacks and omitted properties
-    /// repeat the newest relayed input, and zero before any arrives. The
-    /// returned <see cref="Godot.Collections.Dictionary"/> uses names declared
-    /// with <see cref="NetwPropertyConfig.Input"/>.
+    /// Guesses input for this entity on a peer that runs it as
+    /// <see cref="NetwSimulation.ModeEnum.Active"/>. Relayed input replaces the
+    /// guess. Unset callbacks and omitted properties repeat the newest relayed
+    /// input, and zero before any arrives. The returned
+    /// <see cref="Godot.Collections.Dictionary"/> uses names declared with
+    /// <see cref="NetwPropertyConfig.Input"/>.
     /// <code>
     /// Dictionary
     /// ┖╴property_name  Variant  guessed value of a declared input property
@@ -700,10 +700,10 @@ public sealed class NetwPrediction : NetwRefCounted
             2586408642UL);
 
     /// <summary>
-    /// If <c>true</c>, this entity is corrected together with the entities its
-    /// <see cref="NetwEntity.Simulation"/> selects, rolling them back from the
-    /// same tick. If <c>false</c>, each entity is corrected on its own.
-    /// Defaults to <c>true</c> on an entity with
+    /// If <c>true</c>, this entity is corrected together with the predicted
+    /// entities this peer runs as <see cref="NetwSimulation.ModeEnum.Active"/>,
+    /// rolling them back from the same tick. If <c>false</c>, each entity is
+    /// corrected on its own. Defaults to <c>true</c> on an entity with
     /// <see cref="NetwSimulation.PhysicsDriven"/> that runs at
     /// <see cref="NetwSimulation.ScheduleEnum.Stepped"/>, and <c>false</c>
     /// otherwise.

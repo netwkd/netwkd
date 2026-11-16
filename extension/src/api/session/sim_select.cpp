@@ -86,6 +86,17 @@ void take(
     r_found.push_back(p_member);
 }
 
+sim::Pick pick_of(const sim::Row *p_member, bool p_eligible) {
+    const sim::RemoteMode told = p_member != nullptr
+        ? p_member->declaration.remote_mode
+        : sim::RemoteMode::AUTO;
+    if (told == sim::RemoteMode::PROXY) {
+        return sim::Pick::EXCLUDED;
+    }
+    return told == sim::RemoteMode::ACTIVE && p_eligible ? sim::Pick::CHOSEN
+                                                         : sim::Pick::AUTOMATIC;
+}
+
 } // namespace
 
 void NetwMultiplayer::sim_release_row(const RID &p_entity) {
@@ -100,117 +111,6 @@ void NetwMultiplayer::sim_release_row(const RID &p_entity) {
     sim_refresh_members(sim_rows.release(p_entity));
 }
 
-Error NetwMultiplayer::sim_choose(
-    const RID &p_subject,
-    const Ref<NetwEntity> &p_other,
-    const char *p_call
-) {
-    const Ref<NetwEntity> subject = entity_get_view(p_subject);
-    if (subject.is_null() || p_other.is_null()) {
-        fault::raise(
-            this,
-            NETW_FAULT_EMPTY_ARGUMENT,
-            {p_call, String(), "live entities"}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
-    if (!same_scene(*this, subject, p_other)) {
-        fault::raise(
-            this,
-            NETW_FAULT_BAD_VALUE,
-            {p_call,
-             vformat(
-                 "an entity in another scene than '%s'",
-                 String(subject->get_name())
-             ),
-             "entities in the same scene"}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
-    sim_write_choice(subject.ptr(), p_other->get_rid_handle(), SIM_PICK_CHOSEN);
-    return OK;
-}
-
-Error NetwMultiplayer::simulation_select(
-    const RID &p_entity,
-    const RID &p_other,
-    SimPick p_pick
-) {
-    if (p_pick == SIM_PICK_CHOSEN) {
-        return sim_choose(
-            p_entity,
-            entity_get_view(p_other),
-            "{NetwMultiplayer.simulation_select}"
-        );
-    }
-    const Ref<NetwEntity> subject = entity_get_view(p_entity);
-    if (subject.is_null()) {
-        fault::raise(
-            this,
-            NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwMultiplayer.simulation_select}", String(), "a live entity"}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
-    sim_write_choice(subject.ptr(), p_other, SIM_PICK_FORGET);
-    return OK;
-}
-
-Error NetwMultiplayer::simulation_select_layer(
-    const RID &p_entity,
-    const RID &p_layer,
-    SimPick p_pick
-) {
-    const Ref<NetwEntity> subject = entity_get_view(p_entity);
-    if (subject.is_null()) {
-        fault::raise(
-            this,
-            NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwMultiplayer.simulation_select_layer}",
-             String(),
-             "a live entity"}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
-    if (p_pick == SIM_PICK_FORGET) {
-        sim_write_layer(subject.ptr(), StringName(), p_pick);
-        return OK;
-    }
-    const StringName layer
-        = p_layer.is_valid() ? layer_name_of(p_layer) : StringName();
-    if (p_layer.is_valid() && layer.is_empty()) {
-        fault::raise(
-            this,
-            NETW_FAULT_BAD_VALUE,
-            {"{NetwMultiplayer.simulation_select_layer}",
-             "a layer this session does not have",
-             "a layer from {NetwMultiplayer.interest_layer_create}, or an "
-             "empty RID"}
-        );
-        return ERR_INVALID_PARAMETER;
-    }
-    sim_write_layer(subject.ptr(), layer, p_pick);
-    return OK;
-}
-
-TypedArray<RID> NetwMultiplayer::simulation_get_selected(const RID &p_entity) {
-    TypedArray<RID> out;
-    const sim::Row *row = sim_rows.row_of(p_entity);
-    if (row == nullptr) {
-        return out;
-    }
-    for (const sim::Selected &member : row->selection.members) {
-        if (!member.promoted) {
-            continue;
-        }
-        const RID entity = sim_rows.entity_of_key(member.key);
-        if (entity_get_view(entity).is_valid()) {
-            out.push_back(entity);
-        }
-    }
-    return out;
-}
-
 uint32_t NetwMultiplayer::sim_selection_count(const RID &p_member) const {
     return sim_rows.selection_count(p_member);
 }
@@ -219,54 +119,62 @@ RID NetwMultiplayer::sim_entity_of_key(int64_t p_key) const {
     return sim_rows.entity_of_key(p_key);
 }
 
-bool NetwMultiplayer::sim_chooses(const RID &p_subject) const {
+bool NetwMultiplayer::sim_chooses(const RID &p_subject) {
     const sim::Row *row = sim_rows.row_of(p_subject);
-    return row != nullptr && row->choice.declared(true);
+    if (row == nullptr) {
+        return false;
+    }
+    if (sim_physics_driven(row->view)) {
+        return true;
+    }
+    sim_rows.joiners(sim_joining);
+    for (const RID &joiner : sim_joining) {
+        if (joiner != p_subject) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool NetwMultiplayer::sim_predicts(const Ref<NetwEntity> &p_subject) const {
     return prediction_engine.slot_of(p_subject) >= 0;
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::sim_named(const RID &p_subject) {
-    TypedArray<NetwEntity> out;
-    const sim::Row *row = sim_rows.row_of(p_subject);
-    if (row == nullptr) {
-        return out;
-    }
-    for (const sim::Named &named : row->choice.named) {
-        const Ref<NetwEntity> entity = entity_get_view(named.entity);
-        if (entity.is_valid()) {
-            out.push_back(entity);
-        }
-    }
-    return out;
+bool NetwMultiplayer::sim_selects_unasked(
+    const Ref<NetwEntity> &p_subject
+) const {
+    return sim_predicts(p_subject) && sim_physics_driven(p_subject.ptr());
+}
+
+TypedArray<NetwEntity> NetwMultiplayer::sim_joiners(
+    const Ref<NetwEntity> &p_subject
+) {
+    return sim_gather(p_subject, false);
 }
 
 TypedArray<NetwEntity> NetwMultiplayer::sim_candidates(
     const Ref<NetwEntity> &p_subject
 ) {
+    return sim_gather(p_subject, sim_selects_unasked(p_subject));
+}
+
+TypedArray<NetwEntity> NetwMultiplayer::sim_gather(
+    const Ref<NetwEntity> &p_subject,
+    bool p_shared
+) {
     TypedArray<NetwEntity> out;
-    if (p_subject.is_null()) {
-        return out;
-    }
-    const sim::Row *row = sim_rows.row_of(p_subject->get_rid_handle());
-    if (row == nullptr) {
+    if (p_subject.is_null()
+        || sim_rows.row_of(p_subject->get_rid_handle()) == nullptr) {
         return out;
     }
     LocalVector<Ref<NetwEntity>> found;
-    for (const sim::Named &named : row->choice.named) {
-        take(*this, p_subject, entity_get_view(named.entity), found);
+    sim_rows.joiners(sim_joining);
+    for (const RID &joiner : sim_joining) {
+        take(*this, p_subject, entity_get_view(joiner), found);
     }
-    LocalVector<StringName> layers;
-    if (row->choice.stated) {
-        layers = row->choice.layers;
-    } else if (sim_predicts(p_subject)) {
-        layers.push_back(StringName());
-    }
-    for (const StringName &layer : layers) {
+    if (p_shared) {
         const TypedArray<NetwEntity> shared
-            = interest_shared_entities(p_subject, layer);
+            = interest_shared_entities(p_subject, StringName());
         for (int at = 0; at < shared.size(); ++at) {
             const Ref<NetwEntity> member = shared[at];
             take(*this, p_subject, member, found);
@@ -344,16 +252,15 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_select(
         sim::Candidate candidate;
         candidate.key = key;
         candidate.order_key = int64_t(at);
-        const sim::Named *named = standing->choice.named_of(entity);
-        candidate.pick = named != nullptr ? named->pick : sim::Pick::AUTOMATIC;
         candidate.eligible = sim_selectable(member);
+        candidate.pick = pick_of(sim_rows.row_of(entity), candidate.eligible);
         candidates.push_back(candidate);
         by_key.insert(key, member);
     }
 
     sim::Row &row = sim_rows.ensure(subject);
     row.selection.owner_order_key = subject_order;
-    row.selection.all = row.choice.selects_all(sim_predicts(p_subject));
+    row.selection.all = sim_selects_unasked(p_subject);
     row.selection.commit(candidates, p_frontier);
 
     LocalVector<int64_t> promoted_keys;
@@ -421,31 +328,6 @@ void NetwMultiplayer::sim_release_lingering(
     }
 }
 
-void NetwMultiplayer::sim_select_unpredicted(int64_t p_tick, bool p_commit) {
-    sim_rows.choosers(sim_stepping);
-    for (const RID &subject : sim_stepping) {
-        const Ref<NetwEntity> entity = entity_get_view(subject);
-        if (entity.is_null()) {
-            sim_release_row(subject);
-            continue;
-        }
-        Node *owner = entity->get_owner();
-        const sim::Row *row = sim_rows.row_of(subject);
-        if (owner == nullptr || !owner->is_inside_tree() || row == nullptr
-            || predict_engine_for(subject) != nullptr) {
-            continue;
-        }
-        const sim::Mode mode = row->bodies.recorded
-            ? row->mode
-            : sim_rows.resolve(subject, sim_body_facts(entity));
-        if (!sim::leads(mode)) {
-            sim_drop_selections(subject);
-        } else if (p_commit) {
-            sim_select(entity, sim_candidates(entity), p_tick);
-        }
-    }
-}
-
 void NetwMultiplayer::sim_seed(sim::Row &r_row) {
     const Ref<NetwEntity> entity = entity_get_view(r_row.entity);
     if (entity.is_null()) {
@@ -463,14 +345,13 @@ void NetwMultiplayer::sim_seed(sim::Row &r_row) {
         r_row.declaration.bodies = held.bodies;
     }
     r_row.declaration.schedule = held.schedule;
-    r_row.declaration.replicas = held.replicas;
+    r_row.declaration.remote_mode = held.remote_mode;
     r_row.declaration.restore = held.restore;
     r_row.declaration.max_restore_ticks = held.max_restore_ticks;
     r_row.declaration.step = held.step;
     r_row.declaration.claim_on_contact = held.claim_on_contact;
     r_row.declaration.release_on_rest = held.release_on_rest;
-    r_row.facts.replicas = held.replicas;
-    r_row.choice = found != nullptr ? found->choice : sim::Choice();
+    r_row.facts.remote_mode = held.remote_mode;
 }
 
 void NetwMultiplayer::sim_declare(const Ref<NetwEntity> &p_entity) {

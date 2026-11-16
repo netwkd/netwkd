@@ -44,6 +44,7 @@
 #include "netw/carrier_frame.hpp"
 #include "netw/channel_book.hpp"
 #include "netw/clock_engine.hpp"
+#include "netw/clock_exchange.hpp"
 #include "netw/connect/core.hpp"
 #include "netw/datagram_seq_book.hpp"
 #include "netw/diag/interpolation_view.hpp"
@@ -101,6 +102,7 @@
 #include "netw/wire/capture.hpp"
 #include "netw/wire/registry.hpp"
 #include "netw/wire/stream.hpp"
+#include "netw/wire/traffic.hpp"
 
 #if defined(NETW_TESTS)
 namespace netw_test {
@@ -361,6 +363,7 @@ private:
     godot::Node *node_from_tree_path(const godot::NodePath &p_path) const;
     bool can_resolve_action(const PendingAction &p_request) const;
     int action_readiness(const PendingAction &p_request, int64_t p_tick);
+    int send_lead_ticks() const;
     int input_readiness(const PendingAction &p_request, int64_t p_tick);
     void execute_ready_action(
         const PendingAction &p_request,
@@ -693,14 +696,21 @@ private:
     int64_t last_poll_usec = 0;
     int64_t last_display_frame = -1;
     DatagramSeqBook seq_book;
+    ClockExchange clock_exchange;
     NetwCarrierBuffers carrier;
     wire::AttributionBook attribution;
+    wire::TrafficMeter traffic;
 #if defined(DEBUG_ENABLED)
     wire::NetworkProfiler network_profiler;
     uint32_t profiler_outgoing = wire::NetworkProfiler::NONE;
     uint64_t profiler_last_publish = 0;
     godot::Array profiler_rpc_payload;
     godot::Array profiler_sync_payload;
+    uint64_t profiler_last_traffic = 0;
+    godot::Array profiler_traffic_payload;
+    godot::Array profiler_bandwidth_in;
+    godot::Array profiler_bandwidth_out;
+    bool profiler_bandwidth = false;
     std::unique_ptr<diag::PredictionRings> prediction_rings;
     std::unique_ptr<diag::InterpolationView> interpolation_view;
     std::unique_ptr<diag::Sketch> diag_sketch;
@@ -1279,6 +1289,7 @@ private:
     bool predict_free_queued = false;
     sim::Rows sim_rows;
     godot::LocalVector<godot::RID> sim_stepping;
+    godot::LocalVector<godot::RID> sim_joining;
     godot::LocalVector<uint32_t> sim_walk;
     godot::LocalVector<uint32_t> sim_noted;
     godot::LocalVector<godot::RID> sim_sources;
@@ -1719,6 +1730,7 @@ public:
     void store_stamp_row(uint32_t p_table, uint32_t p_row);
     void store_resource_route(int64_t p_route);
     void store_work_route(int64_t p_route);
+    void store_restate(uint64_t p_binding, int64_t p_peer);
     void store_resource_entity(NetwEntity *p_entity);
     bool store_admits_any(const store::RowAddress &p_at) const;
     store::Source store_source(
@@ -2057,7 +2069,10 @@ public:
 
     void clock_set_mismatch_action(MismatchAction p_action);
     void clock_request_handshake();
-    void clock_send_ping();
+    void clock_owe_ping(bool p_forces);
+    bool clock_ping_waits() const;
+    void clock_board(int64_t p_now_ms, bool p_upkeep_rides);
+    void clock_board_ping();
     void clock_receive_handshake(
         const godot::PackedByteArray &p_payload,
         int64_t p_sender
@@ -2575,17 +2590,19 @@ public:
     );
     sim::Schedule sim_runs_on(sim::Row &r_row, godot::Node *p_owner);
     void sim_release_row(const godot::RID &p_entity);
-    godot::Error sim_choose(
-        const godot::RID &p_subject,
-        const godot::Ref<NetwEntity> &p_other,
-        const char *p_call
-    );
     uint32_t sim_selection_count(const godot::RID &p_member) const;
-    bool sim_chooses(const godot::RID &p_subject) const;
+    bool sim_chooses(const godot::RID &p_subject);
     bool sim_predicts(const godot::Ref<NetwEntity> &p_subject) const;
-    godot::TypedArray<NetwEntity> sim_named(const godot::RID &p_subject);
+    bool sim_selects_unasked(const godot::Ref<NetwEntity> &p_subject) const;
+    godot::TypedArray<NetwEntity> sim_joiners(
+        const godot::Ref<NetwEntity> &p_subject
+    );
     godot::TypedArray<NetwEntity> sim_candidates(
         const godot::Ref<NetwEntity> &p_subject
+    );
+    godot::TypedArray<NetwEntity> sim_gather(
+        const godot::Ref<NetwEntity> &p_subject,
+        bool p_shared
     );
     bool sim_selectable(const godot::Ref<NetwEntity> &p_member);
     godot::RID sim_entity_of_key(int64_t p_key) const;
@@ -2601,7 +2618,6 @@ public:
         bool p_selected
     );
     void sim_release_lingering(const godot::RID &p_subject, int64_t p_floor);
-    void sim_select_unpredicted(int64_t p_tick, bool p_commit);
     void sim_declare(const godot::Ref<NetwEntity> &p_entity);
     void sim_seed(sim::Row &r_row);
     void sim_announce(const godot::RID &p_entity);
@@ -2640,16 +2656,6 @@ private:
         const godot::Callable &p_step
     );
     static void predict_settle_kind(NetwEntity *p_wrapper);
-    static void sim_write_choice(
-        NetwEntity *p_wrapper,
-        const godot::RID &p_other,
-        SimPick p_pick
-    );
-    static void sim_write_layer(
-        NetwEntity *p_wrapper,
-        const godot::StringName &p_layer,
-        SimPick p_pick
-    );
     NetwPredictRunner *predict_runner_seated();
 
 public:
@@ -2697,7 +2703,8 @@ public:
     void predict_relay_command_frame(
         const godot::Ref<NetwEntity> &p_entity,
         const godot::PackedByteArray &p_payload,
-        int64_t p_author
+        int64_t p_author,
+        wire::Delivery p_delivery
     );
     void lagcomp_action_deny(
         int64_t p_requester,
@@ -3003,7 +3010,9 @@ public:
         godot::String &r_text
     );
     void send_standalone_ack(int64_t p_peer, int64_t p_ack);
-    void flush_standalone_acks();
+    void flush_standalone_acks(int64_t p_now_ms, bool p_upkeep_rides);
+    void send_echo(int64_t p_peer);
+    void echo_await_answer(int64_t p_peer);
     void liveness_when_live(
         int64_t p_route,
         const godot::Callable &p_callback,
@@ -3111,19 +3120,6 @@ public:
         const godot::Callable &p_callback
     );
     NetwSimulation::Mode simulation_get_mode(const godot::RID &p_entity);
-    godot::Error simulation_select(
-        const godot::RID &p_entity,
-        const godot::RID &p_other,
-        SimPick p_pick
-    );
-    godot::Error simulation_select_layer(
-        const godot::RID &p_entity,
-        const godot::RID &p_layer,
-        SimPick p_pick
-    );
-    godot::TypedArray<godot::RID> simulation_get_selected(
-        const godot::RID &p_entity
-    );
     NetwSimulation::Schedule simulation_get_schedule(
         const godot::RID &p_entity
     );
@@ -3384,6 +3380,11 @@ public:
 #if defined(DEBUG_ENABLED)
     void profiler_poll();
     void profiler_publish();
+    void profiler_datagram(
+        bool p_incoming,
+        int64_t p_peer,
+        int64_t p_header_bytes
+    );
     void profiler_node_changed(int64_t p_node);
     void profiler_watch_node(godot::Node *p_node);
     godot::String profiler_path(godot::Node *p_node) const;
@@ -3700,7 +3701,10 @@ public:
 
     int64_t datagram_budget() const;
 
-    bool channel_aggregates(int64_t p_channel, bool p_requested) const;
+    wire::Delivery channel_delivery(
+        int64_t p_channel,
+        const wire::Delivery *p_requested
+    ) const;
 
     static godot::PackedByteArray frame_pack(
         int64_t p_route,
@@ -3717,8 +3721,17 @@ public:
         const godot::PackedByteArray &p_payload,
         bool p_reliable,
         int64_t p_comp,
+        const godot::String &p_path
+    );
+    godot::Error send_to(
+        int64_t p_peer,
+        int64_t p_route,
+        int64_t p_channel,
+        const godot::PackedByteArray &p_payload,
+        bool p_reliable,
+        int64_t p_comp,
         const godot::String &p_path,
-        bool p_batched
+        wire::Delivery p_delivery
     );
     godot::Error rpc_send(
         int64_t p_peer,
@@ -3736,7 +3749,7 @@ public:
         bool p_reliable,
         int64_t p_comp,
         const godot::String &p_path,
-        bool p_batched,
+        const wire::Delivery *p_delivery,
         const CarrierRow *p_row,
         bool p_charged
     );
@@ -3750,7 +3763,6 @@ public:
         const godot::PackedByteArray &p_payload,
         bool p_reliable,
         int64_t p_comp,
-        bool p_batched,
         const CarrierRow *p_row
     );
 
@@ -3863,6 +3875,10 @@ public:
     godot::Dictionary relay_stats_snapshot();
     godot::Dictionary lagcomp_metrics() const;
     godot::Dictionary session_get_stats();
+    godot::Dictionary session_get_traffic(int64_t p_peer) const;
+    int64_t packet_overhead() const;
+    void traffic_advance(double p_seconds);
+    void traffic_set_window(double p_seconds);
     void stats_fill_predict(godot::Dictionary &r_out) const;
     void stats_fill_display(godot::Dictionary &r_out) const;
     int64_t stats_get(Stat p_stat);
@@ -3899,10 +3915,14 @@ public:
         int64_t p_peer,
         const godot::PackedByteArray &p_frame,
         bool p_reliable,
-        const CarrierRow *p_row = nullptr
+        const CarrierRow *p_row = nullptr,
+        int64_t p_deadline_ms = 0
     );
 
-    godot::PackedInt64Array carrier_flush();
+    godot::PackedInt64Array carrier_flush(
+        int64_t p_now_ms,
+        bool p_upkeep_rides
+    );
 
     void carrier_clear();
     void carrier_close_route(int64_t p_route);
@@ -3921,7 +3941,7 @@ public:
     int64_t carrier_pending(int64_t p_peer, bool p_reliable) const;
 
     static bool seq_is_fresher(int64_t a, int64_t b);
-    int64_t next_send_seq(int64_t p_peer);
+    int64_t next_send_seq(int64_t p_peer, bool p_carries_frames = true);
     double link_round_trip_ms(int64_t p_peer) const;
     double link_jitter_ms(int64_t p_peer) const;
     bool has_inbound_seq(int64_t p_peer) const;
@@ -3930,14 +3950,24 @@ public:
     uint32_t peer_ack_history(int64_t p_peer) const;
     int64_t datagram_base_tick() const;
     int64_t session_elapsed_ms() const;
-    bool note_inbound_seq(int64_t p_peer, int64_t p_seq);
-    bool note_peer_ack(int64_t p_peer, int64_t p_ack, uint32_t p_history);
+    bool note_inbound_seq(
+        int64_t p_peer,
+        int64_t p_seq,
+        bool p_carries_frames = true
+    );
+    bool note_peer_ack(
+        int64_t p_peer,
+        int64_t p_ack,
+        uint32_t p_history,
+        bool p_echo_waited = false
+    );
     void note_sent(int64_t p_peer, int64_t p_sequence);
     void note_ack(int64_t p_peer, int64_t p_sequence);
     void session_note_state_ack(
         int64_t p_peer,
         int64_t p_ack,
-        uint32_t p_history
+        uint32_t p_history,
+        bool p_echo_waited = false
     );
     godot::Error session_receive_inner_packet(
         int64_t p_sender,
@@ -4349,6 +4379,7 @@ public:
     void predict_relay_subscribe(const godot::RID &p_entity, bool p_subscribed);
     godot::PackedInt64Array relay_peers(int64_t p_entity_slot) const;
     int relay_peer_count(int64_t p_entity_slot) const;
+    uint32_t relay_generation(int64_t p_entity_slot) const;
     void relay_release(int64_t p_entity_slot);
     int relay_request_of(const godot::PackedByteArray &p_payload) const;
     void rpc_channel_register(

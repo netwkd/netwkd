@@ -15,7 +15,7 @@ using namespace godot;
 bool ReplicationSend::declare_channel(
     int64_t p_id,
     const StringName &p_name,
-    bool p_fitted
+    bool p_tick
 ) {
     if (wire::WireRegistry::id_is_builtin(uint8_t(p_id))) {
         fault::raise(
@@ -31,7 +31,7 @@ bool ReplicationSend::declare_channel(
     decl.id = uint8_t(p_id);
     decl.name = p_name;
     decl.delivery
-        = p_fitted ? wire::Delivery::FITTED : wire::Delivery::IMMEDIATE;
+        = p_tick ? wire::Delivery::TICK : wire::Delivery::IMMEDIATE;
     return registry.register_channel(decl);
 }
 

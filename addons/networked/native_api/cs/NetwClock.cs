@@ -32,9 +32,8 @@ namespace Networked;
 /// frame, and only one while <see cref="NetwMultiplayer.ClockSetGate"/> is on.
 /// <see cref="NetwClock.BehindCount"/> counts the frames that ended with a tick
 /// still waiting while the gate was on. <b>How a client follows the server</b>
-/// The client pings the server every <see cref="NetwClock.PingInterval"/>
-/// seconds. The server answers with its tick, and the client aims ahead of it
-/// by half the round trip plus
+/// The client pings the server, which answers with its tick, and the client
+/// aims ahead of it by half the round trip plus
 /// <see cref="NetwMultiplayer.ClockParam.LeadTicks"/>. The first answer sets
 /// the tick directly. After that, <see cref="NetwClock.SyncMode"/> decides.
 /// <see cref="NetwClock.SyncModeEnum.Snap"/> sets the tick directly every time,
@@ -46,13 +45,12 @@ namespace Networked;
 /// snapped. <b>Showing remote state</b> State from other peers arrives late, so
 /// remote entities are shown <see cref="NetwClock.DisplayOffset"/> ticks in the
 /// past. <see cref="NetwClock.RecommendedDisplayOffset"/> is the offset the
-/// current connection needs, the one-way latency plus the jitter times
-/// <see cref="NetwMultiplayer.ClockParam.JitterMultiplier"/>, in ticks. It is
-/// not applied automatically. <see cref="NetwClock.AutoConfigureOffset"/>
-/// applies it. <b>Ticking by hand</b> While <see cref="NetwClock.ManualTick"/>
-/// is on, physics frames run no ticks, and each <see cref="NetwClock.Step"/>
-/// call is one frame that runs the ticks it is given. A replay or a test steps
-/// the clock this way to get an exact tick count.
+/// current connection needs. It is not applied automatically.
+/// <see cref="NetwClock.AutoConfigureOffset"/> applies it. <b>Ticking by
+/// hand</b> While <see cref="NetwClock.ManualTick"/> is on, physics frames run
+/// no ticks, and each <see cref="NetwClock.Step"/> call is one frame that runs
+/// the ticks it is given. A replay or a test steps the clock this way to get an
+/// exact tick count.
 /// <code>
 /// clock.manual_tick = true
 /// for frame in 4:
@@ -468,40 +466,6 @@ public sealed class NetwClock : NetwRefCounted
             long discarded = default;
             NetwThunks.Ptrcall1_Long_Long(
                 _bindSetSyncMode,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetPingInterval =
-        NetwApi.MethodBind("NetwClock", "get_ping_interval", 1740695150UL);
-
-    private static readonly IntPtr _bindSetPingInterval =
-        NetwApi.MethodBind("NetwClock", "set_ping_interval", 373806689UL);
-
-    /// <summary>
-    /// Seconds between pings. Shorter follows the connection more closely and
-    /// sends more packets. The clock pings five times slower once
-    /// <see cref="NetwClock.ClockMonitor.RttJitter"/> is under half a tick.
-    /// </summary>
-    public double PingInterval
-    {
-        get
-        {
-            double answered = default;
-            NetwThunks.Ptrcall0_Double(
-                _bindGetPingInterval,
-                Checked,
-                ref answered);
-            return answered;
-        }
-        set
-        {
-            double slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Double_Long(
-                _bindSetPingInterval,
                 Checked,
                 in slot0,
                 ref discarded);

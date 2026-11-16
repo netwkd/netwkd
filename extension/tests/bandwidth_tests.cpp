@@ -263,7 +263,7 @@ const WireRegistry &registry() {
         netw::wire::ChannelDecl decl;
         decl.id = CHANNEL;
         decl.name = StringName("bandwidth_probe");
-        decl.delivery = netw::wire::Delivery::FITTED;
+        decl.delivery = netw::wire::Delivery::TICK;
         out.register_channel(decl);
         return out;
     }();
@@ -535,9 +535,11 @@ struct Wake {
     LocalVector<Node *> sinks;
     int64_t step = 0;
 
-    explicit Wake(int p_bodies) : rig(2) {
+    Wake(int p_bodies, int p_send_rate) : rig(2) {
         rig.mount();
-        rig.declare_world(WorldDecl().clocked(TICKRATE, 0));
+        rig.declare_world(
+            WorldDecl().clocked(TICKRATE, 0).sending(p_send_rate)
+        );
         for (int at = 0; at < p_bodies; ++at) {
             const EntityDecl body
                 = EntityDecl()
@@ -706,27 +708,158 @@ LawVerdict reliable_alone(Wake &r_wake) {
     return law_held();
 }
 
+double spent(const Dictionary &p_traffic, const char *p_side) {
+    const Array causes = Dictionary(p_traffic[StringName(p_side)]).values();
+    double total = 0.0;
+    for (int at = 0; at < causes.size(); ++at) {
+        total += double(causes[at]);
+    }
+    return total;
+}
+
+bool within_a_twentieth(double p_value, double p_expected) {
+    return Math::abs(p_value - p_expected) <= p_expected * 0.05;
+}
+
+LawVerdict traffic_by_cause(Wake &r_wake) {
+    constexpr double WINDOW = 3600.0;
+    constexpr double UDP_HEADERS = 28.0;
+    r_wake.seat_sinks();
+    NetwMultiplayer *server = r_wake.rig.server();
+    NetwMultiplayer *client = r_wake.rig.client(0);
+    Internals::traffic_window(server, WINDOW);
+    Internals::traffic_window(client, WINDOW);
+    Internals::traffic_advance(server, WINDOW);
+    Internals::traffic_advance(client, WINDOW);
+    r_wake.move(60);
+    Internals::traffic_advance(server, WINDOW);
+    Internals::traffic_advance(client, WINDOW);
+
+    const Dictionary left = Netw::session(r_wake.rig.branch(-1))
+                                ->traffic(r_wake.rig.peer_id(0));
+    const Dictionary arrived = Netw::session(r_wake.rig.branch(0))->traffic();
+    const Dictionary sent = left[StringName("sent")];
+    const Dictionary received = arrived[StringName("received")];
+    const double state = sent[StringName("state")];
+    const double calls = sent[StringName("calls")];
+    if (state <= 0.0 || calls <= 0.0) {
+        return law_broken(
+            "moving bodies and an RPC read %d state and %d call bytes",
+            int(state),
+            int(calls)
+        );
+    }
+    if (double(sent[StringName("input")]) != 0.0) {
+        return law_broken("a session with no input read input bytes");
+    }
+    if (!within_a_twentieth(double(received[StringName("state")]), state)) {
+        return law_broken(
+            "%d state bytes left and %d arrived",
+            int(state),
+            int(double(received[StringName("state")]))
+        );
+    }
+    if (!within_a_twentieth(spent(arrived, "received"), spent(left, "sent"))) {
+        return law_broken(
+            "%d bytes left and %d arrived",
+            int(spent(left, "sent")),
+            int(spent(arrived, "received"))
+        );
+    }
+    const double packets = left[StringName("sent_packets")];
+    const double headers = sent[StringName("headers")];
+    if (headers <= 0.0 || headers >= packets * UDP_HEADERS) {
+        return law_broken(
+            "%d loopback packets cost %d header bytes",
+            int(packets * WINDOW),
+            int(headers * WINDOW)
+        );
+    }
+    return law_held();
+}
+
+LawVerdict sent_on(Wake &r_wake, int p_expected) {
+    const int64_t peer = r_wake.rig.peer_id(0);
+    r_wake.move(8);
+    const LocalVector<double> before = r_wake.mirrored_heights(0);
+    int64_t left = int64_t(r_wake.stats(-1, peer)["sent_bytes"]);
+    int sends = 0;
+    for (int tick = 0; tick < TICKRATE; ++tick) {
+        r_wake.move(1);
+        const int64_t now = int64_t(r_wake.stats(-1, peer)["sent_bytes"]);
+        sends += now > left ? 1 : 0;
+        left = now;
+    }
+    const LocalVector<double> after = r_wake.mirrored_heights(0);
+    for (uint32_t at = 0; at < before.size(); ++at) {
+        if (after[at] < before[at] + double(TICKRATE - 4) * 0.5) {
+            return law_broken("body %d fell behind on the client", at);
+        }
+    }
+    if (sends != p_expected) {
+        return law_broken(
+            "the server sent on %d of %d ticks",
+            sends,
+            TICKRATE
+        );
+    }
+    return law_held();
+}
+
+LawVerdict sent_every_second_tick(Wake &r_wake) {
+    return sent_on(r_wake, TICKRATE / 2);
+}
+
+LawVerdict sent_every_tick(Wake &r_wake) {
+    return sent_on(r_wake, TICKRATE);
+}
+
 struct WakeRow {
     String label;
     int bodies;
     LawVerdict (*check)(Wake &);
+    int send_rate = 0;
+    const char *refusal = nullptr;
 };
 
 TEST_CASE(
     "[Networked][Repl][SceneTree] a peer is sent no more than its "
-    "bandwidth and still sees every body move, and reliable traffic alone "
-    "leaves a link its whole budget"
+    "bandwidth and still sees every body move, reliable traffic alone "
+    "leaves a link its whole budget, traffic reads what left by cause, "
+    "and a send rate sends on fewer ticks or is refused"
 ) {
     const WakeRow ROWS[] = {
         {"240 moving bodies, one peer given 64 kbit/s", 240, &peer_rate},
         {"eight moving bodies and a reliable RPC each way every tick",
          8,
          &reliable_alone},
+        {"eight moving bodies and an RPC each way, read as traffic",
+         8,
+         &traffic_by_cause},
+        {"eight moving bodies sent 30 times a second at 60 ticks",
+         8,
+         &sent_every_second_tick,
+         30},
+        {"eight moving bodies asked for 45 sends a second at 60 ticks",
+         8,
+         &sent_every_tick,
+         45,
+         "*sends_per_second got 45*such as 30 or 60*[NW0032]*"},
+        {"eight moving bodies asked for 3 sends a second at 60 ticks",
+         8,
+         &sent_every_tick,
+         3,
+         "*sends_per_second got 3*at least every 16 ticks, such as 4*"
+         "[NW0032]*"},
     };
     for (const WakeRow &row : ROWS) {
         NETW_FORMAT_TEXT(label_text, row.label.utf8().get_data());
         CAPTURE(label_text);
-        Wake wake(row.bodies);
+        netw_test::FaultWatch faults;
+        if (row.refusal != nullptr) {
+            faults.expect_error(row.refusal, 3);
+        }
+        Wake wake(row.bodies, row.send_rate);
         const LawVerdict verdict = row.check(wake);
         NETW_FORMAT_TEXT(detail_text, verdict.detail);
         CAPTURE(detail_text);

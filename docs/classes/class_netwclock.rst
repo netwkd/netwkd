@@ -37,13 +37,13 @@ At most :ref:`NetwMultiplayer.CLOCK_PARAM_MAX_TICKS_PER_FRAME<class_NetwMultipla
 
 \ **How a client follows the server**\ 
 
-The client pings the server every :ref:`ping_interval<class_NetwClock_property_ping_interval>` seconds. The server answers with its tick, and the client aims ahead of it by half the round trip plus :ref:`NetwMultiplayer.CLOCK_PARAM_LEAD_TICKS<class_NetwMultiplayer_constant_CLOCK_PARAM_LEAD_TICKS>`. The first answer sets the tick directly. After that, :ref:`sync_mode<class_NetwClock_property_sync_mode>` decides.
+The client pings the server, which answers with its tick, and the client aims ahead of it by half the round trip plus :ref:`NetwMultiplayer.CLOCK_PARAM_LEAD_TICKS<class_NetwMultiplayer_constant_CLOCK_PARAM_LEAD_TICKS>`. The first answer sets the tick directly. After that, :ref:`sync_mode<class_NetwClock_property_sync_mode>` decides.
 
 \ :ref:`SYNC_MODE_SNAP<class_NetwClock_constant_SYNC_MODE_SNAP>` sets the tick directly every time, which can move it backwards. :ref:`SYNC_MODE_STRETCH<class_NetwClock_constant_SYNC_MODE_STRETCH>`, the default, runs the clock slightly faster or slower each frame by :ref:`NetwMultiplayer.CLOCK_PARAM_STRETCH_NUDGE_FACTOR<class_NetwMultiplayer_constant_CLOCK_PARAM_STRETCH_NUDGE_FACTOR>` of the difference, so the tick never jumps. A difference larger than :ref:`NetwMultiplayer.CLOCK_PARAM_PANIC_SNAP_THRESHOLD<class_NetwMultiplayer_constant_CLOCK_PARAM_PANIC_SNAP_THRESHOLD>` ticks is snapped.
 
 \ **Showing remote state**\ 
 
-State from other peers arrives late, so remote entities are shown :ref:`display_offset<class_NetwClock_property_display_offset>` ticks in the past. :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` is the offset the current connection needs, the one-way latency plus the jitter times :ref:`NetwMultiplayer.CLOCK_PARAM_JITTER_MULTIPLIER<class_NetwMultiplayer_constant_CLOCK_PARAM_JITTER_MULTIPLIER>`, in ticks. It is not applied automatically. :ref:`auto_configure_offset()<class_NetwClock_method_auto_configure_offset>` applies it.
+State from other peers arrives late, so remote entities are shown :ref:`display_offset<class_NetwClock_property_display_offset>` ticks in the past. :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` is the offset the current connection needs. It is not applied automatically. :ref:`auto_configure_offset()<class_NetwClock_method_auto_configure_offset>` applies it.
 
 \ **Ticking by hand**\ 
 
@@ -77,8 +77,6 @@ Properties
    | :godot:`bool`                            | :ref:`manual_tick<class_NetwClock_property_manual_tick>`                               |
    +------------------------------------------+----------------------------------------------------------------------------------------+
    | :godot:`float`                           | :ref:`physics_factor<class_NetwClock_property_physics_factor>`                         |
-   +------------------------------------------+----------------------------------------------------------------------------------------+
-   | :godot:`float`                           | :ref:`ping_interval<class_NetwClock_property_ping_interval>`                           |
    +------------------------------------------+----------------------------------------------------------------------------------------+
    | :godot:`int`                             | :ref:`recommended_display_offset<class_NetwClock_property_recommended_display_offset>` |
    +------------------------------------------+----------------------------------------------------------------------------------------+
@@ -427,23 +425,6 @@ When ``true``, physics frames run no ticks and only :ref:`step()<class_NetwClock
 - :godot:`float` **get_physics_factor**\ (\ )
 
 Physics frames per tick. Multiply a per-frame value by it to get a per-tick value.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwClock_property_ping_interval:
-
-.. rst-class:: classref-property
-
-:godot:`float` **ping_interval** :ref:`🔗<class_NetwClock_property_ping_interval>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_ping_interval**\ (\ value\: :godot:`float`\ )
-- :godot:`float` **get_ping_interval**\ (\ )
-
-Seconds between pings. Shorter follows the connection more closely and sends more packets. The clock pings five times slower once :ref:`CLOCK_MONITOR_RTT_JITTER<class_NetwClock_constant_CLOCK_MONITOR_RTT_JITTER>` is under half a tick.
 
 .. rst-class:: classref-item-separator
 

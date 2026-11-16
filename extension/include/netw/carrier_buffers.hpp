@@ -15,9 +15,15 @@ class CarrierBatch {
     godot::LocalVector<CarrierRow> descriptors;
     int64_t frames = 0;
     int64_t bits = 0;
+    int64_t riding_since_ms = -1;
+    int64_t deadline_ms = 0;
 
 public:
-    void take_frame(const godot::PackedByteArray &p_frame);
+    void take_frame(
+        const godot::PackedByteArray &p_frame,
+        int64_t p_deadline_ms = 0
+    );
+    bool rides(int64_t p_now_ms);
     void attach(const CarrierRow &p_row);
     void close_route(int64_t p_route);
     void release();
@@ -61,9 +67,11 @@ public:
         const godot::PackedByteArray &p_frame,
         bool p_reliable,
         int64_t p_budget,
-        const CarrierRow *p_row = nullptr
+        const CarrierRow *p_row = nullptr,
+        int64_t p_deadline_ms = 0
     );
 
+    bool rides(int64_t p_peer, int64_t p_now_ms);
     CarrierBatch take(int64_t p_peer, bool p_reliable);
     void recycle(int64_t p_peer, bool p_reliable, CarrierBatch &r_spent);
 

@@ -49,7 +49,7 @@ enum class Schedule : uint8_t {
 struct Declaration {
     godot::Vector<godot::NodePath> bodies;
     Schedule schedule = Schedule::AUTO;
-    Replicas replicas = Replicas::PROXY;
+    RemoteMode remote_mode = RemoteMode::AUTO;
     Restore restore = Restore::BUFFERED;
     int max_restore_ticks = 6;
     godot::Callable step;
@@ -62,7 +62,6 @@ struct Declaration {
 
 struct Decl {
     Declaration declaration;
-    Choice choice;
     bool declared = false;
 };
 
@@ -84,7 +83,6 @@ struct Row {
     int64_t contact_tick = -1;
     int64_t last_frame_tick = -1;
     bool stepped_refused = false;
-    Choice choice;
     Selection selection;
     IdSet selected_by;
     IdSet selecting;
@@ -94,7 +92,7 @@ Schedule resolved_schedule(Schedule p_declared, bool p_has_body);
 
 bool steps(const Row &p_row);
 
-bool chooses(const Row &p_row);
+bool joins(const Row &p_row);
 
 bool contact_moded(const Row &p_row);
 
@@ -113,7 +111,7 @@ class Rows {
     store::Bits due;
     store::Bits bodied_bits;
     store::Bits stepping_bits;
-    store::Bits chooser_bits;
+    store::Bits joiner_bits;
     store::Bits awake_bits;
     store::Bits resting_bits;
     Seed seed = nullptr;
@@ -144,7 +142,7 @@ public:
     uint32_t selection_count(const godot::RID &p_member) const;
     godot::LocalVector<godot::RID> drop_selections(const godot::RID &p_subject);
     godot::RID entity_of_key(int64_t p_key) const;
-    void choosers(godot::LocalVector<godot::RID> &r_out);
+    void joiners(godot::LocalVector<godot::RID> &r_out);
     void hold_poses(
         const godot::RID &p_space,
         const godot::LocalVector<godot::RID> &p_members,
@@ -162,7 +160,7 @@ public:
     bool is_resting(uint32_t p_index) const;
     bool is_bodied(uint32_t p_index) const;
     bool is_stepping(uint32_t p_index) const;
-    bool is_chooser(uint32_t p_index) const;
+    bool is_joiner(uint32_t p_index) const;
     void set_awake(const Row &p_row, bool p_awake);
     void set_resting(const Row &p_row, bool p_resting);
     void each(godot::LocalVector<Row *> &r_out) const;

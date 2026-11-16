@@ -567,6 +567,9 @@ public:
     bool raw_fingerprints_of(int64_t p_slot) const;
     void set_raw_fingerprints(int64_t p_slot, bool p_value);
     void set_owner_evidence(bool p_value);
+    bool gathers_owner_evidence() const {
+        return owner_evidence;
+    }
 
     void seed_recovery_ledger(int64_t p_slot);
     godot::TypedArray<godot::Dictionary> tape_transitions(int64_t p_slot) const;
@@ -1014,7 +1017,8 @@ public:
     enum RelayColumn {
         RELAY_DROPPED_LATE = 0,
         RELAY_RECORDED = 1,
-        RELAY_COLUMN_COUNT = 2,
+        RELAY_GUESSED_WRONG = 2,
+        RELAY_COLUMN_COUNT = 3,
     };
 
     const SchemaRecord *input_schema(int64_t p_slot) const;
@@ -1050,6 +1054,7 @@ public:
     int64_t held_fact_of(int64_t p_slot, int p_fact) const;
     void set_held_fact(int64_t p_slot, int p_fact, int64_t p_value);
     void add_held_fact(int64_t p_slot, int p_fact, int64_t p_delta);
+    bool ack_due(int64_t p_slot, int64_t p_frontier);
     godot::PackedByteArray publish_ack_frame(int64_t p_slot);
     void send_command_frame(int64_t p_slot);
     void send_ack_frame(int64_t p_slot);
@@ -1123,6 +1128,13 @@ public:
         int p_window
     );
 
+    void hear_input(int64_t p_slot, int64_t p_newest, int64_t p_hold);
+    void judge_held_guess(int64_t p_slot, int64_t p_transition);
+    int command_window(int64_t p_slot) const;
+    bool sent_last_tick() const;
+    int input_buffer(int p_buffer_ticks) const;
+    bool holds_input(int64_t p_slot) const;
+    int64_t quiet_hold(int64_t p_slot, int64_t p_newest, bool p_asks);
     godot::PackedInt64Array admit_command_frame(
         int64_t p_slot,
         const predict::CommandFrameRecord &p_frame,
@@ -1169,7 +1181,7 @@ public:
         int64_t p_tick,
         bool p_fresh
     );
-    void consume_one(int64_t p_slot, double p_delta);
+    void consume_one(int64_t p_slot, double p_delta, bool p_holds);
     int replay_tick_window(
         int64_t p_slot,
         int64_t p_from,
@@ -1919,8 +1931,9 @@ public:
         int p_epoch,
         int64_t p_ack,
         int64_t p_owner_ack_floor,
-        int64_t p_detailed_through = -1,
-        int64_t *r_sent_through = nullptr
+        int64_t p_detailed_through,
+        bool p_asked,
+        int64_t *r_sent_through
     ) const;
 
     int tape_size(int64_t p_slot) const;

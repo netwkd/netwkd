@@ -44,7 +44,11 @@ double Playhead::arrival_floor(const Decl &decl) const {
     }
     const double spread
         = arrival_age_mean + decl.arrival_spread_weight * arrival_age_deviation;
-    return std::clamp(spread + 1.0, 0.0, decl.max_arrival_lag);
+    return std::clamp(
+        spread + double(send_interval_ticks),
+        0.0,
+        decl.max_arrival_lag
+    );
 }
 
 double Playhead::min_lag(

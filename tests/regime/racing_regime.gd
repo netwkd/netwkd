@@ -41,23 +41,24 @@ static func attach(session: Node, api: NetwMultiplayer) -> NetwRegimePeer:
 
 
 func connect_session(role: String, port: int) -> Error:
-	var peer := ENetMultiplayerPeer.new()
-	var err: Error
+	Netw.prepare_join(session, StringName(role))
+	var connection: NetwConnection = session_handle.connection
+	var settled: NetwPromise
 	if NetwRegimePeer.role_is_host(role):
 		var info := NetwServerInfo.new()
 		info.motd = "Racing regime"
 		info.max_players = regime.peers
 		session_handle.set_server_info(info)
-		err = peer.create_server(port, regime.peers)
+		settled = connection.host(
+			&"ENetMultiplayerPeer",
+			{ "port": port, "max_players": regime.peers },
+		)
 	else:
-		err = peer.create_client("127.0.0.1", port)
-	if err != OK:
-		return err
-	Netw.prepare_join(session, StringName(role))
-	api.multiplayer_peer = peer
-	if api.multiplayer_peer != peer:
-		return ERR_CANT_CONNECT
-	return OK
+		settled = connection.join(
+			connection.add(&"ENetMultiplayerPeer", "127.0.0.1:%d" % port),
+		)
+	await settled.wait()
+	return settled.code as Error
 
 
 func await_local_ready() -> bool:

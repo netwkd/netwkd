@@ -158,6 +158,11 @@ public:
     const Transport *live_transport() const {
         return live;
     }
+    void peer_connected(int64_t p_peer) {
+        if (live != nullptr) {
+            live->peer_connected(p_peer);
+        }
+    }
 
 private:
     static void assign_created(

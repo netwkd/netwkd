@@ -39,11 +39,16 @@ bool NetwMultiplayer::can_resolve_action(const PendingAction &p_request) const {
     return target != nullptr && target->has_method(p_request.method);
 }
 
+int NetwMultiplayer::send_lead_ticks() const {
+    return clock_engine().get_send_interval() - 1;
+}
+
 int NetwMultiplayer::input_readiness(
     const PendingAction &p_request,
     int64_t p_tick
 ) {
-    if (p_tick - p_request.queued_at_tick >= input_gate_deadline_ticks) {
+    if (p_tick - p_request.queued_at_tick
+        >= input_gate_deadline_ticks + send_lead_ticks()) {
         return ACTION_READY_BY_DEADLINE;
     }
     Node *target = node_from_tree_path(p_request.target_path);
@@ -277,8 +282,7 @@ void NetwMultiplayer::action_send_request(
         session::frame_write(body),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -332,13 +336,14 @@ void NetwMultiplayer::submit_action(
         execute_ready_action(request, now, readiness);
         return;
     }
-    if (p_view_tick > now + max_future_action_ticks) {
+    const int64_t latest = now + max_future_action_ticks + send_lead_ticks();
+    if (p_view_tick > latest) {
         NETW_TRACE(
             sys::PREDICTION,
             "Action %s asks for tick %d, later than the latest allowed %d.",
             String(p_key).utf8().get_data(),
             int(p_view_tick),
-            int(now + max_future_action_ticks)
+            int(latest)
         );
         effect_deny_action(requester, p_key);
         return;

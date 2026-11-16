@@ -14,15 +14,9 @@ class NetwPropertyConfig : public NetwMemberConfig {
     GDCLASS(NetwPropertyConfig, NetwMemberConfig)
 
 public:
-    using Trigger = repl::PropertySet::Trigger;
     using Lane = repl::PropertySet::Lane;
     using Audience = repl::PropertySet::Audience;
 
-    static constexpr Trigger TRIGGER_TICK = repl::PropertySet::TRIGGER_TICK;
-    static constexpr Trigger TRIGGER_ON_CHANGE
-        = repl::PropertySet::TRIGGER_ON_CHANGE;
-    static constexpr Trigger TRIGGER_ON_DEMAND
-        = repl::PropertySet::TRIGGER_ON_DEMAND;
     static constexpr Lane VOLATILE = repl::PropertySet::VOLATILE;
     static constexpr Lane RETAINED = repl::PropertySet::RETAINED;
     static constexpr Audience AUDIENCE_PUBLIC
@@ -41,12 +35,10 @@ private:
     bool in_broadcast_set = false;
     double correction_threshold_override = -1.0;
     double teleport_threshold_override = -1.0;
-    int64_t set_trigger = UNSET;
     int64_t set_heartbeat_ticks = UNSET;
     int64_t set_window = UNSET;
     repl::PropertySet::Audience set_audience
         = repl::PropertySet::AUDIENCE_PUBLIC;
-    bool set_masked = false;
     godot::StringName saved_column;
     bool persist = false;
     bool is_unchecked = false;
@@ -116,13 +108,6 @@ public:
         return teleport_threshold_override;
     }
 
-    void set_set_trigger(repl::PropertySet::Trigger p_set_trigger) {
-        set_trigger = int64_t(p_set_trigger);
-    }
-    repl::PropertySet::Trigger get_set_trigger() const {
-        return repl::PropertySet::Trigger(set_trigger);
-    }
-
     void set_set_heartbeat_ticks(int64_t p_set_heartbeat_ticks) {
         set_heartbeat_ticks = p_set_heartbeat_ticks;
     }
@@ -142,13 +127,6 @@ public:
     }
     repl::PropertySet::Audience get_set_audience() const {
         return set_audience;
-    }
-
-    void set_set_masked(bool p_set_masked) {
-        set_masked = p_set_masked;
-    }
-    bool get_set_masked() const {
-        return set_masked;
     }
 
     bool is_persisted() const {
@@ -184,11 +162,9 @@ public:
     godot::Ref<NetwPropertyConfig> teleport_only();
     godot::Ref<NetwPropertyConfig> correction_threshold(double p_threshold);
     godot::Ref<NetwPropertyConfig> teleport_threshold(double p_distance);
-    godot::Ref<NetwPropertyConfig> on_change();
     godot::Ref<NetwPropertyConfig> heartbeat(int64_t p_ticks);
     godot::Ref<NetwPropertyConfig> windowed(int64_t p_samples);
     godot::Ref<NetwPropertyConfig> audience(bool p_server_only);
-    godot::Ref<NetwPropertyConfig> masked();
     godot::Ref<NetwPropertyConfig> persisted(
         const godot::StringName &p_saved_column_name
     );
@@ -197,6 +173,5 @@ public:
 
 } // namespace netw
 
-VARIANT_ENUM_CAST(netw::NetwPropertyConfig::Trigger);
 VARIANT_ENUM_CAST(netw::NetwPropertyConfig::Lane);
 VARIANT_ENUM_CAST(netw::NetwPropertyConfig::Audience);

@@ -77,6 +77,16 @@ struct Internals {
     }
 
     template <typename Session>
+    static void traffic_advance(const Session &p_session, double p_seconds) {
+        p_session->traffic_advance(p_seconds);
+    }
+
+    template <typename Session>
+    static void traffic_window(const Session &p_session, double p_seconds) {
+        p_session->traffic_set_window(p_seconds);
+    }
+
+    template <typename Session>
     static decltype(auto) clock_engine(const Session &p_session) {
         return p_session->clock_engine();
     }

@@ -24,8 +24,6 @@ Variant NetwMultiplayer::clock_get_param(ClockParam p_param) const {
             return engine.get_tickrate();
         case CLOCK_PARAM_SYNC_MODE:
             return int(engine.get_sync_mode());
-        case CLOCK_PARAM_PING_INTERVAL:
-            return engine.get_ping_interval();
         case CLOCK_PARAM_MAX_TICKS_PER_FRAME:
             return engine.get_max_ticks_per_frame();
         case CLOCK_PARAM_STALL_THRESHOLD:
@@ -64,9 +62,6 @@ Error NetwMultiplayer::clock_set_param(
             return ERR_UNAUTHORIZED;
         case CLOCK_PARAM_SYNC_MODE:
             engine.set_sync_mode(ClockEngine::SyncMode(int(p_value)));
-            return OK;
-        case CLOCK_PARAM_PING_INTERVAL:
-            engine.set_ping_interval(double(p_value));
             return OK;
         case CLOCK_PARAM_MAX_TICKS_PER_FRAME:
             engine.set_max_ticks_per_frame(int(p_value));

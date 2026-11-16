@@ -46,7 +46,6 @@ struct NetwMultiplayer {
     enum ClockParam {
         CLOCK_PARAM_TICKRATE = 0,
         CLOCK_PARAM_SYNC_MODE = 1,
-        CLOCK_PARAM_PING_INTERVAL = 2,
         CLOCK_PARAM_MAX_TICKS_PER_FRAME = 3,
         CLOCK_PARAM_STALL_THRESHOLD = 4,
         CLOCK_PARAM_PANIC_SNAP_THRESHOLD = 5,
@@ -144,17 +143,12 @@ struct NetwMultiplayer {
     enum SimulationParam {
         SIMULATION_PARAM_BODIES = 0,
         SIMULATION_PARAM_SCHEDULE = 1,
-        SIMULATION_PARAM_REPLICAS = 2,
+        SIMULATION_PARAM_REMOTE_MODE = 2,
         SIMULATION_PARAM_RESTORE = 3,
         SIMULATION_PARAM_MAX_RESTORE_TICKS = 4,
         SIMULATION_PARAM_CLAIM_ON_CONTACT = 5,
         SIMULATION_PARAM_RELEASE_ON_REST = 6,
         SIMULATION_PARAM_PHYSICS_DRIVEN = 7,
-    };
-
-    enum SimPick {
-        SIM_PICK_CHOSEN = 0,
-        SIM_PICK_FORGET = 1,
     };
 
     enum WritePolicy {
@@ -175,11 +169,9 @@ struct NetwMultiplayer {
     };
 
     enum PropertySetParam {
-        SET_PARAM_MASKED = 0,
         SET_PARAM_WINDOW = 1,
         SET_PARAM_AUDIENCE = 2,
         SET_PARAM_POLICY = 3,
-        SET_PARAM_TRIGGER = 4,
         SET_PARAM_CADENCE = 5,
         SET_PARAM_STAMP = 6,
         SET_PARAM_PROFILE = 7,
@@ -428,7 +420,6 @@ VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SceneParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::DisplayParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::PredictParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SimulationParam);
-VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::SimPick);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::WritePolicy);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ColumnParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::PropertySetParam);

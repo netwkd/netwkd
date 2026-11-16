@@ -1,16 +1,35 @@
 #include "netw/carrier_buffers.hpp"
 
+#include <algorithm>
 #include <utility>
 
 #include "netw/log.hpp"
+#include "netw/wire/registry.hpp"
 
 namespace netw {
 
 using namespace godot;
 
-void CarrierBatch::take_frame(const PackedByteArray &p_frame) {
+void CarrierBatch::take_frame(
+    const PackedByteArray &p_frame,
+    int64_t p_deadline_ms
+) {
     held.append_array(p_frame);
+    deadline_ms
+        = frames == 0 ? p_deadline_ms : std::min(deadline_ms, p_deadline_ms);
     frames += 1;
+}
+
+bool CarrierBatch::rides(int64_t p_now_ms) {
+    if (deadline_ms <= 0 || held.is_empty()) {
+        return false;
+    }
+    if (riding_since_ms < 0) {
+        riding_since_ms = p_now_ms;
+        return true;
+    }
+    return p_now_ms >= riding_since_ms
+        && p_now_ms - riding_since_ms < deadline_ms;
 }
 
 void CarrierBatch::attach(const CarrierRow &p_row) {
@@ -48,6 +67,8 @@ void CarrierBatch::release() {
     descriptors.clear();
     frames = 0;
     bits = 0;
+    riding_since_ms = -1;
+    deadline_ms = 0;
 }
 
 void CarrierBatch::swap(CarrierBatch &r_other) {
@@ -55,6 +76,8 @@ void CarrierBatch::swap(CarrierBatch &r_other) {
     std::swap(descriptors, r_other.descriptors);
     std::swap(frames, r_other.frames);
     std::swap(bits, r_other.bits);
+    std::swap(riding_since_ms, r_other.riding_since_ms);
+    std::swap(deadline_ms, r_other.deadline_ms);
 }
 
 HashMap<int64_t, CarrierBatch> &NetwCarrierBuffers::lane(bool p_reliable) {
@@ -72,7 +95,8 @@ CarrierBatch NetwCarrierBuffers::append(
     const PackedByteArray &p_frame,
     bool p_reliable,
     int64_t p_budget,
-    const CarrierRow *p_row
+    const CarrierRow *p_row,
+    int64_t p_deadline_ms
 ) {
     HashMap<int64_t, CarrierBatch> &runs = lane(p_reliable);
     CarrierBatch owed;
@@ -96,11 +120,16 @@ CarrierBatch NetwCarrierBuffers::append(
         );
         owed.swap(*run);
     }
-    run->take_frame(p_frame);
+    run->take_frame(p_frame, p_deadline_ms);
     if (p_row != nullptr) {
         run->attach(*p_row);
     }
     return owed;
+}
+
+bool NetwCarrierBuffers::rides(int64_t p_peer, int64_t p_now_ms) {
+    CarrierBatch *run = unreliable.getptr(p_peer);
+    return run != nullptr && run->rides(p_now_ms);
 }
 
 CarrierBatch NetwCarrierBuffers::take(int64_t p_peer, bool p_reliable) {

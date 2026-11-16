@@ -200,8 +200,7 @@ public:
         const godot::PackedByteArray &p_payload,
         bool p_reliable,
         int64_t p_comp,
-        const godot::String &p_path,
-        bool p_batched
+        const godot::String &p_path
     );
     bool is_live_for(int64_t p_peer_id, const godot::Ref<NetwEntity> &p_entity);
     bool policy_admits(
@@ -212,6 +211,8 @@ public:
     );
     godot::PackedInt32Array live_peers(const godot::Ref<NetwEntity> &p_entity);
     void flush_all_buffers();
+    void flush_echoes();
+    bool upkeep_rides() const;
     void expire_control(int64_t p_tick);
     void note_staged(int64_t p_peer_id, int64_t p_seq);
 
@@ -223,7 +224,8 @@ public:
         const godot::String &p_path,
         int64_t p_sender,
         bool p_reliable,
-        int64_t p_seq
+        int64_t p_seq,
+        int64_t p_frame_bytes = -1
     );
 
     godot::Error receive_carrier(

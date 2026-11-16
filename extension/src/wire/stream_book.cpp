@@ -4,6 +4,7 @@
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
+#include "netw/wire/registry.hpp"
 
 namespace netw::wire {
 
@@ -87,12 +88,12 @@ uint64_t binding_floor(
 int64_t repair_interval_ms(int64_t p_smoothed_rtt_ms) {
     const int64_t doubled = p_smoothed_rtt_ms * 2;
     if (doubled < REPAIR_FLOOR_MS) {
-        return REPAIR_FLOOR_MS;
+        return REPAIR_FLOOR_MS + RIDE_DEADLINE_MS;
     }
     if (doubled > REPAIR_CEILING_MS) {
-        return REPAIR_CEILING_MS;
+        return REPAIR_CEILING_MS + RIDE_DEADLINE_MS;
     }
-    return doubled;
+    return doubled + RIDE_DEADLINE_MS;
 }
 
 StreamReaderBook::Connection &StreamReaderBook::connection(int p_peer) {

@@ -81,12 +81,6 @@ public:
         STAMPED = 1,
     };
 
-    enum Trigger : int64_t {
-        TRIGGER_TICK = 0,
-        TRIGGER_ON_CHANGE = 1,
-        TRIGGER_ON_DEMAND = 2,
-    };
-
     enum Stamp {
         STAMP_NONE = 0,
         STAMP_TICK = 1,
@@ -117,13 +111,11 @@ public:
     godot::LocalVector<PropertyColumn> columns;
     int64_t cadence = TICK;
     int64_t profile = PLAIN;
-    int64_t trigger = TRIGGER_TICK;
     int64_t stamp = STAMP_NONE;
     int64_t record = RECORD_NONE;
     int64_t window = 0;
     int64_t heartbeat = 0;
     int64_t audience = AUDIENCE_PUBLIC;
-    bool masked = false;
     NetwMemberConfig::Policy policy = NetwMemberConfig::POLICY_AUTHORITY;
     int64_t channel = -1;
     bool reliable = true;
@@ -163,9 +155,6 @@ public:
     int64_t get_profile() const {
         return profile;
     }
-    int64_t get_trigger() const {
-        return trigger;
-    }
     int64_t get_stamp() const {
         return stamp;
     }
@@ -180,9 +169,6 @@ public:
     }
     int64_t get_audience() const {
         return audience;
-    }
-    bool get_masked() const {
-        return masked;
     }
     NetwMemberConfig::Policy get_policy() const {
         return policy;

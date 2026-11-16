@@ -11,8 +11,8 @@ const MOTION_SPEED = 90.0
 ## The delay before which you can place a new bomb (in seconds).
 const BOMB_RATE = 0.5
 
-const POSITION_LIMITS := Vector2(-500.0, 1500.0)
-const POSITION_STEP := 5.0
+const POSITION_LIMITS := Vector2(0.0, 1056.0)
+const POSITION_STEP := 0.5
 const POSITION_EPSILON := 4.0
 const VELOCITY_LIMIT := MOTION_SPEED
 
@@ -97,9 +97,7 @@ func gather_input(_delta: float, _tick: int) -> void:
 func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
 	last_bomb_time += delta
 	if is_fresh and entity.is_controlled_locally \
-			and not stunned and bombing:
-		if last_bomb_time < BOMB_RATE:
-			return
+			and not stunned and bombing and last_bomb_time >= BOMB_RATE:
 		bomb_action.request(tick, position)
 		if not multiplayer or not multiplayer.is_server():
 			last_bomb_time = 0.0
@@ -168,4 +166,6 @@ func exploded(_by_who: int) -> void:
 		return
 
 	stunned = true
+	current_anim = &"stunned"
+	$anim.stop()
 	$anim.play(&"stunned")

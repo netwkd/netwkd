@@ -27,15 +27,6 @@ bool selected(const LocalVector<int64_t> &p_keys, int64_t p_key) {
     return false;
 }
 
-int named_index(const Choice &p_choice, const RID &p_entity) {
-    for (uint32_t at = 0; at < p_choice.named.size(); ++at) {
-        if (p_choice.named[at].entity == p_entity) {
-            return int(at);
-        }
-    }
-    return -1;
-}
-
 } // namespace
 
 bool Tenure::contains(int64_t p_transition) const {
@@ -154,59 +145,6 @@ int Selection::lingering_count() const {
         out += members[at].lingering ? 1 : 0;
     }
     return out;
-}
-
-bool Choice::selects_all(bool p_predicted) const {
-    return stated ? !layers.is_empty() : p_predicted;
-}
-
-bool Choice::declared(bool p_predicted) const {
-    return !named.is_empty() || selects_all(p_predicted);
-}
-
-const Named *Choice::named_of(const RID &p_entity) const {
-    const int at = named_index(*this, p_entity);
-    return at < 0 ? nullptr : &named[uint32_t(at)];
-}
-
-bool claims_exact(const Choice &p_choice, bool p_stepped) {
-    return p_stepped && !p_choice.selects_all(true);
-}
-
-bool choose(Choice &r_choice, const RID &p_entity, Pick p_pick) {
-    const int at = named_index(r_choice, p_entity);
-    if (at >= 0) {
-        if (r_choice.named[uint32_t(at)].pick == p_pick) {
-            return false;
-        }
-        r_choice.named[uint32_t(at)].pick = p_pick;
-        return true;
-    }
-    Named added;
-    added.entity = p_entity;
-    added.pick = p_pick;
-    r_choice.named.push_back(added);
-    return true;
-}
-
-bool forget(Choice &r_choice, const RID &p_entity) {
-    const int at = named_index(r_choice, p_entity);
-    if (at < 0) {
-        return false;
-    }
-    r_choice.named.remove_at(uint32_t(at));
-    return true;
-}
-
-void simulate_all(Choice &r_choice, const StringName &p_layer) {
-    r_choice.stated = true;
-    r_choice.layers.clear();
-    r_choice.layers.push_back(p_layer);
-}
-
-void simulate_none(Choice &r_choice) {
-    r_choice.stated = true;
-    r_choice.layers.clear();
 }
 
 bool IdSet::note(uint64_t p_id) {

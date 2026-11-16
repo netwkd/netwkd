@@ -57,15 +57,27 @@ const ChannelDecl *WireRegistry::find_channel_by_name(
     return nullptr;
 }
 
-bool WireRegistry::aggregates(uint8_t id, bool requested) const {
+Delivery WireRegistry::delivery_of(uint8_t id) const {
+    const ChannelDecl *decl = find_channel(id);
+    if (decl == nullptr || decl->is_reserved) {
+        return Delivery::IMMEDIATE;
+    }
+    return decl->delivery;
+}
+
+Delivery WireRegistry::delivery_of(uint8_t id, Delivery requested) const {
     const ChannelDecl *decl = find_channel(id);
     if (decl == nullptr || decl->is_reserved) {
         return requested;
     }
     if (decl->delivery == Delivery::IMMEDIATE) {
-        return false;
+        return Delivery::IMMEDIATE;
     }
-    return decl->aggregated || requested;
+    return requested;
+}
+
+Cause WireRegistry::cause_of(uint8_t id) const {
+    return id >= USER_CHANNEL_FIRST ? Cause::CALLS : channels[id].cause;
 }
 
 uint32_t WireRegistry::active_count() const {
@@ -149,7 +161,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::EITHER,
         PayloadContract::PLANNED
     );
@@ -159,7 +171,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::EITHER,
         PayloadContract::PLANNED
     );
@@ -169,7 +181,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::EITHER,
         PayloadContract::PLANNED
     );
@@ -179,7 +191,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED
     );
@@ -189,7 +201,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED
     );
@@ -200,7 +212,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
         1
@@ -211,7 +223,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED
     );
@@ -221,7 +233,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -231,7 +243,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::UNRELIABLE,
         Freshness::NONE,
-        Delivery::IMMEDIATE,
+        Delivery::RIDE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED
     );
@@ -241,9 +253,10 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::UNRELIABLE,
         Freshness::NONE,
-        Delivery::IMMEDIATE,
+        Delivery::TICK,
         Direction::SERVER_TO_CLIENT,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
 
     reg_c(
@@ -252,7 +265,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -262,7 +275,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
         5
@@ -273,7 +286,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
         2
@@ -284,7 +297,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
         2
@@ -295,7 +308,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::KEYED,
         Reliability::UNRELIABLE_ACKED,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::DELTA
     );
@@ -306,7 +319,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -317,7 +330,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::KEYED,
         Reliability::UNRELIABLE_ACKED,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::DELTA
     );
@@ -327,7 +340,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::DELTA
     );
@@ -337,7 +350,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED,
         1
@@ -348,7 +361,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
         1
@@ -360,7 +373,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED,
         3
@@ -371,7 +384,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
         3
@@ -382,7 +395,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
         3
@@ -393,7 +406,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -403,7 +416,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -413,7 +426,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -423,7 +436,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -433,7 +446,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -443,7 +456,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED,
         1
@@ -455,10 +468,10 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::OWNER_TO_SERVER,
         PayloadContract::PLANNED,
-        1
+        3
     );
     reg_c(
         36,
@@ -466,10 +479,10 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::SERVER_TO_OWNER,
         PayloadContract::PLANNED,
-        1
+        3
     );
     reg_c(
         37,
@@ -477,10 +490,10 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
-        1
+        3
     );
     reg_c(
         38,
@@ -488,7 +501,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED
     );
@@ -498,7 +511,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::KEYED,
         Reliability::UNRELIABLE_ACKED,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::DELTA,
         1
@@ -509,7 +522,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::DELTA,
         1
@@ -521,7 +534,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::KEYED,
         Reliability::UNRELIABLE,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
         1
@@ -533,7 +546,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
         1
@@ -545,7 +558,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
         5
@@ -557,7 +570,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -568,7 +581,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::SERVER_TO_OWNER,
         PayloadContract::PLANNED,
         2
@@ -580,7 +593,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
         Freshness::FRESHEST_WINS,
-        Delivery::FITTED,
+        Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED
     );
@@ -591,7 +604,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED
     );
@@ -602,7 +615,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -613,7 +626,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED
     );
@@ -624,7 +637,7 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED
     );
@@ -635,26 +648,41 @@ WireRegistry WireRegistry::create_default() {
         ChannelKind::SESSION,
         Reliability::RELIABLE,
         Freshness::NONE,
-        Delivery::FITTED,
+        Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED
     );
 
-    auto batches = [&](const char *name) {
+    auto spends = [&](Cause cause, const char *name) {
         const ChannelDecl *decl
             = reg.find_channel_by_name(godot::StringName(name));
         NETW_BUG_COND(decl == nullptr);
-        reg.channels[decl->id].aggregated = true;
+        reg.channels[decl->id].cause = cause;
     };
-    batches("SIGNAL");
-    batches("PROPERTY_SYNC");
-    batches("TABLE");
-    batches("SYNC");
-    batches("SYNC_DELTA");
-    batches("SYNC_ROW");
-    batches("SYNC_ROW_DELTA");
-    batches("SYNC_ROW_WINDOW");
-    batches("CLAIM_IMAGE");
+    spends(Cause::STATE, "TABLE");
+    spends(Cause::STATE, "SYNC");
+    spends(Cause::STATE, "SYNC_DELTA");
+    spends(Cause::STATE, "SYNC_ROW");
+    spends(Cause::STATE, "SYNC_ROW_DELTA");
+    spends(Cause::STATE, "PROPERTY_SYNC");
+    spends(Cause::STATE, "CLAIM_IMAGE");
+    spends(Cause::INPUT, "PREDICT_COMMAND");
+    spends(Cause::INPUT, "PREDICT_RELAY");
+    spends(Cause::INPUT, "SYNC_ROW_WINDOW");
+    spends(Cause::CALLS, "ACTION");
+    spends(Cause::CALLS, "CALL");
+    spends(Cause::CALLS, "REPLY");
+    spends(Cause::CALLS, "SIGNAL");
+    spends(Cause::CALLS, "LAGCOMP_DENY");
+    spends(Cause::CALLS, "LAGCOMP_CONFIRM");
+    spends(Cause::UPKEEP, "PREDICT_ACK");
+    spends(Cause::UPKEEP, "PREDICT_RELAY_REQUEST");
+    spends(Cause::UPKEEP, "ROW_CONTROL");
+    spends(Cause::UPKEEP, "CLOCK_HANDSHAKE");
+    spends(Cause::UPKEEP, "CLOCK_HANDSHAKE_REPLY");
+    spends(Cause::UPKEEP, "CLOCK_PING");
+    spends(Cause::UPKEEP, "CLOCK_PONG");
+    spends(Cause::UPKEEP, "SESSION_RESYNC");
 
     return reg;
 }

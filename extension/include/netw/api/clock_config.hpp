@@ -13,13 +13,13 @@ class NetwClockConfig : public godot::Resource {
 
     struct Values {
         int64_t tickrate = 30;
+        int64_t send_rate = 0;
         int64_t max_ticks_per_frame = 8;
         double stall_threshold = 1.0;
         bool use_physics_interpolation = true;
         int64_t sync_mode = 1;
         int64_t panic_snap_threshold = 20;
         double stretch_nudge_factor = 0.05;
-        double ping_interval = 0.1;
         int64_t display_offset = 2;
         double jitter_multiplier = 2.0;
         int64_t jitter_window = 16;
@@ -42,6 +42,15 @@ public:
     }
     int64_t get_tickrate() const {
         return values.tickrate;
+    }
+
+    void set_send_rate(int64_t p_value) {
+        if (guard.takes_count("send_rate", p_value)) {
+            values.send_rate = p_value;
+        }
+    }
+    int64_t get_send_rate() const {
+        return values.send_rate;
     }
 
     void set_max_ticks_per_frame(int64_t p_value) {
@@ -96,15 +105,6 @@ public:
     }
     double get_stretch_nudge_factor() const {
         return values.stretch_nudge_factor;
-    }
-
-    void set_ping_interval(double p_value) {
-        if (guard.takes_positive("ping_interval", p_value)) {
-            values.ping_interval = p_value;
-        }
-    }
-    double get_ping_interval() const {
-        return values.ping_interval;
     }
 
     void set_display_offset(int64_t p_value) {
@@ -166,6 +166,7 @@ public:
     }
 
     godot::Ref<NetwClockConfig> ticks_per_second(int64_t p_value);
+    godot::Ref<NetwClockConfig> sends_per_second(int64_t p_value);
     godot::Ref<NetwClockConfig> display_offset_ticks(int64_t p_value);
     godot::Ref<NetwClockConfig> physics_interpolation(bool p_value);
     godot::Ref<NetwClockConfig> sync(enums::NetwClock::SyncMode p_value);

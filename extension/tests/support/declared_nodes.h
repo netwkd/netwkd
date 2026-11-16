@@ -35,12 +35,6 @@ func _init() -> void:
 	Netw.configure_property(self, &"position").state().interpolate(smoothing)
 )";
 
-constexpr const char *STATE_MASKED = R"(extends Node2D
-
-func _init() -> void:
-	Netw.configure_property(self, &"position").state().masked()
-)";
-
 constexpr const char *STATE_VOLATILE_AND_RETAINED = R"(extends Node2D
 
 var stunned: bool = false
@@ -50,12 +44,12 @@ func _init() -> void:
 	Netw.configure_property(self, &"stunned").state().retained()
 )";
 
-constexpr const char *BROADCAST_MASKED_AIM = R"(extends Node2D
+constexpr const char *BROADCAST_AIM = R"(extends Node2D
 
 var aim_dir: Vector2 = Vector2.ZERO
 
 func _init() -> void:
-	Netw.configure_property(self, &"aim_dir").broadcast().masked()
+	Netw.configure_property(self, &"aim_dir").broadcast()
 )";
 
 constexpr const char *BROADCAST_AUTHORITY_AIM = R"(extends Node2D

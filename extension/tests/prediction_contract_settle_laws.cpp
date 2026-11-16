@@ -136,7 +136,7 @@ TEST_CASE(
 ) {
     Stand stand;
     Node *broadcast
-        = declaring(netw_test::gdsrc::BROADCAST_MASKED_AIM, "BroadcastOnly");
+        = declaring(netw_test::gdsrc::BROADCAST_AIM, "BroadcastOnly");
     REQUIRE(broadcast != nullptr);
 
     stand.pipeline->register_derived(broadcast);

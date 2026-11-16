@@ -29,7 +29,7 @@ Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation
     func _init() -> void:
         var entity := Netw.configure_entity(self)
         entity.simulation.bodies = [^"Sphere"]
-        entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+        entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 
     func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
         if is_fresh:
@@ -41,7 +41,7 @@ Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation
     {
         var entity = Netw.ConfigureEntity(this);
         entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
-        entity.Simulation.Replicas = NetwSimulation.ReplicasEnum.Active;
+        entity.Simulation.RemoteMode = NetwSimulation.RemoteModeEnum.Active;
         entity.Simulation.NetworkProcess = Callable.From<double, long, bool>(NetworkProcess);
     }
 
@@ -57,18 +57,7 @@ An entity is simulated once it sets or calls anything here, is predicted as :ref
 
 \ **Modes**\ 
 
-The peer writing replicated state runs :ref:`MODE_AUTHORITY<class_NetwSimulation_constant_MODE_AUTHORITY>`. A predicting client runs :ref:`MODE_PREDICT<class_NetwSimulation_constant_MODE_PREDICT>`. Every other copy is a frozen :ref:`MODE_PROXY<class_NetwSimulation_constant_MODE_PROXY>`, unless :ref:`replicas<class_NetwSimulation_property_replicas>` or a selection makes it :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`.
-
-\ **Selection**\ 
-
-While this entity runs here as :ref:`MODE_AUTHORITY<class_NetwSimulation_constant_MODE_AUTHORITY>` or :ref:`MODE_PREDICT<class_NetwSimulation_constant_MODE_PREDICT>`, it can pick other entities to run here as :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`. A predicted entity that declares no selection picks every simulated entity this peer holds in its :ref:`NetwInterestLayer<class_NetwInterestLayer>` layers.
-
-\ :ref:`simulate()<class_NetwSimulation_method_simulate>` names one more, :ref:`simulate_all()<class_NetwSimulation_method_simulate_all>` limits automatic selection to one layer, and :ref:`simulate_none()<class_NetwSimulation_method_simulate_none>` drops it.
-
-::
-
-    func _ready() -> void:
-        entity.simulation.simulate(ball)
+The peer writing replicated state runs :ref:`MODE_AUTHORITY<class_NetwSimulation_constant_MODE_AUTHORITY>`. A predicting client runs :ref:`MODE_PREDICT<class_NetwSimulation_constant_MODE_PREDICT>`. Every other copy is :ref:`MODE_PROXY<class_NetwSimulation_constant_MODE_PROXY>` or :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`, as :ref:`remote_mode<class_NetwSimulation_property_remote_mode>` says.
 
 .. rst-class:: classref-introduction-group
 
@@ -85,47 +74,27 @@ Properties
 .. table::
    :widths: auto
 
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`Array`\[:godot:`NodePath`\]                   | :ref:`bodies<class_NetwSimulation_property_bodies>`                       |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`bool`                                         | :ref:`claim_on_contact<class_NetwSimulation_property_claim_on_contact>`   |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`int`                                          | :ref:`max_restore_ticks<class_NetwSimulation_property_max_restore_ticks>` |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :ref:`Mode<enum_NetwSimulation_Mode>`                 | :ref:`mode<class_NetwSimulation_property_mode>`                           |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`bool`                                         | :ref:`physics_driven<class_NetwSimulation_property_physics_driven>`       |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`float`                                        | :ref:`release_on_rest<class_NetwSimulation_property_release_on_rest>`     |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :ref:`Replicas<enum_NetwSimulation_Replicas>`         | :ref:`replicas<class_NetwSimulation_property_replicas>`                   |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :ref:`Restore<enum_NetwSimulation_Restore>`           | :ref:`restore<class_NetwSimulation_property_restore>`                     |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :ref:`Schedule<enum_NetwSimulation_Schedule>`         | :ref:`schedule<class_NetwSimulation_property_schedule>`                   |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`Array`\[:ref:`NetwEntity<class_NetwEntity>`\] | :ref:`selected<class_NetwSimulation_property_selected>`                   |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`Callable`                                     | :ref:`network_process<class_NetwSimulation_property_network_process>`     |
-   +-------------------------------------------------------+---------------------------------------------------------------------------+
-
-.. rst-class:: classref-reftable-group
-
-Methods
--------
-
-.. table::
-   :widths: auto
-
-   +--------+-----------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`forget<class_NetwSimulation_method_forget>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ )     |
-   +--------+-----------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`simulate<class_NetwSimulation_method_simulate>`\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) |
-   +--------+-----------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`simulate_all<class_NetwSimulation_method_simulate_all>`\ (\ layer\: :godot:`StringName` = &""\ )    |
-   +--------+-----------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`simulate_none<class_NetwSimulation_method_simulate_none>`\ (\ )                                     |
-   +--------+-----------------------------------------------------------------------------------------------------------+
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`Array`\[:godot:`NodePath`\]               | :ref:`bodies<class_NetwSimulation_property_bodies>`                       |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`claim_on_contact<class_NetwSimulation_property_claim_on_contact>`   |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`int`                                      | :ref:`max_restore_ticks<class_NetwSimulation_property_max_restore_ticks>` |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :ref:`Mode<enum_NetwSimulation_Mode>`             | :ref:`mode<class_NetwSimulation_property_mode>`                           |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`bool`                                     | :ref:`physics_driven<class_NetwSimulation_property_physics_driven>`       |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`float`                                    | :ref:`release_on_rest<class_NetwSimulation_property_release_on_rest>`     |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :ref:`RemoteMode<enum_NetwSimulation_RemoteMode>` | :ref:`remote_mode<class_NetwSimulation_property_remote_mode>`             |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :ref:`Restore<enum_NetwSimulation_Restore>`       | :ref:`restore<class_NetwSimulation_property_restore>`                     |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :ref:`Schedule<enum_NetwSimulation_Schedule>`     | :ref:`schedule<class_NetwSimulation_property_schedule>`                   |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`Callable`                                 | :ref:`network_process<class_NetwSimulation_property_network_process>`     |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -245,27 +214,35 @@ The physics space is stepped once per tick, and again for each tick of a rollbac
 
 ----
 
-.. _enum_NetwSimulation_Replicas:
+.. _enum_NetwSimulation_RemoteMode:
 
 .. rst-class:: classref-enumeration
 
-enum **Replicas**: :ref:`🔗<enum_NetwSimulation_Replicas>`
+enum **RemoteMode**: :ref:`🔗<enum_NetwSimulation_RemoteMode>`
 
-.. _class_NetwSimulation_constant_REPLICAS_PROXY:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`Replicas<enum_NetwSimulation_Replicas>` **REPLICAS_PROXY** = ``0``
-
-Copies whose state comes from another peer are :ref:`MODE_PROXY<class_NetwSimulation_constant_MODE_PROXY>`, unless a selection makes them active.
-
-.. _class_NetwSimulation_constant_REPLICAS_ACTIVE:
+.. _class_NetwSimulation_constant_REMOTE_MODE_AUTO:
 
 .. rst-class:: classref-enumeration-constant
 
-:ref:`Replicas<enum_NetwSimulation_Replicas>` **REPLICAS_ACTIVE** = ``1``
+:ref:`RemoteMode<enum_NetwSimulation_RemoteMode>` **REMOTE_MODE_AUTO** = ``0``
 
-Copies whose state comes from another peer are :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`. On an entity that is not predicted, a sample that matches the copy is not written, so a resting copy can sleep.
+The copy is :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` while this peer predicts an entity with :ref:`physics_driven<class_NetwSimulation_property_physics_driven>` that shares a :ref:`NetwInterestLayer<class_NetwInterestLayer>` with it, and :ref:`MODE_PROXY<class_NetwSimulation_constant_MODE_PROXY>` otherwise.
+
+.. _class_NetwSimulation_constant_REMOTE_MODE_ACTIVE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`RemoteMode<enum_NetwSimulation_RemoteMode>` **REMOTE_MODE_ACTIVE** = ``1``
+
+The copy is :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`.
+
+.. _class_NetwSimulation_constant_REMOTE_MODE_PROXY:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`RemoteMode<enum_NetwSimulation_RemoteMode>` **REMOTE_MODE_PROXY** = ``2``
+
+The copy is :ref:`MODE_PROXY<class_NetwSimulation_constant_MODE_PROXY>`.
 
 .. rst-class:: classref-item-separator
 
@@ -419,20 +396,18 @@ It needs :ref:`NetwEntity.TRANSFER_IMMEDIATE<class_NetwEntity_constant_TRANSFER_
 
 ----
 
-.. _class_NetwSimulation_property_replicas:
+.. _class_NetwSimulation_property_remote_mode:
 
 .. rst-class:: classref-property
 
-:ref:`Replicas<enum_NetwSimulation_Replicas>` **replicas** :ref:`🔗<class_NetwSimulation_property_replicas>`
+:ref:`RemoteMode<enum_NetwSimulation_RemoteMode>` **remote_mode** :ref:`🔗<class_NetwSimulation_property_remote_mode>`
 
 .. rst-class:: classref-property-setget
 
-- |void| **set_replicas**\ (\ value\: :ref:`Replicas<enum_NetwSimulation_Replicas>`\ )
-- :ref:`Replicas<enum_NetwSimulation_Replicas>` **get_replicas**\ (\ )
+- |void| **set_remote_mode**\ (\ value\: :ref:`RemoteMode<enum_NetwSimulation_RemoteMode>`\ )
+- :ref:`RemoteMode<enum_NetwSimulation_RemoteMode>` **get_remote_mode**\ (\ )
 
-How this peer simulates copies whose state it receives from another peer.
-
-It can change at any time.
+Whether a copy whose state comes from another peer runs here or is interpolated. It can change at any time.
 
 .. rst-class:: classref-item-separator
 
@@ -472,22 +447,6 @@ When :ref:`network_process<class_NetwSimulation_property_network_process>` runs 
 
 ----
 
-.. _class_NetwSimulation_property_selected:
-
-.. rst-class:: classref-property
-
-:godot:`Array`\[:ref:`NetwEntity<class_NetwEntity>`\] **selected** :ref:`🔗<class_NetwSimulation_property_selected>`
-
-.. rst-class:: classref-property-setget
-
-- :godot:`Array`\[:ref:`NetwEntity<class_NetwEntity>`\] **get_selected**\ (\ )
-
-The entities this entity selects on this peer right now.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwSimulation_property_network_process:
 
 .. rst-class:: classref-property
@@ -504,59 +463,6 @@ Called each tick as ``(delta: float, tick: int, is_fresh: bool)`` while :ref:`mo
 \ ``is_fresh`` is ``true`` the first time a tick runs. It is ``false`` when a rollback runs the tick again and on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy, so play sounds and spawn nodes only when it is ``true``.
 
 Ask the physics space with a query. An :godot:`Area3D`'s overlaps and signals and :godot:`CharacterBody3D.is_on_floor() <CharacterBody3D#class_CharacterBody3D_method_is_on_floor>` come from the last physics step, and a rollback restores neither.
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Method Descriptions
--------------------
-
-.. _class_NetwSimulation_method_forget:
-
-.. rst-class:: classref-method
-
-|void| **forget**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwSimulation_method_forget>`
-
-Withdraws the selection :ref:`simulate()<class_NetwSimulation_method_simulate>` made for ``entity``. Automatic selection may still include it.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwSimulation_method_simulate:
-
-.. rst-class:: classref-method
-
-|void| **simulate**\ (\ entity\: :ref:`NetwEntity<class_NetwEntity>`\ ) :ref:`🔗<class_NetwSimulation_method_simulate>`
-
-Selects ``entity``, so it runs here as :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` while this entity runs here as :ref:`MODE_AUTHORITY<class_NetwSimulation_constant_MODE_AUTHORITY>` or :ref:`MODE_PREDICT<class_NetwSimulation_constant_MODE_PREDICT>`. An entity in another scene is refused with an error.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwSimulation_method_simulate_all:
-
-.. rst-class:: classref-method
-
-|void| **simulate_all**\ (\ layer\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwSimulation_method_simulate_all>`
-
-Selects every entity this peer holds in ``layer``. An empty ``layer`` uses the :ref:`NetwInterestLayer<class_NetwInterestLayer>` layers this entity is in.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwSimulation_method_simulate_none:
-
-.. rst-class:: classref-method
-
-|void| **simulate_none**\ (\ ) :ref:`🔗<class_NetwSimulation_method_simulate_none>`
-
-Stops automatic selection. Entities named with :ref:`simulate()<class_NetwSimulation_method_simulate>` stay selected.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

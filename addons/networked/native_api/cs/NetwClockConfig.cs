@@ -63,6 +63,37 @@ public sealed class NetwClockConfig : NetwRefCounted
         }
     }
 
+    private static readonly IntPtr _bindGetSendRate =
+        NetwApi.MethodBind("NetwClockConfig", "get_send_rate", 3905245786UL);
+
+    private static readonly IntPtr _bindSetSendRate =
+        NetwApi.MethodBind("NetwClockConfig", "set_send_rate", 1286410249UL);
+
+    /// <summary>
+    /// How many times a second the session sends. <c>0</c> sends on every tick.
+    /// Any other value must divide <see cref="NetwClockConfig.Tickrate"/> and
+    /// send at least every 16 ticks.
+    /// </summary>
+    public long SendRate
+    {
+        get
+        {
+            long answered = default;
+            NetwThunks.Ptrcall0_Long(_bindGetSendRate, Checked, ref answered);
+            return answered;
+        }
+        set
+        {
+            long slot0 = value;
+            long discarded = default;
+            NetwThunks.Ptrcall1_Long_Long(
+                _bindSetSendRate,
+                Checked,
+                in slot0,
+                ref discarded);
+        }
+    }
+
     private static readonly IntPtr _bindGetMaxTicksPerFrame =
         NetwApi.MethodBind(
             "NetwClockConfig",
@@ -279,42 +310,6 @@ public sealed class NetwClockConfig : NetwRefCounted
             long discarded = default;
             NetwThunks.Ptrcall1_Double_Long(
                 _bindSetStretchNudgeFactor,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetPingInterval =
-        NetwApi.MethodBind(
-            "NetwClockConfig",
-            "get_ping_interval",
-            1740695150UL);
-
-    private static readonly IntPtr _bindSetPingInterval =
-        NetwApi.MethodBind("NetwClockConfig", "set_ping_interval", 373806689UL);
-
-    /// <summary>
-    /// Seconds between pings to the server. The clock pings five times slower
-    /// once the round trip varies by less than half a tick.
-    /// </summary>
-    public double PingInterval
-    {
-        get
-        {
-            double answered = default;
-            NetwThunks.Ptrcall0_Double(
-                _bindGetPingInterval,
-                Checked,
-                ref answered);
-            return answered;
-        }
-        set
-        {
-            double slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Double_Long(
-                _bindSetPingInterval,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -565,6 +560,25 @@ public sealed class NetwClockConfig : NetwRefCounted
         IntPtr answered = default;
         NetwThunks.Ptrcall1_Long_IntPtr(
             _bindTicksPerSecond,
+            Checked,
+            in slot0,
+            ref answered);
+        return NetwClockConfig.Adopt(answered);
+    }
+
+    private static readonly IntPtr _bindSendsPerSecond =
+        NetwApi.MethodBind("NetwClockConfig", "sends_per_second", 432295446UL);
+
+    /// <summary>
+    /// Sets <see cref="NetwClockConfig.SendRate"/>, how many times a second the
+    /// session sends.
+    /// </summary>
+    public NetwClockConfig SendsPerSecond(long sendRate)
+    {
+        long slot0 = sendRate;
+        IntPtr answered = default;
+        NetwThunks.Ptrcall1_Long_IntPtr(
+            _bindSendsPerSecond,
             Checked,
             in slot0,
             ref answered);

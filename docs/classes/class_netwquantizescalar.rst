@@ -134,7 +134,7 @@ The smallest value. Smaller values are clamped.
 - |void| **set_resolution_step**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_resolution_step**\ (\ )
 
-The precision, ``(max_limit - min_limit) / (2 ** bit_count - 1)``. Setting it picks the smallest :ref:`bit_count<class_NetwQuantizeScalar_property_bit_count>` that is at least this precise. Must be above ``0.0``.
+The precision, ``(max_limit - min_limit) / (2 ** bit_count - 2)``. Setting it picks the smallest :ref:`bit_count<class_NetwQuantizeScalar_property_bit_count>` that is at least this precise. Must be above ``0.0``.
 
 .. rst-class:: classref-section-separator
 

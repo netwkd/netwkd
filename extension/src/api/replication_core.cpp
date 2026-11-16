@@ -261,8 +261,7 @@ void ReplicationCore::send_to(
     const PackedByteArray &p_payload,
     bool p_reliable,
     int64_t p_comp,
-    const String &p_path,
-    bool p_batched
+    const String &p_path
 ) {
     NetwMultiplayer *plane = core();
     if (plane != nullptr) {
@@ -273,8 +272,7 @@ void ReplicationCore::send_to(
             p_payload,
             p_reliable,
             p_comp,
-            p_path,
-            p_batched
+            p_path
         );
     }
 }
@@ -306,8 +304,7 @@ void ReplicationCore::broadcast_control(
             payload,
             true,
             0,
-            String(),
-            false
+            String()
         );
     }
 }
@@ -329,8 +326,7 @@ void ReplicationCore::reply_control(
         session::frame_write(p_decision),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -442,8 +438,7 @@ void ReplicationCore::send_claim_images(int64_t p_tick) {
                 payload,
                 false,
                 0,
-                String(),
-                true
+                String()
             );
         }
     }
@@ -518,8 +513,7 @@ void ReplicationCore::request_control(
         session::frame_write(p_request),
         ids.control_requests_ordered,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -529,7 +523,21 @@ void ReplicationCore::flush_all_buffers() {
     if (plane == nullptr || shell == nullptr) {
         return;
     }
-    plane->carrier_flush();
+    plane->carrier_flush(plane->session_elapsed_ms(), upkeep_rides());
+}
+
+bool ReplicationCore::upkeep_rides() const {
+    return books->clock->get_configured() && !books->clock->is_held();
+}
+
+void ReplicationCore::flush_echoes() {
+    NetwMultiplayer *plane = core();
+    if (plane != nullptr) {
+        plane->flush_standalone_acks(
+            plane->session_elapsed_ms(),
+            upkeep_rides()
+        );
+    }
 }
 
 void ReplicationCore::note_staged(int64_t p_peer_id, int64_t p_seq) {
@@ -554,14 +562,13 @@ Error ReplicationCore::receive_carrier(
     Error result = OK;
     int64_t frames = 0;
     while (reader.bits_remaining() > 0) {
-#if defined(DEBUG_ENABLED)
         const int64_t before = reader.bit_length();
-#endif
         wire::Frame frame;
         if (!wire::frame_unpack_next(reader, frame)) {
             return finish_receive_pass(frames, ERR_INVALID_DATA, p_sender);
         }
         frames += 1;
+        const int64_t frame_bytes = (reader.bit_length() - before) / 8;
 #if defined(DEBUG_ENABLED)
         NetwMultiplayer *plane = core();
         const bool loopback
@@ -580,7 +587,7 @@ Error ReplicationCore::receive_carrier(
             plane != nullptr ? books->profiler : nullptr,
             !loopback,
             p_sender,
-            (reader.bit_length() - before) / 8,
+            frame_bytes,
             provisional
         );
 #endif
@@ -592,7 +599,8 @@ Error ReplicationCore::receive_carrier(
             frame.path,
             p_sender,
             p_reliable,
-            p_seq
+            p_seq,
+            frame_bytes
         );
         if (result == OK && verdict != OK) {
             result = verdict;
@@ -629,7 +637,8 @@ Error ReplicationCore::dispatch(
     const String &p_path,
     int64_t p_sender,
     bool p_reliable,
-    int64_t p_seq
+    int64_t p_seq,
+    int64_t p_frame_bytes
 ) {
     NetwMultiplayer *plane = core();
     Object *shell = api();
@@ -642,7 +651,7 @@ Error ReplicationCore::dispatch(
             p_channel,
             p_route,
             p_comp,
-            p_payload.size()
+            p_frame_bytes >= 0 ? p_frame_bytes : p_payload.size()
         );
     }
     if (p_route != 0) {
@@ -1019,10 +1028,12 @@ void ReplicationCore::on_clock_tick(int64_t p_tick) {
         && books->clock->is_closing_tick()) {
         return;
     }
-    flush_all_buffers();
-    if (plane != nullptr) {
-        plane->flush_standalone_acks();
+    if (!books->clock->is_send_tick()) {
+        return;
     }
+    flush_all_buffers();
+    flush_echoes();
+    books->clock->mark_sent();
 }
 
 void ReplicationCore::pump_tables(int64_t p_tick) {
@@ -1098,8 +1109,7 @@ void ReplicationCore::broadcast_table_frames(
                 p_frames[at],
                 p_reliable,
                 0,
-                String(),
-                true
+                String()
             );
         }
     }
@@ -1155,18 +1165,20 @@ void ReplicationCore::replay_tables(int64_t p_peer_id) {
                 frames[frame],
                 true,
                 0,
-                String(),
-                true
+                String()
             );
         }
     }
 }
 
 void ReplicationCore::on_frame_end() {
+    if (!books->clock->is_send_tick()) {
+        return;
+    }
     flush_all_buffers();
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr && books->clock->closed_a_tick()) {
-        plane->flush_standalone_acks();
+    if (books->clock->closed_a_tick()) {
+        flush_echoes();
+        books->clock->mark_sent();
     }
 }
 
@@ -1184,7 +1196,7 @@ void ReplicationCore::on_poll() {
     sync_compat.pump();
     spawn_pipeline.retry_adopt_parked();
     flush_all_buffers();
-    plane->flush_standalone_acks();
+    flush_echoes();
 }
 
 void ReplicationCore::clear_session() {

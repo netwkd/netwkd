@@ -49,7 +49,7 @@ Properties
    +------------------------------------------------------+----------------------------------------------------------------------------------------------+
    | :godot:`int`                                         | :ref:`panic_snap_threshold<class_NetwClockConfig_property_panic_snap_threshold>`             |
    +------------------------------------------------------+----------------------------------------------------------------------------------------------+
-   | :godot:`float`                                       | :ref:`ping_interval<class_NetwClockConfig_property_ping_interval>`                           |
+   | :godot:`int`                                         | :ref:`send_rate<class_NetwClockConfig_property_send_rate>`                                   |
    +------------------------------------------------------+----------------------------------------------------------------------------------------------+
    | :godot:`float`                                       | :ref:`stall_threshold<class_NetwClockConfig_property_stall_threshold>`                       |
    +------------------------------------------------------+----------------------------------------------------------------------------------------------+
@@ -76,6 +76,8 @@ Methods
    | :ref:`NetwClockConfig<class_NetwClockConfig>` | :ref:`display_offset_ticks<class_NetwClockConfig_method_display_offset_ticks>`\ (\ display_offset\: :godot:`int`\ )               |
    +-----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwClockConfig<class_NetwClockConfig>` | :ref:`physics_interpolation<class_NetwClockConfig_method_physics_interpolation>`\ (\ use_physics_interpolation\: :godot:`bool`\ ) |
+   +-----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwClockConfig<class_NetwClockConfig>` | :ref:`sends_per_second<class_NetwClockConfig_method_sends_per_second>`\ (\ send_rate\: :godot:`int`\ )                            |
    +-----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwClockConfig<class_NetwClockConfig>` | :ref:`sync<class_NetwClockConfig_method_sync>`\ (\ sync_mode\: :ref:`SyncMode<enum_NetwClock_SyncMode>`\ )                        |
    +-----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
@@ -210,18 +212,18 @@ Ticks of difference from the server past which the clock snaps, even with :ref:`
 
 ----
 
-.. _class_NetwClockConfig_property_ping_interval:
+.. _class_NetwClockConfig_property_send_rate:
 
 .. rst-class:: classref-property
 
-:godot:`float` **ping_interval** :ref:`🔗<class_NetwClockConfig_property_ping_interval>`
+:godot:`int` **send_rate** :ref:`🔗<class_NetwClockConfig_property_send_rate>`
 
 .. rst-class:: classref-property-setget
 
-- |void| **set_ping_interval**\ (\ value\: :godot:`float`\ )
-- :godot:`float` **get_ping_interval**\ (\ )
+- |void| **set_send_rate**\ (\ value\: :godot:`int`\ )
+- :godot:`int` **get_send_rate**\ (\ )
 
-Seconds between pings to the server. The clock pings five times slower once the round trip varies by less than half a tick.
+How many times a second the session sends. ``0`` sends on every tick. Any other value must divide :ref:`tickrate<class_NetwClockConfig_property_tickrate>` and send at least every 16 ticks.
 
 .. rst-class:: classref-item-separator
 
@@ -353,6 +355,18 @@ Sets :ref:`display_offset<class_NetwClockConfig_property_display_offset>`, how m
 :ref:`NetwClockConfig<class_NetwClockConfig>` **physics_interpolation**\ (\ use_physics_interpolation\: :godot:`bool`\ ) :ref:`🔗<class_NetwClockConfig_method_physics_interpolation>`
 
 Sets :ref:`use_physics_interpolation<class_NetwClockConfig_property_use_physics_interpolation>`, whether :ref:`NetwClock.tick_factor<class_NetwClock_property_tick_factor>` follows Godot physics interpolation.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwClockConfig_method_sends_per_second:
+
+.. rst-class:: classref-method
+
+:ref:`NetwClockConfig<class_NetwClockConfig>` **sends_per_second**\ (\ send_rate\: :godot:`int`\ ) :ref:`🔗<class_NetwClockConfig_method_sends_per_second>`
+
+Sets :ref:`send_rate<class_NetwClockConfig_property_send_rate>`, how many times a second the session sends.
 
 .. rst-class:: classref-item-separator
 

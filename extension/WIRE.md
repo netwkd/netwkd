@@ -1,7 +1,7 @@
-# WIRE v17, the carrier format
+# WIRE v22, the carrier format
 
 The byte layout of every datagram, frame and payload Networked writes.
-`FORMAT_VERSION` is 17. `src/wire/registry.cpp` is the one declaration of the
+`FORMAT_VERSION` is 22. `src/wire/registry.cpp` is the one declaration of the
 channel table and `tools/wire_decode.py` reads a capture against this page.
 
 ---
@@ -43,14 +43,26 @@ exactly representable and re-encoding a decoded value is idempotent.
 
 ## 2. Datagram
 
-Three shapes, selected by the first byte.
+Four magics over three shapes, selected by the first byte.
 
 ```text
 0x58  reliable          [magic bits 8][base_tick varuint 5]
 0x78  unreliable        [magic bits 8][seq bits 16][base_tick varuint 5]
 0x98  unreliable acked  [magic bits 8][seq bits 16][ack bits 16]
                         [history bits 32][base_tick varuint 5]
+0xB8  acked, echo held  the same layout as 0x98
 ```
+
+A sender holds an echo that has no datagram to leave on, for at most 250 ms
+or 8 unechoed datagrams. It holds none when no `0x98` echo left for that peer
+in the last second, so a link with inbound traffic is sampled at least once
+a second. `0xB8` marks an echo that waited past the first
+flush it could have left on. The receiver reads its ack and history as it
+reads `0x98` and takes no round trip sample from it.
+
+A datagram that carries no frames is owed no echo. Its receiver records the
+sequence number, so the next datagram it sends for another reason carries the
+ack, and its sender takes no round trip sample from that ack.
 
 Frames follow the header to the end of the datagram, each byte aligned, and
 the header ends byte aligned.
@@ -189,8 +201,9 @@ ROW_CONTROL declares 5 for the frame of records, the stepped ids, the omitted
 OPEN fields and the RESET that names only a token of section 10, and for the
 parked lanes and binding floors of section 7, LIFECYCLE_DECISION declares 2
 for the author of the revision it names and the denial string a refusal
-carries, PREDICT_COMMAND and PREDICT_RELAY declare 1 for the repeated row bit
-and PREDICT_ACK declares 1 for the compact record of section 20,
+carries, PREDICT_COMMAND and PREDICT_RELAY declare 3 for the repeated row bit,
+the `asks_detail` bit and the `hold` of section 20, PREDICT_ACK declares 3 for
+the compact record, the held bit and the run of section 20,
 INTEREST_AWARENESS declares 1 for the edge of section 15,
 SESSION_KICK_REQUEST declares 1 for the player id of section 16, and every
 other revision is 0.
@@ -724,16 +737,27 @@ CLOCK_HANDSHAKE        [tickrate varuint 2]
 CLOCK_HANDSHAKE_REPLY  [tickrate varuint 2]
 CLOCK_PING             [origin bits 32]
 CLOCK_PONG             [origin bits 32][tick bits 32][phase bits 8]
+                       [wait bits 16]
 ```
 
 ```text
 tickrate  the sender's own configured rate, bounded at 2^14 - 1
-origin    the low 32 bits of the pinging peer's wall clock in microseconds.
-          the server copies it back unchanged, so the round trip is measured
-          against one clock. the wrap is at 71 minutes
-tick      the low 32 bits of the server's session tick
+origin    the low 32 bits of the pinging peer's wall clock in microseconds,
+          read when the ping's datagram leaves. the server copies it back
+          unchanged, so the round trip is measured against one clock. the
+          wrap is at 71 minutes
+tick      the low 32 bits of the server's session tick when the pong leaves
 phase     its fraction of the current tick on a 0..255 grid
+wait      how long the server held the ping before the pong left, in units
+          of 100 microseconds, saturating at 65535
 ```
+
+Neither frame takes a datagram of its own. A ping joins the datagram its
+peer's next flush sends to the server. A ping from a clock that is still
+converging forces that datagram, and a ping from a settled clock waits for
+one for at most 250 ms. The server answers at its next flush for that peer,
+which the pong forces, and answers only the newest ping it holds. The client
+subtracts `wait` from the round trip it measured.
 
 A clock frame is refused whole and leaves the local calibration as it was.
 
@@ -1202,10 +1226,14 @@ range still in flight, floored by what the other side has confirmed.
 
 ```text
 PREDICT_COMMAND (35, U, owner -> server)
-header       svarint ack_of_acks   the owner's highest seen acknowledgement
+header       varuint acked         (ack_of_acks + 1) << 2 | holds << 1
+                                   | asks_detail, where ack_of_acks is the
+                                   owner's highest seen acknowledgement, -1
+                                   before the first
              u8      epoch
              varuint base          the run's first transition
              u8      count         transitions in the run, at most 255
+             varuint hold          only where holds is set, 1 to 1023
 per transition
              varuint tagged        zigzag(label - previous) << 1 | fresh
 payloads     one WirePlan row per FRESH transition, in run order, then align.
@@ -1224,13 +1252,55 @@ sealed `SchemaRecord`.
 
 The evidence count is 0 unless the owner runs with
 `NETW_PREDICT_OWNER_EVIDENCE` set. Evidence feeds only the server's judgement
-of the owner's claim, which is a diagnostic.
+of the owner's claim, which is a diagnostic. The same variable turns on raw
+fingerprints.
+
+`asks_detail` asks the server for whole acknowledgement records. The owner
+sets it while the variable above is set, while an episode is open, while it
+is in quarantine or within 64 transitions of leaving it, while a contact
+window is open, and for one acknowledgement age plus one command window after
+a record that did not match. A record does not count while the owner's row
+and the server's row both stand where the last state row found them inside
+the correction thresholds.
+
+A command frame that sets `asks_detail` also has the server state the
+entity's row to that owner again, as a refresh, once the row has not left for
+one repair interval. The owner compares that row and corrects, so an owner
+that moved while the server's row stood is brought back.
+
+`hold` is how many transitions past the newest in the frame the server may
+run on that newest row. A frame without it asks for none. The server runs a
+held transition only once its own tick has passed that transition by
+`input_buffer_ticks` plus the frame window, which is the set's window plus
+two. Every frame that could carry the row has then had its chance to arrive.
+When a frame does arrive, the server runs that tick as many extra inputs as
+the ticks it waited, so it stands where a server that never waited would. It
+never holds past three seconds of its own ticks. Each frame replaces the hold
+of the frame before it. A row that arrives for a transition the server
+already ran on a different row is acknowledged again as substituted, on three
+sends. Where it is the newest row it
+becomes the held row, and the hold ends until a newer frame asks again. A
+frame that asks for a hold also says every transition before its newest ran
+on that same row, so the server runs one it never received on the held row.
+
+An owner on `SCHEDULE_TICK` asks for a hold of three seconds of ticks once its
+input and its predicted state both stand, the server has acknowledged a
+transition it ran on that input with bit 6 clear, and `asks_detail` is clear.
+It sends two such frames on consecutive ticks and then one each second of
+ticks, at most every 20 ticks, as a frame that rides. It sends nothing in
+between. Any tick where one of those conditions fails sends a frame without a
+hold, as before, and the first such frames reach back to the transition after
+the last hold frame. An owner on `SCHEDULE_FRAME` never asks.
 
 ```text
 PREDICT_ACK (36, U, server -> owner)
 header       u8 epoch, varuint base, u8 count
-per record   u8 flags, whose bit 5 marks a compact record and whose bits
+per record   u8 flags, whose bit 5 marks a compact record, whose bit 6
+             marks a transition the server ran on a held row, and whose bits
              2..4 carry authority's witness class, then post as 32 bits.
+             Bit 7 marks a run and is legal only with bits 5 and 6. A u8
+             count from 1 to 255 follows the post, and that many further
+             transitions carry the same flags and post.
              A record that is not compact continues with u8 mask, then
              pre, command, environment, topology and witness as 32 bits
              each, and a raw fingerprint where the mask claims one.
@@ -1242,16 +1312,33 @@ per record   u8 flags, whose bit 5 marks a compact record and whose bits
              bits 1 to 6 compare with the last record that was not compact
 ```
 
-A record rides whole on its first two sends and compact after that, so the
-range still in flight costs 5 bytes a record. An owner that sees only a
-compact record judges the match and leaves the attribution unknown.
+A record rides whole on its first two sends where the entity samples
+contacts or the owner's newest command frame set `asks_detail`. So does a
+record whose row the server ran from a state other than the row before left,
+with a changed environment digest, or with a changed island roster. Every
+other record is compact and costs 5 bytes. An owner that sees only a compact
+record judges the match and leaves the attribution unknown.
 
 At most 21 records ride, so a worst-case raw frame stays under the 1150 byte
-unreliable budget. Later records ride the next send once `ack_of_acks`
+unreliable budget. A run is one record, so held transitions that left the
+state alone cost 6 bytes however many there are. Later records ride the next send once `ack_of_acks`
 advances.
+
+For an entity on `SCHEDULE_TICK` the frame leaves on a tick a command frame
+arrived. It also leaves on the tick of a row that is news and on the two
+ticks after, until `ack_of_acks` passes that row. A row is news when its post
+differs from the post of the row before it, when it would ride whole for a
+changed cause, when its witness class changed, or when the server substituted
+or superseded it. An entity on `SCHEDULE_FRAME` sends the frame every step.
 
 `PREDICT_RELAY` (37, U, server -> subscriber) is the admitted PREDICT_COMMAND
 bytes re-emitted unchanged, so a subscriber decodes the author's own frame.
+It carries the last four inputs the server ran. It leaves on the tick an input
+differs from the one before it and on the three ticks after. It leaves again
+8, 16 and 32 ticks after the change, where that comes before the refresh.
+While the input stands it leaves once a second, and at least every 64 ticks.
+A new subscriber, or a peer that starts seeing the entity, counts as a change.
+That refresh rides, and every other send leaves on its tick.
 
 `PREDICT_RELAY_REQUEST` (38, R, client -> server) is one boolean bit aligned
 to a single byte.

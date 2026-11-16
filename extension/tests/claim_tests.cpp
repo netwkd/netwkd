@@ -39,7 +39,7 @@ class Grip extends RigidBody3D:
 		var entity := Netw.configure_entity(self)
 		entity.authority = NetwEntity.AUTHORITY_CONTROLLER
 		entity.transfer = NetwEntity.TRANSFER_IMMEDIATE
-		entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 		Netw.configure_property(self, &"position").broadcast()
 		Netw.configure_property(self, &"linear_velocity").broadcast()
 

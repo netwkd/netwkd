@@ -769,7 +769,7 @@ void NetwMultiplayer::sync_flush_rows(
     if (p_send == nullptr) {
         return;
     }
-    const int64_t rate = int64_t(clock_engine().get_tickrate());
+    const int64_t rate = int64_t(clock_engine().send_rate());
     if (rate > 0) {
         p_send->set_tickrate(rate);
     }
@@ -826,7 +826,6 @@ void NetwMultiplayer::sync_flush_rows(
             send.bytes,
             send.reliable,
             int64_t(send.comp),
-            true,
             owns_baseline ? &descriptor : nullptr
         );
         if (send.reliable) {
@@ -859,7 +858,7 @@ void NetwMultiplayer::sync_flush_rows(
             frame.reliable,
             0,
             String(),
-            true,
+            nullptr,
             nullptr,
             true
         );
@@ -1008,8 +1007,7 @@ void NetwMultiplayer::row_control_flush(
                 frame,
                 true,
                 0,
-                String(),
-                true
+                String()
             );
         }
         if (!receipts.is_empty()) {
@@ -1021,7 +1019,7 @@ void NetwMultiplayer::row_control_flush(
                 false,
                 0,
                 String(),
-                true
+                wire::Delivery::RIDE
             );
         }
     }
@@ -1461,12 +1459,17 @@ void NetwMultiplayer::display_compute_sync_intervals(const RID &p_entity) {
     if (state != nullptr && set_feeds_runtime(p_runtime, state->get_set())) {
         p_runtime->set_authored_by_state(true);
     }
-    if (widest <= 0.0 || !clock_engine().get_configured()) {
+    if (!clock_engine().get_configured()) {
         return;
     }
-    p_runtime->display_playhead().set_expected_interval_ticks(
-        MAX(1, int(Math::ceil(widest * clock_engine().get_tickrate())))
+    display::Playhead &playhead = p_runtime->display_playhead();
+    const int paced = widest > 0.0
+        ? MAX(1, int(Math::ceil(widest * clock_engine().get_tickrate())))
+        : playhead.get_expected_interval_ticks();
+    playhead.set_expected_interval_ticks(
+        MAX(paced, clock_engine().get_send_interval())
     );
+    playhead.set_send_interval_ticks(clock_engine().get_send_interval());
 }
 
 bool NetwMultiplayer::display_default_authors_streams(const RID &p_entity) {
@@ -2369,9 +2372,6 @@ void NetwMultiplayer::property_set_set_param(
         return;
     }
     switch (p_param) {
-        case SET_PARAM_MASKED:
-            record->masked = bool(p_value);
-            return;
         case SET_PARAM_WINDOW:
             record->window = int64_t(p_value);
             return;
@@ -2381,9 +2381,6 @@ void NetwMultiplayer::property_set_set_param(
         case SET_PARAM_POLICY:
             record->policy
                 = static_cast<NetwMemberConfig::Policy>(int(p_value));
-            return;
-        case SET_PARAM_TRIGGER:
-            record->trigger = int64_t(p_value);
             return;
         case SET_PARAM_CADENCE:
             record->cadence = int64_t(p_value);
@@ -2495,11 +2492,9 @@ RID NetwMultiplayer::adopt_property_set(
     if (!set.is_valid()) {
         return set;
     }
-    property_set_set_param(set, SET_PARAM_MASKED, p_source.get_masked());
     property_set_set_param(set, SET_PARAM_WINDOW, p_source.get_window());
     property_set_set_param(set, SET_PARAM_AUDIENCE, p_source.get_audience());
     property_set_set_param(set, SET_PARAM_POLICY, p_source.get_policy());
-    property_set_set_param(set, SET_PARAM_TRIGGER, p_source.get_trigger());
     property_set_set_param(set, SET_PARAM_CADENCE, p_source.get_cadence());
     property_set_set_param(set, SET_PARAM_STAMP, p_source.get_stamp());
     property_set_set_param(set, SET_PARAM_PROFILE, p_source.get_profile());

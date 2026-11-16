@@ -29,14 +29,12 @@ void NetwPropertyConfig::warn_double_set(
 Ref<NetwPropertyConfig> NetwPropertyConfig::state() {
     in_state_set = true;
     lane = PropertySet::VOLATILE;
-    set_trigger = PropertySet::TRIGGER_ON_CHANGE;
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::input() {
     in_input_set = true;
     lane = PropertySet::VOLATILE;
-    set_trigger = PropertySet::TRIGGER_ON_CHANGE;
     set_audience = PropertySet::AUDIENCE_SERVER_ONLY;
     return Ref<NetwPropertyConfig>(this);
 }
@@ -44,7 +42,6 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::input() {
 Ref<NetwPropertyConfig> NetwPropertyConfig::broadcast() {
     in_broadcast_set = true;
     lane = PropertySet::VOLATILE;
-    set_trigger = PropertySet::TRIGGER_ON_CHANGE;
     return Ref<NetwPropertyConfig>(this);
 }
 
@@ -94,15 +91,6 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::teleport_threshold(
     return Ref<NetwPropertyConfig>(this);
 }
 
-Ref<NetwPropertyConfig> NetwPropertyConfig::on_change() {
-    warn_double_set(
-        set_trigger != UNSET && set_trigger != PropertySet::TRIGGER_ON_CHANGE,
-        "trigger"
-    );
-    set_trigger = PropertySet::TRIGGER_ON_CHANGE;
-    return Ref<NetwPropertyConfig>(this);
-}
-
 Ref<NetwPropertyConfig> NetwPropertyConfig::heartbeat(int64_t p_ticks) {
     warn_double_set(
         set_heartbeat_ticks != UNSET && set_heartbeat_ticks != p_ticks,
@@ -121,11 +109,6 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::windowed(int64_t p_samples) {
 Ref<NetwPropertyConfig> NetwPropertyConfig::audience(bool p_server_only) {
     set_audience = p_server_only ? PropertySet::AUDIENCE_SERVER_ONLY
                                  : PropertySet::AUDIENCE_PUBLIC;
-    return Ref<NetwPropertyConfig>(this);
-}
-
-Ref<NetwPropertyConfig> NetwPropertyConfig::masked() {
-    set_masked = true;
     return Ref<NetwPropertyConfig>(this);
 }
 
@@ -172,7 +155,6 @@ void NetwPropertyConfig::_bind_methods() {
         D_METHOD("teleport_threshold", "distance"),
         &NetwPropertyConfig::teleport_threshold
     );
-    ClassDB::bind_method(D_METHOD("on_change"), &NetwPropertyConfig::on_change);
     ClassDB::bind_method(
         D_METHOD("heartbeat", "ticks"),
         &NetwPropertyConfig::heartbeat
@@ -186,7 +168,6 @@ void NetwPropertyConfig::_bind_methods() {
         &NetwPropertyConfig::audience,
         DEFVAL(true)
     );
-    ClassDB::bind_method(D_METHOD("masked"), &NetwPropertyConfig::masked);
     ClassDB::bind_method(
         D_METHOD("persisted", "saved_column_name"),
         &NetwPropertyConfig::persisted,
@@ -245,35 +226,11 @@ void NetwPropertyConfig::_bind_methods() {
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, in_state_set);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, in_input_set);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, in_broadcast_set);
-    ClassDB::bind_method(
-        D_METHOD("set_set_trigger", "set_trigger"),
-        &NetwPropertyConfig::set_set_trigger
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_set_trigger"),
-        &NetwPropertyConfig::get_set_trigger
-    );
-    ADD_PROPERTY(
-        PropertyInfo(
-            Variant::INT,
-            "set_trigger",
-            PROPERTY_HINT_NONE,
-            "",
-            PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM,
-            "NetwPropertyConfig.Trigger"
-        ),
-        "set_set_trigger",
-        "get_set_trigger"
-    );
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::INT, set_heartbeat_ticks);
     NETW_PROPERTY_CONFIG_PROPERTY(Variant::INT, set_window);
-    NETW_PROPERTY_CONFIG_PROPERTY(Variant::BOOL, set_masked);
 
 #undef NETW_PROPERTY_CONFIG_PROPERTY
 
-    BIND_ENUM_CONSTANT(TRIGGER_TICK);
-    BIND_ENUM_CONSTANT(TRIGGER_ON_CHANGE);
-    BIND_ENUM_CONSTANT(TRIGGER_ON_DEMAND);
     BIND_ENUM_CONSTANT(VOLATILE);
     BIND_ENUM_CONSTANT(RETAINED);
     BIND_ENUM_CONSTANT(AUDIENCE_PUBLIC);

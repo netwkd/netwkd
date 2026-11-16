@@ -401,6 +401,40 @@ TEST_CASE(
     NETW_HOLDS(quiet(seen));
 }
 
+constexpr const char *CORRIDOR = R"(
+class Walker extends Node3D:
+	var push := 0
+	var wall := false
+
+	func _init() -> void:
+		Netw.configure_entity(self)
+		Netw.configure_property(self, &"position").state()
+		Netw.configure_property(self, &"push").input()
+
+	func _network_process(_delta: float, _tick: int, _fresh: bool) -> void:
+		if push == 1 and not wall:
+			position.x += 1.0
+)";
+
+World walker_meets_a_wall() {
+    return World(CORRIDOR, 1)
+        .watch("Walker", "position")
+        .at(1, spawn("Walker", "Walker"))
+        .at(3, control("Walker", 0))
+        .at(10, on(0, set("Walker", "push", 1)))
+        .at(20, set("Walker", "wall", true))
+        .at(40, on(0, set("Walker", "push", 0)));
+}
+
+TEST_CASE(
+    "[Networked][Compliance] A8 a player who walked on where the server "
+    "stopped them is brought back to where the server holds them"
+) {
+    const Seen seen = walker_meets_a_wall().run(80);
+    NETW_HOLDS(agrees(seen, 0));
+    NETW_HOLDS(quiet(seen));
+}
+
 } // namespace ComplianceControl
 
 #endif

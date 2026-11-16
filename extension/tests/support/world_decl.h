@@ -27,7 +27,6 @@ private:
     struct IslandRow {
         godot::StringName owner;
         godot::Vector<godot::StringName> members;
-        godot::Vector<godot::StringName> simulated;
         int reconcile = 0;
     };
 
@@ -38,8 +37,14 @@ private:
     bool wants_lagcomp = false;
     int clock_tickrate = 30;
     int clock_display_offset = 3;
+    int clock_send_rate = 0;
 
 public:
+    WorldDecl &sending(int p_send_rate) {
+        clock_send_rate = p_send_rate;
+        return *this;
+    }
+
     WorldDecl &clocked(int p_tickrate = 30, int p_display_offset = 3) {
         wants_clock = true;
         clock_tickrate = p_tickrate;
@@ -97,12 +102,6 @@ public:
         row.members = p_members;
         row.reconcile = int(p_reconcile);
         islands.push_back(row);
-        return *this;
-    }
-
-    WorldDecl &simulating(const godot::StringName &p_member) {
-        REQUIRE_MESSAGE(!islands.is_empty(), "fidelity needs an island");
-        islands.write[islands.size() - 1].simulated.push_back(p_member);
         return *this;
     }
 

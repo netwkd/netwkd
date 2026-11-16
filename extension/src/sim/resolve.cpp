@@ -41,7 +41,9 @@ Mode resolve(const Facts &p_facts) {
     if (closed) {
         return Mode::PROXY;
     }
-    if (p_facts.replicas == Replicas::ACTIVE || p_facts.selection_count > 0) {
+    const bool runs_unselected
+        = p_facts.remote_mode == RemoteMode::ACTIVE && !p_facts.predicted;
+    if (runs_unselected || p_facts.selection_count > 0) {
         return Mode::ACTIVE;
     }
     return Mode::PROXY;

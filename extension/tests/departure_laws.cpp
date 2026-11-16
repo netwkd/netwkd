@@ -20,6 +20,7 @@ using netw::NetwMultiplayer;
 const char *BODY_ID = "departure_body";
 
 constexpr int SETTLE_PUMPS = 8;
+constexpr int ECHO_PUMPS = 12;
 constexpr int REPAIR_PUMPS = 16;
 constexpr int WATCH_PUMPS = 30;
 
@@ -114,7 +115,7 @@ struct Streaming {
 
     bool streams() {
         rig.clear_refused_sends();
-        stream(4);
+        stream(ECHO_PUMPS);
         return rig.delivered_sends_at_server() > 0;
     }
 

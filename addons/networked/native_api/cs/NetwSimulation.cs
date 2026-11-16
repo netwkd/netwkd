@@ -19,7 +19,7 @@ namespace Networked;
 /// {
 ///     var entity = Netw.ConfigureEntity(this);
 ///     entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
-///     entity.Simulation.Replicas = NetwSimulation.ReplicasEnum.Active;
+///     entity.Simulation.RemoteMode = NetwSimulation.RemoteModeEnum.Active;
 ///     entity.Simulation.NetworkProcess = Callable.From&lt;double, long, bool&gt;(NetworkProcess);
 /// }
 ///
@@ -36,22 +36,10 @@ namespace Networked;
 /// Other entities stay <see cref="NetwSimulation.ModeEnum.None"/>. <b>Modes</b>
 /// The peer writing replicated state runs
 /// <see cref="NetwSimulation.ModeEnum.Authority"/>. A predicting client runs
-/// <see cref="NetwSimulation.ModeEnum.Predict"/>. Every other copy is a frozen
-/// <see cref="NetwSimulation.ModeEnum.Proxy"/>, unless
-/// <see cref="NetwSimulation.Replicas"/> or a selection makes it
-/// <see cref="NetwSimulation.ModeEnum.Active"/>. <b>Selection</b> While this
-/// entity runs here as <see cref="NetwSimulation.ModeEnum.Authority"/> or
-/// <see cref="NetwSimulation.ModeEnum.Predict"/>, it can pick other entities to
-/// run here as <see cref="NetwSimulation.ModeEnum.Active"/>. A predicted entity
-/// that declares no selection picks every simulated entity this peer holds in
-/// its <see cref="NetwInterestLayer"/> layers.
-/// <see cref="NetwSimulation.Simulate"/> names one more,
-/// <see cref="NetwSimulation.SimulateAll"/> limits automatic selection to one
-/// layer, and <see cref="NetwSimulation.SimulateNone"/> drops it.
-/// <code>
-/// func _ready() -&gt; void:
-///     entity.simulation.simulate(ball)
-/// </code>
+/// <see cref="NetwSimulation.ModeEnum.Predict"/>. Every other copy is
+/// <see cref="NetwSimulation.ModeEnum.Proxy"/> or
+/// <see cref="NetwSimulation.ModeEnum.Active"/>, as
+/// <see cref="NetwSimulation.RemoteMode"/> says.
 /// </para>
 /// </remarks>
 public sealed class NetwSimulation : NetwRefCounted
@@ -129,21 +117,24 @@ public sealed class NetwSimulation : NetwRefCounted
         Auto = 3,
     }
 
-    public enum ReplicasEnum : long
+    public enum RemoteModeEnum : long
     {
         /// <summary>
-        /// Copies whose state comes from another peer are
-        /// <see cref="NetwSimulation.ModeEnum.Proxy"/>, unless a selection
-        /// makes them active.
+        /// The copy is <see cref="NetwSimulation.ModeEnum.Active"/> while this
+        /// peer predicts an entity with
+        /// <see cref="NetwSimulation.PhysicsDriven"/> that shares a
+        /// <see cref="NetwInterestLayer"/> with it, and
+        /// <see cref="NetwSimulation.ModeEnum.Proxy"/> otherwise.
         /// </summary>
-        Proxy = 0,
+        Auto = 0,
         /// <summary>
-        /// Copies whose state comes from another peer are
-        /// <see cref="NetwSimulation.ModeEnum.Active"/>. On an entity that is
-        /// not predicted, a sample that matches the copy is not written, so a
-        /// resting copy can sleep.
+        /// The copy is <see cref="NetwSimulation.ModeEnum.Active"/>.
         /// </summary>
         Active = 1,
+        /// <summary>
+        /// The copy is <see cref="NetwSimulation.ModeEnum.Proxy"/>.
+        /// </summary>
+        Proxy = 2,
     }
 
     public enum RestoreEnum : long
@@ -256,30 +247,30 @@ public sealed class NetwSimulation : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetReplicas =
-        NetwApi.MethodBind("NetwSimulation", "get_replicas", 4160416684UL);
+    private static readonly IntPtr _bindGetRemoteMode =
+        NetwApi.MethodBind("NetwSimulation", "get_remote_mode", 1676356006UL);
 
-    private static readonly IntPtr _bindSetReplicas =
-        NetwApi.MethodBind("NetwSimulation", "set_replicas", 3330814503UL);
+    private static readonly IntPtr _bindSetRemoteMode =
+        NetwApi.MethodBind("NetwSimulation", "set_remote_mode", 2098865915UL);
 
     /// <summary>
-    /// How this peer simulates copies whose state it receives from another
-    /// peer. It can change at any time.
+    /// Whether a copy whose state comes from another peer runs here or is
+    /// interpolated. It can change at any time.
     /// </summary>
-    public NetwSimulation.ReplicasEnum Replicas
+    public NetwSimulation.RemoteModeEnum RemoteMode
     {
         get
         {
             long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetReplicas, Checked, ref answered);
-            return (NetwSimulation.ReplicasEnum)answered;
+            NetwThunks.Ptrcall0_Long(_bindGetRemoteMode, Checked, ref answered);
+            return (NetwSimulation.RemoteModeEnum)answered;
         }
         set
         {
             long slot0 = (long)value;
             long discarded = default;
             NetwThunks.Ptrcall1_Long_Long(
-                _bindSetReplicas,
+                _bindSetRemoteMode,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -555,96 +546,5 @@ public sealed class NetwSimulation : NetwRefCounted
             NetwThunks.Ptrcall0_Long(_bindGetMode, Checked, ref answered);
             return (NetwSimulation.ModeEnum)answered;
         }
-    }
-
-    private static readonly IntPtr _bindGetSelected =
-        NetwApi.MethodBind("NetwSimulation", "get_selected", 3995934104UL);
-
-    /// <summary>
-    /// The entities this entity selects on this peer right now.
-    /// </summary>
-    public NetwEntity[] Selected
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetSelected, Checked, ref answered);
-            NetwEntity[] result =
-                NetwApi.Elements(
-                    VariantUtils.ConvertToArray(answered),
-                    NetwEntity.From);
-            answered.Dispose();
-            return result;
-        }
-    }
-
-    private static readonly IntPtr _bindSimulate =
-        NetwApi.MethodBind("NetwSimulation", "simulate", 3949104711UL);
-
-    /// <summary>
-    /// Selects <paramref name="entity"/>, so it runs here as
-    /// <see cref="NetwSimulation.ModeEnum.Active"/> while this entity runs here
-    /// as <see cref="NetwSimulation.ModeEnum.Authority"/> or
-    /// <see cref="NetwSimulation.ModeEnum.Predict"/>. An entity in another
-    /// scene is refused with an error.
-    /// </summary>
-    public void Simulate(NetwEntity entity)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindSimulate,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindForget =
-        NetwApi.MethodBind("NetwSimulation", "forget", 3949104711UL);
-
-    /// <summary>
-    /// Withdraws the selection <see cref="NetwSimulation.Simulate"/> made for
-    /// <paramref name="entity"/>. Automatic selection may still include it.
-    /// </summary>
-    public void Forget(NetwEntity entity)
-    {
-        IntPtr slot0 = entity?.Native ?? IntPtr.Zero;
-        long discarded = default;
-        NetwThunks.Ptrcall1_IntPtr_Long(
-            _bindForget,
-            Checked,
-            in slot0,
-            ref discarded);
-    }
-
-    private static readonly IntPtr _bindSimulateAll =
-        NetwApi.MethodBind("NetwSimulation", "simulate_all", 3323268493UL);
-
-    /// <summary>
-    /// Selects every entity this peer holds in <paramref name="layer"/>. An
-    /// empty <paramref name="layer"/> uses the <see cref="NetwInterestLayer"/>
-    /// layers this entity is in.
-    /// </summary>
-    public void SimulateAll(StringName layer = null)
-    {
-        layer ??= new StringName("");
-        godot_variant slot0 = VariantUtils.CreateFromStringName(layer);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindSimulateAll, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        answered.Dispose();
-    }
-
-    private static readonly IntPtr _bindSimulateNone =
-        NetwApi.MethodBind("NetwSimulation", "simulate_none", 3218959716UL);
-
-    /// <summary>
-    /// Stops automatic selection. Entities named with
-    /// <see cref="NetwSimulation.Simulate"/> stay selected.
-    /// </summary>
-    public void SimulateNone()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindSimulateNone, Checked, ref discarded);
     }
 }

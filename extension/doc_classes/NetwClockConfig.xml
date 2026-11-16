@@ -27,6 +27,13 @@
 				Sets [member use_physics_interpolation], whether [member NetwClock.tick_factor] follows Godot physics interpolation.
 			</description>
 		</method>
+		<method name="sends_per_second">
+			<return type="NetwClockConfig" />
+			<param index="0" name="send_rate" type="int" />
+			<description>
+				Sets [member send_rate], how many times a second the session sends.
+			</description>
+		</method>
 		<method name="sync">
 			<return type="NetwClockConfig" />
 			<param index="0" name="sync_mode" type="int" enum="NetwClock.SyncMode" />
@@ -64,8 +71,8 @@
 		<member name="panic_snap_threshold" type="int" setter="set_panic_snap_threshold" getter="get_panic_snap_threshold">
 			Ticks of difference from the server past which the clock snaps, even with [constant NetwClock.SYNC_MODE_STRETCH].
 		</member>
-		<member name="ping_interval" type="float" setter="set_ping_interval" getter="get_ping_interval">
-			Seconds between pings to the server. The clock pings five times slower once the round trip varies by less than half a tick.
+		<member name="send_rate" type="int" setter="set_send_rate" getter="get_send_rate">
+			How many times a second the session sends. [code]0[/code] sends on every tick. Any other value must divide [member tickrate] and send at least every 16 ticks.
 		</member>
 		<member name="stall_threshold" type="float" setter="set_stall_threshold" getter="get_stall_threshold">
 			Seconds. A longer frame is treated as a hitch and skipped.

@@ -357,6 +357,13 @@ public:
 
     void close_route(int64_t p_route);
 
+    void restate(
+        uint64_t p_owner,
+        int p_peer,
+        int64_t p_tick,
+        int64_t p_now_ms
+    );
+
     void park_tenures(int64_t p_route, uint64_t p_tenure);
 
     void close_anchors(int64_t p_route, uint64_t p_anchor, uint64_t p_author);

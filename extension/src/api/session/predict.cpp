@@ -96,8 +96,7 @@ void NetwMultiplayer::predict_relay_subscribe(
         predict::RelayBook::request_bytes(p_subscribed),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -982,7 +981,8 @@ void NetwMultiplayer::predict_receive_relay_request_carrier(
 void NetwMultiplayer::predict_relay_command_frame(
     const Ref<NetwEntity> &p_entity,
     const PackedByteArray &p_payload,
-    int64_t p_author
+    int64_t p_author,
+    wire::Delivery p_delivery
 ) {
     if (!is_host() || p_entity.is_null()) {
         return;
@@ -1001,8 +1001,7 @@ void NetwMultiplayer::predict_relay_command_frame(
         );
         return;
     }
-    ReplicationCore *plane = (get_replication_plane());
-    if (plane == nullptr) {
+    if (get_replication_plane() == nullptr) {
         return;
     }
     const int64_t channel = declared_channel("PREDICT_RELAY");
@@ -1011,7 +1010,7 @@ void NetwMultiplayer::predict_relay_command_frame(
         if (peer == p_author || !interest_admits(handle, peer)) {
             continue;
         }
-        plane->send_to(
+        send_to(
             peer,
             route,
             channel,
@@ -1019,7 +1018,7 @@ void NetwMultiplayer::predict_relay_command_frame(
             false,
             0,
             String(),
-            true
+            p_delivery
         );
     }
 }
@@ -1117,8 +1116,7 @@ void NetwMultiplayer::effect_deny_action(
             session::frame_write(session::DenyKey{p_key}),
             true,
             0,
-            String(),
-            false
+            String()
         );
         return;
     }
@@ -1154,8 +1152,7 @@ void NetwMultiplayer::effect_confirm_action(
         session::frame_write(session::ConfirmKey{p_key}),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 

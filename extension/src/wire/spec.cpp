@@ -59,8 +59,12 @@ const char *delivery_name(Delivery p_value) {
     switch (p_value) {
         case Delivery::IMMEDIATE:
             return "IMMEDIATE";
-        case Delivery::FITTED:
-            return "FITTED";
+        case Delivery::TICK:
+            return "TICK";
+        case Delivery::RIDE:
+            return "RIDE";
+        case Delivery::WAIT:
+            return "WAIT";
     }
     return "?";
 }

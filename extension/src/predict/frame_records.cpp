@@ -65,6 +65,22 @@ int64_t CommandFrameRecord::ack_of_acks() const {
     return frame.ack_of_acks;
 }
 
+void CommandFrameRecord::set_asks_detail(bool p_asks) {
+    frame.asks_detail = p_asks;
+}
+
+bool CommandFrameRecord::asks_detail() const {
+    return frame.asks_detail;
+}
+
+void CommandFrameRecord::set_hold(int64_t p_transitions) {
+    frame.hold = CLAMP(p_transitions, int64_t(0), COMMAND_HOLD_MAX);
+}
+
+int64_t CommandFrameRecord::hold() const {
+    return frame.hold;
+}
+
 bool CommandFrameRecord::append_transition(
     int64_t p_index,
     int64_t p_label,

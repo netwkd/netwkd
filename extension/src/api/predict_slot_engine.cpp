@@ -6,7 +6,6 @@
 #include "godot/class_db.hpp"
 #include "godot/engine.hpp"
 #include "godot/math.hpp"
-#include "godot/os.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_stats.hpp"
@@ -46,11 +45,6 @@ const GameCall SIMULATION_STEP
 constexpr int ARRIVAL_BUCKET_MAX = NetwPredictStats::ARRIVAL_BUCKETS - 1;
 constexpr int REPLAY_DEPTH_BUCKET_MAX
     = NetwPredictStats::REPLAY_DEPTH_BUCKETS - 1;
-
-const String &env_raw_fingerprints() {
-    static const String name("NETW_PREDICT_RAW_FP");
-    return name;
-}
 
 const Dictionary &no_sample() {
     static const Dictionary empty;
@@ -947,9 +941,7 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
         slot,
         was_wired,
         same_stream,
-        !OS::get_singleton()
-             ->get_environment(env_raw_fingerprints())
-             .is_empty(),
+        pool->gathers_owner_evidence(),
         pool->bound_input(slot)
     );
     sync_episode();
@@ -1087,7 +1079,8 @@ int NetwPredictSlotEngine::pool_island() const {
     const sim::Row *row = session != nullptr && entity.is_valid()
         ? books->sims->row_of(entity->get_rid_handle())
         : nullptr;
-    const bool chosen = row != nullptr && row->choice.declared(true);
+    const bool chosen = session != nullptr && entity.is_valid()
+        && session->sim_chooses(entity->get_rid_handle());
     const bool selected = row != nullptr && row->selected_by.count() > 0
         && !sim::leads(row->mode);
     if (chosen || selected) {
@@ -2015,9 +2008,20 @@ void NetwPredictSlotEngine::consume_step(
     if (pool->next_input_tick_of(slot) >= 0) {
         resync_if_stranded();
         const int depth = int(queued_span());
-        const int buffer = std::max(0, decl->input_buffer_ticks);
+        const int buffer = pool->input_buffer(decl->input_buffer_ticks);
         int action = consume_action(depth, buffer);
-        if (action == NetwPrediction::CONSUME_ACTION_REPLAY) {
+        const bool granted = action == NetwPrediction::CONSUME_ACTION_STARVED
+            && pool->holds_input(slot);
+        const bool holds = granted
+            && pool->next_input_tick_of(slot) + buffer
+                    + pool->command_window(slot)
+                <= p_server_tick;
+        if (holds) {
+            action = NetwPrediction::CONSUME_ACTION_REPLAY;
+        } else if (granted) {
+            action = NetwPrediction::CONSUME_ACTION_HOLD;
+            hold_behind = std::min(hold_behind + 1, HOLD_BEHIND_MAX);
+        } else if (action == NetwPrediction::CONSUME_ACTION_REPLAY) {
             consume_primed = true;
         } else if (action == NetwPrediction::CONSUME_ACTION_STARVED) {
             consume_primed = false;
@@ -2027,8 +2031,9 @@ void NetwPredictSlotEngine::consume_step(
         pool->report_consume(slot, depth, buffer);
         switch (action) {
             case NetwPrediction::CONSUME_ACTION_REPLAY:
-                consume_one(p_delta);
-                consume_backlog(p_delta, buffer);
+                consume_one(p_delta, holds);
+                consume_backlog(p_delta, buffer, holds ? 0 : hold_behind);
+                hold_behind = holds ? hold_behind : 0;
                 break;
             case NetwPrediction::CONSUME_ACTION_HOLD:
                 stats->set_int_fact(
@@ -2066,7 +2071,9 @@ void NetwPredictSlotEngine::consume_step(
     const PropertyBindingPtr state = state_binding();
     if (state != nullptr) {
         state->set_authored_tick(p_server_tick);
-        state->set_reconcile_ack(ack_advanced() ? ack() : -1);
+        if (ack_advanced() || pool->sent_last_tick()) {
+            state->set_reconcile_ack(ack_advanced() ? ack() : -1);
+        }
     } else {
         NETW_TRACE(
             sys::PREDICTION,
@@ -2233,7 +2240,7 @@ void NetwPredictSlotEngine::resync_if_stranded() {
     pool->resync_input_if_stranded(
         native_slot(),
         decl->max_input_lag_ticks,
-        decl->input_buffer_ticks
+        pool->input_buffer(decl->input_buffer_ticks)
     );
 }
 
@@ -2241,12 +2248,16 @@ int64_t NetwPredictSlotEngine::queued_span() const {
     return pool->queued_span(native_slot());
 }
 
-void NetwPredictSlotEngine::consume_one(double p_delta) {
-    pool->consume_one(native_slot(), p_delta);
+void NetwPredictSlotEngine::consume_one(double p_delta, bool p_holds) {
+    pool->consume_one(native_slot(), p_delta, p_holds);
 }
 
-void NetwPredictSlotEngine::consume_backlog(double p_delta, int p_buffer) {
-    const int ceiling = decl->max_inputs_per_tick;
+void NetwPredictSlotEngine::consume_backlog(
+    double p_delta,
+    int p_buffer,
+    int p_behind
+) {
+    const int ceiling = decl->max_inputs_per_tick + p_behind;
     for (int ran = 1; ran < ceiling; ++ran) {
         const int depth = int(queued_span());
         if (consume_action(depth, p_buffer)
@@ -2254,7 +2265,7 @@ void NetwPredictSlotEngine::consume_backlog(double p_delta, int p_buffer) {
             return;
         }
         finalize_recorded_state();
-        consume_one(p_delta);
+        consume_one(p_delta, false);
     }
 }
 

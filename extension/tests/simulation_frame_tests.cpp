@@ -38,7 +38,7 @@ class Puck extends RigidBody2D:
 		hull.shape = RectangleShape2D.new()
 		add_child(hull)
 		var entity := Netw.configure_entity(self)
-		entity.simulation.replicas = NetwSimulation.REPLICAS_PROXY
+		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_PROXY
 		Netw.configure_property(self, &"position").broadcast()
 
 
@@ -145,7 +145,8 @@ class Car extends Counter:
 			Netw.configure_property(self, property).broadcast()
 
 	func activate() -> void:
-		NetwEntity.of(self).simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		NetwEntity.of(self).simulation.remote_mode = (
+				NetwSimulation.REMOTE_MODE_ACTIVE)
 
 	func _network_process(_delta: float, tick: int, is_fresh: bool) -> void:
 		count(tick, is_fresh)
@@ -205,7 +206,7 @@ class Ball extends RigidBody3D:
 		hull.shape = SphereShape3D.new()
 		add_child(hull)
 		var entity := Netw.configure_entity(self)
-		entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 		entity.simulation.physics_driven = false
 		Netw.configure_property(self, &"position").state().heartbeat(30)
 		Netw.configure_property(self, &"linear_velocity").state()
@@ -236,7 +237,7 @@ class Pusher extends RigidBody3D:
 		var entity := Netw.configure_entity(self)
 		entity.authority = NetwEntity.AUTHORITY_CONTROLLER
 		entity.transfer = NetwEntity.TRANSFER_IMMEDIATE
-		entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 		entity.simulation.claim_on_contact = true
 		Netw.configure_property(self, &"position").broadcast()
 
@@ -271,7 +272,7 @@ class Tug extends Node3D:
 		entity.authority = NetwEntity.AUTHORITY_CONTROLLER
 		entity.transfer = NetwEntity.TRANSFER_IMMEDIATE
 		entity.simulation.bodies = [^"Sphere"]
-		entity.simulation.replicas = NetwSimulation.REPLICAS_ACTIVE
+		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
 		entity.simulation.claim_on_contact = true
 		Netw.configure_property(self, &"sphere_position").broadcast()
 

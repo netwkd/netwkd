@@ -34,6 +34,10 @@ public:
     int epoch() const;
     void set_ack_of_acks(int64_t p_transition);
     int64_t ack_of_acks() const;
+    void set_asks_detail(bool p_asks);
+    bool asks_detail() const;
+    void set_hold(int64_t p_transitions);
+    int64_t hold() const;
 
     bool append_transition(int64_t p_index, int64_t p_label, bool p_fresh);
     bool append_values(const godot::LocalVector<godot::Variant> &p_values);

@@ -83,6 +83,7 @@ void ClockEngine::Stats::clear() {
     }
 
 NETW_CLOCK_ACCESSOR(int, tickrate, tickrate)
+NETW_CLOCK_ACCESSOR(int, send_interval, send_interval)
 NETW_CLOCK_ACCESSOR(int, max_ticks_per_frame, max_ticks_per_frame)
 NETW_CLOCK_ACCESSOR(double, stall_threshold, stall_threshold)
 NETW_CLOCK_ACCESSOR(int, panic_snap_threshold, panic_snap_threshold)
@@ -199,9 +200,10 @@ int ClockEngine::recommended_display_offset() const {
         return display_offset;
     }
     return int(std::ceil(
-        (one_way_latency() + stats.jitter * jitter_multiplier)
-        * double(tickrate)
-    ));
+               (one_way_latency() + stats.jitter * jitter_multiplier)
+               * double(tickrate)
+           ))
+        + send_interval - 1;
 }
 
 bool ClockEngine::is_stable() const {
@@ -250,6 +252,7 @@ void ClockEngine::emit_tick() {
     NETW_ZONE_NC("Tick", colors::CLOCK);
     NETW_ZONE_VALUE(tick);
     const double step = ticktime();
+    opened_tick = tick;
     announce(EVENT_BEFORE_TICK, 2, step, tick);
     announce(EVENT_ON_TICK, 2, step, tick);
     announce(EVENT_AFTER_TICK, 2, step, tick);
@@ -338,6 +341,23 @@ bool ClockEngine::closed_a_tick() const {
 
 int32_t ClockEngine::get_send_tick() const {
     return closing_tick != NO_CLOSING_TICK ? closing_tick : tick;
+}
+
+int ClockEngine::send_rate() const {
+    return tickrate / std::max(1, send_interval);
+}
+
+bool ClockEngine::is_send_tick() const {
+    const int64_t waited = int64_t(opened_tick) - int64_t(sent_tick);
+    return send_interval <= 1 || waited <= 0 || waited >= send_interval;
+}
+
+bool ClockEngine::sent_last_tick() const {
+    return send_interval <= 1 || int64_t(opened_tick) - int64_t(sent_tick) <= 1;
+}
+
+void ClockEngine::mark_sent() {
+    sent_tick = opened_tick;
 }
 
 void ClockEngine::set_manual_tick(bool value) {
@@ -444,7 +464,9 @@ Dictionary ClockEngine::handle_pong(
     }
 
     const double lead
-        = apply_lead ? stats.avg * 0.5 / ticktime() + lead_ticks : 0.0;
+        = apply_lead ? stats.avg * 0.5 / ticktime() + lead_ticks
+                + double(send_interval - 1)
+                     : 0.0;
     const double target
         = double(server_tick_at_pong) + server_tick_phase + lead;
     const int pre_calibrate_diff = int(std::lround(target)) - tick;
@@ -501,12 +523,14 @@ void ClockEngine::nudge_toward_estimate() {
     accumulator += divergence * step * stretch_nudge_factor;
 }
 
+bool ClockEngine::is_settled() const {
+    return int(stats.samples.size()) >= jitter_window && stats.is_stable
+        && stats.jitter < ticktime() * 0.5;
+}
+
 bool ClockEngine::consume_ping_due(double delta) {
     ping_timer += delta;
-    const bool settled = int(stats.samples.size()) >= jitter_window
-        && stats.is_stable && stats.jitter < ticktime() * 0.5;
-    const double due
-        = settled ? ping_interval * SETTLED_PING_STRETCH : ping_interval;
+    const double due = is_settled() ? SETTLED_PING_PERIOD : ping_interval;
     if (ping_timer >= due) {
         ping_timer = 0.0;
         return true;
@@ -516,6 +540,8 @@ bool ClockEngine::consume_ping_due(double delta) {
 
 void ClockEngine::clear() {
     tick = 0;
+    opened_tick = 0;
+    sent_tick = NEVER_SENT;
     is_synchronized = false;
     simulating = true;
     held = false;

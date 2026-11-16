@@ -122,7 +122,7 @@ struct Stand {
         NetwMultiplayer *session = core(p_client);
         netw::sim::Row &row = Internals::sim_row(session, rid(p_client));
         row.declaration.bodies.push_back(NodePath("Body"));
-        row.declaration.replicas = netw::sim::Replicas::ACTIVE;
+        row.declaration.remote_mode = netw::sim::RemoteMode::ACTIVE;
         row.declaration.restore = p_restore;
         session->sim_settle_body(NetwEntity::of(copy(p_client)));
     }

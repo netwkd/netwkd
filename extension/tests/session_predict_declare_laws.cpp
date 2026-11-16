@@ -37,13 +37,11 @@ enum Plant {
     PLANT_A_DECLARATION_THAT_NEVER_HAPPENED,
     PLANT_A_PARAM_WRITTEN_TO_ANOTHER_ENTITY,
     PLANT_AN_UNDECLARE_THAT_NEVER_HAPPENED,
-    PLANT_A_MEMBER_THE_SELECTION_NEVER_TOOK,
 };
 
 struct PredictScenario {
     String label;
     int64_t schedule = NetwSimulation::SCHEDULE_FRAME;
-    bool selects_another = false;
     bool installs_callbacks = false;
 };
 
@@ -60,21 +58,6 @@ PredictScenario a_declaration_with_callbacks() {
     return scenario;
 }
 
-PredictScenario a_selection_of_two() {
-    PredictScenario scenario;
-    scenario.label = "a-selection-of-two";
-    scenario.selects_another = true;
-    return scenario;
-}
-
-PredictScenario a_selection_with_callbacks() {
-    PredictScenario scenario;
-    scenario.label = "a-selection-with-callbacks";
-    scenario.selects_another = true;
-    scenario.installs_callbacks = true;
-    return scenario;
-}
-
 class PredictRun {
     PredictScenario declared;
     Plant planted = PLANT_NONE;
@@ -83,7 +66,6 @@ class PredictRun {
     bool engine_after_undeclare = true;
     Variant schedule_read;
     bool step_is_the_one_installed = false;
-    bool selection_holds_the_other = false;
 
 public:
     PredictRun(const PredictScenario &p_scenario, Plant p_plant = PLANT_NONE)
@@ -98,16 +80,13 @@ public:
         Node3D *other_body = memnew(Node3D);
         netw::gd::scene_root()->add_child(other_body);
         const Ref<NetwEntity> wrapper = NetwEntity::ensure(body);
-        const Ref<NetwEntity> other = NetwEntity::ensure(other_body);
+        NetwEntity::ensure(other_body);
         const RID entity = Internals::entity_of(session, body);
         const RID other_entity = Internals::entity_of(session, other_body);
 
         declare_verdict = planted == PLANT_A_DECLARATION_THAT_NEVER_HAPPENED
             ? OK
             : session->predict_declare(entity);
-        if (declared.selects_another) {
-            session->predict_declare(other_entity);
-        }
         engine_after_declare = session->predict_is_declared(entity);
 
         session->simulation_set_param(
@@ -126,28 +105,12 @@ public:
             session->simulation_set_network_process_callback(entity, step);
         }
 
-        const Ref<NetwSimulation> simulation
-            = session->simulation_handle(entity);
-        if (declared.selects_another
-            && planted != PLANT_A_MEMBER_THE_SELECTION_NEVER_TOOK) {
-            simulation->simulate(other);
-        }
-
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         if (handle.is_valid()) {
             step_is_the_one_installed
                 = NetwMultiplayer::sim_step_of(handle->get_entity().ptr())
                 == step;
         }
-        const netw::sim::Decl *chose
-            = netw_test::Internals::sim_find_declaration(
-                session->entity_get_view(entity).ptr()
-            );
-        const netw::sim::Named *named
-            = chose != nullptr ? chose->choice.named_of(other_entity) : nullptr;
-        selection_holds_the_other
-            = named != nullptr && named->pick == netw::sim::Pick::CHOSEN;
-
         if (planted != PLANT_AN_UNDECLARE_THAT_NEVER_HAPPENED) {
             session->predict_undeclare(entity);
         }
@@ -182,9 +145,6 @@ public:
         return step_is_the_one_installed;
     }
 
-    bool selection_member() const {
-        return selection_holds_the_other;
-    }
 };
 
 typedef LawRowFor<PredictRun> PredictLaw;
@@ -236,16 +196,6 @@ LawVerdict law_addressed(const PredictRun &p_run) {
     return law_held();
 }
 
-LawVerdict law_selecting(const PredictRun &p_run) {
-    if (!p_run.scenario().selects_another) {
-        return law_held();
-    }
-    if (!p_run.selection_member()) {
-        return law_broken("the selection does not hold the entity it named");
-    }
-    return law_held();
-}
-
 const PredictLaw L_DECLARED = {
     "declared",
     "a declared entity has an engine addressed by its own RID",
@@ -270,22 +220,13 @@ const PredictLaw L_ADDRESSED = {
     &law_addressed,
 };
 
-const PredictLaw L_SELECTING = {
-    "selecting",
-    "a selection made on the handle of an entity named by RID holds the "
-    "entity it was given",
-    &law_selecting,
-};
-
 const PredictLaw LAWS[]
-    = {L_DECLARED, L_UNDECLARED, L_PARAMETERISED, L_ADDRESSED, L_SELECTING};
+    = {L_DECLARED, L_UNDECLARED, L_PARAMETERISED, L_ADDRESSED};
 
 TEST_CASE("[Networked][Session][SceneTree] the flat prediction laws hold") {
     const PredictScenario CORPUS[] = {
         a_bare_declaration(),
         a_declaration_with_callbacks(),
-        a_selection_of_two(),
-        a_selection_with_callbacks(),
     };
     for (const PredictScenario &scenario : CORPUS) {
         const PredictRun run(scenario);
@@ -324,16 +265,6 @@ TEST_CASE(
     const PredictRun run(scenario, PLANT_AN_UNDECLARE_THAT_NEVER_HAPPENED);
     NETW_CELL(L_UNDECLARED, scenario);
     NETW_LAW_BREAKS(L_UNDECLARED, run);
-}
-
-TEST_CASE(
-    "[Networked][Session][SceneTree] a member the selection never took reds "
-    "selecting"
-) {
-    const PredictScenario scenario = a_selection_of_two();
-    const PredictRun run(scenario, PLANT_A_MEMBER_THE_SELECTION_NEVER_TOOK);
-    NETW_CELL(L_SELECTING, scenario);
-    NETW_LAW_BREAKS(L_SELECTING, run);
 }
 
 struct ReplayScenario {

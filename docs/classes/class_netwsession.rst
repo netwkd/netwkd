@@ -150,6 +150,8 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwTable<class_NetwTable>`                     | :ref:`table<class_NetwSession_method_table>`\ (\ name\: :godot:`StringName`\ ) |const|                                                                                                |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Dictionary`                                   | :ref:`traffic<class_NetwSession_method_traffic>`\ (\ peer\: :godot:`int` = 0\ ) |const|                                                                                               |
+   +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`transfer_server<class_NetwSession_method_transfer_server>`\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`\ )                                                                  |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`unpause<class_NetwSession_method_unpause>`\ (\ )                                                                                                                                |
@@ -1054,6 +1056,34 @@ Leaves like :ref:`leave()<class_NetwSession_method_leave>`, and :ref:`player_lef
 :ref:`NetwTable<class_NetwTable>` **table**\ (\ name\: :godot:`StringName`\ ) |const| :ref:`🔗<class_NetwSession_method_table>`
 
 The table of the schema declared as ``name`` with :ref:`Netw.configure_schema()<class_Netw_method_configure_schema>`, or ``null`` when there is none.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwSession_method_traffic:
+
+.. rst-class:: classref-method
+
+:godot:`Dictionary` **traffic**\ (\ peer\: :godot:`int` = 0\ ) |const| :ref:`🔗<class_NetwSession_method_traffic>`
+
+What the session sent to ``peer`` and received from it over the last second, in bytes a second. ``0`` counts every peer.
+
+.. code:: text
+
+    Dictionary
+    ┠╴sent                Dictionary  bytes a second sent, by cause
+    ┃ ┠╴state             float       state and broadcast properties
+    ┃ ┠╴input             float       input properties
+    ┃ ┠╴calls             float       RPCs, signals and actions
+    ┃ ┠╴spawns            float       spawns, despawns, control, scenes and joins
+    ┃ ┠╴upkeep            float       prediction acknowledgements and the clock
+    ┃ ┖╴headers           float       packet headers, an estimate for the transport
+    ┠╴received            Dictionary  the same causes, received
+    ┠╴sent_packets        float       packets a second sent
+    ┖╴received_packets    float       packets a second received
+
+\ Every packet costs ``headers`` before it carries anything, so sending fewer packets saves the most. A local session has no transport, so its ``headers`` count only the session's own packet header. The transport's own keepalive is not counted.
 
 .. rst-class:: classref-item-separator
 

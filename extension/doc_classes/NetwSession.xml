@@ -236,6 +236,27 @@
 				The table of the schema declared as [param name] with [method Netw.configure_schema], or [code]null[/code] when there is none.
 			</description>
 		</method>
+		<method name="traffic" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="peer" type="int" default="0" />
+			<description>
+				What the session sent to [param peer] and received from it over the last second, in bytes a second. [code]0[/code] counts every peer.
+				[codeblock lang=text]
+				Dictionary
+				┠╴sent                Dictionary  bytes a second sent, by cause
+				┃ ┠╴state             float       state and broadcast properties
+				┃ ┠╴input             float       input properties
+				┃ ┠╴calls             float       RPCs, signals and actions
+				┃ ┠╴spawns            float       spawns, despawns, control, scenes and joins
+				┃ ┠╴upkeep            float       prediction acknowledgements and the clock
+				┃ ┖╴headers           float       packet headers, an estimate for the transport
+				┠╴received            Dictionary  the same causes, received
+				┠╴sent_packets        float       packets a second sent
+				┖╴received_packets    float       packets a second received
+				[/codeblock]
+				Every packet costs [code]headers[/code] before it carries anything, so sending fewer packets saves the most. A local session has no transport, so its [code]headers[/code] count only the session's own packet header. The transport's own keepalive is not counted.
+			</description>
+		</method>
 		<method name="transfer_server">
 			<return type="int" enum="Error" />
 			<param index="0" name="player" type="NetwPlayer" />

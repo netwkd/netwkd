@@ -75,11 +75,13 @@ struct ClockPong {
     uint64_t origin = 0;
     uint64_t tick = 0;
     uint64_t phase = 0;
+    uint64_t wait = 0;
 
     static constexpr auto wire = netw::wire::describe(
         netw::wire::field<&ClockPong::origin>("origin", netw::wire::bits(32)),
         netw::wire::field<&ClockPong::tick>("tick", netw::wire::bits(32)),
-        netw::wire::field<&ClockPong::phase>("phase", netw::wire::bits(8))
+        netw::wire::field<&ClockPong::phase>("phase", netw::wire::bits(8)),
+        netw::wire::field<&ClockPong::wait>("wait", netw::wire::bits(16))
     );
 };
 

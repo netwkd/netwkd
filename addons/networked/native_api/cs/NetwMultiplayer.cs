@@ -579,10 +579,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         SyncMode = 1,
         /// <summary>
-        /// [float] seconds between pings.
-        /// </summary>
-        PingInterval = 2,
-        /// <summary>
         /// [int] most ticks run in one frame. Leftover time carries to the next
         /// frame.
         /// </summary>
@@ -769,10 +765,10 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         Schedule = 1,
         /// <summary>
-        /// <see cref="NetwSimulation.ReplicasEnum"/>.
-        /// <see cref="NetwSimulation.Replicas"/>.
+        /// <see cref="NetwSimulation.RemoteModeEnum"/>.
+        /// <see cref="NetwSimulation.RemoteMode"/>.
         /// </summary>
-        Replicas = 2,
+        RemoteMode = 2,
         /// <summary>
         /// <see cref="NetwSimulation.RestoreEnum"/>.
         /// <see cref="NetwSimulation.Restore"/>.
@@ -794,22 +790,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// [bool]. <see cref="NetwSimulation.PhysicsDriven"/>.
         /// </summary>
         PhysicsDriven = 7,
-    }
-
-    public enum SimPick : long
-    {
-        /// <summary>
-        /// Selects the entity or layer.
-        /// </summary>
-        Chosen = 0,
-        /// <summary>
-        /// Drops a selection made with
-        /// <see cref="NetwMultiplayer.SimPick.Chosen"/>. In
-        /// <see cref="NetwMultiplayer.SimulationSelectLayer"/> it clears every
-        /// layer pick whatever the layer, and also turns off the default
-        /// every-layer selection of a predicted entity.
-        /// </summary>
-        Forget = 1,
     }
 
     public enum Stat : long
@@ -3889,6 +3869,33 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
+    private static readonly IntPtr _bindSessionGetTraffic =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_get_traffic",
+            3485342025UL);
+
+    /// <summary>
+    /// Returns what the session sent to <paramref name="peer"/> and received
+    /// from it over the last second. <see cref="NetwSession.Traffic"/> lists
+    /// the keys.
+    /// </summary>
+    public Godot.Collections.Dictionary SessionGetTraffic(long peer)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindSessionGetTraffic,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        Godot.Collections.Dictionary result =
+            VariantUtils.ConvertToDictionary(answered);
+        answered.Dispose();
+        return result;
+    }
+
     private static readonly IntPtr _bindPeerSetBandwidth =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -6198,12 +6205,13 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <summary>
     /// Same as <see cref="SceneMultiplayer.SendBytes"/>. Returns
     /// <c>@GlobalScope.ERR_UNCONFIGURED</c> when there is no
-    /// <see cref="MultiplayerApi.MultiplayerPeer"/>. Networked reserves twelve
-    /// first bytes, <c>0x4E</c>, <c>0x56</c>, <c>0x57</c>, <c>0x58</c>,
-    /// <c>0x6E</c>, <c>0x76</c>, <c>0x77</c>, <c>0x78</c>, <c>0x8E</c>,
-    /// <c>0x96</c>, <c>0x97</c> and <c>0x98</c>. A packet that starts with one
-    /// of them never reaches <see cref="NetwMultiplayer.PeerPacket"/>, so give
-    /// a raw packet a first byte of your own.
+    /// <see cref="MultiplayerApi.MultiplayerPeer"/>. Networked reserves
+    /// thirteen first bytes, <c>0x4E</c>, <c>0x56</c>, <c>0x57</c>,
+    /// <c>0x58</c>, <c>0x6E</c>, <c>0x76</c>, <c>0x77</c>, <c>0x78</c>,
+    /// <c>0x8E</c>, <c>0x96</c>, <c>0x97</c>, <c>0x98</c> and <c>0xB8</c>. A
+    /// packet that starts with one of them never reaches
+    /// <see cref="NetwMultiplayer.PeerPacket"/>, so give a raw packet a first
+    /// byte of your own.
     /// </summary>
     public Error SendBytes(byte[] bytes, long id =
         0, MultiplayerPeer.TransferModeEnum mode =
@@ -6540,104 +6548,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
             in slot0,
             ref answered);
         return (NetwSimulation.ModeEnum)answered;
-    }
-
-    private static readonly IntPtr _bindSimulationSelect =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "simulation_select",
-            3013041894UL);
-
-    /// <summary>
-    /// Names <paramref name="other"/> as a body <paramref name="entity"/>
-    /// simulates with <see cref="NetwMultiplayer.SimPick.Chosen"/>, or drops
-    /// that name with <see cref="NetwMultiplayer.SimPick.Forget"/>. Both
-    /// entities must be live in the same scene to choose. The choice is kept
-    /// until it is forgotten, and
-    /// <see cref="NetwMultiplayer.SimulationGetSelected"/> shows what it
-    /// selects.
-    /// </summary>
-    public Error SimulationSelect(
-        Rid entity,
-        Rid other,
-        NetwMultiplayer.SimPick pick)
-    {
-        Rid slot0 = entity;
-        Rid slot1 = other;
-        long slot2 = (long)pick;
-        long answered = default;
-        NetwThunks.Ptrcall3_Rid_Rid_Long_Long(
-            _bindSimulationSelect,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        return (Error)answered;
-    }
-
-    private static readonly IntPtr _bindSimulationSelectLayer =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "simulation_select_layer",
-            3013041894UL);
-
-    /// <summary>
-    /// With <see cref="NetwMultiplayer.SimPick.Chosen"/>,
-    /// <paramref name="entity"/> simulates every entity it shares
-    /// <paramref name="layer"/> with, or every layer it is in when
-    /// <paramref name="layer"/> is an empty <see cref="Rid"/>. With
-    /// <see cref="NetwMultiplayer.SimPick.Forget"/>, <paramref name="layer"/>
-    /// is ignored and every layer pick is cleared. For a predicted entity, this
-    /// also turns off the default selection of every layer it is in, even
-    /// though that default was never made with
-    /// <see cref="NetwMultiplayer.SimPick.Chosen"/>. Entities named with
-    /// <see cref="NetwMultiplayer.SimulationSelect"/> stay selected. Returns
-    /// <c>@GlobalScope.ERR_INVALID_PARAMETER</c> when <paramref name="entity"/>
-    /// is not live or <paramref name="layer"/> is not in this session.
-    /// </summary>
-    public Error SimulationSelectLayer(
-        Rid entity,
-        Rid layer,
-        NetwMultiplayer.SimPick pick)
-    {
-        Rid slot0 = entity;
-        Rid slot1 = layer;
-        long slot2 = (long)pick;
-        long answered = default;
-        NetwThunks.Ptrcall3_Rid_Rid_Long_Long(
-            _bindSimulationSelectLayer,
-            Checked,
-            in slot0,
-            in slot1,
-            in slot2,
-            ref answered);
-        return (Error)answered;
-    }
-
-    private static readonly IntPtr _bindSimulationGetSelected =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "simulation_get_selected",
-            2670461153UL);
-
-    /// <summary>
-    /// Returns the entities <paramref name="entity"/> simulates on this peer
-    /// right now, the same set as <see cref="NetwSimulation.Selected"/>.
-    /// </summary>
-    public Godot.Collections.Array SimulationGetSelected(Rid entity)
-    {
-        godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindSimulationGetSelected,
-            Checked,
-            in slot0,
-            ref answered);
-        slot0.Dispose();
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
-        answered.Dispose();
-        return result;
     }
 
     private static readonly IntPtr _bindSimulationGetSchedule =

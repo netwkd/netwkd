@@ -108,7 +108,8 @@ struct Shot {
     explicit Shot(
         Declare p_declare = &declare_nothing,
         bool p_predicted = true,
-        const char *p_authority = "_server_action"
+        const char *p_authority = "_server_action",
+        int p_send_rate = 0
     )
         : rig(1) {
         rig.mount();
@@ -123,7 +124,7 @@ struct Shot {
             player.predicted(0.01);
         }
         WorldDecl world;
-        world.clocked(30, 3).player(player, 0);
+        world.clocked(30, 3).sending(p_send_rate).player(player, 0);
         rig.declare_world(world);
         owner = Object::cast_to<Carrier>(
             rig.node_of(rig.entity_of(StringName("P"), 0), 0)
@@ -343,6 +344,27 @@ LawVerdict aligned_runs_at_tick(const World &) {
         return law_broken(
             "ran at %d viewing %d for %d",
             int(shot.authority->executed_tick()),
+            int(shot.authority->viewed_tick()),
+            int(view)
+        );
+    }
+    return law_held();
+}
+
+LawVerdict aligned_runs_past_a_send(const World &) {
+    Shot shot(&declare_nothing, true, "_server_action", 3);
+    shot.authority->set_denies(false);
+    shot.rig.step_ticks(ANSWER_TICKS);
+    const int64_t view = shot.server_tick() + 9;
+    shot.owner->fire(view, NetwAction::TIMING_TICK_ALIGNED_STATE_READY);
+    shot.rig.step_ticks(ANSWER_TICKS);
+    if (shot.authority->requests() != 1 || shot.owner->denials() != 0
+        || shot.authority->viewed_tick() != view || shot.fallbacks() != 0) {
+        return law_broken(
+            "%d run(s), %d denial(s) and %d fallback(s), viewing %d for %d",
+            shot.authority->requests(),
+            shot.owner->denials(),
+            int(shot.fallbacks()),
             int(shot.authority->viewed_tick()),
             int(view)
         );
@@ -712,6 +734,10 @@ const Row ROWS[] = {
     {"a tick aligned shot three ticks ahead of the server",
      "the server runs it at that tick and not before",
      &aligned_runs_at_tick},
+    {"a state ready shot nine ticks ahead of the server while the session "
+     "sends on every tenth tick",
+     "the server runs it viewing that tick with no denial and no fallback",
+     &aligned_runs_past_a_send},
     {"an immediate shot six ticks ahead of the server",
      "the server runs it on arrival and still reads the asked tick",
      &immediate_runs_on_arrival},

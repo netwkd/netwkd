@@ -563,8 +563,7 @@ void NetwMultiplayer::transfer_readmit(int64_t p_survivor) {
         join_roster.roster_frame(p_survivor),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -722,8 +721,7 @@ void NetwMultiplayer::transfer_send_resync() {
             resync_outbox[resync_sent],
             true,
             0,
-            String(),
-            false
+            String()
         );
         resync_sent += 1;
         sent += 1;
@@ -815,8 +813,7 @@ void NetwMultiplayer::session_receive_resync(
                         stream.to_bytes(),
                         true,
                         0,
-                        String(),
-                        true
+                        String()
                     );
                 }
                 continue;

@@ -979,8 +979,7 @@ void NetwMultiplayer::scene_publish_viewers(const RID &p_scene) {
             payload,
             true,
             0,
-            String(),
-            false
+            String()
         );
     }
 }
@@ -1009,8 +1008,7 @@ void NetwMultiplayer::scene_send_viewers(const RID &p_scene, int64_t p_target) {
         payload,
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -1174,8 +1172,7 @@ bool NetwMultiplayer::scene_notify_released(
                payload,
                true,
                0,
-               String(),
-               false
+               String()
            )
         == OK;
 }

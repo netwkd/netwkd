@@ -12,9 +12,10 @@ enum class Mode : uint8_t {
     PROXY = 4,
 };
 
-enum class Replicas : uint8_t {
-    PROXY = 0,
+enum class RemoteMode : uint8_t {
+    AUTO = 0,
     ACTIVE = 1,
+    PROXY = 2,
 };
 
 struct Facts {
@@ -28,7 +29,7 @@ struct Facts {
     bool pending_claim_here = false;
     bool fallback_latched = false;
     bool delay_closed = false;
-    Replicas replicas = Replicas::PROXY;
+    RemoteMode remote_mode = RemoteMode::AUTO;
     uint32_t selection_count = 0;
 };
 

@@ -27,7 +27,16 @@ godot::StringName peer_class_of_type(const godot::Variant &p_type);
 
 class Transport {
 public:
+    static constexpr int64_t IPV4_HEADER_BYTES = 20;
+    static constexpr int64_t UDP_HEADER_BYTES = 8;
+    static constexpr int64_t UDP_PACKET_OVERHEAD
+        = IPV4_HEADER_BYTES + UDP_HEADER_BYTES;
+
     virtual ~Transport() = default;
+
+    virtual int64_t packet_overhead() const {
+        return UDP_PACKET_OVERHEAD;
+    }
 
     virtual godot::StringName peer_class() const = 0;
     virtual bool recognizes_peer(
@@ -76,6 +85,8 @@ public:
     );
 
     virtual void adopt(const godot::Ref<godot::MultiplayerPeer> &p_peer) {
+    }
+    virtual void peer_connected(int64_t p_peer) {
     }
     virtual void poll(double p_delta) {
     }

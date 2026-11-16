@@ -170,6 +170,7 @@ class LoopbackRig {
             REQUIRE(config.is_valid());
             config->set("tickrate", p_world.clock_tickrate);
             config->set("display_offset", p_world.clock_display_offset);
+            config->set("send_rate", p_world.clock_send_rate);
             NETW_CHECK_EQ(int(p_api->clock_initialize(config)), int(godot::OK));
             Internals::clock_engine(p_api).set_manual_tick(true);
         }
@@ -1265,13 +1266,6 @@ public:
             }
         }
         const godot::RID owner = entity_of(p_row.owner, p_client);
-        const godot::Ref<netw::NetwSimulation> selecting
-            = p_api->simulation_handle(owner);
-        for (const godot::StringName &member : p_row.simulated) {
-            selecting->simulate(
-                p_api->entity_get_view(entity_of(member, p_client))
-            );
-        }
         p_api->prediction_handle(owner)->set_rollback_together(
             p_row.reconcile == int(WorldDecl::JOINT)
         );

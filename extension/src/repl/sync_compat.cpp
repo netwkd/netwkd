@@ -927,8 +927,7 @@ void SyncCompat::pump() {
                         stock,
                         false,
                         0,
-                        String(),
-                        true
+                        String()
                     );
                     sync_frames_out += 1;
                 }
@@ -1014,8 +1013,7 @@ void SyncCompat::send_deltas(
             bytes,
             true,
             0,
-            String(),
-            true
+            String()
         );
         delta_frames_out += 1;
     }

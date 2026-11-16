@@ -133,26 +133,6 @@ void NetwClock::set_sync_mode(NetwClock::SyncMode p_mode) {
     api->clock_set_param(NetwMultiplayer::CLOCK_PARAM_SYNC_MODE, p_mode);
 }
 
-double NetwClock::get_ping_interval() const {
-    NetwMultiplayer *api = session();
-    if (api == nullptr) {
-        Ref<NetwClockConfig> defaults;
-        defaults.instantiate();
-        return defaults->get_ping_interval();
-    }
-    return double(
-        api->clock_get_param(NetwMultiplayer::CLOCK_PARAM_PING_INTERVAL)
-    );
-}
-
-void NetwClock::set_ping_interval(double p_seconds) {
-    NetwMultiplayer *api = session();
-    if (api == nullptr) {
-        return;
-    }
-    api->clock_set_param(NetwMultiplayer::CLOCK_PARAM_PING_INTERVAL, p_seconds);
-}
-
 void NetwClock::auto_configure_offset() {
     NetwMultiplayer *api = session();
     if (api == nullptr) {
@@ -301,19 +281,6 @@ void NetwClock::_bind_methods() {
         ),
         "set_sync_mode",
         "get_sync_mode"
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_ping_interval"),
-        &NetwClock::get_ping_interval
-    );
-    ClassDB::bind_method(
-        D_METHOD("set_ping_interval", "seconds"),
-        &NetwClock::set_ping_interval
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::FLOAT, "ping_interval"),
-        "set_ping_interval",
-        "get_ping_interval"
     );
 
     ClassDB::bind_method(D_METHOD("monitor", "monitor"), &NetwClock::monitor);

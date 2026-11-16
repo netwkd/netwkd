@@ -28,7 +28,7 @@ Description
         Netw.configure_property(self, &"move_dir").input()
         Netw.configure_property(self, &"aim_dir").broadcast()
 
-\ :ref:`volatile()<class_NetwPropertyConfig_method_volatile>`, :ref:`retained()<class_NetwPropertyConfig_method_retained>`, :ref:`correction_threshold()<class_NetwPropertyConfig_method_correction_threshold>` and :ref:`persisted()<class_NetwPropertyConfig_method_persisted>` apply to one property. :ref:`on_change()<class_NetwPropertyConfig_method_on_change>`, :ref:`heartbeat()<class_NetwPropertyConfig_method_heartbeat>`, :ref:`windowed()<class_NetwPropertyConfig_method_windowed>`, :ref:`audience()<class_NetwPropertyConfig_method_audience>` and :ref:`masked()<class_NetwPropertyConfig_method_masked>` apply to every property of the same kind on the script. Give them consistent values.
+\ :ref:`volatile()<class_NetwPropertyConfig_method_volatile>`, :ref:`retained()<class_NetwPropertyConfig_method_retained>`, :ref:`correction_threshold()<class_NetwPropertyConfig_method_correction_threshold>` and :ref:`persisted()<class_NetwPropertyConfig_method_persisted>` apply to one property. :ref:`heartbeat()<class_NetwPropertyConfig_method_heartbeat>`, :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` and :ref:`audience()<class_NetwPropertyConfig_method_audience>` apply to every property of the same kind on the script. Give them consistent values.
 
 \ :ref:`NetwMemberConfig.interpolate()<class_NetwMemberConfig_method_interpolate>` smooths received values. It returns a :ref:`NetwMemberConfig<class_NetwMemberConfig>`, so chain it after the methods of this class.
 
@@ -68,10 +68,6 @@ Properties
    +---------------------------------------------------+-----------------------------------------------------------------------------------+
    | :godot:`int`                                      | :ref:`set_heartbeat_ticks<class_NetwPropertyConfig_property_set_heartbeat_ticks>` |
    +---------------------------------------------------+-----------------------------------------------------------------------------------+
-   | :godot:`bool`                                     | :ref:`set_masked<class_NetwPropertyConfig_property_set_masked>`                   |
-   +---------------------------------------------------+-----------------------------------------------------------------------------------+
-   | :ref:`Trigger<enum_NetwPropertyConfig_Trigger>`   | :ref:`set_trigger<class_NetwPropertyConfig_property_set_trigger>`                 |
-   +---------------------------------------------------+-----------------------------------------------------------------------------------+
    | :godot:`int`                                      | :ref:`set_window<class_NetwPropertyConfig_property_set_window>`                   |
    +---------------------------------------------------+-----------------------------------------------------------------------------------+
 
@@ -97,10 +93,6 @@ Methods
    | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`heartbeat<class_NetwPropertyConfig_method_heartbeat>`\ (\ ticks\: :godot:`int`\ )                             |
    +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`input<class_NetwPropertyConfig_method_input>`\ (\ )                                                           |
-   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`masked<class_NetwPropertyConfig_method_masked>`\ (\ )                                                         |
-   +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`on_change<class_NetwPropertyConfig_method_on_change>`\ (\ )                                                   |
    +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` | :ref:`on_spawn<class_NetwPropertyConfig_method_on_spawn>`\ (\ )                                                     |
    +-----------------------------------------------------+---------------------------------------------------------------------------------------------------------------------+
@@ -129,40 +121,6 @@ Methods
 
 Enumerations
 ------------
-
-.. _enum_NetwPropertyConfig_Trigger:
-
-.. rst-class:: classref-enumeration
-
-enum **Trigger**: :ref:`🔗<enum_NetwPropertyConfig_Trigger>`
-
-.. _class_NetwPropertyConfig_constant_TRIGGER_TICK:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`Trigger<enum_NetwPropertyConfig_Trigger>` **TRIGGER_TICK** = ``0``
-
-Sent every tick.
-
-.. _class_NetwPropertyConfig_constant_TRIGGER_ON_CHANGE:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`Trigger<enum_NetwPropertyConfig_Trigger>` **TRIGGER_ON_CHANGE** = ``1``
-
-Sent when a value changed.
-
-.. _class_NetwPropertyConfig_constant_TRIGGER_ON_DEMAND:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`Trigger<enum_NetwPropertyConfig_Trigger>` **TRIGGER_ON_DEMAND** = ``2``
-
-Sent only by :ref:`Netw.sync_property()<class_Netw_method_sync_property>`.
-
-.. rst-class:: classref-item-separator
-
-----
 
 .. _enum_NetwPropertyConfig_Lane:
 
@@ -374,40 +332,6 @@ Set by :ref:`heartbeat()<class_NetwPropertyConfig_method_heartbeat>`, or :ref:`U
 
 ----
 
-.. _class_NetwPropertyConfig_property_set_masked:
-
-.. rst-class:: classref-property
-
-:godot:`bool` **set_masked** :ref:`🔗<class_NetwPropertyConfig_property_set_masked>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_set_masked**\ (\ value\: :godot:`bool`\ )
-- :godot:`bool` **get_set_masked**\ (\ )
-
-Set by :ref:`masked()<class_NetwPropertyConfig_method_masked>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_property_set_trigger:
-
-.. rst-class:: classref-property
-
-:ref:`Trigger<enum_NetwPropertyConfig_Trigger>` **set_trigger** :ref:`🔗<class_NetwPropertyConfig_property_set_trigger>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_set_trigger**\ (\ value\: :ref:`Trigger<enum_NetwPropertyConfig_Trigger>`\ )
-- :ref:`Trigger<enum_NetwPropertyConfig_Trigger>` **get_set_trigger**\ (\ )
-
-Set by :ref:`on_change()<class_NetwPropertyConfig_method_on_change>`, or :ref:`UNSET<class_NetwPropertyConfig_constant_UNSET>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwPropertyConfig_property_set_window:
 
 .. rst-class:: classref-property
@@ -549,30 +473,6 @@ The controlling peer owns the value and only the server sees it. Use it for play
         velocity = move_dir * SPEED
 
 \ Each send also includes the last two ticks of input, so the next packet makes up for a lost one. :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` changes how many. Correction settings such as :ref:`extrapolate()<class_NetwPropertyConfig_method_extrapolate>` are ignored on an input.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_method_masked:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **masked**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_masked>`
-
-Changes nothing on a property with no window, because those already send each peer only the values that changed since a state it confirmed. With a window, as :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` sets and :ref:`input()<class_NetwPropertyConfig_method_input>` sets by default, it is ignored with a warning. Sets :ref:`set_masked<class_NetwPropertyConfig_property_set_masked>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwPropertyConfig_method_on_change:
-
-.. rst-class:: classref-method
-
-:ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **on_change**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_on_change>`
-
-Enabled by default.
 
 .. rst-class:: classref-item-separator
 

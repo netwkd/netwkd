@@ -456,6 +456,8 @@ Methods
    +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Dictionary`                                    | :ref:`session_get_stats<class_NetwMultiplayer_method_session_get_stats>`\ (\ )                                                                                                                                                                                                                  |
    +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Dictionary`                                    | :ref:`session_get_traffic<class_NetwMultiplayer_method_session_get_traffic>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                                                                                                                 |
+   +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`                                          | :ref:`session_is_local_client<class_NetwMultiplayer_method_session_is_local_client>`\ (\ ) |const|                                                                                                                                                                                              |
    +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`                                          | :ref:`session_is_online<class_NetwMultiplayer_method_session_is_online>`\ (\ ) |const|                                                                                                                                                                                                          |
@@ -483,12 +485,6 @@ Methods
    | :godot:`Variant`                                       | :ref:`simulation_get_param<class_NetwMultiplayer_method_simulation_get_param>`\ (\ entity\: :godot:`RID`, param\: :ref:`SimulationParam<enum_NetwMultiplayer_SimulationParam>`\ )                                                                                                               |
    +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`Schedule<enum_NetwSimulation_Schedule>`          | :ref:`simulation_get_schedule<class_NetwMultiplayer_method_simulation_get_schedule>`\ (\ entity\: :godot:`RID`\ )                                                                                                                                                                               |
-   +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Array`\[:godot:`RID`\]                         | :ref:`simulation_get_selected<class_NetwMultiplayer_method_simulation_get_selected>`\ (\ entity\: :godot:`RID`\ )                                                                                                                                                                               |
-   +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>`  | :ref:`simulation_select<class_NetwMultiplayer_method_simulation_select>`\ (\ entity\: :godot:`RID`, other\: :godot:`RID`, pick\: :ref:`SimPick<enum_NetwMultiplayer_SimPick>`\ )                                                                                                                |
-   +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>`  | :ref:`simulation_select_layer<class_NetwMultiplayer_method_simulation_select_layer>`\ (\ entity\: :godot:`RID`, layer\: :godot:`RID`, pick\: :ref:`SimPick<enum_NetwMultiplayer_SimPick>`\ )                                                                                                    |
    +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Error <@GlobalScope#enum_@globalscope_Error>`  | :ref:`simulation_set_param<class_NetwMultiplayer_method_simulation_set_param>`\ (\ entity\: :godot:`RID`, param\: :ref:`SimulationParam<enum_NetwMultiplayer_SimulationParam>`, value\: :godot:`Variant`\ )                                                                                     |
    +--------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -1553,14 +1549,6 @@ enum **ClockParam**: :ref:`🔗<enum_NetwMultiplayer_ClockParam>`
 
 The :ref:`SyncMode<enum_NetwClock_SyncMode>`.
 
-.. _class_NetwMultiplayer_constant_CLOCK_PARAM_PING_INTERVAL:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`ClockParam<enum_NetwMultiplayer_ClockParam>` **CLOCK_PARAM_PING_INTERVAL** = ``2``
-
-:godot:`float` seconds between pings.
-
 .. _class_NetwMultiplayer_constant_CLOCK_PARAM_MAX_TICKS_PER_FRAME:
 
 .. rst-class:: classref-enumeration-constant
@@ -1887,13 +1875,13 @@ enum **SimulationParam**: :ref:`🔗<enum_NetwMultiplayer_SimulationParam>`
 
 :ref:`Schedule<enum_NetwSimulation_Schedule>`. :ref:`NetwSimulation.schedule<class_NetwSimulation_property_schedule>`.
 
-.. _class_NetwMultiplayer_constant_SIMULATION_PARAM_REPLICAS:
+.. _class_NetwMultiplayer_constant_SIMULATION_PARAM_REMOTE_MODE:
 
 .. rst-class:: classref-enumeration-constant
 
-:ref:`SimulationParam<enum_NetwMultiplayer_SimulationParam>` **SIMULATION_PARAM_REPLICAS** = ``2``
+:ref:`SimulationParam<enum_NetwMultiplayer_SimulationParam>` **SIMULATION_PARAM_REMOTE_MODE** = ``2``
 
-:ref:`Replicas<enum_NetwSimulation_Replicas>`. :ref:`NetwSimulation.replicas<class_NetwSimulation_property_replicas>`.
+:ref:`RemoteMode<enum_NetwSimulation_RemoteMode>`. :ref:`NetwSimulation.remote_mode<class_NetwSimulation_property_remote_mode>`.
 
 .. _class_NetwMultiplayer_constant_SIMULATION_PARAM_RESTORE:
 
@@ -1934,32 +1922,6 @@ enum **SimulationParam**: :ref:`🔗<enum_NetwMultiplayer_SimulationParam>`
 :ref:`SimulationParam<enum_NetwMultiplayer_SimulationParam>` **SIMULATION_PARAM_PHYSICS_DRIVEN** = ``7``
 
 :godot:`bool`. :ref:`NetwSimulation.physics_driven<class_NetwSimulation_property_physics_driven>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _enum_NetwMultiplayer_SimPick:
-
-.. rst-class:: classref-enumeration
-
-enum **SimPick**: :ref:`🔗<enum_NetwMultiplayer_SimPick>`
-
-.. _class_NetwMultiplayer_constant_SIM_PICK_CHOSEN:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`SimPick<enum_NetwMultiplayer_SimPick>` **SIM_PICK_CHOSEN** = ``0``
-
-Selects the entity or layer.
-
-.. _class_NetwMultiplayer_constant_SIM_PICK_FORGET:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`SimPick<enum_NetwMultiplayer_SimPick>` **SIM_PICK_FORGET** = ``1``
-
-Drops a selection made with :ref:`SIM_PICK_CHOSEN<class_NetwMultiplayer_constant_SIM_PICK_CHOSEN>`. In :ref:`simulation_select_layer()<class_NetwMultiplayer_method_simulation_select_layer>` it clears every layer pick whatever the layer, and also turns off the default every-layer selection of a predicted entity.
 
 .. rst-class:: classref-item-separator
 
@@ -5267,7 +5229,7 @@ Same as :godot:`SceneMultiplayer.send_auth() <SceneMultiplayer#class_SceneMultip
 
 :godot:`Error <@GlobalScope#enum_@globalscope_Error>` **send_bytes**\ (\ bytes\: :godot:`PackedByteArray`, id\: :godot:`int` = 0, mode\: :godot:`MultiplayerPeer.TransferMode <MultiplayerPeer#enum_multiplayerpeer_TransferMode>` = 2, channel\: :godot:`int` = 0\ ) :ref:`🔗<class_NetwMultiplayer_method_send_bytes>`
 
-Same as :godot:`SceneMultiplayer.send_bytes() <SceneMultiplayer#class_SceneMultiplayer_method_send_bytes>`. Returns :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>` when there is no :godot:`MultiplayerAPI.multiplayer_peer <MultiplayerAPI#class_MultiplayerAPI_property_multiplayer_peer>`. Networked reserves twelve first bytes, ``0x4E``, ``0x56``, ``0x57``, ``0x58``, ``0x6E``, ``0x76``, ``0x77``, ``0x78``, ``0x8E``, ``0x96``, ``0x97`` and ``0x98``. A packet that starts with one of them never reaches :ref:`peer_packet<class_NetwMultiplayer_signal_peer_packet>`, so give a raw packet a first byte of your own.
+Same as :godot:`SceneMultiplayer.send_bytes() <SceneMultiplayer#class_SceneMultiplayer_method_send_bytes>`. Returns :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>` when there is no :godot:`MultiplayerAPI.multiplayer_peer <MultiplayerAPI#class_MultiplayerAPI_property_multiplayer_peer>`. Networked reserves thirteen first bytes, ``0x4E``, ``0x56``, ``0x57``, ``0x58``, ``0x6E``, ``0x76``, ``0x77``, ``0x78``, ``0x8E``, ``0x96``, ``0x97``, ``0x98`` and ``0xB8``. A packet that starts with one of them never reaches :ref:`peer_packet<class_NetwMultiplayer_signal_peer_packet>`, so give a raw packet a first byte of your own.
 
 .. rst-class:: classref-item-separator
 
@@ -5409,6 +5371,18 @@ Returns the :ref:`State<enum_NetwSession_State>` the session is in, the same as 
 :godot:`Dictionary` **session_get_stats**\ (\ ) :ref:`🔗<class_NetwMultiplayer_method_session_get_stats>`
 
 Returns every :ref:`Stat<enum_NetwMultiplayer_Stat>` value, keyed by the lowercase constant name, such as ``sent_bytes``.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwMultiplayer_method_session_get_traffic:
+
+.. rst-class:: classref-method
+
+:godot:`Dictionary` **session_get_traffic**\ (\ peer\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_session_get_traffic>`
+
+Returns what the session sent to ``peer`` and received from it over the last second. :ref:`NetwSession.traffic()<class_NetwSession_method_traffic>` lists the keys.
 
 .. rst-class:: classref-item-separator
 
@@ -5603,42 +5577,6 @@ Returns one simulation setting of ``entity``, or ``null``.
 :ref:`Schedule<enum_NetwSimulation_Schedule>` **simulation_get_schedule**\ (\ entity\: :godot:`RID`\ ) :ref:`🔗<class_NetwMultiplayer_method_simulation_get_schedule>`
 
 Returns the schedule ``entity`` runs on here, with :ref:`NetwSimulation.SCHEDULE_AUTO<class_NetwSimulation_constant_SCHEDULE_AUTO>` resolved to the schedule it picked.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwMultiplayer_method_simulation_get_selected:
-
-.. rst-class:: classref-method
-
-:godot:`Array`\[:godot:`RID`\] **simulation_get_selected**\ (\ entity\: :godot:`RID`\ ) :ref:`🔗<class_NetwMultiplayer_method_simulation_get_selected>`
-
-Returns the entities ``entity`` simulates on this peer right now, the same set as :ref:`NetwSimulation.selected<class_NetwSimulation_property_selected>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwMultiplayer_method_simulation_select:
-
-.. rst-class:: classref-method
-
-:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **simulation_select**\ (\ entity\: :godot:`RID`, other\: :godot:`RID`, pick\: :ref:`SimPick<enum_NetwMultiplayer_SimPick>`\ ) :ref:`🔗<class_NetwMultiplayer_method_simulation_select>`
-
-Names ``other`` as a body ``entity`` simulates with :ref:`SIM_PICK_CHOSEN<class_NetwMultiplayer_constant_SIM_PICK_CHOSEN>`, or drops that name with :ref:`SIM_PICK_FORGET<class_NetwMultiplayer_constant_SIM_PICK_FORGET>`. Both entities must be live in the same scene to choose. The choice is kept until it is forgotten, and :ref:`simulation_get_selected()<class_NetwMultiplayer_method_simulation_get_selected>` shows what it selects.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwMultiplayer_method_simulation_select_layer:
-
-.. rst-class:: classref-method
-
-:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **simulation_select_layer**\ (\ entity\: :godot:`RID`, layer\: :godot:`RID`, pick\: :ref:`SimPick<enum_NetwMultiplayer_SimPick>`\ ) :ref:`🔗<class_NetwMultiplayer_method_simulation_select_layer>`
-
-With :ref:`SIM_PICK_CHOSEN<class_NetwMultiplayer_constant_SIM_PICK_CHOSEN>`, ``entity`` simulates every entity it shares ``layer`` with, or every layer it is in when ``layer`` is an empty :godot:`RID`. With :ref:`SIM_PICK_FORGET<class_NetwMultiplayer_constant_SIM_PICK_FORGET>`, ``layer`` is ignored and every layer pick is cleared. For a predicted entity, this also turns off the default selection of every layer it is in, even though that default was never made with :ref:`SIM_PICK_CHOSEN<class_NetwMultiplayer_constant_SIM_PICK_CHOSEN>`. Entities named with :ref:`simulation_select()<class_NetwMultiplayer_method_simulation_select>` stay selected. Returns :godot:`@GlobalScope.ERR_INVALID_PARAMETER <@GlobalScope#class_@GlobalScope_constant_ERR_INVALID_PARAMETER>` when ``entity`` is not live or ``layer`` is not in this session.
 
 .. rst-class:: classref-item-separator
 

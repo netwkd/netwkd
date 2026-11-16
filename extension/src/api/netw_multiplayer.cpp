@@ -1228,8 +1228,7 @@ void NetwMultiplayer::player_request_kick(
         payload,
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -1261,8 +1260,7 @@ void NetwMultiplayer::player_note_leave(
             payload,
             true,
             0,
-            String(),
-            false
+            String()
         );
     }
 }
@@ -1977,8 +1975,7 @@ void NetwMultiplayer::session_fail_join(
         auth::encode_refused(int64_t(p_error), p_reason),
         true,
         0,
-        String(),
-        false
+        String()
     );
     session_turn_peer_away(peer, String());
 }
@@ -1995,8 +1992,7 @@ void NetwMultiplayer::session_turn_peer_away(
             session::frame_write(session::SessionReason{p_reason}),
             true,
             0,
-            String(),
-            false
+            String()
         );
     }
     for (const TurnedAwayPeer &row : turned_away_peers) {
@@ -2176,6 +2172,9 @@ void NetwMultiplayer::session_relay_peer_connected(int64_t p_peer) {
     if (installing_transfer) {
         return;
     }
+    if (!link_handshakes.has(p_peer)) {
+        connect_core.peer_connected(p_peer);
+    }
     peer_mark_reachable(p_peer);
     settled_peer_departures.erase(p_peer);
     event_record(EventPlane::PEER_JOINED, RID(), 0, p_peer);
@@ -2205,6 +2204,7 @@ void NetwMultiplayer::session_clear_disconnected_peer(int64_t p_peer) {
 
 void NetwMultiplayer::session_clear_link_delivery(int64_t p_peer) {
     forget_peer_seqs(p_peer);
+    clock_exchange.forget_peer(p_peer);
     liveness_core->abandon_lease(int(p_peer));
     ReplicationCore *plane = (get_replication_plane());
     if (plane != nullptr) {
@@ -2566,8 +2566,7 @@ void NetwMultiplayer::session_publish_admitted(
             join_roster.roster_frame(p_sender),
             true,
             0,
-            String(),
-            false
+            String()
         );
         liveness_grant_lease(p_sender);
         if (session_paused) {
@@ -2580,8 +2579,7 @@ void NetwMultiplayer::session_publish_admitted(
                 ),
                 true,
                 0,
-                String(),
-                false
+                String()
             );
         }
     }
@@ -2626,8 +2624,7 @@ void NetwMultiplayer::session_send_accept(
         session_accept_payload(p_row, p_destination),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -3333,6 +3330,7 @@ void NetwMultiplayer::auth_send_hello(int64_t p_peer) {
         || !get_authenticating_peers().has(int32_t(p_peer))) {
         return;
     }
+    connect_core.peer_connected(p_peer);
     link_handshakes[p_peer] = LinkHandshake();
     LinkHandshake &opened = link_handshakes[p_peer];
     const double seconds = auth_link_seconds();
@@ -4045,7 +4043,7 @@ void NetwMultiplayer::session_broadcast_control(
     }
     const PackedInt32Array peers = NETW_API_VIRTUAL(get_peer_ids)();
     for (int at = 0; at < int(peers.size()); ++at) {
-        send_to(peers[at], 0, p_channel, p_payload, true, 0, String(), false);
+        send_to(peers[at], 0, p_channel, p_payload, true, 0, String());
     }
     session_publish_control(
         p_channel,
@@ -4266,6 +4264,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
         = poll_delta(Time::get_singleton()->get_ticks_usec());
     session_poll_admissions(int64_t(Time::get_singleton()->get_ticks_msec()));
     connect_core.on_poll(frame_delta);
+    traffic_advance(frame_delta);
     const Error err = embed_poll_transport();
     session_poll_shutdown();
     session_poll_server_shutdown();
@@ -5276,24 +5275,62 @@ void NetwMultiplayer::clock_request_handshake() {
         clock_rate_frame(clock_engine().get_tickrate()),
         true,
         0,
-        String(),
-        true
+        String()
     );
 }
 
-void NetwMultiplayer::clock_send_ping() {
+void NetwMultiplayer::clock_owe_ping(bool p_forces) {
+    clock_exchange.owe_ping(p_forces);
+}
+
+bool NetwMultiplayer::clock_ping_waits() const {
+    return clock_exchange.ping_waits();
+}
+
+void NetwMultiplayer::clock_board(int64_t p_now_ms, bool p_upkeep_rides) {
+    const auto batch_leaves = [&](int64_t p_peer) {
+        return !p_upkeep_rides
+            || (carrier.pending(p_peer, false) > 0
+                && !carrier.rides(p_peer, p_now_ms));
+    };
+    const PackedInt64Array asking = clock_exchange.peers_asking();
+    for (int at = 0; at < asking.size(); ++at) {
+        const bool leaves = batch_leaves(asking[at]);
+        if (!clock_exchange.pong_boards(asking[at], p_now_ms, leaves)) {
+            continue;
+        }
+        session::ClockPong pong
+            = clock_exchange.take_pong(asking[at], clock_wall_usec());
+        pong.tick = uint64_t(clock_engine().get_tick()) & 0xFFFFFFFF;
+        pong.phase = uint64_t(clock_engine().tick_phase() * 255.0) & 0xFF;
+        send_to(
+            asking[at],
+            0,
+            clock_channels.pong,
+            session::frame_write(pong),
+            false,
+            0,
+            String(),
+            wire::Delivery::TICK
+        );
+    }
+    const bool batch_waits = carrier.pending(SERVER_PEER, false) > 0;
+    if (clock_exchange.ping_boards(p_now_ms, !p_upkeep_rides || batch_waits)) {
+        clock_board_ping();
+    }
+}
+
+void NetwMultiplayer::clock_board_ping() {
     NETW_ZONE_NC("Clock ping", colors::CLOCK);
-    session::ClockPing ping;
-    ping.origin = clock_wall_usec() & 0xFFFFFFFF;
     send_to(
         SERVER_PEER,
         0,
         clock_channels.ping,
-        session::frame_write(ping),
+        session::frame_write(clock_exchange.take_ping(clock_wall_usec())),
         false,
         0,
         String(),
-        false
+        wire::Delivery::TICK
     );
 }
 
@@ -5319,8 +5356,7 @@ void NetwMultiplayer::clock_receive_handshake(
         clock_rate_frame(clock_engine().get_tickrate()),
         true,
         0,
-        String(),
-        true
+        String()
     );
 }
 
@@ -5362,7 +5398,7 @@ void NetwMultiplayer::clock_receive_handshake_reply(
             );
         }
     }
-    clock_send_ping();
+    clock_owe_ping(true);
 }
 
 void NetwMultiplayer::clock_receive_ping(
@@ -5373,20 +5409,7 @@ void NetwMultiplayer::clock_receive_ping(
     if (!is_host() || !session::frame_read(p_payload, ping)) {
         return;
     }
-    session::ClockPong pong;
-    pong.origin = ping.origin;
-    pong.tick = uint64_t(clock_engine().get_tick()) & 0xFFFFFFFF;
-    pong.phase = uint64_t(clock_engine().tick_phase() * 255.0) & 0xFF;
-    send_to(
-        p_sender,
-        0,
-        clock_channels.pong,
-        session::frame_write(pong),
-        false,
-        0,
-        String(),
-        false
-    );
+    clock_exchange.hear_ping(p_sender, ping, clock_wall_usec());
 }
 
 void NetwMultiplayer::clock_receive_pong(
@@ -5397,12 +5420,10 @@ void NetwMultiplayer::clock_receive_pong(
     if (p_sender != SERVER_PEER || !session::frame_read(p_payload, pong)) {
         return;
     }
-    const uint32_t client_usec = uint32_t(pong.origin);
     const uint32_t server_tick = uint32_t(pong.tick);
     const double server_phase = double(pong.phase) / 255.0;
-    const uint32_t elapsed
-        = uint32_t((clock_wall_usec() & 0xFFFFFFFF) - client_usec);
-    const double sample = double(elapsed) / 1'000'000.0;
+    const double sample
+        = ClockExchange::round_trip_seconds(pong, clock_wall_usec());
     clock_engine()
         .handle_pong(sample, int(server_tick), server_phase, !is_host());
 }
@@ -5627,6 +5648,46 @@ void NetwMultiplayer::clock_apply_config(const Ref<NetwClockConfig> &p_config) {
     }
     ClockEngine &clock = clock_engine();
     clock.set_tickrate(int(p_config->get_tickrate()));
+    const int64_t ticks = p_config->get_tickrate();
+    const int64_t sends = p_config->get_send_rate();
+    const int64_t widest = predict::SEND_INTERVAL_MAX;
+    const int64_t least = (ticks + widest - 1) / widest;
+    const bool accepted
+        = sends >= least && sends <= ticks && ticks % sends == 0;
+    if (sends > 0 && !accepted) {
+        int64_t below = MIN(sends, ticks);
+        while (below >= least && ticks % below != 0) {
+            --below;
+        }
+        int64_t above = CLAMP(sends, least, ticks);
+        while (ticks % above != 0) {
+            ++above;
+        }
+        String asked = vformat(
+            "a rate that divides %d ticks per second, such as %d",
+            ticks,
+            below
+        );
+        if (below < least) {
+            asked = vformat(
+                "a rate that divides %d ticks per second and sends at least "
+                "every %d ticks, such as %d",
+                ticks,
+                widest,
+                above
+            );
+        } else if (above > below) {
+            asked += vformat(" or %d", above);
+        }
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwClockConfig.sends_per_second}",
+             String::num_int64(sends),
+             asked}
+        );
+    }
+    clock.set_send_interval(accepted ? int(ticks / sends) : 1);
     clock.set_max_ticks_per_frame(int(p_config->get_max_ticks_per_frame()));
     clock.set_stall_threshold(p_config->get_stall_threshold());
     clock.set_use_physics_interpolation(
@@ -5635,7 +5696,6 @@ void NetwMultiplayer::clock_apply_config(const Ref<NetwClockConfig> &p_config) {
     clock.set_sync_mode(ClockEngine::SyncMode(p_config->get_sync_mode()));
     clock.set_panic_snap_threshold(int(p_config->get_panic_snap_threshold()));
     clock.set_stretch_nudge_factor(p_config->get_stretch_nudge_factor());
-    clock.set_ping_interval(p_config->get_ping_interval());
     clock.set_display_offset(int(p_config->get_display_offset()));
     clock.set_jitter_multiplier(p_config->get_jitter_multiplier());
     clock.set_jitter_window(int(p_config->get_jitter_window()));
@@ -6195,8 +6255,7 @@ void NetwMultiplayer::session_submit_request(const JoinRequest &p_request) {
         sending.serialize(),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -6406,8 +6465,7 @@ void NetwMultiplayer::session_send_leave(bool p_returning) {
         session::frame_write(leaving),
         true,
         0,
-        String(),
-        false
+        String()
     );
 }
 
@@ -6684,6 +6742,7 @@ void NetwMultiplayer::clear_session_state() {
     turned_away_peers.clear();
     display_last_timing.reset();
     clear_seq_books();
+    clock_exchange.clear();
     ReplicationCore *plane = (get_replication_plane());
     if (plane != nullptr) {
         plane->clear_session();
@@ -6763,6 +6822,7 @@ void NetwMultiplayer::peer_forget(int64_t p_peer) {
     }
     player_forget(player_id);
     attribution.forget_peer(p_peer);
+    traffic.forget_peer(p_peer);
 }
 
 int64_t NetwMultiplayer::peer_get_player(int64_t p_peer) const {

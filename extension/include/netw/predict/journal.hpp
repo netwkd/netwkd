@@ -58,6 +58,8 @@ enum WitnessState : uint8_t {
     WITNESS_SLEEPING = 1,
     WITNESS_WOKE = 2,
     WITNESS_JUDGED = 4,
+    WITNESS_ROSTER_CHANGED = 8,
+    WITNESS_INPUT_HELD = 16,
 };
 
 enum Evidence : uint8_t {

@@ -207,8 +207,9 @@ void Slot::forget_commands() {
 }
 
 int32_t Slot::topology_fp(const Dictionary &p_topology) {
-    if (topology_fp_quantum != last_quantum
-        || topology_fp_facts != p_topology) {
+    const bool roster_differs = topology_fp_facts != p_topology;
+    roster_changed = roster_changed || roster_differs;
+    if (topology_fp_quantum != last_quantum || roster_differs) {
         topology_fp_facts = p_topology.duplicate();
         topology_fp_quantum = last_quantum;
         topology_fp_value = topology_fingerprint(p_topology, last_quantum);
@@ -427,22 +428,81 @@ void Slot::clear_joint_cells() {
     joint.clear_cells(book.newest_key() - 1);
 }
 
+bool same_command(const StateRow &p_left, const StateRow &p_right) {
+    if (p_left.values.size() != p_right.values.size()) {
+        return false;
+    }
+    for (uint32_t at = 0; at < p_left.values.size(); ++at) {
+        if (p_left.present[at] != p_right.present[at]
+            || p_left.values[at] != p_right.values[at]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void RelayWindow::pace(uint32_t p_send_interval) {
+    const uint32_t size = SENDS * p_send_interval;
+    if (ticks.size() == size) {
+        return;
+    }
+    send_interval = p_send_interval;
+    ticks.resize(size);
+    commands.resize(size);
+    count = 0;
+    next = 0;
+}
+
 void RelayWindow::record(int64_t p_tick, const StateRow &p_command) {
+    const uint32_t size = ticks.size();
     if (count > 0) {
-        const uint32_t newest = (next + SIZE - 1) % SIZE;
+        const uint32_t newest = (next + size - 1) % size;
+        const bool stands = same_command(commands[newest], p_command);
         if (ticks[newest] == p_tick) {
             commands[newest] = p_command;
+            stood_ticks = stands ? stood_ticks : 0;
             return;
         }
+        stood_ticks = stands ? stood_ticks + 1 : 0;
     }
     ticks[next] = p_tick;
     commands[next] = p_command;
-    next = (next + 1) % SIZE;
-    count = count < SIZE ? count + 1 : SIZE;
+    next = (next + 1) % size;
+    count = count < size ? count + 1 : size;
+}
+
+void RelayWindow::follow(uint32_t p_generation) {
+    if (generation != p_generation) {
+        generation = p_generation;
+        stood_ticks = 0;
+    }
+}
+
+bool RelayWindow::due(uint32_t p_refresh_ticks) const {
+    const uint32_t size = ticks.size();
+    if (stood_ticks < size || refreshes(p_refresh_ticks)) {
+        return true;
+    }
+    if (stood_ticks >= p_refresh_ticks) {
+        return false;
+    }
+    return passed(size * 2) || passed(size * 4) || passed(size * 8);
+}
+
+bool RelayWindow::refreshes(uint32_t p_refresh_ticks) const {
+    return stood_ticks >= ticks.size()
+        && stood_ticks / p_refresh_ticks
+            != (stood_ticks - send_interval) / p_refresh_ticks;
+}
+
+bool RelayWindow::passed(uint32_t p_stood_ticks) const {
+    return stood_ticks >= p_stood_ticks
+        && stood_ticks < p_stood_ticks + send_interval;
 }
 
 uint32_t RelayWindow::at_oldest(uint32_t p_offset) const {
-    return (next + SIZE - count + p_offset) % SIZE;
+    const uint32_t size = ticks.size();
+    return (next + size - count + p_offset) % size;
 }
 
 void Slot::trim_history(int64_t p_ack) {
@@ -867,9 +927,17 @@ bool Slot::record_evidence(
         witnessed_sleeping = p_sleeping;
         witnessed_before = true;
     }
+    const int32_t topology = topology_fp(p_topology);
+    if (roster_changed) {
+        witness_state |= WITNESS_ROSTER_CHANGED;
+        roster_changed = false;
+    }
+    if (p_transition == input_held_transition) {
+        witness_state |= WITNESS_INPUT_HELD;
+    }
     journal.mark_solve(
         p_transition,
-        topology_fp(p_topology),
+        topology,
         witness.fingerprint,
         evidence_mask,
         witness.class_bits,

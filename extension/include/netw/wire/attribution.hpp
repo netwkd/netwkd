@@ -6,6 +6,7 @@
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
 #include "netw/wire/profiler.hpp"
+#include "netw/wire/registry.hpp"
 
 namespace netw::wire {
 
@@ -36,7 +37,26 @@ enum class Refusal : uint8_t {
 
 const char *refusal_name(Refusal p_refusal);
 
+struct TrafficTotals {
+    int64_t sent[CAUSE_COUNT] = {};
+    int64_t received[CAUSE_COUNT] = {};
+    int64_t wire_out = 0;
+    int64_t wire_in = 0;
+    int64_t packets_out = 0;
+    int64_t packets_in = 0;
+};
+
 class AttributionBook {
+    struct Datagrams {
+        int64_t bytes_out = 0;
+        int64_t bytes_in = 0;
+        int64_t count_out = 0;
+        int64_t count_in = 0;
+    };
+
+    godot::HashMap<int64_t, Datagrams> datagrams_by_peer;
+    int64_t channel_out[WireRegistry::MAX_CHANNELS] = {};
+    int64_t channel_in[WireRegistry::MAX_CHANNELS] = {};
     godot::HashMap<uint64_t, int64_t> bytes_out;
     godot::HashMap<uint64_t, int64_t> bytes_in;
     godot::HashMap<int64_t, int64_t> route_out;
@@ -101,11 +121,17 @@ public:
         return int64_t(
             bytes_out.size() + bytes_in.size()
             + frames_by_peer_channel_in.size() + refusals.size() + staged.size()
+            + datagrams_by_peer.size()
         );
     }
 
     void note_framing_out(int64_t p_bytes);
-    void note_datagram(bool p_inbound, int64_t p_bytes);
+    void note_datagram(bool p_inbound, int64_t p_peer, int64_t p_bytes);
+    TrafficTotals traffic_totals(
+        int64_t p_peer,
+        const WireRegistry &p_channels
+    ) const;
+    void traffic_peers(godot::LocalVector<int64_t> &r_peers) const;
     void observe_in(const Attribution &p_frame);
     void note_refusal(int64_t p_peer, int64_t p_channel, Refusal p_refusal);
     void note_column(int64_t p_schema, int64_t p_column, int64_t p_bits);

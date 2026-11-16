@@ -18,15 +18,15 @@ using wire::ReadStream;
 using wire::WriteStream;
 
 struct CommandHeader {
-    int64_t ack_of_acks = -1;
+    uint64_t acked = 0;
     uint8_t epoch = 0;
     uint64_t base = 0;
     uint8_t count = 0;
 
     static constexpr auto wire = netw::wire::describe(
-        netw::wire::field<&CommandHeader::ack_of_acks>(
-            "ack_of_acks",
-            netw::wire::svarint(5)
+        netw::wire::field<&CommandHeader::acked>(
+            "acked",
+            netw::wire::varuint(5)
         ),
         netw::wire::field<&CommandHeader::epoch>("epoch", netw::wire::bits(8)),
         netw::wire::field<&CommandHeader::base>("base", netw::wire::varuint(5)),
@@ -200,6 +200,9 @@ bool serialize_command_evidence(
     return true;
 }
 
+constexpr uint64_t COMMAND_ASKS_DETAIL = 1U << 0;
+constexpr uint64_t COMMAND_HOLDS = 1U << 1;
+
 constexpr uint64_t ACK_SAME_PRE = 1U << 0;
 constexpr uint64_t ACK_SAME_COMMAND = 1U << 1;
 constexpr uint64_t ACK_SAME_ENVIRONMENT = 1U << 2;
@@ -371,7 +374,9 @@ bool serialize_command(
 ) {
     CommandHeader header;
     if constexpr (!Stream::is_reading) {
-        header.ack_of_acks = p_frame.ack_of_acks;
+        header.acked = uint64_t(p_frame.ack_of_acks + 1) << 2
+            | (p_frame.hold > 0 ? COMMAND_HOLDS : 0U)
+            | (p_frame.asks_detail ? COMMAND_ASKS_DETAIL : 0U);
         header.epoch = p_frame.epoch;
         header.base = p_frame.transitions.is_empty()
             ? 0
@@ -381,8 +386,15 @@ bool serialize_command(
     if (!CommandHeader::wire.run(p_stream, header)) {
         return false;
     }
+    uint64_t hold = Stream::is_reading ? 0 : uint64_t(p_frame.hold);
+    if ((header.acked & COMMAND_HOLDS) != 0
+        && (!p_stream.varuint(hold, 2) || hold == 0)) {
+        return false;
+    }
     if constexpr (Stream::is_reading) {
-        p_frame.ack_of_acks = header.ack_of_acks;
+        p_frame.ack_of_acks = int64_t(header.acked >> 2) - 1;
+        p_frame.asks_detail = (header.acked & COMMAND_ASKS_DETAIL) != 0;
+        p_frame.hold = int64_t(hold);
         p_frame.epoch = header.epoch;
     }
 
@@ -460,16 +472,39 @@ bool serialize_command(
     return p_stream.align_verify();
 }
 
+constexpr uint8_t ACK_RUN = 1U << 7;
+constexpr uint8_t ACK_RUNS = ACK_COMPACT | ACK_HELD;
+constexpr uint32_t ACK_RUN_MAX = 255;
+
+uint32_t ack_run_after(
+    const LocalVector<AckEvidenceWire> &p_records,
+    uint32_t p_at
+) {
+    const AckEvidenceWire &head = p_records[p_at];
+    if ((head.flags & ACK_RUNS) != ACK_RUNS) {
+        return 0;
+    }
+    uint32_t run = 0;
+    while (run < ACK_RUN_MAX && p_at + run + 1 < p_records.size()
+           && p_records[p_at + run + 1].flags == head.flags
+           && p_records[p_at + run + 1].post_fp == head.post_fp) {
+        run += 1;
+    }
+    return run;
+}
+
 template <class Stream>
 bool serialize_ack(Stream &p_stream, AckFrame &p_frame) {
     AckHeader header;
     if constexpr (!Stream::is_reading) {
         header.epoch = p_frame.epoch;
         header.base = p_frame.base;
-        header.count = uint8_t(
-            p_frame.records.size() < ACK_RECORD_MAX ? p_frame.records.size()
-                                                    : ACK_RECORD_MAX
-        );
+        uint32_t carried = 0;
+        while (header.count < ACK_RECORD_MAX
+               && carried < p_frame.records.size()) {
+            carried += ack_run_after(p_frame.records, carried) + 1;
+            header.count += 1;
+        }
     }
     if (!AckHeader::wire.run(p_stream, header)) {
         return false;
@@ -481,14 +516,15 @@ bool serialize_ack(Stream &p_stream, AckFrame &p_frame) {
         p_frame.epoch = header.epoch;
         p_frame.base = header.base;
     }
-    if constexpr (Stream::is_reading) {
-        p_frame.records.reserve(header.count);
-    }
     int detailed = -1;
-    for (uint32_t at = 0; at < header.count; ++at) {
+    uint32_t at = 0;
+    for (uint32_t written = 0; written < header.count; ++written) {
         AckEvidenceWire record;
+        uint64_t run = 0;
         if constexpr (!Stream::is_reading) {
             record = p_frame.records[at];
+            run = ack_run_after(p_frame.records, at);
+            record.flags |= run > 0 ? ACK_RUN : 0;
         }
         if (!serialize_ack_evidence(
                 p_stream,
@@ -498,12 +534,22 @@ bool serialize_ack(Stream &p_stream, AckFrame &p_frame) {
             )) {
             return false;
         }
+        if ((record.flags & ACK_RUN) != 0) {
+            if ((record.flags & ACK_RUNS) != ACK_RUNS
+                || !p_stream.bits(run, 8) || run == 0) {
+                return false;
+            }
+            record.flags &= uint8_t(~ACK_RUN);
+        }
         if constexpr (Stream::is_reading) {
-            p_frame.records.push_back(record);
+            for (uint64_t copy = 0; copy <= run; ++copy) {
+                p_frame.records.push_back(record);
+            }
         }
         if ((record.flags & ACK_COMPACT) == 0) {
             detailed = int(at);
         }
+        at += uint32_t(run) + 1;
     }
     return p_stream.align_verify();
 }
@@ -566,6 +612,16 @@ bool decode_command(
     }
     r_frame = staged;
     return true;
+}
+
+int ack_transitions_carried(const AckFrame &p_frame) {
+    uint32_t carried = 0;
+    for (int written = 0;
+         written < ACK_RECORD_MAX && carried < p_frame.records.size();
+         ++written) {
+        carried += ack_run_after(p_frame.records, carried) + 1;
+    }
+    return int(carried);
 }
 
 PackedByteArray encode_ack(const AckFrame &p_frame) {

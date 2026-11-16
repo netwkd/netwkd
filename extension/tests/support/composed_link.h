@@ -47,7 +47,7 @@ inline const netw::wire::WireRegistry &composed_registry() {
         netw::wire::ChannelDecl decl;
         decl.id = COMPOSED_CHANNEL;
         decl.name = godot::StringName("composed_probe");
-        decl.delivery = netw::wire::Delivery::FITTED;
+        decl.delivery = netw::wire::Delivery::TICK;
         out.register_channel(decl);
         return out;
     }();

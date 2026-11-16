@@ -104,31 +104,43 @@ std::string windowed_track(int p_window) {
     return text;
 }
 
-World runner_in_a_tunnel(const std::string &p_track, int p_lost) {
+constexpr int RESTS = 20;
+constexpr int RESUMES = 35;
+
+World runner_in_a_tunnel(const std::string &p_track, int p_lost, bool p_rests) {
+    const int dark_at = p_rests ? RESUMES : 30;
     return World(p_track.c_str(), 1)
         .watch("Runner", "pressed")
         .watch("Runner", "gaps")
         .at(1, spawn("Runner", "Runner"))
         .at(3, control("Runner", 0))
-        .each(10, 50, on(0, call("Runner", "press")))
-        .at(30, impair(0, dark()))
-        .at(30 + p_lost, heal(0));
+        .each(10, p_rests ? RESTS : 50, on(0, call("Runner", "press")))
+        .each(p_rests ? RESUMES : 51, 50, on(0, call("Runner", "press")))
+        .at(dark_at, impair(0, dark()))
+        .at(dark_at + p_lost, heal(0));
 }
 
 TEST_CASE(
     "[Networked][Compliance] L3 lost input packets in a row lose no input "
-    "while the window covers them, and one more loses exactly one"
+    "while the window covers them, and one more loses exactly one, whether "
+    "the input was changing or had stood still"
 ) {
-    for (const int window : {1, 3}) {
-        const std::string track = windowed_track(window);
-        for (const int missed : {0, 1}) {
-            const int lost = window + 1 + missed;
-            CAPTURE(window);
-            CAPTURE(lost);
-            const Seen seen = runner_in_a_tunnel(track, lost).run(70);
-            NETW_HOLDS(reads(seen, SERVER, "Runner", "pressed", 41));
-            NETW_HOLDS(reads(seen, SERVER, "Runner", "gaps", missed));
-            NETW_HOLDS(quiet(seen));
+    for (const bool rests : {false, true}) {
+        for (const int window : {1, 3}) {
+            const std::string track = windowed_track(window);
+            for (const int missed : {0, 1}) {
+                const int lost = window + 1 + missed;
+                CAPTURE(rests);
+                CAPTURE(window);
+                CAPTURE(lost);
+                const Seen seen
+                    = runner_in_a_tunnel(track, lost, rests).run(70);
+                NETW_HOLDS(
+                    reads(seen, SERVER, "Runner", "pressed", rests ? 27 : 41)
+                );
+                NETW_HOLDS(reads(seen, SERVER, "Runner", "gaps", missed));
+                NETW_HOLDS(quiet(seen));
+            }
         }
     }
 }

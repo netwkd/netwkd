@@ -24,12 +24,10 @@ namespace Networked;
 /// <see cref="NetwPropertyConfig.Retained"/>,
 /// <see cref="NetwPropertyConfig.CorrectionThreshold"/> and
 /// <see cref="NetwPropertyConfig.Persisted"/> apply to one property.
-/// <see cref="NetwPropertyConfig.OnChange"/>,
 /// <see cref="NetwPropertyConfig.Heartbeat"/>,
-/// <see cref="NetwPropertyConfig.Windowed"/>,
-/// <see cref="NetwPropertyConfig.Audience"/> and
-/// <see cref="NetwPropertyConfig.Masked"/> apply to every property of the same
-/// kind on the script. Give them consistent values.
+/// <see cref="NetwPropertyConfig.Windowed"/> and
+/// <see cref="NetwPropertyConfig.Audience"/> apply to every property of the
+/// same kind on the script. Give them consistent values.
 /// <see cref="NetwMemberConfig.Interpolate"/> smooths received values. It
 /// returns a <see cref="NetwMemberConfig"/>, so chain it after the methods of
 /// this class. <b>Rigid bodies</b> When the <see cref="NetwEntity"/> root is a
@@ -62,22 +60,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     public new static NetwPropertyConfig From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
-    }
-
-    public enum Trigger : long
-    {
-        /// <summary>
-        /// Sent every tick.
-        /// </summary>
-        Tick = 0,
-        /// <summary>
-        /// Sent when a value changed.
-        /// </summary>
-        OnChange = 1,
-        /// <summary>
-        /// Sent only by <see cref="Netw.SyncProperty"/>.
-        /// </summary>
-        OnDemand = 2,
     }
 
     public enum LaneEnum : long
@@ -357,42 +339,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         }
     }
 
-    private static readonly IntPtr _bindGetSetTrigger =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "get_set_trigger",
-            2646279090UL);
-
-    private static readonly IntPtr _bindSetSetTrigger =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_set_trigger",
-            2154726264UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.OnChange"/>, or
-    /// <see cref="NetwPropertyConfig.Unset"/>.
-    /// </summary>
-    public NetwPropertyConfig.Trigger SetTrigger
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetSetTrigger, Checked, ref answered);
-            return (NetwPropertyConfig.Trigger)answered;
-        }
-        set
-        {
-            long slot0 = (long)value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetSetTrigger,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
     private static readonly IntPtr _bindGetSetHeartbeatTicks =
         NetwApi.MethodBind(
             "NetwPropertyConfig",
@@ -462,38 +408,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
             long discarded = default;
             NetwThunks.Ptrcall1_Long_Long(
                 _bindSetSetWindow,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetSetMasked =
-        NetwApi.MethodBind("NetwPropertyConfig", "get_set_masked", 36873697UL);
-
-    private static readonly IntPtr _bindSetSetMasked =
-        NetwApi.MethodBind(
-            "NetwPropertyConfig",
-            "set_set_masked",
-            2586408642UL);
-
-    /// <summary>
-    /// Set by <see cref="NetwPropertyConfig.Masked"/>.
-    /// </summary>
-    public bool SetMasked
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(_bindGetSetMasked, Checked, ref answered);
-            return answered != 0;
-        }
-        set
-        {
-            byte slot0 = value ? (byte)1 : (byte)0;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Byte_Long(
-                _bindSetSetMasked,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -761,19 +675,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         return NetwPropertyConfig.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindOnChange =
-        NetwApi.MethodBind("NetwPropertyConfig", "on_change", 1162647290UL);
-
-    /// <summary>
-    /// Enabled by default.
-    /// </summary>
-    public NetwPropertyConfig OnChange()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindOnChange, Checked, ref answered);
-        return NetwPropertyConfig.Adopt(answered);
-    }
-
     private static readonly IntPtr _bindHeartbeat =
         NetwApi.MethodBind("NetwPropertyConfig", "heartbeat", 1358280359UL);
 
@@ -841,23 +742,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
             Checked,
             in slot0,
             ref answered);
-        return NetwPropertyConfig.Adopt(answered);
-    }
-
-    private static readonly IntPtr _bindMasked =
-        NetwApi.MethodBind("NetwPropertyConfig", "masked", 1162647290UL);
-
-    /// <summary>
-    /// Changes nothing on a property with no window, because those already send
-    /// each peer only the values that changed since a state it confirmed. With
-    /// a window, as <see cref="NetwPropertyConfig.Windowed"/> sets and
-    /// <see cref="NetwPropertyConfig.Input"/> sets by default, it is ignored
-    /// with a warning. Sets <see cref="NetwPropertyConfig.SetMasked"/>.
-    /// </summary>
-    public NetwPropertyConfig Masked()
-    {
-        IntPtr answered = default;
-        NetwThunks.Ptrcall0_IntPtr(_bindMasked, Checked, ref answered);
         return NetwPropertyConfig.Adopt(answered);
     }
 

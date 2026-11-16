@@ -550,7 +550,7 @@ FlowScenario retained(const char *p_label, bool p_flips) {
 FlowScenario broadcast(const char *p_label) {
     FlowScenario out = scenario(p_label);
     out.flow = BROADCAST;
-    out.body = netw_test::gdsrc::BROADCAST_MASKED_AIM;
+    out.body = netw_test::gdsrc::BROADCAST_AIM;
     out.clients = 2;
     out.author = 0;
     out.lossy = true;

@@ -808,7 +808,6 @@ struct FieldDecl {
     bool in_broadcast = false;
     bool retained = false;
     bool persisted = false;
-    bool masked = false;
     bool server_only = false;
     bool quantized = false;
     int64_t window = -1;
@@ -895,9 +894,6 @@ Ref<NetwPropertyConfig> compile(const FieldDecl &p_field) {
     }
     if (p_field.persisted) {
         config->persisted(StringName("value"));
-    }
-    if (p_field.masked) {
-        config->masked();
     }
     if (p_field.server_only) {
         config->audience(true);
@@ -1041,22 +1037,16 @@ LawVerdict law_knobs(const Derived &p_run) {
     }
     const int64_t record = p_run.declared.record;
     int64_t window = record == PropertySet::RECORD_INPUT ? 2 : 0;
-    bool masked = false;
     for (const FieldDecl &each : p_run.owed) {
         if (each.window >= 0 && record != PropertySet::RECORD_BROADCAST) {
             window = each.window;
         }
-        masked = masked || each.masked;
     }
-    masked = masked && window <= 0;
-    if (p_run.set.get_window() != window
-        || p_run.set.get_masked() != masked) {
+    if (p_run.set.get_window() != window) {
         return law_broken(
-            "window %d masked %d, owed %d and %d",
+            "window %d, owed %d",
             int(p_run.set.get_window()),
-            int(p_run.set.get_masked()),
-            int(window),
-            int(masked)
+            int(window)
         );
     }
     return law_held();
@@ -1104,18 +1094,13 @@ const DerivationLaw DERIVATION_LAWS[] = {
      "them",
      &law_reach},
     {"knobs",
-     "the last property to name a window owns it, a broadcast keeps none, "
-     "and masked yields to a window",
+     "the last property to name a window owns it and a broadcast keeps none",
      &law_knobs},
     {"lanes",
      "each property rides the lane it declared, watches when retained, and "
      "keeps its own quantizer",
      &law_lanes},
 };
-
-void set_masked(FieldDecl &r_field) {
-    r_field.masked = true;
-}
 
 void set_cast(FieldDecl &r_field) {
     r_field.in_broadcast = true;
@@ -1147,11 +1132,6 @@ void set_controller_secret(FieldDecl &r_field) {
     r_field.policy = POLICY_ASKS_CONTROLLER;
 }
 
-void set_masked_window(FieldDecl &r_field) {
-    r_field.masked = true;
-    r_field.window = 3;
-}
-
 void set_persisted_only(FieldDecl &r_field) {
     r_field.retained = false;
     r_field.persisted = true;
@@ -1166,7 +1146,6 @@ TEST_CASE(
     faults.expect_warning("*sets NetwPropertyConfig.audience*[NW0038]*", 1);
     faults.expect_warning("*sets broadcast*[NW0038]*", 1);
     faults.expect_warning("*The window of*[NW0035]*", 1);
-    faults.expect_warning("*sets NetwPropertyConfig.masked*[NW0038]*", 1);
 
     const int64_t STATE = PropertySet::RECORD_STATE;
     const int64_t INPUT = PropertySet::RECORD_INPUT;
@@ -1183,11 +1162,6 @@ TEST_CASE(
             "two inputs",
             INPUT,
             {input_field("move"), input_field("aim")}
-        ),
-        declared(
-            "a masked broadcast",
-            CAST,
-            {with(broadcast_field("aim_dir"), &set_masked)}
         ),
         declared(
             "a broadcast asking for an audience and a window",
@@ -1233,16 +1207,6 @@ TEST_CASE(
             INPUT,
             {with(input_field("move"), &set_window_two),
              with(input_field("aim"), &set_window_five)}
-        ),
-        declared(
-            "a masked input with a window",
-            INPUT,
-            {with(input_field("move"), &set_masked_window)}
-        ),
-        declared(
-            "a masked state",
-            STATE,
-            {with(state_field("position"), &set_masked)}
         ),
     };
     for (const Declared &scenario : CORPUS) {

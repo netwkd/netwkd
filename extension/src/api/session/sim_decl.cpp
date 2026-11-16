@@ -99,8 +99,8 @@ Error NetwMultiplayer::sim_write_param(
         case SIMULATION_PARAM_SCHEDULE:
             declared.schedule = sim::Schedule(int(p_value));
             break;
-        case SIMULATION_PARAM_REPLICAS:
-            declared.replicas = sim::Replicas(int(p_value));
+        case SIMULATION_PARAM_REMOTE_MODE:
+            declared.remote_mode = sim::RemoteMode(int(p_value));
             break;
         case SIMULATION_PARAM_RESTORE:
             declared.restore = sim::Restore(int(p_value));
@@ -147,8 +147,8 @@ Variant NetwMultiplayer::sim_read_param(
         }
         case SIMULATION_PARAM_SCHEDULE:
             return int(declared.schedule);
-        case SIMULATION_PARAM_REPLICAS:
-            return int(declared.replicas);
+        case SIMULATION_PARAM_REMOTE_MODE:
+            return int(declared.remote_mode);
         case SIMULATION_PARAM_RESTORE:
             return int(declared.restore);
         case SIMULATION_PARAM_MAX_RESTORE_TICKS:
@@ -228,42 +228,6 @@ bool NetwMultiplayer::sim_physics_driven(const NetwEntity *p_wrapper) {
 bool NetwMultiplayer::sim_simulated(const NetwEntity *p_wrapper) {
     return p_wrapper != nullptr
         && (sim_step_of(p_wrapper).is_valid() || sim_physics_driven(p_wrapper));
-}
-
-void NetwMultiplayer::sim_write_choice(
-    NetwEntity *p_wrapper,
-    const RID &p_other,
-    SimPick p_pick
-) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
-    }
-    sim::Choice &choice = record->sim_declaration().choice;
-    if (p_pick == SIM_PICK_CHOSEN) {
-        sim::choose(choice, p_other, sim::Pick::CHOSEN);
-    } else {
-        sim::forget(choice, p_other);
-    }
-    sim_restate(p_wrapper, true);
-}
-
-void NetwMultiplayer::sim_write_layer(
-    NetwEntity *p_wrapper,
-    const StringName &p_layer,
-    SimPick p_pick
-) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
-    }
-    sim::Choice &choice = record->sim_declaration().choice;
-    if (p_pick == SIM_PICK_CHOSEN) {
-        sim::simulate_all(choice, p_layer);
-    } else {
-        sim::simulate_none(choice);
-    }
-    sim_restate(p_wrapper, true);
 }
 
 NetwSimulation::Restore NetwMultiplayer::sim_snap_restore_of(

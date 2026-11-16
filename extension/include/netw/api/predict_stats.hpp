@@ -49,6 +49,7 @@ struct NetwPredictStats {
         FACT_JOINT_DEPTH = 44,
         FACT_LINGER_HELD = 52,
         FACT_INSTALLS = 53,
+        FACT_RELAY_GUESSED_WRONG = 54,
     };
 
     enum Source : uint8_t {

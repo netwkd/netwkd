@@ -899,8 +899,9 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.name
                 ),
                 "If it hit an entity, add that entity to one of its "
-                "{NetwInterestLayer} layers or pass it to "
-                "{NetwSimulation.simulate}."
+                "{NetwInterestLayer} layers or set its "
+                "{NetwSimulation.remote_mode} to "
+                "{NetwSimulation.REMOTE_MODE_ACTIVE}."
             };
         case NETW_FAULT_BROADCAST_UNCORRECTED:
             return {
