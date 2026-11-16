@@ -20,16 +20,6 @@ namespace netw::persist {
 
 namespace {
 
-const GameCall MIGRATION_STEP
-    = {"The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
-       "func(values: Dictionary) -> Dictionary",
-       1};
-
-const GameCall RECORD_ID
-    = {"The NetwPersistenceConfig.record_id provider",
-       "func() -> StringName",
-       0};
-
 Node *node_of(ObjectID p_id) {
     return Object::cast_to<Node>(gd::object_of(p_id));
 }
@@ -184,7 +174,7 @@ RID durable_schema(
     const Array froms = steps.keys();
     for (int at = 0; at < froms.size(); ++at) {
         const Callable step = steps[froms[at]];
-        game_call_declared(step, MIGRATION_STEP);
+        game_call_declared(step, game_calls::MIGRATION_STEP);
         p_schemas.add_migration(schema, int(froms[at]), step);
     }
     if (p_session->schema_seal(schema) != OK) {
@@ -396,7 +386,8 @@ RID Bindings::compile(Node *p_root) {
         return RID();
     }
     bool called = false;
-    const Variant answered = game_call(provider, Array(), RECORD_ID, &called);
+    const Variant answered
+        = game_call(provider, Array(), game_calls::RECORD_ID, &called);
     if (!called) {
         return RID();
     }

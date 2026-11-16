@@ -11,7 +11,8 @@ namespace Networked;
 /// </summary>
 /// <remarks>
 /// Lag compensation starts automatically for <see cref="NetwPrediction"/> and
-/// <see cref="NetwAction"/>. Once applied, settings cannot change.
+/// for an action declared with <see cref="Netw.ConfigureAction"/>. Once
+/// applied, settings cannot change.
 /// <code>
 /// func _init() -&gt; void:
 ///     Netw.configure_lagcomp(self) \
@@ -89,7 +90,7 @@ public sealed class NetwLagCompensationConfig : NetwRefCounted
 
     /// <summary>
     /// How many ticks a
-    /// <see cref="NetwAction.TimingModeEnum.TickAlignedStateReady"/> action
+    /// <see cref="NetwActionConfig.TimingEnum.TickAlignedStateReady"/> action
     /// waits for missing input before running anyway. Raise it for connections
     /// that lose packets often. Lower it to answer players sooner.
     /// </summary>

@@ -66,6 +66,14 @@ godot::Error declare_database(
 
 godot::Dictionary databases_on(godot::Node *p_scope);
 
+godot::Error declare_action(
+    godot::Node *p_scope,
+    const godot::StringName &p_method,
+    const godot::Variant &p_config
+);
+
+godot::Dictionary actions_on(godot::Node *p_scope);
+
 class Book {
 public:
     Resolved resolve(NetwMultiplayer *p_api, Kind p_kind);

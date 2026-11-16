@@ -17,9 +17,6 @@ namespace {
 
 constexpr SubsystemName MODULE = sys::LAGCOMP;
 
-const GameCall REWIND_BODY
-    = {"The Netw.rewind body", "func() -> Variant", 0};
-
 bool is_suspended_call(const Variant &p_answered) {
     if (p_answered.get_type() != Variant::OBJECT) {
         return false;
@@ -490,7 +487,7 @@ Variant NetwLagCompCore::rewind(
     }
 
     const Variant answered = p_body.is_valid()
-        ? game_call(p_body, Array(), REWIND_BODY)
+        ? game_call(p_body, Array(), game_calls::REWIND_BODY)
         : Variant();
     if (r_awaited != nullptr) {
         *r_awaited = is_suspended_call(answered);

@@ -1,6 +1,7 @@
 #include "netw/api/account_provider.hpp"
 
 #include "godot/class_db.hpp"
+#include "netw/game_call.hpp"
 
 using namespace godot;
 
@@ -21,11 +22,14 @@ Variant NetwAccountProvider::verify(
     const Ref<NetwJoinRequest> &p_request,
     const Variant &p_proof
 ) {
-    Variant answer;
-    if (GDVIRTUAL_CALL(_verify, p_request, p_proof, answer)) {
-        return answer;
+    const StringName method("_verify");
+    if (!has_method(method)) {
+        return Variant();
     }
-    return Variant(int64_t(OK));
+    Array args;
+    args.push_back(p_request);
+    args.push_back(p_proof);
+    return game_call(Callable(this, method), args, game_calls::ACCOUNT_VERIFY);
 }
 
 void NetwAccountProvider::_bind_methods() {

@@ -29,7 +29,7 @@ the past.
 
 .. code-block:: gdscript
 
-    func _fire(ctx: NetwActionContext, origin: Vector3, aim: Vector3) -> void:
+    func _fire(ctx: NetwActionRequest, origin: Vector3, aim: Vector3) -> void:
         var ray := PhysicsRayQueryParameters3D.create(origin, origin + aim)
         Netw.rewind(targets, ctx.view_tick, func() -> void:
             var hit := get_world_3d().direct_space_state.intersect_ray(ray)
@@ -40,7 +40,7 @@ Return what the query found, and change the property afterwards.
 
 .. code-block:: gdscript
 
-    func _fire(ctx: NetwActionContext, origin: Vector3, aim: Vector3) -> void:
+    func _fire(ctx: NetwActionRequest, origin: Vector3, aim: Vector3) -> void:
         var ray := PhysicsRayQueryParameters3D.create(origin, origin + aim)
         var hit: Dictionary = Netw.rewind(targets, ctx.view_tick,
                 func() -> Dictionary:

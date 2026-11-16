@@ -84,7 +84,7 @@ Methods
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Variant`                      | :ref:`answer<class_NetwPromise_method_answer>`\ (\ ) |const|                                                                                                   |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`catch_error<class_NetwPromise_method_catch_error>`\ (\ cb\: :godot:`Callable`\ )                                                                         |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`catch_error<class_NetwPromise_method_catch_error>`\ (\ callback\: :godot:`Callable`\ )                                                                   |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                | :ref:`reject<class_NetwPromise_method_reject>`\ (\ err_code\: :godot:`Error <@GlobalScope#enum_@globalscope_Error>`, err_detail\: :godot:`String` = ""\ )      |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -94,11 +94,11 @@ Methods
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>` | :ref:`resolved<class_NetwPromise_method_resolved>`\ (\ value\: :godot:`Variant`\ ) |static|                                                                    |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`then<class_NetwPromise_method_then>`\ (\ cb\: :godot:`Callable`\ )                                                                                       |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`then<class_NetwPromise_method_then>`\ (\ callback\: :godot:`Callable`\ )                                                                                 |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Signal`                       | :ref:`wait<class_NetwPromise_method_wait>`\ (\ )                                                                                                               |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`when_settled<class_NetwPromise_method_when_settled>`\ (\ cb\: :godot:`Callable`\ )                                                                       |
+   | :ref:`NetwPromise<class_NetwPromise>` | :ref:`when_settled<class_NetwPromise_method_when_settled>`\ (\ callback\: :godot:`Callable`\ )                                                                 |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -244,9 +244,13 @@ Returns :ref:`result<class_NetwPromise_property_result>` on success, or :ref:`co
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **catch_error**\ (\ cb\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPromise_method_catch_error>`
+:ref:`NetwPromise<class_NetwPromise>` **catch_error**\ (\ callback\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPromise_method_catch_error>`
 
-Calls ``cb`` as ``cb(code, detail)`` when the promise fails. Returns the promise.
+Calls ``callback`` with :ref:`code<class_NetwPromise_property_code>` and :ref:`detail<class_NetwPromise_property_detail>` when the promise fails. Returns the promise.
+
+::
+
+    func show_error(code: Error, detail: String) -> void:
 
 .. rst-class:: classref-item-separator
 
@@ -304,9 +308,13 @@ Returns a promise that already completed with ``value``.
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **then**\ (\ cb\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPromise_method_then>`
+:ref:`NetwPromise<class_NetwPromise>` **then**\ (\ callback\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPromise_method_then>`
 
-Calls ``cb`` with :ref:`result<class_NetwPromise_property_result>` when the promise completes. Returns the promise.
+Calls ``callback`` with :ref:`result<class_NetwPromise_property_result>` when the promise completes. Returns the promise.
+
+::
+
+    func show_receipt(receipt: Dictionary) -> void:
 
 .. rst-class:: classref-item-separator
 
@@ -332,9 +340,9 @@ Returns a new signal to ``await``, which fires once with :ref:`answer()<class_Ne
 
 .. rst-class:: classref-method
 
-:ref:`NetwPromise<class_NetwPromise>` **when_settled**\ (\ cb\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPromise_method_when_settled>`
+:ref:`NetwPromise<class_NetwPromise>` **when_settled**\ (\ callback\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPromise_method_when_settled>`
 
-Calls ``cb`` with no arguments when the promise settles, whether it completed or failed. Returns the promise.
+Calls ``callback`` with no arguments when the promise settles, whether it completed or failed. Returns the promise.
 
 ::
 

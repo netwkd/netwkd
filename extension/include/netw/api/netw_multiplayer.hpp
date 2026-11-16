@@ -15,7 +15,8 @@
 #include "godot/variant.hpp"
 #include "godot/viewport.hpp"
 #include "netw/action_gate_book.hpp"
-#include "netw/api/action.hpp"
+#include "netw/api/action_config.hpp"
+#include "netw/api/action_request.hpp"
 #include "netw/api/clock.hpp"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/connection.hpp"
@@ -358,7 +359,13 @@ private:
     godot::LocalVector<PendingAction> pending_actions;
     godot::LocalVector<PendingAction> actions_still_waiting;
     int64_t gate_fallbacks = 0;
-    godot::HashMap<godot::String, int64_t> action_slots;
+
+    struct ActionDenial {
+        godot::Error code = godot::ERR_UNAUTHORIZED;
+        godot::String reason;
+    };
+
+    godot::HashMap<godot::StringName, ActionDenial> action_denials;
 
     godot::Node *node_from_tree_path(const godot::NodePath &p_path) const;
     bool can_resolve_action(const PendingAction &p_request) const;
@@ -861,6 +868,7 @@ private:
         bool flag = false;
         bool paused = false;
         godot::String reason;
+        godot::Error refusal = godot::OK;
         godot::Dictionary report;
     };
     static void entity_announce(godot::Object *p_wrapper, Announcement p_row);
@@ -1172,7 +1180,6 @@ private:
     };
     struct LayerMonitorRow {
         godot::Callable watch;
-        bool typed = false;
     };
     struct LayerRow {
         godot::StringName name;
@@ -1984,13 +1991,15 @@ public:
         int64_t p_requester,
         NetwEntity *p_entity,
         godot::Node *p_destination,
-        godot::String &r_reason
+        godot::String &r_reason,
+        godot::Error &r_code
     );
     void lifecycle_notify_refused(
         NetwEntity *p_entity,
         lifecycle::Kind p_kind,
         godot::ObjectID p_destination,
-        const godot::String &p_reason
+        const godot::String &p_reason,
+        godot::Error p_code
     );
     void lifecycle_withdraw_author(int64_t p_route, int64_t p_author);
     bool lifecycle_withhold_despawn(
@@ -2000,7 +2009,8 @@ public:
     bool lifecycle_answer_withheld(
         int64_t p_route,
         bool p_accepted,
-        const godot::String &p_reason
+        const godot::String &p_reason,
+        godot::Error p_code
     );
     bool lifecycle_forget_withheld(const godot::RID &p_entity);
     void lifecycle_detach_ahead(NetwEntity *p_dying);
@@ -2394,13 +2404,8 @@ public:
     ) const;
     void layer_set_monitor(
         const godot::RID &p_layer,
-        const godot::Callable &p_callback,
-        bool p_typed
+        const godot::Callable &p_callback
     );
-    godot::Callable layer_get_monitor(
-        const godot::RID &p_layer,
-        bool p_typed
-    ) const;
 
     godot::Error run_layer_drivers();
     int64_t layer_driver_count() const;
@@ -2708,11 +2713,38 @@ public:
     );
     void lagcomp_action_deny(
         int64_t p_requester,
+        const godot::StringName &p_key,
+        godot::Error p_code = godot::ERR_UNAUTHORIZED,
+        const godot::String &p_reason = godot::String()
+    );
+    void lagcomp_action_confirm(
+        int64_t p_requester,
         const godot::StringName &p_key
     );
     void effect_deny_action(
         int64_t p_requester,
-        const godot::StringName &p_key
+        const godot::StringName &p_key,
+        godot::Error p_code = godot::ERR_UNAUTHORIZED,
+        const godot::String &p_reason = godot::String()
+    );
+    void effect_discard_denied(
+        const godot::StringName &p_key,
+        godot::Error p_code,
+        const godot::String &p_reason
+    );
+    godot::Error action_ask(
+        const godot::Callable &p_method,
+        int64_t p_view_tick,
+        const godot::Array &p_args
+    );
+    void action_run_revert(
+        const godot::StringName &p_key,
+        const godot::Ref<NetwActionConfig> &p_declared,
+        int64_t p_predicted
+    );
+    void action_run_confirm(
+        const godot::Ref<NetwActionConfig> &p_declared,
+        int64_t p_predicted
     );
     void effect_confirm_action(
         int64_t p_requester,
@@ -2724,25 +2756,24 @@ public:
         const godot::StringName &p_method,
         int64_t p_view_tick,
         const godot::Array &p_args,
-        const godot::StringName &p_key,
-        int p_timing_mode,
         int64_t p_requester
     );
     void action_send_request(
         const godot::NodePath &p_target_path,
         const godot::StringName &p_method,
         int64_t p_view_tick,
-        const godot::Array &p_args,
-        const godot::StringName &p_key,
-        int p_timing_mode
+        const godot::Array &p_args
     );
     godot::Error lagcomp_action_request(
-        const godot::StringName &p_key,
         const godot::NodePath &p_target,
         const godot::StringName &p_method,
         int64_t p_view_tick,
-        const godot::Array &p_args,
-        NetwAction::TimingMode p_timing
+        const godot::Array &p_args
+    );
+    static godot::Ref<NetwActionConfig> lagcomp_action_declare(
+        godot::Node *p_root,
+        const godot::StringName &p_method,
+        const godot::Callable &p_handler
     );
     void drain_pending_actions(int64_t p_tick);
     void tick_step(double p_delta, int64_t p_tick);
@@ -3034,8 +3065,7 @@ public:
     int64_t native_prediction_slot(
         const godot::Ref<NetwEntity> &p_entity
     ) const;
-    int64_t action_slot_of(const godot::Callable &p_authority);
-    godot::Ref<NetwAction> lagcomp_action(const godot::Callable &p_authority);
+    void lagcomp_action_install_from(godot::Node *p_scope);
     void register_prediction(const godot::Ref<NetwEntity> &p_entity);
     void unregister_prediction(const godot::Ref<NetwEntity> &p_entity);
     godot::Error predict_declare(const godot::RID &p_entity);
@@ -4859,7 +4889,7 @@ public:
     godot::StringName lagcomp_action_key(
         const godot::RID &p_entity,
         int64_t p_view_tick,
-        int64_t p_slot
+        const godot::StringName &p_method
     ) const;
     godot::Error lagcomp_timeline_declare(const godot::RID &p_entity);
     void lagcomp_timeline_undeclare(const godot::RID &p_entity);
@@ -5215,13 +5245,17 @@ private:
     static void control_settle(
         NetwEntity *p_entity,
         uint64_t p_op,
-        entity::Control::Outcome p_outcome
+        entity::Control::Outcome p_outcome,
+        godot::Error p_code,
+        const godot::String &p_reason
     );
     static void control_settle_claim(
         NetwEntity *p_entity,
         const godot::Ref<NetwPromise> &p_promise,
         const entity::Control::Pending &p_taken,
-        entity::Control::Outcome p_outcome
+        entity::Control::Outcome p_outcome,
+        godot::Error p_code,
+        const godot::String &p_reason
     );
     static void control_handle_request(
         NetwEntity *p_entity,
@@ -5233,7 +5267,9 @@ private:
         int64_t p_requester,
         uint64_t p_op,
         int64_t p_hold,
-        int64_t p_source_route = 0
+        int64_t p_source_route = 0,
+        godot::Error *r_code = nullptr,
+        godot::String *r_reason = nullptr
     );
     static entity::Control::Outcome control_decide_release(
         NetwEntity *p_entity,
@@ -5246,7 +5282,9 @@ private:
         NetwEntity *p_entity,
         int64_t p_requester,
         uint64_t p_op,
-        entity::Control::Outcome p_outcome
+        entity::Control::Outcome p_outcome,
+        godot::Error p_code = godot::OK,
+        const godot::String &p_reason = godot::String()
     );
     static void control_restate(NetwEntity *p_entity, int64_t p_peer);
     static void control_decide(

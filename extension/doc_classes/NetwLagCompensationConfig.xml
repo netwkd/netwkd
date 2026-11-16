@@ -4,7 +4,7 @@
 		How long the server waits for a late player action, and how far ahead of itself it will take one.
 	</brief_description>
 	<description>
-		Lag compensation starts automatically for [NetwPrediction] and [NetwAction].
+		Lag compensation starts automatically for [NetwPrediction] and for an action declared with [method Netw.configure_action].
 		Once applied, settings cannot change.
 		[codeblock]
 		func _init() -&gt; void:
@@ -33,7 +33,7 @@
 	</methods>
 	<members>
 		<member name="input_gate_deadline_ticks" type="int" setter="set_input_gate_deadline_ticks" getter="get_input_gate_deadline_ticks">
-			How many ticks a [constant NetwAction.TIMING_TICK_ALIGNED_STATE_READY] action waits for missing input before running anyway. Raise it for connections that lose packets often. Lower it to answer players sooner.
+			How many ticks a [constant NetwActionConfig.TIMING_TICK_ALIGNED_STATE_READY] action waits for missing input before running anyway. Raise it for connections that lose packets often. Lower it to answer players sooner.
 		</member>
 		<member name="max_future_action_ticks" type="int" setter="set_max_future_action_ticks" getter="get_max_future_action_ticks">
 			How many ticks ahead of the server an action may be. Further ahead is denied, so a client cannot claim it acted in the future.

@@ -323,8 +323,9 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 "The host could not join its own session, so it has no "
                 "{NetwPlayer}.",
                 vformat(
-                    "Admit peer 1 in the {Netw.configure_admission} handler, "
-                    "which refused it with %s.",
+                    "Call {NetwJoinRequest.admit} for peer 1 in the "
+                    "{Netw.configure_admission} handler. The join was refused "
+                    "with %s.",
                     v.detail
                 )
             };
@@ -963,6 +964,41 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                           v.name
                       ),
                 "Set it on each one in that property's own units."
+            };
+        case NETW_FAULT_ACTION_OFF_ROOT:
+            return {
+                vformat(
+                    "{Netw.action} got a method of '%s', which is not the "
+                    "root node of a {NetwEntity}.",
+                    v.owner
+                ),
+                "Declare the action and call {Netw.action} in the script on "
+                "the entity's root node."
+            };
+        case NETW_FAULT_ACTION_NOT_DECLARED:
+            return {
+                vformat(
+                    "{Netw.action} got '%s', which is not a declared action.",
+                    v.name
+                ),
+                "Declare it with {Netw.configure_action} in _init."
+            };
+        case NETW_FAULT_JOIN_UNANSWERED:
+            return {
+                "The {Netw.configure_admission} handler finished without an "
+                "answer, so the join was refused.",
+                "Call {NetwJoinRequest.admit} to let the player join, or "
+                "{NetwRequest.deny} to refuse."
+            };
+        case NETW_FAULT_HANDLER_AWAITED:
+            return {
+                vformat(
+                    "%s awaited, so the request was judged before it "
+                    "finished.",
+                    v.name
+                ),
+                "Call {NetwRequest.deny} before the first await, or do not "
+                "await in this handler."
             };
     }
     return {};

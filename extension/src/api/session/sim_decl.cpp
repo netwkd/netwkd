@@ -16,12 +16,6 @@ namespace netw {
 
 namespace {
 
-const GameCall SIMULATION_STEP
-    = {"NetwSimulation.network_process",
-       "func _network_process(delta: float, tick: int, is_fresh: bool) "
-       "-> void",
-       3};
-
 const StringName &network_process_name() {
     static const StringName name("_network_process");
     return name;
@@ -168,7 +162,7 @@ void NetwMultiplayer::sim_write_step(
     NetwEntity *p_wrapper,
     const Callable &p_step
 ) {
-    game_call_declared(p_step, SIMULATION_STEP);
+    game_call_declared(p_step, game_calls::SIMULATION_STEP);
     NetwEntityRecord *record = record_of_wrapper(p_wrapper);
     if (record == nullptr) {
         return;

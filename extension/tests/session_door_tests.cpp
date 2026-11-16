@@ -11,6 +11,7 @@
 #include "netw/api/clock.hpp"
 #include "netw/api/clock_config.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/entity.hpp"
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/nodes/multiplayer_viewport.hpp"
@@ -41,6 +42,20 @@ func none() -> void:
 	calls += 1
 
 func one(_value) -> void:
+	calls += 1
+
+func mistyped(_delta: float, _tick: String, _is_fresh: bool) -> void:
+	calls += 1
+)";
+
+constexpr const char *PROVIDERS = R"(extends Node
+
+var calls := 0
+
+func ancestor(info: RefCounted) -> void:
+	calls += 1
+
+func untyped(info):
 	calls += 1
 )";
 
@@ -76,6 +91,10 @@ struct Mounted {
 
     Ref<MultiplayerAPI> api() const {
         return tree->get_api();
+    }
+
+    netw::NetwMultiplayer *core() const {
+        return Object::cast_to<netw::NetwMultiplayer>(api().ptr());
     }
 
     Ref<MultiplayerPeer> peer() const {
@@ -308,6 +327,90 @@ LawVerdict step_with_wrong_parameters(const Stand &) {
     return law_held();
 }
 
+LawVerdict step_with_wrong_type(const Stand &) {
+    FaultWatch watch;
+    watch.expect_error("*NetwSimulation.network_process*[NW1002]*", 1);
+    const Ref<RefCounted> on = handlers();
+    Ref<netw::NetwSimulation> simulation;
+    simulation.instantiate();
+
+    simulation->set_network_process(Callable(on.ptr(), StringName("mistyped")));
+    return law_held();
+}
+
+LawVerdict provider_answers(const char *p_method) {
+    FaultWatch watch;
+    watch.expect_error("*[NW1002]*", 0);
+    const Mounted branch("DoorProvider");
+    Node *host = netw_test::minted_node(PROVIDERS);
+    REQUIRE(host != nullptr);
+    branch.tree->add_child(host);
+    Netw::configure_server_info(Callable(host, StringName(p_method)));
+
+    bool answered = false;
+    branch.core()->probe_reply_payload(answered);
+
+    if (!answered || int(host->get(StringName("calls"))) != 1) {
+        return law_broken("the provider did not answer the probe");
+    }
+    return law_held();
+}
+
+LawVerdict provider_taking_ancestor(const Stand &) {
+    return provider_answers("ancestor");
+}
+
+LawVerdict provider_without_types(const Stand &) {
+    return provider_answers("untyped");
+}
+
+LawVerdict completed_without_parameters(const Stand &) {
+    FaultWatch watch;
+    watch.expect_error(
+        "*The NetwConnection.create_peer callback*[NW1002]*",
+        1
+    );
+    const Ref<RefCounted> on = handlers();
+    const Mounted branch("DoorCreatePeer");
+
+    const RID ticket = branch.core()->transport_create_peer(
+        RID(),
+        netw::NetwMultiplayer::TRANSPORT_MODE_CLIENT,
+        String("nowhere.example"),
+        Dictionary(),
+        Callable(on.ptr(), StringName("none"))
+    );
+
+    if (ticket.is_valid()) {
+        return law_broken("a callback that takes no peer got a ticket");
+    }
+    return law_held();
+}
+
+LawVerdict drawn_without_parameters(const Stand &) {
+    FaultWatch watch;
+    watch.expect_error(
+        "*The NetwMultiplayer.display_set_callback callback*[NW1002]*",
+        1
+    );
+    const Ref<RefCounted> on = handlers();
+    const Mounted branch("DoorDisplay");
+    Node *drawn = memnew(Node);
+    const Ref<netw::NetwEntity> record = netw::NetwEntity::ensure(drawn);
+    branch.tree->add_child(drawn);
+    const RID entity = record->get_rid_handle();
+    netw::NetwMultiplayer *core = branch.core();
+    core->display_set_callback(entity, Callable(on.ptr(), StringName("none")));
+
+    core->display_write_track(entity, StringName("position"), Vector2());
+    core->display_write_track(entity, StringName("position"), Vector2());
+
+    if (calls_on(on) != 0) {
+        return law_broken("a callback that takes no entity ran");
+    }
+    return law_held();
+}
+
 const Row ROWS[] = {
     {"a session handle and its clock kept after the session is freed",
      "every read answers empty, leave answers a promise, and the clock "
@@ -341,6 +444,21 @@ const Row ROWS[] = {
     {"a simulation step with the wrong parameters",
      "one NW1002 names NetwSimulation.network_process when the step is set",
      &step_with_wrong_parameters},
+    {"a simulation step that declares tick as a String",
+     "one NW1002 names NetwSimulation.network_process when the step is set",
+     &step_with_wrong_type},
+    {"a server info provider that declares its parameter as RefCounted",
+     "nothing is reported and it answers the probe",
+     &provider_taking_ancestor},
+    {"a server info provider that declares no types",
+     "nothing is reported and it answers the probe",
+     &provider_without_types},
+    {"a create_peer callback that takes no parameters",
+     "no ticket is handed out and one NW1002 names NetwConnection.create_peer",
+     &completed_without_parameters},
+    {"a display callback that takes no parameters, drawn twice",
+     "it never runs and one NW1002 names display_set_callback",
+     &drawn_without_parameters},
 };
 
 TEST_CASE(

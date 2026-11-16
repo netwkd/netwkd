@@ -1674,7 +1674,7 @@ LawVerdict packed_array_grown_in_place(const World &) {
     return law_held();
 }
 
-void deny_every_request(int64_t, Object *p_request) {
+void deny_every_request(Object *p_request) {
     NetwControlRequest *asked = Object::cast_to<NetwControlRequest>(p_request);
     if (asked != nullptr) {
         asked->deny();
@@ -1692,10 +1692,7 @@ LawVerdict refused_claim_writes_back(const World &) {
     board.node(-1)->set("ink", stroke(3));
     board.rig.step_ticks(6);
     NetwEntity::of(board.node(-1))
-        ->connect(
-            StringName("control_requested"),
-            callable_mp_static(&deny_every_request)
-        );
+        ->set_control_handler(callable_mp_static(&deny_every_request));
     const int flight = 8;
     Ref<netw::NetwLinkConditions> slow = netw_test::link(31);
     slow->set_latency_ms(double(flight) * 1000.0 / TICKRATE);

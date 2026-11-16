@@ -426,7 +426,7 @@ void NetwConnection::_bind_methods() {
             "mode",
             "address",
             "settings",
-            "completed"
+            "callback"
         ),
         &NetwConnection::create_peer
     );

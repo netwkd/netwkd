@@ -393,7 +393,8 @@ bool NetwMultiplayer::lifecycle_filter_denies(
     int64_t p_requester,
     NetwEntity *p_entity,
     Node *p_destination,
-    String &r_reason
+    String &r_reason,
+    Error &r_code
 ) {
     if (p_entity == nullptr) {
         return false;
@@ -404,17 +405,18 @@ bool NetwMultiplayer::lifecycle_filter_denies(
         Ref<NetwEntity>(p_entity),
         p_destination
     );
-    p_entity
-        ->emit_signal(StringName("lifecycle_requested"), p_requester, request);
+    p_entity->judge_lifecycle(request);
     r_reason = request->get_reason();
-    return request->get_denied();
+    r_code = request->get_code();
+    return request->is_denied();
 }
 
 void NetwMultiplayer::lifecycle_notify_refused(
     NetwEntity *p_entity,
     lifecycle::Kind p_kind,
     ObjectID p_destination,
-    const String &p_reason
+    const String &p_reason,
+    Error p_code
 ) {
     if (p_entity == nullptr) {
         return;
@@ -425,6 +427,7 @@ void NetwMultiplayer::lifecycle_notify_refused(
     row.requester = get_unique_id();
     row.node = p_destination;
     row.reason = p_reason;
+    row.refusal = p_code;
     entity_announce(p_entity, row);
 }
 
@@ -448,19 +451,21 @@ bool NetwMultiplayer::lifecycle_admit_despawn(
         return true;
     }
     String reason;
+    Error denied = OK;
     if (lifecycle_filter_denies(
             lifecycle::Kind::DESPAWN,
             p_sender,
             entity.ptr(),
             nullptr,
-            reason
+            reason,
+            denied
         )) {
         lifecycle_decide(
             op.route,
             p_sender,
             lifecycle::Kind::DESPAWN,
             op.base,
-            ERR_UNAUTHORIZED,
+            denied,
             reason
         );
         return false;
@@ -511,7 +516,8 @@ bool NetwMultiplayer::lifecycle_withhold_despawn(
 bool NetwMultiplayer::lifecycle_answer_withheld(
     int64_t p_route,
     bool p_accepted,
-    const String &p_reason
+    const String &p_reason,
+    Error p_code
 ) {
     HashMap<uint64_t, WithheldDespawn>::Iterator found
         = lifecycle_withheld.begin();
@@ -547,7 +553,8 @@ bool NetwMultiplayer::lifecycle_answer_withheld(
         entity,
         lifecycle::Kind::DESPAWN,
         gd::instance_id(owner->get_parent()),
-        p_reason
+        p_reason,
+        p_code
     );
     lifecycle_restore_detached(p_route);
     entity_settle_captured(entity);
@@ -700,19 +707,21 @@ bool NetwMultiplayer::lifecycle_admit_move(
         return true;
     }
     String reason;
+    Error denied = OK;
     if (lifecycle_filter_denies(
             lifecycle::Kind::REPARENT,
             p_sender,
             wrapper_for_route(op.route).ptr(),
             parent,
-            reason
+            reason,
+            denied
         )) {
         lifecycle_decide(
             op.route,
             p_sender,
             lifecycle::Kind::REPARENT,
             op.base,
-            ERR_UNAUTHORIZED,
+            denied,
             reason
         );
         return false;
@@ -825,11 +834,12 @@ void NetwMultiplayer::lifecycle_receive_decision(
         return;
     }
     const lifecycle::Kind decided = lifecycle::Kind(kind);
+    const Error code = Error(int(code_named));
     if (decided == lifecycle::Kind::DESPAWN) {
         if (accepted) {
             lifecycle_detached_ahead.erase(route);
         }
-        if (lifecycle_answer_withheld(route, accepted, reason)) {
+        if (lifecycle_answer_withheld(route, accepted, reason, code)) {
             return;
         }
         if (!accepted) {
@@ -848,10 +858,9 @@ void NetwMultiplayer::lifecycle_receive_decision(
     const ObjectID asked
         = gd::instance_id(owner != nullptr ? owner->get_parent() : nullptr);
     if (decided != lifecycle::Kind::REPARENT) {
-        lifecycle_notify_refused(entity.ptr(), decided, asked, reason);
+        lifecycle_notify_refused(entity.ptr(), decided, asked, reason, code);
         return;
     }
-    const Error code = Error(int(code_named));
     const String detail = !reason.is_empty()
         ? reason
         : vformat(
@@ -870,7 +879,7 @@ void NetwMultiplayer::lifecycle_receive_decision(
         anchored ? anchor_resolve(anchor) : nullptr,
         standing
     );
-    lifecycle_notify_refused(entity.ptr(), decided, asked, reason);
+    lifecycle_notify_refused(entity.ptr(), decided, asked, reason, code);
 }
 
 void NetwMultiplayer::entity_settle_foreign_move(const EntityDeparture &p_row) {

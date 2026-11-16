@@ -15,15 +15,6 @@ namespace {
 const char *SIG_PEER_COMPLETED = "peer_completed";
 const char *SIG_SETTLED = "settled";
 
-const GameCall GROUP_THEN
-    = {"The NetwGroupPromise.then callback",
-       "func(results: Dictionary)",
-       1};
-const GameCall GROUP_CATCH
-    = {"The NetwGroupPromise.catch_error callback",
-       "func(code: Error, detail: String)",
-       2};
-
 } // namespace
 
 Ref<NetwGroupPromise> NetwGroupPromise::create(
@@ -71,7 +62,7 @@ Ref<NetwGroupPromise> NetwGroupPromise::then(const Callable &p_callback) {
     if (completed) {
         Array args;
         args.push_back(results);
-        game_call(p_callback, args, GROUP_THEN);
+        game_call(p_callback, args, game_calls::GROUP_THEN);
     } else {
         then_callbacks.push_back(p_callback);
     }
@@ -85,7 +76,7 @@ Ref<NetwGroupPromise> NetwGroupPromise::catch_error(
         Array args;
         args.push_back(code);
         args.push_back(detail);
-        game_call(p_callback, args, GROUP_CATCH);
+        game_call(p_callback, args, game_calls::GROUP_CATCH);
     } else {
         catch_callbacks.push_back(p_callback);
     }
@@ -157,7 +148,7 @@ void NetwGroupPromise::resolve_all() {
     Array args;
     args.push_back(results);
     for (uint32_t at = 0; at < chained.size(); ++at) {
-        game_call(chained[at], args, GROUP_THEN);
+        game_call(chained[at], args, game_calls::GROUP_THEN);
     }
     promise_wait::release(waiting, results);
 }
@@ -184,7 +175,7 @@ void NetwGroupPromise::reject(Error p_code, const String &p_detail) {
     args.push_back(p_code);
     args.push_back(p_detail);
     for (uint32_t at = 0; at < chained.size(); ++at) {
-        game_call(chained[at], args, GROUP_CATCH);
+        game_call(chained[at], args, game_calls::GROUP_CATCH);
     }
     promise_wait::release(waiting, Variant(p_code));
 }
@@ -197,9 +188,9 @@ void NetwGroupPromise::_bind_methods() {
     );
     ClassDB::bind_method(D_METHOD("wait"), &NetwGroupPromise::wait);
     ClassDB::bind_method(D_METHOD("answer"), &NetwGroupPromise::answer);
-    ClassDB::bind_method(D_METHOD("then", "cb"), &NetwGroupPromise::then);
+    ClassDB::bind_method(D_METHOD("then", "callback"), &NetwGroupPromise::then);
     ClassDB::bind_method(
-        D_METHOD("catch_error", "cb"),
+        D_METHOD("catch_error", "callback"),
         &NetwGroupPromise::catch_error
     );
     ClassDB::bind_method(

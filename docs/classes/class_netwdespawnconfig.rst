@@ -48,11 +48,11 @@ Methods
 .. table::
    :widths: auto
 
-   +---------------------------------------------------+----------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwDespawnConfig<class_NetwDespawnConfig>` | :ref:`before_removal<class_NetwDespawnConfig_method_before_removal>`\ (\ callable\: :godot:`Callable`\ ) |
-   +---------------------------------------------------+----------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwDespawnConfig<class_NetwDespawnConfig>` | :ref:`linger<class_NetwDespawnConfig_method_linger>`\ (\ seconds\: :godot:`float`\ )                     |
-   +---------------------------------------------------+----------------------------------------------------------------------------------------------------------+
+   +---------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwDespawnConfig<class_NetwDespawnConfig>` | :ref:`before_removal<class_NetwDespawnConfig_method_before_removal>`\ (\ method\: :godot:`Callable`\ ) |
+   +---------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwDespawnConfig<class_NetwDespawnConfig>` | :ref:`linger<class_NetwDespawnConfig_method_linger>`\ (\ seconds\: :godot:`float`\ )                   |
+   +---------------------------------------------------+--------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -106,9 +106,13 @@ Method Descriptions
 
 .. rst-class:: classref-method
 
-:ref:`NetwDespawnConfig<class_NetwDespawnConfig>` **before_removal**\ (\ callable\: :godot:`Callable`\ ) :ref:`🔗<class_NetwDespawnConfig_method_before_removal>`
+:ref:`NetwDespawnConfig<class_NetwDespawnConfig>` **before_removal**\ (\ method\: :godot:`Callable`\ ) :ref:`🔗<class_NetwDespawnConfig_method_before_removal>`
 
-Only the method name of ``callable`` is kept. Each :ref:`NetwEntity<class_NetwEntity>` root calls that method before removal.
+Only the method name of ``method`` is kept. Each :ref:`NetwEntity<class_NetwEntity>` root calls that method before removal.
+
+::
+
+    func play_death_vfx() -> void:
 
 .. rst-class:: classref-item-separator
 

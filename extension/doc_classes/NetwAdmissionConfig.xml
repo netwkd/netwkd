@@ -4,17 +4,18 @@
 		Settings for a session's admission handler.
 	</brief_description>
 	<description>
-		The server passes each joining client's [NetwJoinRequest] to the handler, which may [code]await[/code]. The client is not connected and receives nothing until the handler returns [constant @GlobalScope.OK]. Any other [enum @GlobalScope.Error] refuses it, and the client receives that code unchanged in [signal NetwSession.join_failed], with the reason given to [method NetwJoinRequest.refuse].
+		The server passes each joining client's [NetwJoinRequest] to the handler, which may [code]await[/code]. The client is not connected and receives nothing until the handler calls [method NetwJoinRequest.admit]. Calling [method NetwRequest.deny] refuses it, and the client receives that code and reason in [signal NetwSession.join_failed].
 		[codeblock]
 		var lobby_open := true
 
 		func _init() -&gt; void:
 		    Netw.configure_admission(admit)
 
-		func admit(request: NetwJoinRequest) -&gt; Error:
-		    if not lobby_open:
-		        return request.refuse(ERR_BUSY, "The match has started.")
-		    return OK
+		func admit(request: NetwJoinRequest) -&gt; void:
+		    if lobby_open:
+		        request.admit()
+		    else:
+		        request.deny("The match has started.", ERR_BUSY)
 		[/codeblock]
 		Each [NetwAccountProvider] accepted here proves one kind of account before the handler runs.
 	</description>

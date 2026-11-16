@@ -54,7 +54,7 @@ public:
         enums::NetwConnection::TransportMode p_mode,
         const godot::String &p_address,
         const godot::Dictionary &p_settings,
-        const godot::Callable &p_completed
+        const godot::Callable &p_callback
     );
     void cancel_peer_creation(const godot::RID &p_ticket);
 

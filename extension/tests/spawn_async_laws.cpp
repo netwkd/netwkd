@@ -9,7 +9,7 @@
 
 #include "godot/node.hpp"
 #include "godot/object.hpp"
-#include "netw/api/action.hpp"
+#include "netw/api/action_request.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/interest_layer.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -470,7 +470,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] NetwActionContext.bind_result refuses a node "
+    "[Networked][Spawn] NetwActionRequest.bind_result refuses a node "
     "Netw.spawn_async built"
 ) {
     const Ref<Script> spawner = netw_test::minted_script(SPAWNER_SOURCE);
@@ -484,7 +484,7 @@ TEST_CASE(
     );
 
     Node *made = spawn_made(stand);
-    Ref<netw::NetwActionContext> context;
+    Ref<netw::NetwActionRequest> context;
     context.instantiate();
     context->bind_result(made);
 

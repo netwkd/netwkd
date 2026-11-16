@@ -59,8 +59,6 @@ Properties
    +------------------------------------------------------------------+----------------------------------------------------------------------------------------------+
    | :godot:`StringName`                                              | :ref:`layer_id<class_NetwInterestLayer_property_layer_id>`                                   |
    +------------------------------------------------------------------+----------------------------------------------------------------------------------------------+
-   | :godot:`Callable`                                                | :ref:`monitor<class_NetwInterestLayer_property_monitor>`                                     |
-   +------------------------------------------------------------------+----------------------------------------------------------------------------------------------+
    | :ref:`LayerPolicy<enum_NetwInterestLayer_LayerPolicy>`           | :ref:`policy<class_NetwInterestLayer_property_policy>`                                       |
    +------------------------------------------------------------------+----------------------------------------------------------------------------------------------+
    | :godot:`Dictionary`                                              | :ref:`viewers<class_NetwInterestLayer_property_viewers>`                                     |
@@ -378,28 +376,6 @@ The entities in the layer, as keys. On a client, only the ones it sees. Returns 
 - :godot:`StringName` **get_layer_id**\ (\ )
 
 The name of the layer.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwInterestLayer_property_monitor:
-
-.. rst-class:: classref-property
-
-:godot:`Callable` **monitor** :ref:`🔗<class_NetwInterestLayer_property_monitor>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_monitor**\ (\ value\: :godot:`Callable`\ )
-- :godot:`Callable` **get_monitor**\ (\ )
-
-Called whenever this layer emits :ref:`interest_entered<class_NetwInterestLayer_signal_interest_entered>`, :ref:`interest_exited<class_NetwInterestLayer_signal_interest_exited>` or :ref:`visibility_changed<class_NetwInterestLayer_signal_visibility_changed>`. On a client, the peer is always this one.
-
-::
-
-    sight.monitor = func(entity: NetwEntity, peer_id: int, visible: bool) -> void:
-        print(entity.root.name," ", peer_id, " ", visible)
 
 .. rst-class:: classref-item-separator
 

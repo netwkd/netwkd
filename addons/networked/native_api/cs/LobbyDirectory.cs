@@ -75,6 +75,37 @@ public class LobbyDirectory : NetwService
         return Adopt(NetwApi.ObjectOf(value));
     }
 
+    /// <summary>
+    /// Makes a <see cref="LobbyDirectory"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_service_type</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public new static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "LobbyDirectory",
+            "_service_type",
+            "_should_register",
+            "_service_entered",
+            "_service_exiting",
+            "_peer_class",
+            "_is_available",
+            "_host_settings",
+            "_client_settings",
+            "_join_address",
+            "_member_name",
+            "_account_of",
+            "_local_member_name",
+            "_list_lobbies",
+            "_stop_listing",
+            "_leave_lobby",
+            "_host_lobby",
+            "_join_lobby");
+    }
+
     public enum Capability : long
     {
         /// <summary>

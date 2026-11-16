@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="NetwJoinRequest" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="NetwJoinRequest" inherits="NetwRequest" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		A player's request to join a session.
 	</brief_description>
 	<description>
-		The server passes this request to the handler declared with [method Netw.configure_admission], after every [NetwAccountProvider] has verified. The joining client is not connected until the handler returns [constant @GlobalScope.OK], and [method refuse] tells it why it was refused. A requested [member username] does not verify an account.
+		The server passes this request to the handler declared with [method Netw.configure_admission], after every [NetwAccountProvider] has verified. The joining client is not connected until the handler calls [method admit], and [method NetwRequest.deny] tells it why it was refused. The player reads the code and the reason in [signal NetwSession.join_failed] and [signal NetwConnection.failed]. The reason is cut to 255 UTF-8 bytes, and an empty one sends a default sentence that names the code. A handler that finishes without calling either refuses the join with [constant @GlobalScope.ERR_UNAUTHORIZED] and reports an error. The handler may [code]await[/code], and what it returns is ignored. A requested [member username] does not verify an account.
 		[codeblocks]
 		[gdscript]
-		func admit(request: NetwJoinRequest) -&gt; Error:
-		    return OK if request.account else ERR_UNAUTHORIZED
+		func admit(request: NetwJoinRequest) -&gt; void:
+		    if request.account:
+		        request.admit()
+		    else:
+		        request.deny()
 		[/gdscript]
 		[csharp]
-		private Error Admit(Variant value)
+		void Admit(NetwJoinRequest request)
 		{
-		    using var request = NetwJoinRequest.From(value);
-		    return string.IsNullOrEmpty(request.Account)
-		        ? Error.Unauthorized : Error.Ok;
+		    if (string.IsNullOrEmpty(request.Account))
+		        request.Deny();
+		    else
+		        request.Admit();
 		}
 		[/csharp]
 		[/codeblocks]
@@ -32,6 +36,12 @@
 				Adds [param account] with the display [param name] to [member accounts], from [method NetwAccountProvider._verify]. Pass [code]false[/code] for [param answers_challenge] when the proof does not depend on [member challenge]. An account already listed keeps its place.
 			</description>
 		</method>
+		<method name="admit">
+			<return type="void" />
+			<description>
+				Lets the player join. A [method NetwRequest.deny] on the same request wins over it.
+			</description>
+		</method>
 		<method name="is_bound" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="account" type="String" />
@@ -44,14 +54,6 @@
 			<param index="0" name="account" type="String" />
 			<description>
 				Returns the display name proven with [param account], or [code]""[/code].
-			</description>
-		</method>
-		<method name="refuse">
-			<return type="int" enum="Error" />
-			<param index="0" name="code" type="int" enum="Error" />
-			<param index="1" name="reason" type="String" default="&quot;&quot;" />
-			<description>
-				Returns [param code] for the admission handler to return, and sends [param reason] to the refused player with it. The player reads both in [signal NetwSession.join_failed] and [signal NetwConnection.failed]. [param reason] is sent only when the handler returns this same [param code], and is cut to 255 UTF-8 bytes. An empty [param reason] sends a default sentence that names [param code]. Passing [constant @GlobalScope.OK] reports an error and refuses with [constant @GlobalScope.ERR_UNCONFIGURED].
 			</description>
 		</method>
 	</methods>
@@ -70,9 +72,6 @@
 		</member>
 		<member name="challenge" type="String" setter="" getter="get_challenge">
 			The challenge every [NetwAccountProvider] proved on the joining peer, or [code]""[/code] when none is accepted.
-		</member>
-		<member name="peer_id" type="int" setter="" getter="get_peer_id">
-			The joining peer's id.
 		</member>
 		<member name="session" type="NetwSession" setter="" getter="get_session">
 			The server's session the peer is joining.

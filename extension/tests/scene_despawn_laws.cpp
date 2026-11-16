@@ -39,9 +39,9 @@ constexpr const char *HOST_ID = "sr_host";
 
 constexpr const char *GATE_SOURCE = R"(extends Node
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	request.account = "test:" + request.username
-	return OK
+	request.admit()
 )";
 
 constexpr const char *LEVEL_SOURCE = R"(extends Node2D

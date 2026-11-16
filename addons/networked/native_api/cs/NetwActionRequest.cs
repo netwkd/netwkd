@@ -6,63 +6,49 @@ using Godot.NativeInterop;
 namespace Networked;
 
 /// <summary>
-/// Information about a <see cref="NetwAction"/> request, passed to its method
+/// Information about a <see cref="Netw.Action"/> request, passed to its method
 /// on the server.
 /// </summary>
 /// <remarks>
-/// It is the first argument, before the arguments of
-/// <see cref="NetwAction.Request"/>. Call <see cref="NetwActionContext.Bind"/>
-/// on a node the action spawns, before adding it to the tree. Call
-/// <see cref="NetwActionContext.Deny"/> to reject the action.
+/// A <see cref="NetwRequest"/> that is the first argument, before the arguments
+/// of <see cref="Netw.Action"/>. Call <see cref="NetwActionRequest.Bind"/> on a
+/// node the action spawns, before adding it to the tree. Call
+/// <see cref="NetwRequest.Deny"/> to reject the action. The requesting peer
+/// undoes its prediction, and its <see cref="NetwActionConfig.Revert"/> handler
+/// receives the code and the reason, which is cut to 255 UTF-8 bytes.
 /// <code>
-/// func _place_bomb(ctx: NetwActionContext) -&gt; void:
-///     var past := Netw.sample(entity, ctx.view_tick)
+/// func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+///     var past := Netw.sample(entity, request.view_tick)
 ///     if not past.has_value(&amp;"position"):
-///         ctx.deny()
+///         request.deny("no position at that tick")
 ///         return
 ///     var bomb := BOMB.instantiate()
-///     ctx.bind(bomb)
+///     request.bind(bomb)
 ///     bombs.add_child(bomb)
 /// </code>
 /// </remarks>
-public sealed class NetwActionContext : NetwRefCounted
+public sealed class NetwActionRequest : NetwRequest
 {
-    public NetwActionContext(IntPtr native) : base(native)
+    public NetwActionRequest(IntPtr native) : base(native)
     {
     }
 
-    public static NetwActionContext Adopt(IntPtr native)
+    public new static NetwActionRequest Adopt(IntPtr native)
     {
-        return native == IntPtr.Zero ? null : new NetwActionContext(native);
+        return native == IntPtr.Zero ? null : new NetwActionRequest(native);
     }
 
-    public static NetwActionContext From(Variant value)
+    public new static NetwActionRequest From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
-    private static readonly IntPtr _bindGetRequester =
-        NetwApi.MethodBind("NetwActionContext", "get_requester", 3905245786UL);
-
-    /// <summary>
-    /// The peer that sent the request.
-    /// </summary>
-    public long Requester
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetRequester, Checked, ref answered);
-            return answered;
-        }
-    }
-
     private static readonly IntPtr _bindGetViewTick =
-        NetwApi.MethodBind("NetwActionContext", "get_view_tick", 3905245786UL);
+        NetwApi.MethodBind("NetwActionRequest", "get_view_tick", 3905245786UL);
 
     /// <summary>
     /// The tick the client saw when it acted, no later than
-    /// <see cref="NetwActionContext.ExecutionTick"/>. Use it with
+    /// <see cref="NetwActionRequest.ExecutionTick"/>. Use it with
     /// <see cref="Netw.Rewind"/> and <see cref="Netw.Sample"/>.
     /// </summary>
     public long ViewTick
@@ -77,7 +63,7 @@ public sealed class NetwActionContext : NetwRefCounted
 
     private static readonly IntPtr _bindGetRequestedTick =
         NetwApi.MethodBind(
-            "NetwActionContext",
+            "NetwActionRequest",
             "get_requested_tick",
             3905245786UL);
 
@@ -99,7 +85,7 @@ public sealed class NetwActionContext : NetwRefCounted
 
     private static readonly IntPtr _bindGetExecutionTick =
         NetwApi.MethodBind(
-            "NetwActionContext",
+            "NetwActionRequest",
             "get_execution_tick",
             3905245786UL);
 
@@ -120,7 +106,7 @@ public sealed class NetwActionContext : NetwRefCounted
     }
 
     private static readonly IntPtr _bindBind =
-        NetwApi.MethodBind("NetwActionContext", "bind", 1078189570UL);
+        NetwApi.MethodBind("NetwActionRequest", "bind", 1078189570UL);
 
     /// <summary>
     /// Links <paramref name="node"/> to this action, so the client's predicted
@@ -135,17 +121,5 @@ public sealed class NetwActionContext : NetwRefCounted
             Checked,
             in slot0,
             ref discarded);
-    }
-
-    private static readonly IntPtr _bindDeny =
-        NetwApi.MethodBind("NetwActionContext", "deny", 3218959716UL);
-
-    /// <summary>
-    /// Rejects the action. The requesting client undoes its prediction.
-    /// </summary>
-    public void Deny()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindDeny, Checked, ref discarded);
     }
 }

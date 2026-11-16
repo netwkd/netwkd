@@ -103,7 +103,10 @@ void NetwMultiplayer::entity_emit(
                     Ref<NetwEntity>(p_entity),
                     Object::cast_to<Node>(gd::object_of(p_row.node))
                 );
-            request->deny(p_row.reason);
+            request->deny(
+                p_row.reason,
+                p_row.refusal != OK ? p_row.refusal : ERR_UNAUTHORIZED
+            );
             p_entity->emit_signal(StringName("lifecycle_refused"), request);
         } break;
         case AnnouncementKind::REPARENTED:

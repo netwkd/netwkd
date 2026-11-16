@@ -19,7 +19,7 @@ Settings for a session's admission handler.
 Description
 -----------
 
-The server passes each joining client's :ref:`NetwJoinRequest<class_NetwJoinRequest>` to the handler, which may ``await``. The client is not connected and receives nothing until the handler returns :godot:`@GlobalScope.OK <@GlobalScope#class_@GlobalScope_constant_OK>`. Any other :godot:`@GlobalScope.Error <@GlobalScope#enum_@globalscope_Error>` refuses it, and the client receives that code unchanged in :ref:`NetwSession.join_failed<class_NetwSession_signal_join_failed>`, with the reason given to :ref:`NetwJoinRequest.refuse()<class_NetwJoinRequest_method_refuse>`.
+The server passes each joining client's :ref:`NetwJoinRequest<class_NetwJoinRequest>` to the handler, which may ``await``. The client is not connected and receives nothing until the handler calls :ref:`NetwJoinRequest.admit()<class_NetwJoinRequest_method_admit>`. Calling :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` refuses it, and the client receives that code and reason in :ref:`NetwSession.join_failed<class_NetwSession_signal_join_failed>`.
 
 ::
 
@@ -28,10 +28,11 @@ The server passes each joining client's :ref:`NetwJoinRequest<class_NetwJoinRequ
     func _init() -> void:
         Netw.configure_admission(admit)
 
-    func admit(request: NetwJoinRequest) -> Error:
-        if not lobby_open:
-            return request.refuse(ERR_BUSY, "The match has started.")
-        return OK
+    func admit(request: NetwJoinRequest) -> void:
+        if lobby_open:
+            request.admit()
+        else:
+            request.deny("The match has started.", ERR_BUSY)
 
 \ Each :ref:`NetwAccountProvider<class_NetwAccountProvider>` accepted here proves one kind of account before the handler runs.
 

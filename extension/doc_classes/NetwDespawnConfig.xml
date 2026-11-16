@@ -15,9 +15,12 @@
 	<methods>
 		<method name="before_removal">
 			<return type="NetwDespawnConfig" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Only the method name of [param callable] is kept. Each [NetwEntity] root calls that method before removal.
+				Only the method name of [param method] is kept. Each [NetwEntity] root calls that method before removal.
+				[codeblock]
+				func play_death_vfx() -&gt; void:
+				[/codeblock]
 			</description>
 		</method>
 		<method name="linger">

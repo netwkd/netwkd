@@ -6,15 +6,6 @@ using namespace godot;
 
 namespace netw {
 
-namespace {
-
-const GameCall DEFERRED_CALL
-    = {"The NetwMultiplayer.session_defer callback",
-       "func() -> void",
-       0};
-
-} // namespace
-
 void SettleQueue::schedule(const Callable &fn, const StringName &key) {
     if (!key.is_empty()) {
         cancel(key);
@@ -112,7 +103,7 @@ PackedStringArray SettleQueue::drain() {
         }
         for (const Row &row : batch) {
             if (row.fn.is_valid()) {
-                game_call(row.fn, Array(), DEFERRED_CALL);
+                game_call(row.fn, Array(), game_calls::DEFERRED_CALL);
             }
         }
     }

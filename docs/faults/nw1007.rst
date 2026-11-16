@@ -13,12 +13,12 @@ what to return.
 
 .. code-block:: gdscript
 
-    func admit(request: NetwJoinRequest) -> void:
-        pass
+    func fetch(nonce: String) -> String:
+        return saved_token
 
-Return what the log line asks for, such as an ``Error``.
+Return what the log line asks for, such as a ``NetwPromise``.
 
 .. code-block:: gdscript
 
-    func admit(request: NetwJoinRequest) -> Error:
-        return OK
+    func fetch(nonce: String) -> NetwPromise:
+        return account_service.request_token(nonce)

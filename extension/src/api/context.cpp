@@ -13,6 +13,7 @@
 #include "netw/connect/transport.hpp"
 #include "netw/decl_sites.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/scene_core.hpp"
@@ -418,6 +419,7 @@ Error Netw::configure_server_info(const Callable &p_provider) {
     if (scope == nullptr) {
         return ERR_INVALID_PARAMETER;
     }
+    game_call_declared(p_provider, game_calls::SERVER_INFO_HANDLER);
     decl_sites::record_handler(p_provider);
     return session_decl::declare(
         scope,
@@ -448,6 +450,7 @@ Ref<NetwJoinConfig> Netw::configure_join(const Callable &p_handler) {
         );
         return Ref<NetwJoinConfig>();
     }
+    game_call_declared(p_handler, game_calls::JOIN_HANDLER);
     decl_sites::record_handler(p_handler);
     Ref<NetwJoinConfig> config;
     config.instantiate();
@@ -492,6 +495,7 @@ Error Netw::configure_transfer(const Callable &p_keep) {
     if (scope == nullptr) {
         return ERR_INVALID_PARAMETER;
     }
+    game_call_declared(p_keep, game_calls::TRANSFER_KEEP);
     decl_sites::record_handler(p_keep);
     return session_decl::declare(
         scope,
@@ -889,7 +893,7 @@ void Netw::sync_property(Node *p_node, const StringName &p_property) {
     );
 }
 
-void Netw::emit_entity_signal(const Signal &p_signal, const Array &p_args) {
+void Netw::emit(const Signal &p_signal, const Array &p_args) {
     Node *node = Object::cast_to<Node>(p_signal.get_object());
     if (node == nullptr) {
         return;
@@ -1068,15 +1072,36 @@ Ref<NetwPromise> Netw::reparent(Node *p_node, Node *p_new_parent) {
     return api->entity_reparent(entity->get_rid_handle(), p_new_parent);
 }
 
-Ref<NetwAction> Netw::action(const Callable &p_authority) {
-    Node *host = Object::cast_to<Node>(p_authority.get_object());
+Ref<NetwActionConfig> Netw::configure_action(const Callable &p_method) {
+    Node *host = Object::cast_to<Node>(p_method.get_object());
+    const StringName method = p_method.get_method();
+    if (host == nullptr || method.is_empty() || !host->has_method(method)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{Netw.configure_action}"),
+             String(),
+             String("a method of a Node")},
+            host != nullptr ? uint64_t(gd::instance_id(host)) : 0
+        );
+        return Ref<NetwActionConfig>();
+    }
+    return NetwMultiplayer::lagcomp_action_declare(host, method, p_method);
+}
+
+void Netw::action(
+    const Callable &p_method,
+    int64_t p_tick,
+    const Array &p_args
+) {
+    Node *host = Object::cast_to<Node>(p_method.get_object());
     if (host == nullptr) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_CALLABLE,
             {String("{Netw.action}"), String(), String("a method of a Node")}
         );
-        return Ref<NetwAction>();
+        return;
     }
     NetwMultiplayer *api = NetwMultiplayer::session_holding(host);
     if (api == nullptr) {
@@ -1086,9 +1111,9 @@ Ref<NetwAction> Netw::action(const Callable &p_authority) {
             {String("{Netw.action}"), String(host->get_name())},
             uint64_t(gd::instance_id(host))
         );
-        return Ref<NetwAction>();
+        return;
     }
-    return api->lagcomp_action(p_authority);
+    api->action_ask(p_method, p_tick, p_args);
 }
 
 Ref<DictionaryRecord> Netw::sample(
@@ -1216,7 +1241,7 @@ void Netw::_bind_methods() {
 
     ClassDB::bind_static_method(
         "Netw",
-        D_METHOD("configure_server_info", "provider"),
+        D_METHOD("configure_server_info", "handler"),
         &Netw::configure_server_info
     );
     ClassDB::bind_static_method(
@@ -1231,7 +1256,7 @@ void Netw::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "Netw",
-        D_METHOD("configure_transfer", "keep"),
+        D_METHOD("configure_transfer", "handler"),
         &Netw::configure_transfer
     );
     ClassDB::bind_static_method(
@@ -1258,7 +1283,7 @@ void Netw::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "Netw",
-        D_METHOD("configure_rpc", "callable"),
+        D_METHOD("configure_rpc", "method"),
         &Netw::configure_rpc
     );
     ClassDB::bind_static_method(
@@ -1268,7 +1293,7 @@ void Netw::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "Netw",
-        D_METHOD("configure_spawn", "callable"),
+        D_METHOD("configure_spawn", "method"),
         &Netw::configure_spawn
     );
     ClassDB::bind_static_method(
@@ -1292,35 +1317,35 @@ void Netw::_bind_methods() {
         &Netw::configure_schema
     );
 
-    gd::bind_static_vararg("Netw", D_METHOD("rpc", "callable"), &Netw::rpc);
+    gd::bind_static_vararg("Netw", D_METHOD("rpc", "method"), &Netw::rpc);
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("rpc_id", "peer_id", "callable"),
+        D_METHOD("rpc_id", "peer_id", "method"),
         &Netw::rpc_id
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("rpc_controller", "callable"),
+        D_METHOD("rpc_controller", "method"),
         &Netw::rpc_controller
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("request", "callable"),
+        D_METHOD("request", "method"),
         &Netw::request
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("request_id", "peer_id", "callable"),
+        D_METHOD("request_id", "peer_id", "method"),
         &Netw::request_id
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("request_all", "callable"),
+        D_METHOD("request_all", "method"),
         &Netw::request_all
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("request_controller", "callable"),
+        D_METHOD("request_controller", "method"),
         &Netw::request_controller
     );
     ClassDB::bind_static_method(
@@ -1330,8 +1355,8 @@ void Netw::_bind_methods() {
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("emit_entity_signal", "sig"),
-        &Netw::emit_entity_signal
+        D_METHOD("emit", "sig"),
+        &Netw::emit
     );
     ClassDB::bind_static_method(
         "Netw",
@@ -1344,15 +1369,15 @@ void Netw::_bind_methods() {
         &Netw::configure_database
     );
 
-    gd::bind_static_vararg("Netw", D_METHOD("spawn", "fn"), &Netw::spawn);
+    gd::bind_static_vararg("Netw", D_METHOD("spawn", "method"), &Netw::spawn);
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("spawn_player", "player", "fn"),
+        D_METHOD("spawn_player", "player", "method"),
         &Netw::spawn_player
     );
     gd::bind_static_vararg(
         "Netw",
-        D_METHOD("spawn_async", "fn"),
+        D_METHOD("spawn_async", "method"),
         &Netw::spawn_async
     );
     ClassDB::bind_static_method(
@@ -1369,7 +1394,12 @@ void Netw::_bind_methods() {
 
     ClassDB::bind_static_method(
         "Netw",
-        D_METHOD("action", "authority"),
+        D_METHOD("configure_action", "method"),
+        &Netw::configure_action
+    );
+    gd::bind_static_vararg(
+        "Netw",
+        D_METHOD("action", "method", "tick"),
         &Netw::action
     );
     ClassDB::bind_static_method(
@@ -1379,7 +1409,7 @@ void Netw::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "Netw",
-        D_METHOD("rewind", "entities", "tick", "body"),
+        D_METHOD("rewind", "entities", "tick", "callback"),
         &Netw::rewind
     );
 

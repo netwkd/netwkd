@@ -10,7 +10,7 @@
 NetwControlRequest
 ==================
 
-**Inherits:** :godot:`RefCounted`
+**Inherits:** :ref:`NetwRequest<class_NetwRequest>` **<** :godot:`RefCounted`
 
 A request to control a node.
 
@@ -19,13 +19,13 @@ A request to control a node.
 Description
 -----------
 
-Passed by :ref:`NetwEntity.control_requested<class_NetwEntity_signal_control_requested>` on the server. Call :ref:`deny()<class_NetwControlRequest_method_deny>` to reject the request, otherwise it is granted.
+Passed to :ref:`NetwEntity.control_handler<class_NetwEntity_property_control_handler>` on the server. Call :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` to reject the request, otherwise it is granted.
 
 ::
 
-    func _on_control_requested(peer_id: int, request: NetwControlRequest) -> void:
-        if not can_carry(peer_id):
-            request.deny()
+    func judge_claim(request: NetwControlRequest) -> void:
+        if not can_carry(request.peer_id):
+            request.deny("hands full")
 
 .. rst-class:: classref-reftable-group
 
@@ -35,25 +35,9 @@ Properties
 .. table::
    :widths: auto
 
-   +-----------------------------------+---------------------------------------------------------------+
-   | :godot:`bool`                     | :ref:`denied<class_NetwControlRequest_property_denied>`       |
-   +-----------------------------------+---------------------------------------------------------------+
-   | :ref:`Hold<enum_NetwEntity_Hold>` | :ref:`hold<class_NetwControlRequest_property_hold>`           |
-   +-----------------------------------+---------------------------------------------------------------+
-   | :godot:`int`                      | :ref:`requester<class_NetwControlRequest_property_requester>` |
-   +-----------------------------------+---------------------------------------------------------------+
-
-.. rst-class:: classref-reftable-group
-
-Methods
--------
-
-.. table::
-   :widths: auto
-
-   +--------+---------------------------------------------------------+
-   | |void| | :ref:`deny<class_NetwControlRequest_method_deny>`\ (\ ) |
-   +--------+---------------------------------------------------------+
+   +-----------------------------------+-----------------------------------------------------+
+   | :ref:`Hold<enum_NetwEntity_Hold>` | :ref:`hold<class_NetwControlRequest_property_hold>` |
+   +-----------------------------------+-----------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -63,23 +47,6 @@ Methods
 
 Property Descriptions
 ---------------------
-
-.. _class_NetwControlRequest_property_denied:
-
-.. rst-class:: classref-property
-
-:godot:`bool` **denied** :ref:`🔗<class_NetwControlRequest_property_denied>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_denied**\ (\ value\: :godot:`bool`\ )
-- :godot:`bool` **get_denied**\ (\ )
-
-Whether the request should be rejected. Writing ``false`` over a :ref:`deny()<class_NetwControlRequest_method_deny>` call has no effect.
-
-.. rst-class:: classref-item-separator
-
-----
 
 .. _class_NetwControlRequest_property_hold:
 
@@ -92,40 +59,6 @@ Whether the request should be rejected. Writing ``false`` over a :ref:`deny()<cl
 - :ref:`Hold<enum_NetwEntity_Hold>` **get_hold**\ (\ )
 
 The :ref:`Hold<enum_NetwEntity_Hold>` the peer asked to hold the entity with.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwControlRequest_property_requester:
-
-.. rst-class:: classref-property
-
-:godot:`int` **requester** :ref:`🔗<class_NetwControlRequest_property_requester>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_requester**\ (\ value\: :godot:`int`\ )
-- :godot:`int` **get_requester**\ (\ )
-
-Peer id reported by :godot:`MultiplayerAPI.get_remote_sender_id() <MultiplayerAPI#class_MultiplayerAPI_method_get_remote_sender_id>`.
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Method Descriptions
--------------------
-
-.. _class_NetwControlRequest_method_deny:
-
-.. rst-class:: classref-method
-
-|void| **deny**\ (\ ) :ref:`🔗<class_NetwControlRequest_method_deny>`
-
-Rejects this request.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

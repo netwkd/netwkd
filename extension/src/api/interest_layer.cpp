@@ -188,26 +188,6 @@ Callable NetwInterestLayer::get_driver() {
                             : Callable();
 }
 
-void NetwInterestLayer::set_monitor(const Callable &p_monitor) {
-    const Ref<NetwMultiplayer> owner = host();
-    if (owner.is_null()) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_NOT_IN_SESSION,
-            {String("{NetwInterestLayer.set_monitor}"), String(layer_id)},
-            uint64_t(get_instance_id())
-        );
-        return;
-    }
-    owner->layer_set_monitor(layer, p_monitor, true);
-}
-
-Callable NetwInterestLayer::get_monitor() {
-    const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() ? owner->layer_get_monitor(layer, true)
-                            : Callable();
-}
-
 Dictionary NetwInterestLayer::monitor_snapshot() const {
     const Ref<NetwMultiplayer> owner = host();
     return owner.is_valid() ? owner->interest_layer_get_stats(layer)
@@ -364,19 +344,6 @@ void NetwInterestLayer::_bind_methods() {
         PropertyInfo(Variant::CALLABLE, "driver"),
         "set_driver",
         "get_driver"
-    );
-    ClassDB::bind_method(
-        D_METHOD("set_monitor", "monitor"),
-        &NetwInterestLayer::set_monitor
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_monitor"),
-        &NetwInterestLayer::get_monitor
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::CALLABLE, "monitor"),
-        "set_monitor",
-        "get_monitor"
     );
 
     ADD_SIGNAL(MethodInfo(

@@ -64,6 +64,24 @@ public sealed class NetwPhysicsStepper : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
+    /// <summary>
+    /// Makes a <see cref="NetwPhysicsStepper"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_can_step</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwPhysicsStepper",
+            "_can_step",
+            "_step",
+            "_snapshot",
+            "_restore");
+    }
+
     private static readonly IntPtr _bindCanStep =
         NetwApi.MethodBind("NetwPhysicsStepper", "can_step", 2240911060UL);
 

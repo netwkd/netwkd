@@ -5,8 +5,11 @@
 #include "godot/class_db.hpp"
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/action.hpp"
+#include "godot/vararg.hpp"
+#include "netw/api/action_config.hpp"
+#include "netw/api/action_request.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/session_decl.hpp"
 
 #if defined(NETW_TIER_HOSTED)
 #include <godot_cpp/classes/node2d.hpp>
@@ -27,10 +30,13 @@ class Carrier : public godot::Node2D {
     int rewind_visits = 0;
     bool count_replay_effects = false;
     double last_simulated_x = 0.0;
-    godot::Ref<netw::NetwAction> action;
+    godot::Ref<netw::NetwActionConfig> action;
+    godot::StringName action_method;
     int ghost_count = 0;
     int confirmed_count = 0;
     int denied_count = 0;
+    int last_denial_code = 0;
+    godot::String last_denial_reason;
     int server_requests = 0;
     int64_t last_view_tick = -1;
     int64_t last_requested_tick = -1;
@@ -52,7 +58,7 @@ protected:
             D_METHOD("sum_into_speed", "delta", "tick", "fresh"),
             &Carrier::sum_into_speed
         );
-        godot::ClassDB::bind_method(
+        netw::gd::bind_vararg_method(
             D_METHOD("_predict_ghost"),
             &Carrier::predict_ghost
         );
@@ -65,11 +71,11 @@ protected:
             &Carrier::server_action_carrying
         );
         godot::ClassDB::bind_method(
-            D_METHOD("_note_confirmed"),
+            D_METHOD("_note_confirmed", "node"),
             &Carrier::note_confirmed
         );
         godot::ClassDB::bind_method(
-            D_METHOD("_note_denied"),
+            D_METHOD("_note_denied", "node", "code", "reason"),
             &Carrier::note_denied
         );
     }
@@ -138,7 +144,7 @@ public:
         set("speed", double(get("speed")) + double(get("throttle")));
     }
 
-    godot::Node *predict_ghost() {
+    godot::Node *predict_ghost(const godot::Array &) {
         godot::Node *ghost = memnew(godot::Node);
         ghost->set_name("Ghost");
         add_child(ghost);
@@ -146,19 +152,19 @@ public:
         return ghost;
     }
 
-    void server_action(netw::NetwActionContext *p_ctx) {
+    void server_action(netw::NetwActionRequest *p_ctx) {
         REQUIRE_MESSAGE(p_ctx != nullptr, "an action needs a context");
         server_requests += 1;
         last_view_tick = p_ctx->get_view_tick();
         last_requested_tick = p_ctx->get_requested_tick();
         last_execution_tick = p_ctx->get_execution_tick();
         if (denies) {
-            p_ctx->deny();
+            p_ctx->deny("no ammunition", godot::ERR_BUSY);
         }
     }
 
     void server_action_carrying(
-        netw::NetwActionContext *p_ctx,
+        netw::NetwActionRequest *p_ctx,
         const godot::Variant &p_first,
         const godot::Variant &p_second
     ) {
@@ -172,12 +178,32 @@ public:
         return carried;
     }
 
-    void note_confirmed() {
+    void note_confirmed(godot::Node *p_node) {
         confirmed_count += 1;
+        if (p_node != nullptr) {
+            p_node->queue_free();
+        }
     }
 
-    void note_denied() {
+    void note_denied(
+        godot::Node *p_node,
+        int p_code,
+        const godot::String &p_reason
+    ) {
         denied_count += 1;
+        last_denial_code = p_code;
+        last_denial_reason = p_reason;
+        if (p_node != nullptr) {
+            p_node->queue_free();
+        }
+    }
+
+    int denial_code() const {
+        return last_denial_code;
+    }
+
+    godot::String denial_reason() const {
+        return last_denial_reason;
     }
 
     void arm_action(
@@ -186,39 +212,52 @@ public:
         = godot::StringName("_server_action")
     ) {
         REQUIRE_MESSAGE(p_api != nullptr, "an action needs a session");
-        action = p_api->lagcomp_action(godot::Callable(this, p_authority));
-        REQUIRE_MESSAGE(action.is_valid(), "the session minted no action");
+        action = netw::action_declared_on(this, p_authority);
+        if (action.is_null()) {
+            action.instantiate();
+            action->set_authority(godot::Callable(this, p_authority));
+            netw::session_decl::declare_action(this, p_authority, action);
+        }
+        action_method = p_authority;
+        action->predict(
+            godot::Callable(this, godot::StringName("_predict_ghost"))
+        );
+        action->confirm(
+            godot::Callable(this, godot::StringName("_note_confirmed"))
+        );
+        action->revert(
+            godot::Callable(this, godot::StringName("_note_denied"))
+        );
+        p_api->lagcomp_want();
+    }
+
+    godot::Ref<netw::NetwActionConfig> armed_action() const {
+        return action;
+    }
+
+    void declare_timing(netw::NetwActionConfig::Timing p_mode) {
+        REQUIRE_MESSAGE(action.is_valid(), "a timing needs an armed action");
         if (action.is_null()) {
             return;
         }
-        action->set_predict(
-            godot::Callable(this, godot::StringName("_predict_ghost"))
-        );
-        action->connect(
-            "confirmed",
-            godot::Callable(this, godot::StringName("_note_confirmed"))
-        );
-        action->connect(
-            "denied",
-            godot::Callable(this, godot::StringName("_note_denied"))
-        );
-    }
-
-    godot::Ref<netw::NetwAction> armed_action() const {
-        return action;
+        action->timing(p_mode);
     }
 
     void fire(
         int64_t p_view_tick,
-        int p_timing_mode,
         const godot::Array &p_args = godot::Array()
     ) {
-        REQUIRE_MESSAGE(action.is_valid(), "a fire needs an armed action");
-        if (action.is_null()) {
+        netw::NetwMultiplayer *api
+            = netw::NetwMultiplayer::session_holding(this);
+        REQUIRE_MESSAGE(api != nullptr, "a fire needs a session");
+        if (api == nullptr) {
             return;
         }
-        action->set_timing_mode(netw::NetwAction::TimingMode(p_timing_mode));
-        action->request(p_view_tick, p_args);
+        api->action_ask(
+            godot::Callable(this, action_method),
+            p_view_tick,
+            p_args
+        );
     }
 
     godot::Node *ghost() const {

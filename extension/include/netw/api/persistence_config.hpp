@@ -55,10 +55,10 @@ public:
     godot::Ref<NetwPersistenceConfig> storage_version(int p_version);
     godot::Ref<NetwPersistenceConfig> migrate(
         int p_from_version,
-        const godot::Callable &p_step
+        const godot::Callable &p_handler
     );
     godot::Ref<NetwPersistenceConfig> record_id(
-        const godot::Callable &p_provider
+        const godot::Callable &p_handler
     );
     godot::Ref<NetwPersistenceConfig> interval(double p_seconds);
     godot::Ref<NetwPersistenceConfig> load_on_spawn(bool p_enabled);

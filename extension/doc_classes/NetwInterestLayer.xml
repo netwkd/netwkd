@@ -124,13 +124,6 @@
 		<member name="layer_id" type="StringName" setter="" getter="get_layer_id">
 			The name of the layer.
 		</member>
-		<member name="monitor" type="Callable" setter="set_monitor" getter="get_monitor">
-			Called whenever this layer emits [signal interest_entered], [signal interest_exited] or [signal visibility_changed]. On a client, the peer is always this one.
-			[codeblock]
-			sight.monitor = func(entity: NetwEntity, peer_id: int, visible: bool) -&gt; void:
-			    print(entity.root.name," ", peer_id, " ", visible)
-			[/codeblock]
-		</member>
 		<member name="policy" type="int" setter="set_policy" getter="get_policy" enum="NetwInterestLayer.LayerPolicy">
 			Whether [member viewers] are the peers that see the entities, or the ones that do not.
 		</member>

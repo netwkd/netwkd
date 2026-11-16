@@ -383,7 +383,9 @@ bool NetwEntityRecord::set_controller(Object *p_wrapper, int64_t p_peer) {
 int64_t NetwEntityRecord::admit_control_request(
     Object *p_wrapper,
     int64_t p_requester,
-    int64_t p_hold
+    int64_t p_hold,
+    Error &r_code,
+    String &r_reason
 ) {
     if (!control.admits_request()) {
         const NetwEntity *named = Object::cast_to<NetwEntity>(p_wrapper);
@@ -398,21 +400,17 @@ int64_t NetwEntityRecord::admit_control_request(
         );
         return 0;
     }
-    Ref<NetwControlRequest> request;
-    request.instantiate();
-    request->requester = p_requester;
-    request->hold = p_hold;
-    if (p_wrapper != nullptr) {
-        p_wrapper->emit_signal(
-            StringName("control_requested"),
-            p_requester,
-            request
-        );
+    const Ref<NetwControlRequest> request
+        = NetwControlRequest::create(p_requester, p_hold);
+    if (const NetwEntity *judge = Object::cast_to<NetwEntity>(p_wrapper)) {
+        judge->judge_control(request);
     }
-    if (request->denied) {
+    if (request->is_denied()) {
+        r_code = request->get_code();
+        r_reason = request->get_reason();
         NETW_DEBUG(
             sys::ENTITY,
-            "The control_requested handler denied peer %d.",
+            "The control handler denied peer %d.",
             int(p_requester)
         );
         return 0;

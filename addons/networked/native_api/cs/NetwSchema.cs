@@ -731,7 +731,7 @@ public sealed class NetwSchema : NetwRefCounted
         NetwApi.MethodBind("NetwSchema", "migrate", 3083647625UL);
 
     /// <summary>
-    /// A read runs one <paramref name="step"/> per saved version up to
+    /// A read runs one <paramref name="handler"/> per saved version up to
     /// <see cref="NetwSchema.StorageVersion"/>. A missing step refuses the
     /// read.
     /// <code>
@@ -755,10 +755,35 @@ public sealed class NetwSchema : NetwRefCounted
     /// at the current version.
     /// </para>
     /// </summary>
-    public NetwSchema Migrate(int fromVersion, Callable step)
+    public NetwSchema Migrate(
+        int fromVersion,
+        Func<Godot.Collections.Dictionary,
+        Godot.Collections.Dictionary> handler)
     {
+        Callable bridged1 = default;
+        if (handler != null)
+        {
+            var bridge1 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    Godot.Collections.Dictionary answer =
+                        handler(a0.As<Godot.Collections.Dictionary>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromDictionary(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwSchema.Migrate", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(handler, bridge1, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromInt((long)fromVersion);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(step);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindMigrate,

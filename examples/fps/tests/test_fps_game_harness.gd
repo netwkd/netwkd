@@ -52,8 +52,6 @@ func test_a_client_shot_lands_on_an_enemy_every_peer_sees() -> void:
 	var mario := await host.await_player(&"mario", 2.0)
 	var host_enemy: Node3D = host_level.get_node(^"Enemies/enemy-flying")
 	var client_enemy: Node3D = client_level.get_node(^"Enemies/enemy-flying")
-	var confirmed := [0]
-	own.shoot.confirmed.connect(func() -> void: confirmed[0] += 1)
 	await game.sync_ticks(30)
 
 	mario.camera.rotation.x = deg_to_rad(90)
@@ -66,9 +64,6 @@ func test_a_client_shot_lands_on_an_enemy_every_peer_sees() -> void:
 	Input.action_release("shoot")
 	await game.sync_ticks(30)
 
-	assert_int(confirmed[0]).override_failure_message(
-		"the server must run the shot action the client requested",
-	).is_greater(0)
 	assert_int(host_enemy.health).override_failure_message(
 		"the server must take the hit the client reported",
 	).is_less(100)

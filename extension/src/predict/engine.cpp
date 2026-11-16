@@ -46,27 +46,6 @@ using repl::PropertySet;
 
 namespace {
 
-const GameCall SIMULATION_STEP
-    = {"NetwSimulation.network_process",
-       "func _network_process(delta: float, tick: int, is_fresh: bool) "
-       "-> void",
-       3};
-
-const GameCall PREDICT_INPUT_CALL
-    = {"NetwPrediction.predict_input",
-       "func(entity: NetwEntity, tick: int) -> Dictionary",
-       2};
-
-const GameCall CORRECTION_PATH_CALL
-    = {"NetwPrediction.correction_path_clear",
-       "func(current: Dictionary, proposed: Dictionary) -> bool",
-       2};
-
-const GameCall SENSOR_CALL
-    = {"A NetwPrediction.sensors entry",
-       "func() -> Variant",
-       0};
-
 constexpr int ACK_WINDOW_MAX = 64;
 
 String participant_key(const Ref<NetwEntity> &p_entity) {
@@ -996,7 +975,7 @@ void NetwPredictionEngine::call_step(
     arguments.push_back(p_fresh);
     const int stale = p_fresh ? 0 : 1;
     replay_steps += stale;
-    game_call(p_step, arguments, SIMULATION_STEP);
+    game_call(p_step, arguments, game_calls::SIMULATION_STEP);
     replay_steps -= stale;
 }
 
@@ -1727,7 +1706,12 @@ bool NetwPredictionEngine::predict_command(
     arguments.push_back(p_tick);
     bool called = false;
     const Variant predicted
-        = game_call(predictor, arguments, PREDICT_INPUT_CALL, &called);
+        = game_call(
+            predictor,
+            arguments,
+            game_calls::PREDICT_INPUT_CALL,
+            &called
+        );
     row = mutable_row_of(p_slot);
     if (row == nullptr) {
         return false;
@@ -2778,7 +2762,8 @@ int64_t NetwPredictionEngine::sample_environment(
     depth += 1;
     for (const KeyValue<StringName, Callable> &sensor : row->sensors) {
         if (sensor.value.is_valid()) {
-            samples[sensor.key] = game_call(sensor.value, Array(), SENSOR_CALL);
+            samples[sensor.key]
+                = game_call(sensor.value, Array(), game_calls::SENSOR_CALL);
         }
     }
     depth -= 1;
@@ -7395,7 +7380,11 @@ Dictionary NetwPredictionEngine::try_transport(
         arguments.push_back(p_current);
         arguments.push_back(proposed);
         corridor_clear
-            = bool(game_call(p_corridor, arguments, CORRECTION_PATH_CALL));
+            = bool(game_call(
+                p_corridor,
+                arguments,
+                game_calls::CORRECTION_PATH_CALL
+            ));
     }
     const bool eligible = prior_ok && corridor_clear;
 

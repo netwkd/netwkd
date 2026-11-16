@@ -60,11 +60,6 @@ using repl::PropertySet;
 
 namespace {
 
-const GameCall MIGRATION_STEP
-    = {"The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
-       "func(values: Dictionary) -> Dictionary",
-       1};
-
 constexpr double SHUTDOWN_NOTIFY_DELAY = 0.5;
 
 enum class OpenSeat : uint8_t {
@@ -1742,7 +1737,7 @@ void NetwMultiplayer::adopt_schema_declarations() {
         const Array froms = steps.keys();
         for (int at_step = 0; at_step < froms.size(); ++at_step) {
             const Callable step = steps[froms[at_step]];
-            game_call_declared(step, MIGRATION_STEP);
+            game_call_declared(step, game_calls::MIGRATION_STEP);
             schema_core.add_migration(schema, int(froms[at_step]), step);
         }
         if (schema_seal(schema) != OK) {
@@ -1960,21 +1955,15 @@ bool NetwMultiplayer::lagcomp_effect_watch(
 StringName NetwMultiplayer::lagcomp_action_key(
     const RID &p_entity,
     int64_t p_view_tick,
-    int64_t p_slot
+    const StringName &p_method
 ) const {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
-    const StringName named
-        = wrapper.is_valid() ? wrapper->get_name() : StringName();
-    if (named.is_empty()) {
-        Array act_args;
-        act_args.push_back(p_view_tick);
-        act_args.push_back(p_slot);
-        return StringName(String("act__{0}__{1}").format(act_args));
-    }
     Array act_args;
-    act_args.push_back(named);
+    act_args.push_back(
+        wrapper.is_valid() ? liveness_route_of(wrapper.ptr()) : 0
+    );
     act_args.push_back(p_view_tick);
-    act_args.push_back(p_slot);
+    act_args.push_back(p_method);
     return StringName(String("act__{0}__{1}__{2}").format(act_args));
 }
 
@@ -2066,7 +2055,11 @@ Error NetwMultiplayer::display_write_track(
 ) {
     const Callable *callback = display_callbacks.getptr(p_entity.get_id());
     if (callback != nullptr && callback->is_valid()) {
-        callback->call(p_entity, p_track, p_value);
+        Array args;
+        args.push_back(p_entity);
+        args.push_back(p_track);
+        args.push_back(p_value);
+        game_call(*callback, args, game_calls::DISPLAY_CALLBACK);
         return OK;
     }
     const RID *item = display_target_items.getptr(p_entity.get_id());

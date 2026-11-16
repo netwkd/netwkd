@@ -29,8 +29,11 @@ namespace Networked;
 /// func fetch_token(nonce: String) -&gt; NetwPromise:
 ///     return backend.request_join_token(nonce)
 ///
-/// func admit(request: NetwJoinRequest) -&gt; Error:
-///     return OK if request.account else ERR_UNAUTHORIZED
+/// func admit(request: NetwJoinRequest) -&gt; void:
+///     if request.account:
+///         request.admit()
+///     else:
+///         request.deny()
 /// </code>
 /// </remarks>
 public sealed class NetwIdToken : NetwAccountProvider
@@ -259,14 +262,39 @@ public sealed class NetwIdToken : NetwAccountProvider
 
     /// <summary>
     /// Sets where the joining peer gets tokens for <paramref name="issuer"/>.
-    /// <paramref name="fetch"/> takes the nonce the token must carry and
+    /// <paramref name="handler"/> takes the nonce the token must carry and
     /// returns a <see cref="NetwPromise"/> of the token. A later call for the
     /// same issuer replaces it, and an empty <see cref="Callable"/> removes it.
+    /// <code>
+    /// func fetch_token(nonce: String) -&gt; NetwPromise:
+    /// </code>
     /// </summary>
-    public static void Provide(string issuer, Callable fetch)
+    public static void Provide(string issuer, Func<string, NetwPromise> handler)
     {
+        Callable bridged1 = default;
+        if (handler != null)
+        {
+            var bridge1 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    NetwPromise answer = handler(a0.As<string>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromGodotObjectPtr(
+                                answer?.Native ?? IntPtr.Zero)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwIdToken.Provide", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(handler, bridge1, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromString(issuer);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(fetch);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindProvide,

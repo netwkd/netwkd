@@ -82,6 +82,10 @@ Fault index
 - :doc:`nw1037`, PRACTICE
 - :doc:`nw1038`, PRACTICE
 - :doc:`nw1039`, PRACTICE
+- :doc:`nw1040`, MISUSE
+- :doc:`nw1041`, MISUSE
+- :doc:`nw1042`, MISUSE
+- :doc:`nw1043`, MISUSE
 
 .. toctree::
    :hidden:
@@ -167,3 +171,7 @@ Fault index
    nw1037
    nw1038
    nw1039
+   nw1040
+   nw1041
+   nw1042
+   nw1043

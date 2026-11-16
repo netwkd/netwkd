@@ -36,10 +36,18 @@ void NetwDespawnOpts::_bind_methods() {
     NETW_OPTION(NetwDespawnOpts, Variant::FLOAT, linger_seconds);
 }
 
+Ref<NetwControlRequest> NetwControlRequest::create(
+    int64_t p_requester,
+    int64_t p_hold
+) {
+    Ref<NetwControlRequest> made;
+    made.instantiate();
+    made->peer_id = p_requester;
+    made->hold = p_hold;
+    return made;
+}
+
 void NetwControlRequest::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("deny"), &NetwControlRequest::deny);
-    NETW_OPTION(NetwControlRequest, Variant::INT, requester);
-    NETW_OPTION(NetwControlRequest, Variant::BOOL, denied);
     ClassDB::bind_method(D_METHOD("get_hold"), &NetwControlRequest::get_hold);
     ADD_PROPERTY(
         PropertyInfo(

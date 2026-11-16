@@ -61,8 +61,6 @@ Methods
    +-------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`PackedInt32Array`                             | :ref:`linked_peer_ids<class_LocalMultiplayerPeer_method_linked_peer_ids>`\ (\ ) |const|                                                                                       |
    +-------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`transfer_server<class_LocalMultiplayerPeer_method_transfer_server>`\ (\ peer_id\: :godot:`int`\ )                                                                       |
-   +-------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -150,18 +148,6 @@ Returns ``true`` when this peer is connected to ``peer_id``.
 :godot:`PackedInt32Array` **linked_peer_ids**\ (\ ) |const| :ref:`🔗<class_LocalMultiplayerPeer_method_linked_peer_ids>`
 
 Returns the ids of every connected peer, in the order they connected.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_LocalMultiplayerPeer_method_transfer_server:
-
-.. rst-class:: classref-method
-
-:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **transfer_server**\ (\ peer_id\: :godot:`int`\ ) :ref:`🔗<class_LocalMultiplayerPeer_method_transfer_server>`
-
-Makes the connected client ``peer_id`` the server and keeps this server connected as a client under a new id, which is how :ref:`NetwSession.transfer_server()<class_NetwSession_method_transfer_server>` moves a session that runs on a :ref:`LocalLoopbackSession<class_LocalLoopbackSession>`.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

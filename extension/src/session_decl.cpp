@@ -64,6 +64,7 @@ const KindRow &row_of(Kind p_kind) {
 }
 
 constexpr const char *META_DATABASES = "_netw_d_db";
+constexpr const char *META_ACTIONS = "_netw_d_act";
 constexpr const char *META_ARMED = "_netw_d_armed";
 constexpr const char *META_LAST_API = "_netw_d_api";
 constexpr const char *SIG_TREE_ENTERED = "tree_entered";
@@ -329,6 +330,39 @@ Error declare_database(
     return OK;
 }
 
+Dictionary actions_on(Node *p_scope) {
+    const StringName key(META_ACTIONS);
+    if (p_scope == nullptr || !p_scope->has_meta(key)) {
+        return Dictionary();
+    }
+    return p_scope->get_meta(key);
+}
+
+Error declare_action(
+    Node *p_scope,
+    const StringName &p_method,
+    const Variant &p_config
+) {
+    Dictionary declared = actions_on(p_scope);
+    if (declared.has(p_method)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_DECLARED_TWICE,
+            {vformat("{Netw.configure_action} for '%s'", String(p_method)),
+             String(p_scope->get_name())},
+            uint64_t(gd::instance_id(p_scope))
+        );
+        return ERR_ALREADY_EXISTS;
+    }
+    declared[p_method] = p_config;
+    p_scope->set_meta(StringName(META_ACTIONS), declared);
+    arm(p_scope);
+    if (p_scope->is_inside_tree()) {
+        install_now(Variant(p_scope));
+    }
+    return OK;
+}
+
 void Book::install_from(NetwMultiplayer *p_api, Node *p_scope) {
     if (p_api == nullptr || p_scope == nullptr) {
         return;
@@ -371,6 +405,7 @@ void Book::install_from(NetwMultiplayer *p_api, Node *p_scope) {
         }
     }
     p_api->database_install_from(p_scope);
+    p_api->lagcomp_action_install_from(p_scope);
 }
 
 void Book::refresh(NetwMultiplayer *p_api) {

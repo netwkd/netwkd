@@ -56,36 +56,48 @@
 		</method>
 		<method name="on_enter">
 			<return type="NetwInterest" />
-			<param index="0" name="callback" type="Callable" />
+			<param index="0" name="handler" type="Callable" />
 			<param index="1" name="layer_id" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when [param layer_id] shows the entity to a peer, once that peer also sees the [NetwEntity] above it. An empty [param layer_id] means every layer joined so far.
+				Calls [param handler] when [param layer_id] shows the entity to a peer, once that peer also sees the [NetwEntity] above it. An empty [param layer_id] means every layer joined so far.
+				[codeblock]
+				func _on_interest_enter(layer_id: StringName, peer_id: int) -&gt; void:
+				[/codeblock]
 			</description>
 		</method>
 		<method name="on_leave">
 			<return type="NetwInterest" />
-			<param index="0" name="callback" type="Callable" />
+			<param index="0" name="handler" type="Callable" />
 			<param index="1" name="layer_id" type="StringName" default="&amp;&quot;&quot;" />
 			<description>
-				Calls [param callback] as [code]callback(layer_id, peer_id)[/code] when [param layer_id] stops showing the entity to a peer, also when that peer stops seeing the [NetwEntity] above it. An empty [param layer_id] means every layer joined so far.
+				Calls [param handler] when [param layer_id] stops showing the entity to a peer, also when that peer stops seeing the [NetwEntity] above it. An empty [param layer_id] means every layer joined so far.
+				[codeblock]
+				func _on_interest_leave(layer_id: StringName, peer_id: int) -&gt; void:
+				[/codeblock]
 			</description>
 		</method>
 		<method name="on_leave_policy">
 			<return type="NetwInterest" />
 			<param index="0" name="layer_id" type="StringName" />
 			<param index="1" name="policy" type="int" enum="NetwInterestLayer.LeavePolicy" />
-			<param index="2" name="custom_callback" type="Callable" default="Callable()" />
+			<param index="2" name="handler" type="Callable" default="Callable()" />
 			<description>
-				Sets what happens to a peer's copy when it stops seeing the entity through [param layer_id]. [constant NetwInterestLayer.LEAVE_POLICY_CUSTOM] requires [param custom_callback], called on the server as [code]custom_callback(peer_id, layer_id)[/code].
+				Sets what happens to a peer's copy when it stops seeing the entity through [param layer_id]. [constant NetwInterestLayer.LEAVE_POLICY_CUSTOM] requires [param handler], called on the server.
+				[codeblock]
+				func fade_out(peer_id: int, layer_id: StringName) -&gt; void:
+				[/codeblock]
 			</description>
 		</method>
 		<method name="on_perception_policy">
 			<return type="NetwInterest" />
 			<param index="0" name="layer_id" type="StringName" />
 			<param index="1" name="policy" type="int" enum="NetwInterestLayer.PerceptionPolicy" />
-			<param index="2" name="custom_callback" type="Callable" default="Callable()" />
+			<param index="2" name="handler" type="Callable" default="Callable()" />
 			<description>
-				Sets whether this peer keeps showing the entity when it stops seeing it through [param layer_id]. [constant NetwInterestLayer.PERCEPTION_POLICY_CUSTOM] requires [param custom_callback], called as [code]custom_callback(visible, peer_id, layer_id)[/code].
+				Sets whether this peer keeps showing the entity when it stops seeing it through [param layer_id]. [constant NetwInterestLayer.PERCEPTION_POLICY_CUSTOM] requires [param handler].
+				[codeblock]
+				func show_ghost(visible: bool, peer_id: int, layer_id: StringName) -&gt; void:
+				[/codeblock]
 			</description>
 		</method>
 	</methods>

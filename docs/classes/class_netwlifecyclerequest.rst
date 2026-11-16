@@ -10,7 +10,7 @@
 NetwLifecycleRequest
 ====================
 
-**Inherits:** :godot:`RefCounted`
+**Inherits:** :ref:`NetwRequest<class_NetwRequest>` **<** :godot:`RefCounted`
 
 A spawn, despawn or move by a controlling client, waiting for the server to accept it.
 
@@ -19,15 +19,15 @@ A spawn, despawn or move by a controlling client, waiting for the server to acce
 Description
 -----------
 
-The server receives one in :ref:`NetwEntity.lifecycle_requested<class_NetwEntity_signal_lifecycle_requested>` for each change the :ref:`NetwEntity.controller<class_NetwEntity_property_controller>` of a :ref:`NetwEntity.LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>` entity makes, and can call :ref:`deny()<class_NetwLifecycleRequest_method_deny>` before other peers see it.
+The server passes one to :ref:`NetwEntity.lifecycle_handler<class_NetwEntity_property_lifecycle_handler>` for each change the :ref:`NetwEntity.controller<class_NetwEntity_property_controller>` of a :ref:`NetwEntity.LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>` entity makes, and can call :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` before other peers see it.
 
 ::
 
-    func _on_lifecycle_requested(peer_id: int, request: NetwLifecycleRequest) -> void:
-        if request.kind == NetwLifecycleRequest.KIND_DESPAWN and not may_remove(peer_id):
+    func judge_change(request: NetwLifecycleRequest) -> void:
+        if request.kind == NetwLifecycleRequest.KIND_DESPAWN and not may_remove(request.peer_id):
             request.deny("only the builder removes it")
 
-\ Once denied, the request stays denied. The peer that made the change receives :ref:`NetwEntity.lifecycle_refused<class_NetwEntity_signal_lifecycle_refused>` with the :ref:`reason<class_NetwLifecycleRequest_property_reason>`.
+\ Once denied, the request stays denied. The peer that made the change receives :ref:`NetwEntity.lifecycle_refused<class_NetwEntity_signal_lifecycle_refused>` with the :ref:`NetwRequest.code<class_NetwRequest_property_code>` and the :ref:`NetwRequest.reason<class_NetwRequest_property_reason>`.
 
 .. rst-class:: classref-reftable-group
 
@@ -38,30 +38,12 @@ Properties
    :widths: auto
 
    +---------------------------------------------+---------------------------------------------------------------------+
-   | :godot:`bool`                               | :ref:`denied<class_NetwLifecycleRequest_property_denied>`           |
-   +---------------------------------------------+---------------------------------------------------------------------+
    | :godot:`Node`                               | :ref:`destination<class_NetwLifecycleRequest_property_destination>` |
    +---------------------------------------------+---------------------------------------------------------------------+
    | :ref:`NetwEntity<class_NetwEntity>`         | :ref:`entity<class_NetwLifecycleRequest_property_entity>`           |
    +---------------------------------------------+---------------------------------------------------------------------+
    | :ref:`Kind<enum_NetwLifecycleRequest_Kind>` | :ref:`kind<class_NetwLifecycleRequest_property_kind>`               |
    +---------------------------------------------+---------------------------------------------------------------------+
-   | :godot:`String`                             | :ref:`reason<class_NetwLifecycleRequest_property_reason>`           |
-   +---------------------------------------------+---------------------------------------------------------------------+
-   | :godot:`int`                                | :ref:`requester<class_NetwLifecycleRequest_property_requester>`     |
-   +---------------------------------------------+---------------------------------------------------------------------+
-
-.. rst-class:: classref-reftable-group
-
-Methods
--------
-
-.. table::
-   :widths: auto
-
-   +--------+------------------------------------------------------------------------------------------+
-   | |void| | :ref:`deny<class_NetwLifecycleRequest_method_deny>`\ (\ reason\: :godot:`String` = ""\ ) |
-   +--------+------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -111,23 +93,6 @@ The controller moved the entity with :ref:`Netw.reparent()<class_Netw_method_rep
 Property Descriptions
 ---------------------
 
-.. _class_NetwLifecycleRequest_property_denied:
-
-.. rst-class:: classref-property
-
-:godot:`bool` **denied** :ref:`🔗<class_NetwLifecycleRequest_property_denied>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_denied**\ (\ value\: :godot:`bool`\ )
-- :godot:`bool` **get_denied**\ (\ )
-
-Whether the change is refused. Writing ``false`` after :ref:`deny()<class_NetwLifecycleRequest_method_deny>` has no effect.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwLifecycleRequest_property_destination:
 
 .. rst-class:: classref-property
@@ -171,55 +136,6 @@ The entity the change is about. On a spawn it is the server's copy, holding the 
 - :ref:`Kind<enum_NetwLifecycleRequest_Kind>` **get_kind**\ (\ )
 
 Which change the controller made.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwLifecycleRequest_property_reason:
-
-.. rst-class:: classref-property
-
-:godot:`String` **reason** :ref:`🔗<class_NetwLifecycleRequest_property_reason>`
-
-.. rst-class:: classref-property-setget
-
-- :godot:`String` **get_reason**\ (\ )
-
-What the server passed to :ref:`deny()<class_NetwLifecycleRequest_method_deny>`, empty until then.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwLifecycleRequest_property_requester:
-
-.. rst-class:: classref-property
-
-:godot:`int` **requester** :ref:`🔗<class_NetwLifecycleRequest_property_requester>`
-
-.. rst-class:: classref-property-setget
-
-- :godot:`int` **get_requester**\ (\ )
-
-The peer that made the change.
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Method Descriptions
--------------------
-
-.. _class_NetwLifecycleRequest_method_deny:
-
-.. rst-class:: classref-method
-
-|void| **deny**\ (\ reason\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwLifecycleRequest_method_deny>`
-
-Refuses this change and records ``reason`` for the peer that made it. Only the first call counts.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

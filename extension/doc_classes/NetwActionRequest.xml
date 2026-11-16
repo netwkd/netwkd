@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="NetwActionContext" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="NetwActionRequest" inherits="NetwRequest" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Information about a [NetwAction] request, passed to its method on the server.
+		Information about a [method Netw.action] request, passed to its method on the server.
 	</brief_description>
 	<description>
-		It is the first argument, before the arguments of [method NetwAction.request]. Call [method bind] on a node the action spawns, before adding it to the tree. Call [method deny] to reject the action.
+		A [NetwRequest] that is the first argument, before the arguments of [method Netw.action]. Call [method bind] on a node the action spawns, before adding it to the tree. Call [method NetwRequest.deny] to reject the action. The requesting peer undoes its prediction, and its [method NetwActionConfig.revert] handler receives the code and the reason, which is cut to 255 UTF-8 bytes.
 		[codeblock]
-		func _place_bomb(ctx: NetwActionContext) -&gt; void:
-		    var past := Netw.sample(entity, ctx.view_tick)
+		func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+		    var past := Netw.sample(entity, request.view_tick)
 		    if not past.has_value(&amp;"position"):
-		        ctx.deny()
+		        request.deny("no position at that tick")
 		        return
 		    var bomb := BOMB.instantiate()
-		    ctx.bind(bomb)
+		    request.bind(bomb)
 		    bombs.add_child(bomb)
 		[/codeblock]
 	</description>
@@ -26,12 +26,6 @@
 				Links [param node] to this action, so the client's predicted copy is replaced by it. Call it before adding the node to the tree.
 			</description>
 		</method>
-		<method name="deny">
-			<return type="void" />
-			<description>
-				Rejects the action. The requesting client undoes its prediction.
-			</description>
-		</method>
 	</methods>
 	<members>
 		<member name="execution_tick" type="int" setter="" getter="get_execution_tick">
@@ -39,9 +33,6 @@
 		</member>
 		<member name="requested_tick" type="int" setter="" getter="get_requested_tick">
 			The tick the client asked for.
-		</member>
-		<member name="requester" type="int" setter="" getter="get_requester">
-			The peer that sent the request.
 		</member>
 		<member name="view_tick" type="int" setter="" getter="get_view_tick">
 			The tick the client saw when it acted, no later than [member execution_tick]. Use it with [method Netw.rewind] and [method Netw.sample].

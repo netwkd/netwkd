@@ -13,12 +13,12 @@ it needs.
 
 .. code-block:: gdscript
 
-    func admit() -> Error:
-        return OK
+    func admit() -> void:
+        pass
 
 Declare it as the log line says.
 
 .. code-block:: gdscript
 
-    func admit(request: NetwJoinRequest) -> Error:
-        return OK
+    func admit(request: NetwJoinRequest) -> void:
+        request.admit()

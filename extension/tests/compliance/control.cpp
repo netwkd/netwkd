@@ -9,10 +9,16 @@ using namespace netw_test;
 
 constexpr const char *PITCH = R"(
 class Ball extends Node3D:
+	signal claim_judged
+
 	func _init() -> void:
 		var entity := Netw.configure_entity(self)
 		entity.transfer = NetwEntity.TRANSFER_REQUESTABLE
+		entity.control_handler = judge
 		Netw.configure_property(self, &"position").broadcast()
+
+	func judge(_request: NetwControlRequest) -> void:
+		claim_judged.emit()
 
 	func nudge(by: Vector3) -> void:
 		position += by
@@ -77,10 +83,10 @@ func _init() -> void:
 	Netw.configure_session(self).return_window(60.0)
 
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	if request.username != &"":
 		request.account = "test:" + request.username
-	return OK
+	request.admit()
 
 
 func seat(username: String, called: String) -> void:
@@ -244,14 +250,14 @@ class Crate extends Node3D:
 	func _init() -> void:
 		var entity := Netw.configure_entity(self)
 		entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
-		entity.lifecycle_requested.connect(judge)
+		entity.lifecycle_handler = judge
 		entity.lifecycle_refused.connect(
 			func(request: NetwLifecycleRequest) -> void:
 				if request.kind == NetwLifecycleRequest.KIND_REPARENT:
 					refused_under.emit(String(get_parent().name))
 		)
 
-	func judge(_peer_id: int, request: NetwLifecycleRequest) -> void:
+	func judge(request: NetwLifecycleRequest) -> void:
 		request.deny("not yours")
 
 	func shelve() -> void:
@@ -365,7 +371,7 @@ World racked_balls() {
     World world(PITCH, 1);
     world.at(4, impair(TAKER, rough(11, TICK_MS)));
     for (const char *ball : RACK) {
-        world.hear(ball, "control_requested")
+        world.hear(ball, "claim_judged")
             .at(1, spawn("Ball", ball))
             .at(CLAIMED, on(TAKER, claim(ball)));
     }
@@ -375,7 +381,7 @@ World racked_balls() {
 LawVerdict claimed_in_order(const Seen &p_seen) {
     godot::PackedStringArray heard;
     for (const Heard &row : p_seen.heard) {
-        if (row.peer == SERVER && row.signal == "control_requested") {
+        if (row.peer == SERVER && row.signal == "claim_judged") {
             heard.push_back(row.node);
         }
     }
@@ -433,6 +439,36 @@ TEST_CASE(
     const Seen seen = walker_meets_a_wall().run(80);
     NETW_HOLDS(agrees(seen, 0));
     NETW_HOLDS(quiet(seen));
+}
+
+constexpr const char *SLOW_JUDGE = R"(
+class Ball extends Node3D:
+	func _init() -> void:
+		var entity := Netw.configure_entity(self)
+		entity.transfer = NetwEntity.TRANSFER_REQUESTABLE
+		entity.control_handler = judge
+
+	func judge(request: NetwControlRequest) -> void:
+		await get_tree().process_frame
+		request.deny("too late")
+)";
+
+World slowly_judged_ball() {
+    return World(SLOW_JUDGE, 1)
+        .at(1, spawn("Ball", "Ball"))
+        .at(8, on(TAKER, claim("Ball")));
+}
+
+TEST_CASE(
+    "[Networked][Compliance] A9 a control handler that awaits before it "
+    "denies is reported, and the claim is granted as the request stood "
+    "when the handler returned"
+) {
+    const Seen seen = slowly_judged_ball().run(30);
+    NETW_HOLDS(reads(seen, SERVER, "Ball", "controller", "client 0"));
+    NETW_HOLDS(agrees(seen, TAKER));
+    REQUIRE(seen.faults.size() == 1);
+    CHECK(seen.faults[0].contains("[NW1043]"));
 }
 
 } // namespace ComplianceControl

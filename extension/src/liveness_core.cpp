@@ -14,16 +14,6 @@ namespace netw {
 
 namespace {
 
-const GameCall LIVE_CALLBACK
-    = {"The callback waiting for a route",
-       "func() -> void",
-       0};
-
-const GameCall LIVE_TIMEOUT
-    = {"The timeout waiting for a route",
-       "func() -> void",
-       0};
-
 int rank_of(NetwLivenessCore::State state) {
     switch (state) {
         case NetwLivenessCore::STATE_UNKNOWN:
@@ -470,7 +460,7 @@ void NetwLivenessCore::when_live(
     const Callable &on_timeout
 ) {
     if (route_state(route) == STATE_LIVE && deferred_flushes.find(route) < 0) {
-        game_call(callback, Array(), LIVE_CALLBACK);
+        game_call(callback, Array(), game_calls::LIVE_CALLBACK);
         return;
     }
     Pending entry;
@@ -523,7 +513,7 @@ void NetwLivenessCore::flush_live(int route) {
     pending.remove(found);
     for (const Pending &entry : waiting) {
         if (entry.callback.is_valid()) {
-            game_call(entry.callback, Array(), LIVE_CALLBACK);
+            game_call(entry.callback, Array(), game_calls::LIVE_CALLBACK);
         }
     }
 }
@@ -538,7 +528,7 @@ void NetwLivenessCore::fail_live(int route) {
     pending.remove(found);
     for (const Pending &entry : waiting) {
         if (entry.on_timeout.is_valid()) {
-            game_call(entry.on_timeout, Array(), LIVE_TIMEOUT);
+            game_call(entry.on_timeout, Array(), game_calls::LIVE_TIMEOUT);
         }
     }
 }
@@ -596,7 +586,7 @@ PackedInt32Array NetwLivenessCore::sweep_pending(int clock_tick) {
     expired.sort();
 
     for (const Callable &callback : fired) {
-        game_call(callback, Array(), LIVE_TIMEOUT);
+        game_call(callback, Array(), game_calls::LIVE_TIMEOUT);
     }
     return expired;
 }

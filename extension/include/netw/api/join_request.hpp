@@ -5,6 +5,7 @@
 #include "godot/local_vector.hpp"
 #include "godot/ref_counted.hpp"
 #include "godot/variant.hpp"
+#include "netw/api/request.hpp"
 #include "netw/api/session.hpp"
 #include "netw/wire/describe.hpp"
 
@@ -12,8 +13,8 @@ namespace netw {
 
 class NetwMultiplayer;
 
-class NetwJoinRequest : public godot::RefCounted {
-    GDCLASS(NetwJoinRequest, godot::RefCounted)
+class NetwJoinRequest : public NetwRequest {
+    GDCLASS(NetwJoinRequest, NetwRequest)
 
     struct Proven {
         godot::String account;
@@ -21,7 +22,6 @@ class NetwJoinRequest : public godot::RefCounted {
         bool bound = false;
     };
 
-    int64_t peer_id = 0;
     godot::StringName username;
     godot::Array args;
     godot::String challenge;
@@ -30,8 +30,7 @@ class NetwJoinRequest : public godot::RefCounted {
     godot::String account;
     godot::String account_name;
     godot::ObjectID core_id;
-    godot::Error refused_code = godot::OK;
-    godot::String refused_reason;
+    bool admitted = false;
 
     const Proven *find(const godot::String &p_account) const;
     void merge(
@@ -42,6 +41,7 @@ class NetwJoinRequest : public godot::RefCounted {
 
 protected:
     static void _bind_methods();
+    void denied() override;
 
 public:
     void bind_to(
@@ -65,9 +65,6 @@ public:
     void start_from_first_account();
     godot::String name_of(const godot::String &p_account) const;
     bool is_bound(const godot::String &p_account) const;
-    int64_t get_peer_id() const {
-        return peer_id;
-    }
     godot::StringName get_username() const {
         return username;
     }
@@ -90,8 +87,12 @@ public:
     godot::String get_account_name() const {
         return account_name;
     }
-    godot::Error refuse(godot::Error p_code, const godot::String &p_reason);
-    godot::String reason_for(godot::Error p_code) const;
+    void admit() {
+        admitted = true;
+    }
+    bool is_admitted() const {
+        return admitted && !is_denied();
+    }
 };
 
 struct JoinFrame {

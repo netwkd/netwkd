@@ -42,17 +42,16 @@ func _init() -> void:
 	var entity: NetwEntity = Netw.configure_entity(self)
 	entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
 	entity.transfer = NetwEntity.TRANSFER_REQUESTABLE
-	entity.lifecycle_requested.connect(judge)
+	entity.lifecycle_handler = judge
 	entity.lifecycle_refused.connect(refused)
 	Netw.configure_property(self, &"hp").broadcast().on_spawn()
 
 
-func judge(peer_id: int, request: NetwLifecycleRequest) -> void:
+func judge(request: NetwLifecycleRequest) -> void:
 	var destination: Node = request.destination
 	asked.append({
-		"peer": peer_id,
+		"peer": request.peer_id,
 		"kind": request.kind,
-		"requester": request.requester,
 		"hp": request.entity.root.get(&"hp"),
 		"placed": is_inside_tree(),
 		"destination": String(destination.name) if destination != null else "",
@@ -60,9 +59,8 @@ func judge(peer_id: int, request: NetwLifecycleRequest) -> void:
 	var reason: String = verdicts.get(request.kind, "")
 	if reason.is_empty():
 		return
-	request.deny(reason)
+	request.deny(reason, ERR_BUSY)
 	if relatch:
-		request.denied = false
 		request.deny("again")
 
 
@@ -70,7 +68,7 @@ func refused(request: NetwLifecycleRequest) -> void:
 	heard.append({
 		"kind": request.kind,
 		"reason": request.reason,
-		"denied": request.denied,
+		"denied": request.code == ERR_BUSY,
 		"at": multiplayer.get_unique_id(),
 	})
 )";
@@ -287,7 +285,6 @@ TEST_CASE(
         int64_t(NetwLifecycleRequest::KIND_SPAWN)
     );
     NETW_CHECK_EQ(int64_t(row["peer"]), int64_t(stage.rig.peer_id(0)));
-    NETW_CHECK_EQ(int64_t(row["requester"]), int64_t(stage.rig.peer_id(0)));
     NETW_CHECK_EQ(int64_t(row["hp"]), AUTHORED_HP);
     CHECK_FALSE(bool(row["placed"]));
     CHECK(String(row["destination"]) == String("Arena"));

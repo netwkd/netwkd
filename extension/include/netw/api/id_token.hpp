@@ -107,7 +107,7 @@ public:
     godot::Ref<NetwPromise> fetch_keys();
     static void provide(
         const godot::String &p_issuer,
-        const godot::Callable &p_fetch
+        const godot::Callable &p_handler
     );
     static void hold(
         const godot::String &p_issuer,

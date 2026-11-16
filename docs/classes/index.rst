@@ -118,8 +118,8 @@ Other classes
     class_multiplayerviewport
     class_netw
     class_netwaccountprovider
-    class_netwaction
-    class_netwactioncontext
+    class_netwactionconfig
+    class_netwactionrequest
     class_netwadmissionconfig
     class_netwauthprotocol
     class_netwbitstream
@@ -164,6 +164,7 @@ Other classes
     class_netwquantizetransform2d
     class_netwquantizetransform3d
     class_netwrecord
+    class_netwrequest
     class_netwscene
     class_netwsceneconfig
     class_netwschema

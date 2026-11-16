@@ -11,7 +11,8 @@
 #include "godot/rid.hpp"
 #include "godot/script.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/action.hpp"
+#include "netw/api/action_request.hpp"
+#include "netw/api/action_config.hpp"
 #include "netw/api/channel.hpp"
 #include "netw/api/clock.hpp"
 #include "netw/api/clock_config.hpp"
@@ -59,7 +60,7 @@ public:
     static godot::Ref<NetwScene> scene(godot::Node *p_node);
 
     static godot::Error configure_server_info(
-        const godot::Callable &p_provider
+        const godot::Callable &p_handler
     );
     static godot::Ref<NetwJoinConfig> configure_join(
         const godot::Callable &p_handler
@@ -67,7 +68,7 @@ public:
     static godot::Ref<NetwAdmissionConfig> configure_admission(
         const godot::Callable &p_handler
     );
-    static godot::Error configure_transfer(const godot::Callable &p_keep);
+    static godot::Error configure_transfer(const godot::Callable &p_handler);
     static godot::Ref<NetwSessionConfig> configure_session(godot::Node *p_node);
     static godot::Ref<NetwClockConfig> configure_clock(godot::Node *p_node);
     static godot::Ref<NetwLagCompensationConfig> configure_lagcomp(
@@ -80,13 +81,13 @@ public:
         int64_t p_declared_type = -1
     );
     static godot::Ref<NetwMemberConfig> configure_rpc(
-        const godot::Callable &p_callable
+        const godot::Callable &p_method
     );
     static godot::Ref<NetwMemberConfig> configure_signal(
         const godot::Signal &p_signal
     );
     static godot::Ref<NetwMemberConfig> configure_spawn(
-        const godot::Callable &p_callable
+        const godot::Callable &p_method
     );
     static godot::Ref<NetwEntity> configure_entity(godot::Node *p_node);
     static godot::Ref<NetwDespawnConfig> configure_despawn(godot::Node *p_node);
@@ -98,40 +99,40 @@ public:
     );
 
     static void rpc(
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static void rpc_id(
         int64_t p_peer_id,
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static void rpc_controller(
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Ref<NetwPromise> request(
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Ref<NetwPromise> request_id(
         int64_t p_peer_id,
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Ref<NetwGroupPromise> request_all(
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Ref<NetwPromise> request_controller(
-        const godot::Callable &p_callable,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static void sync_property(
         godot::Node *p_node,
         const godot::StringName &p_property
     );
-    static void emit_entity_signal(
+    static void emit(
         const godot::Signal &p_signal,
         const godot::Array &p_args
     );
@@ -145,16 +146,16 @@ public:
     );
 
     static godot::Node *spawn(
-        const godot::Callable &p_fn,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Node *spawn_player(
         const godot::Ref<NetwPlayer> &p_player,
-        const godot::Callable &p_fn,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Ref<NetwPromise> spawn_async(
-        const godot::Callable &p_fn,
+        const godot::Callable &p_method,
         const godot::Array &p_args
     );
     static godot::Error despawn(
@@ -166,7 +167,14 @@ public:
         godot::Node *p_new_parent
     );
 
-    static godot::Ref<NetwAction> action(const godot::Callable &p_authority);
+    static godot::Ref<NetwActionConfig> configure_action(
+        const godot::Callable &p_method
+    );
+    static void action(
+        const godot::Callable &p_method,
+        int64_t p_tick,
+        const godot::Array &p_args
+    );
     static godot::Ref<DictionaryRecord> sample(
         const godot::Ref<NetwEntity> &p_entity,
         int64_t p_tick
@@ -174,7 +182,7 @@ public:
     static godot::Variant rewind(
         const godot::TypedArray<NetwEntity> &p_entities,
         int64_t p_tick,
-        const godot::Callable &p_body
+        const godot::Callable &p_callback
     );
 
     static godot::Ref<NetwSceneConfig> configure_scene(godot::Node *p_node);

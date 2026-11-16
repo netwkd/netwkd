@@ -41,7 +41,7 @@
 		[constant AUTHORITY_SERVER] keeps Godot multiplayer authority on the server while [member controller] steers. [constant AUTHORITY_CONTROLLER] moves Godot authority with control. Properties configured with [method NetwPropertyConfig.state] are server-written in both modes.
 		[member NetwSimulation.claim_on_contact] and [member NetwSimulation.release_on_rest] let a body take control of what it touches and hand it back once it rests.
 		[b]Letting the controller spawn and despawn[/b]
-		Only the server spawns, moves and despawns an entity by default. When [member lifecycle] is [constant LIFECYCLE_CONTROLLER] the [member controller] may too, and the change shows on its screen at once. The server can refuse it in [signal lifecycle_requested], and the change is then undone on the controller.
+		Only the server spawns, moves and despawns an entity by default. When [member lifecycle] is [constant LIFECYCLE_CONTROLLER] the [member controller] may too, and the change shows on its screen at once. The server can refuse it in [member lifecycle_handler], and the change is then undone on the controller.
 		[codeblock]
 		func _init() -&gt; void:
 		    Netw.configure_entity(self).lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
@@ -66,14 +66,15 @@
 				Asks the server to make the local player the [member controller] with [param hold]. The returned [NetwPromise] resolves with this entity once the decision reaches this peer.
 				[codeblock lang=text]
 				Error
-				┠╴ERR_UNAUTHORIZED   another peer's hold or control_requested refused it
+				┠╴ERR_UNAUTHORIZED   another peer's hold refused it
 				┠╴ERR_UNAVAILABLE    transfer does not allow a claim, or it is
 				┃                    TRANSFER_IMMEDIATE on an entity with a state()
 				┃                    property, prediction or a MultiplayerSynchronizer
 				┖╴ERR_TIMEOUT        no decision arrived within one second
 				[/codeblock]
 				Under [constant TRANSFER_IMMEDIATE] this peer runs the node before the decision. A refusal restores the controller's latest values.
-				The server emits [signal control_requested] for one peer's claims in the order that peer made them, whichever entities they name.
+				A claim that [member control_handler] denies fails with the code and the reason it passed to [method NetwRequest.deny].
+				The server runs [member control_handler] for one peer's claims in the order that peer made them, whichever entities they name.
 				[codeblock]
 				entity.claim_control(NetwEntity.HOLD_SOFT) \
 				    .then(func(_held: NetwEntity) -&gt; void: pick_up()) \
@@ -127,6 +128,17 @@
 			Who holds Godot multiplayer authority for the root and its children. Set it before tree entry. Later changes are refused.
 			At spawn, a non-server Godot authority on the root selects [constant AUTHORITY_CONTROLLER] if neither [member controller] nor this mode was explicitly assigned.
 		</member>
+		<member name="control_handler" type="Callable" setter="set_control_handler" getter="get_control_handler">
+			The method the server runs for each [method claim_control] a peer sends, before it decides. The claim is granted unless the method calls [method NetwRequest.deny] on its [NetwControlRequest], and the peer that asked receives that code and reason. It does not run when a [member hold] already refuses the claim. It runs inside the call that reads the claim, so a method that awaits is an error and the claim is judged as it stands at the first [code]await[/code].
+			[codeblock]
+			func _init() -&gt; void:
+			    Netw.configure_entity(self).control_handler = judge_claim
+
+			func judge_claim(request: NetwControlRequest) -&gt; void:
+			    if not can_carry(request.peer_id):
+			        request.deny("hands full")
+			[/codeblock]
+		</member>
 		<member name="controller" type="NetwPlayer" setter="set_controller" getter="get_controller">
 			The player that steers this entity, or [code]null[/code] when the server controls it. It can differ from [member player], since a player can steer a server-owned entity.
 			A write in the spawn function sets the starting controller. After that, only the server can write it, and [member hold] resets to [constant HOLD_NONE]. Writing [code]null[/code] hands the entity to the server. See [method claim_control] for a player request.
@@ -158,6 +170,37 @@
 			    var entity := Netw.configure_entity(self)
 			    entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
 			[/codeblock]
+		</member>
+		<member name="lifecycle_handler" type="Callable" setter="set_lifecycle_handler" getter="get_lifecycle_handler">
+			The method the server runs for each spawn, move and despawn the [member controller] of a [constant LIFECYCLE_CONTROLLER] entity makes, before other peers see it. The change stands unless the method calls [method NetwRequest.deny] on its [NetwLifecycleRequest], and the controller receives that code and reason in [signal lifecycle_refused]. On a spawn the entity has not entered the tree yet, so [member NetwLifecycleRequest.destination] is where it will go. It runs inside the call that reads the change, so a method that awaits is an error and the change is judged as it stands at the first [code]await[/code].
+			[codeblocks]
+			[gdscript]
+			func _init() -&gt; void:
+			    var entity := Netw.configure_entity(self)
+			    entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
+			    entity.lifecycle_handler = judge_change
+
+			func judge_change(request: NetwLifecycleRequest) -&gt; void:
+			    if request.kind == NetwLifecycleRequest.KIND_DESPAWN \
+			            and not may_remove(request.peer_id):
+			        request.deny("only the builder removes it")
+			[/gdscript]
+			[csharp]
+			public Crate()
+			{
+			    var entity = Netw.ConfigureEntity(this);
+			    entity.Lifecycle = NetwEntity.LifecycleEnum.Controller;
+			    entity.SetLifecycleHandler(JudgeChange);
+			}
+
+			void JudgeChange(NetwLifecycleRequest request)
+			{
+			    if (request.Kind == NetwLifecycleRequest.KindEnum.Despawn
+			            &amp;&amp; !MayRemove(request.PeerId))
+			        request.Deny("only the builder removes it");
+			}
+			[/csharp]
+			[/codeblocks]
 		</member>
 		<member name="name" type="StringName" setter="set_name" getter="get_name">
 			The name that identifies this entity on every peer and in logs. A save finds its row by [method NetwPersistenceConfig.record_id].
@@ -230,14 +273,6 @@
 				Emitted once on each peer when [member controller] changes, after the multiplayer authority has moved under [constant AUTHORITY_CONTROLLER]. A change made while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported when that poll or tick ends. An entity that is not in a session yet reports it at once.
 			</description>
 		</signal>
-		<signal name="control_requested">
-			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="request" type="NetwControlRequest" />
-			<description>
-				Emitted on the server when a peer calls [method claim_control]. Calling [method NetwControlRequest.deny] on [param request] refuses it, whatever the listener order.
-				Not emitted when a [member hold] already refuses the request.
-			</description>
-		</signal>
 		<signal name="despawned">
 			<description>
 				Emitted once the entity has been freed, by [method despawn] or by freeing [member root] directly. [member root] may already be [code]null[/code], so cleanup that needs the node belongs in [signal despawning]. An entity freed while [method MultiplayerAPI.poll] or a [NetwClock] tick runs is reported after its [signal despawning], at the latest when that poll or tick ends.
@@ -258,39 +293,7 @@
 		<signal name="lifecycle_refused">
 			<param index="0" name="request" type="NetwLifecycleRequest" />
 			<description>
-				Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused move is already undone and a refused despawn has already put the same [member root] back. A refusal heard while [method MultiplayerAPI.poll] runs is reported when that poll ends. [member NetwLifecycleRequest.destination] is the parent the move asked for. [member NetwLifecycleRequest.reason] is what the server passed to [method NetwLifecycleRequest.deny], or empty when the server refused for another reason.
-			</description>
-		</signal>
-		<signal name="lifecycle_requested">
-			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="request" type="NetwLifecycleRequest" />
-			<description>
-				Emitted on the server when the [member controller] of a [constant LIFECYCLE_CONTROLLER] entity spawns, despawns or moves it, before other peers see the change. Calling [method NetwLifecycleRequest.deny] on [param request] refuses it.
-				[codeblocks]
-				[gdscript]
-				func _init() -&gt; void:
-				    Netw.configure_entity(self).lifecycle_requested.connect(judge)
-
-
-				func judge(peer_id: int, request: NetwLifecycleRequest) -&gt; void:
-				    if request.destination is Backpack and request.destination.is_full():
-				        request.deny("backpack full")
-				[/gdscript]
-				[csharp]
-				public Crate()
-				{
-				    Netw.ConfigureEntity(this).LifecycleRequested += Judge;
-				}
-
-				private void Judge(long peerId, Variant request)
-				{
-				    var asked = request.As&lt;NetwLifecycleRequest&gt;();
-				    if (asked.Destination is Backpack backpack &amp;&amp; backpack.IsFull())
-				        asked.Deny("backpack full");
-				}
-				[/csharp]
-				[/codeblocks]
-				On a spawn the entity has not entered the tree yet, so [member NetwLifecycleRequest.destination] is where it will go.
+				Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused move is already undone and a refused despawn has already put the same [member root] back. A refusal heard while [method MultiplayerAPI.poll] runs is reported when that poll ends. [member NetwLifecycleRequest.destination] is the parent the move asked for. [member NetwRequest.code] and [member NetwRequest.reason] are what [member lifecycle_handler] passed to [method NetwRequest.deny] on the server. The reason is empty when the server refused for another reason.
 			</description>
 		</signal>
 		<signal name="reparented">

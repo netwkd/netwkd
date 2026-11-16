@@ -4,8 +4,11 @@
 ## func _init() -> void:
 ##     Netw.configure_admission(admit).accept(SteamTicket.new())
 ##
-## func admit(request: NetwJoinRequest) -> Error:
-##     return OK if request.account.begins_with("steam:") else ERR_UNAUTHORIZED
+## func admit(request: NetwJoinRequest) -> void:
+##     if request.account.begins_with("steam:"):
+##         request.admit()
+##     else:
+##         request.deny()
 ## [/codeblock]
 ## The server must run Steam to check a ticket.
 ## [br][br]
@@ -58,7 +61,7 @@ func _prove(_challenge: String, session: NetwSession) -> Variant:
 	}
 
 
-func _verify(request: NetwJoinRequest, proof: Variant) -> Variant:
+func _verify(request: NetwJoinRequest, proof: Variant) -> void:
 	if _SteamStart.start(ProjectSettings.get_setting(_APP_ID_SETTING, 0)) \
 			.status != 0:
 		if not _warned:
@@ -67,7 +70,7 @@ func _verify(request: NetwJoinRequest, proof: Variant) -> Variant:
 				+ "running on this server. Run the server signed in to Steam.",
 			)
 			_warned = true
-		return OK
+		return
 
 	match proof:
 		{ "steam_id": var steam_id, "ticket": var ticket } when (
@@ -78,7 +81,7 @@ func _verify(request: NetwJoinRequest, proof: Variant) -> Variant:
 			steam.requestUserInformation(steam_id, true)
 			steam.endAuthSession(steam_id)
 			if steam.beginAuthSession(ticket, ticket.size(), steam_id) != 0:
-				return OK
+				return
 
 			_begun[[session, request.peer_id]] = steam_id
 			session.exited.connect(
@@ -104,14 +107,13 @@ func _verify(request: NetwJoinRequest, proof: Variant) -> Variant:
 				checked = await steam.validate_auth_ticket_response
 			if checked[1] != _TICKET_VALID:
 				_on_peer_disconnected(request.peer_id, session)
-				return OK
+				return
 
 			request.add_account(
 				"steam:%d" % steam_id,
 				steam.getFriendPersonaName(steam_id),
 				false,
 			)
-	return OK
 
 
 func _on_exited(_reason: int, _detail: String, session: NetwSession) -> void:

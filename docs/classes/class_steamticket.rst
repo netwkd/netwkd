@@ -25,8 +25,11 @@ Description
     func _init() -> void:
         Netw.configure_admission(admit).accept(SteamTicket.new())
 
-    func admit(request: NetwJoinRequest) -> Error:
-        return OK if request.account.begins_with("steam:") else ERR_UNAUTHORIZED
+    func admit(request: NetwJoinRequest) -> void:
+        if request.account.begins_with("steam:"):
+            request.admit()
+        else:
+            request.deny()
 
 \ The server must run Steam to check a ticket. 
 

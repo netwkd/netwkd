@@ -135,7 +135,7 @@ public sealed class NetwPersistenceConfig : NetwRefCounted
 
     /// <summary>
     /// Upgrades saved data from <paramref name="fromVersion"/> to the next
-    /// version. A load calls <paramref name="step"/> for each version up to
+    /// version. A load calls <paramref name="handler"/> for each version up to
     /// <see cref="NetwPersistenceConfig.StorageVersion"/>. Return all
     /// properties needed by the next version.
     /// <code>
@@ -145,10 +145,35 @@ public sealed class NetwPersistenceConfig : NetwRefCounted
     /// ┖╴saved property name  Variant  the value stored under that name
     /// </code>
     /// </summary>
-    public NetwPersistenceConfig Migrate(int fromVersion, Callable step)
+    public NetwPersistenceConfig Migrate(
+        int fromVersion,
+        Func<Godot.Collections.Dictionary,
+        Godot.Collections.Dictionary> handler)
     {
+        Callable bridged1 = default;
+        if (handler != null)
+        {
+            var bridge1 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    Godot.Collections.Dictionary answer =
+                        handler(a0.As<Godot.Collections.Dictionary>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromDictionary(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwPersistenceConfig.Migrate", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(handler, bridge1, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromInt((long)fromVersion);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(step);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindMigrate,
@@ -170,14 +195,38 @@ public sealed class NetwPersistenceConfig : NetwRefCounted
         NetwApi.MethodBind("NetwPersistenceConfig", "record_id", 2383254644UL);
 
     /// <summary>
-    /// Calls <paramref name="provider"/> once on the server, when
+    /// Calls <paramref name="handler"/> once on the server, when
     /// <see cref="Netw.Spawn"/> returns the root or, for a root that was not
     /// spawned, when it is ready. Its nonempty <see cref="StringName"/>
     /// identifies the record across sessions.
+    /// <code>
+    /// func account_name() -&gt; StringName:
+    /// </code>
     /// </summary>
-    public NetwPersistenceConfig RecordId(Callable provider)
+    public NetwPersistenceConfig RecordId(Func<StringName> handler)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(provider);
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = () =>
+            {
+                try
+                {
+                    StringName answer = handler();
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromStringName(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwPersistenceConfig.RecordId", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwAnswer));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindRecordId, Checked, in slot0, ref answered);
         slot0.Dispose();

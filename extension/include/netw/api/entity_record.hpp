@@ -251,7 +251,9 @@ public:
     int64_t admit_control_request(
         godot::Object *p_wrapper,
         int64_t p_requester,
-        int64_t p_hold = entity::Control::HOLD_EXCLUSIVE
+        int64_t p_hold,
+        godot::Error &r_code,
+        godot::String &r_reason
     );
 
     bool begin_despawn(

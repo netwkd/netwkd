@@ -66,9 +66,9 @@
 		<method name="migrate">
 			<return type="NetwPersistenceConfig" />
 			<param index="0" name="from_version" type="int" />
-			<param index="1" name="step" type="Callable" />
+			<param index="1" name="handler" type="Callable" />
 			<description>
-				Upgrades saved data from [param from_version] to the next version. A load calls [param step] for each version up to [method storage_version]. Return all properties needed by the next version.
+				Upgrades saved data from [param from_version] to the next version. A load calls [param handler] for each version up to [method storage_version]. Return all properties needed by the next version.
 				[codeblock lang=text]
 				step(values: Dictionary) -&gt; Dictionary
 
@@ -79,9 +79,12 @@
 		</method>
 		<method name="record_id">
 			<return type="NetwPersistenceConfig" />
-			<param index="0" name="provider" type="Callable" />
+			<param index="0" name="handler" type="Callable" />
 			<description>
-				Calls [param provider] once on the server, when [method Netw.spawn] returns the root or, for a root that was not spawned, when it is ready. Its nonempty [StringName] identifies the record across sessions.
+				Calls [param handler] once on the server, when [method Netw.spawn] returns the root or, for a root that was not spawned, when it is ready. Its nonempty [StringName] identifies the record across sessions.
+				[codeblock]
+				func account_name() -&gt; StringName:
+				[/codeblock]
 			</description>
 		</method>
 		<method name="storage_version">

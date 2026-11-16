@@ -27,7 +27,7 @@ namespace Networked;
 /// - <c>entity_*</c> and <c>spawn_*</c>: <see cref="NetwEntity"/>
 /// - <c>table_*</c> and <c>liveness_*</c>: <see cref="NetwTable"/>
 /// - <c>schema_*</c>: <see cref="NetwSchema"/>
-/// - <c>lagcomp_*</c>: <see cref="NetwAction"/>
+/// - <c>lagcomp_*</c>: <see cref="NetwActionConfig"/>
 /// - <c>player_*</c> and <c>peer_*</c>: <see cref="NetwPlayer"/>
 /// - <c>display_*</c>: <see cref="NetwDisplay"/>
 /// - <c>endpoint_*</c>: <see cref="NetwConnection"/>
@@ -1546,51 +1546,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetAuthCallback =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "get_auth_callback",
-            1307783378UL);
-
-    private static readonly IntPtr _bindSetAuthCallback =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "set_auth_callback",
-            1611583062UL);
-
-    /// <summary>
-    /// Same as <c>SceneMultiplayer.auth_callback</c>. It runs first on each
-    /// link and receives what the other peer passed to
-    /// <see cref="NetwMultiplayer.SendAuth"/>. The join continues once the game
-    /// calls <see cref="NetwMultiplayer.CompleteAuth"/>, so the
-    /// <see cref="Netw.ConfigureAdmission"/> handler runs after it. Set the
-    /// same callback on every peer, or the join is refused with
-    /// <c>@GlobalScope.ERR_UNCONFIGURED</c>.
-    /// </summary>
-    public Callable AuthCallback
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetAuthCallback, Checked, ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(
-                _bindSetAuthCallback,
-                Checked,
-                in slot0,
-                ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
-    }
-
     private static readonly IntPtr _bindEntityGetRecipients =
         NetwApi.MethodBind(
             "NetwMultiplayer",
@@ -1838,13 +1793,40 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// Calls <paramref name="callback"/> as <c>callback(visible, entity,
     /// peer_id)</c> when an entity enters or leaves <paramref name="layer"/>
     /// for a peer, where <c>entity</c> is an <see cref="Rid"/>.
-    /// <see cref="NetwInterestLayer.Monitor"/> is the same with objects, and
-    /// setting one replaces the other.
+    /// <see cref="NetwInterestLayer.InterestEntered"/> and
+    /// <see cref="NetwInterestLayer.InterestExited"/> report the same with a
+    /// <see cref="NetwEntity"/>.
     /// </summary>
-    public void InterestLayerSetMonitorCallback(Rid layer, Callable callback)
+    public void InterestLayerSetMonitorCallback(
+        Rid layer,
+        Action<bool,
+        Rid,
+        long> callback)
     {
+        Callable bridged1 = default;
+        if (callback != null)
+        {
+            var bridge1 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    callback(a0.As<bool>(), a1.As<Rid>(), a2.As<long>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.InterestLayerSetMonitorCallback",
+                        thrown);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(callback, bridge1, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(layer);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindInterestLayerSetMonitorCallback,
@@ -2312,7 +2294,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// Assign the peer to <see cref="MultiplayerApi.MultiplayerPeer"/> inside
     /// this callback, before any <c>await</c>. Returning without assigning it
     /// closes the peer. Returns an invalid <see cref="Rid"/> when
-    /// <paramref name="completed"/> is not valid.
+    /// <paramref name="completed"/> is not valid or does not take those three
+    /// arguments.
     /// <code>
     /// var ticket := api.transport_create_peer(
     ///         relay, NetwConnection.TRANSPORT_MODE_CLIENT,
@@ -2329,8 +2312,35 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwConnection.TransportMode mode,
         string address,
         Godot.Collections.Dictionary settings,
-        Callable completed)
+        Action<MultiplayerPeer,
+        Error,
+        string> completed)
     {
+        Callable bridged4 = default;
+        if (completed != null)
+        {
+            var bridge4 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    completed(
+                        a0.As<MultiplayerPeer>(),
+                        (Error)a1.AsInt64(),
+                        a2.As<string>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.TransportCreatePeer",
+                        thrown);
+                }
+            };
+            bridged4 = Callable.From(
+                NetwApi.Anchored(completed, bridge4, owner => owner.NetwHold));
+        }
         IntPtr pack = NetwThunks.ArgsNew(5);
         godot_variant slot0 = VariantUtils.CreateFromRid(transport);
         NetwThunks.ArgsSet(pack, 0, in slot0);
@@ -2344,7 +2354,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
         godot_variant slot3 = VariantUtils.CreateFromDictionary(settings);
         NetwThunks.ArgsSet(pack, 3, in slot3);
         slot3.Dispose();
-        godot_variant slot4 = VariantUtils.CreateFromCallable(completed);
+        godot_variant slot4 = VariantUtils.CreateFromCallable(bridged4);
         NetwThunks.ArgsSet(pack, 4, in slot4);
         slot4.Dispose();
         godot_variant answered = default;
@@ -2948,8 +2958,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <summary>
     /// Sets the <see cref="NetwServerInfo"/> this host shows in server
     /// browsers, for example after a player names their server.
-    /// <paramref name="info"/> is copied. <c>null</c> clears it. A provider
-    /// from <see cref="Netw.ConfigureServerInfo"/> receives this value and can
+    /// <paramref name="info"/> is copied. <c>null</c> clears it. A handler from
+    /// <see cref="Netw.ConfigureServerInfo"/> receives this value and can
     /// change it.
     /// </summary>
     public void SessionSetServerInfo(NetwServerInfo info)
@@ -4023,11 +4033,28 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// </summary>
     public void LagcompEffectArm(
         StringName key,
-        Callable revert,
+        Action revert,
         int timeoutTicks = 0)
     {
+        Callable bridged1 = default;
+        if (revert != null)
+        {
+            var bridge1 = () =>
+            {
+                try
+                {
+                    revert();
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwMultiplayer.LagcompEffectArm", thrown);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(revert, bridge1, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(revert);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant slot2 = VariantUtils.CreateFromInt((long)timeoutTicks);
         godot_variant answered = default;
         NetwThunks.Call3(
@@ -4051,26 +4078,72 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Calls <paramref name="confirmed"/> or <paramref name="denied"/> when the
-    /// effect <paramref name="key"/> resolves. When
-    /// <see cref="NetwMultiplayer.LagcompActionDeny"/>,<see cref="NetwActionContext.Deny"/>,
+    /// effect <paramref name="key"/> resolves. Neither takes an argument.
+    /// <code>
+    /// api.lagcomp_effect_watch(key,
+    ///         func() -&gt; void: ghost.modulate = Color.WHITE,
+    ///         func() -&gt; void: ghost.queue_free())
+    /// </code>
+    /// <para>
+    /// When <see cref="NetwMultiplayer.LagcompActionDeny"/>,
+    /// <see cref="NetwRequest.Deny"/>,
     /// <see cref="NetwMultiplayer.LagcompActionRequest"/>,
-    /// <see cref="NetwAction.Request"/> or an assignment of
+    /// <see cref="Netw.Action"/> or an assignment of
     /// <see cref="MultiplayerApi.MultiplayerPeer"/> resolves it outside a poll
     /// and a network tick, they run as that call returns. When a host's own
     /// <see cref="NetwMultiplayer.LagcompActionRequest"/> runs its handler at
-    /// once, a <see cref="NetwActionContext.Deny"/> inside that handler runs
-    /// them as the request returns. Otherwise they run when the poll or the run
-    /// of network ticks in progress ends, or at the end of the next one.
-    /// Returns <c>false</c> when the effect is not pending.
+    /// once, a <see cref="NetwRequest.Deny"/> inside that handler runs them as
+    /// the request returns. Otherwise they run when the poll or the run of
+    /// network ticks in progress ends, or at the end of the next one. Returns
+    /// <c>false</c> when the effect is not pending.
+    /// </para>
     /// </summary>
     public bool LagcompEffectWatch(
         StringName key,
-        Callable confirmed,
-        Callable denied)
+        Action confirmed,
+        Action denied)
     {
+        Callable bridged1 = default;
+        if (confirmed != null)
+        {
+            var bridge1 = () =>
+            {
+                try
+                {
+                    confirmed();
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.LagcompEffectWatch",
+                        thrown);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(confirmed, bridge1, owner => owner.NetwHold));
+        }
+        Callable bridged2 = default;
+        if (denied != null)
+        {
+            var bridge2 = () =>
+            {
+                try
+                {
+                    denied();
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.LagcompEffectWatch",
+                        thrown);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(denied, bridge2, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(confirmed);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(denied);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindLagcompEffectWatch,
@@ -4857,7 +4930,7 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <summary>
     /// Emits <paramref name="signal"/> on <paramref name="node"/>, a node of
     /// <paramref name="entity"/>, with <paramref name="args"/> on every peer.
-    /// <see cref="Netw.EmitEntitySignal"/> calls this.
+    /// <see cref="Netw.Emit"/> calls this.
     /// </summary>
     public void SyncSendSignal(
         Rid entity,
@@ -5569,14 +5642,40 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// <paramref name="layer"/>. It runs once per frame with the layer's
     /// <see cref="Rid"/> and returns the <see cref="Rid"/> of every entity in
     /// it. An empty <see cref="Callable"/> removes it.
-    /// <see cref="NetwInterestLayer.Driver"/> is the same with objects, and
+    /// <see cref="NetwInterestLayer.SetDriver"/> is the same with objects, and
     /// setting one replaces the other. A layer that belongs to a scene takes no
     /// callback, and an error is pushed.
     /// </summary>
-    public void InterestLayerSetDriverCallback(Rid layer, Callable callback)
+    public void InterestLayerSetDriverCallback(
+        Rid layer,
+        Func<Rid,
+        Godot.Collections.Array> callback)
     {
+        Callable bridged1 = default;
+        if (callback != null)
+        {
+            var bridge1 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    Godot.Collections.Array answer = callback(a0.As<Rid>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromArray(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.InterestLayerSetDriverCallback",
+                        thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(callback, bridge1, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(layer);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindInterestLayerSetDriverCallback,
@@ -5839,11 +5938,32 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// ┖╴ERR_INVALID_PARAMETER  callback is not valid
     /// </code>
     /// </summary>
-    public Error InterestOnEnter(Rid entity, Rid layer, Callable callback)
+    public Error InterestOnEnter(
+        Rid entity,
+        Rid layer,
+        Action<StringName,
+        long> callback)
     {
+        Callable bridged2 = default;
+        if (callback != null)
+        {
+            var bridge2 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    callback(a0.As<StringName>(), a1.As<long>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwMultiplayer.InterestOnEnter", thrown);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(callback, bridge2, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromRid(layer);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindInterestOnEnter,
@@ -5874,11 +5994,32 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// ┖╴ERR_INVALID_PARAMETER  callback is not valid
     /// </code>
     /// </summary>
-    public Error InterestOnLeave(Rid entity, Rid layer, Callable callback)
+    public Error InterestOnLeave(
+        Rid entity,
+        Rid layer,
+        Action<StringName,
+        long> callback)
     {
+        Callable bridged2 = default;
+        if (callback != null)
+        {
+            var bridge2 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    callback(a0.As<StringName>(), a1.As<long>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwMultiplayer.InterestOnLeave", thrown);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(callback, bridge2, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromRid(layer);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindInterestOnLeave,
@@ -5919,12 +6060,35 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Rid entity,
         Rid layer,
         NetwInterestLayer.LeavePolicy policy,
-        Callable customCallback = default)
+        Action<long,
+        StringName> customCallback = null)
     {
+        Callable bridged3 = default;
+        if (customCallback != null)
+        {
+            var bridge3 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    customCallback(a0.As<long>(), a1.As<StringName>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.InterestOnLeavePolicy",
+                        thrown);
+                }
+            };
+            bridged3 = Callable.From(
+                NetwApi.Anchored(
+                    customCallback,
+                    bridge3,
+                    owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromRid(layer);
         godot_variant slot2 = VariantUtils.CreateFromInt((long)policy);
-        godot_variant slot3 = VariantUtils.CreateFromCallable(customCallback);
+        godot_variant slot3 = VariantUtils.CreateFromCallable(bridged3);
         godot_variant answered = default;
         NetwThunks.Call4(
             _bindInterestOnLeavePolicy,
@@ -5966,12 +6130,42 @@ public sealed class NetwMultiplayer : NetwRefCounted
         Rid entity,
         Rid layer,
         NetwInterestLayer.PerceptionPolicy policy,
-        Callable customCallback = default)
+        Action<bool,
+        long,
+        StringName> customCallback = null)
     {
+        Callable bridged3 = default;
+        if (customCallback != null)
+        {
+            var bridge3 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    customCallback(
+                        a0.As<bool>(),
+                        a1.As<long>(),
+                        a2.As<StringName>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.InterestOnPerceptionPolicy",
+                        thrown);
+                }
+            };
+            bridged3 = Callable.From(
+                NetwApi.Anchored(
+                    customCallback,
+                    bridge3,
+                    owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromRid(layer);
         godot_variant slot2 = VariantUtils.CreateFromInt((long)policy);
-        godot_variant slot3 = VariantUtils.CreateFromCallable(customCallback);
+        godot_variant slot3 = VariantUtils.CreateFromCallable(bridged3);
         godot_variant answered = default;
         NetwThunks.Call4(
             _bindInterestOnPerceptionPolicy,
@@ -6090,11 +6284,35 @@ public sealed class NetwMultiplayer : NetwRefCounted
     /// </summary>
     public void RpcChannelRegister(
         long channel,
-        Callable handler,
+        Action<Rid,
+        byte[],
+        long> handler,
         bool deferWhenUnknown = false)
     {
+        Callable bridged1 = default;
+        if (handler != null)
+        {
+            var bridge1 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    handler(a0.As<Rid>(), a1.As<byte[]>(), a2.As<long>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.RpcChannelRegister",
+                        thrown);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(handler, bridge1, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromInt((long)channel);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(handler);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant slot2 = VariantUtils.CreateFromBool(deferWhenUnknown);
         godot_variant answered = default;
         NetwThunks.Call3(
@@ -6123,11 +6341,32 @@ public sealed class NetwMultiplayer : NetwRefCounted
     public void LagcompRewind(
         Godot.Collections.Array entities,
         long tick,
-        Callable body)
+        Func<Variant> body)
     {
+        Callable bridged2 = default;
+        if (body != null)
+        {
+            var bridge2 = () =>
+            {
+                try
+                {
+                    Variant answer = body();
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            answer.CopyNativeVariant()));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwMultiplayer.LagcompRewind", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(body, bridge2, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromArray(entities);
         godot_variant slot1 = VariantUtils.CreateFromInt((long)tick);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(body);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindLagcompRewind,
@@ -6363,13 +6602,43 @@ public sealed class NetwMultiplayer : NetwRefCounted
             3379118538UL);
 
     /// <summary>
-    /// Sets <see cref="NetwPrediction.CorrectionPathClear"/> on
+    /// Sets <see cref="NetwPrediction.SetCorrectionPathClear"/> on
     /// <paramref name="entity"/>.
     /// </summary>
-    public void PredictSetCorrectionPathCallback(Rid entity, Callable callback)
+    public void PredictSetCorrectionPathCallback(
+        Rid entity,
+        Func<Godot.Collections.Dictionary,
+        Godot.Collections.Dictionary,
+        bool> callback)
     {
+        Callable bridged1 = default;
+        if (callback != null)
+        {
+            var bridge1 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    bool answer =
+                        callback(
+                            a0.As<Godot.Collections.Dictionary>(),
+                            a1.As<Godot.Collections.Dictionary>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromBool(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.PredictSetCorrectionPathCallback",
+                        thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(callback, bridge1, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindPredictSetCorrectionPathCallback,
@@ -6389,13 +6658,41 @@ public sealed class NetwMultiplayer : NetwRefCounted
             3379118538UL);
 
     /// <summary>
-    /// Sets <see cref="NetwPrediction.PredictInput"/> on
+    /// Sets <see cref="NetwPrediction.SetPredictInput"/> on
     /// <paramref name="entity"/>.
     /// </summary>
-    public void PredictSetInputCallback(Rid entity, Callable callback)
+    public void PredictSetInputCallback(
+        Rid entity,
+        Func<NetwEntity,
+        long,
+        Godot.Collections.Dictionary> callback)
     {
+        Callable bridged1 = default;
+        if (callback != null)
+        {
+            var bridge1 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    Godot.Collections.Dictionary answer =
+                        callback(Wrapped(a0, NetwEntity.From), a1.As<long>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromDictionary(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.PredictSetInputCallback",
+                        thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(callback, bridge1, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindPredictSetInputCallback,
@@ -6507,15 +6804,39 @@ public sealed class NetwMultiplayer : NetwRefCounted
             3379118538UL);
 
     /// <summary>
-    /// Sets <see cref="NetwSimulation.NetworkProcess"/> on
+    /// Sets <see cref="NetwSimulation.SetNetworkProcess"/> on
     /// <paramref name="entity"/>.
     /// </summary>
     public void SimulationSetNetworkProcessCallback(
         Rid entity,
-        Callable callback)
+        Action<double,
+        long,
+        bool> callback)
     {
+        Callable bridged1 = default;
+        if (callback != null)
+        {
+            var bridge1 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    callback(a0.As<double>(), a1.As<long>(), a2.As<bool>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.SimulationSetNetworkProcessCallback",
+                        thrown);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(callback, bridge1, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindSimulationSetNetworkProcessCallback,
@@ -6619,25 +6940,36 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "lagcomp_action_deny",
-            3780747571UL);
+            173782642UL);
 
     /// <summary>
     /// Rejects the action <paramref name="key"/> from
     /// <paramref name="requester"/>, which undoes its local effect.
+    /// <paramref name="code"/> and <paramref name="reason"/> reach the
+    /// <see cref="NetwActionConfig.Revert"/> handler of
+    /// <paramref name="requester"/>, and <paramref name="reason"/> is cut to
+    /// 255 UTF-8 bytes.
     /// </summary>
-    public void LagcompActionDeny(long requester, StringName key)
+    public void LagcompActionDeny(long requester, StringName key, Error code =
+        (Error)4, string reason = "")
     {
         godot_variant slot0 = VariantUtils.CreateFromInt((long)requester);
         godot_variant slot1 = VariantUtils.CreateFromStringName(key);
+        godot_variant slot2 = VariantUtils.CreateFromInt((long)code);
+        godot_variant slot3 = VariantUtils.CreateFromString(reason);
         godot_variant answered = default;
-        NetwThunks.Call2(
+        NetwThunks.Call4(
             _bindLagcompActionDeny,
             Checked,
             in slot0,
             in slot1,
+            in slot2,
+            in slot3,
             ref answered);
         slot0.Dispose();
         slot1.Dispose();
+        slot2.Dispose();
+        slot3.Dispose();
         answered.Dispose();
     }
 
@@ -7002,10 +7334,36 @@ public sealed class NetwMultiplayer : NetwRefCounted
     ///     marker.position = value
     /// </code>
     /// </summary>
-    public void DisplaySetCallback(Rid entity, Callable callback)
+    public void DisplaySetCallback(
+        Rid entity,
+        Action<Rid,
+        StringName,
+        Variant> callback)
     {
+        Callable bridged1 = default;
+        if (callback != null)
+        {
+            var bridge1 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    callback(a0.As<Rid>(), a1.As<StringName>(), a2);
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwMultiplayer.DisplaySetCallback",
+                        thrown);
+                }
+            };
+            bridged1 = Callable.From(
+                NetwApi.Anchored(callback, bridge1, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot1 = VariantUtils.CreateFromCallable(bridged1);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindDisplaySetCallback,
@@ -7418,21 +7776,23 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "lagcomp_action_key",
-            4102288666UL);
+            1139474967UL);
 
     /// <summary>
-    /// Returns the key of the action <paramref name="entity"/> requests for
-    /// <paramref name="viewTick"/>. <paramref name="slot"/> tells apart two
-    /// actions of <paramref name="entity"/> on the same tick. The key is passed
-    /// to <see cref="NetwMultiplayer.LagcompEffectArm"/>,
-    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/> and
-    /// <see cref="NetwMultiplayer.LagcompActionRequest"/>.
+    /// Returns the key of the action that calls <paramref name="method"/> on
+    /// <paramref name="entity"/> for <paramref name="viewTick"/>. The server
+    /// computes the same key for the request it receives. The key is passed to
+    /// <see cref="NetwMultiplayer.LagcompEffectArm"/> and
+    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/>.
     /// </summary>
-    public StringName LagcompActionKey(Rid entity, long viewTick, long slot = 0)
+    public StringName LagcompActionKey(
+        Rid entity,
+        long viewTick,
+        StringName method)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromInt((long)viewTick);
-        godot_variant slot2 = VariantUtils.CreateFromInt((long)slot);
+        godot_variant slot2 = VariantUtils.CreateFromStringName(method);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindLagcompActionKey,
@@ -7449,64 +7809,108 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
+    private static readonly IntPtr _bindLagcompActionDeclare =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "lagcomp_action_declare",
+            1230729024UL);
+
+    /// <summary>
+    /// Declares the action <paramref name="method"/> on
+    /// <paramref name="root"/>, the root node of a <see cref="NetwEntity"/>,
+    /// and returns its <see cref="NetwActionConfig"/>. The server calls
+    /// <paramref name="handler"/> for each
+    /// <see cref="NetwMultiplayer.LagcompActionRequest"/> that names
+    /// <paramref name="method"/>, and <paramref name="root"/> needs no method
+    /// of that name. <see cref="Netw.ConfigureAction"/> declares a method of
+    /// the node this way.
+    /// <code>
+    /// func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+    ///     bombs.add_child(make_bomb(pos))
+    /// </code>
+    /// </summary>
+    public static NetwActionConfig LagcompActionDeclare(
+        Node root,
+        StringName method,
+        Callable handler)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromGodotObject(root);
+        godot_variant slot1 = VariantUtils.CreateFromStringName(method);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(handler);
+        godot_variant answered = default;
+        NetwThunks.Call3(
+            _bindLagcompActionDeclare,
+            IntPtr.Zero,
+            in slot0,
+            in slot1,
+            in slot2,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        NetwActionConfig result =
+            NetwActionConfig.Adopt(
+                NetwApi.Retained(
+                    VariantUtils.ConvertToGodotObjectPtr(answered)));
+        answered.Dispose();
+        return result;
+    }
+
     private static readonly IntPtr _bindLagcompActionRequest =
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "lagcomp_action_request",
-            3353655088UL);
+            970022527UL);
 
     /// <summary>
     /// Sends <paramref name="method"/> with <paramref name="args"/> to the
     /// server, which calls it on the node at <paramref name="target"/>, a path
     /// from the session's root node, as the world was at
-    /// <paramref name="viewTick"/>. <paramref name="timing"/> picks when the
-    /// server runs it. On a server, a host or an offline session the action
-    /// runs and resolves <paramref name="key"/> before this returns, so
+    /// <paramref name="viewTick"/>. The server runs it when the
+    /// <see cref="NetwActionConfig.Timing"/> of its own declaration says. The
+    /// server answers under the key
+    /// <see cref="NetwMultiplayer.LagcompActionKey"/> returns for the entity of
+    /// <paramref name="target"/>, <paramref name="viewTick"/> and
+    /// <paramref name="method"/>. On a server, a host or an offline session the
+    /// action runs and resolves that key before this returns, so
     /// <see cref="NetwMultiplayer.LagcompEffectArm"/> and
-    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/> are called for
-    /// <paramref name="key"/> first. Returns <c>@GlobalScope.ERR_BUSY</c> while
-    /// the session applies its settings.
+    /// <see cref="NetwMultiplayer.LagcompEffectWatch"/> are called for it
+    /// first. Returns <c>@GlobalScope.ERR_BUSY</c> while the session applies
+    /// its settings.
     /// <code>
-    /// var key := api.lagcomp_action_key(entity, tick)
+    /// var key := api.lagcomp_action_key(entity, tick, &amp;"fire")
     /// api.lagcomp_effect_arm(key, revert)
     /// api.lagcomp_effect_watch(key, confirmed, denied)
-    /// api.lagcomp_action_request(key, target, &amp;"fire", tick, [aim])
+    /// api.lagcomp_action_request(target, &amp;"fire", tick, [aim])
     /// </code>
     /// <para>
     /// <b>Player request.</b>
     /// </para>
     /// </summary>
-    public Error LagcompActionRequest(StringName key, NodePath target, StringName method, long viewTick, Godot.Collections.Array args =
-        null, NetwAction.TimingModeEnum timing = (NetwAction.TimingModeEnum)2)
+    public Error LagcompActionRequest(
+        NodePath target,
+        StringName method,
+        long viewTick,
+        Godot.Collections.Array args = null)
     {
         args ??= new Godot.Collections.Array();
-        IntPtr pack = NetwThunks.ArgsNew(6);
-        godot_variant slot0 = VariantUtils.CreateFromStringName(key);
-        NetwThunks.ArgsSet(pack, 0, in slot0);
-        slot0.Dispose();
-        godot_variant slot1 = VariantUtils.CreateFromNodePath(target);
-        NetwThunks.ArgsSet(pack, 1, in slot1);
-        slot1.Dispose();
-        godot_variant slot2 = VariantUtils.CreateFromStringName(method);
-        NetwThunks.ArgsSet(pack, 2, in slot2);
-        slot2.Dispose();
-        godot_variant slot3 = VariantUtils.CreateFromInt((long)viewTick);
-        NetwThunks.ArgsSet(pack, 3, in slot3);
-        slot3.Dispose();
-        godot_variant slot4 = VariantUtils.CreateFromArray(args);
-        NetwThunks.ArgsSet(pack, 4, in slot4);
-        slot4.Dispose();
-        godot_variant slot5 = VariantUtils.CreateFromInt((long)timing);
-        NetwThunks.ArgsSet(pack, 5, in slot5);
-        slot5.Dispose();
+        godot_variant slot0 = VariantUtils.CreateFromNodePath(target);
+        godot_variant slot1 = VariantUtils.CreateFromStringName(method);
+        godot_variant slot2 = VariantUtils.CreateFromInt((long)viewTick);
+        godot_variant slot3 = VariantUtils.CreateFromArray(args);
         godot_variant answered = default;
-        NetwThunks.CallPack(
+        NetwThunks.Call4(
             _bindLagcompActionRequest,
             Checked,
-            pack,
-            6,
+            in slot0,
+            in slot1,
+            in slot2,
+            in slot3,
             ref answered);
-        NetwThunks.ArgsFree(pack);
+        slot0.Dispose();
+        slot1.Dispose();
+        slot2.Dispose();
+        slot3.Dispose();
         Error result = (Error)VariantUtils.ConvertToInt64(answered);
         answered.Dispose();
         return result;
@@ -7942,8 +8346,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
 
     /// <summary>
     /// Same as <c>SceneMultiplayer.complete_auth</c>, called from
-    /// <see cref="NetwMultiplayer.AuthCallback"/> when the game's own check of
-    /// <paramref name="id"/> passes. The peer connects once its join is
+    /// <see cref="NetwMultiplayer.SetAuthCallback"/> when the game's own check
+    /// of <paramref name="id"/> passes. The peer connects once its join is
     /// admitted. Returns <c>@GlobalScope.ERR_UNCONFIGURED</c> when there is no
     /// wrapped <see cref="SceneMultiplayer"/>.
     /// </summary>
@@ -7976,6 +8380,47 @@ public sealed class NetwMultiplayer : NetwRefCounted
             VariantUtils.ConvertAsPackedInt32ArrayToSystemArray(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindSetAuthCallback =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "set_auth_callback",
+            1611583062UL);
+
+    /// <summary>
+    /// Same as <c>SceneMultiplayer.auth_callback</c>. It runs first on each
+    /// link and receives what the other peer passed to
+    /// <see cref="NetwMultiplayer.SendAuth"/>. The join continues once the game
+    /// calls <see cref="NetwMultiplayer.CompleteAuth"/>, so the
+    /// <see cref="Netw.ConfigureAdmission"/> handler runs after it. Set the
+    /// same callback on every peer, or the join is refused with
+    /// <c>@GlobalScope.ERR_UNCONFIGURED</c>.
+    /// </summary>
+    public void SetAuthCallback(Action<long, byte[]> callback)
+    {
+        Callable bridged0 = default;
+        if (callback != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    callback(a0.As<long>(), a1.As<byte[]>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwMultiplayer.SetAuthCallback", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(callback, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindSetAuthCallback, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        answered.Dispose();
     }
 
     private static readonly IntPtr _bindDisconnectPeer =

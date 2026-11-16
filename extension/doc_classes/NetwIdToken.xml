@@ -20,8 +20,11 @@
 		func fetch_token(nonce: String) -&gt; NetwPromise:
 		    return backend.request_join_token(nonce)
 
-		func admit(request: NetwJoinRequest) -&gt; Error:
-		    return OK if request.account else ERR_UNAUTHORIZED
+		func admit(request: NetwJoinRequest) -&gt; void:
+		    if request.account:
+		        request.admit()
+		    else:
+		        request.deny()
 		[/codeblock]
 	</description>
 	<tutorials>
@@ -45,9 +48,12 @@
 		<method name="provide" qualifiers="static">
 			<return type="void" />
 			<param index="0" name="issuer" type="String" />
-			<param index="1" name="fetch" type="Callable" />
+			<param index="1" name="handler" type="Callable" />
 			<description>
-				Sets where the joining peer gets tokens for [param issuer]. [param fetch] takes the nonce the token must carry and returns a [NetwPromise] of the token. A later call for the same issuer replaces it, and an empty [Callable] removes it.
+				Sets where the joining peer gets tokens for [param issuer]. [param handler] takes the nonce the token must carry and returns a [NetwPromise] of the token. A later call for the same issuer replaces it, and an empty [Callable] removes it.
+				[codeblock]
+				func fetch_token(nonce: String) -&gt; NetwPromise:
+				[/codeblock]
 			</description>
 		</method>
 	</methods>

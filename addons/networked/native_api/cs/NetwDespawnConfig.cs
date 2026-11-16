@@ -114,12 +114,32 @@ public sealed class NetwDespawnConfig : NetwRefCounted
         NetwApi.MethodBind("NetwDespawnConfig", "before_removal", 2556279349UL);
 
     /// <summary>
-    /// Only the method name of <paramref name="callable"/> is kept. Each
+    /// Only the method name of <paramref name="method"/> is kept. Each
     /// <see cref="NetwEntity"/> root calls that method before removal.
+    /// <code>
+    /// func play_death_vfx() -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwDespawnConfig BeforeRemoval(Callable callable)
+    public NetwDespawnConfig BeforeRemoval(Action method)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = () =>
+            {
+                try
+                {
+                    method();
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwDespawnConfig.BeforeRemoval", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindBeforeRemoval, Checked, in slot0, ref answered);
         slot0.Dispose();

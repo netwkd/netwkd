@@ -30,12 +30,7 @@ public:
         const godot::String &,
         godot::Ref<NetwSession>
     )
-    GDVIRTUAL2R(
-        godot::Variant,
-        _verify,
-        godot::Ref<NetwJoinRequest>,
-        const godot::Variant &
-    )
+    GDVIRTUAL2(_verify, godot::Ref<NetwJoinRequest>, const godot::Variant &)
 };
 
 } // namespace netw

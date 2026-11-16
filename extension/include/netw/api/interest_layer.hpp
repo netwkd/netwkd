@@ -68,8 +68,6 @@ public:
     godot::Dictionary monitor_snapshot() const;
     void set_driver(const godot::Callable &p_driver);
     godot::Callable get_driver();
-    void set_monitor(const godot::Callable &p_monitor);
-    godot::Callable get_monitor();
 };
 
 } // namespace netw

@@ -238,10 +238,10 @@ func _init() -> void:
 	Netw.configure_session(self).return_window(60.0)
 
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	if request.username != &"":
 		request.account = "test:" + request.username
-	return OK
+	request.admit()
 
 
 func seat(username: String, called: String) -> void:

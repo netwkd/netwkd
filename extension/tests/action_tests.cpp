@@ -11,16 +11,19 @@
 
 #include "godot/node.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/action.hpp"
+#include "netw/api/action_config.hpp"
+#include "netw/api/action_request.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/lag_compensation_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/session/frames.hpp"
+#include "netw/wire/registry.hpp"
 
 namespace TestAction {
 
 using namespace godot;
 using netw::Netw;
-using netw::NetwAction;
+using netw::NetwActionConfig;
 using netw_test::CallLog;
 using netw_test::Carrier;
 using netw_test::EntityDecl;
@@ -36,32 +39,34 @@ constexpr int ANSWER_TICKS = 30;
 
 constexpr const char *GUN = R"(extends Node2D
 
-var shot: NetwAction
 var ghosts := 0
 var confirmed := 0
 
 func _init() -> void:
 	Netw.configure_entity(self)
 	Netw.configure_spawn(make_bolt)
+	Netw.configure_action(fire).predict(draw_ghost).confirm(keep)
 
 func make_bolt() -> Node:
 	var bolt := Node2D.new()
 	bolt.name = &"Bolt"
 	return bolt
 
-func arm() -> void:
-	shot = Netw.action(_fire)
-	shot.predict = _ghost
-	shot.confirmed.connect(func() -> void: confirmed += 1)
+func shoot(tick: int) -> void:
+	Netw.action(fire, tick)
 
-func _ghost() -> Node:
+func draw_ghost() -> Node:
 	var ghost := Node2D.new()
 	ghost.name = &"Ghost"
 	add_child(ghost)
 	ghosts += 1
 	return ghost
 
-func _fire(ctx: NetwActionContext) -> void:
+func keep(ghost: Node) -> void:
+	confirmed += 1
+	ghost.queue_free()
+
+func fire(ctx: NetwActionRequest) -> void:
 	var bolt: Node = Netw.spawn(make_bolt)
 	ctx.bind(bolt)
 	add_child(bolt)
@@ -109,6 +114,7 @@ struct Shot {
         Declare p_declare = &declare_nothing,
         bool p_predicted = true,
         const char *p_authority = "_server_action",
+        bool p_server_armed = true,
         int p_send_rate = 0
     )
         : rig(1) {
@@ -133,13 +139,20 @@ struct Shot {
         REQUIRE(owner != nullptr);
         REQUIRE(authority != nullptr);
         owner->arm_action(rig.client(0), StringName(p_authority));
-        authority->arm_action(rig.server(), StringName(p_authority));
+        if (p_server_armed) {
+            authority->arm_action(rig.server(), StringName(p_authority));
+        }
     }
 
     ~Shot() {
         if (orphan != nullptr) {
             memdelete(orphan);
         }
+    }
+
+    void declare_timing(NetwActionConfig::Timing p_mode) {
+        authority->declare_timing(p_mode);
+        owner->declare_timing(p_mode);
     }
 
     int64_t server_tick() const {
@@ -164,7 +177,7 @@ struct Shot {
 
 LawVerdict denied_reverts(const World &) {
     Shot shot;
-    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.owner->fire(shot.client_tick());
     if (shot.owner->ghosts() != 1 || shot.owner->ghost() == nullptr) {
         return law_broken("predict made %d ghost(s)", shot.owner->ghosts());
     }
@@ -179,13 +192,21 @@ LawVerdict denied_reverts(const World &) {
     if (!shot.owner->ghost()->is_queued_for_deletion()) {
         return law_broken("the denied ghost was kept");
     }
+    if (shot.owner->denial_code() != int(ERR_BUSY)
+        || shot.owner->denial_reason() != String("no ammunition")) {
+        return law_broken(
+            "revert got code %d and reason '%s'",
+            shot.owner->denial_code(),
+            shot.owner->denial_reason().utf8().get_data()
+        );
+    }
     return law_held();
 }
 
 LawVerdict accepted_confirms(const World &) {
     Shot shot;
     shot.authority->set_denies(false);
-    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.owner->fire(shot.client_tick());
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.owner->confirmations() != 1 || shot.owner->denials() != 0) {
         return law_broken(
@@ -228,7 +249,7 @@ LawVerdict host_fires(HostControl p_way, const char *p_label) {
             return law_broken("the release did not complete");
         }
     }
-    shot.authority->fire(shot.server_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.authority->fire(shot.server_tick());
     if (shot.authority->requests() != 1
         || shot.authority->confirmations() != 1) {
         return law_broken(
@@ -258,10 +279,8 @@ LawVerdict confirm_keeps(const World &) {
     Shot shot;
     shot.authority->set_denies(false);
     const CallLog log;
-    shot.owner->armed_action()->set_confirm(
-        log.callable(StringName("confirmed"))
-    );
-    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.owner->armed_action()->confirm(log.callable(StringName("confirmed")));
+    shot.owner->fire(shot.client_tick());
     shot.rig.step_ticks(ANSWER_TICKS);
     if (log.count(StringName("confirmed")) != 1) {
         return law_broken(
@@ -280,7 +299,6 @@ LawVerdict arguments_in_order(const World &) {
     Shot shot(&declare_nothing, true, "_server_action_carrying");
     shot.owner->fire(
         shot.client_tick(),
-        NetwAction::TIMING_IMMEDIATE,
         netw::gd::array_of(Vector2(3.0, -4.0), 7)
     );
     shot.rig.step_ticks(ANSWER_TICKS);
@@ -297,17 +315,21 @@ LawVerdict arguments_in_order(const World &) {
 LawVerdict two_actions_apart(const World &) {
     Shot shot;
     const CallLog log;
-    const Ref<NetwAction> other
-        = Netw::action(Callable(shot.owner, StringName("_predict_ghost")));
-    if (other.is_null()) {
-        return law_broken("Netw.action answered nothing");
-    }
-    other->set_predict(Callable(shot.owner, StringName("_predict_ghost")));
-    other->connect("denied", log.callable(StringName("denied")));
-    other->connect("confirmed", log.callable(StringName("confirmed")));
+    const Callable second(shot.owner, StringName("_predict_ghost"));
+    Ref<NetwActionConfig> other;
+    other.instantiate();
+    other->set_authority(second);
+    netw::session_decl::declare_action(
+        shot.owner,
+        second.get_method(),
+        other
+    );
+    other->predict(second)
+        ->confirm(log.callable(StringName("confirmed")))
+        ->revert(log.callable(StringName("denied")));
     const int64_t tick = shot.client_tick();
-    shot.owner->fire(tick, NetwAction::TIMING_IMMEDIATE);
-    other->request(tick, Array());
+    shot.owner->fire(tick);
+    shot.rig.client(0)->action_ask(second, tick, Array());
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.owner->ghosts() != 2 || shot.owner->denials() != 1) {
         return law_broken(
@@ -326,8 +348,9 @@ LawVerdict two_actions_apart(const World &) {
 
 LawVerdict aligned_runs_at_tick(const World &) {
     Shot shot;
+    shot.declare_timing(NetwActionConfig::TIMING_TICK_ALIGNED);
     const int64_t view = shot.server_tick() + 3;
-    shot.owner->fire(view, NetwAction::TIMING_TICK_ALIGNED);
+    shot.owner->fire(view);
     shot.rig.step_ticks(3);
     if (shot.authority->requests() != 0) {
         return law_broken("the server ran it before its tick");
@@ -352,11 +375,12 @@ LawVerdict aligned_runs_at_tick(const World &) {
 }
 
 LawVerdict aligned_runs_past_a_send(const World &) {
-    Shot shot(&declare_nothing, true, "_server_action", 3);
+    Shot shot(&declare_nothing, true, "_server_action", true, 3);
     shot.authority->set_denies(false);
+    shot.declare_timing(NetwActionConfig::TIMING_TICK_ALIGNED_STATE_READY);
     shot.rig.step_ticks(ANSWER_TICKS);
     const int64_t view = shot.server_tick() + 9;
-    shot.owner->fire(view, NetwAction::TIMING_TICK_ALIGNED_STATE_READY);
+    shot.owner->fire(view);
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.authority->requests() != 1 || shot.owner->denials() != 0
         || shot.authority->viewed_tick() != view || shot.fallbacks() != 0) {
@@ -374,8 +398,9 @@ LawVerdict aligned_runs_past_a_send(const World &) {
 
 LawVerdict immediate_runs_on_arrival(const World &) {
     Shot shot;
+    shot.declare_timing(NetwActionConfig::TIMING_IMMEDIATE);
     const int64_t ahead = shot.server_tick() + 6;
-    shot.owner->fire(ahead, NetwAction::TIMING_IMMEDIATE);
+    shot.owner->fire(ahead);
     shot.step_until_run(ANSWER_TICKS);
     if (shot.authority->requests() != 1) {
         return law_broken("the server never ran it");
@@ -398,8 +423,9 @@ void declare_patient_gate(LoopbackRig &p_rig) {
 LawVerdict state_ready_waits(const World &) {
     Shot shot(&declare_patient_gate);
     shot.rig.conditions(-1, netw_test::polls(8), shot.rig.peer_id(0));
+    shot.declare_timing(NetwActionConfig::TIMING_TICK_ALIGNED_STATE_READY);
     const int64_t view = shot.server_tick() + 3;
-    shot.owner->fire(view, NetwAction::TIMING_TICK_ALIGNED_STATE_READY);
+    shot.owner->fire(view);
     shot.rig.step_ticks(5);
     if (shot.authority->requests() != 0) {
         return law_broken("the server ran it before the input arrived");
@@ -425,8 +451,9 @@ void declare_short_gate(LoopbackRig &p_rig) {
 
 LawVerdict state_ready_gives_up(const World &) {
     Shot shot(&declare_short_gate);
+    shot.declare_timing(NetwActionConfig::TIMING_TICK_ALIGNED_STATE_READY);
     const int64_t view = shot.server_tick() + 3;
-    shot.owner->fire(view, NetwAction::TIMING_TICK_ALIGNED_STATE_READY);
+    shot.owner->fire(view);
     shot.rig.step_ticks(6);
     if (shot.authority->requests() != 1
         || shot.authority->viewed_tick() != view) {
@@ -444,7 +471,8 @@ LawVerdict state_ready_gives_up(const World &) {
 
 LawVerdict future_denied(const World &) {
     Shot shot;
-    shot.owner->fire(shot.server_tick() + 60, NetwAction::TIMING_TICK_ALIGNED);
+    shot.declare_timing(NetwActionConfig::TIMING_TICK_ALIGNED);
+    shot.owner->fire(shot.server_tick() + 60);
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.authority->requests() != 0 || shot.owner->denials() != 1) {
         return law_broken(
@@ -462,7 +490,7 @@ LawVerdict former_controller_refused(const World &) {
     faults.expect_warning("*[NW0007]*", 1);
     Shot shot;
     shot.rig.conditions(-1, netw_test::polls(4), shot.rig.peer_id(0));
-    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.owner->fire(shot.client_tick());
     shot.rig.server()->entity_set_controller(shot.rig.entity_of("P"), 1);
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.authority->requests() != 0) {
@@ -484,10 +512,11 @@ LawVerdict settings_sealed(const World &) {
     Shot shot(&declare_tight_future);
     const Ref<netw::NetwLagCompensationConfig> draft = tight_future;
     tight_future.unref();
-    shot.owner->fire(shot.server_tick() + 5, NetwAction::TIMING_TICK_ALIGNED);
+    shot.declare_timing(NetwActionConfig::TIMING_TICK_ALIGNED);
+    shot.owner->fire(shot.server_tick() + 5);
     shot.rig.step_ticks(ANSWER_TICKS);
     draft->max_future_action(60);
-    shot.owner->fire(shot.server_tick() + 5, NetwAction::TIMING_TICK_ALIGNED);
+    shot.owner->fire(shot.server_tick() + 5);
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.authority->requests() != 0 || shot.owner->denials() != 2) {
         return law_broken(
@@ -500,8 +529,8 @@ LawVerdict settings_sealed(const World &) {
 }
 
 LawVerdict refused_before_predict(Shot &p_shot) {
-    p_shot.owner->fire(0, NetwAction::TIMING_IMMEDIATE);
-    p_shot.owner->fire(1, NetwAction::TIMING_IMMEDIATE);
+    p_shot.owner->fire(0);
+    p_shot.owner->fire(1);
     p_shot.rig.step_ticks(5);
     if (p_shot.owner->ghosts() != 0 || p_shot.authority->requests() != 0) {
         return law_broken(
@@ -567,7 +596,7 @@ LawVerdict second_declaration_null(const World &) {
     if (again.is_valid()) {
         return law_broken("the second declaration answered a draft");
     }
-    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.owner->fire(shot.client_tick());
     shot.rig.step_ticks(ANSWER_TICKS);
     if (shot.owner->ghosts() != 1 || shot.owner->denials() != 1) {
         return law_broken(
@@ -610,12 +639,8 @@ LawVerdict bound_spawn_shown_at_tick(const World &) {
     if (owner == nullptr || bystander == nullptr || served == nullptr) {
         return law_broken("a peer holds no gun");
     }
-    owner->call(StringName("arm"));
-    served->call(StringName("arm"));
-    bystander->call(StringName("arm"));
     const int64_t view = rig.client(0)->clock_get_tick() + 2;
-    Object::cast_to<Object>(owner->get(StringName("shot")))
-        ->call(StringName("request"), view);
+    owner->call(StringName("shoot"), view);
     if (int(owner->get(StringName("ghosts"))) != 1) {
         return law_broken("the owner drew no ghost");
     }
@@ -661,10 +686,7 @@ void fire_from_confirmed() {
     ++reentry.calls;
     netw::NetwMultiplayer *client = reentry.shot->rig.client(0);
     reentry.applying = client->config_is_applying();
-    reentry.shot->owner->fire(
-        reentry.shot->client_tick() + 1,
-        NetwAction::TIMING_IMMEDIATE
-    );
+    reentry.shot->owner->fire(reentry.shot->client_tick() + 1);
 }
 
 LawVerdict confirmed_fires_after_setup(const World &) {
@@ -685,7 +707,7 @@ LawVerdict confirmed_fires_after_setup(const World &) {
         callable_mp_static(&fire_from_confirmed),
         Callable()
     );
-    shot.owner->fire(shot.client_tick(), NetwAction::TIMING_IMMEDIATE);
+    shot.owner->fire(shot.client_tick());
     shot.rig.step_ticks(ANSWER_TICKS);
     const Reentry seen = reentry;
     reentry = Reentry();
@@ -705,6 +727,145 @@ LawVerdict confirmed_fires_after_setup(const World &) {
             "%d ghost(s), %d run(s) and %d confirmation(s) for two shots",
             shot.owner->ghosts(),
             shot.authority->requests(),
+            shot.owner->confirmations()
+        );
+    }
+    return law_held();
+}
+
+LawVerdict declared_server_runs(const World &) {
+    Shot shot(&declare_nothing, false, "_server_action", false);
+    const StringName method("_server_action");
+    const Ref<NetwActionConfig> declared
+        = Netw::configure_action(Callable(shot.authority, method));
+    if (declared.is_null()) {
+        return law_broken("the declaration answered nothing");
+    }
+    declared->timing(NetwActionConfig::TIMING_TICK_ALIGNED)->timeout_ticks(9);
+    const Ref<NetwActionConfig> found
+        = netw::action_declared_on(shot.authority, method);
+    if (found != declared
+        || found->get_timing() != NetwActionConfig::TIMING_TICK_ALIGNED
+        || found->get_timeout_ticks() != 9) {
+        return law_broken("the declaration did not read back as written");
+    }
+    shot.rig.server()->config_settle();
+    shot.authority->set_denies(false);
+    shot.owner->fire(shot.client_tick());
+    shot.rig.step_ticks(ANSWER_TICKS);
+    if (shot.authority->requests() != 1 || shot.owner->confirmations() != 1) {
+        return law_broken(
+            "%d run(s) and %d confirmation(s)",
+            shot.authority->requests(),
+            shot.owner->confirmations()
+        );
+    }
+    return law_held();
+}
+
+LawVerdict undeclared_method_denied(const World &) {
+    Shot shot;
+    shot.authority->set_denies(false);
+    netw::NetwMultiplayer *client = shot.rig.client(0);
+    REQUIRE(client->lagcomp_require("the client") == OK);
+    const CallLog log;
+    netw::session::ActionRequest forged;
+    forged.method = StringName("_server_action_carrying");
+    forged.view_tick = shot.client_tick();
+    const StringName key = client->lagcomp_action_key(
+        netw::NetwEntity::of(shot.owner)->get_rid_handle(),
+        forged.view_tick,
+        forged.method
+    );
+    client->lagcomp_effect_arm(key, Callable(), 0);
+    client->lagcomp_effect_watch(
+        key,
+        log.callable(StringName("confirmed")),
+        log.callable(StringName("denied"))
+    );
+    forged.data
+        = netw::gd::var_to_bytes(netw::gd::array_of(Vector2(3.0, -4.0), 7));
+    client->send_to(
+        MultiplayerPeer::TARGET_PEER_SERVER,
+        netw::NetwEntity::of(shot.owner)->get_route(),
+        netw::wire::builtin_channel("ACTION"),
+        netw::session::frame_write(forged),
+        true,
+        0,
+        String()
+    );
+    shot.rig.step_ticks(ANSWER_TICKS);
+    if (shot.authority->requests() != 0) {
+        return law_broken("the server ran the undeclared method");
+    }
+    if (log.count(StringName("denied")) != 1
+        || log.count(StringName("confirmed")) != 0) {
+        return law_broken(
+            "the asker heard %d denial(s) and %d confirmation(s)",
+            log.count(StringName("denied")),
+            log.count(StringName("confirmed"))
+        );
+    }
+    return law_held();
+}
+
+LawVerdict refused_call_denied(const World &) {
+    FaultWatch faults;
+    faults.expect_error("*The Netw.configure_action method*[NW1002]*", 1);
+    Shot shot;
+    shot.authority->set_denies(false);
+    shot.owner->fire(shot.client_tick(), netw::gd::array_of(7));
+    shot.rig.step_ticks(ANSWER_TICKS);
+    if (shot.authority->requests() != 0 || shot.owner->denials() != 1
+        || shot.owner->confirmations() != 0) {
+        return law_broken(
+            "%d run(s), %d denial(s) and %d confirmation(s)",
+            shot.authority->requests(),
+            shot.owner->denials(),
+            shot.owner->confirmations()
+        );
+    }
+    return law_held();
+}
+
+constexpr const char *PATIENT = R"(extends Node2D
+
+var entered := 0
+var returned := 0
+
+func slow_action(ctx: NetwActionRequest) -> void:
+	entered += 1
+	await get_tree().process_frame
+	returned += 1
+)";
+
+LawVerdict awaiting_confirms_on_return(const World &) {
+    const Ref<Script> script = netw_test::minted_script(PATIENT);
+    if (script.is_null()) {
+        return law_broken("the patient script did not compile");
+    }
+    Shot shot(&declare_nothing, true, "slow_action", false);
+    shot.authority->set_script(script);
+    shot.authority->arm_action(shot.rig.server(), StringName("slow_action"));
+    shot.rig.server()->config_settle();
+    shot.owner->fire(shot.client_tick());
+    shot.rig.step_ticks(ANSWER_TICKS);
+    if (int(shot.authority->get(StringName("entered"))) != 1
+        || shot.owner->confirmations() != 0 || shot.owner->denials() != 0) {
+        return law_broken(
+            "%d run(s), %d confirmation(s) and %d denial(s) while it waits",
+            int(shot.authority->get(StringName("entered"))),
+            shot.owner->confirmations(),
+            shot.owner->denials()
+        );
+    }
+    netw::gd::scene_tree()->emit_signal(StringName("process_frame"));
+    shot.rig.step_ticks(ANSWER_TICKS);
+    if (int(shot.authority->get(StringName("returned"))) != 1
+        || shot.owner->confirmations() != 1) {
+        return law_broken(
+            "%d return(s) and %d confirmation(s) one frame later",
+            int(shot.authority->get(StringName("returned"))),
             shot.owner->confirmations()
         );
     }
@@ -779,6 +940,20 @@ const Row ROWS[] = {
      "the callback runs after the setup and its shot is drawn and run with "
      "no NW1008",
      &confirmed_fires_after_setup},
+    {"a shot at a server that only declared the action, tick aligned with a "
+     "nine tick timeout",
+     "the declaration reads back as written, and the server runs the shot",
+     &declared_server_runs},
+    {"a request naming a method of the player that the game never declared "
+     "as an action",
+     "the server does not run the method and the asker hears denied",
+     &undeclared_method_denied},
+    {"a shot carrying one argument more than its server method takes",
+     "the server reports NW1002 once and the owner hears denied",
+     &refused_call_denied},
+    {"a shot whose server method awaits one frame before it returns",
+     "the owner hears nothing while it waits, and confirmed once it returns",
+     &awaiting_confirms_on_return},
 };
 
 TEST_CASE(

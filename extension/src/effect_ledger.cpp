@@ -10,25 +10,6 @@ using namespace godot;
 
 namespace netw {
 
-namespace {
-
-const GameCall EFFECT_REVERT
-    = {"The NetwMultiplayer.lagcomp_effect_arm revert",
-       "func() -> void",
-       0};
-
-const GameCall EFFECT_CONFIRMED
-    = {"The NetwMultiplayer.lagcomp_effect_watch confirmed callback",
-       "func() -> void",
-       0};
-
-const GameCall EFFECT_DENIED
-    = {"The NetwMultiplayer.lagcomp_effect_watch denied callback",
-       "func() -> void",
-       0};
-
-} // namespace
-
 void NetwEffectLedger::arm(
     const StringName &p_key,
     const Callable &p_revert,
@@ -103,11 +84,12 @@ void NetwEffectLedger::resolve(const StringName &p_key, bool p_keep) {
         int(p_keep)
     );
     if (!p_keep && revert.is_valid()) {
-        settled.push_back({revert, &EFFECT_REVERT});
+        settled.push_back({revert, &game_calls::EFFECT_REVERT});
     }
     if (observer.is_valid()) {
         settled.push_back(
-            {observer, p_keep ? &EFFECT_CONFIRMED : &EFFECT_DENIED}
+            {observer, p_keep ? &game_calls::EFFECT_CONFIRMED
+                   : &game_calls::EFFECT_DENIED}
         );
     }
 }

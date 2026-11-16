@@ -20,7 +20,7 @@ Ref<NetwDespawnConfig> NetwDespawnConfig::linger(double p_seconds) {
 
 void NetwDespawnConfig::_bind_methods() {
     ClassDB::bind_method(
-        D_METHOD("before_removal", "callable"),
+        D_METHOD("before_removal", "method"),
         &NetwDespawnConfig::before_removal
     );
     ClassDB::bind_method(

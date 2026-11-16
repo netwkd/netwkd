@@ -8,20 +8,21 @@ class EchoAccount extends NetwAccountProvider:
 		return "proof:" + challenge
 
 
-	func _verify(request: NetwJoinRequest, proof: Variant) -> Variant:
+	func _verify(request: NetwJoinRequest, proof: Variant) -> void:
 		if proof is String and proof == "proof:" + request.challenge:
 			request.add_account("echo:%d" % request.peer_id, "")
-		return OK
 
 
 class Gate extends Node:
 	var requests: Array[NetwJoinRequest] = []
 
 
-	func admit(request: NetwJoinRequest) -> Error:
+	func admit(request: NetwJoinRequest) -> void:
 		requests.append(request)
-		var echo := "echo:%d" % request.peer_id
-		return OK if request.is_bound(echo) else ERR_UNAUTHORIZED
+		if request.is_bound("echo:%d" % request.peer_id):
+			request.admit()
+		else:
+			request.deny()
 
 
 func before(

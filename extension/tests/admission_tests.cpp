@@ -47,28 +47,31 @@ var seen_name := StringName()
 var seen_team := StringName()
 var verdict := OK
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	calls += 1
 	seen_peer = request.peer_id
 	seen_name = request.username
 	if not request.args.is_empty():
 		seen_team = request.args[0]
-	return verdict
+	if verdict == OK:
+		request.admit()
+	else:
+		request.deny("", verdict)
 
 func seat(_who, _team: StringName) -> void:
 	pass
 )";
 
-constexpr const char *GATE_ANSWERING_NO_ERROR = R"(extends Node
+constexpr const char *GATE_NOT_ANSWERING = R"(extends Node
 
 func admit(_request: NetwJoinRequest):
-	return "admitted"
+	return OK
 )";
 
 constexpr const char *GATE_TAKING_PEER_ID = R"(extends Node
 
-func admit(_peer_id: int, _username: StringName) -> Error:
-	return OK
+func admit(_peer_id: int, _username: StringName) -> void:
+	pass
 )";
 
 constexpr const char *ASYNC_GATE = R"(extends Node
@@ -80,24 +83,34 @@ var request: NetwJoinRequest
 var account_seen := ""
 var name_seen := ""
 
-func admit(value: NetwJoinRequest) -> Error:
+func admit(value: NetwJoinRequest) -> void:
     calls += 1
     request = value
     account_seen = value.account
     name_seen = value.account_name
     if delay_admit and value.peer_id != 1:
         await decided
-    return OK
+    value.admit()
 )";
 
 constexpr const char *PROMISE_GATE = R"(extends Node
 
 var results: Array[NetwPromise] = []
 
-func admit(_request: NetwJoinRequest) -> NetwPromise:
+func admit(request: NetwJoinRequest) -> void:
     var result := NetwPromise.new()
     results.append(result)
-    return result
+    await result.wait()
+    request.admit()
+)";
+
+constexpr const char *SCRIPTED_ACCOUNT = R"(extends NetwAccountProvider
+
+signal checked
+
+func _verify(request: NetwJoinRequest, _proof: Variant) -> void:
+    await checked
+    request.deny("Wrong passcode.")
 )";
 
 constexpr const char *CHALLENGE = "0123456789abcdef0123456789abcdef";
@@ -156,7 +169,10 @@ public:
                 answers_challenge
             );
         }
-        return hold_verify ? Variant(hold()) : Variant(int64_t(verdict));
+        if (verdict != OK) {
+            p_request->deny(String(), verdict);
+        }
+        return hold_verify ? Variant(hold()) : Variant();
     }
 
     void release_prove() {
@@ -460,21 +476,18 @@ LawVerdict host_refused(const Admission &) {
     return law_held();
 }
 
-LawVerdict handler_answers_no_error(const Admission &) {
+LawVerdict handler_gives_no_answer(const Admission &) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "*the admission handler returned String*[NW1007]*",
-        1
-    );
-    const Host host("AdmitNoError");
-    admit_through(host.gate(GATE_ANSWERING_NO_ERROR));
+    expected_faults.expect_error("*NetwJoinRequest.admit*[NW1042]*", 1);
+    const Host host("AdmitNoAnswer");
+    admit_through(host.gate(GATE_NOT_ANSWERING));
 
     join_as(host.session, "ana", 9);
 
     if (host.seated(9)) {
         return law_broken("peer 9 was seated");
     }
-    if (!host.refusal(9).contains(String("did not return an Error"))) {
+    if (!host.refusal(9).contains(String("Unauthorized"))) {
         return law_broken("the refusal does not say why");
     }
     return law_held();
@@ -546,7 +559,7 @@ template <AwaitedStep STEP> LawVerdict awaited(const Admission &) {
         } else {
             REQUIRE(held->held.size() == 1);
             if (STEP == AWAIT_VERIFY) {
-                held->held[0]->resolve(int64_t(OK));
+                held->held[0]->resolve(Variant());
             } else {
                 held->release_prove();
             }
@@ -681,6 +694,31 @@ LawVerdict proof_count_differs(const Admission &) {
     return law_held();
 }
 
+LawVerdict scripted_verify_denies(const Admission &) {
+    const Host host("ScriptedVerify");
+    Node *gate = host.gate(ASYNC_GATE);
+    Ref<netw::NetwAccountProvider> scripted;
+    scripted.instantiate();
+    scripted->set_script(shape_of(SCRIPTED_ACCOUNT));
+    admit_through(gate)->accept(scripted);
+    Array proofs;
+    proofs.push_back(String("ticket"));
+
+    join_proving(host.session, 9, proofs);
+    scripted->emit_signal(StringName("checked"));
+
+    if (host.seated(9)) {
+        return law_broken("peer 9 was seated");
+    }
+    if (int(gate->get("calls")) != 0) {
+        return law_broken("the handler ran for a refused join");
+    }
+    if (!host.refusal(9).contains(String("Wrong passcode."))) {
+        return law_broken("the refusal does not carry the reason");
+    }
+    return law_held();
+}
+
 LawVerdict verify_error(const Admission &) {
     const Host host("VerifyRefuses");
     Node *gate = host.gate(ASYNC_GATE);
@@ -743,11 +781,11 @@ LawVerdict late_promise(const Admission &) {
         join();
         const Ref<netw::NetwPromise> second = promise_at(1);
 
-        first->resolve(int64_t(OK));
+        first->resolve(Variant());
         if (host.seated(9)) {
             return law_broken("verifying=%d seated on the late one", verifying);
         }
-        second->resolve(int64_t(OK));
+        second->resolve(Variant());
         if (!host.seated(9)) {
             return law_broken("verifying=%d did not seat at all", verifying);
         }
@@ -960,9 +998,9 @@ const Row ROWS[] = {
     {"a handler that refuses the host's own join",
      "the host has no player and one error says so",
      &host_refused},
-    {"a handler that answers something other than an Error",
-     "the join is refused and the refusal says why",
-     &handler_answers_no_error},
+    {"a handler that returns OK and never admits or denies",
+     "the join is refused as unauthorized and one error says so",
+     &handler_gives_no_answer},
     {"a handler that cannot take a NetwJoinRequest",
      "every join is refused, the host's too, with one error each",
      &handler_wrong_signature},
@@ -990,6 +1028,9 @@ const Row ROWS[] = {
     {"a provider whose verify answers an Error",
      "the join is refused with that Error and the handler never runs",
      &verify_error},
+    {"a scripted provider whose _verify awaits and then denies",
+     "the join is refused with its reason and the handler never runs",
+     &scripted_verify_denies},
     {"a late answer for a join the peer left",
      "it cannot seat or refuse the peer's next join",
      &late_promise},

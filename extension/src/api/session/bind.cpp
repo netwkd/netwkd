@@ -18,6 +18,7 @@
 #include "godot/utility.hpp"
 #include "godot/viewport.hpp"
 #include "godot/world.hpp"
+#include "netw/api/action_config.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/join_request.hpp"
 #include "netw/api/prediction.hpp"
@@ -1087,8 +1088,10 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::predict_is_declared
     );
     ClassDB::bind_method(
-        D_METHOD("lagcomp_action_deny", "requester", "key"),
-        &NetwMultiplayer::lagcomp_action_deny
+        D_METHOD("lagcomp_action_deny", "requester", "key", "code", "reason"),
+        &NetwMultiplayer::lagcomp_action_deny,
+        DEFVAL(ERR_UNAUTHORIZED),
+        DEFVAL(String())
     );
     ClassDB::bind_method(
         D_METHOD("clock_get_param", "param"),
@@ -1224,23 +1227,24 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::scene_get_local_player_entities
     );
     ClassDB::bind_method(
-        D_METHOD("lagcomp_action_key", "entity", "view_tick", "slot"),
-        &NetwMultiplayer::lagcomp_action_key,
-        DEFVAL(0)
+        D_METHOD("lagcomp_action_key", "entity", "view_tick", "method"),
+        &NetwMultiplayer::lagcomp_action_key
+    );
+    ClassDB::bind_static_method(
+        "NetwMultiplayer",
+        D_METHOD("lagcomp_action_declare", "root", "method", "handler"),
+        &NetwMultiplayer::lagcomp_action_declare
     );
     ClassDB::bind_method(
         D_METHOD(
             "lagcomp_action_request",
-            "key",
             "target",
             "method",
             "view_tick",
-            "args",
-            "timing"
+            "args"
         ),
         &NetwMultiplayer::lagcomp_action_request,
-        DEFVAL(Array()),
-        DEFVAL(NetwAction::TIMING_IMMEDIATE)
+        DEFVAL(Array())
     );
     ClassDB::bind_method(
         D_METHOD("lagcomp_timeline_declare", "entity"),

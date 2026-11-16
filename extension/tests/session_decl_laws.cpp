@@ -56,7 +56,7 @@ Node *child_named(Node *p_parent, const char *p_name) {
 }
 
 Callable provider(const CallLog &p_log, Node *p_on, const StringName &p_tag) {
-    return p_log.minting_on<NetwServerInfo>(p_on, p_tag);
+    return p_log.callable_on(p_on, p_tag);
 }
 
 bool probe_answers(NetwMultiplayer *p_api) {
@@ -283,29 +283,6 @@ TEST_CASE(
     NETW_CHECK_EQ(log.count("new"), 1);
 
     memdelete(scope);
-}
-
-TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD9 a provider that answers "
-    "something that is not a NetwServerInfo refuses the probe, because an "
-    "empty advertised reply reads as a working host"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "*Netw.configure_server_info*[NW1007]*",
-        1
-    );
-
-    Branch branch("HD9");
-    const CallLog log;
-    Node *scope = child_named(branch.node, "Session");
-    Netw::configure_server_info(log.callable_on(scope, "info"));
-
-    bool answered = true;
-    const PackedByteArray payload = branch.api->probe_reply_payload(answered);
-    CHECK_FALSE(answered);
-    CHECK(payload.is_empty());
-    NETW_CHECK_EQ(log.count("info"), 1);
 }
 
 TEST_CASE(

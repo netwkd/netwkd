@@ -42,7 +42,7 @@ Reached through :ref:`NetwEntity.simulation<class_NetwEntity_property_simulation
         var entity = Netw.ConfigureEntity(this);
         entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
         entity.Simulation.RemoteMode = NetwSimulation.RemoteModeEnum.Active;
-        entity.Simulation.NetworkProcess = Callable.From<double, long, bool>(NetworkProcess);
+        entity.Simulation.SetNetworkProcess(NetworkProcess);
     }
 
     private void NetworkProcess(double delta, long tick, bool isFresh)
@@ -83,6 +83,8 @@ Properties
    +---------------------------------------------------+---------------------------------------------------------------------------+
    | :ref:`Mode<enum_NetwSimulation_Mode>`             | :ref:`mode<class_NetwSimulation_property_mode>`                           |
    +---------------------------------------------------+---------------------------------------------------------------------------+
+   | :godot:`Callable`                                 | :ref:`network_process<class_NetwSimulation_property_network_process>`     |
+   +---------------------------------------------------+---------------------------------------------------------------------------+
    | :godot:`bool`                                     | :ref:`physics_driven<class_NetwSimulation_property_physics_driven>`       |
    +---------------------------------------------------+---------------------------------------------------------------------------+
    | :godot:`float`                                    | :ref:`release_on_rest<class_NetwSimulation_property_release_on_rest>`     |
@@ -92,8 +94,6 @@ Properties
    | :ref:`Restore<enum_NetwSimulation_Restore>`       | :ref:`restore<class_NetwSimulation_property_restore>`                     |
    +---------------------------------------------------+---------------------------------------------------------------------------+
    | :ref:`Schedule<enum_NetwSimulation_Schedule>`     | :ref:`schedule<class_NetwSimulation_property_schedule>`                   |
-   +---------------------------------------------------+---------------------------------------------------------------------------+
-   | :godot:`Callable`                                 | :ref:`network_process<class_NetwSimulation_property_network_process>`     |
    +---------------------------------------------------+---------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -358,6 +358,31 @@ The mode this entity runs in on this peer. :ref:`mode_changed<class_NetwSimulati
 
 ----
 
+.. _class_NetwSimulation_property_network_process:
+
+.. rst-class:: classref-property
+
+:godot:`Callable` **network_process** :ref:`🔗<class_NetwSimulation_property_network_process>`
+
+.. rst-class:: classref-property-setget
+
+- |void| **set_network_process**\ (\ value\: :godot:`Callable`\ )
+- :godot:`Callable` **get_network_process**\ (\ )
+
+Called each tick while :ref:`mode<class_NetwSimulation_property_mode>` runs the body. Defaults to the root's ``_network_process``.
+
+::
+
+    func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
+
+\ ``is_fresh`` is ``true`` the first time a tick runs. It is ``false`` when a rollback runs the tick again and on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy, so play sounds and spawn nodes only when it is ``true``.
+
+Ask the physics space with a query. An :godot:`Area3D`'s overlaps and signals and :godot:`CharacterBody3D.is_on_floor() <CharacterBody3D#class_CharacterBody3D_method_is_on_floor>` come from the last physics step, and a rollback restores neither.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwSimulation_property_physics_driven:
 
 .. rst-class:: classref-property
@@ -442,27 +467,6 @@ How a sample from the authority lands on a :ref:`MODE_ACTIVE<class_NetwSimulatio
 - :ref:`Schedule<enum_NetwSimulation_Schedule>` **get_schedule**\ (\ )
 
 When :ref:`network_process<class_NetwSimulation_property_network_process>` runs and when the physics server moves the bodies.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwSimulation_property_network_process:
-
-.. rst-class:: classref-property
-
-:godot:`Callable` **network_process** :ref:`🔗<class_NetwSimulation_property_network_process>`
-
-.. rst-class:: classref-property-setget
-
-- |void| **set_network_process**\ (\ value\: :godot:`Callable`\ )
-- :godot:`Callable` **get_network_process**\ (\ )
-
-Called each tick as ``(delta: float, tick: int, is_fresh: bool)`` while :ref:`mode<class_NetwSimulation_property_mode>` runs the body. Defaults to the root's ``_network_process``.
-
-\ ``is_fresh`` is ``true`` the first time a tick runs. It is ``false`` when a rollback runs the tick again and on a :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>` copy, so play sounds and spawn nodes only when it is ``true``.
-
-Ask the physics space with a query. An :godot:`Area3D`'s overlaps and signals and :godot:`CharacterBody3D.is_on_floor() <CharacterBody3D#class_CharacterBody3D_method_is_on_floor>` come from the last physics step, and a rollback restores neither.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

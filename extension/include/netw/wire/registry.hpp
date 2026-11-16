@@ -64,7 +64,7 @@ enum class Cause : uint8_t {
 inline constexpr int CAUSE_COUNT = 5;
 inline constexpr uint8_t USER_CHANNEL_FIRST = 100;
 
-inline constexpr uint16_t FORMAT_VERSION = 22;
+inline constexpr uint16_t FORMAT_VERSION = 23;
 
 struct ChannelDecl {
     uint8_t id = 0;

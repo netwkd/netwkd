@@ -270,10 +270,11 @@ constexpr const char *LOBBY_GATE = R"(extends Node
 
 var open := false
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	if open or request.username != &"turned_away":
-		return OK
-	return request.refuse(ERR_LOCKED, "The lobby is closed.")
+		request.admit()
+	else:
+		request.deny("The lobby is closed.", ERR_LOCKED)
 )";
 
 constexpr const char *LOBBY_SINK = R"(extends Node

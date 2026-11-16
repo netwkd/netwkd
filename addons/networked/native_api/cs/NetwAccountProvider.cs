@@ -20,10 +20,11 @@ namespace Networked;
 /// func _prove(challenge: String, _session: NetwSession) -&gt; Variant:
 ///     return (PASSCODE + challenge).sha256_text()
 ///
-/// func _verify(request: NetwJoinRequest, proof: Variant) -&gt; Variant:
+/// func _verify(request: NetwJoinRequest, proof: Variant) -&gt; void:
 ///     if proof is String and proof == (PASSCODE + request.challenge).sha256_text():
 ///         request.add_account("club:" + request.username, request.username)
-///     return OK
+///     else:
+///         request.deny("Wrong passcode.")
 /// </code>
 /// <para>
 /// Proving and verifying count against the join deadline of
@@ -50,5 +51,21 @@ public class NetwAccountProvider : NetwRefCounted
     public static NetwAccountProvider From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
+    }
+
+    /// <summary>
+    /// Makes a <see cref="NetwAccountProvider"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_prove</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwAccountProvider",
+            "_prove",
+            "_verify");
     }
 }

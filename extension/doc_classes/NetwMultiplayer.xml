@@ -19,7 +19,7 @@
 		- [code]entity_*[/code] and [code]spawn_*[/code]: [NetwEntity]
 		- [code]table_*[/code] and [code]liveness_*[/code]: [NetwTable]
 		- [code]schema_*[/code]: [NetwSchema]
-		- [code]lagcomp_*[/code]: [NetwAction]
+		- [code]lagcomp_*[/code]: [NetwActionConfig]
 		- [code]player_*[/code] and [code]peer_*[/code]: [NetwPlayer]
 		- [code]display_*[/code]: [NetwDisplay]
 		- [code]endpoint_*[/code]: [NetwConnection]
@@ -305,6 +305,13 @@
 				Returns one display setting of [param entity], or [code]null[/code] when it has none.
 			</description>
 		</method>
+		<method name="display_get_tick">
+			<return type="int" />
+			<param index="0" name="entity" type="RID" />
+			<description>
+				Returns the tick [param entity] is displayed at, or [code]-1[/code] when it is not interpolated.
+			</description>
+		</method>
 		<method name="display_get_track_stat">
 			<return type="Variant" />
 			<param index="0" name="entity" type="RID" />
@@ -312,13 +319,6 @@
 			<param index="2" name="stat" type="StringName" />
 			<description>
 				Returns the display diagnostic [param stat] of [param entity], or [code]null[/code] when unknown. Some stats describe one [param track], and the rest ignore it.
-			</description>
-		</method>
-		<method name="display_get_tick">
-			<return type="int" />
-			<param index="0" name="entity" type="RID" />
-			<description>
-				Returns the tick [param entity] is displayed at, or [code]-1[/code] when it is not interpolated.
 			</description>
 		</method>
 		<method name="display_reset">
@@ -875,7 +875,7 @@
 			<param index="0" name="layer" type="RID" />
 			<param index="1" name="callback" type="Callable" />
 			<description>
-				Calls [param callback] as [code]callback(visible, entity, peer_id)[/code] when an entity enters or leaves [param layer] for a peer, where [code]entity[/code] is an [RID]. [member NetwInterestLayer.monitor] is the same with objects, and setting one replaces the other.
+				Calls [param callback] as [code]callback(visible, entity, peer_id)[/code] when an entity enters or leaves [param layer] for a peer, where [code]entity[/code] is an [RID]. [signal NetwInterestLayer.interest_entered] and [signal NetwInterestLayer.interest_exited] report the same with a [NetwEntity].
 			</description>
 		</method>
 		<method name="interest_layer_set_param">
@@ -969,38 +969,51 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="lagcomp_action_declare" qualifiers="static">
+			<return type="NetwActionConfig" />
+			<param index="0" name="root" type="Node" />
+			<param index="1" name="method" type="StringName" />
+			<param index="2" name="handler" type="Callable" />
+			<description>
+				Declares the action [param method] on [param root], the root node of a [NetwEntity], and returns its [NetwActionConfig]. The server calls [param handler] for each [method lagcomp_action_request] that names [param method], and [param root] needs no method of that name. [method Netw.configure_action] declares a method of the node this way.
+				[codeblock]
+				func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+				    bombs.add_child(make_bomb(pos))
+				[/codeblock]
+			</description>
+		</method>
 		<method name="lagcomp_action_deny">
 			<return type="void" />
 			<param index="0" name="requester" type="int" />
 			<param index="1" name="key" type="StringName" />
+			<param index="2" name="code" type="int" enum="Error" default="4" />
+			<param index="3" name="reason" type="String" default="&quot;&quot;" />
 			<description>
-				Rejects the action [param key] from [param requester], which undoes its local effect.
+				Rejects the action [param key] from [param requester], which undoes its local effect. [param code] and [param reason] reach the [method NetwActionConfig.revert] handler of [param requester], and [param reason] is cut to 255 UTF-8 bytes.
 			</description>
 		</method>
 		<method name="lagcomp_action_key" qualifiers="const">
 			<return type="StringName" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="view_tick" type="int" />
-			<param index="2" name="slot" type="int" default="0" />
+			<param index="2" name="method" type="StringName" />
 			<description>
-				Returns the key of the action [param entity] requests for [param view_tick]. [param slot] tells apart two actions of [param entity] on the same tick. The key is passed to [method lagcomp_effect_arm], [method lagcomp_effect_watch] and [method lagcomp_action_request].
+				Returns the key of the action that calls [param method] on [param entity] for [param view_tick]. The server computes the same key for the request it receives. The key is passed to [method lagcomp_effect_arm] and [method lagcomp_effect_watch].
 			</description>
 		</method>
 		<method name="lagcomp_action_request">
 			<return type="int" enum="Error" />
-			<param index="0" name="key" type="StringName" />
-			<param index="1" name="target" type="NodePath" />
-			<param index="2" name="method" type="StringName" />
-			<param index="3" name="view_tick" type="int" />
-			<param index="4" name="args" type="Array" default="[]" />
-			<param index="5" name="timing" type="int" enum="NetwAction.TimingMode" default="2" />
+			<param index="0" name="target" type="NodePath" />
+			<param index="1" name="method" type="StringName" />
+			<param index="2" name="view_tick" type="int" />
+			<param index="3" name="args" type="Array" default="[]" />
 			<description>
-				Sends [param method] with [param args] to the server, which calls it on the node at [param target], a path from the session's root node, as the world was at [param view_tick]. [param timing] picks when the server runs it. On a server, a host or an offline session the action runs and resolves [param key] before this returns, so [method lagcomp_effect_arm] and [method lagcomp_effect_watch] are called for [param key] first. Returns [constant @GlobalScope.ERR_BUSY] while the session applies its settings.
+				Sends [param method] with [param args] to the server, which calls it on the node at [param target], a path from the session's root node, as the world was at [param view_tick]. The server runs it when the [method NetwActionConfig.timing] of its own declaration says. The server answers under the key [method lagcomp_action_key] returns for the entity of [param target], [param view_tick] and [param method]. On a server, a host or an offline session the action runs and resolves that key before this returns, so [method lagcomp_effect_arm] and [method lagcomp_effect_watch] are called for it first. Returns [constant @GlobalScope.ERR_BUSY] while the session applies its settings.
 				[codeblock]
-				var key := api.lagcomp_action_key(entity, tick)
+				var key := api.lagcomp_action_key(entity, tick, &amp;"fire")
 				api.lagcomp_effect_arm(key, revert)
 				api.lagcomp_effect_watch(key, confirmed, denied)
-				api.lagcomp_action_request(key, target, &amp;"fire", tick, [aim])
+				api.lagcomp_action_request(target, &amp;"fire", tick, [aim])
 				[/codeblock]
 				[b]Player request.[/b]
 			</description>
@@ -1020,7 +1033,13 @@
 			<param index="1" name="confirmed" type="Callable" />
 			<param index="2" name="denied" type="Callable" />
 			<description>
-				Calls [param confirmed] or [param denied] when the effect [param key] resolves. When [method lagcomp_action_deny],[method NetwActionContext.deny], [method lagcomp_action_request], [method NetwAction.request] or an assignment of [member MultiplayerAPI.multiplayer_peer] resolves it outside a poll and a network tick, they run as that call returns. When a host's own [method lagcomp_action_request] runs its handler at once, a [method NetwActionContext.deny] inside that handler runs them as the request returns. Otherwise they run when the poll or the run of network ticks in progress ends, or at the end of the next one. Returns [code]false[/code] when the effect is not pending.
+				Calls [param confirmed] or [param denied] when the effect [param key] resolves. Neither takes an argument.
+				[codeblock]
+				api.lagcomp_effect_watch(key,
+				        func() -&gt; void: ghost.modulate = Color.WHITE,
+				        func() -&gt; void: ghost.queue_free())
+				[/codeblock]
+				When [method lagcomp_action_deny], [method NetwRequest.deny], [method lagcomp_action_request], [method Netw.action] or an assignment of [member MultiplayerAPI.multiplayer_peer] resolves it outside a poll and a network tick, they run as that call returns. When a host's own [method lagcomp_action_request] runs its handler at once, a [method NetwRequest.deny] inside that handler runs them as the request returns. Otherwise they run when the poll or the run of network ticks in progress ends, or at the end of the next one. Returns [code]false[/code] when the effect is not pending.
 			</description>
 		</method>
 		<method name="lagcomp_rewind">
@@ -1676,13 +1695,6 @@
 				Returns [code]true[/code] while the server has paused the session with [method session_pause].
 			</description>
 		</method>
-		<method name="session_of" qualifiers="static">
-			<return type="NetwMultiplayer" />
-			<param index="0" name="node" type="Node" default="null" />
-			<description>
-				Returns the session [param node] is in, or [code]null[/code] when it is outside the tree. A [code]null[/code] [param node] returns the only running session, or reports an error and returns [code]null[/code] when there is not exactly one.
-			</description>
-		</method>
 		<method name="session_leave">
 			<return type="NetwPromise" />
 			<description>
@@ -1694,6 +1706,13 @@
 				if left.result != OK:
 				    push_error("still online: %s" % error_string(left.result))
 				[/codeblock]
+			</description>
+		</method>
+		<method name="session_of" qualifiers="static">
+			<return type="NetwMultiplayer" />
+			<param index="0" name="node" type="Node" default="null" />
+			<description>
+				Returns the session [param node] is in, or [code]null[/code] when it is outside the tree. A [code]null[/code] [param node] returns the only running session, or reports an error and returns [code]null[/code] when there is not exactly one.
 			</description>
 		</method>
 		<method name="session_pause">
@@ -1725,7 +1744,7 @@
 			<return type="void" />
 			<param index="0" name="info" type="NetwServerInfo" />
 			<description>
-				Sets the [NetwServerInfo] this host shows in server browsers, for example after a player names their server. [param info] is copied. [code]null[/code] clears it. A provider from [method Netw.configure_server_info] receives this value and can change it.
+				Sets the [NetwServerInfo] this host shows in server browsers, for example after a player names their server. [param info] is copied. [code]null[/code] clears it. A handler from [method Netw.configure_server_info] receives this value and can change it.
 			</description>
 		</method>
 		<method name="session_step_away">
@@ -1771,6 +1790,14 @@
 				Returns the schedule [param entity] runs on here, with [constant NetwSimulation.SCHEDULE_AUTO] resolved to the schedule it picked.
 			</description>
 		</method>
+		<method name="simulation_set_network_process_callback">
+			<return type="void" />
+			<param index="0" name="entity" type="RID" />
+			<param index="1" name="callback" type="Callable" />
+			<description>
+				Sets [member NetwSimulation.network_process] on [param entity].
+			</description>
+		</method>
 		<method name="simulation_set_param">
 			<return type="int" enum="Error" />
 			<param index="0" name="entity" type="RID" />
@@ -1785,14 +1812,6 @@
 				┠╴ERR_LOCKED             bodies changed after the entity entered the tree
 				┖╴ERR_INVALID_PARAMETER  param is unknown
 				[/codeblock]
-			</description>
-		</method>
-		<method name="simulation_set_network_process_callback">
-			<return type="void" />
-			<param index="0" name="entity" type="RID" />
-			<param index="1" name="callback" type="Callable" />
-			<description>
-				Sets [member NetwSimulation.network_process] on [param entity].
 			</description>
 		</method>
 		<method name="spawn_call">
@@ -1858,7 +1877,7 @@
 			<param index="2" name="signal" type="StringName" />
 			<param index="3" name="args" type="Array" default="[]" />
 			<description>
-				Emits [param signal] on [param node], a node of [param entity], with [param args] on every peer. [method Netw.emit_entity_signal] calls this.
+				Emits [param signal] on [param node], a node of [param entity], with [param args] on every peer. [method Netw.emit] calls this.
 			</description>
 		</method>
 		<method name="table_claim_routes">
@@ -2084,7 +2103,7 @@
 			<description>
 				Asks [param transport] to create a [MultiplayerPeer] and returns a ticket for [method transport_cancel_peer_creation]. [param address] is used by clients and [param settings] by hosts.
 				[param completed] is called once, in a later frame, as [code]completed(peer, error, detail)[/code]. Assign the peer to [member MultiplayerAPI.multiplayer_peer] inside this callback, before any [code]await[/code]. Returning without assigning it closes the peer.
-				Returns an invalid [RID] when [param completed] is not valid.
+				Returns an invalid [RID] when [param completed] is not valid or does not take those three arguments.
 				[codeblock]
 				var ticket := api.transport_create_peer(
 				        relay, NetwConnection.TRANSPORT_MODE_CLIENT,

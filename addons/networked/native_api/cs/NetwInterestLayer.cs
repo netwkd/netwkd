@@ -395,81 +395,6 @@ public sealed class NetwInterestLayer : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetDriver =
-        NetwApi.MethodBind("NetwInterestLayer", "get_driver", 2136241257UL);
-
-    private static readonly IntPtr _bindSetDriver =
-        NetwApi.MethodBind("NetwInterestLayer", "set_driver", 1611583062UL);
-
-    /// <summary>
-    /// Called on the server once per frame with this layer. It returns every
-    /// entity that belongs in the layer.
-    /// <code>
-    /// sight.driver = func(layer: NetwInterestLayer) -&gt; Array[NetwEntity]:
-    ///     return entities_near(beacon.position, 20.0)
-    /// </code>
-    /// <para>
-    /// If the result holds anything that is not an entity of this session, the
-    /// layer does not change that frame.
-    /// </para>
-    /// </summary>
-    public Callable Driver
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetDriver, Checked, ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(_bindSetDriver, Checked, in slot0, ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
-    }
-
-    private static readonly IntPtr _bindGetMonitor =
-        NetwApi.MethodBind("NetwInterestLayer", "get_monitor", 2136241257UL);
-
-    private static readonly IntPtr _bindSetMonitor =
-        NetwApi.MethodBind("NetwInterestLayer", "set_monitor", 1611583062UL);
-
-    /// <summary>
-    /// Called whenever this layer emits
-    /// <see cref="NetwInterestLayer.InterestEntered"/>,
-    /// <see cref="NetwInterestLayer.InterestExited"/> or
-    /// <see cref="NetwInterestLayer.VisibilityChanged"/>. On a client, the peer
-    /// is always this one.
-    /// <code>
-    /// sight.monitor = func(entity: NetwEntity, peer_id: int, visible: bool) -&gt; void:
-    ///     print(entity.root.name," ", peer_id, " ", visible)
-    /// </code>
-    /// </summary>
-    public Callable Monitor
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetMonitor, Checked, ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(_bindSetMonitor, Checked, in slot0, ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
-    }
-
     private static readonly IntPtr _bindAddViewer =
         NetwApi.MethodBind("NetwInterestLayer", "add_viewer", 3067735520UL);
 
@@ -649,5 +574,52 @@ public sealed class NetwInterestLayer : NetwRefCounted
             VariantUtils.ConvertToDictionary(answered);
         answered.Dispose();
         return result;
+    }
+
+    private static readonly IntPtr _bindSetDriver =
+        NetwApi.MethodBind("NetwInterestLayer", "set_driver", 1611583062UL);
+
+    /// <summary>
+    /// Called on the server once per frame with this layer. It returns every
+    /// entity that belongs in the layer.
+    /// <code>
+    /// sight.driver = func(layer: NetwInterestLayer) -&gt; Array[NetwEntity]:
+    ///     return entities_near(beacon.position, 20.0)
+    /// </code>
+    /// <para>
+    /// If the result holds anything that is not an entity of this session, the
+    /// layer does not change that frame.
+    /// </para>
+    /// </summary>
+    public void SetDriver(Func<NetwInterestLayer, NetwEntity[]> driver)
+    {
+        Callable bridged0 = default;
+        if (driver != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    NetwEntity[] answer =
+                        driver(Wrapped(a0, NetwInterestLayer.From));
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromArray(
+                                NetwApi.ArrayOf(answer))));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwInterestLayer.SetDriver", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(driver, bridge0, owner => owner.NetwAnswer));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindSetDriver, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        answered.Dispose();
     }
 }

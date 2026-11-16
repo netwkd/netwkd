@@ -4,8 +4,11 @@
 ## func _init() -> void:
 ##     Netw.configure_admission(admit).accept(DiscordIdToken.new(DISCORD_APP))
 ##
-## func admit(request: NetwJoinRequest) -> Error:
-##     return OK if request.account else ERR_UNAUTHORIZED
+## func admit(request: NetwJoinRequest) -> void:
+##     if request.account:
+##         request.admit()
+##     else:
+##         request.deny()
 ## [/codeblock]
 ## Discord's own ID token carries no name, so
 ## [member NetwJoinRequest.account_name] is empty. A token from
@@ -29,9 +32,11 @@ func _init(application_id: int) -> void:
 ##         DiscordIdToken.signed_by(DISCORD_APP, "res://activity_token.pub"),
 ##     )
 ##
-## func admit(request: NetwJoinRequest) -> Error:
-##     var discord := request.account.begins_with("discord:")
-##     return OK if discord else ERR_UNAUTHORIZED
+## func admit(request: NetwJoinRequest) -> void:
+##     if request.account.begins_with("discord:"):
+##         request.admit()
+##     else:
+##         request.deny()
 ## [/codeblock]
 static func signed_by(
 		application_id: int,

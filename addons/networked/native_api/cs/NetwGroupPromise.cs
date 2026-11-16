@@ -272,12 +272,33 @@ public sealed partial class NetwGroupPromise : NetwRefCounted
         NetwApi.MethodBind("NetwGroupPromise", "then", 3578470499UL);
 
     /// <summary>
-    /// Calls <paramref name="cb"/> with <see cref="NetwGroupPromise.Results"/>
-    /// when every peer answered. Returns the group.
+    /// Calls <paramref name="callback"/> with
+    /// <see cref="NetwGroupPromise.Results"/> when every peer answered. Returns
+    /// the group.
+    /// <code>
+    /// func count_votes(votes: Dictionary) -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwGroupPromise Then(Callable cb)
+    public NetwGroupPromise Then(Action<Godot.Collections.Dictionary> callback)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(cb);
+        Callable bridged0 = default;
+        if (callback != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    callback(a0.As<Godot.Collections.Dictionary>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwGroupPromise.Then", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(callback, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindThen, Checked, in slot0, ref answered);
         slot0.Dispose();
@@ -293,12 +314,34 @@ public sealed partial class NetwGroupPromise : NetwRefCounted
         NetwApi.MethodBind("NetwGroupPromise", "catch_error", 3578470499UL);
 
     /// <summary>
-    /// Calls <paramref name="cb"/> as <c>cb(code, detail)</c> when the group
-    /// fails. Returns the group.
+    /// Calls <paramref name="callback"/> with
+    /// <see cref="NetwGroupPromise.Code"/> and
+    /// <see cref="NetwGroupPromise.Detail"/> when the group fails. Returns the
+    /// group.
+    /// <code>
+    /// func show_error(code: Error, detail: String) -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwGroupPromise CatchError(Callable cb)
+    public NetwGroupPromise CatchError(Action<Error, string> callback)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(cb);
+        Callable bridged0 = default;
+        if (callback != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    callback((Error)a0.AsInt64(), a1.As<string>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwGroupPromise.CatchError", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(callback, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindCatchError, Checked, in slot0, ref answered);
         slot0.Dispose();

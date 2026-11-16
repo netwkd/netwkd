@@ -10,7 +10,7 @@
 NetwJoinRequest
 ===============
 
-**Inherits:** :godot:`RefCounted`
+**Inherits:** :ref:`NetwRequest<class_NetwRequest>` **<** :godot:`RefCounted`
 
 A player's request to join a session.
 
@@ -19,23 +19,27 @@ A player's request to join a session.
 Description
 -----------
 
-The server passes this request to the handler declared with :ref:`Netw.configure_admission()<class_Netw_method_configure_admission>`, after every :ref:`NetwAccountProvider<class_NetwAccountProvider>` has verified. The joining client is not connected until the handler returns :godot:`@GlobalScope.OK <@GlobalScope#class_@GlobalScope_constant_OK>`, and :ref:`refuse()<class_NetwJoinRequest_method_refuse>` tells it why it was refused. A requested :ref:`username<class_NetwJoinRequest_property_username>` does not verify an account.
+The server passes this request to the handler declared with :ref:`Netw.configure_admission()<class_Netw_method_configure_admission>`, after every :ref:`NetwAccountProvider<class_NetwAccountProvider>` has verified. The joining client is not connected until the handler calls :ref:`admit()<class_NetwJoinRequest_method_admit>`, and :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` tells it why it was refused. The player reads the code and the reason in :ref:`NetwSession.join_failed<class_NetwSession_signal_join_failed>` and :ref:`NetwConnection.failed<class_NetwConnection_signal_failed>`. The reason is cut to 255 UTF-8 bytes, and an empty one sends a default sentence that names the code. A handler that finishes without calling either refuses the join with :godot:`@GlobalScope.ERR_UNAUTHORIZED <@GlobalScope#class_@GlobalScope_constant_ERR_UNAUTHORIZED>` and reports an error. The handler may ``await``, and what it returns is ignored. A requested :ref:`username<class_NetwJoinRequest_property_username>` does not verify an account.
 
 
 .. tabs::
 
  .. code-tab:: gdscript
 
-    func admit(request: NetwJoinRequest) -> Error:
-        return OK if request.account else ERR_UNAUTHORIZED
+    func admit(request: NetwJoinRequest) -> void:
+        if request.account:
+            request.admit()
+        else:
+            request.deny()
 
  .. code-tab:: csharp
 
-    private Error Admit(Variant value)
+    void Admit(NetwJoinRequest request)
     {
-        using var request = NetwJoinRequest.From(value);
-        return string.IsNullOrEmpty(request.Account)
-            ? Error.Unauthorized : Error.Ok;
+        if (string.IsNullOrEmpty(request.Account))
+            request.Deny();
+        else
+            request.Admit();
     }
 
 \ 
@@ -59,8 +63,6 @@ Properties
    +---------------------------------------+------------------------------------------------------------------+
    | :godot:`String`                       | :ref:`challenge<class_NetwJoinRequest_property_challenge>`       |
    +---------------------------------------+------------------------------------------------------------------+
-   | :godot:`int`                          | :ref:`peer_id<class_NetwJoinRequest_property_peer_id>`           |
-   +---------------------------------------+------------------------------------------------------------------+
    | :ref:`NetwSession<class_NetwSession>` | :ref:`session<class_NetwJoinRequest_property_session>`           |
    +---------------------------------------+------------------------------------------------------------------+
    | :godot:`StringName`                   | :ref:`username<class_NetwJoinRequest_property_username>`         |
@@ -74,15 +76,15 @@ Methods
 .. table::
    :widths: auto
 
-   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                                                | :ref:`add_account<class_NetwJoinRequest_method_add_account>`\ (\ account\: :godot:`String`, name\: :godot:`String`, answers_challenge\: :godot:`bool` = true\ ) |
-   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`bool`                                         | :ref:`is_bound<class_NetwJoinRequest_method_is_bound>`\ (\ account\: :godot:`String`\ ) |const|                                                                 |
-   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`String`                                       | :ref:`name_of<class_NetwJoinRequest_method_name_of>`\ (\ account\: :godot:`String`\ ) |const|                                                                   |
-   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`refuse<class_NetwJoinRequest_method_refuse>`\ (\ code\: :godot:`Error <@GlobalScope#enum_@globalscope_Error>`, reason\: :godot:`String` = ""\ )           |
-   +-------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   +-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | |void|          | :ref:`add_account<class_NetwJoinRequest_method_add_account>`\ (\ account\: :godot:`String`, name\: :godot:`String`, answers_challenge\: :godot:`bool` = true\ ) |
+   +-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | |void|          | :ref:`admit<class_NetwJoinRequest_method_admit>`\ (\ )                                                                                                          |
+   +-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`bool`   | :ref:`is_bound<class_NetwJoinRequest_method_is_bound>`\ (\ account\: :godot:`String`\ ) |const|                                                                 |
+   +-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`String` | :ref:`name_of<class_NetwJoinRequest_method_name_of>`\ (\ account\: :godot:`String`\ ) |const|                                                                   |
+   +-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -177,22 +179,6 @@ The challenge every :ref:`NetwAccountProvider<class_NetwAccountProvider>` proved
 
 ----
 
-.. _class_NetwJoinRequest_property_peer_id:
-
-.. rst-class:: classref-property
-
-:godot:`int` **peer_id** :ref:`🔗<class_NetwJoinRequest_property_peer_id>`
-
-.. rst-class:: classref-property-setget
-
-- :godot:`int` **get_peer_id**\ (\ )
-
-The joining peer's id.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwJoinRequest_property_session:
 
 .. rst-class:: classref-property
@@ -242,6 +228,18 @@ Adds ``account`` with the display ``name`` to :ref:`accounts<class_NetwJoinReque
 
 ----
 
+.. _class_NetwJoinRequest_method_admit:
+
+.. rst-class:: classref-method
+
+|void| **admit**\ (\ ) :ref:`🔗<class_NetwJoinRequest_method_admit>`
+
+Lets the player join. A :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` on the same request wins over it.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwJoinRequest_method_is_bound:
 
 .. rst-class:: classref-method
@@ -261,18 +259,6 @@ Returns ``true`` when another server of this game could not have passed on the p
 :godot:`String` **name_of**\ (\ account\: :godot:`String`\ ) |const| :ref:`🔗<class_NetwJoinRequest_method_name_of>`
 
 Returns the display name proven with ``account``, or ``""``.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwJoinRequest_method_refuse:
-
-.. rst-class:: classref-method
-
-:godot:`Error <@GlobalScope#enum_@globalscope_Error>` **refuse**\ (\ code\: :godot:`Error <@GlobalScope#enum_@globalscope_Error>`, reason\: :godot:`String` = ""\ ) :ref:`🔗<class_NetwJoinRequest_method_refuse>`
-
-Returns ``code`` for the admission handler to return, and sends ``reason`` to the refused player with it. The player reads both in :ref:`NetwSession.join_failed<class_NetwSession_signal_join_failed>` and :ref:`NetwConnection.failed<class_NetwConnection_signal_failed>`. ``reason`` is sent only when the handler returns this same ``code``, and is cut to 255 UTF-8 bytes. An empty ``reason`` sends a default sentence that names ``code``. Passing :godot:`@GlobalScope.OK <@GlobalScope#class_@GlobalScope_constant_OK>` reports an error and refuses with :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>`.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

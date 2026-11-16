@@ -12,10 +12,11 @@
 		func _prove(challenge: String, _session: NetwSession) -&gt; Variant:
 		    return (PASSCODE + challenge).sha256_text()
 
-		func _verify(request: NetwJoinRequest, proof: Variant) -&gt; Variant:
+		func _verify(request: NetwJoinRequest, proof: Variant) -&gt; void:
 		    if proof is String and proof == (PASSCODE + request.challenge).sha256_text():
 		        request.add_account("club:" + request.username, request.username)
-		    return OK
+		    else:
+		        request.deny("Wrong passcode.")
 		[/codeblock]
 		Proving and verifying count against the join deadline of [method NetwAdmissionConfig.timeout]. [NetwIdToken] is a ready provider for signed tokens.
 	</description>
@@ -32,11 +33,11 @@
 			</description>
 		</method>
 		<method name="_verify" qualifiers="virtual">
-			<return type="Variant" />
+			<return type="void" />
 			<param index="0" name="request" type="NetwJoinRequest" />
 			<param index="1" name="proof" type="Variant" />
 			<description>
-				Runs on the server with what [method _prove] returned. Call [method NetwJoinRequest.add_account] for the account [param proof] proves and return [constant @GlobalScope.OK]. Any other [enum @GlobalScope.Error] refuses the join. It may [code]await[/code] or return a [NetwPromise].
+				Runs on the server with what [method _prove] returned. Call [method NetwJoinRequest.add_account] for the account [param proof] proves. Calling [method NetwRequest.deny] on [param request] refuses the join. It may [code]await[/code].
 			</description>
 		</method>
 	</methods>

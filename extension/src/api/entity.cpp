@@ -6,6 +6,7 @@
 #include "godot/script.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/display.hpp"
+#include "netw/game_call.hpp"
 #include "netw/api/interest.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/persistence.hpp"
@@ -42,8 +43,6 @@ constexpr const char *SIG_DESPAWNED = "despawned";
 constexpr const char *SIG_DESPAWNING = "despawning";
 constexpr const char *SIG_CONTROL_CHANGED = "control_changed";
 constexpr const char *SIG_HIDDEN = "hidden";
-constexpr const char *SIG_CONTROL_REQUESTED = "control_requested";
-constexpr const char *SIG_LIFECYCLE_REQUESTED = "lifecycle_requested";
 constexpr const char *SIG_LIFECYCLE_REFUSED = "lifecycle_refused";
 constexpr const char *SIG_REPARENTED = "reparented";
 
@@ -422,6 +421,60 @@ void NetwEntity::set_route(int64_t p_route) {
 
 RID NetwEntity::get_rid_handle() const {
     return draft != nullptr ? draft->get_handle() : attached;
+}
+
+void NetwEntity::set_control_handler(const Callable &p_handler) {
+    if (p_handler.is_valid()) {
+        game_call_declared(p_handler, game_calls::CONTROL_HANDLER);
+    }
+    control_handler = p_handler;
+}
+
+static void judge_now(
+    NetwMultiplayer *p_session,
+    const Callable &p_handler,
+    const Variant &p_request,
+    const GameCall &p_site
+) {
+    if (!p_handler.is_valid()) {
+        return;
+    }
+    Array args;
+    args.push_back(p_request);
+    const Variant returned = game_call(p_handler, args, p_site);
+    const Object *resumes = gd::live_object(returned);
+    if (resumes != nullptr && resumes->is_class("GDScriptFunctionState")) {
+        fault::raise(
+            p_session,
+            NETW_FAULT_HANDLER_AWAITED,
+            {String("{") + p_site.member + String("}")}
+        );
+    }
+}
+
+void NetwEntity::judge_control(const Variant &p_request) const {
+    judge_now(
+        session_core(),
+        control_handler,
+        p_request,
+        game_calls::CONTROL_HANDLER
+    );
+}
+
+void NetwEntity::set_lifecycle_handler(const Callable &p_handler) {
+    if (p_handler.is_valid()) {
+        game_call_declared(p_handler, game_calls::LIFECYCLE_HANDLER);
+    }
+    lifecycle_handler = p_handler;
+}
+
+void NetwEntity::judge_lifecycle(const Variant &p_request) const {
+    judge_now(
+        session_core(),
+        lifecycle_handler,
+        p_request,
+        game_calls::LIFECYCLE_HANDLER
+    );
 }
 
 NetwEntity::Transfer NetwEntity::get_transfer() const {
@@ -1146,6 +1199,33 @@ void NetwEntity::_bind_methods() {
         "get_rid"
     );
 
+    ClassDB::bind_method(
+        D_METHOD("get_control_handler"),
+        &NetwEntity::get_control_handler
+    );
+    ClassDB::bind_method(
+        D_METHOD("set_control_handler", "handler"),
+        &NetwEntity::set_control_handler
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::CALLABLE, "control_handler"),
+        "set_control_handler",
+        "get_control_handler"
+    );
+    ClassDB::bind_method(
+        D_METHOD("get_lifecycle_handler"),
+        &NetwEntity::get_lifecycle_handler
+    );
+    ClassDB::bind_method(
+        D_METHOD("set_lifecycle_handler", "handler"),
+        &NetwEntity::set_lifecycle_handler
+    );
+    ADD_PROPERTY(
+        PropertyInfo(Variant::CALLABLE, "lifecycle_handler"),
+        "set_lifecycle_handler",
+        "get_lifecycle_handler"
+    );
+
     ClassDB::bind_method(D_METHOD("get_transfer"), &NetwEntity::get_transfer);
     ClassDB::bind_method(
         D_METHOD("set_transfer", "value"),
@@ -1460,26 +1540,6 @@ void NetwEntity::_bind_methods() {
         SIG_CONTROL_CHANGED,
         PropertyInfo(Variant::INT, "previous_peer"),
         PropertyInfo(Variant::INT, "peer")
-    ));
-    ADD_SIGNAL(MethodInfo(
-        SIG_CONTROL_REQUESTED,
-        PropertyInfo(Variant::INT, "peer_id"),
-        PropertyInfo(
-            Variant::OBJECT,
-            "request",
-            PROPERTY_HINT_RESOURCE_TYPE,
-            "NetwControlRequest"
-        )
-    ));
-    ADD_SIGNAL(MethodInfo(
-        SIG_LIFECYCLE_REQUESTED,
-        PropertyInfo(Variant::INT, "peer_id"),
-        PropertyInfo(
-            Variant::OBJECT,
-            "request",
-            PROPERTY_HINT_RESOURCE_TYPE,
-            "NetwLifecycleRequest"
-        )
     ));
     ADD_SIGNAL(MethodInfo(
         SIG_LIFECYCLE_REFUSED,

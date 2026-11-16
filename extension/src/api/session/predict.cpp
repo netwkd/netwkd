@@ -32,6 +32,7 @@
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
+#include "netw/auth_protocol.hpp"
 #include "netw/colliders.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
@@ -1047,7 +1048,7 @@ void NetwMultiplayer::action_receive_carrier(
         fault::raise(
             this,
             NETW_FAULT_RPC_REFUSED,
-            {"{NetwAction.request}",
+            {"{Netw.action}",
              String(p_entity->get_owner()->get_name()),
              "the server or the controller of the entity",
              p_sender},
@@ -1084,24 +1085,36 @@ void NetwMultiplayer::action_receive_carrier(
         body.method,
         body.view_tick,
         Array(carried),
-        body.key,
-        int(body.timing),
         p_sender
     );
 }
 
 void NetwMultiplayer::lagcomp_action_deny(
     int64_t p_requester,
+    const StringName &p_key,
+    Error p_code,
+    const String &p_reason
+) {
+    effect_deny_action(p_requester, p_key, p_code, p_reason);
+    effect_drain();
+}
+
+void NetwMultiplayer::lagcomp_action_confirm(
+    int64_t p_requester,
     const StringName &p_key
 ) {
-    effect_deny_action(p_requester, p_key);
+    const Ref<NetwMultiplayer> keep(this);
+    effect_confirm_action(p_requester, p_key);
     effect_drain();
 }
 
 void NetwMultiplayer::effect_deny_action(
     int64_t p_requester,
-    const StringName &p_key
+    const StringName &p_key,
+    Error p_code,
+    const String &p_reason
 ) {
+    const String reason = auth::capped_reason(p_reason);
     if (action_requester_is_remote(p_requester)) {
         NETW_TRACE(
             sys::PREDICTION,
@@ -1113,7 +1126,9 @@ void NetwMultiplayer::effect_deny_action(
             p_requester,
             0,
             wire::builtin_channel("LAGCOMP_DENY"),
-            session::frame_write(session::DenyKey{p_key}),
+            session::frame_write(
+                session::DenyKey{p_key, int64_t(p_code), reason}
+            ),
             true,
             0,
             String()
@@ -1125,6 +1140,17 @@ void NetwMultiplayer::effect_deny_action(
         "Action %s was refused on this peer, so its effect is undone.",
         String(p_key).utf8().get_data()
     );
+    effect_discard_denied(p_key, p_code, reason);
+}
+
+void NetwMultiplayer::effect_discard_denied(
+    const StringName &p_key,
+    Error p_code,
+    const String &p_reason
+) {
+    if (effects.pending(p_key)) {
+        action_denials[p_key] = ActionDenial{p_code, p_reason};
+    }
     effect_discard(p_key);
 }
 
@@ -1593,16 +1619,6 @@ void NetwMultiplayer::predict_set_input_callback(
 
 namespace {
 
-const GameCall PREDICT_INPUT_CALL
-    = {"NetwPrediction.predict_input",
-       "func(entity: NetwEntity, tick: int) -> Dictionary",
-       2};
-
-const GameCall CORRECTION_PATH_CALL
-    = {"NetwPrediction.correction_path_clear",
-       "func(current: Dictionary, proposed: Dictionary) -> bool",
-       2};
-
 bool refuses_dead_callable(
     const NetwEntity *p_wrapper,
     const Callable &p_value,
@@ -1776,7 +1792,7 @@ void NetwMultiplayer::predict_write_correction_path(
         )) {
         return;
     }
-    game_call_declared(p_callback, CORRECTION_PATH_CALL);
+    game_call_declared(p_callback, game_calls::CORRECTION_PATH_CALL);
     record->predict_declaration().correction_path = p_callback;
 }
 
@@ -1788,7 +1804,7 @@ void NetwMultiplayer::predict_write_input(
     if (record == nullptr) {
         return;
     }
-    game_call_declared(p_callback, PREDICT_INPUT_CALL);
+    game_call_declared(p_callback, game_calls::PREDICT_INPUT_CALL);
     record->predict_declaration().input = p_callback;
 }
 

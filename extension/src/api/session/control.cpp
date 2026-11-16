@@ -5,6 +5,7 @@
 #include "godot/utility.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/auth_protocol.hpp"
 #include "netw/entity/control.hpp"
 #include "netw/entity/stage.hpp"
 #include "netw/fault_book.hpp"
@@ -639,15 +640,26 @@ Ref<NetwPromise> NetwMultiplayer::control_claim(
         return NetwPromise::resolved(Ref<NetwEntity>(p_entity));
     }
     if (control_deciding_locally(p_entity)) {
-        const entity::Control::Outcome outcome
-            = control_decide_request(p_entity, local, 0, hold, p_source_route);
+        Error denied = OK;
+        String reason;
+        const entity::Control::Outcome outcome = control_decide_request(
+            p_entity,
+            local,
+            0,
+            hold,
+            p_source_route,
+            &denied,
+            &reason
+        );
         if (outcome == entity::Control::Outcome::GRANTED) {
             return NetwPromise::resolved(Ref<NetwEntity>(p_entity));
         }
+        const Error ruled = outcome == entity::Control::Outcome::UNAVAILABLE
+            ? ERR_UNAVAILABLE
+            : ERR_UNAUTHORIZED;
         return NetwPromise::rejected(
-            outcome == entity::Control::Outcome::UNAVAILABLE ? ERR_UNAVAILABLE
-                                                             : ERR_UNAUTHORIZED,
-            control_refusal_detail(p_entity, hold)
+            denied != OK ? denied : ruled,
+            !reason.is_empty() ? reason : control_refusal_detail(p_entity, hold)
         );
     }
     NetwMultiplayer *core = p_entity->session_core();
@@ -1137,14 +1149,23 @@ Ref<NetwPromise> NetwMultiplayer::control_take_claim(
 void NetwMultiplayer::control_settle(
     NetwEntity *p_entity,
     uint64_t p_op,
-    entity::Control::Outcome p_outcome
+    entity::Control::Outcome p_outcome,
+    Error p_code,
+    const String &p_reason
 ) {
     const bool was_ahead = p_entity->is_claim_running_ahead();
     entity::Control::Pending taken;
     if (p_entity->control()->take_pending(p_op, taken)) {
         const Ref<NetwPromise> promise = control_take_claim(p_entity, p_op);
         control_follow_claim(p_entity, was_ahead);
-        control_settle_claim(p_entity, promise, taken, p_outcome);
+        control_settle_claim(
+            p_entity,
+            promise,
+            taken,
+            p_outcome,
+            p_code,
+            p_reason
+        );
         return;
     }
     if (p_entity->control()->take_abandoned(p_op)
@@ -1158,7 +1179,9 @@ void NetwMultiplayer::control_settle_claim(
     NetwEntity *p_entity,
     const Ref<NetwPromise> &p_promise,
     const entity::Control::Pending &p_taken,
-    entity::Control::Outcome p_outcome
+    entity::Control::Outcome p_outcome,
+    Error p_code,
+    const String &p_reason
 ) {
     if (p_promise.is_null()) {
         return;
@@ -1171,10 +1194,13 @@ void NetwMultiplayer::control_settle_claim(
         p_promise->resolve(Ref<NetwEntity>(p_entity));
         return;
     }
+    const Error ruled = p_outcome == entity::Control::Outcome::UNAVAILABLE
+        ? ERR_UNAVAILABLE
+        : ERR_UNAUTHORIZED;
     p_promise->reject(
-        p_outcome == entity::Control::Outcome::UNAVAILABLE ? ERR_UNAVAILABLE
-                                                           : ERR_UNAUTHORIZED,
-        control_refusal_detail(p_entity, p_taken.hold)
+        p_code != OK ? p_code : ruled,
+        !p_reason.is_empty() ? p_reason
+                             : control_refusal_detail(p_entity, p_taken.hold)
     );
 }
 
@@ -1282,10 +1308,14 @@ entity::Control::Outcome NetwMultiplayer::control_decide_request(
     int64_t p_requester,
     uint64_t p_op,
     int64_t p_hold,
-    int64_t p_source_route
+    int64_t p_source_route,
+    Error *r_code,
+    String *r_reason
 ) {
     using Outcome = entity::Control::Outcome;
     using Ruling = entity::Control::Ruling;
+    Error denied = OK;
+    String reason;
     const Ruling ruling
         = p_entity->control()->rule(p_requester, p_hold, p_entity->steering());
     Outcome outcome = Outcome::GRANTED;
@@ -1309,7 +1339,13 @@ entity::Control::Outcome NetwMultiplayer::control_decide_request(
     } else if (
         ruling == Ruling::ASK_FILTER
         && p_entity->get_record()
-                ->admit_control_request(p_entity, p_requester, p_hold)
+                ->admit_control_request(
+                    p_entity,
+                    p_requester,
+                    p_hold,
+                    denied,
+                    reason
+                )
             == 0
     ) {
         outcome = Outcome::UNAUTHORIZED;
@@ -1330,7 +1366,11 @@ entity::Control::Outcome NetwMultiplayer::control_decide_request(
     if (outcome == Outcome::GRANTED) {
         control_decide(p_entity, p_requester, p_hold, p_requester, p_op);
     } else {
-        control_refuse(p_entity, p_requester, p_op, outcome);
+        control_refuse(p_entity, p_requester, p_op, outcome, denied, reason);
+    }
+    if (r_code != nullptr && r_reason != nullptr) {
+        *r_code = denied;
+        *r_reason = reason;
     }
     return outcome;
 }
@@ -1368,7 +1408,9 @@ void NetwMultiplayer::control_refuse(
     NetwEntity *p_entity,
     int64_t p_requester,
     uint64_t p_op,
-    entity::Control::Outcome p_outcome
+    entity::Control::Outcome p_outcome,
+    Error p_code,
+    const String &p_reason
 ) {
     NetwMultiplayer *core = p_entity->session_core();
     ReplicationCore *plane
@@ -1382,6 +1424,8 @@ void NetwMultiplayer::control_refuse(
     reply.hold = uint8_t(p_entity->control()->hold);
     reply.op = p_op;
     reply.outcome = uint8_t(p_outcome);
+    reply.code = uint64_t(p_code);
+    reply.reason = auth::capped_reason(p_reason);
     reply.kept = core != nullptr
         && core->player_kept_despawns(p_entity->get_rid_handle().get_id());
     plane->reply_control(p_entity, reply, p_requester);
@@ -1546,7 +1590,9 @@ void NetwMultiplayer::control_handle_apply(
         control_settle(
             p_entity,
             p_applied.op,
-            entity::Control::Outcome(p_applied.outcome)
+            entity::Control::Outcome(p_applied.outcome),
+            Error(int(p_applied.code)),
+            p_applied.reason
         );
     }
 }

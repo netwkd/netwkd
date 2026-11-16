@@ -60,7 +60,7 @@ class Shown extends Node3D:
 	func slide() -> void:
 		position.x += 0.05
 		point.rpc(position.x)
-		Netw.emit_entity_signal(aimed, position.x)
+		Netw.emit(aimed, position.x)
 
 	func hop() -> void:
 		position.x += 50.0

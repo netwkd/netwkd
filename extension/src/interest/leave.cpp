@@ -12,11 +12,6 @@ using PerPeer = Leave::PerPeer;
 
 namespace {
 
-const GameCall LEAVE_POLICY_CUSTOM
-    = {"The NetwInterest.on_leave_policy custom_callback",
-       "func(peer_id: int, layer_id: StringName)",
-       2};
-
 const StringName &hide_key() {
     static const StringName key("hide");
     return key;
@@ -180,7 +175,7 @@ void Leave::commit(
         Array args;
         args.push_back(peer);
         args.push_back(action[1]);
-        game_call(callback, args, LEAVE_POLICY_CUSTOM);
+        game_call(callback, args, game_calls::LEAVE_POLICY_CUSTOM);
     }
 }
 

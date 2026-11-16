@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="NetwRequest" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Something a peer asked the server for, which the server can deny.
+	</brief_description>
+	<description>
+		The server hands a game one of [NetwJoinRequest], [NetwActionRequest], [NetwControlRequest] or [NetwLifecycleRequest]. Each one has the [member peer_id] of the peer that asked, and [method deny] records the [member code] and [member reason] the peer that asked receives.
+		[codeblock]
+		func judge(request: NetwRequest) -&gt; void:
+		    if banned.has(request.peer_id):
+		        request.deny("You are banned.", ERR_UNAUTHORIZED)
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="deny">
+			<return type="void" />
+			<param index="0" name="reason" type="String" default="&quot;&quot;" />
+			<param index="1" name="code" type="int" enum="Error" default="4" />
+			<description>
+				Refuses the request and records [param reason] and [param code] for the peer that asked. Only the first call counts. A [param code] of [constant @GlobalScope.OK] is an error and denies nothing.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="code" type="int" setter="" getter="get_code" enum="Error">
+			The code [method deny] was given, or [constant @GlobalScope.OK] while the request is not denied.
+		</member>
+		<member name="peer_id" type="int" setter="" getter="get_peer_id">
+			The peer that asked.
+		</member>
+		<member name="reason" type="String" setter="" getter="get_reason">
+			The reason [method deny] was given, empty while the request is not denied.
+		</member>
+	</members>
+</class>

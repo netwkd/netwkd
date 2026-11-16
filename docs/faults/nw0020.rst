@@ -13,14 +13,18 @@ refusal.
 
 .. code-block:: gdscript
 
-    func admit(request: NetwJoinRequest) -> Error:
-        return OK if invited.has(request.peer_id) else ERR_UNAUTHORIZED
+    func admit(request: NetwJoinRequest) -> void:
+        if invited.has(request.peer_id):
+            request.admit()
+        else:
+            request.deny()
 
 Admit peer 1 in the handler.
 
 .. code-block:: gdscript
 
-    func admit(request: NetwJoinRequest) -> Error:
-        if request.peer_id == 1:
-            return OK
-        return OK if is_invited(request) else ERR_UNAUTHORIZED
+    func admit(request: NetwJoinRequest) -> void:
+        if request.peer_id == 1 or invited.has(request.peer_id):
+            request.admit()
+        else:
+            request.deny()

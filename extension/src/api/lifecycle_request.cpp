@@ -16,7 +16,7 @@ Ref<NetwLifecycleRequest> NetwLifecycleRequest::create(
     Ref<NetwLifecycleRequest> made;
     made.instantiate();
     made->kind = Kind(int(p_kind));
-    made->requester = p_requester;
+    made->peer_id = p_requester;
     made->entity = p_entity;
     made->destination = p_destination != nullptr
         ? gd::instance_id(p_destination)
@@ -24,30 +24,11 @@ Ref<NetwLifecycleRequest> NetwLifecycleRequest::create(
     return made;
 }
 
-void NetwLifecycleRequest::deny(const String &p_reason) {
-    if (denied) {
-        return;
-    }
-    denied = true;
-    reason = p_reason;
-}
-
-void NetwLifecycleRequest::set_denied(bool p_denied) {
-    if (p_denied) {
-        deny(String());
-    }
-}
-
 Node *NetwLifecycleRequest::get_destination() const {
     return Object::cast_to<Node>(gd::object_of(destination));
 }
 
 void NetwLifecycleRequest::_bind_methods() {
-    ClassDB::bind_method(
-        D_METHOD("deny", "reason"),
-        &NetwLifecycleRequest::deny,
-        DEFVAL(String())
-    );
     ClassDB::bind_method(D_METHOD("get_kind"), &NetwLifecycleRequest::get_kind);
     ADD_PROPERTY(
         PropertyInfo(
@@ -60,15 +41,6 @@ void NetwLifecycleRequest::_bind_methods() {
         ),
         String(),
         "get_kind"
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_requester"),
-        &NetwLifecycleRequest::get_requester
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::INT, "requester"),
-        String(),
-        "get_requester"
     );
     ClassDB::bind_method(
         D_METHOD("get_entity"),
@@ -99,28 +71,6 @@ void NetwLifecycleRequest::_bind_methods() {
         ),
         String(),
         "get_destination"
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_denied"),
-        &NetwLifecycleRequest::get_denied
-    );
-    ClassDB::bind_method(
-        D_METHOD("set_denied", "denied"),
-        &NetwLifecycleRequest::set_denied
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::BOOL, "denied"),
-        "set_denied",
-        "get_denied"
-    );
-    ClassDB::bind_method(
-        D_METHOD("get_reason"),
-        &NetwLifecycleRequest::get_reason
-    );
-    ADD_PROPERTY(
-        PropertyInfo(Variant::STRING, "reason"),
-        String(),
-        "get_reason"
     );
     BIND_ENUM_CONSTANT(KIND_SPAWN);
     BIND_ENUM_CONSTANT(KIND_DESPAWN);

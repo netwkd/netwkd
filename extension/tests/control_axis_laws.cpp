@@ -75,10 +75,10 @@ Array one_type() {
     return out;
 }
 
-void deny_every_request(int64_t, Object *p_request) {
+void deny_every_request(Object *p_request) {
     NetwControlRequest *asked = Object::cast_to<NetwControlRequest>(p_request);
     if (asked != nullptr) {
-        asked->deny();
+        asked->deny("hands full", ERR_BUSY);
     }
 }
 
@@ -174,23 +174,18 @@ TEST_CASE(
     NETW_CHECK_EQ(host->get_controller(), represented);
 
     host->set_transfer(NetwEntity::TRANSFER_REQUESTABLE);
-    host->connect(
-        StringName("control_requested"),
-        callable_mp_static(&deny_every_request)
-    );
+    host->set_control_handler(callable_mp_static(&deny_every_request));
 
     const Ref<NetwPromise> denied = entity_at(rig, route, 1)->claim_control();
     rig.pump(10);
 
     CHECK(denied->get_is_failed());
-    NETW_CHECK_EQ(denied->get_code(), ERR_UNAUTHORIZED);
+    NETW_CHECK_EQ(denied->get_code(), ERR_BUSY);
+    CHECK(denied->get_detail() == String("hands full"));
     NETW_CHECK_EQ(host->get_controller(), represented);
     NETW_CHECK_EQ(rig.route_node(route, -1)->get_multiplayer_authority(), 1);
 
-    host->disconnect(
-        StringName("control_requested"),
-        callable_mp_static(&deny_every_request)
-    );
+    host->set_control_handler(Callable());
     host->set_transfer(NetwEntity::TRANSFER_FIXED);
 
     const Ref<NetwPromise> fixed = entity_at(rig, route, 1)->claim_control();
@@ -346,10 +341,7 @@ TEST_CASE(
     CallLog log;
     entity_at(rig, route, 0)
         ->connect(StringName("control_changed"), log.callable("changed"));
-    host->connect(
-        StringName("control_requested"),
-        callable_mp_static(&deny_every_request)
-    );
+    host->set_control_handler(callable_mp_static(&deny_every_request));
     const Ref<NetwPromise> tightened
         = entity_at(rig, route, 0)->claim_control(Control::HOLD_EXCLUSIVE);
     rig.pump(10);
@@ -364,10 +356,7 @@ TEST_CASE(
         tenure
     );
     NETW_CHECK_EQ(log.count("changed"), 0);
-    host->disconnect(
-        StringName("control_requested"),
-        callable_mp_static(&deny_every_request)
-    );
+    host->set_control_handler(Callable());
 }
 
 TEST_CASE(

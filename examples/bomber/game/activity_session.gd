@@ -16,5 +16,8 @@ func _ready() -> void:
 	$LobbyProviders/WebTorrentLobbyDirectory.free()
 
 
-func admit(request: NetwJoinRequest) -> Error:
-	return OK if request.account.begins_with("discord:") else ERR_UNAUTHORIZED
+func admit(request: NetwJoinRequest) -> void:
+	if request.account.begins_with("discord:"):
+		request.admit()
+	else:
+		request.deny()

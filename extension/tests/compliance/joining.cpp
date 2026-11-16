@@ -18,10 +18,10 @@ func _init() -> void:
 	Netw.configure_admission(admit)
 
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	if request.username != &"":
 		request.account = "test:" + request.username
-	return OK
+	request.admit()
 )";
 
 constexpr int WATCHER = 0;

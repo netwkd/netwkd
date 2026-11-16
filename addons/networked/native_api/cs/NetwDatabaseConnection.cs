@@ -49,4 +49,22 @@ public sealed class NetwDatabaseConnection : NetwRefCounted
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
+
+    /// <summary>
+    /// Makes a <see cref="NetwDatabaseConnection"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_read</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwDatabaseConnection",
+            "_read",
+            "_scan",
+            "_write_batch",
+            "_close");
+    }
 }

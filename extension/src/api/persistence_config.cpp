@@ -102,11 +102,11 @@ void NetwPersistenceConfig::_bind_methods() {
         &NetwPersistenceConfig::storage_version
     );
     ClassDB::bind_method(
-        D_METHOD("migrate", "from_version", "step"),
+        D_METHOD("migrate", "from_version", "handler"),
         &NetwPersistenceConfig::migrate
     );
     ClassDB::bind_method(
-        D_METHOD("record_id", "provider"),
+        D_METHOD("record_id", "handler"),
         &NetwPersistenceConfig::record_id
     );
     ClassDB::bind_method(

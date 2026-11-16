@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="NetwActionConfig" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		How one action a node declared is predicted, and when the server runs it.
+	</brief_description>
+	<description>
+		Every peer declares the action in [code]_init[/code] on the root node of a [NetwEntity], and each node keeps its own settings.
+		[codeblock]
+		func _init() -&gt; void:
+		    Netw.configure_action(place_bomb) \
+		            .predict(ghost_bomb) \
+		            .timing(NetwActionConfig.TIMING_TICK_ALIGNED_STATE_READY)
+		[/codeblock]
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="confirm">
+			<return type="NetwActionConfig" />
+			<param index="0" name="handler" type="Callable" />
+			<description>
+				Sets the method that runs on the peer that asked once the server ran the action. It receives the [Node] the [method predict] handler returned, or [code]null[/code]. With no handler set, that node is freed.
+				[codeblock]
+				func keep_bomb(ghost: Node) -&gt; void:
+				[/codeblock]
+			</description>
+		</method>
+		<method name="predict">
+			<return type="NetwActionConfig" />
+			<param index="0" name="handler" type="Callable" />
+			<description>
+				Sets the method that runs on the peer that asked, inside [method Netw.action], with the action's arguments. It shows the action at once and returns a [Node], usually a placeholder, or [code]null[/code].
+				[codeblock]
+				func ghost_bomb(pos: Vector2) -&gt; Node:
+				[/codeblock]
+			</description>
+		</method>
+		<method name="revert">
+			<return type="NetwActionConfig" />
+			<param index="0" name="handler" type="Callable" />
+			<description>
+				Sets the method that runs on the peer that asked once the server denied the action or did not answer in time. It receives the [Node] the [method predict] handler returned, or [code]null[/code], with the code and the reason of [method NetwRequest.deny]. An action the server did not answer gives [constant @GlobalScope.ERR_TIMEOUT] and an empty reason. With no handler set, that node is freed.
+				[codeblock]
+				func remove_bomb(ghost: Node, code: Error, reason: String) -&gt; void:
+				[/codeblock]
+			</description>
+		</method>
+		<method name="timeout_ticks">
+			<return type="NetwActionConfig" />
+			<param index="0" name="ticks" type="int" />
+			<description>
+				Sets how many ticks a request waits for the server's answer, where [code]0[/code] waits 120 ticks.
+			</description>
+		</method>
+		<method name="timing">
+			<return type="NetwActionConfig" />
+			<param index="0" name="mode" type="int" enum="NetwActionConfig.Timing" />
+			<description>
+				Sets when the server runs the action, which is [constant TIMING_IMMEDIATE] until set.
+			</description>
+		</method>
+	</methods>
+	<constants>
+		<constant name="TIMING_TICK_ALIGNED" value="0" enum="Timing">
+			Runs on the server when its tick reaches [member NetwActionRequest.view_tick].
+		</constant>
+		<constant name="TIMING_TICK_ALIGNED_STATE_READY" value="1" enum="Timing">
+			Runs on the server once it has recorded the requesting entity's state at [member NetwActionRequest.view_tick], so the action sees the state the client saw.
+		</constant>
+		<constant name="TIMING_IMMEDIATE" value="2" enum="Timing">
+			Runs as soon as the request reaches the server.
+		</constant>
+	</constants>
+</class>

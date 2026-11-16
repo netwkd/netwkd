@@ -1278,7 +1278,7 @@ void SyncPipeline::send_signal(
         fault::raise(
             plane,
             NETW_FAULT_UNKNOWN_NAME,
-            {String("{Netw.emit_entity_signal}"),
+            {String("{Netw.emit}"),
              String(p_node->get_name()),
              String(p_signal)},
             uint64_t(gd::instance_id(p_node))
@@ -1303,7 +1303,7 @@ void SyncPipeline::send_signal(
             fault::raise(
                 plane,
                 NETW_FAULT_UNKNOWN_NAME,
-                {String("{Netw.emit_entity_signal}"),
+                {String("{Netw.emit}"),
                  String(p_node->get_name()),
                  String(p_signal)},
                 uint64_t(gd::instance_id(p_node))

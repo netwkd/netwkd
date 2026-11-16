@@ -239,12 +239,32 @@ public sealed partial class NetwPromise : NetwRefCounted
         NetwApi.MethodBind("NetwPromise", "then", 4104835065UL);
 
     /// <summary>
-    /// Calls <paramref name="cb"/> with <see cref="NetwPromise.Result"/> when
-    /// the promise completes. Returns the promise.
+    /// Calls <paramref name="callback"/> with <see cref="NetwPromise.Result"/>
+    /// when the promise completes. Returns the promise.
+    /// <code>
+    /// func show_receipt(receipt: Dictionary) -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwPromise Then(Callable cb)
+    public NetwPromise Then(Action<Variant> callback)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(cb);
+        Callable bridged0 = default;
+        if (callback != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    callback(a0);
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwPromise.Then", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(callback, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindThen, Checked, in slot0, ref answered);
         slot0.Dispose();
@@ -260,12 +280,33 @@ public sealed partial class NetwPromise : NetwRefCounted
         NetwApi.MethodBind("NetwPromise", "catch_error", 4104835065UL);
 
     /// <summary>
-    /// Calls <paramref name="cb"/> as <c>cb(code, detail)</c> when the promise
-    /// fails. Returns the promise.
+    /// Calls <paramref name="callback"/> with <see cref="NetwPromise.Code"/>
+    /// and <see cref="NetwPromise.Detail"/> when the promise fails. Returns the
+    /// promise.
+    /// <code>
+    /// func show_error(code: Error, detail: String) -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwPromise CatchError(Callable cb)
+    public NetwPromise CatchError(Action<Error, string> callback)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(cb);
+        Callable bridged0 = default;
+        if (callback != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    callback((Error)a0.AsInt64(), a1.As<string>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwPromise.CatchError", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(callback, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindCatchError, Checked, in slot0, ref answered);
         slot0.Dispose();
@@ -281,15 +322,32 @@ public sealed partial class NetwPromise : NetwRefCounted
         NetwApi.MethodBind("NetwPromise", "when_settled", 4104835065UL);
 
     /// <summary>
-    /// Calls <paramref name="cb"/> with no arguments when the promise settles,
-    /// whether it completed or failed. Returns the promise.
+    /// Calls <paramref name="callback"/> with no arguments when the promise
+    /// settles, whether it completed or failed. Returns the promise.
     /// <code>
     /// operation.when_settled(func() -&gt; void: reply(operation.code))
     /// </code>
     /// </summary>
-    public NetwPromise WhenSettled(Callable cb)
+    public NetwPromise WhenSettled(Action callback)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(cb);
+        Callable bridged0 = default;
+        if (callback != null)
+        {
+            var bridge0 = () =>
+            {
+                try
+                {
+                    callback();
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwPromise.WhenSettled", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(callback, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindWhenSettled, Checked, in slot0, ref answered);
         slot0.Dispose();

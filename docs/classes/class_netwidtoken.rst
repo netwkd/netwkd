@@ -39,8 +39,11 @@ The token's nonce names a key the joining peer keeps, and that key signs each se
     func fetch_token(nonce: String) -> NetwPromise:
         return backend.request_join_token(nonce)
 
-    func admit(request: NetwJoinRequest) -> Error:
-        return OK if request.account else ERR_UNAUTHORIZED
+    func admit(request: NetwJoinRequest) -> void:
+        if request.account:
+            request.admit()
+        else:
+            request.deny()
 
 .. rst-class:: classref-reftable-group
 
@@ -77,7 +80,7 @@ Methods
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                | :ref:`hold<class_NetwIdToken_method_hold>`\ (\ issuer\: :godot:`String`, token\: :godot:`String`, key\: :godot:`CryptoKey`\ ) |static| |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                                | :ref:`provide<class_NetwIdToken_method_provide>`\ (\ issuer\: :godot:`String`, fetch\: :godot:`Callable`\ ) |static|                   |
+   | |void|                                | :ref:`provide<class_NetwIdToken_method_provide>`\ (\ issuer\: :godot:`String`, handler\: :godot:`Callable`\ ) |static|                 |
    +---------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -224,9 +227,13 @@ Gives the joining peer a ``token`` for ``issuer``. The token's nonce must name t
 
 .. rst-class:: classref-method
 
-|void| **provide**\ (\ issuer\: :godot:`String`, fetch\: :godot:`Callable`\ ) |static| :ref:`🔗<class_NetwIdToken_method_provide>`
+|void| **provide**\ (\ issuer\: :godot:`String`, handler\: :godot:`Callable`\ ) |static| :ref:`🔗<class_NetwIdToken_method_provide>`
 
-Sets where the joining peer gets tokens for ``issuer``. ``fetch`` takes the nonce the token must carry and returns a :ref:`NetwPromise<class_NetwPromise>` of the token. A later call for the same issuer replaces it, and an empty :godot:`Callable` removes it.
+Sets where the joining peer gets tokens for ``issuer``. ``handler`` takes the nonce the token must carry and returns a :ref:`NetwPromise<class_NetwPromise>` of the token. A later call for the same issuer replaces it, and an empty :godot:`Callable` removes it.
+
+::
+
+    func fetch_token(nonce: String) -> NetwPromise:
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

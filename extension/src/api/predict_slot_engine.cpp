@@ -36,12 +36,6 @@ using repl::PropertyBindingPtr;
 
 namespace {
 
-const GameCall SIMULATION_STEP
-    = {"NetwSimulation.network_process",
-       "func _network_process(delta: float, tick: int, is_fresh: bool) "
-       "-> void",
-       3};
-
 constexpr int ARRIVAL_BUCKET_MAX = NetwPredictStats::ARRIVAL_BUCKETS - 1;
 constexpr int REPLAY_DEPTH_BUCKET_MAX
     = NetwPredictStats::REPLAY_DEPTH_BUCKETS - 1;
@@ -2321,7 +2315,7 @@ void NetwPredictSlotEngine::run_command(
         arguments.push_back(p_delta);
         arguments.push_back(p_tick);
         arguments.push_back(p_fresh);
-        game_call(step, arguments, SIMULATION_STEP);
+        game_call(step, arguments, game_calls::SIMULATION_STEP);
     } else {
         NETW_TRACE(sys::PREDICTION, "Tick %d has no step to run.", int(p_tick));
     }

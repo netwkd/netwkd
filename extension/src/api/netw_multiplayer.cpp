@@ -3471,14 +3471,10 @@ void NetwMultiplayer::auth_receive_game(
         disconnect_peer(p_peer);
         return;
     }
-    static const GameCall AUTH_CALLBACK
-        = {"NetwMultiplayer.auth_callback",
-           "func(peer_id: int, data: PackedByteArray)",
-           2};
     Array args;
     args.push_back(p_peer);
     args.push_back(auth::payload_of(p_data));
-    game_call(auth_app_callback, args, AUTH_CALLBACK);
+    game_call(auth_app_callback, args, game_calls::AUTH_CALLBACK);
 }
 
 void NetwMultiplayer::auth_receive_join(
@@ -3813,24 +3809,10 @@ PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
         r_answered = false;
         return PackedByteArray();
     }
-    bool called = false;
-    const Variant answered
-        = gd::call_checked(declared.callable, Variant(base), called);
-    const Ref<NetwServerInfo> info
-        = Ref<NetwServerInfo>(Object::cast_to<NetwServerInfo>(answered));
-    if (!called || info.is_null()) {
-        fault::raise(
-            this,
-            NETW_FAULT_BAD_RETURN,
-            {"the {Netw.configure_server_info} handler",
-             called ? String(Variant::get_type_name(answered.get_type()))
-                    : String("nothing, because the call itself failed"),
-             "the {NetwServerInfo} it is given, edited"}
-        );
-        r_answered = false;
-        return PackedByteArray();
-    }
-    return NetwServerInfo::to_payload(info);
+    Array args;
+    args.push_back(base);
+    game_call(declared.callable, args, game_calls::SERVER_INFO_HANDLER);
+    return NetwServerInfo::to_payload(base);
 }
 
 void NetwMultiplayer::session_answer_probe(int64_t p_peer) {
@@ -5858,12 +5840,8 @@ int64_t NetwMultiplayer::action_gate_count() const {
 
 Node *NetwMultiplayer::session_get_root() const {
     if (session_root_reader.is_valid()) {
-        static const GameCall ROOT_READER
-            = {"The NetwMultiplayer.session_set_root reader",
-               "func() -> Node",
-               0};
         const Variant answered
-            = game_call(session_root_reader, Array(), ROOT_READER);
+            = game_call(session_root_reader, Array(), game_calls::ROOT_READER);
         Node *declared = Object::cast_to<Node>(gd::live_object(answered));
         if (declared != nullptr) {
             session_root_last_live = gd::instance_id(declared);
@@ -6841,7 +6819,11 @@ void NetwMultiplayer::handle_deny(
     if (p_sender != SERVER_PEER || !session::frame_read(p_payload, denied)) {
         return;
     }
-    effect_discard(denied.key);
+    effect_discard_denied(
+        denied.key,
+        denied.code == OK ? ERR_UNAUTHORIZED : Error(denied.code),
+        denied.reason
+    );
 }
 
 void NetwMultiplayer::handle_confirm(

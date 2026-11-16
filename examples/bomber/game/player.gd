@@ -33,7 +33,6 @@ var pressed := {
 @onready var label: Label = %label
 
 @onready var entity := NetwEntity.of(self)
-@onready var bomb_action := Netw.action(_place_bomb)
 @onready var session: NetwSession = Netw.session(self)
 @onready var clock: NetwClock = session.clock
 @onready var gamestate: BomberGamestate = \
@@ -63,17 +62,14 @@ func _init() -> void:
 				NetwQuantizeScalar.new().limits(-VELOCITY_LIMIT, VELOCITY_LIMIT),
 			) \
 			.unchecked()
+	Netw.configure_action(place_bomb) \
+			.predict(ghost_bomb) \
+			.timing(NetwActionConfig.TIMING_TICK_ALIGNED_STATE_READY)
 
 
 func _ready() -> void:
 	clock.before_tick.connect(gather_input)
 	stunned = false
-	bomb_action.timing_mode = NetwAction.TIMING_TICK_ALIGNED_STATE_READY
-	bomb_action.predict = func() -> Node:
-		var ghost := GHOST_BOMB.instantiate()
-		ghost.position = position
-		add_sibling(ghost)
-		return ghost
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -98,7 +94,7 @@ func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
 	last_bomb_time += delta
 	if is_fresh and entity.is_controlled_locally \
 			and not stunned and bombing and last_bomb_time >= BOMB_RATE:
-		bomb_action.request(tick, position)
+		Netw.action(place_bomb, tick, position)
 		if not multiplayer or not multiplayer.is_server():
 			last_bomb_time = 0.0
 
@@ -113,25 +109,32 @@ func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
 	velocity /= factor
 
 
-func _place_bomb(action_context: NetwActionContext, pos: Vector2) -> void:
+func ghost_bomb(pos: Vector2) -> Node:
+	var ghost := GHOST_BOMB.instantiate()
+	ghost.position = pos
+	add_sibling(ghost)
+	return ghost
+
+
+func place_bomb(request: NetwActionRequest, pos: Vector2) -> void:
 	if not multiplayer or not multiplayer.is_server():
 		return
 	if last_bomb_time < BOMB_RATE:
-		action_context.deny()
+		request.deny()
 		return
-	var past := Netw.sample(entity, action_context.view_tick)
+	var past := Netw.sample(entity, request.view_tick)
 	if not past.has_value(&"position"):
-		action_context.deny()
+		request.deny()
 		return
 	var past_position := past.get_value(&"position") as Vector2
 	if past_position.distance_to(pos) > BOMB_CELL_TOLERANCE:
-		action_context.deny()
+		request.deny()
 		return
 	last_bomb_time = 0.0
 	var real := BOMB.instantiate() as Area2D
 	real.position = pos
 	real.from_player = entity.peer_id
-	action_context.bind(real)
+	request.bind(real)
 	entity.scene.root.get_node(^"Bombs").add_child(real)
 
 

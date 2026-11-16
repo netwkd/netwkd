@@ -1,0 +1,37 @@
+:github_url: hide
+
+.. _fault_nw1043:
+
+NW1043. A control or lifecycle handler awaited
+==============================================
+
+Reported as an error when
+:ref:`NetwEntity.control_handler <class_NetwEntity_property_control_handler>`
+or
+:ref:`NetwEntity.lifecycle_handler <class_NetwEntity_property_lifecycle_handler>`
+awaits. The server judges the request inside the call that read it, so
+the request stands as it was at the first ``await``. A request not yet
+denied is granted.
+
+The handler waits before it denies.
+
+.. code-block:: gdscript
+
+    func judge_claim(request: NetwControlRequest) -> void:
+        var allowed: bool = await inventory.has_room(request.peer_id)
+        if not allowed:
+            request.deny("hands full")
+
+Decide from what the server already holds.
+
+.. code-block:: gdscript
+
+    func judge_claim(request: NetwControlRequest) -> void:
+        if not room_for.get(request.peer_id, false):
+            request.deny("hands full")
+
+The handlers of
+:ref:`Netw.configure_admission <class_Netw_method_configure_admission>`
+and
+:ref:`Netw.configure_action <class_Netw_method_configure_action>` may
+await, because the peer that asked already waits for them.

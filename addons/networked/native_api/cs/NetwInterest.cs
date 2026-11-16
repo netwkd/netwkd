@@ -219,15 +219,38 @@ public sealed class NetwInterest : NetwRefCounted
         NetwApi.MethodBind("NetwInterest", "on_enter", 3040490050UL);
 
     /// <summary>
-    /// Calls <paramref name="callback"/> as <c>callback(layer_id, peer_id)</c>
-    /// when <paramref name="layerId"/> shows the entity to a peer, once that
-    /// peer also sees the <see cref="NetwEntity"/> above it. An empty
-    /// <paramref name="layerId"/> means every layer joined so far.
+    /// Calls <paramref name="handler"/> when <paramref name="layerId"/> shows
+    /// the entity to a peer, once that peer also sees the
+    /// <see cref="NetwEntity"/> above it. An empty <paramref name="layerId"/>
+    /// means every layer joined so far.
+    /// <code>
+    /// func _on_interest_enter(layer_id: StringName, peer_id: int) -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwInterest OnEnter(Callable callback, StringName layerId = null)
+    public NetwInterest OnEnter(
+        Action<StringName,
+        long> handler,
+        StringName layerId = null)
     {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    handler(a0.As<StringName>(), a1.As<long>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwInterest.OnEnter", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
         layerId ??= new StringName("");
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
         godot_variant answered = default;
         NetwThunks.Call2(
@@ -250,15 +273,38 @@ public sealed class NetwInterest : NetwRefCounted
         NetwApi.MethodBind("NetwInterest", "on_leave", 3040490050UL);
 
     /// <summary>
-    /// Calls <paramref name="callback"/> as <c>callback(layer_id, peer_id)</c>
-    /// when <paramref name="layerId"/> stops showing the entity to a peer, also
-    /// when that peer stops seeing the <see cref="NetwEntity"/> above it. An
-    /// empty <paramref name="layerId"/> means every layer joined so far.
+    /// Calls <paramref name="handler"/> when <paramref name="layerId"/> stops
+    /// showing the entity to a peer, also when that peer stops seeing the
+    /// <see cref="NetwEntity"/> above it. An empty <paramref name="layerId"/>
+    /// means every layer joined so far.
+    /// <code>
+    /// func _on_interest_leave(layer_id: StringName, peer_id: int) -&gt; void:
+    /// </code>
     /// </summary>
-    public NetwInterest OnLeave(Callable callback, StringName layerId = null)
+    public NetwInterest OnLeave(
+        Action<StringName,
+        long> handler,
+        StringName layerId = null)
     {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    handler(a0.As<StringName>(), a1.As<long>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwInterest.OnLeave", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
         layerId ??= new StringName("");
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callback);
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant slot1 = VariantUtils.CreateFromStringName(layerId);
         godot_variant answered = default;
         NetwThunks.Call2(
@@ -284,17 +330,37 @@ public sealed class NetwInterest : NetwRefCounted
     /// Sets what happens to a peer's copy when it stops seeing the entity
     /// through <paramref name="layerId"/>.
     /// <see cref="NetwInterestLayer.LeavePolicy.Custom"/> requires
-    /// <paramref name="customCallback"/>, called on the server as
-    /// <c>custom_callback(peer_id, layer_id)</c>.
+    /// <paramref name="handler"/>, called on the server.
+    /// <code>
+    /// func fade_out(peer_id: int, layer_id: StringName) -&gt; void:
+    /// </code>
     /// </summary>
     public NetwInterest OnLeavePolicy(
         StringName layerId,
         NetwInterestLayer.LeavePolicy policy,
-        Callable customCallback = default)
+        Action<long,
+        StringName> handler = null)
     {
+        Callable bridged2 = default;
+        if (handler != null)
+        {
+            var bridge2 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    handler(a0.As<long>(), a1.As<StringName>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwInterest.OnLeavePolicy", thrown);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(handler, bridge2, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromStringName(layerId);
         godot_variant slot1 = VariantUtils.CreateFromInt((long)policy);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(customCallback);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindOnLeavePolicy,
@@ -324,17 +390,41 @@ public sealed class NetwInterest : NetwRefCounted
     /// Sets whether this peer keeps showing the entity when it stops seeing it
     /// through <paramref name="layerId"/>.
     /// <see cref="NetwInterestLayer.PerceptionPolicy.Custom"/> requires
-    /// <paramref name="customCallback"/>, called as <c>custom_callback(visible,
-    /// peer_id, layer_id)</c>.
+    /// <paramref name="handler"/>.
+    /// <code>
+    /// func show_ghost(visible: bool, peer_id: int, layer_id: StringName) -&gt; void:
+    /// </code>
     /// </summary>
     public NetwInterest OnPerceptionPolicy(
         StringName layerId,
         NetwInterestLayer.PerceptionPolicy policy,
-        Callable customCallback = default)
+        Action<bool,
+        long,
+        StringName> handler = null)
     {
+        Callable bridged2 = default;
+        if (handler != null)
+        {
+            var bridge2 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    handler(a0.As<bool>(), a1.As<long>(), a2.As<StringName>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwInterest.OnPerceptionPolicy", thrown);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(handler, bridge2, owner => owner.NetwHold));
+        }
         godot_variant slot0 = VariantUtils.CreateFromStringName(layerId);
         godot_variant slot1 = VariantUtils.CreateFromInt((long)policy);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(customCallback);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindOnPerceptionPolicy,

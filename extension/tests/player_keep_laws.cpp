@@ -39,9 +39,9 @@ constexpr const char *SPAWNER_ID = "kept_spawner";
 
 constexpr const char *ACCOUNT_GATE = R"(extends Node
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	request.account = "test:" + request.username
-	return OK
+	request.admit()
 )";
 
 constexpr const char *SPAWNER_SOURCE = R"(extends Node

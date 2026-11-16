@@ -19,9 +19,8 @@ class AnotherGame:
 		Netw.configure_server_info(answer)
 
 
-	func answer(info: NetwServerInfo) -> NetwServerInfo:
+	func answer(info: NetwServerInfo) -> void:
 		info.app_id = &"another-game"
-		return info
 
 
 class SmallServer:
@@ -34,9 +33,8 @@ class SmallServer:
 		Netw.configure_server_info(answer)
 
 
-	func answer(info: NetwServerInfo) -> NetwServerInfo:
+	func answer(info: NetwServerInfo) -> void:
 		info.max_players = max_players
-		return info
 
 
 class TeamGame:

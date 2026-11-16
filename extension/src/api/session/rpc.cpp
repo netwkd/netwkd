@@ -93,23 +93,6 @@ PackedByteArray call_frame(
     return stream.to_bytes();
 }
 
-const GameCall CHANNEL_HANDLER
-    = {"The NetwMultiplayer.rpc_channel_register handler",
-       "func(entity: RID, payload: PackedByteArray, sender: int)",
-       3};
-const GameCall NETW_CHANNEL_HANDLER
-    = {"The NetwChannel.register handler",
-       "func(sender: int, payload: PackedByteArray) -> void",
-       2};
-const GameCall RPC_LOCAL
-    = {"The method Netw.rpc runs on this peer",
-       "a function that takes the arguments given to Netw.rpc",
-       -1};
-const GameCall RPC_CONTROLLER_LOCAL
-    = {"The method Netw.rpc_controller runs on this peer",
-       "a function that takes the arguments given to Netw.rpc_controller",
-       -1};
-
 } // namespace
 
 Error NetwMultiplayer::relay_subscribe(
@@ -174,13 +157,13 @@ void NetwMultiplayer::channel_dispatch(
     if (row->sender_first) {
         args.push_back(p_sender);
         args.push_back(p_payload);
-        game_call(row->handler, args, NETW_CHANNEL_HANDLER);
+        game_call(row->handler, args, game_calls::NETW_CHANNEL_HANDLER);
         return;
     }
     args.push_back(p_wrapper.is_valid() ? p_wrapper->get_rid_handle() : RID());
     args.push_back(p_payload);
     args.push_back(p_sender);
-    game_call(row->handler, args, CHANNEL_HANDLER);
+    game_call(row->handler, args, game_calls::CHANNEL_HANDLER);
 }
 
 void NetwMultiplayer::rpc_channel_register(
@@ -202,7 +185,8 @@ void NetwMultiplayer::rpc_channel_install(
     }
     game_call_declared(
         p_handler,
-        p_sender_first ? NETW_CHANNEL_HANDLER : CHANNEL_HANDLER
+        p_sender_first ? game_calls::NETW_CHANNEL_HANDLER
+                       : game_calls::CHANNEL_HANDLER
     );
     if (!p_handler.is_valid()) {
         return;
@@ -1279,7 +1263,7 @@ void NetwMultiplayer::rpc_call(
         if (call_local) {
             const int64_t previous = dispatching_sender;
             dispatching_sender = local_id;
-            game_call(p_callable, p_args, RPC_LOCAL);
+            game_call(p_callable, p_args, game_calls::RPC_LOCAL);
             dispatching_sender = previous;
         } else if (p_peer == local_id) {
             fault::raise(
@@ -1576,7 +1560,7 @@ void NetwMultiplayer::rpc_call_controller(
     }
     const int64_t previous = dispatching_sender;
     dispatching_sender = local_id;
-    game_call(p_callable, p_args, RPC_CONTROLLER_LOCAL);
+    game_call(p_callable, p_args, game_calls::RPC_CONTROLLER_LOCAL);
     dispatching_sender = previous;
 }
 

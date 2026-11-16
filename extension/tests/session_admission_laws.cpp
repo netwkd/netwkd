@@ -197,7 +197,7 @@ constexpr const char *ACCOUNT_GATE = R"(extends Node
 var seats := 0
 var kick_signed_in := false
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
     request.account = "test:" + request.username
     request.account_name = String(request.username).to_upper()
     if kick_signed_in:
@@ -205,7 +205,7 @@ func admit(request: NetwJoinRequest) -> Error:
         var signed_in: NetwPlayer = session.find_player(request.account)
         if signed_in != null:
             session.kick(signed_in, "Signed in somewhere else.")
-    return OK
+    request.admit()
 
 func seat(_player: NetwPlayer) -> void:
     seats += 1

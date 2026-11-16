@@ -87,7 +87,7 @@ Methods
    +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`                       | :ref:`is_replicated<class_NetwSchema_method_is_replicated>`\ (\ ) |const|                                                                                                                                                   |
    +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSchema<class_NetwSchema>` | :ref:`migrate<class_NetwSchema_method_migrate>`\ (\ from_version\: :godot:`int`, step\: :godot:`Callable`\ )                                                                                                                |
+   | :ref:`NetwSchema<class_NetwSchema>` | :ref:`migrate<class_NetwSchema_method_migrate>`\ (\ from_version\: :godot:`int`, handler\: :godot:`Callable`\ )                                                                                                             |
    +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`int`                        | :ref:`quaternion<class_NetwSchema_method_quaternion>`\ (\ key\: :godot:`StringName`, quantizer\: :ref:`NetwQuantize<class_NetwQuantize>` = null, stride\: :godot:`int` = 1\ )                                               |
    +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -517,9 +517,9 @@ Whether a session creates a replicated :ref:`NetwTable<class_NetwTable>` from th
 
 .. rst-class:: classref-method
 
-:ref:`NetwSchema<class_NetwSchema>` **migrate**\ (\ from_version\: :godot:`int`, step\: :godot:`Callable`\ ) :ref:`🔗<class_NetwSchema_method_migrate>`
+:ref:`NetwSchema<class_NetwSchema>` **migrate**\ (\ from_version\: :godot:`int`, handler\: :godot:`Callable`\ ) :ref:`🔗<class_NetwSchema_method_migrate>`
 
-A read runs one ``step`` per saved version up to :ref:`storage_version()<class_NetwSchema_method_storage_version>`. A missing step refuses the read.
+A read runs one ``handler`` per saved version up to :ref:`storage_version()<class_NetwSchema_method_storage_version>`. A missing step refuses the read.
 
 .. code:: text
 

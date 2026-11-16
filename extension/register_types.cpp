@@ -5,7 +5,8 @@
 #include "godot/extension.hpp"
 #include "netw/decl_sites.hpp"
 
-#include "netw/api/action.hpp"
+#include "netw/api/action_request.hpp"
+#include "netw/api/action_config.hpp"
 #include "netw/api/admission_config.hpp"
 #include "netw/api/auth_protocol.hpp"
 #include "netw/api/bit_stream.hpp"
@@ -50,6 +51,7 @@
 #include "netw/api/property_config.hpp"
 #include "netw/api/record.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/api/request.hpp"
 #include "netw/api/scene.hpp"
 #include "netw/api/scene_config.hpp"
 #include "netw/api/schema_model.hpp"
@@ -157,8 +159,9 @@ void initialize_networked_module(ModuleInitializationLevel level) {
     GDREGISTER_ABSTRACT_CLASS(netw::NetwInterestLayer);
     GDREGISTER_CLASS(netw::NetwPromise);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwAuthProtocol);
-    GDREGISTER_ABSTRACT_CLASS(netw::NetwAction);
-    GDREGISTER_ABSTRACT_CLASS(netw::NetwActionContext);
+    GDREGISTER_ABSTRACT_CLASS(netw::NetwRequest);
+    GDREGISTER_ABSTRACT_CLASS(netw::NetwActionRequest);
+    GDREGISTER_ABSTRACT_CLASS(netw::NetwActionConfig);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwPlayer);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwEndpoint);
     GDREGISTER_CLASS(netw::NetwPhysicsStepper);

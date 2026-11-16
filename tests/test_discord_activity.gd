@@ -13,12 +13,12 @@ class Gate extends Node:
 	var requests: Array[NetwJoinRequest] = []
 
 
-	func admit(request: NetwJoinRequest) -> Error:
+	func admit(request: NetwJoinRequest) -> void:
+		request.admit()
 		if request.peer_id == 1:
 			request.account = ""
-			return OK
-		requests.append(request)
-		return OK
+		else:
+			requests.append(request)
 
 
 class SlowWorker extends NetwTestDiscordService:

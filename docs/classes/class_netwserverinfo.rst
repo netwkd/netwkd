@@ -26,12 +26,11 @@ A server browser can check a server without joining it, and gets one of these ba
     func _init() -> void:
         Netw.configure_server_info(server_info)
 
-    func server_info(info: NetwServerInfo) -> NetwServerInfo:
+    func server_info(info: NetwServerInfo) -> void:
         info.motd = "Ranked, no friendly fire"
         info.game_mode = &"ranked"
-        return info
 
-\ Returning anything but a **NetwServerInfo** makes the browser show the server as broken. Put any extra values in :ref:`metadata<class_NetwServerInfo_property_metadata>`.
+\ Put any extra values in :ref:`metadata<class_NetwServerInfo_property_metadata>`.
 
 .. rst-class:: classref-reftable-group
 

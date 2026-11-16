@@ -22,7 +22,7 @@
 		    var entity = Netw.ConfigureEntity(this);
 		    entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
 		    entity.Simulation.RemoteMode = NetwSimulation.RemoteModeEnum.Active;
-		    entity.Simulation.NetworkProcess = Callable.From&lt;double, long, bool&gt;(NetworkProcess);
+		    entity.Simulation.SetNetworkProcess(NetworkProcess);
 		}
 
 		private void NetworkProcess(double delta, long tick, bool isFresh)
@@ -54,6 +54,14 @@
 		<member name="mode" type="int" setter="" getter="get_mode" enum="NetwSimulation.Mode">
 			The mode this entity runs in on this peer. [signal mode_changed] reports each change.
 		</member>
+		<member name="network_process" type="Callable" setter="set_network_process" getter="get_network_process">
+			Called each tick while [member mode] runs the body. Defaults to the root's [code]_network_process[/code].
+			[codeblock]
+			func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
+			[/codeblock]
+			[code]is_fresh[/code] is [code]true[/code] the first time a tick runs. It is [code]false[/code] when a rollback runs the tick again and on a [constant MODE_ACTIVE] copy, so play sounds and spawn nodes only when it is [code]true[/code].
+			Ask the physics space with a query. An [Area3D]'s overlaps and signals and [method CharacterBody3D.is_on_floor] come from the last physics step, and a rollback restores neither.
+		</member>
 		<member name="physics_driven" type="bool" setter="set_physics_driven" getter="get_physics_driven">
 			If [code]true[/code], the physics server moves this entity, so one with a [method NetwPropertyConfig.state] property is predicted without a [member network_process]. Defaults to [code]true[/code] when the root or a body in [member bodies] is a [RigidBody2D] or [RigidBody3D].
 			While such an entity is predicted, [member RigidBody3D.max_contacts_reported] is raised to [code]8[/code] on its bodies so their contacts can be read.
@@ -70,11 +78,6 @@
 		</member>
 		<member name="schedule" type="int" setter="set_schedule" getter="get_schedule" enum="NetwSimulation.Schedule">
 			When [member network_process] runs and when the physics server moves the bodies.
-		</member>
-		<member name="network_process" type="Callable" setter="set_network_process" getter="get_network_process">
-			Called each tick as [code](delta: float, tick: int, is_fresh: bool)[/code] while [member mode] runs the body. Defaults to the root's [code]_network_process[/code].
-			[code]is_fresh[/code] is [code]true[/code] the first time a tick runs. It is [code]false[/code] when a rollback runs the tick again and on a [constant MODE_ACTIVE] copy, so play sounds and spawn nodes only when it is [code]true[/code].
-			Ask the physics space with a query. An [Area3D]'s overlaps and signals and [method CharacterBody3D.is_on_floor] come from the last physics step, and a rollback restores neither.
 		</member>
 	</members>
 	<signals>

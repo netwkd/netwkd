@@ -9,88 +9,29 @@ namespace Networked;
 /// A request to control a node.
 /// </summary>
 /// <remarks>
-/// Passed by <see cref="NetwEntity.ControlRequested"/> on the server. Call
-/// <see cref="NetwControlRequest.Deny"/> to reject the request, otherwise it is
+/// Passed to <see cref="NetwEntity.SetControlHandler"/> on the server. Call
+/// <see cref="NetwRequest.Deny"/> to reject the request, otherwise it is
 /// granted.
 /// <code>
-/// func _on_control_requested(peer_id: int, request: NetwControlRequest) -&gt; void:
-///     if not can_carry(peer_id):
-///         request.deny()
+/// func judge_claim(request: NetwControlRequest) -&gt; void:
+///     if not can_carry(request.peer_id):
+///         request.deny("hands full")
 /// </code>
 /// </remarks>
-public sealed class NetwControlRequest : NetwRefCounted
+public sealed class NetwControlRequest : NetwRequest
 {
     public NetwControlRequest(IntPtr native) : base(native)
     {
     }
 
-    public static NetwControlRequest Adopt(IntPtr native)
+    public new static NetwControlRequest Adopt(IntPtr native)
     {
         return native == IntPtr.Zero ? null : new NetwControlRequest(native);
     }
 
-    public static NetwControlRequest From(Variant value)
+    public new static NetwControlRequest From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
-    }
-
-    private static readonly IntPtr _bindGetRequester =
-        NetwApi.MethodBind("NetwControlRequest", "get_requester", 3905245786UL);
-
-    private static readonly IntPtr _bindSetRequester =
-        NetwApi.MethodBind("NetwControlRequest", "set_requester", 1286410249UL);
-
-    /// <summary>
-    /// Peer id reported by <see cref="MultiplayerApi.GetRemoteSenderId"/>.
-    /// </summary>
-    public long Requester
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetRequester, Checked, ref answered);
-            return answered;
-        }
-        set
-        {
-            long slot0 = value;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetRequester,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetDenied =
-        NetwApi.MethodBind("NetwControlRequest", "get_denied", 36873697UL);
-
-    private static readonly IntPtr _bindSetDenied =
-        NetwApi.MethodBind("NetwControlRequest", "set_denied", 2586408642UL);
-
-    /// <summary>
-    /// Whether the request should be rejected. Writing <c>false</c> over a
-    /// <see cref="NetwControlRequest.Deny"/> call has no effect.
-    /// </summary>
-    public bool Denied
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(_bindGetDenied, Checked, ref answered);
-            return answered != 0;
-        }
-        set
-        {
-            byte slot0 = value ? (byte)1 : (byte)0;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Byte_Long(
-                _bindSetDenied,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
     }
 
     private static readonly IntPtr _bindGetHold =
@@ -108,17 +49,5 @@ public sealed class NetwControlRequest : NetwRefCounted
             NetwThunks.Ptrcall0_Long(_bindGetHold, Checked, ref answered);
             return (NetwEntity.HoldEnum)answered;
         }
-    }
-
-    private static readonly IntPtr _bindDeny =
-        NetwApi.MethodBind("NetwControlRequest", "deny", 3218959716UL);
-
-    /// <summary>
-    /// Rejects this request.
-    /// </summary>
-    public void Deny()
-    {
-        long discarded = default;
-        NetwThunks.Ptrcall0_Long(_bindDeny, Checked, ref discarded);
     }
 }

@@ -37,11 +37,11 @@ public:
     godot::TypedArray<godot::StringName> layer_ids() const;
 
     godot::Ref<NetwInterest> on_enter(
-        const godot::Callable &p_callback,
+        const godot::Callable &p_handler,
         const godot::StringName &p_layer_id
     );
     godot::Ref<NetwInterest> on_leave(
-        const godot::Callable &p_callback,
+        const godot::Callable &p_handler,
         const godot::StringName &p_layer_id
     );
     godot::Ref<NetwInterest> on_observed(const godot::Callable &p_callback);
@@ -49,12 +49,12 @@ public:
     godot::Ref<NetwInterest> on_leave_policy(
         const godot::StringName &p_layer_id,
         NetwMultiplayer::LeavePolicy p_policy,
-        const godot::Callable &p_custom
+        const godot::Callable &p_handler
     );
     godot::Ref<NetwInterest> on_perception_policy(
         const godot::StringName &p_layer_id,
         NetwMultiplayer::PerceptionPolicy p_policy,
-        const godot::Callable &p_custom
+        const godot::Callable &p_handler
     );
 
     int64_t leave_policy_for(

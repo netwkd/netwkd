@@ -1,0 +1,30 @@
+:github_url: hide
+
+.. _fault_nw1041:
+
+NW1041. An action was asked for and was never declared
+======================================================
+
+Reported as an error when
+:ref:`Netw.action <class_Netw_method_action>` gets a method its node
+did not declare with
+:ref:`Netw.configure_action <class_Netw_method_configure_action>`.
+Nothing is sent.
+
+The node asks for ``fire`` and never declared it.
+
+.. code-block:: gdscript
+
+    func pull_trigger(tick: int) -> void:
+        Netw.action(fire, tick)
+
+Declare the action in ``_init``.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_entity(self)
+        Netw.configure_action(fire)
+
+Every peer declares the action, the server included, because the
+server runs only a method its own node declared.

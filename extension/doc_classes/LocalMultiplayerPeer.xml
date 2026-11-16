@@ -52,13 +52,6 @@
 				Returns the ids of every connected peer, in the order they connected.
 			</description>
 		</method>
-		<method name="transfer_server">
-			<return type="int" enum="Error" />
-			<param index="0" name="peer_id" type="int" />
-			<description>
-				Makes the connected client [param peer_id] the server and keeps this server connected as a client under a new id, which is how [method NetwSession.transfer_server] moves a session that runs on a [LocalLoopbackSession].
-			</description>
-		</method>
 	</methods>
 	<members>
 		<member name="loopback_session" type="LocalLoopbackSession" setter="set_loopback_session" getter="get_loopback_session">

@@ -9,11 +9,6 @@ namespace netw::persist {
 
 namespace {
 
-const GameCall MIGRATION_STEP
-    = {"The NetwSchema.migrate or NetwPersistenceConfig.migrate step",
-       "func(values: Dictionary) -> Dictionary",
-       1};
-
 const char *KEY_FORMAT = "format_version";
 const char *KEY_KIND = "kind";
 const char *KEY_SCHEMA = "schema_name";
@@ -205,7 +200,8 @@ Error open_record(
         Array args;
         args.push_back(row);
         bool called = false;
-        const Variant answered = game_call(step, args, MIGRATION_STEP, &called);
+        const Variant answered
+            = game_call(step, args, game_calls::MIGRATION_STEP, &called);
         if (!called) {
             r_detail = vformat(
                 "the migration from storage version %d of schema '%s' "

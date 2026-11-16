@@ -124,7 +124,7 @@ public:
     godot::Ref<NetwSchema> storage_version(int p_version);
     godot::Ref<NetwSchema> migrate(
         int p_from_version,
-        const godot::Callable &p_step
+        const godot::Callable &p_handler
     );
 };
 

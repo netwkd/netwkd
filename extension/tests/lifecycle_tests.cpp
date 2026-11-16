@@ -1410,10 +1410,7 @@ LawVerdict drop_then_release(const World &) {
     return law_held();
 }
 
-void deny_control(
-    int64_t p_peer_id,
-    const Ref<netw::NetwControlRequest> &p_request
-) {
+void deny_control(const Ref<netw::NetwControlRequest> &p_request) {
     p_request->deny();
 }
 
@@ -1423,10 +1420,7 @@ LawVerdict immediate_claim_refused(const World &) {
     Moving moving(NetwEntity::TRANSFER_IMMEDIATE);
     const Ref<NetwEntity> claimant = NetwEntity::of(moving.cube_on(1));
     NetwEntity::of(moving.cube_on(-1))
-        ->connect(
-            StringName("control_requested"),
-            callable_mp_static(&deny_control)
-        );
+        ->set_control_handler(callable_mp_static(&deny_control));
 
     const Ref<NetwPromise> claimed = claimant->claim_control();
     const Ref<NetwPromise> moved

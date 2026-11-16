@@ -157,9 +157,26 @@ public sealed class NetwChannel : NetwRefCounted
     /// Calls <paramref name="handler"/> as <c>handler(sender, payload)</c> for
     /// every payload received on this channel.
     /// </summary>
-    public void Register(Callable handler)
+    public void Register(Action<long, byte[]> handler)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(handler);
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    handler(a0.As<long>(), a1.As<byte[]>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwChannel.Register", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(_bindRegister, Checked, in slot0, ref answered);
         slot0.Dispose();

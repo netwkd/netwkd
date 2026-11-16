@@ -81,6 +81,27 @@ public sealed class NetwWebRTCSignaler : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
+    /// <summary>
+    /// Makes a <see cref="NetwWebRTCSignaler"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_open</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwWebRTCSignaler",
+            "_open",
+            "_poll",
+            "_send",
+            "_room_id",
+            "_local_signaler_id",
+            "_on_session_connected",
+            "_close");
+    }
+
     private static readonly IntPtr _bindReceive =
         NetwApi.MethodBind("NetwWebRTCSignaler", "receive", 4199752328UL);
 

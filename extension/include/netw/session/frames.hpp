@@ -89,8 +89,6 @@ struct ActionRequest {
     godot::StringName method;
     int64_t view_tick = 0;
     godot::PackedByteArray data;
-    godot::StringName key;
-    int64_t timing = 0;
 
     static constexpr auto wire = netw::wire::describe(
         netw::wire::field<&ActionRequest::method>(
@@ -104,11 +102,6 @@ struct ActionRequest {
         netw::wire::field<&ActionRequest::data>(
             "data",
             netw::wire::bytes_capped(4095)
-        ),
-        netw::wire::field<&ActionRequest::key>("key", netw::wire::string()),
-        netw::wire::field<&ActionRequest::timing>(
-            "timing",
-            netw::wire::int_range(0, 3)
         )
     );
 };
@@ -278,6 +271,8 @@ struct ControlApply {
     godot::PackedByteArray final_state;
     uint64_t peer = 0;
     uint64_t player_id = 0;
+    uint64_t code = 0;
+    godot::String reason;
 
     static constexpr auto wire = netw::wire::describe(
         netw::wire::field<&ControlApply::controller>(
@@ -311,6 +306,11 @@ struct ControlApply {
         netw::wire::field<&ControlApply::player_id>(
             "player_id",
             netw::wire::varuint(5)
+        ),
+        netw::wire::field<&ControlApply::code>("code", netw::wire::varuint(2)),
+        netw::wire::field<&ControlApply::reason>(
+            "reason",
+            netw::wire::string()
         )
     );
 };
@@ -407,9 +407,13 @@ struct Resync {
 
 struct DenyKey {
     godot::StringName key;
+    int64_t code = 0;
+    godot::String reason;
 
     static constexpr auto wire = netw::wire::describe(
-        netw::wire::field<&DenyKey::key>("key", netw::wire::string())
+        netw::wire::field<&DenyKey::key>("key", netw::wire::string()),
+        netw::wire::field<&DenyKey::code>("code", netw::wire::varuint(2)),
+        netw::wire::field<&DenyKey::reason>("reason", netw::wire::string())
     );
 };
 

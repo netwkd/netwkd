@@ -298,31 +298,32 @@ Both :godot:`Dictionary` arguments contain state declared with :ref:`NetwPropert
 
  .. code-tab:: csharp
 
-    private readonly PhysicsTestMotionParameters3D correctionMotion = new();
-
-    public Car()
+    public partial class Car : RigidBody3D
     {
-        var entity = Netw.ConfigureEntity(this);
-        entity.Prediction.CorrectionPathClear = Callable.From<
-            Godot.Collections.Dictionary,
-            Godot.Collections.Dictionary, bool>(CorrectionIsClear);
-    }
+        private readonly PhysicsTestMotionParameters3D correctionMotion = new();
 
-    private bool CorrectionIsClear(
-        Godot.Collections.Dictionary current,
-        Godot.Collections.Dictionary proposed)
-    {
-        var rotation = current["quaternion"].AsQuaternion();
-        if (rotation != proposed["quaternion"].AsQuaternion())
-            return false;
-        var parentPose = GlobalTransform * Transform.AffineInverse();
-        var start = new Transform3D(
-            new Basis(rotation), current["position"].AsVector3());
-        correctionMotion.From = parentPose * start;
-        var destination = parentPose * proposed["position"].AsVector3();
-        correctionMotion.Motion = destination - correctionMotion.From.Origin;
-        correctionMotion.RecoveryAsCollision = true;
-        return !PhysicsServer3D.BodyTestMotion(GetRid(), correctionMotion);
+        public Car()
+        {
+            var entity = Netw.ConfigureEntity(this);
+            entity.Prediction.SetCorrectionPathClear(CorrectionIsClear);
+        }
+
+        private bool CorrectionIsClear(
+            Godot.Collections.Dictionary current,
+            Godot.Collections.Dictionary proposed)
+        {
+            var rotation = current["quaternion"].AsQuaternion();
+            if (rotation != proposed["quaternion"].AsQuaternion())
+                return false;
+            var parentPose = GlobalTransform * Transform.AffineInverse();
+            var start = new Transform3D(
+                new Basis(rotation), current["position"].AsVector3());
+            correctionMotion.From = parentPose * start;
+            var destination = parentPose * proposed["position"].AsVector3();
+            correctionMotion.Motion = destination - correctionMotion.From.Origin;
+            correctionMotion.RecoveryAsCollision = true;
+            return !PhysicsServer3D.BodyTestMotion(GetRid(), correctionMotion);
+        }
     }
 
 \ 
@@ -470,12 +471,11 @@ The returned :godot:`Dictionary` uses names declared with :ref:`NetwPropertyConf
     public Car()
     {
         var entity = Netw.ConfigureEntity(this);
-        entity.Prediction.PredictInput = Callable.From<
-            GodotObject, long, Godot.Collections.Dictionary>(GuessInput);
+        entity.Prediction.SetPredictInput(GuessInput);
     }
 
     private Godot.Collections.Dictionary GuessInput(
-        GodotObject entity, long tick)
+        NetwEntity entity, long tick)
     {
         return new Godot.Collections.Dictionary
         {

@@ -12,7 +12,7 @@ namespace Networked;
 /// Reached by <see cref="NetwEntity.Prediction"/>. An entity with a
 /// <see cref="NetwPropertyConfig.State"/> property, a
 /// <see cref="NetwPropertyConfig.Input"/> property and a
-/// <see cref="NetwSimulation.NetworkProcess"/> is predicted. A
+/// <see cref="NetwSimulation.SetNetworkProcess"/> is predicted. A
 /// <see cref="RigidBody2D"/> or <see cref="RigidBody3D"/> needs only the two
 /// properties. The client that controls the entity runs that function on its
 /// own input each tick, and the server runs it on the same input when it
@@ -95,8 +95,8 @@ public sealed class NetwPrediction : NetwRefCounted
         Offset = 1,
         /// <summary>
         /// Do not predict. The client that controls the entity does not run
-        /// <see cref="NetwSimulation.NetworkProcess"/> and shows the server's
-        /// state.
+        /// <see cref="NetwSimulation.SetNetworkProcess"/> and shows the
+        /// server's state.
         /// </summary>
         Disabled = 2,
         /// <summary>
@@ -142,66 +142,6 @@ public sealed class NetwPrediction : NetwRefCounted
             )
         );
         remove => DisconnectBridge("corrected", value);
-    }
-
-    private static readonly IntPtr _bindGetPredictInput =
-        NetwApi.MethodBind("NetwPrediction", "get_predict_input", 1307783378UL);
-
-    private static readonly IntPtr _bindSetPredictInput =
-        NetwApi.MethodBind("NetwPrediction", "set_predict_input", 1611583062UL);
-
-    /// <summary>
-    /// Guesses input for this entity on a peer that runs it as
-    /// <see cref="NetwSimulation.ModeEnum.Active"/>. Relayed input replaces the
-    /// guess. Unset callbacks and omitted properties repeat the newest relayed
-    /// input, and zero before any arrives. The returned
-    /// <see cref="Godot.Collections.Dictionary"/> uses names declared with
-    /// <see cref="NetwPropertyConfig.Input"/>.
-    /// <code>
-    /// Dictionary
-    /// ┖╴property_name  Variant  guessed value of a declared input property
-    /// </code>
-    /// <code>
-    /// public Car()
-    /// {
-    ///     var entity = Netw.ConfigureEntity(this);
-    ///     entity.Prediction.PredictInput = Callable.From&lt;
-    ///         GodotObject, long, Godot.Collections.Dictionary&gt;(GuessInput);
-    /// }
-    ///
-    /// private Godot.Collections.Dictionary GuessInput(
-    ///     GodotObject entity, long tick)
-    /// {
-    ///     return new Godot.Collections.Dictionary
-    ///     {
-    ///         [new StringName("throttle")] = 1.0,
-    ///         [new StringName("steering")] = 0.0,
-    ///     };
-    /// }
-    /// </code>
-    /// </summary>
-    public Callable PredictInput
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetPredictInput, Checked, ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(
-                _bindSetPredictInput,
-                Checked,
-                in slot0,
-                ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
     }
 
     private static readonly IntPtr _bindGetMode =
@@ -308,87 +248,6 @@ public sealed class NetwPrediction : NetwRefCounted
                 Checked,
                 in slot0,
                 ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetCorrectionPathClear =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "get_correction_path_clear",
-            1307783378UL);
-
-    private static readonly IntPtr _bindSetCorrectionPathClear =
-        NetwApi.MethodBind(
-            "NetwPrediction",
-            "set_correction_path_clear",
-            1611583062UL);
-
-    /// <summary>
-    /// Checks whether a correction can move the body straight to its proposed
-    /// state. Return <c>true</c> only when the swept path is clear. The engine
-    /// moves the body. An unset callback disables this correction. Both
-    /// <see cref="Godot.Collections.Dictionary"/> arguments contain state
-    /// declared with <see cref="NetwPropertyConfig.State"/>. This example
-    /// sweeps an unscaled <see cref="RigidBody3D"/> with <c>Node3D.position</c>
-    /// and <c>Node3D.quaternion</c> state. It refuses rotation changes because
-    /// <c>PhysicsServer3D.body_test_motion</c> sweeps translation only.
-    /// <code>
-    /// Dictionary
-    /// ┖╴property_name  Variant  current or proposed value of a state property
-    /// </code>
-    /// <code>
-    /// private readonly PhysicsTestMotionParameters3D correctionMotion = new();
-    ///
-    /// public Car()
-    /// {
-    ///     var entity = Netw.ConfigureEntity(this);
-    ///     entity.Prediction.CorrectionPathClear = Callable.From&lt;
-    ///         Godot.Collections.Dictionary,
-    ///         Godot.Collections.Dictionary, bool&gt;(CorrectionIsClear);
-    /// }
-    ///
-    /// private bool CorrectionIsClear(
-    ///     Godot.Collections.Dictionary current,
-    ///     Godot.Collections.Dictionary proposed)
-    /// {
-    ///     var rotation = current["quaternion"].AsQuaternion();
-    ///     if (rotation != proposed["quaternion"].AsQuaternion())
-    ///         return false;
-    ///     var parentPose = GlobalTransform * Transform.AffineInverse();
-    ///     var start = new Transform3D(
-    ///         new Basis(rotation), current["position"].AsVector3());
-    ///     correctionMotion.From = parentPose * start;
-    ///     var destination = parentPose * proposed["position"].AsVector3();
-    ///     correctionMotion.Motion = destination - correctionMotion.From.Origin;
-    ///     correctionMotion.RecoveryAsCollision = true;
-    ///     return !PhysicsServer3D.BodyTestMotion(GetRid(), correctionMotion);
-    /// }
-    /// </code>
-    /// </summary>
-    public Callable CorrectionPathClear
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(
-                _bindGetCorrectionPathClear,
-                Checked,
-                ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(
-                _bindSetCorrectionPathClear,
-                Checked,
-                in slot0,
-                ref answered);
-            slot0.Dispose();
-            answered.Dispose();
         }
     }
 
@@ -536,8 +395,8 @@ public sealed class NetwPrediction : NetwRefCounted
     /// <summary>
     /// How many queued inputs the server may run in one tick to catch up to
     /// <see cref="NetwPrediction.InputBufferTicks"/> behind the newest input.
-    /// Each extra input runs <see cref="NetwSimulation.NetworkProcess"/> once
-    /// more, and none is skipped. It applies to
+    /// Each extra input runs <see cref="NetwSimulation.SetNetworkProcess"/>
+    /// once more, and none is skipped. It applies to
     /// <see cref="NetwSimulation.ScheduleEnum.Tick"/>, and an entity at
     /// <see cref="NetwSimulation.ScheduleEnum.Frame"/> catches up by running
     /// one input per physics frame.
@@ -766,5 +625,162 @@ public sealed class NetwPrediction : NetwRefCounted
     {
         long discarded = default;
         NetwThunks.Ptrcall0_Long(_bindNotifyCollision, Checked, ref discarded);
+    }
+
+    private static readonly IntPtr _bindSetPredictInput =
+        NetwApi.MethodBind("NetwPrediction", "set_predict_input", 1611583062UL);
+
+    /// <summary>
+    /// Guesses input for this entity on a peer that runs it as
+    /// <see cref="NetwSimulation.ModeEnum.Active"/>. Relayed input replaces the
+    /// guess. Unset callbacks and omitted properties repeat the newest relayed
+    /// input, and zero before any arrives. The returned
+    /// <see cref="Godot.Collections.Dictionary"/> uses names declared with
+    /// <see cref="NetwPropertyConfig.Input"/>.
+    /// <code>
+    /// Dictionary
+    /// ┖╴property_name  Variant  guessed value of a declared input property
+    /// </code>
+    /// <code>
+    /// public Car()
+    /// {
+    ///     var entity = Netw.ConfigureEntity(this);
+    ///     entity.Prediction.SetPredictInput(GuessInput);
+    /// }
+    ///
+    /// private Godot.Collections.Dictionary GuessInput(
+    ///     NetwEntity entity, long tick)
+    /// {
+    ///     return new Godot.Collections.Dictionary
+    ///     {
+    ///         [new StringName("throttle")] = 1.0,
+    ///         [new StringName("steering")] = 0.0,
+    ///     };
+    /// }
+    /// </code>
+    /// </summary>
+    public void SetPredictInput(
+        Func<NetwEntity,
+        long,
+        Godot.Collections.Dictionary> value)
+    {
+        Callable bridged0 = default;
+        if (value != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    Godot.Collections.Dictionary answer =
+                        value(Wrapped(a0, NetwEntity.From), a1.As<long>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromDictionary(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwPrediction.SetPredictInput", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(value, bridge0, owner => owner.NetwAnswer));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(_bindSetPredictInput, Checked, in slot0, ref answered);
+        slot0.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindSetCorrectionPathClear =
+        NetwApi.MethodBind(
+            "NetwPrediction",
+            "set_correction_path_clear",
+            1611583062UL);
+
+    /// <summary>
+    /// Checks whether a correction can move the body straight to its proposed
+    /// state. Return <c>true</c> only when the swept path is clear. The engine
+    /// moves the body. An unset callback disables this correction. Both
+    /// <see cref="Godot.Collections.Dictionary"/> arguments contain state
+    /// declared with <see cref="NetwPropertyConfig.State"/>. This example
+    /// sweeps an unscaled <see cref="RigidBody3D"/> with <c>Node3D.position</c>
+    /// and <c>Node3D.quaternion</c> state. It refuses rotation changes because
+    /// <c>PhysicsServer3D.body_test_motion</c> sweeps translation only.
+    /// <code>
+    /// Dictionary
+    /// ┖╴property_name  Variant  current or proposed value of a state property
+    /// </code>
+    /// <code>
+    /// public partial class Car : RigidBody3D
+    /// {
+    ///     private readonly PhysicsTestMotionParameters3D correctionMotion = new();
+    ///
+    ///     public Car()
+    ///     {
+    ///         var entity = Netw.ConfigureEntity(this);
+    ///         entity.Prediction.SetCorrectionPathClear(CorrectionIsClear);
+    ///     }
+    ///
+    ///     private bool CorrectionIsClear(
+    ///         Godot.Collections.Dictionary current,
+    ///         Godot.Collections.Dictionary proposed)
+    ///     {
+    ///         var rotation = current["quaternion"].AsQuaternion();
+    ///         if (rotation != proposed["quaternion"].AsQuaternion())
+    ///             return false;
+    ///         var parentPose = GlobalTransform * Transform.AffineInverse();
+    ///         var start = new Transform3D(
+    ///             new Basis(rotation), current["position"].AsVector3());
+    ///         correctionMotion.From = parentPose * start;
+    ///         var destination = parentPose * proposed["position"].AsVector3();
+    ///         correctionMotion.Motion = destination - correctionMotion.From.Origin;
+    ///         correctionMotion.RecoveryAsCollision = true;
+    ///         return !PhysicsServer3D.BodyTestMotion(GetRid(), correctionMotion);
+    ///     }
+    /// }
+    /// </code>
+    /// </summary>
+    public void SetCorrectionPathClear(
+        Func<Godot.Collections.Dictionary,
+        Godot.Collections.Dictionary,
+        bool> value)
+    {
+        Callable bridged0 = default;
+        if (value != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    bool answer =
+                        value(
+                            a0.As<Godot.Collections.Dictionary>(),
+                            a1.As<Godot.Collections.Dictionary>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromBool(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report(
+                        "NetwPrediction.SetCorrectionPathClear",
+                        thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(value, bridge0, owner => owner.NetwAnswer));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindSetCorrectionPathClear,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        answered.Dispose();
     }
 }

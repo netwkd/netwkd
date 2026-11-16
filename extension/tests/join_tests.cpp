@@ -54,10 +54,10 @@ func seat(_who, slot: int) -> void:
 
 constexpr const char *ACCOUNT_GATE = R"(extends Node
 
-func admit(request: NetwJoinRequest) -> Error:
+func admit(request: NetwJoinRequest) -> void:
 	request.account = "test:" + request.username
 	request.account_name = String(request.username).to_upper()
-	return OK
+	request.admit()
 )";
 
 struct Stand {

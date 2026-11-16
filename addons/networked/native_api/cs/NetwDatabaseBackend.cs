@@ -46,6 +46,23 @@ public class NetwDatabaseBackend : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
+    /// <summary>
+    /// Makes a <see cref="NetwDatabaseBackend"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_open</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwDatabaseBackend",
+            "_open",
+            "_list_slots",
+            "_delete_slot");
+    }
+
     private static readonly IntPtr _bindOpen =
         NetwApi.MethodBind("NetwDatabaseBackend", "open", 1060174695UL);
 

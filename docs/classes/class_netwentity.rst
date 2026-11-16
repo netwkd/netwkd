@@ -70,7 +70,7 @@ A node placed in a scene by hand can set its own :ref:`name<class_NetwEntity_pro
 
 \ **Letting the controller spawn and despawn**\ 
 
-Only the server spawns, moves and despawns an entity by default. When :ref:`lifecycle<class_NetwEntity_property_lifecycle>` is :ref:`LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>` the :ref:`controller<class_NetwEntity_property_controller>` may too, and the change shows on its screen at once. The server can refuse it in :ref:`lifecycle_requested<class_NetwEntity_signal_lifecycle_requested>`, and the change is then undone on the controller.
+Only the server spawns, moves and despawns an entity by default. When :ref:`lifecycle<class_NetwEntity_property_lifecycle>` is :ref:`LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>` the :ref:`controller<class_NetwEntity_property_controller>` may too, and the change shows on its screen at once. The server can refuse it in :ref:`lifecycle_handler<class_NetwEntity_property_lifecycle_handler>`, and the change is then undone on the controller.
 
 ::
 
@@ -106,6 +106,8 @@ Properties
    +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
    | :ref:`Authority<enum_NetwEntity_Authority>`                 | :ref:`authority<class_NetwEntity_property_authority>`                               |
    +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
+   | :godot:`Callable`                                           | :ref:`control_handler<class_NetwEntity_property_control_handler>`                   |
+   +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
    | :ref:`NetwPlayer<class_NetwPlayer>`                         | :ref:`controller<class_NetwEntity_property_controller>`                             |
    +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
    | :ref:`NetwDisplay<class_NetwDisplay>`                       | :ref:`display<class_NetwEntity_property_display>`                                   |
@@ -119,6 +121,8 @@ Properties
    | :godot:`bool`                                               | :ref:`is_controlled_locally<class_NetwEntity_property_is_controlled_locally>`       |
    +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
    | :ref:`Lifecycle<enum_NetwEntity_Lifecycle>`                 | :ref:`lifecycle<class_NetwEntity_property_lifecycle>`                               |
+   +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
+   | :godot:`Callable`                                           | :ref:`lifecycle_handler<class_NetwEntity_property_lifecycle_handler>`               |
    +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
    | :godot:`StringName`                                         | :ref:`name<class_NetwEntity_property_name>`                                         |
    +-------------------------------------------------------------+-------------------------------------------------------------------------------------+
@@ -186,20 +190,6 @@ Emitted once on each peer when :ref:`controller<class_NetwEntity_property_contro
 
 ----
 
-.. _class_NetwEntity_signal_control_requested:
-
-.. rst-class:: classref-signal
-
-**control_requested**\ (\ peer_id\: :godot:`int`, request\: :ref:`NetwControlRequest<class_NetwControlRequest>`\ ) :ref:`🔗<class_NetwEntity_signal_control_requested>`
-
-Emitted on the server when a peer calls :ref:`claim_control()<class_NetwEntity_method_claim_control>`. Calling :ref:`NetwControlRequest.deny()<class_NetwControlRequest_method_deny>` on ``request`` refuses it, whatever the listener order.
-
-Not emitted when a :ref:`hold<class_NetwEntity_property_hold>` already refuses the request.
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_NetwEntity_signal_despawned:
 
 .. rst-class:: classref-signal
@@ -244,50 +234,7 @@ Neither :ref:`despawning<class_NetwEntity_signal_despawning>` nor :ref:`despawne
 
 **lifecycle_refused**\ (\ request\: :ref:`NetwLifecycleRequest<class_NetwLifecycleRequest>`\ ) :ref:`🔗<class_NetwEntity_signal_lifecycle_refused>`
 
-Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused move is already undone and a refused despawn has already put the same :ref:`root<class_NetwEntity_property_root>` back. A refusal heard while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends. :ref:`NetwLifecycleRequest.destination<class_NetwLifecycleRequest_property_destination>` is the parent the move asked for. :ref:`NetwLifecycleRequest.reason<class_NetwLifecycleRequest_property_reason>` is what the server passed to :ref:`NetwLifecycleRequest.deny()<class_NetwLifecycleRequest_method_deny>`, or empty when the server refused for another reason.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwEntity_signal_lifecycle_requested:
-
-.. rst-class:: classref-signal
-
-**lifecycle_requested**\ (\ peer_id\: :godot:`int`, request\: :ref:`NetwLifecycleRequest<class_NetwLifecycleRequest>`\ ) :ref:`🔗<class_NetwEntity_signal_lifecycle_requested>`
-
-Emitted on the server when the :ref:`controller<class_NetwEntity_property_controller>` of a :ref:`LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>` entity spawns, despawns or moves it, before other peers see the change. Calling :ref:`NetwLifecycleRequest.deny()<class_NetwLifecycleRequest_method_deny>` on ``request`` refuses it.
-
-
-.. tabs::
-
- .. code-tab:: gdscript
-
-    func _init() -> void:
-        Netw.configure_entity(self).lifecycle_requested.connect(judge)
-
-
-    func judge(peer_id: int, request: NetwLifecycleRequest) -> void:
-        if request.destination is Backpack and request.destination.is_full():
-            request.deny("backpack full")
-
- .. code-tab:: csharp
-
-    public Crate()
-    {
-        Netw.ConfigureEntity(this).LifecycleRequested += Judge;
-    }
-
-    private void Judge(long peerId, Variant request)
-    {
-        var asked = request.As<NetwLifecycleRequest>();
-        if (asked.Destination is Backpack backpack && backpack.IsFull())
-            asked.Deny("backpack full");
-    }
-
-\ 
-
-On a spawn the entity has not entered the tree yet, so :ref:`NetwLifecycleRequest.destination<class_NetwLifecycleRequest_property_destination>` is where it will go.
+Emitted on the peer whose spawn, despawn or move of this entity the server refused. A refused move is already undone and a refused despawn has already put the same :ref:`root<class_NetwEntity_property_root>` back. A refusal heard while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is reported when that poll ends. :ref:`NetwLifecycleRequest.destination<class_NetwLifecycleRequest_property_destination>` is the parent the move asked for. :ref:`NetwRequest.code<class_NetwRequest_property_code>` and :ref:`NetwRequest.reason<class_NetwRequest_property_reason>` are what :ref:`lifecycle_handler<class_NetwEntity_property_lifecycle_handler>` passed to :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` on the server. The reason is empty when the server refused for another reason.
 
 .. rst-class:: classref-item-separator
 
@@ -514,6 +461,32 @@ At spawn, a non-server Godot authority on the root selects :ref:`AUTHORITY_CONTR
 
 ----
 
+.. _class_NetwEntity_property_control_handler:
+
+.. rst-class:: classref-property
+
+:godot:`Callable` **control_handler** :ref:`🔗<class_NetwEntity_property_control_handler>`
+
+.. rst-class:: classref-property-setget
+
+- |void| **set_control_handler**\ (\ value\: :godot:`Callable`\ )
+- :godot:`Callable` **get_control_handler**\ (\ )
+
+The method the server runs for each :ref:`claim_control()<class_NetwEntity_method_claim_control>` a peer sends, before it decides. The claim is granted unless the method calls :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` on its :ref:`NetwControlRequest<class_NetwControlRequest>`, and the peer that asked receives that code and reason. It does not run when a :ref:`hold<class_NetwEntity_property_hold>` already refuses the claim. It runs inside the call that reads the claim, so a method that awaits is an error and the claim is judged as it stands at the first ``await``.
+
+::
+
+    func _init() -> void:
+        Netw.configure_entity(self).control_handler = judge_claim
+
+    func judge_claim(request: NetwControlRequest) -> void:
+        if not can_carry(request.peer_id):
+            request.deny("hands full")
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwEntity_property_controller:
 
 .. rst-class:: classref-property
@@ -639,6 +612,56 @@ During a rollback these calls return :godot:`@GlobalScope.ERR_BUSY <@GlobalScope
     func _init() -> void:
         var entity := Netw.configure_entity(self)
         entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwEntity_property_lifecycle_handler:
+
+.. rst-class:: classref-property
+
+:godot:`Callable` **lifecycle_handler** :ref:`🔗<class_NetwEntity_property_lifecycle_handler>`
+
+.. rst-class:: classref-property-setget
+
+- |void| **set_lifecycle_handler**\ (\ value\: :godot:`Callable`\ )
+- :godot:`Callable` **get_lifecycle_handler**\ (\ )
+
+The method the server runs for each spawn, move and despawn the :ref:`controller<class_NetwEntity_property_controller>` of a :ref:`LIFECYCLE_CONTROLLER<class_NetwEntity_constant_LIFECYCLE_CONTROLLER>` entity makes, before other peers see it. The change stands unless the method calls :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` on its :ref:`NetwLifecycleRequest<class_NetwLifecycleRequest>`, and the controller receives that code and reason in :ref:`lifecycle_refused<class_NetwEntity_signal_lifecycle_refused>`. On a spawn the entity has not entered the tree yet, so :ref:`NetwLifecycleRequest.destination<class_NetwLifecycleRequest_property_destination>` is where it will go. It runs inside the call that reads the change, so a method that awaits is an error and the change is judged as it stands at the first ``await``.
+
+
+.. tabs::
+
+ .. code-tab:: gdscript
+
+    func _init() -> void:
+        var entity := Netw.configure_entity(self)
+        entity.lifecycle = NetwEntity.LIFECYCLE_CONTROLLER
+        entity.lifecycle_handler = judge_change
+
+    func judge_change(request: NetwLifecycleRequest) -> void:
+        if request.kind == NetwLifecycleRequest.KIND_DESPAWN \
+                and not may_remove(request.peer_id):
+            request.deny("only the builder removes it")
+
+ .. code-tab:: csharp
+
+    public Crate()
+    {
+        var entity = Netw.ConfigureEntity(this);
+        entity.Lifecycle = NetwEntity.LifecycleEnum.Controller;
+        entity.SetLifecycleHandler(JudgeChange);
+    }
+
+    void JudgeChange(NetwLifecycleRequest request)
+    {
+        if (request.Kind == NetwLifecycleRequest.KindEnum.Despawn
+                && !MayRemove(request.PeerId))
+            request.Deny("only the builder removes it");
+    }
+
+\ 
 
 .. rst-class:: classref-item-separator
 
@@ -904,7 +927,7 @@ Asks the server to make the local player the :ref:`controller<class_NetwEntity_p
 .. code:: text
 
     Error
-    ┠╴ERR_UNAUTHORIZED   another peer's hold or control_requested refused it
+    ┠╴ERR_UNAUTHORIZED   another peer's hold refused it
     ┠╴ERR_UNAVAILABLE    transfer does not allow a claim, or it is
     ┃                    TRANSFER_IMMEDIATE on an entity with a state()
     ┃                    property, prediction or a MultiplayerSynchronizer
@@ -912,7 +935,9 @@ Asks the server to make the local player the :ref:`controller<class_NetwEntity_p
 
 \ Under :ref:`TRANSFER_IMMEDIATE<class_NetwEntity_constant_TRANSFER_IMMEDIATE>` this peer runs the node before the decision. A refusal restores the controller's latest values.
 
-The server emits :ref:`control_requested<class_NetwEntity_signal_control_requested>` for one peer's claims in the order that peer made them, whichever entities they name.
+A claim that :ref:`control_handler<class_NetwEntity_property_control_handler>` denies fails with the code and the reason it passed to :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>`.
+
+The server runs :ref:`control_handler<class_NetwEntity_property_control_handler>` for one peer's claims in the order that peer made them, whichever entities they name.
 
 ::
 

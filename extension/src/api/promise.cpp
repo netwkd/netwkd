@@ -16,15 +16,6 @@ namespace {
 const char *SIG_SETTLED = "settled";
 const char *SIG_ANSWERED = "answered";
 
-const GameCall PROMISE_THEN
-    = {"The NetwPromise.then callback", "func(result)", 1};
-const GameCall PROMISE_CATCH
-    = {"The NetwPromise.catch_error callback",
-       "func(code: Error, detail: String)",
-       2};
-const GameCall PROMISE_SETTLED
-    = {"The NetwPromise.when_settled callback", "func()", 0};
-
 void answer_waiter(const Ref<RefCounted> &p_waiter, const Variant &p_answer) {
     p_waiter->emit_signal(StringName(SIG_ANSWERED), p_answer);
 }
@@ -91,7 +82,7 @@ Ref<NetwPromise> NetwPromise::then(const Callable &callback) {
     if (completed) {
         Array args;
         args.push_back(result);
-        game_call(callback, args, PROMISE_THEN);
+        game_call(callback, args, game_calls::PROMISE_THEN);
     } else {
         then_callbacks.push_back(callback);
     }
@@ -104,7 +95,7 @@ Ref<NetwPromise> NetwPromise::catch_error(const Callable &callback) {
         Array args;
         args.push_back(code);
         args.push_back(detail);
-        game_call(callback, args, PROMISE_CATCH);
+        game_call(callback, args, game_calls::PROMISE_CATCH);
     } else {
         catch_callbacks.push_back(callback);
     }
@@ -117,7 +108,7 @@ Ref<NetwPromise> NetwPromise::when_settled(const Callable &callback) {
     }
     failure_read = true;
     if (completed || failed) {
-        game_call(callback, Array(), PROMISE_SETTLED);
+        game_call(callback, Array(), game_calls::PROMISE_SETTLED);
         return Ref<NetwPromise>(this);
     }
     connect(StringName(SIG_SETTLED), callback, Object::CONNECT_ONE_SHOT);
@@ -158,7 +149,7 @@ void NetwPromise::resolve(const Variant &value) {
     Array args;
     args.push_back(value);
     for (uint32_t index = 0; index < chained.size(); ++index) {
-        game_call(chained[index], args, PROMISE_THEN);
+        game_call(chained[index], args, game_calls::PROMISE_THEN);
     }
     promise_wait::release(waiting, value);
 }
@@ -180,7 +171,7 @@ void NetwPromise::reject(Error error_code, const String &error_detail) {
     args.push_back(error_code);
     args.push_back(error_detail);
     for (uint32_t index = 0; index < chained.size(); ++index) {
-        game_call(chained[index], args, PROMISE_CATCH);
+        game_call(chained[index], args, game_calls::PROMISE_CATCH);
     }
     promise_wait::release(waiting, Variant(error_code));
 }
@@ -197,13 +188,13 @@ void NetwPromise::_bind_methods() {
         &NetwPromise::rejected,
         DEFVAL(String())
     );
-    ClassDB::bind_method(D_METHOD("then", "cb"), &NetwPromise::then);
+    ClassDB::bind_method(D_METHOD("then", "callback"), &NetwPromise::then);
     ClassDB::bind_method(
-        D_METHOD("catch_error", "cb"),
+        D_METHOD("catch_error", "callback"),
         &NetwPromise::catch_error
     );
     ClassDB::bind_method(
-        D_METHOD("when_settled", "cb"),
+        D_METHOD("when_settled", "callback"),
         &NetwPromise::when_settled
     );
     ClassDB::bind_method(D_METHOD("wait"), &NetwPromise::wait);

@@ -19,7 +19,7 @@ How long the server waits for a late player action, and how far ahead of itself 
 Description
 -----------
 
-Lag compensation starts automatically for :ref:`NetwPrediction<class_NetwPrediction>` and :ref:`NetwAction<class_NetwAction>`.
+Lag compensation starts automatically for :ref:`NetwPrediction<class_NetwPrediction>` and for an action declared with :ref:`Netw.configure_action()<class_Netw_method_configure_action>`.
 
 Once applied, settings cannot change.
 
@@ -78,7 +78,7 @@ Property Descriptions
 - |void| **set_input_gate_deadline_ticks**\ (\ value\: :godot:`int`\ )
 - :godot:`int` **get_input_gate_deadline_ticks**\ (\ )
 
-How many ticks a :ref:`NetwAction.TIMING_TICK_ALIGNED_STATE_READY<class_NetwAction_constant_TIMING_TICK_ALIGNED_STATE_READY>` action waits for missing input before running anyway. Raise it for connections that lose packets often. Lower it to answer players sooner.
+How many ticks a :ref:`NetwActionConfig.TIMING_TICK_ALIGNED_STATE_READY<class_NetwActionConfig_constant_TIMING_TICK_ALIGNED_STATE_READY>` action waits for missing input before running anyway. Raise it for connections that lose packets often. Lower it to answer players sooner.
 
 .. rst-class:: classref-item-separator
 

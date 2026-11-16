@@ -4,6 +4,7 @@
 
 #include "godot/ref_counted.hpp"
 #include "godot/string_name.hpp"
+#include "netw/api/request.hpp"
 #include "netw/entity/control.hpp"
 
 namespace netw {
@@ -57,36 +58,22 @@ public:
     }
 };
 
-class NetwControlRequest : public godot::RefCounted {
-    GDCLASS(NetwControlRequest, godot::RefCounted)
+class NetwControlRequest : public NetwRequest {
+    GDCLASS(NetwControlRequest, NetwRequest)
+
+    int64_t hold = entity::Control::HOLD_EXCLUSIVE;
 
 protected:
     static void _bind_methods();
 
 public:
-    int64_t requester = 0;
-    int64_t hold = entity::Control::HOLD_EXCLUSIVE;
-    bool denied = false;
-
-    void deny() {
-        denied = true;
-    }
+    static godot::Ref<NetwControlRequest> create(
+        int64_t p_requester,
+        int64_t p_hold
+    );
 
     entity::Control::Hold get_hold() const {
         return entity::Control::Hold(hold);
-    }
-
-    int64_t get_requester() const {
-        return requester;
-    }
-    void set_requester(int64_t p_requester) {
-        requester = p_requester;
-    }
-    bool get_denied() const {
-        return denied;
-    }
-    void set_denied(bool p_denied) {
-        denied = denied || p_denied;
     }
 };
 

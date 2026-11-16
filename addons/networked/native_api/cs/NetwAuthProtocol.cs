@@ -61,7 +61,7 @@ public sealed class NetwAuthProtocol : NetwRefCounted
         Probe = 2,
         /// <summary>
         /// Bytes the game sends with <see cref="NetwMultiplayer.SendAuth"/>
-        /// while <see cref="NetwMultiplayer.AuthCallback"/> runs.
+        /// while <see cref="NetwMultiplayer.SetAuthCallback"/> runs.
         /// </summary>
         Game = 3,
         /// <summary>

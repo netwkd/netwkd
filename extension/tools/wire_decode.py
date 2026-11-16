@@ -481,8 +481,8 @@ AGAINST_SPEC = [
     },
     {
         "record": "ActionRequest",
-        "bytes": bytes([0x04, 0x00]) + b"fire" + bytes([0x12, 0x00, 0x00, 0x01, 0x00]) + b"k" + bytes([0x01]),
-        "values": {"method": "fire", "view_tick": 9, "data": b"", "key": "k", "timing": 1},
+        "bytes": bytes([0x04, 0x00]) + b"fire" + bytes([0x12, 0x00, 0x00]),
+        "values": {"method": "fire", "view_tick": 9, "data": b""},
         "why": "WIRE.md 18, a remote action request at view tick 9",
     },
     {
@@ -622,7 +622,9 @@ AGAINST_SPEC = [
     },
     {
         "record": "ControlApply",
-        "bytes": bytes([0x02, 0x03, 0x00, 0x25, 0x00, 0x00, 0x09, 0x04]),
+        "bytes": bytes(
+            [0x02, 0x03, 0x00, 0x25, 0x00, 0x00, 0x09, 0x04, 0x00, 0x00, 0x00]
+        ),
         "values": {
             "controller": 2,
             "revision": 3,
@@ -635,15 +637,17 @@ AGAINST_SPEC = [
             "final_state": b"",
             "peer": 9,
             "player_id": 4,
+            "code": 0,
+            "reason": "",
         },
         "why": "WIRE.md 14, revision 3 opens peer 2's tenure with an exclusive "
-        "hold and hands the entity to peer 9 as player 4",
+        "hold and hands the entity to peer 9 as player 4, with no refusal",
     },
     {
         "record": "DenyKey",
-        "bytes": bytes([0x04, 0x00]) + b"shot",
-        "values": {"key": "shot"},
-        "why": "WIRE.md 13, a ten bit length, its alignment pad, then the utf8",
+        "bytes": bytes([0x04, 0x00]) + b"shot" + bytes([0x2C, 0x02, 0x00]) + b"no",
+        "values": {"key": "shot", "code": 44, "reason": "no"},
+        "why": "WIRE.md 13, a denial with ERR_BUSY and a two byte reason",
     },
     {
         "record": "ConfirmKey",
@@ -792,6 +796,12 @@ CAPTURE_MAGICS_BY_FORMAT = {
         0xB8: "DatagramAckedHeld",
     },
     22: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
+    },
+    23: {
         0x58: "DatagramReliable",
         0x78: "DatagramUnreliable",
         0x98: "DatagramAcked",

@@ -10,8 +10,11 @@
 ## func _init() -> void:
 ##     Netw.configure_admission(admit).accept(NakamaIdToken.new(JOIN_KEY))
 ##
-## func admit(request: NetwJoinRequest) -> Error:
-##     return OK if request.account else ERR_UNAUTHORIZED
+## func admit(request: NetwJoinRequest) -> void:
+##     if request.account:
+##         request.admit()
+##     else:
+##         request.deny()
 ## [/codeblock]
 class_name NakamaIdToken
 extends NetwIdToken

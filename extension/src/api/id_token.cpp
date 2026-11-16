@@ -68,11 +68,6 @@ void answer_waits(Source &r_source, bool p_fetched) {
     }
 }
 
-const GameCall TOKEN_FETCH
-    = {"The NetwIdToken.provide fetch",
-       "func(nonce: String) -> NetwPromise",
-       1};
-
 } // namespace
 
 Variant NetwIdToken::check(
@@ -82,7 +77,7 @@ Variant NetwIdToken::check(
     int64_t p_now_msec,
     bool p_may_fetch
 ) {
-    const Variant answered = Variant(int64_t(OK));
+    const Variant answered;
     if (p_request.is_null() || p_proof.get_type() != Variant::ARRAY) {
         return answered;
     }
@@ -310,7 +305,7 @@ Variant NetwIdToken::prove_at(const String &p_challenge, double p_now) {
     Array args;
     args.push_back(pem.sha256_text());
     const Variant returned
-        = game_call(source->fetch, args, TOKEN_FETCH, &called);
+        = game_call(source->fetch, args, game_calls::TOKEN_FETCH, &called);
     const Ref<NetwPromise> pending(
         Object::cast_to<NetwPromise>(gd::live_object(returned))
     );
@@ -415,7 +410,7 @@ void NetwIdToken::provide(const String &p_issuer, const Callable &p_fetch) {
         sources().erase(p_issuer);
         return;
     }
-    game_call_declared(p_fetch, TOKEN_FETCH);
+    game_call_declared(p_fetch, game_calls::TOKEN_FETCH);
     Source fresh;
     fresh.fetch = p_fetch;
     sources()[p_issuer] = fresh;
@@ -494,7 +489,7 @@ void NetwIdToken::_bind_methods() {
     ClassDB::bind_method(D_METHOD("fetch_keys"), &NetwIdToken::fetch_keys);
     ClassDB::bind_static_method(
         "NetwIdToken",
-        D_METHOD("provide", "issuer", "fetch"),
+        D_METHOD("provide", "issuer", "handler"),
         &NetwIdToken::provide
     );
     ClassDB::bind_static_method(

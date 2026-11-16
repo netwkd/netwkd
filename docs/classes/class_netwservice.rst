@@ -23,7 +23,10 @@ Description
 
 Get it with :ref:`NetwSession.service()<class_NetwSession_method_service>`. Override :ref:`_service_entered()<class_NetwService_private_method__service_entered>` and :ref:`_service_exiting()<class_NetwService_private_method__service_exiting>` for setup and cleanup.
 
-::
+
+.. tabs::
+
+ .. code-tab:: gdscript
 
     class_name MatchClock
     extends NetwService
@@ -37,7 +40,39 @@ Get it with :ref:`NetwSession.service()<class_NetwSession_method_service>`. Over
     func _service_exiting(session: NetwSession) -> void:
         session.entered.disconnect(_on_entered)
 
-\ A node that extends another class can call :ref:`register()<class_NetwService_method_register>` and :ref:`unregister()<class_NetwService_method_unregister>` instead.
+ .. code-tab:: csharp
+
+    public partial class MatchClock : Node
+    {
+        NetwSession session;
+
+        public void _service_entered(RefCounted value)
+        {
+            session = NetwSession.From(value);
+            session.Entered += OnEntered;
+        }
+
+        public void _service_exiting(RefCounted value)
+        {
+            session.Entered -= OnEntered;
+        }
+
+        void OnEntered() { }
+    }
+
+    public partial class Match : Node
+    {
+        public override void _Ready()
+        {
+            AddChild(NetwService.Create<MatchClock>());
+        }
+    }
+
+\ 
+
+A C# script extends :godot:`Node` and keeps each method name exactly as it is written here. It takes the :ref:`NetwSession<class_NetwSession>` as a :godot:`RefCounted`, and ``NetwService.Create`` makes the node.
+
+A node that extends another class can call :ref:`register()<class_NetwService_method_register>` and :ref:`unregister()<class_NetwService_method_unregister>` instead.
 
 .. rst-class:: classref-reftable-group
 

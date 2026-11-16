@@ -1,35 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="NetwControlRequest" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="NetwControlRequest" inherits="NetwRequest" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		A request to control a node.
 	</brief_description>
 	<description>
-		Passed by [signal NetwEntity.control_requested] on the server. Call [method deny] to reject the request, otherwise it is granted.
+		Passed to [member NetwEntity.control_handler] on the server. Call [method NetwRequest.deny] to reject the request, otherwise it is granted.
 		[codeblock]
-		func _on_control_requested(peer_id: int, request: NetwControlRequest) -&gt; void:
-		    if not can_carry(peer_id):
-		        request.deny()
+		func judge_claim(request: NetwControlRequest) -&gt; void:
+		    if not can_carry(request.peer_id):
+		        request.deny("hands full")
 		[/codeblock]
 	</description>
 	<tutorials>
 	</tutorials>
-	<methods>
-		<method name="deny">
-			<return type="void" />
-			<description>
-				Rejects this request.
-			</description>
-		</method>
-	</methods>
 	<members>
-		<member name="denied" type="bool" setter="set_denied" getter="get_denied">
-			Whether the request should be rejected. Writing [code]false[/code] over a [method deny] call has no effect.
-		</member>
 		<member name="hold" type="int" setter="" getter="get_hold" enum="NetwEntity.Hold">
 			The [enum NetwEntity.Hold] the peer asked to hold the entity with.
-		</member>
-		<member name="requester" type="int" setter="set_requester" getter="get_requester">
-			Peer id reported by [method MultiplayerAPI.get_remote_sender_id].
 		</member>
 	</members>
 </class>

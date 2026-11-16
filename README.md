@@ -106,7 +106,7 @@ Configure the signal, then emit it on every peer with one call.
 func _init() -> void:
     Netw.configure_signal(self.exploded)
 
-Netw.emit_entity_signal(self.exploded, position)
+Netw.emit(self.exploded, position)
 ```
 
 ## Spawn

@@ -464,18 +464,47 @@ public sealed class NetwConnection : NetwRefCounted
 
     /// <summary>
     /// Creates a peer for a game that assigns it itself.
-    /// <paramref name="completed"/> runs once in a later frame as
-    /// <c>completed(peer, error, detail)</c>, and a peer it leaves unassigned
-    /// is closed. Returns a ticket for
+    /// <paramref name="callback"/> runs once in a later frame, and a peer it
+    /// leaves unassigned is closed. Returns a ticket for
     /// <see cref="NetwConnection.CancelPeerCreation"/>.
+    /// <code>
+    /// func created(peer: MultiplayerPeer, error: Error, detail: String) -&gt; void:
+    ///     if error == OK:
+    ///         multiplayer.multiplayer_peer = peer
+    /// </code>
     /// </summary>
     public Rid CreatePeer(
         Variant transport,
         NetwConnection.TransportMode mode,
         string address,
         Godot.Collections.Dictionary settings,
-        Callable completed)
+        Action<MultiplayerPeer,
+        Error,
+        string> callback)
     {
+        Callable bridged4 = default;
+        if (callback != null)
+        {
+            var bridge4 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    callback(
+                        a0.As<MultiplayerPeer>(),
+                        (Error)a1.AsInt64(),
+                        a2.As<string>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwConnection.CreatePeer", thrown);
+                }
+            };
+            bridged4 = Callable.From(
+                NetwApi.Anchored(callback, bridge4, owner => owner.NetwHold));
+        }
         IntPtr pack = NetwThunks.ArgsNew(5);
         godot_variant slot0 = transport.CopyNativeVariant();
         NetwThunks.ArgsSet(pack, 0, in slot0);
@@ -489,7 +518,7 @@ public sealed class NetwConnection : NetwRefCounted
         godot_variant slot3 = VariantUtils.CreateFromDictionary(settings);
         NetwThunks.ArgsSet(pack, 3, in slot3);
         slot3.Dispose();
-        godot_variant slot4 = VariantUtils.CreateFromCallable(completed);
+        godot_variant slot4 = VariantUtils.CreateFromCallable(bridged4);
         NetwThunks.ArgsSet(pack, 4, in slot4);
         slot4.Dispose();
         godot_variant answered = default;

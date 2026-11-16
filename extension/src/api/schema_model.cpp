@@ -475,7 +475,7 @@ void NetwSchema::_bind_methods() {
         &NetwSchema::storage_version
     );
     ClassDB::bind_method(
-        D_METHOD("migrate", "from_version", "step"),
+        D_METHOD("migrate", "from_version", "handler"),
         &NetwSchema::migrate
     );
     ClassDB::bind_method(

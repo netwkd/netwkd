@@ -17,15 +17,12 @@ namespace Networked;
 /// func _init() -&gt; void:
 ///     Netw.configure_server_info(server_info)
 ///
-/// func server_info(info: NetwServerInfo) -&gt; NetwServerInfo:
+/// func server_info(info: NetwServerInfo) -&gt; void:
 ///     info.motd = "Ranked, no friendly fire"
 ///     info.game_mode = &amp;"ranked"
-///     return info
 /// </code>
 /// <para>
-/// Returning anything but a <see cref="NetwServerInfo"/> makes the browser show
-/// the server as broken. Put any extra values in
-/// <see cref="NetwServerInfo.Metadata"/>.
+/// Put any extra values in <see cref="NetwServerInfo.Metadata"/>.
 /// </para>
 /// </remarks>
 public sealed class NetwServerInfo : NetwRefCounted

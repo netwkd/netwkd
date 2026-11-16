@@ -32,7 +32,7 @@ public:
     }
 
     godot::Ref<NetwDespawnConfig> before_removal(
-        const godot::Callable &p_callable
+        const godot::Callable &p_method
     );
     godot::Ref<NetwDespawnConfig> linger(double p_seconds);
 };

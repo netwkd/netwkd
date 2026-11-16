@@ -135,7 +135,7 @@ Ref<netw::NetwJoinRequest> request_for(const String &p_challenge) {
 }
 
 bool answered_ok(const Variant &p_answer) {
-    return p_answer.get_type() == Variant::INT && int64_t(p_answer) == OK;
+    return p_answer.get_type() == Variant::NIL;
 }
 
 int64_t ticks() {

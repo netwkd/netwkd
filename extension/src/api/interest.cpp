@@ -309,27 +309,22 @@ void NetwInterest::_bind_methods() {
     ClassDB::bind_method(D_METHOD("leave", "layer_id"), &NetwInterest::leave);
     ClassDB::bind_method(D_METHOD("layer_ids"), &NetwInterest::layer_ids);
     ClassDB::bind_method(
-        D_METHOD("on_enter", "callback", "layer_id"),
+        D_METHOD("on_enter", "handler", "layer_id"),
         &NetwInterest::on_enter,
         DEFVAL(StringName())
     );
     ClassDB::bind_method(
-        D_METHOD("on_leave", "callback", "layer_id"),
+        D_METHOD("on_leave", "handler", "layer_id"),
         &NetwInterest::on_leave,
         DEFVAL(StringName())
     );
     ClassDB::bind_method(
-        D_METHOD("on_leave_policy", "layer_id", "policy", "custom_callback"),
+        D_METHOD("on_leave_policy", "layer_id", "policy", "handler"),
         &NetwInterest::on_leave_policy,
         DEFVAL(Callable())
     );
     ClassDB::bind_method(
-        D_METHOD(
-            "on_perception_policy",
-            "layer_id",
-            "policy",
-            "custom_callback"
-        ),
+        D_METHOD("on_perception_policy", "layer_id", "policy", "handler"),
         &NetwInterest::on_perception_policy,
         DEFVAL(Callable())
     );

@@ -74,7 +74,6 @@ signal health_updated
 
 @onready var entity := NetwEntity.of(self)
 @onready var clock := Netw.session(self).clock
-@onready var shoot := Netw.action(hit)
 
 @export var crosshair: TextureRect
 @export var skins: Array[Texture2D] = []
@@ -94,6 +93,7 @@ func _init():
 	Netw.configure_property(self, &"weapon_index").broadcast()
 	Netw.configure_property(self, &"shots").broadcast()
 	Netw.configure_rpc(damage).call_local()
+	Netw.configure_action(hit)
 
 # Functions
 
@@ -277,7 +277,7 @@ func action_shoot():
 			# Hitting an enemy
 
 			if collider.has_method("damage"):
-				shoot.request(clock.tick - clock.display_offset, raycast.global_position, raycast.get_collision_point(), weapon_index)
+				Netw.action(hit, clock.tick - clock.display_offset, raycast.global_position, raycast.get_collision_point(), weapon_index)
 
 			# Creating an impact animation
 
@@ -359,10 +359,10 @@ func damage(amount):
 		position = spawn_position
 
 
-func hit(ctx: NetwActionContext, from: Vector3, to: Vector3, index: int):
+func hit(request: NetwActionRequest, from: Vector3, to: Vector3, index: int):
 	var result: Dictionary = Netw.rewind(
 		entity.scene.entities,
-		ctx.view_tick,
+		request.view_tick,
 		func():
 			var query := PhysicsRayQueryParameters3D.create(from, from + from.direction_to(to) * weapons[index].max_distance)
 			query.collide_with_areas = true

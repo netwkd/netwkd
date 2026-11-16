@@ -136,9 +136,9 @@
 		<method name="migrate">
 			<return type="NetwSchema" />
 			<param index="0" name="from_version" type="int" />
-			<param index="1" name="step" type="Callable" />
+			<param index="1" name="handler" type="Callable" />
 			<description>
-				A read runs one [param step] per saved version up to [method storage_version]. A missing step refuses the read.
+				A read runs one [param handler] per saved version up to [method storage_version]. A missing step refuses the read.
 				[codeblock lang=text]
 				step(values: Dictionary) -&gt; Dictionary
 

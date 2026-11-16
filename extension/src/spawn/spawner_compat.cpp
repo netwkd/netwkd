@@ -28,11 +28,6 @@ const char *SIG_SPAWNED = "spawned";
 const char *SIG_DESPAWNED = "despawned";
 const char *KEY_CLEAR_SESSION = "spawner-compat-clear-session";
 
-const GameCall SPAWNER_FUNCTION
-    = {"The MultiplayerSpawner.spawn_function",
-       "func(data: Variant) -> Node",
-       1};
-
 Variant duplicate_arg(const Variant &p_data) {
     if (p_data.get_type() == Variant::ARRAY) {
         return Array(p_data).duplicate(true);
@@ -180,7 +175,7 @@ void SpawnerCompat::wrap_spawner(Object *p_spawner) {
     if (current.get_object() == plane) {
         return;
     }
-    game_call_declared(current, SPAWNER_FUNCTION);
+    game_call_declared(current, game_calls::SPAWNER_FUNCTION);
     originals[int64_t(gd::instance_id(spawner))] = current;
     spawner->set_spawn_function(
         callable_mp(plane, &NetwMultiplayer::spawner_wrapped_spawn)
@@ -197,7 +192,8 @@ Node *SpawnerCompat::wrapped_spawn(
     }
     Array args;
     args.push_back(p_data);
-    const Variant built = game_call(p_original, args, SPAWNER_FUNCTION);
+    const Variant built
+        = game_call(p_original, args, game_calls::SPAWNER_FUNCTION);
     Node *node = Object::cast_to<Node>(gd::live_object(built));
     if (node != nullptr) {
         custom_args[int64_t(gd::instance_id(node))] = duplicate_arg(p_data);
@@ -251,7 +247,8 @@ Node *SpawnerCompat::instantiate(
     }
     Array args;
     args.push_back(p_data);
-    const Variant built = game_call(original, args, SPAWNER_FUNCTION);
+    const Variant built
+        = game_call(original, args, game_calls::SPAWNER_FUNCTION);
     return Object::cast_to<Node>(gd::live_object(built));
 }
 

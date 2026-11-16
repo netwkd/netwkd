@@ -75,6 +75,44 @@ public sealed class NetwTransport : NetwRefCounted
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
 
+    /// <summary>
+    /// Makes a <see cref="NetwTransport"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_peer_class</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwTransport",
+            "_peer_class",
+            "_recognizes_peer",
+            "_display_name",
+            "_is_available",
+            "_can_host_here",
+            "_can_probe",
+            "_address_label",
+            "_address_placeholder",
+            "_address_help",
+            "_accepts_empty_address",
+            "_host_settings",
+            "_client_settings",
+            "_make_peer",
+            "_cancel_peer_creation",
+            "_probe",
+            "_can_browse",
+            "_browse",
+            "_make_probe_peer",
+            "_adopt",
+            "_poll",
+            "_join_address",
+            "_diagnostics",
+            "_timeout_hint",
+            "_close");
+    }
+
     private static readonly IntPtr _bindGetSession =
         NetwApi.MethodBind("NetwTransport", "get_session", 3160388065UL);
 

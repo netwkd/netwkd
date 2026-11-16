@@ -103,6 +103,8 @@ private:
     void readmitted_ready();
     int64_t action_spawn_tick = -1;
     int64_t action_requester = 0;
+    godot::Callable control_handler;
+    godot::Callable lifecycle_handler;
 
     entity::Control *control() const;
     NetwMultiplayer *session_core() const;
@@ -140,6 +142,17 @@ public:
     godot::Ref<godot::MultiplayerAPI> get_multiplayer() const;
 
     void stamp_multiplayer(const godot::Ref<NetwMultiplayer> &p_api);
+
+    godot::Callable get_control_handler() const {
+        return control_handler;
+    }
+    void set_control_handler(const godot::Callable &p_handler);
+    void judge_control(const godot::Variant &p_request) const;
+    godot::Callable get_lifecycle_handler() const {
+        return lifecycle_handler;
+    }
+    void set_lifecycle_handler(const godot::Callable &p_handler);
+    void judge_lifecycle(const godot::Variant &p_request) const;
 
     Transfer get_transfer() const;
     void set_transfer(Transfer p_value);

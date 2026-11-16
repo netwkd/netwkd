@@ -1,0 +1,34 @@
+:github_url: hide
+
+.. _fault_nw1042:
+
+NW1042. The admission handler gave no answer
+============================================
+
+Reported as an error when the handler declared with
+:ref:`Netw.configure_admission <class_Netw_method_configure_admission>`
+finishes without admitting or denying the join. The join is refused with
+``ERR_UNAUTHORIZED``. It is reported once per session.
+
+The handler admits nobody, because what it returns is not read.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> Error:
+        return OK if request.account else ERR_UNAUTHORIZED
+
+Call
+:ref:`NetwJoinRequest.admit <class_NetwJoinRequest_method_admit>` to let
+the player join, or
+:ref:`NetwRequest.deny <class_NetwRequest_method_deny>` to refuse.
+
+.. code-block:: gdscript
+
+    func admit(request: NetwJoinRequest) -> void:
+        if request.account:
+            request.admit()
+        else:
+            request.deny()
+
+A handler stopped by a script error gives no answer, so it refuses the
+join too.

@@ -31,10 +31,11 @@ Accept the same providers in the same order on every peer with :ref:`NetwAdmissi
     func _prove(challenge: String, _session: NetwSession) -> Variant:
         return (PASSCODE + challenge).sha256_text()
 
-    func _verify(request: NetwJoinRequest, proof: Variant) -> Variant:
+    func _verify(request: NetwJoinRequest, proof: Variant) -> void:
         if proof is String and proof == (PASSCODE + request.challenge).sha256_text():
             request.add_account("club:" + request.username, request.username)
-        return OK
+        else:
+            request.deny("Wrong passcode.")
 
 \ Proving and verifying count against the join deadline of :ref:`NetwAdmissionConfig.timeout()<class_NetwAdmissionConfig_method_timeout>`. :ref:`NetwIdToken<class_NetwIdToken>` is a ready provider for signed tokens.
 
@@ -49,7 +50,7 @@ Methods
    +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Variant` | :ref:`_prove<class_NetwAccountProvider_private_method__prove>`\ (\ challenge\: :godot:`String`, session\: :ref:`NetwSession<class_NetwSession>`\ ) |virtual|        |
    +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Variant` | :ref:`_verify<class_NetwAccountProvider_private_method__verify>`\ (\ request\: :ref:`NetwJoinRequest<class_NetwJoinRequest>`, proof\: :godot:`Variant`\ ) |virtual| |
+   | |void|           | :ref:`_verify<class_NetwAccountProvider_private_method__verify>`\ (\ request\: :ref:`NetwJoinRequest<class_NetwJoinRequest>`, proof\: :godot:`Variant`\ ) |virtual| |
    +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -79,9 +80,9 @@ Runs on the joining peer. Return a proof of the account that answers ``challenge
 
 .. rst-class:: classref-method
 
-:godot:`Variant` **_verify**\ (\ request\: :ref:`NetwJoinRequest<class_NetwJoinRequest>`, proof\: :godot:`Variant`\ ) |virtual| :ref:`🔗<class_NetwAccountProvider_private_method__verify>`
+|void| **_verify**\ (\ request\: :ref:`NetwJoinRequest<class_NetwJoinRequest>`, proof\: :godot:`Variant`\ ) |virtual| :ref:`🔗<class_NetwAccountProvider_private_method__verify>`
 
-Runs on the server with what :ref:`_prove()<class_NetwAccountProvider_private_method__prove>` returned. Call :ref:`NetwJoinRequest.add_account()<class_NetwJoinRequest_method_add_account>` for the account ``proof`` proves and return :godot:`@GlobalScope.OK <@GlobalScope#class_@GlobalScope_constant_OK>`. Any other :godot:`@GlobalScope.Error <@GlobalScope#enum_@globalscope_Error>` refuses the join. It may ``await`` or return a :ref:`NetwPromise<class_NetwPromise>`.
+Runs on the server with what :ref:`_prove()<class_NetwAccountProvider_private_method__prove>` returned. Call :ref:`NetwJoinRequest.add_account()<class_NetwJoinRequest_method_add_account>` for the account ``proof`` proves. Calling :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` on ``request`` refuses the join. It may ``await``.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

@@ -51,13 +51,13 @@ Methods
    +-----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwInterest<class_NetwInterest>` | :ref:`of<class_NetwInterest_method_of>`\ (\ node\: :godot:`Node`\ ) |static|                                                                                                                                                                             |
    +-----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_enter<class_NetwInterest_method_on_enter>`\ (\ callback\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ )                                                                                                                            |
+   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_enter<class_NetwInterest_method_on_enter>`\ (\ handler\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ )                                                                                                                             |
    +-----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_leave<class_NetwInterest_method_on_leave>`\ (\ callback\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ )                                                                                                                            |
+   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_leave<class_NetwInterest_method_on_leave>`\ (\ handler\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ )                                                                                                                             |
    +-----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_leave_policy<class_NetwInterest_method_on_leave_policy>`\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`LeavePolicy<enum_NetwInterestLayer_LeavePolicy>`, custom_callback\: :godot:`Callable` = Callable()\ )                               |
+   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_leave_policy<class_NetwInterest_method_on_leave_policy>`\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`LeavePolicy<enum_NetwInterestLayer_LeavePolicy>`, handler\: :godot:`Callable` = Callable()\ )                                       |
    +-----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_perception_policy<class_NetwInterest_method_on_perception_policy>`\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`PerceptionPolicy<enum_NetwInterestLayer_PerceptionPolicy>`, custom_callback\: :godot:`Callable` = Callable()\ )           |
+   | :ref:`NetwInterest<class_NetwInterest>` | :ref:`on_perception_policy<class_NetwInterest_method_on_perception_policy>`\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`PerceptionPolicy<enum_NetwInterestLayer_PerceptionPolicy>`, handler\: :godot:`Callable` = Callable()\ )                   |
    +-----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -188,9 +188,13 @@ Returns the :ref:`NetwEntity.interest<class_NetwEntity_property_interest>` of ``
 
 .. rst-class:: classref-method
 
-:ref:`NetwInterest<class_NetwInterest>` **on_enter**\ (\ callback\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwInterest_method_on_enter>`
+:ref:`NetwInterest<class_NetwInterest>` **on_enter**\ (\ handler\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwInterest_method_on_enter>`
 
-Calls ``callback`` as ``callback(layer_id, peer_id)`` when ``layer_id`` shows the entity to a peer, once that peer also sees the :ref:`NetwEntity<class_NetwEntity>` above it. An empty ``layer_id`` means every layer joined so far.
+Calls ``handler`` when ``layer_id`` shows the entity to a peer, once that peer also sees the :ref:`NetwEntity<class_NetwEntity>` above it. An empty ``layer_id`` means every layer joined so far.
+
+::
+
+    func _on_interest_enter(layer_id: StringName, peer_id: int) -> void:
 
 .. rst-class:: classref-item-separator
 
@@ -200,9 +204,13 @@ Calls ``callback`` as ``callback(layer_id, peer_id)`` when ``layer_id`` shows th
 
 .. rst-class:: classref-method
 
-:ref:`NetwInterest<class_NetwInterest>` **on_leave**\ (\ callback\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwInterest_method_on_leave>`
+:ref:`NetwInterest<class_NetwInterest>` **on_leave**\ (\ handler\: :godot:`Callable`, layer_id\: :godot:`StringName` = &""\ ) :ref:`🔗<class_NetwInterest_method_on_leave>`
 
-Calls ``callback`` as ``callback(layer_id, peer_id)`` when ``layer_id`` stops showing the entity to a peer, also when that peer stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it. An empty ``layer_id`` means every layer joined so far.
+Calls ``handler`` when ``layer_id`` stops showing the entity to a peer, also when that peer stops seeing the :ref:`NetwEntity<class_NetwEntity>` above it. An empty ``layer_id`` means every layer joined so far.
+
+::
+
+    func _on_interest_leave(layer_id: StringName, peer_id: int) -> void:
 
 .. rst-class:: classref-item-separator
 
@@ -212,9 +220,13 @@ Calls ``callback`` as ``callback(layer_id, peer_id)`` when ``layer_id`` stops sh
 
 .. rst-class:: classref-method
 
-:ref:`NetwInterest<class_NetwInterest>` **on_leave_policy**\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`LeavePolicy<enum_NetwInterestLayer_LeavePolicy>`, custom_callback\: :godot:`Callable` = Callable()\ ) :ref:`🔗<class_NetwInterest_method_on_leave_policy>`
+:ref:`NetwInterest<class_NetwInterest>` **on_leave_policy**\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`LeavePolicy<enum_NetwInterestLayer_LeavePolicy>`, handler\: :godot:`Callable` = Callable()\ ) :ref:`🔗<class_NetwInterest_method_on_leave_policy>`
 
-Sets what happens to a peer's copy when it stops seeing the entity through ``layer_id``. :ref:`NetwInterestLayer.LEAVE_POLICY_CUSTOM<class_NetwInterestLayer_constant_LEAVE_POLICY_CUSTOM>` requires ``custom_callback``, called on the server as ``custom_callback(peer_id, layer_id)``.
+Sets what happens to a peer's copy when it stops seeing the entity through ``layer_id``. :ref:`NetwInterestLayer.LEAVE_POLICY_CUSTOM<class_NetwInterestLayer_constant_LEAVE_POLICY_CUSTOM>` requires ``handler``, called on the server.
+
+::
+
+    func fade_out(peer_id: int, layer_id: StringName) -> void:
 
 .. rst-class:: classref-item-separator
 
@@ -224,9 +236,13 @@ Sets what happens to a peer's copy when it stops seeing the entity through ``lay
 
 .. rst-class:: classref-method
 
-:ref:`NetwInterest<class_NetwInterest>` **on_perception_policy**\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`PerceptionPolicy<enum_NetwInterestLayer_PerceptionPolicy>`, custom_callback\: :godot:`Callable` = Callable()\ ) :ref:`🔗<class_NetwInterest_method_on_perception_policy>`
+:ref:`NetwInterest<class_NetwInterest>` **on_perception_policy**\ (\ layer_id\: :godot:`StringName`, policy\: :ref:`PerceptionPolicy<enum_NetwInterestLayer_PerceptionPolicy>`, handler\: :godot:`Callable` = Callable()\ ) :ref:`🔗<class_NetwInterest_method_on_perception_policy>`
 
-Sets whether this peer keeps showing the entity when it stops seeing it through ``layer_id``. :ref:`NetwInterestLayer.PERCEPTION_POLICY_CUSTOM<class_NetwInterestLayer_constant_PERCEPTION_POLICY_CUSTOM>` requires ``custom_callback``, called as ``custom_callback(visible, peer_id, layer_id)``.
+Sets whether this peer keeps showing the entity when it stops seeing it through ``layer_id``. :ref:`NetwInterestLayer.PERCEPTION_POLICY_CUSTOM<class_NetwInterestLayer_constant_PERCEPTION_POLICY_CUSTOM>` requires ``handler``.
+
+::
+
+    func show_ghost(visible: bool, peer_id: int, layer_id: StringName) -> void:
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

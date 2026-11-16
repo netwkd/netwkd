@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import shutil
@@ -155,9 +156,78 @@ NAMED_MEMBER_METHODS = {
     "spawn",
     "spawn_async",
     "spawn_player",
-    "emit_entity_signal",
+    "emit",
     "action",
 }
+TYPED_ARITY = 8
+TYPED_METHODS = {
+    "configure_rpc": "declared",
+    "configure_spawn": "declared",
+    "rpc": "sent",
+    "rpc_id": "sent",
+    "rpc_controller": "sent",
+    "request": "answered",
+    "request_id": "answered",
+    "request_controller": "answered",
+    "request_all": "gathered",
+    "spawn": "made",
+    "spawn_player": "made",
+    "spawn_async": "made_later",
+    "action": "requested",
+}
+TASK = "System.Threading.Tasks.Task"
+GAME_CALLS = ROOT / "extension" / "include" / "netw" / "game_calls.def"
+GAME_CALL = re.compile(r'NETW_GAME_CALL\(\s*\w+,\s*"([^"]*)",\s*"[^"]*",\s*"([^"]*)"\s*\)')
+HANDLER_SHAPE = re.compile(r"^func(?: \w+)?\((.*)\) -> (.+)$")
+DECLARED_HANDLERS = {
+    "Netw.configure_action.method": "NetwMultiplayer.LagcompActionDeclare",
+}
+AWAITED_HANDLERS = {"Netw.configure_admission.handler"}
+NAMED_HANDLERS = {"NetwActionConfig.predict.handler"}
+GENERIC_HANDLERS = {"Netw.configure_join.handler"}
+
+
+@dataclass(frozen=True)
+class Handler:
+    """What the addon passes one game callback, and what it reads back."""
+
+    arguments: tuple
+    answered: dict | None
+    variadic: bool
+
+
+def handler_entry(spelled: str) -> dict | None:
+    if spelled == "void":
+        return None
+    if spelled == "Error":
+        return {"type": "enum::Error"}
+    if spelled.startswith("Array["):
+        return {"type": "typedarray::" + spelled[len("Array[") : -1]}
+    return {"type": spelled}
+
+
+def handler_of(shape: str) -> Handler | None:
+    matched = HANDLER_SHAPE.match(shape)
+    if matched is None:
+        return None
+    listed = [one.strip() for one in matched.group(1).split(",") if one.strip()]
+    arguments = tuple(handler_entry(one.split(":")[1].strip()) for one in listed if one != "...")
+    return Handler(arguments, handler_entry(matched.group(2)), "..." in listed)
+
+
+def game_calls(path: Path = GAME_CALLS) -> dict[str, Handler]:
+    """Every callback the addon calls, keyed by the Class.method.argument or
+    Class.property that takes it."""
+    shapes: dict[str, str] = {}
+    for targets, shape in GAME_CALL.findall(path.read_text(encoding="utf-8")):
+        for target in targets.split():
+            shapes[target] = shape
+    found = {}
+    for target, shape in shapes.items():
+        handler = handler_of(shape)
+        if handler is not None:
+            found[target] = handler
+    return found
 
 PTRCALL_MAX_ARITY = 3
 CALL_MAX_ARITY = 4
@@ -734,8 +804,12 @@ class Surface:
 class Emitter:
     """Writes one class file from its dump entry."""
 
-    def __init__(self, surface: Surface):
+    def __init__(self, surface: Surface, handlers: dict[str, Handler] | None = None):
         self.surface = surface
+        self.handlers = game_calls() if handlers is None else handlers
+        self.setters: dict[str, str] = {}
+        self.generic_docs: dict[str, list[str]] = {}
+        self.untyped: list[str] = []
         self.skipped: list[str] = []
         self.taken: set[str] = set()
         self.binds: dict[str, str] = {}
@@ -779,6 +853,14 @@ class Emitter:
         ]
         methods = {method["name"]: method for method in entry.get("methods", [])}
         accessors = self.accessor_names(entry)
+        self.setters = {}
+        for member in entry.get("properties", []):
+            setter = member.get("setter")
+            if member.get("type") == "Callable" and setter in methods:
+                if self.bridged("%s.%s" % (name, member["name"])):
+                    self.setters[setter] = member["name"]
+                    accessors.discard(setter)
+                    self.record("%s.%s" % (name, member["name"]), pascal(setter))
 
         for held in entry.get("enums", []):
             emitted = self.enum_of(name, held)
@@ -795,6 +877,8 @@ class Emitter:
                 lines.extend(["", *emitted])
 
         for member in entry.get("properties", []):
+            if member.get("setter") in self.setters:
+                continue
             emitted = self.property_of(name, member, methods)
             if emitted:
                 lines.extend(["", *emitted])
@@ -802,12 +886,21 @@ class Emitter:
         for method in entry.get("methods", []):
             if method["name"] in accessors or method.get("is_virtual"):
                 continue
+            declared = self.declared_overloads(name, method)
+            if declared:
+                for overload in declared:
+                    lines.extend(["", *overload])
+                continue
             emitted = self.method_of(name, method)
             if emitted:
                 lines.extend(["", *emitted])
+                for overload in self.handler_overloads(name, method):
+                    lines.extend(["", *overload])
                 if name == "Netw":
                     overload = self.named_overload(method)
                     if overload:
+                        lines.extend(["", *overload])
+                    for overload in self.typed_overloads(method):
                         lines.extend(["", *overload])
 
         lines.append("}")
@@ -858,6 +951,41 @@ class Emitter:
             % (
                 "NetwApi.Retained(NetwApi.ObjectOf(value))" if entry.get("is_refcounted") else "NetwApi.ObjectOf(value)"
             ),
+            "    }",
+            *self.creator_of(entry),
+        ]
+
+    def overrides_of(self, entry: dict | None) -> list[str]:
+        """Every method a game overrides on a class, its bases' included."""
+        if entry is None:
+            return []
+        found = self.overrides_of(self.surface.classes.get(entry.get("inherits")))
+        return found + [method["name"] for method in entry.get("methods", []) if method.get("is_virtual")]
+
+    def creator_of(self, entry: dict) -> list[str]:
+        name = entry["name"]
+        virtuals = self.overrides_of(entry)
+        declares = any(method.get("is_virtual") for method in entry.get("methods", []))
+        if not declares or not entry.get("is_instantiable"):
+            return []
+        base = self.surface.classes.get(entry.get("inherits"))
+        hides = base is not None and self.creator_of(base)
+        return [
+            "",
+            "    /// <summary>",
+            "    /// Makes a <see cref=\"%s\"/> that runs the script of" % name,
+            "    /// <typeparamref name=\"T\"/>, and returns it. A method the",
+            "    /// addon calls keeps its exact name, such as",
+            "    /// <c>%s</c>. An object of the addon is" % virtuals[0],
+            "    /// typed <c>RefCounted</c> or <c>Node</c> and read with",
+            "    /// <c>From</c>.",
+            "    /// </summary>",
+            "    public %sstatic T Create<T>() where T : GodotObject" % ("new " if hides else ""),
+            "    {",
+            "        return NetwApi.Create<T>(",
+            '            "%s",' % name,
+            *['            "%s",' % one for one in virtuals[:-1]],
+            '            "%s");' % virtuals[-1],
             "    }",
         ]
 
@@ -1199,6 +1327,8 @@ class Emitter:
             "    ",
             {argument["name"]: name for argument, name in zip(arguments, names)},
         )
+        if method["name"] in self.setters:
+            told = self.doc_of(class_name, "members", self.setters[method["name"]], "    ")
         preflight = self.preflight_of(class_name, method, arguments, names)
 
         plan = self.ptrcall_plan(method, arguments)
@@ -1225,6 +1355,38 @@ class Emitter:
             return None
         answered, boxed = plan
         signature, filled = self.declared_arguments(arguments, names, boxed)
+        passed = list(names)
+        if class_name == "Netw" and method["name"] in NAMED_MEMBER_METHODS:
+            for index, argument in enumerate(arguments):
+                if argument["type"] != "Callable":
+                    continue
+                name = names[index]
+                signature = signature.replace("Callable %s" % name, "Node node, StringName %s" % name)
+                passed[index] = "new Callable(node, %s)" % name
+        site = "%s.%s" % (class_name, spelled)
+        for index, argument in enumerate(arguments):
+            if argument["type"] != "Callable" or passed[index] != names[index]:
+                continue
+            target = self.target_of(class_name, method, argument)
+            if not self.bridged(target):
+                self.untyped.append(target)
+                continue
+            name = names[index]
+            if target in GENERIC_HANDLERS or target in AWAITED_HANDLERS:
+                modifier = modifier.replace("public", "private")
+                self.generic_docs[target] = told
+                told = []
+                continue
+            if target in NAMED_HANDLERS:
+                declared = "Delegate"
+                passed[index] = 'new Callable(NetwApi.Receiver(%s, "%s"), %s.Method.Name)' % (name, site, name)
+            else:
+                handler = self.handlers[target]
+                declared = self.delegate_of(handler)
+                passed[index] = "bridged%d" % index
+                preflight = preflight + self.bridge_lines(handler, name, passed[index], site)
+            signature = signature.replace("Callable %s = default" % name, "%s %s = null" % (declared, name))
+            signature = signature.replace("Callable %s" % name, "%s %s" % (declared, name))
         varargs = None
         if method.get("is_vararg"):
             element = VARARG_TYPES.get((class_name, method["name"]), "Variant")
@@ -1237,7 +1399,7 @@ class Emitter:
             + self.call_lines(
                 field,
                 instance,
-                list(zip(names, boxed)),
+                list(zip(passed, boxed)),
                 answered,
                 "        ",
                 varargs,
@@ -1262,23 +1424,324 @@ class Emitter:
                 "            declaredType = NetwPropertyTypes.Resolve(node, property);",
                 "        }",
             ]
-        if method["name"] not in NAMED_MEMBER_METHODS:
+        return []
+
+    def target_of(self, class_name: str, method: dict, argument: dict) -> str:
+        held = self.setters.get(method["name"])
+        if held is not None:
+            return "%s.%s" % (class_name, held)
+        return "%s.%s.%s" % (class_name, method["name"], argument["name"])
+
+    def bridged(self, target: str) -> bool:
+        """Whether the Callable at one target is taken as a typed method."""
+        handler = self.handlers.get(target)
+        if handler is None:
+            return False
+        if target in NAMED_HANDLERS:
+            return True
+        if handler.variadic and target not in GENERIC_HANDLERS | set(DECLARED_HANDLERS):
+            return False
+        return self.handler_types(handler) is not None
+
+    def handler_types(self, handler: Handler) -> tuple[list[str], Boxed] | None:
+        carried = []
+        for argument in handler.arguments:
+            declared = self.surface.signal_type(argument)
+            if declared is None:
+                return None
+            carried.append(declared)
+        answered = self.surface.box(handler.answered)
+        if answered is None:
+            return None
+        return carried, answered
+
+    def delegate_of(self, handler: Handler, extra: list[str] | None = None) -> str:
+        carried, answered = self.handler_types(handler)
+        taken = carried + (extra or [])
+        if answered.declared == "void":
+            return "Action<%s>" % ", ".join(taken) if taken else "Action"
+        return "Func<%s>" % ", ".join(taken + [answered.declared])
+
+    def bridge_lines(
+        self,
+        handler: Handler,
+        name: str,
+        local: str,
+        site: str,
+        extra: list[str] | None = None,
+        awaited: bool = False,
+        denied: bool = False,
+    ) -> list[str]:
+        """The Callable the addon calls for one typed handler. It hands the
+        handler each object as its own class, converts what the handler
+        returns, and answers nothing when the handler throws. A handler
+        that awaits answers a NetwPromise the addon waits for. A denied
+        handler has its request denied when it throws."""
+        carried, answered = self.handler_types(handler)
+        received = []
+        passed = []
+        for at, (declared, argument) in enumerate(zip(carried, handler.arguments)):
+            if declared in self.surface.classes:
+                passed.append("Wrapped(a%d, %s.From)" % (at, declared))
+            elif argument.get("type", "").startswith(("enum::", "bitfield::")):
+                passed.append("(%s)a%d.AsInt64()" % (declared, at))
+            elif declared == "Variant":
+                passed.append("a%d" % at)
+            else:
+                passed.append("a%d.As<%s>()" % (at, declared))
+        for at, declared in enumerate(extra or [], len(carried)):
+            passed.append("a%d.As<%s>()" % (at, declared))
+        received = ["Godot.Variant a%d" % at for at in range(len(passed))]
+        call = "%s(%s)" % (name, ", ".join(passed))
+        inner = " " * 20
+        if awaited:
+            tried = [
+                inner + "return NetwApi.Answered(",
+                inner + '    NetwApi.Awaited("%s", %s));' % (site, call),
+            ]
+            failed = [inner + "return NetwApi.Answered(default);"]
+            anchor = "NetwAnswer"
+        elif answered.declared == "void":
+            tried = [inner + call + ";"]
+            failed = [inner + '%s?.Deny("The action handler failed.");' % passed[0]] if denied else []
+            anchor = "NetwHold"
+        else:
+            made = answered.to_variant.format(name="answer")
+            tried = [
+                inner + "%s answer = %s;" % (answered.declared, call),
+                inner + "return NetwApi.Answered(",
+                inner + "    Godot.Variant.CreateTakingOwnershipOfDisposableValue(",
+                inner + "        %s));" % made,
+            ]
+            failed = [inner + "return NetwApi.Answered(default);"]
+            anchor = "NetwAnswer"
+        bridge = "bridge" + local[len("bridged") :]
+        opened = "            var %s = (%s) =>" % (bridge, ", ".join(received))
+        if len(opened) > WIDTH:
+            listed = ["                %s," % one for one in received]
+            listed[-1] = listed[-1][:-1] + ") =>"
+            heading = ["            var %s = (" % bridge, *listed]
+        else:
+            heading = [opened]
+        return [
+            "        Callable %s = default;" % local,
+            "        if (%s != null)" % name,
+            "        {",
+            *heading,
+            "            {",
+            "                try",
+            "                {",
+            *tried,
+            "                }",
+            "                catch (Exception thrown)",
+            "                {",
+            inner + 'NetwApi.Report("%s", thrown);' % site,
+            *failed,
+            "                }",
+            "            };",
+            "            %s = Callable.From(" % local,
+            "                NetwApi.Anchored(%s, %s, owner => owner.%s));" % (name, bridge, anchor),
+            "        }",
+        ]
+
+    def declared_overloads(self, class_name: str, method: dict) -> list[list[str]]:
+        """The overloads of a method that declares a handler by its node and
+        name. The addon keeps the name and calls the typed handler, so the
+        node needs no method Godot can call by that name."""
+        arguments = method.get("arguments") or []
+        if len(arguments) != 1 or arguments[0]["type"] != "Callable":
             return []
-        lines = []
-        for argument, name in zip(arguments, names):
-            if argument["type"] != "Callable":
-                continue
-            lines.extend(
+        target = self.target_of(class_name, method, arguments[0])
+        answered = self.surface.box(method.get("return_value"))
+        if target not in DECLARED_HANDLERS or not self.bridged(target) or answered is None:
+            return []
+        spelled = pascal(method["name"])
+        if not self.claim("%s.%s" % (class_name, method["name"]), spelled):
+            return []
+        handler = self.handlers[target]
+        name = self.parameters(method)[0]
+        site = "%s.%s" % (class_name, spelled)
+        head = "    public static %s %s" % (answered.declared, spelled)
+        told = self.doc_of(class_name, "methods", method["name"], "    ", {arguments[0]["name"]: name})
+        overloads = []
+        for count in range(TYPED_ARITY + 1):
+            extra = ["T%d" % (index + 1) for index in range(count)]
+            if extra:
+                opened = [
+                    head + "<",
+                    *["        [MustBeVariant] %s," % one for one in extra[:-1]],
+                    "        [MustBeVariant] %s>(" % extra[-1],
+                ]
+            else:
+                opened = [*told, head + "("]
+            overloads.append(
                 [
-                    "        if (%s.Delegate != null)" % name,
-                    "        {",
-                    "            throw new ArgumentException(",
-                    '                "Netw.%s sends a method by name. Pass the " +' % pascal(method["name"]),
-                    '                "node and a MethodName constant.", nameof(%s));' % name,
-                    "        }",
+                    *opened,
+                    "        %s %s)" % (self.delegate_of(handler, extra), name),
+                    "    {",
+                    '        Node root = NetwApi.Receiver(%s, "%s", false);' % (name, site),
+                    *self.bridge_lines(handler, name, "bridged0", site, extra, False, True),
+                    "        return %s(" % DECLARED_HANDLERS[target],
+                    "            root,",
+                    "            %s.Method.Name," % name,
+                    "            bridged0);",
+                    "    }",
                 ]
             )
-        return lines
+        return overloads
+
+    def handler_overloads(self, class_name: str, method: dict) -> list[list[str]]:
+        """The overloads a handler earns beside its typed method. One takes
+        a handler that awaits, and a handler with arguments of the game's
+        own takes one overload for each count of them."""
+        arguments = method.get("arguments") or []
+        if len(arguments) != 1 or arguments[0]["type"] != "Callable":
+            return []
+        target = self.target_of(class_name, method, arguments[0])
+        if not self.bridged(target):
+            return []
+        answered = self.surface.box(method.get("return_value"))
+        if answered is None:
+            return []
+        handler = self.handlers[target]
+        name = self.parameters(method)[0]
+        spelled = pascal(method["name"])
+        site = "%s.%s" % (class_name, spelled)
+        head = "    public %s%s %s" % ("static " if method.get("is_static") else "", answered.declared, spelled)
+        returned = "" if answered.declared == "void" else "return "
+        if target not in GENERIC_HANDLERS and target not in AWAITED_HANDLERS:
+            return []
+        overloads = []
+        if target in AWAITED_HANDLERS:
+            carried, _ = self.handler_types(handler)
+            overloads.append(
+                [
+                    head + "(",
+                    "        Func<%s> %s)" % (", ".join(carried + [TASK]), name),
+                    "    {",
+                    *self.bridge_lines(handler, name, "bridged0", site, None, True),
+                    "        %s%s(bridged0);" % (returned, spelled),
+                    "    }",
+                ]
+            )
+        for count in range(TYPED_ARITY + 1 if handler.variadic else 1):
+            extra = ["T%d" % (index + 1) for index in range(count)]
+            taken = "        %s %s)" % (self.delegate_of(handler, extra), name)
+            if extra:
+                opened = [
+                    head + "<",
+                    *["        [MustBeVariant] %s," % one for one in extra[:-1]],
+                    "        [MustBeVariant] %s>(" % extra[-1],
+                ]
+            else:
+                opened = [*self.generic_docs.get(target, []), head + "("]
+            overloads.append(
+                [
+                    *opened,
+                    taken,
+                    "    {",
+                    *self.bridge_lines(handler, name, "bridged0", site, extra),
+                    "        %s%s(bridged0);" % (returned, spelled),
+                    "    }",
+                ]
+            )
+        return overloads[::-1] if target in AWAITED_HANDLERS else overloads
+
+    def typed_overloads(self, method: dict) -> list[list[str]]:
+        """The overloads of one networked method that take the method
+        itself. Each sends the delegate's node and name through the
+        overload that takes them, after NetwApi.Receiver has checked them."""
+        kind = TYPED_METHODS.get(method["name"])
+        if kind is None:
+            return []
+        spelled = pascal(method["name"])
+        names = self.parameters(method)
+        before: list[tuple[str, str]] = []
+        after: list[tuple[str, str]] = []
+        held = None
+        for argument, name in zip(method.get("arguments") or [], names):
+            if argument["type"] == "Callable":
+                held = name
+                continue
+            boxed = self.surface.box(argument)
+            if boxed is None:
+                return []
+            (before if held is None else after).append((boxed.declared, name))
+        answered = self.surface.box(method.get("return_value"))
+        if answered is None or held is None:
+            return []
+        receiver = 'NetwApi.Receiver(%s, "Netw.%s"%s)' % (held, spelled, ", false" if kind == "requested" else "")
+        fixed = [name for _, name in before] + [receiver, "%s.Method.Name" % held] + [name for _, name in after]
+        if kind == "declared":
+            return [
+                [
+                    "    public static %s %s(Delegate %s)" % (answered.declared, spelled, held),
+                    "    {",
+                    "        return %s(%s);" % (spelled, ", ".join(fixed)),
+                    "    }",
+                ]
+            ]
+        return [
+            self.typed_overload(kind, spelled, held, before, after, fixed, answered.declared, count)
+            for count in range(TYPED_ARITY + 1)
+        ]
+
+    def typed_overload(
+        self,
+        kind: str,
+        spelled: str,
+        held: str,
+        before: list[tuple[str, str]],
+        after: list[tuple[str, str]],
+        fixed: list[str],
+        declared: str,
+        count: int,
+    ) -> list[str]:
+        carried = ["T%d" % (index + 1) for index in range(count)]
+        generic = ["[MustBeVariant] %s" % one for one in carried]
+        taken = list(carried)
+        constraint = ""
+        call = "%s(%s)" % (spelled, ", ".join(fixed + ["Variant.From(a%d)" % (index + 1) for index in range(count)]))
+        if kind == "sent":
+            body = call
+        elif kind == "requested":
+            taken.insert(0, "NetwActionRequest")
+            body = call
+        elif kind == "gathered":
+            generic.append("TR")
+            taken.append("TR")
+            body = "return " + call
+        elif kind == "answered":
+            generic.append("[MustBeVariant] TR")
+            taken.append("TR")
+            declared = "%s<TR>" % TASK
+            body = "return %s.AsTask<TR>()" % call
+        else:
+            generic.append("TN")
+            taken.append("TN")
+            constraint = " where TN : Node"
+            if kind == "made":
+                declared = "TN"
+                body = "return (TN)" + call
+            else:
+                declared = "%s<TN>" % TASK
+                body = "return %s.AsTask(value => (TN)value.AsGodotObject())" % call
+        shape = "Action" if kind in ("sent", "requested") else "Func"
+        if taken:
+            shape += "<%s>" % ", ".join(taken)
+        signature = (
+            ["%s %s" % pair for pair in before]
+            + ["%s %s" % (shape, held)]
+            + ["%s %s" % pair for pair in after]
+            + ["%s a%d" % (one, index + 1) for index, one in enumerate(carried)]
+        )
+        head = "    public static %s %s" % (declared, spelled)
+        if generic:
+            opened = [head + "<", *["        %s," % one for one in generic[:-1]], "        %s>(" % generic[-1]]
+        else:
+            opened = [head + "("]
+        listed = ["        %s," % one for one in signature[:-1]] + ["        %s)%s" % (signature[-1], constraint)]
+        return [*opened, *listed, "    {", "        %s;" % body, "    }"]
 
     def named_overload(self, method: dict) -> list[str]:
         if method["name"] not in NAMED_MEMBER_METHODS:
@@ -1289,7 +1752,9 @@ class Emitter:
         passed = []
         for argument, name in zip(arguments, names):
             kind = argument["type"]
-            if kind in ("Callable", "Signal"):
+            if kind == "Callable":
+                return []
+            if kind == "Signal":
                 signature.extend(["Node node", "StringName name"])
                 passed.append("new %s(node, name)" % kind)
             else:
@@ -1751,6 +2216,110 @@ def compile_tree(output: Path, workspace: Path, version: str, timeout: float) ->
     workspace.mkdir(parents=True)
     project = workspace / "bindings.csproj"
     project.write_text(PROJECT % (output, version), encoding="utf-8")
+    run(
+        ["dotnet", "build", str(project), "--nologo", "-v", "quiet"],
+        cwd=workspace,
+        timeout=timeout,
+    )
+    return compile_samples(DOC_DIR, project, workspace / "samples", version, timeout)
+
+
+SAMPLE = re.compile(r"\[csharp\][^\n]*\n(.*?)\n[ \t]*\[/csharp\]", re.S)
+SAMPLE_TYPE = re.compile(
+    r"^\s*(?:(?:public|internal|sealed|abstract|static|partial)\s+)*(?:class|struct|interface)\s+\w+",
+    re.M,
+)
+SAMPLE_CONSTRUCTOR = re.compile(r"^\s*public\s+(\w+)\s*\(", re.M)
+SAMPLE_STANDS = CI_DIR / "csharp_samples.cs"
+SAMPLE_HEAD = """using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Godot;
+using Networked;
+using static SampleStands;
+"""
+
+SAMPLE_PROJECT = """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GodotProjectDir>%s/</GodotProjectDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Compile Include="%s" />
+    <ProjectReference Include="%s" />
+    <PackageReference Include="GodotSharp" Version="%s" />
+    <PackageReference Include="Godot.SourceGenerators" Version="%s" />
+  </ItemGroup>
+</Project>
+"""
+
+
+@dataclass
+class Sample:
+    """One `[csharp]` block of a class XML, and the line its body starts on."""
+
+    path: Path
+    line: int
+    body: str
+
+    @property
+    def name(self) -> str:
+        return "%s_%d" % (self.path.stem, self.line)
+
+    @property
+    def declares_type(self) -> bool:
+        return SAMPLE_TYPE.search(self.body) is not None
+
+    def source(self) -> str:
+        """The block as a C# file whose errors name the XML and its line.
+
+        A block that declares a type is built as written. Any other block is
+        the members of one class in a namespace of its own, named after the
+        constructor the block declares when it has one.
+        """
+        mapped = '#line %d "%s"\n%s\n#line default\n' % (self.line, self.path, self.body)
+        if self.declares_type:
+            return SAMPLE_HEAD + mapped
+        constructor = SAMPLE_CONSTRUCTOR.search(self.body)
+        wrapper = constructor.group(1) if constructor else "Sample"
+        return "%snamespace %s\n{\npublic partial class %s : Node\n{\n%s}\n}\n" % (
+            SAMPLE_HEAD,
+            self.name,
+            wrapper,
+            mapped,
+        )
+
+
+def doc_samples(doc_dir: Path) -> list[Sample]:
+    samples = []
+    for path in sorted(doc_dir.glob("*.xml")):
+        text = path.read_text(encoding="utf-8")
+        for found in SAMPLE.finditer(text):
+            line = text.count("\n", 0, found.start(1)) + 1
+            samples.append(Sample(path, line, html.unescape(found.group(1))))
+    return samples
+
+
+def compile_samples(doc_dir: Path, bindings: Path, workspace: Path, version: str, timeout: float) -> int:
+    """Compile every `[csharp]` block of the class XML against the bindings,
+    because a sample is prose to every other reader and ships wrong."""
+    samples = doc_samples(doc_dir)
+    if workspace.exists():
+        shutil.rmtree(workspace)
+    workspace.mkdir(parents=True)
+    for sample in samples:
+        (workspace / ("%s.cs" % sample.name)).write_text(sample.source(), encoding="utf-8")
+    project = workspace / "samples.csproj"
+    project.write_text(
+        SAMPLE_PROJECT % (workspace, SAMPLE_STANDS, bindings, version, version),
+        encoding="utf-8",
+    )
+    typed = sum(1 for sample in samples if sample.declares_type)
+    print("SAMPLES blocks=%d typed=%d wrapped=%d" % (len(samples), typed, len(samples) - typed))
     run(
         ["dotnet", "build", str(project), "--nologo", "-v", "quiet"],
         cwd=workspace,

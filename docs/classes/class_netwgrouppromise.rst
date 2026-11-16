@@ -69,7 +69,7 @@ Methods
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Variant`                                | :ref:`answer<class_NetwGroupPromise_method_answer>`\ (\ ) |const|                                                                                              |
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwGroupPromise<class_NetwGroupPromise>` | :ref:`catch_error<class_NetwGroupPromise_method_catch_error>`\ (\ cb\: :godot:`Callable`\ )                                                                    |
+   | :ref:`NetwGroupPromise<class_NetwGroupPromise>` | :ref:`catch_error<class_NetwGroupPromise_method_catch_error>`\ (\ callback\: :godot:`Callable`\ )                                                              |
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwGroupPromise<class_NetwGroupPromise>` | :ref:`create<class_NetwGroupPromise_method_create>`\ (\ peers\: :godot:`PackedInt32Array`\ ) |static|                                                          |
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -81,7 +81,7 @@ Methods
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                          | :ref:`resolve_peer<class_NetwGroupPromise_method_resolve_peer>`\ (\ peer_id\: :godot:`int`, val\: :godot:`Variant`\ )                                          |
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwGroupPromise<class_NetwGroupPromise>` | :ref:`then<class_NetwGroupPromise_method_then>`\ (\ cb\: :godot:`Callable`\ )                                                                                  |
+   | :ref:`NetwGroupPromise<class_NetwGroupPromise>` | :ref:`then<class_NetwGroupPromise_method_then>`\ (\ callback\: :godot:`Callable`\ )                                                                            |
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Signal`                                 | :ref:`wait<class_NetwGroupPromise_method_wait>`\ (\ )                                                                                                          |
    +-------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -259,9 +259,13 @@ Returns :ref:`results<class_NetwGroupPromise_property_results>` on success, or :
 
 .. rst-class:: classref-method
 
-:ref:`NetwGroupPromise<class_NetwGroupPromise>` **catch_error**\ (\ cb\: :godot:`Callable`\ ) :ref:`🔗<class_NetwGroupPromise_method_catch_error>`
+:ref:`NetwGroupPromise<class_NetwGroupPromise>` **catch_error**\ (\ callback\: :godot:`Callable`\ ) :ref:`🔗<class_NetwGroupPromise_method_catch_error>`
 
-Calls ``cb`` as ``cb(code, detail)`` when the group fails. Returns the group.
+Calls ``callback`` with :ref:`code<class_NetwGroupPromise_property_code>` and :ref:`detail<class_NetwGroupPromise_property_detail>` when the group fails. Returns the group.
+
+::
+
+    func show_error(code: Error, detail: String) -> void:
 
 .. rst-class:: classref-item-separator
 
@@ -331,9 +335,13 @@ Records the result of ``peer_id`` and emits :ref:`peer_completed<class_NetwGroup
 
 .. rst-class:: classref-method
 
-:ref:`NetwGroupPromise<class_NetwGroupPromise>` **then**\ (\ cb\: :godot:`Callable`\ ) :ref:`🔗<class_NetwGroupPromise_method_then>`
+:ref:`NetwGroupPromise<class_NetwGroupPromise>` **then**\ (\ callback\: :godot:`Callable`\ ) :ref:`🔗<class_NetwGroupPromise_method_then>`
 
-Calls ``cb`` with :ref:`results<class_NetwGroupPromise_property_results>` when every peer answered. Returns the group.
+Calls ``callback`` with :ref:`results<class_NetwGroupPromise_property_results>` when every peer answered. Returns the group.
+
+::
+
+    func count_votes(votes: Dictionary) -> void:
 
 .. rst-class:: classref-item-separator
 

@@ -10,15 +10,6 @@ namespace netw::interest {
 
 namespace {
 
-const GameCall INTEREST_ENTER
-    = {"The NetwInterest.on_enter callback",
-       "func(layer_id: StringName, peer_id: int)",
-       2};
-const GameCall INTEREST_LEAVE
-    = {"The NetwInterest.on_leave callback",
-       "func(layer_id: StringName, peer_id: int)",
-       2};
-
 void fire_each(
     const Array callbacks,
     const StringName &layer_id,
@@ -253,7 +244,7 @@ bool Facet::on_enter(const StringName &layer_id, const Callable &callback) {
         );
         return false;
     }
-    game_call_declared(callback, INTEREST_ENTER);
+    game_call_declared(callback, game_calls::INTEREST_ENTER);
     remember(enter_callbacks, layer_id, callback);
     return true;
 }
@@ -269,7 +260,7 @@ bool Facet::on_leave(const StringName &layer_id, const Callable &callback) {
         );
         return false;
     }
-    game_call_declared(callback, INTEREST_LEAVE);
+    game_call_declared(callback, game_calls::INTEREST_LEAVE);
     remember(leave_callbacks, layer_id, callback);
     return true;
 }
@@ -327,14 +318,14 @@ bool Facet::set_perception_policy(
 void Facet::dispatch_enter(const StringName &layer_id, int64_t peer) {
     const Array *held = enter_callbacks.getptr(layer_id);
     if (held != nullptr) {
-        fire_each(*held, layer_id, peer, INTEREST_ENTER);
+        fire_each(*held, layer_id, peer, game_calls::INTEREST_ENTER);
     }
 }
 
 void Facet::dispatch_leave(const StringName &layer_id, int64_t peer) {
     const Array *held = leave_callbacks.getptr(layer_id);
     if (held != nullptr) {
-        fire_each(*held, layer_id, peer, INTEREST_LEAVE);
+        fire_each(*held, layer_id, peer, game_calls::INTEREST_LEAVE);
     }
 }
 

@@ -503,14 +503,14 @@ void NetwMultiplayer::session_ask_admission(int64_t p_peer) {
     const String uncallable
         = "The admission handler cannot take a NetwJoinRequest, so the join "
           "was refused. Declare it as func admit(request: NetwJoinRequest) "
-          "-> Error.";
+          "-> void.";
     if (p_peer != get_unique_id()) {
         fault::raise(
             this,
             NETW_FAULT_HANDLER_UNCALLABLE,
             {String("The admission handler"),
              String(),
-             String("func admit(request: NetwJoinRequest) -> Error"),
+             String("func admit(request: NetwJoinRequest) -> void"),
              p_peer}
         );
     }
@@ -550,33 +550,16 @@ void NetwMultiplayer::session_admission_settled(
         session_fail_join(p_peer, result->get_code(), result->get_detail());
         return;
     }
-    const Variant verdict = result->get_result();
-    if (verdict.get_type() != Variant::INT) {
-        fault::raise(
-            this,
-            NETW_FAULT_BAD_RETURN,
-            {String(
-                 provider ? "{NetwAccountProvider._verify}"
-                          : "the admission handler"
-             ),
-             String(Variant::get_type_name(verdict.get_type())),
-             "OK or an Error",
-             p_peer}
-        );
-        pending_admissions.erase(p_peer);
-        session_fail_join(
-            p_peer,
-            ERR_UNCONFIGURED,
-            provider ? "An account provider did not return an Error."
-                     : "The admission handler did not return an Error."
-        );
-        return;
+    const Ref<NetwJoinRequest> judged = answered.request;
+    const bool unanswered
+        = !provider && !judged->is_denied() && !judged->is_admitted();
+    if (unanswered && p_peer != get_unique_id()) {
+        fault::raise(this, NETW_FAULT_JOIN_UNANSWERED, {});
     }
-    const Error refusal = Error(int64_t(verdict));
+    const Error refusal = unanswered ? ERR_UNAUTHORIZED : judged->get_code();
     if (refusal != OK) {
         pending_admissions.erase(p_peer);
-        const String given
-            = provider ? String() : answered.request->reason_for(refusal);
+        const String given = judged->get_reason();
         const String refused = !given.is_empty()
             ? given
             : vformat(

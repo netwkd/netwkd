@@ -1,0 +1,37 @@
+:github_url: hide
+
+.. _fault_nw1040:
+
+NW1040. An action was asked for on a node that is not an entity's root
+======================================================================
+
+Reported as an error when
+:ref:`Netw.action <class_Netw_method_action>` gets a method of a node
+that is not the root node of a :ref:`NetwEntity <class_NetwEntity>`.
+Nothing is sent.
+
+``Muzzle`` is a child of ``Gun``, and ``Gun`` is the entity.
+
+.. code-block:: gdscript
+
+    # muzzle.gd
+    func _init() -> void:
+        Netw.configure_action(fire)
+
+    func pull_trigger(tick: int) -> void:
+        Netw.action(fire, tick)
+
+Declare the action and ask for it in the script on ``Gun``.
+
+.. code-block:: gdscript
+
+    # gun.gd
+    func _init() -> void:
+        Netw.configure_entity(self)
+        Netw.configure_action(fire)
+
+    func pull_trigger(tick: int) -> void:
+        Netw.action(fire, tick)
+
+A request names an entity and a method, so the server looks for the
+method on the entity's root node.

@@ -11,20 +11,20 @@ namespace Networked;
 /// <remarks>
 /// The server passes each joining client's <see cref="NetwJoinRequest"/> to the
 /// handler, which may <c>await</c>. The client is not connected and receives
-/// nothing until the handler returns <c>@GlobalScope.OK</c>. Any other
-/// <c>@GlobalScope.Error</c> refuses it, and the client receives that code
-/// unchanged in <see cref="NetwSession.JoinFailed"/>, with the reason given to
-/// <see cref="NetwJoinRequest.Refuse"/>.
+/// nothing until the handler calls <see cref="NetwJoinRequest.Admit"/>. Calling
+/// <see cref="NetwRequest.Deny"/> refuses it, and the client receives that code
+/// and reason in <see cref="NetwSession.JoinFailed"/>.
 /// <code>
 /// var lobby_open := true
 ///
 /// func _init() -&gt; void:
 ///     Netw.configure_admission(admit)
 ///
-/// func admit(request: NetwJoinRequest) -&gt; Error:
-///     if not lobby_open:
-///         return request.refuse(ERR_BUSY, "The match has started.")
-///     return OK
+/// func admit(request: NetwJoinRequest) -&gt; void:
+///     if lobby_open:
+///         request.admit()
+///     else:
+///         request.deny("The match has started.", ERR_BUSY)
 /// </code>
 /// <para>
 /// Each <see cref="NetwAccountProvider"/> accepted here proves one kind of

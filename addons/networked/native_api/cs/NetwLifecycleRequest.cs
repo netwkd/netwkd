@@ -10,33 +10,33 @@ namespace Networked;
 /// accept it.
 /// </summary>
 /// <remarks>
-/// The server receives one in <see cref="NetwEntity.LifecycleRequested"/> for
+/// The server passes one to <see cref="NetwEntity.SetLifecycleHandler"/> for
 /// each change the <see cref="NetwEntity.Controller"/> of a
 /// <see cref="NetwEntity.LifecycleEnum.Controller"/> entity makes, and can call
-/// <see cref="NetwLifecycleRequest.Deny"/> before other peers see it.
+/// <see cref="NetwRequest.Deny"/> before other peers see it.
 /// <code>
-/// func _on_lifecycle_requested(peer_id: int, request: NetwLifecycleRequest) -&gt; void:
-///     if request.kind == NetwLifecycleRequest.KIND_DESPAWN and not may_remove(peer_id):
+/// func judge_change(request: NetwLifecycleRequest) -&gt; void:
+///     if request.kind == NetwLifecycleRequest.KIND_DESPAWN and not may_remove(request.peer_id):
 ///         request.deny("only the builder removes it")
 /// </code>
 /// <para>
 /// Once denied, the request stays denied. The peer that made the change
 /// receives <see cref="NetwEntity.LifecycleRefused"/> with the
-/// <see cref="NetwLifecycleRequest.Reason"/>.
+/// <see cref="NetwRequest.Code"/> and the <see cref="NetwRequest.Reason"/>.
 /// </para>
 /// </remarks>
-public sealed class NetwLifecycleRequest : NetwRefCounted
+public sealed class NetwLifecycleRequest : NetwRequest
 {
     public NetwLifecycleRequest(IntPtr native) : base(native)
     {
     }
 
-    public static NetwLifecycleRequest Adopt(IntPtr native)
+    public new static NetwLifecycleRequest Adopt(IntPtr native)
     {
         return native == IntPtr.Zero ? null : new NetwLifecycleRequest(native);
     }
 
-    public static NetwLifecycleRequest From(Variant value)
+    public new static NetwLifecycleRequest From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
     }
@@ -72,25 +72,6 @@ public sealed class NetwLifecycleRequest : NetwRefCounted
             long answered = default;
             NetwThunks.Ptrcall0_Long(_bindGetKind, Checked, ref answered);
             return (NetwLifecycleRequest.KindEnum)answered;
-        }
-    }
-
-    private static readonly IntPtr _bindGetRequester =
-        NetwApi.MethodBind(
-            "NetwLifecycleRequest",
-            "get_requester",
-            3905245786UL);
-
-    /// <summary>
-    /// The peer that made the change.
-    /// </summary>
-    public long Requester
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetRequester, Checked, ref answered);
-            return answered;
         }
     }
 
@@ -133,70 +114,5 @@ public sealed class NetwLifecycleRequest : NetwRefCounted
             answered.Dispose();
             return result;
         }
-    }
-
-    private static readonly IntPtr _bindGetDenied =
-        NetwApi.MethodBind("NetwLifecycleRequest", "get_denied", 36873697UL);
-
-    private static readonly IntPtr _bindSetDenied =
-        NetwApi.MethodBind("NetwLifecycleRequest", "set_denied", 2586408642UL);
-
-    /// <summary>
-    /// Whether the change is refused. Writing <c>false</c> after
-    /// <see cref="NetwLifecycleRequest.Deny"/> has no effect.
-    /// </summary>
-    public bool Denied
-    {
-        get
-        {
-            byte answered = default;
-            NetwThunks.Ptrcall0_Byte(_bindGetDenied, Checked, ref answered);
-            return answered != 0;
-        }
-        set
-        {
-            byte slot0 = value ? (byte)1 : (byte)0;
-            long discarded = default;
-            NetwThunks.Ptrcall1_Byte_Long(
-                _bindSetDenied,
-                Checked,
-                in slot0,
-                ref discarded);
-        }
-    }
-
-    private static readonly IntPtr _bindGetReason =
-        NetwApi.MethodBind("NetwLifecycleRequest", "get_reason", 201670096UL);
-
-    /// <summary>
-    /// What the server passed to <see cref="NetwLifecycleRequest.Deny"/>, empty
-    /// until then.
-    /// </summary>
-    public string Reason
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetReason, Checked, ref answered);
-            string result = VariantUtils.ConvertToString(answered);
-            answered.Dispose();
-            return result;
-        }
-    }
-
-    private static readonly IntPtr _bindDeny =
-        NetwApi.MethodBind("NetwLifecycleRequest", "deny", 3005725572UL);
-
-    /// <summary>
-    /// Refuses this change and records <paramref name="reason"/> for the peer
-    /// that made it. Only the first call counts.
-    /// </summary>
-    public void Deny(string reason = "")
-    {
-        godot_variant slot0 = VariantUtils.CreateFromString(reason);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindDeny, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        answered.Dispose();
     }
 }

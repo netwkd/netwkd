@@ -115,31 +115,11 @@ PackedStringArray NetwJoinRequest::get_accounts() const {
     return out;
 }
 
-Error NetwJoinRequest::refuse(Error p_code, const String &p_reason) {
-    Error code = p_code;
-    if (code == OK) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_BAD_VALUE,
-            {"{NetwJoinRequest.refuse}", "OK", "the Error to refuse with"}
-        );
-        code = ERR_UNCONFIGURED;
-    }
-    refused_code = code;
-    refused_reason = auth::capped_reason(p_reason);
-    return code;
-}
-
-String NetwJoinRequest::reason_for(Error p_code) const {
-    return p_code == refused_code ? refused_reason : String();
+void NetwJoinRequest::denied() {
+    reason = auth::capped_reason(reason);
 }
 
 void NetwJoinRequest::_bind_methods() {
-    ClassDB::bind_method(
-        D_METHOD("get_peer_id"),
-        &NetwJoinRequest::get_peer_id
-    );
-    ADD_PROPERTY(PropertyInfo(Variant::INT, "peer_id"), "", "get_peer_id");
     ClassDB::bind_method(
         D_METHOD("get_username"),
         &NetwJoinRequest::get_username
@@ -197,11 +177,7 @@ void NetwJoinRequest::_bind_methods() {
         D_METHOD("is_bound", "account"),
         &NetwJoinRequest::is_bound
     );
-    ClassDB::bind_method(
-        D_METHOD("refuse", "code", "reason"),
-        &NetwJoinRequest::refuse,
-        DEFVAL(String())
-    );
+    ClassDB::bind_method(D_METHOD("admit"), &NetwJoinRequest::admit);
     ClassDB::bind_method(
         D_METHOD("set_account", "account"),
         &NetwJoinRequest::set_account

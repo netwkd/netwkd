@@ -16,11 +16,11 @@ A client that lacks the scene or the function cannot build the node.
 
     func _init() -> void:
         if multiplayer.is_server():
-            Netw.configure_spawn(self, make_car)
+            Netw.configure_spawn(make_car)
 
 Create it the same way on every peer.
 
 .. code-block:: gdscript
 
     func _init() -> void:
-        Netw.configure_spawn(self, make_car)
+        Netw.configure_spawn(make_car)

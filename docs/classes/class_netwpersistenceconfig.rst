@@ -65,21 +65,21 @@ Methods
 .. table::
    :widths: auto
 
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`database<class_NetwPersistenceConfig_method_database>`\ (\ name\: :godot:`StringName`\ )                          |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`interval<class_NetwPersistenceConfig_method_interval>`\ (\ seconds\: :godot:`float`\ )                            |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`load_on_spawn<class_NetwPersistenceConfig_method_load_on_spawn>`\ (\ enabled\: :godot:`bool` = true\ )            |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`migrate<class_NetwPersistenceConfig_method_migrate>`\ (\ from_version\: :godot:`int`, step\: :godot:`Callable`\ ) |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`record_id<class_NetwPersistenceConfig_method_record_id>`\ (\ provider\: :godot:`Callable`\ )                      |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`storage_version<class_NetwPersistenceConfig_method_storage_version>`\ (\ version\: :godot:`int`\ )                |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`table<class_NetwPersistenceConfig_method_table>`\ (\ name\: :godot:`StringName`\ )                                |
-   +-----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------+
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`database<class_NetwPersistenceConfig_method_database>`\ (\ name\: :godot:`StringName`\ )                             |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`interval<class_NetwPersistenceConfig_method_interval>`\ (\ seconds\: :godot:`float`\ )                               |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`load_on_spawn<class_NetwPersistenceConfig_method_load_on_spawn>`\ (\ enabled\: :godot:`bool` = true\ )               |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`migrate<class_NetwPersistenceConfig_method_migrate>`\ (\ from_version\: :godot:`int`, handler\: :godot:`Callable`\ ) |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`record_id<class_NetwPersistenceConfig_method_record_id>`\ (\ handler\: :godot:`Callable`\ )                          |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`storage_version<class_NetwPersistenceConfig_method_storage_version>`\ (\ version\: :godot:`int`\ )                   |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` | :ref:`table<class_NetwPersistenceConfig_method_table>`\ (\ name\: :godot:`StringName`\ )                                   |
+   +-----------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -134,9 +134,9 @@ Clients do not receive the :ref:`NetwEntity<class_NetwEntity>` until the load su
 
 .. rst-class:: classref-method
 
-:ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` **migrate**\ (\ from_version\: :godot:`int`, step\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPersistenceConfig_method_migrate>`
+:ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` **migrate**\ (\ from_version\: :godot:`int`, handler\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPersistenceConfig_method_migrate>`
 
-Upgrades saved data from ``from_version`` to the next version. A load calls ``step`` for each version up to :ref:`storage_version()<class_NetwPersistenceConfig_method_storage_version>`. Return all properties needed by the next version.
+Upgrades saved data from ``from_version`` to the next version. A load calls ``handler`` for each version up to :ref:`storage_version()<class_NetwPersistenceConfig_method_storage_version>`. Return all properties needed by the next version.
 
 .. code:: text
 
@@ -153,9 +153,13 @@ Upgrades saved data from ``from_version`` to the next version. A load calls ``st
 
 .. rst-class:: classref-method
 
-:ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` **record_id**\ (\ provider\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPersistenceConfig_method_record_id>`
+:ref:`NetwPersistenceConfig<class_NetwPersistenceConfig>` **record_id**\ (\ handler\: :godot:`Callable`\ ) :ref:`🔗<class_NetwPersistenceConfig_method_record_id>`
 
-Calls ``provider`` once on the server, when :ref:`Netw.spawn()<class_Netw_method_spawn>` returns the root or, for a root that was not spawned, when it is ready. Its nonempty :godot:`StringName` identifies the record across sessions.
+Calls ``handler`` once on the server, when :ref:`Netw.spawn()<class_Netw_method_spawn>` returns the root or, for a root that was not spawned, when it is ready. Its nonempty :godot:`StringName` identifies the record across sessions.
+
+::
+
+    func account_name() -> StringName:
 
 .. rst-class:: classref-item-separator
 

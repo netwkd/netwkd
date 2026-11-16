@@ -11,7 +11,7 @@ namespace Networked;
 /// <remarks>
 /// Reached through <see cref="NetwEntity.Simulation"/>. Each peer runs the
 /// entity in one <see cref="NetwSimulation.Mode"/>, which decides whether
-/// <see cref="NetwSimulation.NetworkProcess"/> runs and whether the body is
+/// <see cref="NetwSimulation.SetNetworkProcess"/> runs and whether the body is
 /// frozen. A game sets the members below and reads
 /// <see cref="NetwSimulation.Mode"/>.
 /// <code>
@@ -20,7 +20,7 @@ namespace Networked;
 ///     var entity = Netw.ConfigureEntity(this);
 ///     entity.Simulation.Bodies = new Godot.Collections.Array { new NodePath("Sphere") };
 ///     entity.Simulation.RemoteMode = NetwSimulation.RemoteModeEnum.Active;
-///     entity.Simulation.NetworkProcess = Callable.From&lt;double, long, bool&gt;(NetworkProcess);
+///     entity.Simulation.SetNetworkProcess(NetworkProcess);
 /// }
 ///
 /// private void NetworkProcess(double delta, long tick, bool isFresh)
@@ -66,8 +66,8 @@ public sealed class NetwSimulation : NetwRefCounted
         None = 0,
         /// <summary>
         /// This peer has authority over the entity.
-        /// <see cref="NetwSimulation.NetworkProcess"/> runs and the samples go
-        /// out from here.
+        /// <see cref="NetwSimulation.SetNetworkProcess"/> runs and the samples
+        /// go out from here.
         /// </summary>
         Authority = 1,
         /// <summary>
@@ -88,14 +88,14 @@ public sealed class NetwSimulation : NetwRefCounted
     public enum ScheduleEnum : long
     {
         /// <summary>
-        /// <see cref="NetwSimulation.NetworkProcess"/> moves the entity once
+        /// <see cref="NetwSimulation.SetNetworkProcess"/> moves the entity once
         /// per tick.
         /// </summary>
         Tick = 0,
         /// <summary>
         /// The physics server moves the bodies in each frame that brings a
-        /// tick, and <see cref="NetwSimulation.NetworkProcess"/> runs once in
-        /// that frame.
+        /// tick, and <see cref="NetwSimulation.SetNetworkProcess"/> runs once
+        /// in that frame.
         /// </summary>
         Frame = 1,
         /// <summary>
@@ -224,7 +224,7 @@ public sealed class NetwSimulation : NetwRefCounted
         NetwApi.MethodBind("NetwSimulation", "set_schedule", 2897485363UL);
 
     /// <summary>
-    /// When <see cref="NetwSimulation.NetworkProcess"/> runs and when the
+    /// When <see cref="NetwSimulation.SetNetworkProcess"/> runs and when the
     /// physics server moves the bodies.
     /// </summary>
     public NetwSimulation.ScheduleEnum Schedule
@@ -455,7 +455,7 @@ public sealed class NetwSimulation : NetwRefCounted
     /// <summary>
     /// If <c>true</c>, the physics server moves this entity, so one with a
     /// <see cref="NetwPropertyConfig.State"/> property is predicted without a
-    /// <see cref="NetwSimulation.NetworkProcess"/>. Defaults to <c>true</c>
+    /// <see cref="NetwSimulation.SetNetworkProcess"/>. Defaults to <c>true</c>
     /// when the root or a body in <see cref="NetwSimulation.Bodies"/> is a
     /// <see cref="RigidBody2D"/> or <see cref="RigidBody3D"/>. While such an
     /// entity is predicted, <c>RigidBody3D.max_contacts_reported</c> is raised
@@ -484,53 +484,6 @@ public sealed class NetwSimulation : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetNetworkProcess =
-        NetwApi.MethodBind(
-            "NetwSimulation",
-            "get_network_process",
-            1307783378UL);
-
-    private static readonly IntPtr _bindSetNetworkProcess =
-        NetwApi.MethodBind(
-            "NetwSimulation",
-            "set_network_process",
-            1611583062UL);
-
-    /// <summary>
-    /// Called each tick as <c>(delta: float, tick: int, is_fresh: bool)</c>
-    /// while <see cref="NetwSimulation.Mode"/> runs the body. Defaults to the
-    /// root's <c>_network_process</c>. <c>is_fresh</c> is <c>true</c> the first
-    /// time a tick runs. It is <c>false</c> when a rollback runs the tick again
-    /// and on a <see cref="NetwSimulation.ModeEnum.Active"/> copy, so play
-    /// sounds and spawn nodes only when it is <c>true</c>. Ask the physics
-    /// space with a query. An <see cref="Area3D"/>'s overlaps and signals and
-    /// <c>CharacterBody3D.is_on_floor</c> come from the last physics step, and
-    /// a rollback restores neither.
-    /// </summary>
-    public Callable NetworkProcess
-    {
-        get
-        {
-            godot_variant answered = default;
-            NetwThunks.Call0(_bindGetNetworkProcess, Checked, ref answered);
-            Callable result = VariantUtils.ConvertToCallable(answered);
-            answered.Dispose();
-            return result;
-        }
-        set
-        {
-            godot_variant slot0 = VariantUtils.CreateFromCallable(value);
-            godot_variant answered = default;
-            NetwThunks.Call1(
-                _bindSetNetworkProcess,
-                Checked,
-                in slot0,
-                ref answered);
-            slot0.Dispose();
-            answered.Dispose();
-        }
-    }
-
     private static readonly IntPtr _bindGetMode =
         NetwApi.MethodBind("NetwSimulation", "get_mode", 208454416UL);
 
@@ -546,5 +499,60 @@ public sealed class NetwSimulation : NetwRefCounted
             NetwThunks.Ptrcall0_Long(_bindGetMode, Checked, ref answered);
             return (NetwSimulation.ModeEnum)answered;
         }
+    }
+
+    private static readonly IntPtr _bindSetNetworkProcess =
+        NetwApi.MethodBind(
+            "NetwSimulation",
+            "set_network_process",
+            1611583062UL);
+
+    /// <summary>
+    /// Called each tick while <see cref="NetwSimulation.Mode"/> runs the body.
+    /// Defaults to the root's <c>_network_process</c>.
+    /// <code>
+    /// func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
+    /// </code>
+    /// <para>
+    /// <c>is_fresh</c> is <c>true</c> the first time a tick runs. It is
+    /// <c>false</c> when a rollback runs the tick again and on a
+    /// <see cref="NetwSimulation.ModeEnum.Active"/> copy, so play sounds and
+    /// spawn nodes only when it is <c>true</c>. Ask the physics space with a
+    /// query. An <see cref="Area3D"/>'s overlaps and signals and
+    /// <c>CharacterBody3D.is_on_floor</c> come from the last physics step, and
+    /// a rollback restores neither.
+    /// </para>
+    /// </summary>
+    public void SetNetworkProcess(Action<double, long, bool> value)
+    {
+        Callable bridged0 = default;
+        if (value != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    value(a0.As<double>(), a1.As<long>(), a2.As<bool>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwSimulation.SetNetworkProcess", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(value, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindSetNetworkProcess,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        answered.Dispose();
     }
 }

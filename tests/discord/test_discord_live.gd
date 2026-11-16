@@ -6,8 +6,11 @@ const ENET := &"ENetMultiplayerPeer"
 
 
 class Gate extends Node:
-	func admit(request: NetwJoinRequest) -> Error:
-		return OK if request.account else ERR_UNAUTHORIZED
+	func admit(request: NetwJoinRequest) -> void:
+		if request.account:
+			request.admit()
+		else:
+			request.deny()
 
 
 var role: String

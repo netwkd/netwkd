@@ -3,14 +3,18 @@
 #include "godot/node.hpp"
 #include "godot/script.hpp"
 #include "godot/utility.hpp"
+#include "netw/api/action_config.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_slot_engine.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
+#include "netw/decl_sites.hpp"
+#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/session/frames.hpp"
+#include "netw/session_decl.hpp"
 #include "netw/subsystems.hpp"
 #include "netw/wire/registry.hpp"
 
@@ -24,6 +28,14 @@ constexpr int TIMING_TICK_ALIGNED = 0;
 constexpr int TIMING_TICK_ALIGNED_STATE_READY = 1;
 constexpr int TIMING_IMMEDIATE = 2;
 
+void confirm_when_returned(const Variant &, const Variant &p_context) {
+    NetwActionRequest *context
+        = Object::cast_to<NetwActionRequest>(gd::live_object(p_context));
+    if (context != nullptr) {
+        context->confirm_unanswered();
+    }
+}
+
 } // namespace
 
 Node *NetwMultiplayer::node_from_tree_path(const NodePath &p_path) const {
@@ -36,7 +48,7 @@ Node *NetwMultiplayer::node_from_tree_path(const NodePath &p_path) const {
 
 bool NetwMultiplayer::can_resolve_action(const PendingAction &p_request) const {
     Node *target = node_from_tree_path(p_request.target_path);
-    return target != nullptr && target->has_method(p_request.method);
+    return action_declared_on(target, p_request.method).is_valid();
 }
 
 int NetwMultiplayer::send_lead_ticks() const {
@@ -116,14 +128,17 @@ void NetwMultiplayer::execute_action(
 ) {
     const Ref<NetwMultiplayer> keep(this);
     NETW_ZONE_NC("action execute", colors::PREDICTION);
-    Node *target = node_from_tree_path(p_request.target_path);
-    if (target == nullptr || !target->has_method(p_request.method)) {
+    const Ref<NetwActionConfig> declared = action_declared_on(
+        node_from_tree_path(p_request.target_path),
+        p_request.method
+    );
+    if (declared.is_null()) {
         effect_deny_action(p_request.requester, p_request.key);
         return;
     }
     const int64_t clamped
         = p_request.view_tick < p_tick ? p_request.view_tick : p_tick;
-    Ref<NetwActionContext> context;
+    Ref<NetwActionRequest> context;
     context.instantiate();
     context->open(
         this,
@@ -140,41 +155,65 @@ void NetwMultiplayer::execute_action(
         arguments[at + 1] = p_request.args[at];
     }
     ++action_handler_depth;
-    const Variant ran = Callable(target, p_request.method).callv(arguments);
+    bool called = false;
+    const Variant ran = game_call(
+        declared->get_authority(),
+        arguments,
+        game_calls::ACTION_AUTHORITY,
+        &called
+    );
     --action_handler_depth;
-    if (!context->answered() && !is_coroutine(ran)) {
-        effect_confirm_action(p_request.requester, p_request.key);
+    if (!called) {
+        effect_deny_action(p_request.requester, p_request.key);
+        return;
     }
+    if (context->answered()) {
+        return;
+    }
+    if (!is_coroutine(ran)) {
+        effect_confirm_action(p_request.requester, p_request.key);
+        return;
+    }
+    Object *waiting = gd::live_object(ran);
+    waiting->connect(
+        StringName("completed"),
+        callable_mp_static(&confirm_when_returned).bind(context),
+        Object::CONNECT_ONE_SHOT
+    );
 }
 
-int64_t NetwMultiplayer::action_slot_of(const Callable &p_authority) {
-    Node *target = Object::cast_to<Node>(p_authority.get_object());
-    if (target == nullptr) {
-        return 0;
+Ref<NetwActionConfig> NetwMultiplayer::lagcomp_action_declare(
+    Node *p_root,
+    const StringName &p_method,
+    const Callable &p_handler
+) {
+    if (p_root == nullptr || p_method.is_empty() || !p_handler.is_valid()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{NetwMultiplayer.lagcomp_action_declare}"),
+             String(),
+             String("the entity's root node, a method name and a handler")},
+            p_root != nullptr ? uint64_t(gd::instance_id(p_root)) : 0
+        );
+        return Ref<NetwActionConfig>();
     }
-    const Ref<NetwEntity> entity = NetwEntity::of(target);
-    if (entity.is_null()) {
-        return 0;
+    game_call_declared(p_handler, game_calls::ACTION_AUTHORITY);
+    decl_sites::record_handler(p_handler);
+    Ref<NetwActionConfig> config;
+    config.instantiate();
+    config->set_authority(p_handler);
+    if (session_decl::declare_action(p_root, p_method, config) != OK) {
+        return Ref<NetwActionConfig>();
     }
-    const String route
-        = String(entity->get_name()) + ":" + String(p_authority.get_method());
-    const HashMap<String, int64_t>::ConstIterator found
-        = action_slots.find(route);
-    if (found) {
-        return found->value;
-    }
-    const int64_t minted = int64_t(action_slots.size());
-    action_slots[route] = minted;
-    return minted;
+    return config;
 }
 
 Error NetwMultiplayer::lagcomp_action_request(
-    const StringName &p_key,
     const NodePath &p_target,
     const StringName &p_method,
     int64_t p_view_tick,
-    const Array &p_args,
-    NetwAction::TimingMode p_timing
+    const Array &p_args
 ) {
     const Error ready = lagcomp_require("the action request");
     if (ready == ERR_BUSY) {
@@ -189,33 +228,175 @@ Error NetwMultiplayer::lagcomp_action_request(
         return ready;
     }
     const Ref<NetwMultiplayer> keep(this);
-    action_send_request(
-        p_target,
-        p_method,
-        p_view_tick,
-        p_args,
-        p_key,
-        int(p_timing)
-    );
+    action_send_request(p_target, p_method, p_view_tick, p_args);
     effect_drain();
     return OK;
 }
 
-Ref<NetwAction> NetwMultiplayer::lagcomp_action(const Callable &p_authority) {
-    lagcomp_want();
-    Ref<NetwAction> minted;
-    minted.instantiate();
-    minted->open(this, p_authority, action_slot_of(p_authority));
-    return minted;
+Error NetwMultiplayer::action_ask(
+    const Callable &p_method,
+    int64_t p_view_tick,
+    const Array &p_args
+) {
+    const Ref<NetwMultiplayer> keep(this);
+    Node *target = Object::cast_to<Node>(p_method.get_object());
+    const StringName method = p_method.get_method();
+    const String shown
+        = target != nullptr ? String(target->get_name()) : String(method);
+    const uint64_t subject
+        = target != nullptr ? uint64_t(gd::instance_id(target)) : 0;
+    const Ref<NetwEntity> entity = NetwEntity::of(target);
+    if (entity.is_null()) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_ENTITY,
+            {"{Netw.action}", shown},
+            subject
+        );
+        return ERR_UNCONFIGURED;
+    }
+    if (entity->get_owner() != target) {
+        fault::raise(
+            this,
+            NETW_FAULT_ACTION_OFF_ROOT,
+            {String(), shown},
+            subject
+        );
+        return ERR_UNCONFIGURED;
+    }
+    const Ref<NetwActionConfig> declared = action_declared_on(target, method);
+    if (declared.is_null()) {
+        fault::raise(
+            this,
+            NETW_FAULT_ACTION_NOT_DECLARED,
+            {String(method), shown},
+            subject
+        );
+        return ERR_UNCONFIGURED;
+    }
+    if (!entity->get_is_controlled_locally()) {
+        return ERR_UNAUTHORIZED;
+    }
+    Node *root = session_get_root();
+    const NodePath target_path = root != nullptr && target->is_inside_tree()
+        ? root->get_path_to(target)
+        : NodePath();
+    if (target_path.is_empty()) {
+        fault::raise(
+            this,
+            NETW_FAULT_NOT_IN_SESSION,
+            {"{Netw.action}", shown},
+            subject
+        );
+        return ERR_UNCONFIGURED;
+    }
+    const Error ready = lagcomp_require("the action request");
+    if (ready == ERR_BUSY) {
+        fault::raise(
+            this,
+            NETW_FAULT_BUSY_APPLYING,
+            {"{Netw.action}"},
+            subject
+        );
+        return ERR_BUSY;
+    }
+    if (ready != OK || !entity->get_is_controlled_locally()) {
+        effect_drain();
+        return ready != OK ? ready : ERR_UNAUTHORIZED;
+    }
+    const bool is_remote = has_multiplayer_peer() && !is_host();
+    if (!is_remote && liveness_route_of(entity.ptr()) <= 0) {
+        liveness_allocate_route(entity.ptr());
+    }
+    const StringName key
+        = lagcomp_action_key(entity->get_rid_handle(), p_view_tick, method);
+    const Callable predict = declared->get_predict();
+    Node *predicted = predict.is_valid()
+        ? Object::cast_to<Node>(
+              gd::live_object(
+                  game_call(predict, p_args, game_calls::ACTION_PREDICT)
+              )
+          )
+        : nullptr;
+    const int64_t predicted_id = predicted != nullptr
+        ? int64_t(uint64_t(gd::instance_id(predicted)))
+        : 0;
+    lagcomp_effect_arm(
+        key,
+        callable_mp(this, &NetwMultiplayer::action_run_revert)
+            .bind(key, declared, predicted_id),
+        int(declared->get_timeout_ticks())
+    );
+    lagcomp_effect_watch(
+        key,
+        callable_mp(this, &NetwMultiplayer::action_run_confirm)
+            .bind(declared, predicted_id),
+        Callable()
+    );
+    action_send_request(target_path, method, p_view_tick, p_args);
+    effect_drain();
+    return OK;
+}
+
+void NetwMultiplayer::action_run_revert(
+    const StringName &p_key,
+    const Ref<NetwActionConfig> &p_declared,
+    int64_t p_predicted
+) {
+    ActionDenial denial{ERR_TIMEOUT, String()};
+    if (const ActionDenial *found = action_denials.getptr(p_key)) {
+        denial = *found;
+        action_denials.erase(p_key);
+    }
+    Node *predicted = Object::cast_to<Node>(
+        gd::object_of(ObjectID(uint64_t(p_predicted)))
+    );
+    const Callable revert
+        = p_declared.is_valid() ? p_declared->get_revert() : Callable();
+    if (revert.is_valid()) {
+        Array arguments;
+        arguments.push_back(predicted);
+        arguments.push_back(int64_t(denial.code));
+        arguments.push_back(denial.reason);
+        game_call(revert, arguments, game_calls::ACTION_REVERT);
+        return;
+    }
+    if (predicted != nullptr) {
+        predicted->queue_free();
+    }
+}
+
+void NetwMultiplayer::action_run_confirm(
+    const Ref<NetwActionConfig> &p_declared,
+    int64_t p_predicted
+) {
+    Node *predicted = Object::cast_to<Node>(
+        gd::object_of(ObjectID(uint64_t(p_predicted)))
+    );
+    const Callable confirm
+        = p_declared.is_valid() ? p_declared->get_confirm() : Callable();
+    if (confirm.is_valid()) {
+        Array arguments;
+        arguments.push_back(predicted);
+        game_call(confirm, arguments, game_calls::ACTION_CONFIRM);
+        return;
+    }
+    if (predicted != nullptr) {
+        predicted->queue_free();
+    }
+}
+
+void NetwMultiplayer::lagcomp_action_install_from(Node *p_scope) {
+    if (!session_decl::actions_on(p_scope).is_empty()) {
+        lagcomp_want();
+    }
 }
 
 void NetwMultiplayer::action_send_request(
     const NodePath &p_target_path,
     const StringName &p_method,
     int64_t p_view_tick,
-    const Array &p_args,
-    const StringName &p_key,
-    int p_timing_mode
+    const Array &p_args
 ) {
     const bool is_remote = has_multiplayer_peer() && !is_host();
     const int64_t destination = SERVER_PEER;
@@ -233,20 +414,12 @@ void NetwMultiplayer::action_send_request(
         fault::raise(
             this,
             NETW_FAULT_NOT_ENTITY,
-            {"NetwAction.request", String(p_target_path)},
+            {"{Netw.action}", String(p_target_path)},
             target != nullptr ? uint64_t(gd::instance_id(target)) : 0
         );
     }
     if (!is_remote) {
-        submit_action(
-            route,
-            p_method,
-            p_view_tick,
-            p_args,
-            p_key,
-            p_timing_mode,
-            0
-        );
+        submit_action(route, p_method, p_view_tick, p_args, 0);
         return;
     }
     ReplicationCore *plane = (get_replication_plane());
@@ -262,8 +435,6 @@ void NetwMultiplayer::action_send_request(
     body.method = p_method;
     body.view_tick = p_view_tick;
     body.data = gd::var_to_bytes(p_args);
-    body.key = p_key;
-    body.timing = p_timing_mode;
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
             profiler_outgoing,
@@ -291,8 +462,6 @@ void NetwMultiplayer::submit_action(
     const StringName &p_method,
     int64_t p_view_tick,
     const Array &p_args,
-    const StringName &p_key,
-    int p_timing_mode,
     int64_t p_requester
 ) {
     NETW_ZONE_NC("action submit", colors::PREDICTION);
@@ -302,34 +471,44 @@ void NetwMultiplayer::submit_action(
         requester = int64_t(NETW_API_VIRTUAL(get_unique_id)());
     }
 
+    const Ref<NetwEntity> entity
+        = Object::cast_to<NetwEntity>(wrapper_for_route(p_route).ptr());
+    const StringName key = lagcomp_action_key(
+        entity.is_valid() ? entity->get_rid_handle() : RID(),
+        p_view_tick,
+        p_method
+    );
+
     PendingAction request;
     request.method = p_method;
     request.args = p_args;
-    request.key = p_key;
+    request.key = key;
     request.view_tick = p_view_tick;
     request.requester = requester;
-    request.timing_mode = p_timing_mode;
     request.queued_at_tick = clock_engine().get_tick();
 
     Node *anchor = lagcomp_configured ? session_get_root() : nullptr;
     if (anchor != nullptr) {
-        const Ref<NetwEntity> entity
-            = Object::cast_to<NetwEntity>(wrapper_for_route(p_route).ptr());
         Node *owner = entity.is_valid() ? entity->get_owner() : nullptr;
         if (owner != nullptr) {
             request.target_path = anchor->get_path_to(owner);
         }
     }
 
-    if (!can_resolve_action(request)) {
+    const Ref<NetwActionConfig> declared = action_declared_on(
+        node_from_tree_path(request.target_path),
+        p_method
+    );
+    if (declared.is_null()) {
         NETW_TRACE(
             sys::PREDICTION,
             "Action %s names a method this session cannot reach.",
-            String(p_key).utf8().get_data()
+            String(key).utf8().get_data()
         );
-        effect_deny_action(requester, p_key);
+        effect_deny_action(requester, key);
         return;
     }
+    request.timing_mode = int(declared->get_timing());
     const int64_t now = clock_engine().get_tick();
     const int readiness = action_readiness(request, now);
     if (readiness != ACTION_NOT_READY) {
@@ -341,11 +520,11 @@ void NetwMultiplayer::submit_action(
         NETW_TRACE(
             sys::PREDICTION,
             "Action %s asks for tick %d, later than the latest allowed %d.",
-            String(p_key).utf8().get_data(),
+            String(key).utf8().get_data(),
             int(p_view_tick),
             int(latest)
         );
-        effect_deny_action(requester, p_key);
+        effect_deny_action(requester, key);
         return;
     }
     pending_actions.push_back(request);

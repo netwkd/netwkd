@@ -8,8 +8,8 @@ const FRIEND := 76561197960287930
 
 
 class Gate extends Node:
-	func admit(_request: NetwJoinRequest) -> Error:
-		return OK
+	func admit(request: NetwJoinRequest) -> void:
+		request.admit()
 
 
 var viewport: MultiplayerViewport

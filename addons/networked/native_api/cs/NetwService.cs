@@ -13,22 +13,38 @@ namespace Networked;
 /// Get it with <see cref="NetwSession.Service"/>. Override
 /// <c>_service_entered</c> and <c>_service_exiting</c> for setup and cleanup.
 /// <code>
-/// class_name MatchClock
-/// extends NetwService
+/// public partial class MatchClock : Node
+/// {
+///     NetwSession session;
 ///
-/// func _service_type() -&gt; Script:
-///     return MatchClock
+///     public void _service_entered(RefCounted value)
+///     {
+///         session = NetwSession.From(value);
+///         session.Entered += OnEntered;
+///     }
 ///
-/// func _service_entered(session: NetwSession) -&gt; void:
-///     session.entered.connect(_on_entered)
+///     public void _service_exiting(RefCounted value)
+///     {
+///         session.Entered -= OnEntered;
+///     }
 ///
-/// func _service_exiting(session: NetwSession) -&gt; void:
-///     session.entered.disconnect(_on_entered)
+///     void OnEntered() { }
+/// }
+///
+/// public partial class Match : Node
+/// {
+///     public override void _Ready()
+///     {
+///         AddChild(NetwService.Create&lt;MatchClock&gt;());
+///     }
+/// }
 /// </code>
 /// <para>
-/// A node that extends another class can call
-/// <see cref="NetwService.Register"/> and <see cref="NetwService.Unregister"/>
-/// instead.
+/// A C# script extends <see cref="Node"/> and keeps each method name exactly as
+/// it is written here. It takes the <see cref="NetwSession"/> as a
+/// <see cref="RefCounted"/>, and <c>NetwService.Create</c> makes the node. A
+/// node that extends another class can call <see cref="NetwService.Register"/>
+/// and <see cref="NetwService.Unregister"/> instead.
 /// </para>
 /// </remarks>
 public class NetwService : NetwNode
@@ -49,6 +65,24 @@ public class NetwService : NetwNode
     public static NetwService From(Variant value)
     {
         return Adopt(NetwApi.ObjectOf(value));
+    }
+
+    /// <summary>
+    /// Makes a <see cref="NetwService"/> that runs the script of
+    /// <typeparamref name="T"/>, and returns it. A method the
+    /// addon calls keeps its exact name, such as
+    /// <c>_service_type</c>. An object of the addon is
+    /// typed <c>RefCounted</c> or <c>Node</c> and read with
+    /// <c>From</c>.
+    /// </summary>
+    public static T Create<T>() where T : GodotObject
+    {
+        return NetwApi.Create<T>(
+            "NetwService",
+            "_service_type",
+            "_should_register",
+            "_service_entered",
+            "_service_exiting");
     }
 
     private static readonly IntPtr _bindRegister =

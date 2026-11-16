@@ -804,8 +804,8 @@ Variant via_sync_property(Node *p_node) {
     return Variant();
 }
 
-Variant via_emit_entity_signal(Node *p_node) {
-    Netw::emit_entity_signal(Signal(p_node, StringName("rang")), one_tag());
+Variant via_emit(Node *p_node) {
+    Netw::emit(Signal(p_node, StringName("rang")), one_tag());
     return Variant();
 }
 
@@ -828,7 +828,7 @@ const Door DOORS[] = {
     {"rpc_request_call", true, false, &via_rpc_request_call},
     {"rpc_request_call_group", true, false, &via_rpc_request_call_group},
     {"Netw.sync_property", false, false, &via_sync_property},
-    {"Netw.emit_entity_signal", false, true, &via_emit_entity_signal},
+    {"Netw.emit", false, true, &via_emit},
 };
 
 struct Fault {

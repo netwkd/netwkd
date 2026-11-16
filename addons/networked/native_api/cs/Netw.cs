@@ -205,20 +205,37 @@ public sealed class Netw : NetwRefCounted
 
     /// <summary>
     /// Declares what this server says about itself when another peer probes it
-    /// with <see cref="NetwEndpoint.Probe"/>.
+    /// with <see cref="NetwEndpoint.Probe"/>. <paramref name="handler"/> edits
+    /// the <see cref="NetwServerInfo"/> it is given.
     /// <code>
     /// func _init() -&gt; void:
     ///     Netw.configure_server_info(server_info)
     ///
-    /// func server_info(info: NetwServerInfo) -&gt; NetwServerInfo:
+    /// func server_info(info: NetwServerInfo) -&gt; void:
     ///     info.motd = "Friday night session"
     ///     info.max_players = 8
-    ///     return info
     /// </code>
     /// </summary>
-    public static Error ConfigureServerInfo(Callable provider)
+    public static Error ConfigureServerInfo(Action<NetwServerInfo> handler)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(provider);
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    handler(Wrapped(a0, NetwServerInfo.From));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureServerInfo", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(
             _bindConfigureServerInfo,
@@ -234,23 +251,7 @@ public sealed class Netw : NetwRefCounted
     private static readonly IntPtr _bindConfigureJoin =
         NetwApi.MethodBind("Netw", "configure_join", 591905551UL);
 
-    /// <summary>
-    /// Declares what the server does with each peer that joins.
-    /// <code>
-    /// func _init() -&gt; void:
-    ///     Netw.configure_join(spawn_at)
-    ///
-    /// func spawn_at(who: NetwPlayer, point: StringName, team: int) -&gt; void:
-    ///     arena.add_child(Netw.spawn_player(who, make_avatar, team))
-    /// </code>
-    /// <para>
-    /// <paramref name="handler"/> receives the <see cref="NetwPlayer"/>, then
-    /// the arguments the client passed to <see cref="Netw.PrepareJoin"/> after
-    /// its username. The username is <see cref="NetwPlayer.UserName"/>.
-    /// <b>Server Only.</b>
-    /// </para>
-    /// </summary>
-    public static NetwJoinConfig ConfigureJoin(Callable handler)
+    private static NetwJoinConfig ConfigureJoin(Callable handler)
     {
         godot_variant slot0 = VariantUtils.CreateFromCallable(handler);
         godot_variant answered = default;
@@ -268,25 +269,353 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
+    /// <summary>
+    /// Declares what the server does with each peer that joins.
+    /// <code>
+    /// func _init() -&gt; void:
+    ///     Netw.configure_join(spawn_at)
+    ///
+    /// func spawn_at(who: NetwPlayer, point: StringName, team: int) -&gt; void:
+    ///     arena.add_child(Netw.spawn_player(who, make_avatar, team))
+    /// </code>
+    /// <para>
+    /// <paramref name="handler"/> receives the <see cref="NetwPlayer"/>, then
+    /// the arguments the client passed to <see cref="Netw.PrepareJoin"/> after
+    /// its username. The username is <see cref="NetwPlayer.UserName"/>.
+    /// <b>Server Only.</b>
+    /// </para>
+    /// </summary>
+    public static NetwJoinConfig ConfigureJoin(
+        Action<NetwPlayer> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    handler(Wrapped(a0, NetwPlayer.From));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1>(
+        Action<NetwPlayer, T1> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    handler(Wrapped(a0, NetwPlayer.From), a1.As<T1>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2>(
+        Action<NetwPlayer, T1, T2> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3>(
+        Action<NetwPlayer, T1, T2, T3> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4>(
+        Action<NetwPlayer, T1, T2, T3, T4> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5>(
+        Action<NetwPlayer, T1, T2, T3, T4, T5> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6>(
+        Action<NetwPlayer, T1, T2, T3, T4, T5, T6> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5,
+                Godot.Variant a6) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>(),
+                        a6.As<T6>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7>(
+        Action<NetwPlayer, T1, T2, T3, T4, T5, T6, T7> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5,
+                Godot.Variant a6,
+                Godot.Variant a7) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>(),
+                        a6.As<T6>(),
+                        a7.As<T7>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
+    public static NetwJoinConfig ConfigureJoin<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8>(
+        Action<NetwPlayer, T1, T2, T3, T4, T5, T6, T7, T8> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5,
+                Godot.Variant a6,
+                Godot.Variant a7,
+                Godot.Variant a8) =>
+            {
+                try
+                {
+                    handler(
+                        Wrapped(a0, NetwPlayer.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>(),
+                        a6.As<T6>(),
+                        a7.As<T7>(),
+                        a8.As<T8>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureJoin", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureJoin(bridged0);
+    }
+
     private static readonly IntPtr _bindConfigureAdmission =
         NetwApi.MethodBind("Netw", "configure_admission", 2472650386UL);
 
-    /// <summary>
-    /// Declares who may join the session.
-    /// <code>
-    /// func _init() -&gt; void:
-    ///     Netw.configure_admission(admit).accept(id_token)
-    ///
-    /// func admit(request: NetwJoinRequest) -&gt; Error:
-    ///     return OK if request.account else ERR_UNAUTHORIZED
-    /// </code>
-    /// <para>
-    /// A joining client is not connected until <paramref name="handler"/>
-    /// returns <c>@GlobalScope.OK</c>. <see cref="NetwAdmissionConfig"/> shows
-    /// a lobby that admits players only while it is open.
-    /// </para>
-    /// </summary>
-    public static NetwAdmissionConfig ConfigureAdmission(Callable handler)
+    private static NetwAdmissionConfig ConfigureAdmission(Callable handler)
     {
         godot_variant slot0 = VariantUtils.CreateFromCallable(handler);
         godot_variant answered = default;
@@ -304,13 +633,94 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
+    /// <summary>
+    /// Declares who may join the session.
+    /// <code>
+    /// public Lobby()
+    /// {
+    ///     Netw.ConfigureAdmission(Admit).Accept(idToken);
+    /// }
+    ///
+    /// async Task Admit(NetwJoinRequest request)
+    /// {
+    ///     if (await IsBanned(request.Account))
+    ///         request.Deny();
+    ///     else
+    ///         request.Admit();
+    /// }
+    ///
+    /// async Task&lt;bool&gt; IsBanned(string account)
+    /// {
+    ///     http.Request(BansUrl + account);
+    ///     var response = await ToSignal(http, HttpRequest.SignalName.RequestCompleted);
+    ///     return response[1].AsInt64() == 200;
+    /// }
+    /// </code>
+    /// <para>
+    /// A joining client is not connected until <paramref name="handler"/> calls
+    /// <see cref="NetwJoinRequest.Admit"/>, and <see cref="NetwRequest.Deny"/>
+    /// refuses it. Every request the server decides is a
+    /// <see cref="NetwRequest"/>. <see cref="NetwAdmissionConfig"/> shows a
+    /// lobby that admits players only while it is open.
+    /// </para>
+    /// </summary>
+    public static NetwAdmissionConfig ConfigureAdmission(
+        Action<NetwJoinRequest> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    handler(Wrapped(a0, NetwJoinRequest.From));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAdmission", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        return ConfigureAdmission(bridged0);
+    }
+
+    public static NetwAdmissionConfig ConfigureAdmission(
+        Func<NetwJoinRequest, System.Threading.Tasks.Task> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    return NetwApi.Answered(
+                        NetwApi.Awaited(
+                            "Netw.ConfigureAdmission",
+                            handler(Wrapped(a0, NetwJoinRequest.From))));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAdmission", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwAnswer));
+        }
+        return ConfigureAdmission(bridged0);
+    }
+
     private static readonly IntPtr _bindConfigureTransfer =
         NetwApi.MethodBind("Netw", "configure_transfer", 2275419960UL);
 
     /// <summary>
     /// Picks which <see cref="NetwEntity"/> instances outlive a server transfer
     /// in <see cref="NetwSession.TransferMode.Rejoin"/>. The new server calls
-    /// <paramref name="keep"/> with the root node of each
+    /// <paramref name="handler"/> with the root node of each
     /// <see cref="NetwEntity"/> it took over, and despawns the ones it answers
     /// <c>false</c> for before any client gets the world again.
     /// <code>
@@ -324,9 +734,30 @@ public sealed class Netw : NetwRefCounted
     /// Declare it on every peer, since any of them can become the server.
     /// </para>
     /// </summary>
-    public static Error ConfigureTransfer(Callable keep)
+    public static Error ConfigureTransfer(Func<Node, bool> handler)
     {
-        godot_variant slot0 = VariantUtils.CreateFromCallable(keep);
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    bool answer = handler(a0.As<Node>());
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            VariantUtils.CreateFromBool(answer)));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureTransfer", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwAnswer));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
         godot_variant answered = default;
         NetwThunks.Call1(
             _bindConfigureTransfer,
@@ -452,8 +883,8 @@ public sealed class Netw : NetwRefCounted
         NetwApi.MethodBind("Netw", "configure_rpc", 2692389314UL);
 
     /// <summary>
-    /// <paramref name="callable"/> must name a script method. Anonymous
-    /// callbacks are refused.
+    /// <paramref name="method"/> must name a script method. Anonymous callbacks
+    /// are refused.
     /// <code>
     /// func _init() -&gt; void:
     ///     Netw.configure_rpc(self.aim).controller().quantize(
@@ -465,15 +896,10 @@ public sealed class Netw : NetwRefCounted
     ///     turret.rotation.y = yaw
     /// </code>
     /// </summary>
-    public static NetwMemberConfig ConfigureRpc(Callable callable)
+    public static NetwMemberConfig ConfigureRpc(Node node, StringName method)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.ConfigureRpc sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         godot_variant answered = default;
         NetwThunks.Call1(
             _bindConfigureRpc,
@@ -489,9 +915,11 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwMemberConfig ConfigureRpc(Node node, StringName name)
+    public static NetwMemberConfig ConfigureRpc(Delegate method)
     {
-        return ConfigureRpc(new Callable(node, name));
+        return ConfigureRpc(
+            NetwApi.Receiver(method, "Netw.ConfigureRpc"),
+            method.Method.Name);
     }
 
     private static readonly IntPtr _bindConfigureSignal =
@@ -554,15 +982,10 @@ public sealed class Netw : NetwRefCounted
     /// may await only under <see cref="Netw.SpawnAsync"/>.
     /// </para>
     /// </summary>
-    public static NetwMemberConfig ConfigureSpawn(Callable callable)
+    public static NetwMemberConfig ConfigureSpawn(Node node, StringName method)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.ConfigureSpawn sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         godot_variant answered = default;
         NetwThunks.Call1(
             _bindConfigureSpawn,
@@ -578,9 +1001,11 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwMemberConfig ConfigureSpawn(Node node, StringName name)
+    public static NetwMemberConfig ConfigureSpawn(Delegate method)
     {
-        return ConfigureSpawn(new Callable(node, name));
+        return ConfigureSpawn(
+            NetwApi.Receiver(method, "Netw.ConfigureSpawn"),
+            method.Method.Name);
     }
 
     private static readonly IntPtr _bindConfigureEntity =
@@ -691,23 +1116,18 @@ public sealed class Netw : NetwRefCounted
         NetwApi.MethodBind("Netw", "rpc", 187483682UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on every peer that can see the node.
-    /// The node must be part of a spawned <see cref="NetwEntity"/>.
+    /// Calls <paramref name="method"/> on every peer that can see the node. The
+    /// node must be part of a spawned <see cref="NetwEntity"/>.
     /// <code>
     /// Netw.rpc(turret.aim, yaw)
     /// </code>
     /// </summary>
-    public static void Rpc(Callable callable, params Variant[] rest)
+    public static void Rpc(Node node, StringName method, params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.Rpc sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -722,36 +1142,205 @@ public sealed class Netw : NetwRefCounted
         answered.Dispose();
     }
 
-    public static void Rpc(Node node, StringName name, params Variant[] rest)
+    public static void Rpc(
+        Action method)
     {
-        Rpc(new Callable(node, name), rest);
+        Rpc(NetwApi.Receiver(method, "Netw.Rpc"), method.Method.Name);
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1>(
+        Action<T1> method,
+        T1 a1)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2>(
+        Action<T1, T2> method,
+        T1 a1,
+        T2 a2)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3>(
+        Action<T1, T2, T3> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4>(
+        Action<T1, T2, T3, T4> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5>(
+        Action<T1, T2, T3, T4, T5> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6>(
+        Action<T1, T2, T3, T4, T5, T6> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7>(
+        Action<T1, T2, T3, T4, T5, T6, T7> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static void Rpc<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8>(
+        Action<T1, T2, T3, T4, T5, T6, T7, T8> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        Rpc(
+            NetwApi.Receiver(method, "Netw.Rpc"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindRpcId =
         NetwApi.MethodBind("Netw", "rpc_id", 3088989228UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on <paramref name="peerId"/>, or on
+    /// Calls <paramref name="method"/> on <paramref name="peerId"/>, or on
     /// every peer when <c>0</c>. The node must be part of a spawned
     /// <see cref="NetwEntity"/>.
     /// </summary>
     public static void RpcId(
         long peerId,
-        Callable callable,
+        Node node,
+        StringName method,
         params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.RpcId sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 2 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
         godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot1 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 1, in slot1);
         slot1.Dispose();
         for (int index = 2; index < total; index++)
@@ -768,32 +1357,219 @@ public sealed class Netw : NetwRefCounted
 
     public static void RpcId(
         long peerId,
-        Node node,
-        StringName name,
-        params Variant[] rest)
+        Action method)
     {
-        RpcId(peerId, new Callable(node, name), rest);
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name);
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1>(
+        long peerId,
+        Action<T1> method,
+        T1 a1)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2>(
+        long peerId,
+        Action<T1, T2> method,
+        T1 a1,
+        T2 a2)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3>(
+        long peerId,
+        Action<T1, T2, T3> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4>(
+        long peerId,
+        Action<T1, T2, T3, T4> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5>(
+        long peerId,
+        Action<T1, T2, T3, T4, T5> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6>(
+        long peerId,
+        Action<T1, T2, T3, T4, T5, T6> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7>(
+        long peerId,
+        Action<T1, T2, T3, T4, T5, T6, T7> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static void RpcId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8>(
+        long peerId,
+        Action<T1, T2, T3, T4, T5, T6, T7, T8> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        RpcId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RpcId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindRpcController =
         NetwApi.MethodBind("Netw", "rpc_controller", 187483682UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on the peer of the node's
+    /// Calls <paramref name="method"/> on the peer of the node's
     /// <see cref="NetwEntity.Controller"/>, and on the server when no peer
     /// steers it. The node must be part of a spawned <see cref="NetwEntity"/>.
     /// </summary>
-    public static void RpcController(Callable callable, params Variant[] rest)
+    public static void RpcController(
+        Node node,
+        StringName method,
+        params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.RpcController sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -814,23 +1590,195 @@ public sealed class Netw : NetwRefCounted
     }
 
     public static void RpcController(
-        Node node,
-        StringName name,
-        params Variant[] rest)
+        Action method)
     {
-        RpcController(new Callable(node, name), rest);
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name);
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1>(
+        Action<T1> method,
+        T1 a1)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2>(
+        Action<T1, T2> method,
+        T1 a1,
+        T2 a2)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3>(
+        Action<T1, T2, T3> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4>(
+        Action<T1, T2, T3, T4> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5>(
+        Action<T1, T2, T3, T4, T5> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6>(
+        Action<T1, T2, T3, T4, T5, T6> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7>(
+        Action<T1, T2, T3, T4, T5, T6, T7> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static void RpcController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8>(
+        Action<T1, T2, T3, T4, T5, T6, T7, T8> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        RpcController(
+            NetwApi.Receiver(method, "Netw.RpcController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindRequest =
         NetwApi.MethodBind("Netw", "request", 2325787334UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on the server and returns a
+    /// Calls <paramref name="method"/> on the server and returns a
     /// <see cref="NetwPromise"/> with its return value.
     /// <code>
     /// public async void BuyShield()
     /// {
-    ///     bool sold = (await Netw.Request(shop, MethodName.Buy, "shield")).AsBool();
+    ///     bool sold = (await Netw.Request(shop.Buy, (StringName)"shield")).AsBool();
     /// }
     ///
     /// [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
@@ -844,17 +1792,15 @@ public sealed class Netw : NetwRefCounted
     /// replies, so the promise fails when it times out.
     /// </para>
     /// </summary>
-    public static NetwPromise Request(Callable callable, params Variant[] rest)
+    public static NetwPromise Request(
+        Node node,
+        StringName method,
+        params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.Request sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -879,41 +1825,218 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwPromise Request(
-        Node node,
-        StringName name,
-        params Variant[] rest)
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] TR>(
+        Func<TR> method)
     {
-        return Request(new Callable(node, name), rest);
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] TR>(
+        Func<T1, TR> method,
+        T1 a1)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] TR>(
+        Func<T1, T2, TR> method,
+        T1 a1,
+        T2 a2)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, T6, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, T6, T7, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> Request<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        return Request(
+            NetwApi.Receiver(method, "Netw.Request"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8)).AsTask<TR>();
     }
 
     private static readonly IntPtr _bindRequestId =
         NetwApi.MethodBind("Netw", "request_id", 1728372685UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on <paramref name="peerId"/> and
-    /// returns a <see cref="NetwPromise"/> with its return value. Use
+    /// Calls <paramref name="method"/> on <paramref name="peerId"/> and returns
+    /// a <see cref="NetwPromise"/> with its return value. Use
     /// <see cref="Netw.RequestAll"/> to call every peer. The promise fails at
     /// once when the node is not part of a spawned <see cref="NetwEntity"/>.
     /// The method may <c>await</c>, as for <see cref="Netw.Request"/>.
     /// </summary>
     public static NetwPromise RequestId(
         long peerId,
-        Callable callable,
+        Node node,
+        StringName method,
         params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.RequestId sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 2 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
         godot_variant slot0 = VariantUtils.CreateFromInt((long)peerId);
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
-        godot_variant slot1 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot1 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 1, in slot1);
         slot1.Dispose();
         for (int index = 2; index < total; index++)
@@ -938,21 +2061,219 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwPromise RequestId(
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] TR>(
         long peerId,
-        Node node,
-        StringName name,
-        params Variant[] rest)
+        Func<TR> method)
     {
-        return RequestId(peerId, new Callable(node, name), rest);
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, TR> method,
+        T1 a1)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, TR> method,
+        T1 a1,
+        T2 a2)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, T3, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, T3, T4, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, T3, T4, T5, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, T3, T4, T5, T6, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, T3, T4, T5, T6, T7, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestId<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        [MustBeVariant] TR>(
+        long peerId,
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        return RequestId(
+            peerId,
+            NetwApi.Receiver(method, "Netw.RequestId"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8)).AsTask<TR>();
     }
 
     private static readonly IntPtr _bindRequestAll =
         NetwApi.MethodBind("Netw", "request_all", 2458339060UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on every peer that can see the node,
-    /// and returns a <see cref="NetwGroupPromise"/> with each return value. The
+    /// Calls <paramref name="method"/> on every peer that can see the node, and
+    /// returns a <see cref="NetwGroupPromise"/> with each return value. The
     /// promise fails at once when the node is not part of a spawned
     /// <see cref="NetwEntity"/>. This peer is asked too when the method is
     /// <c>call_local</c>, set through [annotation @GDScript.@rpc] or
@@ -987,6 +2308,8 @@ public sealed class Netw : NetwRefCounted
     ///
     ///     public Node MakeMatch() =&gt; warm.Instantiate();
     ///
+    ///     public Node MakePlayer() =&gt; new Node();
+    ///
     ///     public Variant PreloadLevel(string path) =&gt; NetwPromise.FromTask(Preload(path));
     ///
     ///     async Task&lt;bool&gt; Preload(string path)
@@ -1002,18 +2325,14 @@ public sealed class Netw : NetwRefCounted
     /// </code>
     /// </summary>
     public static NetwGroupPromise RequestAll(
-        Callable callable,
+        Node node,
+        StringName method,
         params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.RequestAll sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -1038,37 +2357,214 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwGroupPromise RequestAll(
-        Node node,
-        StringName name,
-        params Variant[] rest)
+    public static NetwGroupPromise RequestAll<
+        TR>(
+        Func<TR> method)
     {
-        return RequestAll(new Callable(node, name), rest);
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name);
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        TR>(
+        Func<T1, TR> method,
+        T1 a1)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        TR>(
+        Func<T1, T2, TR> method,
+        T1 a1,
+        T2 a2)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        TR>(
+        Func<T1, T2, T3, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        TR>(
+        Func<T1, T2, T3, T4, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        TR>(
+        Func<T1, T2, T3, T4, T5, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        TR>(
+        Func<T1, T2, T3, T4, T5, T6, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        TR>(
+        Func<T1, T2, T3, T4, T5, T6, T7, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static NetwGroupPromise RequestAll<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        TR>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        return RequestAll(
+            NetwApi.Receiver(method, "Netw.RequestAll"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindRequestController =
         NetwApi.MethodBind("Netw", "request_controller", 2325787334UL);
 
     /// <summary>
-    /// Calls <paramref name="callable"/> on the peer of the node's
+    /// Calls <paramref name="method"/> on the peer of the node's
     /// <see cref="NetwEntity.Controller"/>, and on the server when no peer
     /// steers it. The promise fails at once when the node is not part of a
     /// spawned <see cref="NetwEntity"/>. The method may <c>await</c>, as for
     /// <see cref="Netw.Request"/>.
     /// </summary>
     public static NetwPromise RequestController(
-        Callable callable,
+        Node node,
+        StringName method,
         params Variant[] rest)
     {
-        if (callable.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.RequestController sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(callable));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(callable);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -1093,12 +2589,193 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwPromise RequestController(
-        Node node,
-        StringName name,
-        params Variant[] rest)
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] TR>(
+        Func<TR> method)
     {
-        return RequestController(new Callable(node, name), rest);
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] TR>(
+        Func<T1, TR> method,
+        T1 a1)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] TR>(
+        Func<T1, T2, TR> method,
+        T1 a1,
+        T2 a2)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, T6, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, T6, T7, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7)).AsTask<TR>();
+    }
+
+    public static System.Threading.Tasks.Task<TR> RequestController<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        [MustBeVariant] TR>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TR> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        return RequestController(
+            NetwApi.Receiver(method, "Netw.RequestController"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8)).AsTask<TR>();
     }
 
     private static readonly IntPtr _bindSyncProperty =
@@ -1140,8 +2817,8 @@ public sealed class Netw : NetwRefCounted
         answered.Dispose();
     }
 
-    private static readonly IntPtr _bindEmitEntitySignal =
-        NetwApi.MethodBind("Netw", "emit_entity_signal", 2789890179UL);
+    private static readonly IntPtr _bindEmit =
+        NetwApi.MethodBind("Netw", "emit", 2789890179UL);
 
     /// <summary>
     /// Emits <paramref name="sig"/> on every peer, including the local one,
@@ -1154,13 +2831,13 @@ public sealed class Netw : NetwRefCounted
     ///
     /// # ...
     ///
-    /// Netw.emit_entity_signal(self.exploded, position)
+    /// Netw.emit(self.exploded, position)
     /// </code>
     /// <para>
     /// Do not also call <c>sig.emit()</c>, or local listeners fire twice.
     /// </para>
     /// </summary>
-    public static void EmitEntitySignal(Signal sig, params Variant[] rest)
+    public static void Emit(Signal sig, params Variant[] rest)
     {
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
@@ -1174,22 +2851,14 @@ public sealed class Netw : NetwRefCounted
             carried.Dispose();
         }
         godot_variant answered = default;
-        NetwThunks.CallPack(
-            _bindEmitEntitySignal,
-            IntPtr.Zero,
-            pack,
-            total,
-            ref answered);
+        NetwThunks.CallPack(_bindEmit, IntPtr.Zero, pack, total, ref answered);
         NetwThunks.ArgsFree(pack);
         answered.Dispose();
     }
 
-    public static void EmitEntitySignal(
-        Node node,
-        StringName name,
-        params Variant[] rest)
+    public static void Emit(Node node, StringName name, params Variant[] rest)
     {
-        EmitEntitySignal(new Signal(node, name), rest);
+        Emit(new Signal(node, name), rest);
     }
 
     private static readonly IntPtr _bindChannel =
@@ -1262,36 +2931,35 @@ public sealed class Netw : NetwRefCounted
         NetwApi.MethodBind("Netw", "spawn", 3345110683UL);
 
     /// <summary>
-    /// Calls <paramref name="fn"/> with the arguments after it on every peer,
-    /// and returns the node it made here. Add the node before the next tick,
-    /// under a node every peer has.
+    /// Calls <paramref name="method"/> with the arguments after it on every
+    /// peer, and returns the node it made here. Add the node before the next
+    /// tick, under a node every peer has.
     /// <code>
     /// muzzle.add_child(Netw.spawn(make_bullet, direction))
     /// </code>
     /// <para>
-    /// Register <paramref name="fn"/> with <see cref="Netw.ConfigureSpawn"/>
-    /// first. A player who joins later calls <paramref name="fn"/> too, with
-    /// the same arguments. The node outlives every player.
-    /// <see cref="Netw.SpawnPlayer"/> makes one that is despawned with its
-    /// player. A client can call it when the node sets
+    /// Register <paramref name="method"/> with
+    /// <see cref="Netw.ConfigureSpawn"/> first. A player who joins later calls
+    /// <paramref name="method"/> too, with the same arguments. The node
+    /// outlives every player. <see cref="Netw.SpawnPlayer"/> makes one that is
+    /// despawned with its player. A client can call it when the node sets
     /// <see cref="NetwEntity.Lifecycle"/> to
     /// <see cref="NetwEntity.LifecycleEnum.Controller"/>. That client's player
     /// becomes its <see cref="NetwEntity.Controller"/>. The client sees it at
-    /// once and loses it if the server refuses. <paramref name="fn"/> returns
-    /// without waiting. Use <see cref="Netw.SpawnAsync"/> when it awaits.
+    /// once and loses it if the server refuses. <paramref name="method"/>
+    /// returns without waiting. Use <see cref="Netw.SpawnAsync"/> when it
+    /// awaits.
     /// </para>
     /// </summary>
-    public static Node Spawn(Callable fn, params Variant[] rest)
+    public static Node Spawn(
+        Node node,
+        StringName method,
+        params Variant[] rest)
     {
-        if (fn.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.Spawn sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(fn));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(fn);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -1308,9 +2976,193 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static Node Spawn(Node node, StringName name, params Variant[] rest)
+    public static TN Spawn<
+        TN>(
+        Func<TN> method) where TN : Node
     {
-        return Spawn(new Callable(node, name), rest);
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name);
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        TN>(
+        Func<T1, TN> method,
+        T1 a1) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        TN>(
+        Func<T1, T2, TN> method,
+        T1 a1,
+        T2 a2) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        TN>(
+        Func<T1, T2, T3, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        TN>(
+        Func<T1, T2, T3, T4, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        TN>(
+        Func<T1, T2, T3, T4, T5, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        TN>(
+        Func<T1, T2, T3, T4, T5, T6, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        TN>(
+        Func<T1, T2, T3, T4, T5, T6, T7, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static TN Spawn<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        TN>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8) where TN : Node
+    {
+        return (
+            TN)Spawn(NetwApi.Receiver(method, "Netw.Spawn"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindSpawnPlayer =
@@ -1318,7 +3170,7 @@ public sealed class Netw : NetwRefCounted
 
     /// <summary>
     /// Like <see cref="Netw.Spawn"/>, and writes
-    /// <see cref="NetwEntity.Player"/> on the node <paramref name="fn"/>
+    /// <see cref="NetwEntity.Player"/> on the node <paramref name="method"/>
     /// returns. The two lines below spawn the same entity.
     /// <code>
     /// players.add_child(Netw.spawn_player(player, make_avatar))
@@ -1333,8 +3185,8 @@ public sealed class Netw : NetwRefCounted
     /// <para>
     /// Returns <c>null</c> and spawns nothing when the session does not hold
     /// <paramref name="player"/>, and raises an error unless that player left
-    /// the session. The node keeps the name <paramref name="fn"/> gave it, and
-    /// <see cref="NetwEntity.Name"/> is the player's
+    /// the session. The node keeps the name <paramref name="method"/> gave it,
+    /// and <see cref="NetwEntity.Name"/> is the player's
     /// <see cref="NetwPlayer.UserName"/>. The node is despawned when
     /// <paramref name="player"/> leaves. With
     /// <see cref="NetwPersistenceConfig.LoadOnSpawn"/>, other peers receive it
@@ -1343,15 +3195,10 @@ public sealed class Netw : NetwRefCounted
     /// </summary>
     public static Node SpawnPlayer(
         NetwPlayer player,
-        Callable fn,
+        Node node,
+        StringName method,
         params Variant[] rest)
     {
-        if (fn.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.SpawnPlayer sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(fn));
-        }
         int total = 2 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
         godot_variant slot0 =
@@ -1359,7 +3206,8 @@ public sealed class Netw : NetwRefCounted
                 player?.Native ?? IntPtr.Zero);
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
-        godot_variant slot1 = VariantUtils.CreateFromCallable(fn);
+        godot_variant slot1 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 1, in slot1);
         slot1.Dispose();
         for (int index = 2; index < total; index++)
@@ -1381,23 +3229,221 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static Node SpawnPlayer(
+    public static TN SpawnPlayer<
+        TN>(
         NetwPlayer player,
-        Node node,
-        StringName name,
-        params Variant[] rest)
+        Func<TN> method) where TN : Node
     {
-        return SpawnPlayer(player, new Callable(node, name), rest);
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name);
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        TN>(
+        NetwPlayer player,
+        Func<T1, TN> method,
+        T1 a1) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, TN> method,
+        T1 a1,
+        T2 a2) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, T3, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, T3, T4, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, T3, T4, T5, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, T3, T4, T5, T6, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, T3, T4, T5, T6, T7, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static TN SpawnPlayer<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        TN>(
+        NetwPlayer player,
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8) where TN : Node
+    {
+        return (
+            TN)SpawnPlayer(player,
+            NetwApi.Receiver(method, "Netw.SpawnPlayer"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindSpawnAsync =
         NetwApi.MethodBind("Netw", "spawn_async", 2325787334UL);
 
     /// <summary>
-    /// Like <see cref="Netw.Spawn"/>, and <paramref name="fn"/> may await. The
-    /// <see cref="NetwPromise"/> settles with the node once
-    /// <paramref name="fn"/> returns on this peer. Add the node before the next
-    /// tick.
+    /// Like <see cref="Netw.Spawn"/>, and <paramref name="method"/> may await.
+    /// The <see cref="NetwPromise"/> settles with the node once
+    /// <paramref name="method"/> returns on this peer. Add the node before the
+    /// next tick.
     /// <code>
     /// public async void Start(string path)
     /// {
@@ -1426,17 +3472,15 @@ public sealed class Netw : NetwRefCounted
     /// loaded a level before you spawn it. <b>Server Only.</b>
     /// </para>
     /// </summary>
-    public static NetwPromise SpawnAsync(Callable fn, params Variant[] rest)
+    public static NetwPromise SpawnAsync(
+        Node node,
+        StringName method,
+        params Variant[] rest)
     {
-        if (fn.Delegate != null)
-        {
-            throw new ArgumentException(
-                "Netw.SpawnAsync sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(fn));
-        }
         int total = 1 + (rest == null ? 0 : rest.Length);
         IntPtr pack = NetwThunks.ArgsNew(total);
-        godot_variant slot0 = VariantUtils.CreateFromCallable(fn);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
         NetwThunks.ArgsSet(pack, 0, in slot0);
         slot0.Dispose();
         for (int index = 1; index < total; index++)
@@ -1461,12 +3505,193 @@ public sealed class Netw : NetwRefCounted
         return result;
     }
 
-    public static NetwPromise SpawnAsync(
-        Node node,
-        StringName name,
-        params Variant[] rest)
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        TN>(
+        Func<TN> method) where TN : Node
     {
-        return SpawnAsync(new Callable(node, name), rest);
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        TN>(
+        Func<T1, TN> method,
+        T1 a1) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        TN>(
+        Func<T1, T2, TN> method,
+        T1 a1,
+        T2 a2) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        TN>(
+        Func<T1, T2, T3, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        TN>(
+        Func<T1, T2, T3, T4, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        TN>(
+        Func<T1, T2, T3, T4, T5, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        TN>(
+        Func<T1, T2, T3, T4, T5, T6, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        TN>(
+        Func<T1, T2, T3, T4, T5, T6, T7, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7)).AsTask(value => (TN)value.AsGodotObject());
+    }
+
+    public static System.Threading.Tasks.Task<TN> SpawnAsync<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8,
+        TN>(
+        Func<T1, T2, T3, T4, T5, T6, T7, T8, TN> method,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8) where TN : Node
+    {
+        return SpawnAsync(
+            NetwApi.Receiver(method, "Netw.SpawnAsync"),
+            method.Method.Name,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8)).AsTask(value => (TN)value.AsGodotObject());
     }
 
     private static readonly IntPtr _bindDespawn =
@@ -1551,38 +3776,678 @@ public sealed class Netw : NetwRefCounted
         return NetwPromise.Adopt(answered);
     }
 
-    private static readonly IntPtr _bindAction =
-        NetwApi.MethodBind("Netw", "action", 1326300923UL);
-
     /// <summary>
-    /// Creates a <see cref="NetwAction"/> whose server callback is
-    /// <paramref name="authority"/>. Call it on every peer, including the
-    /// server. Repeated calls return the same object. See
-    /// <see cref="NetwAction"/> for requests and prediction.
+    /// Declares <paramref name="method"/> as an action and returns its
+    /// <see cref="NetwActionConfig"/>. Call it in <c>_init</c> on every peer,
+    /// with a method of the root node of a <see cref="NetwEntity"/>.
+    /// <code>
+    /// public Bomber()
+    /// {
+    ///     Netw.ConfigureAction&lt;Vector2&gt;(PlaceBomb).Predict(GhostBomb);
+    /// }
+    ///
+    /// public void PlaceBomb(NetwActionRequest request, Vector2 pos)
+    /// {
+    ///     bombs.AddChild(MakeBomb(pos));
+    /// }
+    ///
+    /// public Node GhostBomb(Vector2 pos) =&gt; MakeBomb(pos);
+    /// </code>
+    /// <para>
+    /// The server passes <paramref name="method"/> a
+    /// <see cref="NetwActionRequest"/> before the arguments of
+    /// <see cref="Netw.Action"/>, and <see cref="NetwRequest.Deny"/> rejects
+    /// the action. Declaring an action turns lag compensation on for the
+    /// session. A second call for the same method on one node returns
+    /// <c>null</c>.
+    /// </para>
     /// </summary>
-    public static NetwAction Action(Callable authority)
+    public static NetwActionConfig ConfigureAction(
+        Action<NetwActionRequest> method)
     {
-        if (authority.Delegate != null)
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
         {
-            throw new ArgumentException(
-                "Netw.Action sends a method by name. Pass the " +
-                "node and a MethodName constant.", nameof(authority));
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    method(Wrapped(a0, NetwActionRequest.From));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
         }
-        godot_variant slot0 = VariantUtils.CreateFromCallable(authority);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindAction, IntPtr.Zero, in slot0, ref answered);
-        slot0.Dispose();
-        NetwAction result =
-            NetwAction.Adopt(
-                NetwApi.Retained(
-                    VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
     }
 
-    public static NetwAction Action(Node node, StringName name)
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1>(
+        Action<NetwActionRequest, T1> method)
     {
-        return Action(new Callable(node, name));
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (Godot.Variant a0, Godot.Variant a1) =>
+            {
+                try
+                {
+                    method(Wrapped(a0, NetwActionRequest.From), a1.As<T1>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2>(
+        Action<NetwActionRequest, T1, T2> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3>(
+        Action<NetwActionRequest, T1, T2, T3> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4>(
+        Action<NetwActionRequest, T1, T2, T3, T4> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5, T6> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5,
+                Godot.Variant a6) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>(),
+                        a6.As<T6>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5, T6, T7> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5,
+                Godot.Variant a6,
+                Godot.Variant a7) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>(),
+                        a6.As<T6>(),
+                        a7.As<T7>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    public static NetwActionConfig ConfigureAction<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5, T6, T7, T8> method)
+    {
+        Node root = NetwApi.Receiver(method, "Netw.ConfigureAction", false);
+        Callable bridged0 = default;
+        if (method != null)
+        {
+            var bridge0 = (
+                Godot.Variant a0,
+                Godot.Variant a1,
+                Godot.Variant a2,
+                Godot.Variant a3,
+                Godot.Variant a4,
+                Godot.Variant a5,
+                Godot.Variant a6,
+                Godot.Variant a7,
+                Godot.Variant a8) =>
+            {
+                try
+                {
+                    method(
+                        Wrapped(a0, NetwActionRequest.From),
+                        a1.As<T1>(),
+                        a2.As<T2>(),
+                        a3.As<T3>(),
+                        a4.As<T4>(),
+                        a5.As<T5>(),
+                        a6.As<T6>(),
+                        a7.As<T7>(),
+                        a8.As<T8>());
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.ConfigureAction", thrown);
+                    Wrapped(
+                        a0,
+                        NetwActionRequest.From)?.Deny(
+                            "The action handler failed.");
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(method, bridge0, owner => owner.NetwHold));
+        }
+        return NetwMultiplayer.LagcompActionDeclare(
+            root,
+            method.Method.Name,
+            bridged0);
+    }
+
+    private static readonly IntPtr _bindAction =
+        NetwApi.MethodBind("Netw", "action", 882870381UL);
+
+    /// <summary>
+    /// Asks the server to run <paramref name="method"/>, an action declared
+    /// with <see cref="Netw.ConfigureAction"/>. <paramref name="tick"/> is the
+    /// tick the player acted on, and the arguments after it are passed to
+    /// <paramref name="method"/> and to the
+    /// <see cref="NetwActionConfig.Predict"/> handler. Only the peer that
+    /// controls the <see cref="NetwEntity"/> sends a request.
+    /// <code>
+    /// func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
+    ///     if is_fresh and bombing:
+    ///         Netw.action(place_bomb, tick, position)
+    /// </code>
+    /// <para>
+    /// <b>Player request.</b>
+    /// </para>
+    /// </summary>
+    public static void Action(
+        Node node,
+        StringName method,
+        long tick,
+        params Variant[] rest)
+    {
+        int total = 2 + (rest == null ? 0 : rest.Length);
+        IntPtr pack = NetwThunks.ArgsNew(total);
+        godot_variant slot0 =
+            VariantUtils.CreateFromCallable(new Callable(node, method));
+        NetwThunks.ArgsSet(pack, 0, in slot0);
+        slot0.Dispose();
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)tick);
+        NetwThunks.ArgsSet(pack, 1, in slot1);
+        slot1.Dispose();
+        for (int index = 2; index < total; index++)
+        {
+            godot_variant carried = rest[index - 2].CopyNativeVariant();
+            NetwThunks.ArgsSet(pack, index, in carried);
+            carried.Dispose();
+        }
+        godot_variant answered = default;
+        NetwThunks.CallPack(
+            _bindAction,
+            IntPtr.Zero,
+            pack,
+            total,
+            ref answered);
+        NetwThunks.ArgsFree(pack);
+        answered.Dispose();
+    }
+
+    public static void Action(
+        Action<NetwActionRequest> method,
+        long tick)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick);
+    }
+
+    public static void Action<
+        [MustBeVariant] T1>(
+        Action<NetwActionRequest, T1> method,
+        long tick,
+        T1 a1)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2>(
+        Action<NetwActionRequest, T1, T2> method,
+        long tick,
+        T1 a1,
+        T2 a2)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3>(
+        Action<NetwActionRequest, T1, T2, T3> method,
+        long tick,
+        T1 a1,
+        T2 a2,
+        T3 a3)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4>(
+        Action<NetwActionRequest, T1, T2, T3, T4> method,
+        long tick,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5> method,
+        long tick,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5, T6> method,
+        long tick,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5, T6, T7> method,
+        long tick,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7));
+    }
+
+    public static void Action<
+        [MustBeVariant] T1,
+        [MustBeVariant] T2,
+        [MustBeVariant] T3,
+        [MustBeVariant] T4,
+        [MustBeVariant] T5,
+        [MustBeVariant] T6,
+        [MustBeVariant] T7,
+        [MustBeVariant] T8>(
+        Action<NetwActionRequest, T1, T2, T3, T4, T5, T6, T7, T8> method,
+        long tick,
+        T1 a1,
+        T2 a2,
+        T3 a3,
+        T4 a4,
+        T5 a5,
+        T6 a6,
+        T7 a7,
+        T8 a8)
+    {
+        Action(
+            NetwApi.Receiver(method, "Netw.Action", false),
+            method.Method.Name,
+            tick,
+            Variant.From(a1),
+            Variant.From(a2),
+            Variant.From(a3),
+            Variant.From(a4),
+            Variant.From(a5),
+            Variant.From(a6),
+            Variant.From(a7),
+            Variant.From(a8));
     }
 
     private static readonly IntPtr _bindSample =
@@ -1594,10 +4459,10 @@ public sealed class Netw : NetwRefCounted
     /// property declared on a child node is keyed by its path, such as
     /// <c>&amp;"Hurtbox:offset"</c>.
     /// <code>
-    /// func _place_bomb(ctx: NetwActionContext, pos: Vector2) -&gt; void:
-    ///     var past := Netw.sample(entity, ctx.view_tick)
+    /// func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+    ///     var past := Netw.sample(entity, request.view_tick)
     ///     if not past.has_value(&amp;"position"):
-    ///         ctx.deny()
+    ///         request.deny()
     ///         return
     /// </code>
     /// </summary>
@@ -1620,14 +4485,14 @@ public sealed class Netw : NetwRefCounted
 
     /// <summary>
     /// Moves every entity in <paramref name="entities"/> back to
-    /// <paramref name="tick"/>, calls <paramref name="body"/>, moves them back,
-    /// and returns what <paramref name="body"/> returned. Apply what the query
-    /// found after it returns.
+    /// <paramref name="tick"/>, calls <paramref name="callback"/>, moves them
+    /// back, and returns what <paramref name="callback"/> returned. Apply what
+    /// the query found after it returns.
     /// <code>
-    /// func _fire(ctx: NetwActionContext, origin: Vector3, aim: Vector3) -&gt; void:
+    /// func fire(request: NetwActionRequest, origin: Vector3, aim: Vector3) -&gt; void:
     ///     var targets := players.entities.keys()
     ///     targets.erase(entity)
-    ///     var hit: Dictionary = Netw.rewind(targets, ctx.view_tick, func() -&gt; Dictionary:
+    ///     var hit: Dictionary = Netw.rewind(targets, request.view_tick, func() -&gt; Dictionary:
     ///         var ray := PhysicsRayQueryParameters3D.create(
     ///                 origin, origin + aim * RANGE, HITBOX_LAYER)
     ///         ray.collide_with_areas = true
@@ -1643,12 +4508,33 @@ public sealed class Netw : NetwRefCounted
     public static Variant Rewind(
         NetwEntity[] entities,
         long tick,
-        Callable body)
+        Func<Variant> callback)
     {
+        Callable bridged2 = default;
+        if (callback != null)
+        {
+            var bridge2 = () =>
+            {
+                try
+                {
+                    Variant answer = callback();
+                    return NetwApi.Answered(
+                        Godot.Variant.CreateTakingOwnershipOfDisposableValue(
+                            answer.CopyNativeVariant()));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("Netw.Rewind", thrown);
+                    return NetwApi.Answered(default);
+                }
+            };
+            bridged2 = Callable.From(
+                NetwApi.Anchored(callback, bridge2, owner => owner.NetwAnswer));
+        }
         godot_variant slot0 =
             VariantUtils.CreateFromArray(NetwApi.ArrayOf(entities));
         godot_variant slot1 = VariantUtils.CreateFromInt((long)tick);
-        godot_variant slot2 = VariantUtils.CreateFromCallable(body);
+        godot_variant slot2 = VariantUtils.CreateFromCallable(bridged2);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindRewind,

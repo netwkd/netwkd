@@ -13,17 +13,17 @@ The peer was refused. The log line names the peer.
 .. code-block:: gdscript
 
     # server
-    Netw.configure_join(self, join_handler)
+    Netw.configure_join(join_handler)
 
-    func join_handler(name: String, color: Color) -> Error:
-        return OK
+    func join_handler(player: NetwPlayer, color: Color) -> void:
+        pass
 
     # client
-    Netw.prepare_join(self, "Ana")
+    Netw.prepare_join(self, &"Ana")
 
-Pass the arguments the handler declares to
+Pass the arguments the handler declares after the player to
 :ref:`Netw.prepare_join <class_Netw_method_prepare_join>` on the client.
 
 .. code-block:: gdscript
 
-    Netw.prepare_join(self, "Ana", Color.RED)
+    Netw.prepare_join(self, &"Ana", Color.RED)

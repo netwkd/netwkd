@@ -1,7 +1,7 @@
-# WIRE v22, the carrier format
+# WIRE v23, the carrier format
 
 The byte layout of every datagram, frame and payload Networked writes.
-`FORMAT_VERSION` is 22. `src/wire/registry.cpp` is the one declaration of the
+`FORMAT_VERSION` is 23. `src/wire/registry.cpp` is the one declaration of the
 channel table and `tools/wire_decode.py` reads a capture against this page.
 
 ---
@@ -188,7 +188,10 @@ Every axis of the table folds into the identity hash two peers exchange at
 admission, so a build disagreeing about any cell cannot pair.
 
 A channel also carries a `payload_revision`, folded into identity when
-non-zero. SYNC_ROW, SYNC_ROW_DELTA and SYNC_ROW_WINDOW declare 1 for the v11
+non-zero. ACTION declares 1 for the request of section 18 that carries
+neither a timing nor a key. LAGCOMP_DENY declares 1 for the code and the
+reason of section 13. SYNC_ROW, SYNC_ROW_DELTA and SYNC_ROW_WINDOW declare 1
+for the v11
 row contract, SESSION_JOIN declares 1 for its proof, SESSION_ACCEPT and
 SESSION_ROSTER declare 3 for the membership row, its account and the join
 address of section 16,
@@ -196,7 +199,8 @@ SPAWN declares 5 for the player id, the decision, the anchor revision and
 its author the header of section 11 carries and the origin its ADOPT body
 carries, DESPAWN declares 1 for the base a controller's DESPAWN carries,
 REPARENT declares 2 for its anchor revision and its author,
-CONTROL_REQUEST and CONTROL_APPLY declare 1 for the layouts of section 14,
+CONTROL_REQUEST declares 1 for the layout of section 14 and CONTROL_APPLY
+declares 2 for that layout and the code and the reason of a refusal,
 ROW_CONTROL declares 5 for the frame of records, the stepped ids, the omitted
 OPEN fields and the RESET that names only a token of section 10, and for the
 parked lanes and binding floors of section 7, LIFECYCLE_DECISION declares 2
@@ -636,8 +640,9 @@ next row opens under the server's pair. A refusal whose base names no op the
 controller still holds changes nothing. A refused DESPAWN also moves each
 descendant the controller detached ahead of it back under its old parent in
 the entity the server serves again, keeping its world pose. The denial string
-is the reason the server's `lifecycle_requested` handler passed to `deny`, and
-it reaches the controller's `lifecycle_refused` and the rejected promise.
+is the reason the entity's `lifecycle_handler` passed to `deny` and `reason` is
+the code it passed, and both reach the controller's `lifecycle_refused` and
+the rejected promise.
 
 ```text
 SPAWN
@@ -766,13 +771,15 @@ A clock frame is refused whole and leaves the local calibration as it was.
 ## 13. The lag compensation denial and confirmation
 
 ```text
-LAGCOMP_DENY     [key string]
+LAGCOMP_DENY     [key string][code varuint 2][reason string]
 LAGCOMP_CONFIRM  [key string]
 ```
 
 `key` names the effect the server refused, and the receiver discards exactly
-that effect's local prediction. A denial that does not decode whole discards
-nothing.
+that effect's local prediction. `code` is an `Error` value and `reason` is the
+server's text, at most 255 bytes of UTF-8, and both reach the handler that
+undoes the prediction. A `code` of 0 reads as `ERR_UNAUTHORIZED`. A denial
+that does not decode whole discards nothing.
 
 A confirmation names an effect the server ran without denying it and without
 binding a node to it, and the receiver keeps that effect's local prediction.
@@ -808,6 +815,8 @@ CONTROL_APPLY
 [final_state bytes_capped 1024]   the new tenure's first sample, or empty
 [peer varuint 5]                  the new owner's peer, 0 the server
 [player_id varuint 5]             the new owner's player id, 0 no player
+[code varuint 2]                  an Error the handler denied with, or 0
+[reason string]                   the handler's reason, or empty
 [align_verify]
 ```
 
@@ -818,7 +827,10 @@ coordinator decides them in the order they were issued, across entities too.
 `CONTROL_APPLY` is admitted only from the session authority and is broadcast
 to every peer the entity is live for. The issuer's copy also carries its `op`
 and the `outcome`. A refusal reaches only the issuer and restates the current
-decision at its current revision. A receiver installs a decision only when its
+decision at its current revision. When the entity's `control_handler` denied
+the claim, the refusal also carries the `code` and the `reason` it passed to
+`deny`, at most 255 bytes of UTF-8, and both reject the issuer's promise. A
+`code` of 0 reads as the `outcome`. A receiver installs a decision only when its
 revision is newer than the one it holds, and settles the op either way. An
 apply for a route the receiver has not spawned waits for the spawn.
 
@@ -1157,8 +1169,7 @@ REPLY          [txn varuint 5][failed bool]
 SIGNAL         [signal token][args slots][align_verify]
 PROPERTY_SYNC  [property token][values slots][align_verify]
 ACTION         [method string][view_tick svarint 5]
-               [data bytes_capped 4095][key string]
-               [timing int_range 0..3][align_verify]
+               [data bytes_capped 4095][align_verify]
 ```
 
 `flags` bits 0 and 1 name who the call is addressed to, `0` everyone the

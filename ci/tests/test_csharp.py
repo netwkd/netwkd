@@ -836,16 +836,175 @@ class ConstructionAndNames(unittest.TestCase):
             "hash": 1,
             "is_static": True,
             "is_vararg": True,
-            "arguments": [{"name": "peer_id", "type": "int"}, {"name": "callable", "type": "Callable"}],
+            "arguments": [{"name": "peer_id", "type": "int"}, {"name": "method", "type": "Callable"}],
         }
         facade = facade_class()
         facade["methods"] = [method]
         emitter = csharp.Emitter(csharp.Surface(dump_of(facade)))
         text = emitter.emit(facade)
-        self.assertIn("longpeerId,Nodenode,StringNamename", "".join(text.split()))
-        self.assertIn("new Callable(node, name)", text)
-        self.assertIn("params Variant[]", text)
-        self.assertIn("if (callable.Delegate != null)", text)
+        packed = "".join(text.split())
+        self.assertIn("longpeerId,Nodenode,StringNamemethod,paramsVariant[]rest)", packed)
+        self.assertIn("new Callable(node, method)", text)
+        self.assertNotIn("Callable method", text)
+
+    def test_a_networked_method_takes_the_method_itself(self):
+        rows = [
+            ("rpc", None, [], "voidRpc<[MustBeVariant]T1>(Action<T1>method,T1a1)"),
+            ("rpc", None, [], "voidRpc(Actionmethod)"),
+            (
+                "request",
+                "Netw",
+                [],
+                "Task<TR>Request<[MustBeVariant]T1,[MustBeVariant]TR>(Func<T1,TR>method,T1a1)",
+            ),
+            ("spawn", "Netw", [], "TNSpawn<[MustBeVariant]T1,TN>(Func<T1,TN>method,T1a1)whereTN:Node"),
+            ("action", None, ["tick"], "(Action<NetwActionRequest,T1>method,longtick,T1a1)"),
+            ("configure_rpc", "Netw", [], "NetwConfigureRpc(Delegatemethod)"),
+        ]
+        for name, answered, after, shape in rows:
+            with self.subTest(name=name, shape=shape):
+                method = {
+                    "name": name,
+                    "hash": 1,
+                    "is_static": True,
+                    "is_vararg": not name.startswith("configure"),
+                    "arguments": [
+                        {"name": "method", "type": "Callable"},
+                        *[{"name": one, "type": "int"} for one in after],
+                    ],
+                }
+                if answered:
+                    method["return_value"] = {"type": answered}
+                facade = facade_class()
+                facade["methods"] = [method]
+                emitter = csharp.Emitter(csharp.Surface(dump_of(facade)))
+                text = emitter.emit(facade)
+                spelled = csharp.pascal(name)
+                self.assertIn(shape, "".join(text.split()))
+                self.assertIn('NetwApi.Receiver(method, "Netw.%s"' % spelled, text)
+                self.assertEqual(text.count("T8 a8"), 0 if "configure" in name else 1)
+                self.assertNotIn("T9", text)
+                for line in text.splitlines():
+                    self.assertLessEqual(len(line), csharp.WIDTH, line)
+
+    def test_a_handler_is_a_typed_method(self):
+        rows = [
+            (
+                "configure_server_info",
+                "handler",
+                None,
+                "func(info: Netw) -> void",
+                [
+                    "publicstaticvoidConfigureServerInfo(Action<Netw>handler)",
+                    "handler(Wrapped(a0,Netw.From));",
+                    'NetwApi.Report("Netw.ConfigureServerInfo",thrown);',
+                    "NetwApi.Anchored(handler,bridge0,owner=>owner.NetwHold)",
+                ],
+            ),
+            (
+                "rewind",
+                "callback",
+                None,
+                "func(tick: int, code: Error) -> Netw",
+                [
+                    "publicstaticvoidRewind(Func<long,Error,Netw>callback)",
+                    "Netwanswer=callback(a0.As<long>(),(Error)a1.AsInt64());",
+                    "returnNetwApi.Answered(default);",
+                    "owner=>owner.NetwAnswer",
+                ],
+            ),
+            (
+                "set_driver",
+                "driver",
+                "driver",
+                "func(layer: Netw) -> Array[Netw]",
+                ["publicvoidSetDriver(Func<Netw,Netw[]>driver)", "NetwApi.ArrayOf(answer)"],
+            ),
+            (
+                "configure_action",
+                "method",
+                None,
+                "func(request: Netw, ...) -> void",
+                [
+                    "ConfigureAction<[MustBeVariant]T1>(Action<Netw,T1>method)",
+                    'Noderoot=NetwApi.Receiver(method,"Netw.ConfigureAction",false);',
+                    "method(Wrapped(a0,Netw.From),a1.As<T1>());",
+                    'Wrapped(a0,Netw.From)?.Deny("Theactionhandlerfailed.");',
+                    "NetwMultiplayer.LagcompActionDeclare(root,method.Method.Name,bridged0);",
+                ],
+            ),
+            (
+                "configure_admission",
+                "handler",
+                None,
+                "func(request: Netw) -> void",
+                [
+                    "privatestaticvoidConfigureAdmission(Callablehandler)",
+                    "publicstaticvoidConfigureAdmission(Action<Netw>handler)",
+                    "ConfigureAdmission(Func<Netw,System.Threading.Tasks.Task>handler)",
+                    'NetwApi.Awaited("Netw.ConfigureAdmission",handler(Wrapped(a0,Netw.From)))',
+                ],
+            ),
+        ]
+        for name, argument, held, shape, expected in rows:
+            with self.subTest(name=name):
+                facade = facade_class()
+                facade["methods"] = [
+                    {
+                        "name": name,
+                        "hash": 1,
+                        "is_static": held is None,
+                        "arguments": [{"name": argument, "type": "Callable"}],
+                    }
+                ]
+                facade["properties"] = []
+                target = "Netw.%s.%s" % (name, argument)
+                if held is not None:
+                    facade["properties"] = [{"type": "Callable", "name": held, "setter": name}]
+                    target = "Netw.%s" % held
+                handlers = {target: csharp.handler_of(shape)}
+                emitter = csharp.Emitter(csharp.Surface(dump_of(facade)), handlers)
+                text = emitter.emit(facade)
+                packed = "".join(text.split())
+                for one in expected:
+                    self.assertIn(one, packed)
+                self.assertNotIn("publicCallable", packed)
+                self.assertNotIn("public static void %s(Callable" % csharp.pascal(name), text)
+                for line in text.splitlines():
+                    self.assertLessEqual(len(line), csharp.WIDTH, line)
+
+    def test_the_callback_table_names_what_takes_each_handler(self):
+        handlers = csharp.game_calls()
+        self.assertEqual(len(handlers["NetwEntity.control_handler"].arguments), 1)
+        self.assertTrue(handlers["Netw.configure_join.handler"].variadic)
+        self.assertIsNone(handlers["Netw.configure_admission.handler"].answered)
+
+    def test_a_class_a_game_extends_is_made_with_create(self):
+        virtual = {"name": "_service_entered", "hash": 1, "is_virtual": True}
+        rows = [
+            (True, [virtual], None, 'NetwApi.Create<T>("NetwClock","_service_entered");'),
+            (False, [virtual], None, None),
+            (True, [], None, None),
+            (True, [{**virtual, "name": "_peer_class"}], "Netw", '"NetwClock","_should_register","_peer_class");'),
+        ]
+        for instantiable, methods, inherits, expected in rows:
+            with self.subTest(instantiable=instantiable, methods=len(methods), inherits=inherits):
+                entry = clock_class()
+                entry["is_instantiable"] = instantiable
+                entry["methods"] = entry["methods"] + methods
+                base = facade_class()
+                base["is_instantiable"] = True
+                base["methods"] = [{**virtual, "name": "_should_register"}]
+                if inherits:
+                    entry["inherits"] = inherits
+                text = csharp.Emitter(csharp.Surface(dump_of(entry, base))).emit(entry)
+                packed = "".join(text.split())
+                if expected is None:
+                    self.assertNotIn("Create<T>", text)
+                    continue
+                self.assertIn(expected, packed)
+                hides = "new " if inherits else ""
+                self.assertIn("public %sstatic T Create<T>() where T : GodotObject" % hides, text)
 
     def test_enum_event_marshals_integer_and_casts(self):
         entry = promise_class()
@@ -864,6 +1023,66 @@ class ConstructionAndNames(unittest.TestCase):
         self.assertIn("Action<NetwPromise.Stage, NetwPromise.Stage>", text)
         self.assertIn("(long a0, long a1)", text)
         self.assertIn("value((NetwPromise.Stage)a0, (NetwPromise.Stage)a1)", text)
+
+
+class Samples(unittest.TestCase):
+    XML = """<class name="Crate">
+    <description>
+        [codeblocks]
+        [gdscript]
+        func _init() -&gt; void:
+            pass
+        [/gdscript]
+        [csharp]
+        public Crate()
+        {
+            Netw.ConfigureEntity(this).Changed += Judge;
+        }
+
+        private void Judge(Variant request) =&gt; request.As&lt;Node&gt;();
+        [/csharp]
+        [/codeblocks]
+        [codeblocks]
+        [csharp]
+        public partial class Shop : Node
+        {
+        }
+        [/csharp]
+        [/codeblocks]
+    </description>
+</class>
+"""
+
+    def samples(self, workspace: str) -> list:
+        path = Path(workspace) / "Crate.xml"
+        path.write_text(self.XML, encoding="utf-8")
+        return csharp.doc_samples(Path(workspace))
+
+    def test_members_are_wrapped_in_the_class_their_constructor_names(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            members, typed = self.samples(workspace)
+        self.assertFalse(members.declares_type)
+        source = members.source()
+        self.assertIn("namespace Crate_9\n{\npublic partial class Crate : Node\n{", source)
+        self.assertIn("private void Judge(Variant request) => request.As<Node>();", source)
+        self.assertTrue(typed.declares_type)
+        self.assertNotIn("namespace", typed.source())
+        self.assertEqual(typed.source().count("class"), 1)
+
+    def test_a_block_with_no_constructor_takes_a_generated_class(self):
+        sample = csharp.Sample(Path("Shop.xml"), 4, "public void Buy() { }")
+        self.assertIn("namespace Shop_4\n{\npublic partial class Sample : Node\n{", sample.source())
+
+    def test_a_broken_line_is_reported_at_its_xml_path_and_line(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            members, typed = self.samples(workspace)
+            path = Path(workspace) / "Crate.xml"
+        lines = members.source().splitlines()
+        mapped = lines.index('#line 9 "%s"' % path)
+        broken = next(at for at, line in enumerate(lines) if "Changed += Judge" in line)
+        self.assertEqual(9 + broken - mapped - 1, 11)
+        self.assertEqual(self.XML.splitlines()[10], lines[broken])
+        self.assertIn('#line 19 "%s"' % path, typed.source())
 
 
 if __name__ == "__main__":

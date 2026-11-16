@@ -40,12 +40,18 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="action" qualifiers="static">
-			<return type="NetwAction" />
-			<param index="0" name="authority" type="Callable" />
+		<method name="action" qualifiers="vararg static">
+			<return type="void" />
+			<param index="0" name="method" type="Callable" />
+			<param index="1" name="tick" type="int" />
 			<description>
-				Creates a [NetwAction] whose server callback is [param authority]. Call it on every peer, including the server. Repeated calls return the same object.
-				See [NetwAction] for requests and prediction.
+				Asks the server to run [param method], an action declared with [method configure_action]. [param tick] is the tick the player acted on, and the arguments after it are passed to [param method] and to the [method NetwActionConfig.predict] handler. Only the peer that controls the [NetwEntity] sends a request.
+				[codeblock]
+				func _network_process(delta: float, tick: int, is_fresh: bool) -&gt; void:
+				    if is_fresh and bombing:
+				        Netw.action(place_bomb, tick, position)
+				[/codeblock]
+				[b]Player request.[/b]
 			</description>
 		</method>
 		<method name="channel" qualifiers="static">
@@ -61,19 +67,83 @@
 				[/codeblock]
 			</description>
 		</method>
+		<method name="configure_action" qualifiers="static">
+			<return type="NetwActionConfig" />
+			<param index="0" name="method" type="Callable" />
+			<description>
+				Declares [param method] as an action and returns its [NetwActionConfig]. Call it in [code]_init[/code] on every peer, with a method of the root node of a [NetwEntity].
+				[codeblocks]
+				[gdscript]
+				func _init() -&gt; void:
+				    Netw.configure_action(place_bomb).predict(ghost_bomb)
+
+				func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+				    bombs.add_child(make_bomb(pos))
+
+				func ghost_bomb(pos: Vector2) -&gt; Node:
+				    return make_bomb(pos)
+				[/gdscript]
+				[csharp]
+				public Bomber()
+				{
+				    Netw.ConfigureAction&lt;Vector2&gt;(PlaceBomb).Predict(GhostBomb);
+				}
+
+				public void PlaceBomb(NetwActionRequest request, Vector2 pos)
+				{
+				    bombs.AddChild(MakeBomb(pos));
+				}
+
+				public Node GhostBomb(Vector2 pos) =&gt; MakeBomb(pos);
+				[/csharp]
+				[/codeblocks]
+				The server passes [param method] a [NetwActionRequest] before the arguments of [method action], and [method NetwRequest.deny] rejects the action. Declaring an action turns lag compensation on for the session. A second call for the same method on one node returns [code]null[/code].
+			</description>
+		</method>
 		<method name="configure_admission" qualifiers="static">
 			<return type="NetwAdmissionConfig" />
 			<param index="0" name="handler" type="Callable" />
 			<description>
 				Declares who may join the session.
-				[codeblock]
+				[codeblocks]
+				[gdscript]
 				func _init() -&gt; void:
 				    Netw.configure_admission(admit).accept(id_token)
 
-				func admit(request: NetwJoinRequest) -&gt; Error:
-				    return OK if request.account else ERR_UNAUTHORIZED
-				[/codeblock]
-				A joining client is not connected until [param handler] returns [constant @GlobalScope.OK]. [NetwAdmissionConfig] shows a lobby that admits players only while it is open.
+				func admit(request: NetwJoinRequest) -&gt; void:
+				    if await is_banned(request.account):
+				        request.deny()
+				    else:
+				        request.admit()
+
+				func is_banned(account: String) -&gt; bool:
+				    http.request(BANS_URL + account)
+				    var response: Array = await http.request_completed
+				    return response[1] == 200
+				[/gdscript]
+				[csharp]
+				public Lobby()
+				{
+				    Netw.ConfigureAdmission(Admit).Accept(idToken);
+				}
+
+				async Task Admit(NetwJoinRequest request)
+				{
+				    if (await IsBanned(request.Account))
+				        request.Deny();
+				    else
+				        request.Admit();
+				}
+
+				async Task&lt;bool&gt; IsBanned(string account)
+				{
+				    http.Request(BansUrl + account);
+				    var response = await ToSignal(http, HttpRequest.SignalName.RequestCompleted);
+				    return response[1].AsInt64() == 200;
+				}
+				[/csharp]
+				[/codeblocks]
+				A joining client is not connected until [param handler] calls [method NetwJoinRequest.admit], and [method NetwRequest.deny] refuses it. Every request the server decides is a [NetwRequest]. [NetwAdmissionConfig] shows a lobby that admits players only while it is open.
 			</description>
 		</method>
 		<method name="configure_clock" qualifiers="static">
@@ -179,9 +249,9 @@
 		</method>
 		<method name="configure_rpc" qualifiers="static">
 			<return type="NetwMemberConfig" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				[param callable] must name a script method. Anonymous callbacks are refused.
+				[param method] must name a script method. Anonymous callbacks are refused.
 				[codeblock]
 				func _init() -&gt; void:
 				    Netw.configure_rpc(self.aim).controller().quantize(
@@ -221,17 +291,16 @@
 		</method>
 		<method name="configure_server_info" qualifiers="static">
 			<return type="int" enum="Error" />
-			<param index="0" name="provider" type="Callable" />
+			<param index="0" name="handler" type="Callable" />
 			<description>
-				Declares what this server says about itself when another peer probes it with [method NetwEndpoint.probe].
+				Declares what this server says about itself when another peer probes it with [method NetwEndpoint.probe]. [param handler] edits the [NetwServerInfo] it is given.
 				[codeblock]
 				func _init() -&gt; void:
 				    Netw.configure_server_info(server_info)
 
-				func server_info(info: NetwServerInfo) -&gt; NetwServerInfo:
+				func server_info(info: NetwServerInfo) -&gt; void:
 				    info.motd = "Friday night session"
 				    info.max_players = 8
-				    return info
 				[/codeblock]
 			</description>
 		</method>
@@ -259,7 +328,7 @@
 		</method>
 		<method name="configure_spawn" qualifiers="static">
 			<return type="NetwMemberConfig" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
 				[codeblock]
 				func _init() -&gt; void:
@@ -278,9 +347,9 @@
 		</method>
 		<method name="configure_transfer" qualifiers="static">
 			<return type="int" enum="Error" />
-			<param index="0" name="keep" type="Callable" />
+			<param index="0" name="handler" type="Callable" />
 			<description>
-				Picks which [NetwEntity] instances outlive a server transfer in [constant NetwSession.TRANSFER_REJOIN]. The new server calls [param keep] with the root node of each [NetwEntity] it took over, and despawns the ones it answers [code]false[/code] for before any client gets the world again.
+				Picks which [NetwEntity] instances outlive a server transfer in [constant NetwSession.TRANSFER_REJOIN]. The new server calls [param handler] with the root node of each [NetwEntity] it took over, and despawns the ones it answers [code]false[/code] for before any client gets the world again.
 				[codeblock]
 				func _init() -&gt; void:
 				    Netw.configure_transfer(keeps)
@@ -306,7 +375,7 @@
 				A client can call it when its player is the [member NetwEntity.controller] and [member NetwEntity.lifecycle] is [constant NetwEntity.LIFECYCLE_CONTROLLER]. The node is removed on that client at once, and comes back if the server refuses.
 			</description>
 		</method>
-		<method name="emit_entity_signal" qualifiers="vararg static">
+		<method name="emit" qualifiers="vararg static">
 			<return type="void" />
 			<param index="0" name="sig" type="Signal" />
 			<description>
@@ -319,7 +388,7 @@
 
 				# ...
 
-				Netw.emit_entity_signal(self.exploded, position)
+				Netw.emit(self.exploded, position)
 				[/codeblock]
 				Do not also call [code]sig.emit()[/code], or local listeners fire twice.
 			</description>
@@ -369,9 +438,9 @@
 		</method>
 		<method name="request" qualifiers="vararg static">
 			<return type="NetwPromise" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on the server and returns a [NetwPromise] with its return value.
+				Calls [param method] on the server and returns a [NetwPromise] with its return value.
 				[codeblocks]
 				[gdscript]
 				func buy_shield() -&gt; void:
@@ -384,7 +453,7 @@
 				[csharp]
 				public async void BuyShield()
 				{
-				    bool sold = (await Netw.Request(shop, MethodName.Buy, "shield")).AsBool();
+				    bool sold = (await Netw.Request(shop.Buy, (StringName)"shield")).AsBool();
 				}
 
 				[Rpc(MultiplayerApi.RpcMode.AnyPeer)]
@@ -397,9 +466,9 @@
 		</method>
 		<method name="request_all" qualifiers="vararg static">
 			<return type="NetwGroupPromise" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on every peer that can see the node, and returns a [NetwGroupPromise] with each return value. The promise fails at once when the node is not part of a spawned [NetwEntity].
+				Calls [param method] on every peer that can see the node, and returns a [NetwGroupPromise] with each return value. The promise fails at once when the node is not part of a spawned [NetwEntity].
 				This peer is asked too when the method is [code]call_local[/code], set through [annotation @GDScript.@rpc] or [method NetwMemberConfig.call_local]. The method may [code]await[/code] for 5 seconds, and [method NetwMemberConfig.timeout] sets a longer deadline.
 				[codeblocks]
 				[gdscript]
@@ -465,6 +534,8 @@
 
 				    public Node MakeMatch() =&gt; warm.Instantiate();
 
+				    public Node MakePlayer() =&gt; new Node();
+
 				    public Variant PreloadLevel(string path) =&gt; NetwPromise.FromTask(Preload(path));
 
 				    async Task&lt;bool&gt; Preload(string path)
@@ -483,31 +554,31 @@
 		</method>
 		<method name="request_controller" qualifiers="vararg static">
 			<return type="NetwPromise" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on the peer of the node's [member NetwEntity.controller], and on the server when no peer steers it. The promise fails at once when the node is not part of a spawned [NetwEntity]. The method may [code]await[/code], as for [method request].
+				Calls [param method] on the peer of the node's [member NetwEntity.controller], and on the server when no peer steers it. The promise fails at once when the node is not part of a spawned [NetwEntity]. The method may [code]await[/code], as for [method request].
 			</description>
 		</method>
 		<method name="request_id" qualifiers="vararg static">
 			<return type="NetwPromise" />
 			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="callable" type="Callable" />
+			<param index="1" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on [param peer_id] and returns a [NetwPromise] with its return value. Use [method request_all] to call every peer. The promise fails at once when the node is not part of a spawned [NetwEntity]. The method may [code]await[/code], as for [method request].
+				Calls [param method] on [param peer_id] and returns a [NetwPromise] with its return value. Use [method request_all] to call every peer. The promise fails at once when the node is not part of a spawned [NetwEntity]. The method may [code]await[/code], as for [method request].
 			</description>
 		</method>
 		<method name="rewind" qualifiers="static">
 			<return type="Variant" />
 			<param index="0" name="entities" type="NetwEntity[]" />
 			<param index="1" name="tick" type="int" />
-			<param index="2" name="body" type="Callable" />
+			<param index="2" name="callback" type="Callable" />
 			<description>
-				Moves every entity in [param entities] back to [param tick], calls [param body], moves them back, and returns what [param body] returned. Apply what the query found after it returns.
+				Moves every entity in [param entities] back to [param tick], calls [param callback], moves them back, and returns what [param callback] returned. Apply what the query found after it returns.
 				[codeblock]
-				func _fire(ctx: NetwActionContext, origin: Vector3, aim: Vector3) -&gt; void:
+				func fire(request: NetwActionRequest, origin: Vector3, aim: Vector3) -&gt; void:
 				    var targets := players.entities.keys()
 				    targets.erase(entity)
-				    var hit: Dictionary = Netw.rewind(targets, ctx.view_tick, func() -&gt; Dictionary:
+				    var hit: Dictionary = Netw.rewind(targets, request.view_tick, func() -&gt; Dictionary:
 				        var ray := PhysicsRayQueryParameters3D.create(
 				                origin, origin + aim * RANGE, HITBOX_LAYER)
 				        ray.collide_with_areas = true
@@ -520,9 +591,9 @@
 		</method>
 		<method name="rpc" qualifiers="vararg static">
 			<return type="void" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on every peer that can see the node. The node must be part of a spawned [NetwEntity].
+				Calls [param method] on every peer that can see the node. The node must be part of a spawned [NetwEntity].
 				[codeblock]
 				Netw.rpc(turret.aim, yaw)
 				[/codeblock]
@@ -530,17 +601,17 @@
 		</method>
 		<method name="rpc_controller" qualifiers="vararg static">
 			<return type="void" />
-			<param index="0" name="callable" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on the peer of the node's [member NetwEntity.controller], and on the server when no peer steers it. The node must be part of a spawned [NetwEntity].
+				Calls [param method] on the peer of the node's [member NetwEntity.controller], and on the server when no peer steers it. The node must be part of a spawned [NetwEntity].
 			</description>
 		</method>
 		<method name="rpc_id" qualifiers="vararg static">
 			<return type="void" />
 			<param index="0" name="peer_id" type="int" />
-			<param index="1" name="callable" type="Callable" />
+			<param index="1" name="method" type="Callable" />
 			<description>
-				Calls [param callable] on [param peer_id], or on every peer when [code]0[/code]. The node must be part of a spawned [NetwEntity].
+				Calls [param method] on [param peer_id], or on every peer when [code]0[/code]. The node must be part of a spawned [NetwEntity].
 			</description>
 		</method>
 		<method name="sample" qualifiers="static">
@@ -550,10 +621,10 @@
 			<description>
 				Returns a copy of the state of [param entity] at [param tick]. It is empty when nothing was recorded. A property declared on a child node is keyed by its path, such as [code]&amp;"Hurtbox:offset"[/code].
 				[codeblock]
-				func _place_bomb(ctx: NetwActionContext, pos: Vector2) -&gt; void:
-				    var past := Netw.sample(entity, ctx.view_tick)
+				func place_bomb(request: NetwActionRequest, pos: Vector2) -&gt; void:
+				    var past := Netw.sample(entity, request.view_tick)
 				    if not past.has_value(&amp;"position"):
-				        ctx.deny()
+				        request.deny()
 				        return
 				[/codeblock]
 			</description>
@@ -583,23 +654,23 @@
 		</method>
 		<method name="spawn" qualifiers="vararg static">
 			<return type="Node" />
-			<param index="0" name="fn" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Calls [param fn] with the arguments after it on every peer, and returns the node it made here. Add the node before the next tick, under a node every peer has.
+				Calls [param method] with the arguments after it on every peer, and returns the node it made here. Add the node before the next tick, under a node every peer has.
 				[codeblock]
 				muzzle.add_child(Netw.spawn(make_bullet, direction))
 				[/codeblock]
-				Register [param fn] with [method configure_spawn] first. A player who joins later calls [param fn] too, with the same arguments.
+				Register [param method] with [method configure_spawn] first. A player who joins later calls [param method] too, with the same arguments.
 				The node outlives every player. [method spawn_player] makes one that is despawned with its player.
 				A client can call it when the node sets [member NetwEntity.lifecycle] to [constant NetwEntity.LIFECYCLE_CONTROLLER]. That client's player becomes its [member NetwEntity.controller]. The client sees it at once and loses it if the server refuses.
-				[param fn] returns without waiting. Use [method spawn_async] when it awaits.
+				[param method] returns without waiting. Use [method spawn_async] when it awaits.
 			</description>
 		</method>
 		<method name="spawn_async" qualifiers="vararg static">
 			<return type="NetwPromise" />
-			<param index="0" name="fn" type="Callable" />
+			<param index="0" name="method" type="Callable" />
 			<description>
-				Like [method spawn], and [param fn] may await. The [NetwPromise] settles with the node once [param fn] returns on this peer. Add the node before the next tick.
+				Like [method spawn], and [param method] may await. The [NetwPromise] settles with the node once [param method] returns on this peer. Add the node before the next tick.
 				[codeblocks]
 				[gdscript]
 				func start(path: String) -&gt; void:
@@ -643,9 +714,9 @@
 		<method name="spawn_player" qualifiers="vararg static">
 			<return type="Node" />
 			<param index="0" name="player" type="NetwPlayer" />
-			<param index="1" name="fn" type="Callable" />
+			<param index="1" name="method" type="Callable" />
 			<description>
-				Like [method spawn], and writes [member NetwEntity.player] on the node [param fn] returns. The two lines below spawn the same entity.
+				Like [method spawn], and writes [member NetwEntity.player] on the node [param method] returns. The two lines below spawn the same entity.
 				[codeblock]
 				players.add_child(Netw.spawn_player(player, make_avatar))
 				players.add_child(Netw.spawn(make_avatar_of, player.peer_id))
@@ -656,7 +727,7 @@
 				    NetwEntity.of(avatar).player = who
 				    return avatar
 				[/codeblock]
-				Returns [code]null[/code] and spawns nothing when the session does not hold [param player], and raises an error unless that player left the session. The node keeps the name [param fn] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
+				Returns [code]null[/code] and spawns nothing when the session does not hold [param player], and raises an error unless that player left the session. The node keeps the name [param method] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
 				[b]Server Only.[/b]
 			</description>
 		</method>

@@ -5,7 +5,8 @@
 	</brief_description>
 	<description>
 		Get it with [method NetwSession.service]. Override [method _service_entered] and [method _service_exiting] for setup and cleanup.
-		[codeblock]
+		[codeblocks]
+		[gdscript]
 		class_name MatchClock
 		extends NetwService
 
@@ -17,7 +18,36 @@
 
 		func _service_exiting(session: NetwSession) -&gt; void:
 		    session.entered.disconnect(_on_entered)
-		[/codeblock]
+		[/gdscript]
+		[csharp]
+		public partial class MatchClock : Node
+		{
+		    NetwSession session;
+
+		    public void _service_entered(RefCounted value)
+		    {
+		        session = NetwSession.From(value);
+		        session.Entered += OnEntered;
+		    }
+
+		    public void _service_exiting(RefCounted value)
+		    {
+		        session.Entered -= OnEntered;
+		    }
+
+		    void OnEntered() { }
+		}
+
+		public partial class Match : Node
+		{
+		    public override void _Ready()
+		    {
+		        AddChild(NetwService.Create&lt;MatchClock&gt;());
+		    }
+		}
+		[/csharp]
+		[/codeblocks]
+		A C# script extends [Node] and keeps each method name exactly as it is written here. It takes the [NetwSession] as a [RefCounted], and [code]NetwService.Create[/code] makes the node.
 		A node that extends another class can call [method register] and [method unregister] instead.
 	</description>
 	<tutorials>

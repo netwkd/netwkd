@@ -76,7 +76,7 @@ namespace Networked;
 /// <see cref="NetwEntity.LifecycleEnum.Controller"/> the
 /// <see cref="NetwEntity.Controller"/> may too, and the change shows on its
 /// screen at once. The server can refuse it in
-/// <see cref="NetwEntity.LifecycleRequested"/>, and the change is then undone
+/// <see cref="NetwEntity.SetLifecycleHandler"/>, and the change is then undone
 /// on the controller.
 /// <code>
 /// func _init() -&gt; void:
@@ -307,70 +307,16 @@ public sealed class NetwEntity : NetwRefCounted
     }
 
     /// <summary>
-    /// Emitted on the server when a peer calls
-    /// <see cref="NetwEntity.ClaimControl"/>. Calling
-    /// <see cref="NetwControlRequest.Deny"/> on <c>request</c> refuses it,
-    /// whatever the listener order. Not emitted when a
-    /// <see cref="NetwEntity.Hold"/> already refuses the request.
-    /// </summary>
-    public event Action<long, NetwControlRequest> ControlRequested
-    {
-        add => ConnectBridge(
-            "control_requested",
-            value,
-            Callable.From(
-                (long a0, Variant a1) =>
-                    value(a0, Wrapped(a1, NetwControlRequest.From))
-            )
-        );
-        remove => DisconnectBridge("control_requested", value);
-    }
-
-    /// <summary>
-    /// Emitted on the server when the <see cref="NetwEntity.Controller"/> of a
-    /// <see cref="NetwEntity.LifecycleEnum.Controller"/> entity spawns,
-    /// despawns or moves it, before other peers see the change. Calling
-    /// <see cref="NetwLifecycleRequest.Deny"/> on <c>request</c> refuses it.
-    /// <code>
-    /// public Crate()
-    /// {
-    ///     Netw.ConfigureEntity(this).LifecycleRequested += Judge;
-    /// }
-    ///
-    /// private void Judge(long peerId, Variant request)
-    /// {
-    ///     var asked = request.As&lt;NetwLifecycleRequest&gt;();
-    ///     if (asked.Destination is Backpack backpack &amp;&amp; backpack.IsFull())
-    ///         asked.Deny("backpack full");
-    /// }
-    /// </code>
-    /// <para>
-    /// On a spawn the entity has not entered the tree yet, so
-    /// <see cref="NetwLifecycleRequest.Destination"/> is where it will go.
-    /// </para>
-    /// </summary>
-    public event Action<long, NetwLifecycleRequest> LifecycleRequested
-    {
-        add => ConnectBridge(
-            "lifecycle_requested",
-            value,
-            Callable.From(
-                (long a0, Variant a1) =>
-                    value(a0, Wrapped(a1, NetwLifecycleRequest.From))
-            )
-        );
-        remove => DisconnectBridge("lifecycle_requested", value);
-    }
-
-    /// <summary>
     /// Emitted on the peer whose spawn, despawn or move of this entity the
     /// server refused. A refused move is already undone and a refused despawn
     /// has already put the same <see cref="NetwEntity.Root"/> back. A refusal
     /// heard while <see cref="MultiplayerApi.Poll"/> runs is reported when that
     /// poll ends. <see cref="NetwLifecycleRequest.Destination"/> is the parent
-    /// the move asked for. <see cref="NetwLifecycleRequest.Reason"/> is what
-    /// the server passed to <see cref="NetwLifecycleRequest.Deny"/>, or empty
-    /// when the server refused for another reason.
+    /// the move asked for. <see cref="NetwRequest.Code"/> and
+    /// <see cref="NetwRequest.Reason"/> are what
+    /// <see cref="NetwEntity.SetLifecycleHandler"/> passed to
+    /// <see cref="NetwRequest.Deny"/> on the server. The reason is empty when
+    /// the server refused for another reason.
     /// </summary>
     public event Action<NetwLifecycleRequest> LifecycleRefused
     {
@@ -665,8 +611,8 @@ public sealed class NetwEntity : NetwRefCounted
     /// and returns its failure value. <see cref="Node.Reparent"/> cannot be
     /// refused, so it warns and the move stays on this peer. During a rollback
     /// these calls return <c>@GlobalScope.ERR_BUSY</c> with no error, so
-    /// <see cref="NetwSimulation.NetworkProcess"/> spawns only the first time a
-    /// tick runs.
+    /// <see cref="NetwSimulation.SetNetworkProcess"/> spawns only the first
+    /// time a tick runs.
     /// <code>
     /// func _init() -&gt; void:
     ///     var entity := Netw.configure_entity(self)
@@ -1024,6 +970,119 @@ public sealed class NetwEntity : NetwRefCounted
         return NetwEntity.Adopt(answered);
     }
 
+    private static readonly IntPtr _bindSetControlHandler =
+        NetwApi.MethodBind("NetwEntity", "set_control_handler", 1611583062UL);
+
+    /// <summary>
+    /// The method the server runs for each
+    /// <see cref="NetwEntity.ClaimControl"/> a peer sends, before it decides.
+    /// The claim is granted unless the method calls
+    /// <see cref="NetwRequest.Deny"/> on its <see cref="NetwControlRequest"/>,
+    /// and the peer that asked receives that code and reason. It does not run
+    /// when a <see cref="NetwEntity.Hold"/> already refuses the claim. It runs
+    /// inside the call that reads the claim, so a method that awaits is an
+    /// error and the claim is judged as it stands at the first <c>await</c>.
+    /// <code>
+    /// func _init() -&gt; void:
+    ///     Netw.configure_entity(self).control_handler = judge_claim
+    ///
+    /// func judge_claim(request: NetwControlRequest) -&gt; void:
+    ///     if not can_carry(request.peer_id):
+    ///         request.deny("hands full")
+    /// </code>
+    /// </summary>
+    public void SetControlHandler(Action<NetwControlRequest> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    handler(Wrapped(a0, NetwControlRequest.From));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwEntity.SetControlHandler", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindSetControlHandler,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        answered.Dispose();
+    }
+
+    private static readonly IntPtr _bindSetLifecycleHandler =
+        NetwApi.MethodBind("NetwEntity", "set_lifecycle_handler", 1611583062UL);
+
+    /// <summary>
+    /// The method the server runs for each spawn, move and despawn the
+    /// <see cref="NetwEntity.Controller"/> of a
+    /// <see cref="NetwEntity.LifecycleEnum.Controller"/> entity makes, before
+    /// other peers see it. The change stands unless the method calls
+    /// <see cref="NetwRequest.Deny"/> on its
+    /// <see cref="NetwLifecycleRequest"/>, and the controller receives that
+    /// code and reason in <see cref="NetwEntity.LifecycleRefused"/>. On a spawn
+    /// the entity has not entered the tree yet, so
+    /// <see cref="NetwLifecycleRequest.Destination"/> is where it will go. It
+    /// runs inside the call that reads the change, so a method that awaits is
+    /// an error and the change is judged as it stands at the first
+    /// <c>await</c>.
+    /// <code>
+    /// public Crate()
+    /// {
+    ///     var entity = Netw.ConfigureEntity(this);
+    ///     entity.Lifecycle = NetwEntity.LifecycleEnum.Controller;
+    ///     entity.SetLifecycleHandler(JudgeChange);
+    /// }
+    ///
+    /// void JudgeChange(NetwLifecycleRequest request)
+    /// {
+    ///     if (request.Kind == NetwLifecycleRequest.KindEnum.Despawn
+    ///             &amp;&amp; !MayRemove(request.PeerId))
+    ///         request.Deny("only the builder removes it");
+    /// }
+    /// </code>
+    /// </summary>
+    public void SetLifecycleHandler(Action<NetwLifecycleRequest> handler)
+    {
+        Callable bridged0 = default;
+        if (handler != null)
+        {
+            var bridge0 = (Godot.Variant a0) =>
+            {
+                try
+                {
+                    handler(Wrapped(a0, NetwLifecycleRequest.From));
+                }
+                catch (Exception thrown)
+                {
+                    NetwApi.Report("NetwEntity.SetLifecycleHandler", thrown);
+                }
+            };
+            bridged0 = Callable.From(
+                NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
+        }
+        godot_variant slot0 = VariantUtils.CreateFromCallable(bridged0);
+        godot_variant answered = default;
+        NetwThunks.Call1(
+            _bindSetLifecycleHandler,
+            Checked,
+            in slot0,
+            ref answered);
+        slot0.Dispose();
+        answered.Dispose();
+    }
+
     private static readonly IntPtr _bindClaimControl =
         NetwApi.MethodBind("NetwEntity", "claim_control", 2273159157UL);
 
@@ -1034,7 +1093,7 @@ public sealed class NetwEntity : NetwRefCounted
     /// decision reaches this peer.
     /// <code>
     /// Error
-    /// ┠╴ERR_UNAUTHORIZED   another peer's hold or control_requested refused it
+    /// ┠╴ERR_UNAUTHORIZED   another peer's hold refused it
     /// ┠╴ERR_UNAVAILABLE    transfer does not allow a claim, or it is
     /// ┃                    TRANSFER_IMMEDIATE on an entity with a state()
     /// ┃                    property, prediction or a MultiplayerSynchronizer
@@ -1043,9 +1102,11 @@ public sealed class NetwEntity : NetwRefCounted
     /// <para>
     /// Under <see cref="NetwEntity.TransferEnum.Immediate"/> this peer runs the
     /// node before the decision. A refusal restores the controller's latest
-    /// values. The server emits <see cref="NetwEntity.ControlRequested"/> for
-    /// one peer's claims in the order that peer made them, whichever entities
-    /// they name.
+    /// values. A claim that <see cref="NetwEntity.SetControlHandler"/> denies
+    /// fails with the code and the reason it passed to
+    /// <see cref="NetwRequest.Deny"/>. The server runs
+    /// <see cref="NetwEntity.SetControlHandler"/> for one peer's claims in the
+    /// order that peer made them, whichever entities they name.
     /// <code>
     /// entity.claim_control(NetwEntity.HOLD_SOFT) \
     ///     .then(func(_held: NetwEntity) -&gt; void: pick_up()) \

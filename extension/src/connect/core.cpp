@@ -18,6 +18,7 @@
 #include "netw/connect/directory_transport.hpp"
 #include "netw/connect/probe_client.hpp"
 #include "netw/connect/transport.hpp"
+#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/session_core.hpp"
 
@@ -562,6 +563,9 @@ RID ConnectCore::create_peer(
     const Dictionary &p_settings,
     const Callable &p_completed
 ) {
+    if (!game_call_declared(p_completed, game_calls::PEER_COMPLETED)) {
+        return RID();
+    }
     const RID ticket = open_creation(
         p_transport,
         p_mode,
@@ -1024,7 +1028,7 @@ void ConnectCore::settle_creation(
         carried.push_back(p_peer);
         carried.push_back(int64_t(p_error));
         carried.push_back(p_detail);
-        answering.callv(carried);
+        game_call(answering, carried, game_calls::PEER_COMPLETED);
         answering_offer = outer;
     }
 

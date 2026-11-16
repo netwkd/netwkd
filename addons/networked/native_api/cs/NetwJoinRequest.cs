@@ -12,48 +12,39 @@ namespace Networked;
 /// The server passes this request to the handler declared with
 /// <see cref="Netw.ConfigureAdmission"/>, after every
 /// <see cref="NetwAccountProvider"/> has verified. The joining client is not
-/// connected until the handler returns <c>@GlobalScope.OK</c>, and
-/// <see cref="NetwJoinRequest.Refuse"/> tells it why it was refused. A
-/// requested <see cref="NetwJoinRequest.UserName"/> does not verify an account.
+/// connected until the handler calls <see cref="NetwJoinRequest.Admit"/>, and
+/// <see cref="NetwRequest.Deny"/> tells it why it was refused. The player reads
+/// the code and the reason in <see cref="NetwSession.JoinFailed"/> and
+/// <see cref="NetwConnection.Failed"/>. The reason is cut to 255 UTF-8 bytes,
+/// and an empty one sends a default sentence that names the code. A handler
+/// that finishes without calling either refuses the join with
+/// <c>@GlobalScope.ERR_UNAUTHORIZED</c> and reports an error. The handler may
+/// <c>await</c>, and what it returns is ignored. A requested
+/// <see cref="NetwJoinRequest.UserName"/> does not verify an account.
 /// <code>
-/// private Error Admit(Variant value)
+/// void Admit(NetwJoinRequest request)
 /// {
-///     using var request = NetwJoinRequest.From(value);
-///     return string.IsNullOrEmpty(request.Account)
-///         ? Error.Unauthorized : Error.Ok;
+///     if (string.IsNullOrEmpty(request.Account))
+///         request.Deny();
+///     else
+///         request.Admit();
 /// }
 /// </code>
 /// </remarks>
-public sealed class NetwJoinRequest : NetwRefCounted
+public sealed class NetwJoinRequest : NetwRequest
 {
     public NetwJoinRequest(IntPtr native) : base(native)
     {
     }
 
-    public static NetwJoinRequest Adopt(IntPtr native)
+    public new static NetwJoinRequest Adopt(IntPtr native)
     {
         return native == IntPtr.Zero ? null : new NetwJoinRequest(native);
     }
 
-    public static NetwJoinRequest From(Variant value)
+    public new static NetwJoinRequest From(Variant value)
     {
         return Adopt(NetwApi.Retained(NetwApi.ObjectOf(value)));
-    }
-
-    private static readonly IntPtr _bindGetPeerId =
-        NetwApi.MethodBind("NetwJoinRequest", "get_peer_id", 3905245786UL);
-
-    /// <summary>
-    /// The joining peer's id.
-    /// </summary>
-    public long PeerId
-    {
-        get
-        {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(_bindGetPeerId, Checked, ref answered);
-            return answered;
-        }
     }
 
     private static readonly IntPtr _bindGetUserName =
@@ -289,35 +280,16 @@ public sealed class NetwJoinRequest : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindRefuse =
-        NetwApi.MethodBind("NetwJoinRequest", "refuse", 3228710962UL);
+    private static readonly IntPtr _bindAdmit =
+        NetwApi.MethodBind("NetwJoinRequest", "admit", 3218959716UL);
 
     /// <summary>
-    /// Returns <paramref name="code"/> for the admission handler to return, and
-    /// sends <paramref name="reason"/> to the refused player with it. The
-    /// player reads both in <see cref="NetwSession.JoinFailed"/> and
-    /// <see cref="NetwConnection.Failed"/>. <paramref name="reason"/> is sent
-    /// only when the handler returns this same <paramref name="code"/>, and is
-    /// cut to 255 UTF-8 bytes. An empty <paramref name="reason"/> sends a
-    /// default sentence that names <paramref name="code"/>. Passing
-    /// <c>@GlobalScope.OK</c> reports an error and refuses with
-    /// <c>@GlobalScope.ERR_UNCONFIGURED</c>.
+    /// Lets the player join. A <see cref="NetwRequest.Deny"/> on the same
+    /// request wins over it.
     /// </summary>
-    public Error Refuse(Error code, string reason = "")
+    public void Admit()
     {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)code);
-        godot_variant slot1 = VariantUtils.CreateFromString(reason);
-        godot_variant answered = default;
-        NetwThunks.Call2(
-            _bindRefuse,
-            Checked,
-            in slot0,
-            in slot1,
-            ref answered);
-        slot0.Dispose();
-        slot1.Dispose();
-        Error result = (Error)VariantUtils.ConvertToInt64(answered);
-        answered.Dispose();
-        return result;
+        long discarded = default;
+        NetwThunks.Ptrcall0_Long(_bindAdmit, Checked, ref discarded);
     }
 }
