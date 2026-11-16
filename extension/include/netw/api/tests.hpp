@@ -41,15 +41,12 @@ public:
     void instrumentation_probe(int64_t value) const;
     static void schema_model_clear();
     static void tracker_book_clear();
+    static void fault_book_clear();
     static godot::Dictionary prediction_stats(godot::Object *handle);
     static void attribution_arm(NetwMultiplayer *session);
     static godot::Dictionary attribution_snapshot(NetwMultiplayer *session);
     static void predict_tap_flush(NetwMultiplayer *session);
     static godot::Dictionary predict_tap_cost(NetwMultiplayer *session);
-    static godot::TypedArray<godot::StringName> property_set_keys_of_script(
-        const godot::Ref<godot::Script> &script,
-        int64_t record
-    );
     static void scene_enter(
         NetwMultiplayer *session,
         const godot::RID &scene,

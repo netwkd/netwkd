@@ -20,6 +20,7 @@
 #include "godot/world.hpp"
 #include "netw/api/action_config.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/join_config.hpp"
 #include "netw/api/join_request.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
@@ -780,6 +781,11 @@ void NetwMultiplayer::_bind_methods() {
         D_METHOD("player_request_kick", "player", "reason"),
         &NetwMultiplayer::player_request_kick,
         DEFVAL(String())
+    );
+    ClassDB::bind_static_method(
+        "NetwMultiplayer",
+        D_METHOD("session_join_declare", "handler", "arg_types"),
+        &NetwMultiplayer::session_join_declare
     );
     ClassDB::bind_method(
         D_METHOD("session_prepare_join", "username", "args"),

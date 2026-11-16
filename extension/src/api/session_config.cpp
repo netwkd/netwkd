@@ -193,7 +193,7 @@ void NetwSessionConfig::_bind_methods() {
 }
 
 void NetwSessionConfig::set_return_window_seconds(double p_seconds) {
-    if (!(p_seconds >= 0.0)) {
+    if (!guard.refused && !(p_seconds >= 0.0)) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_VALUE,
@@ -214,7 +214,7 @@ Ref<NetwSessionConfig> NetwSessionConfig::return_window(double p_seconds) {
 }
 
 void NetwSessionConfig::set_transfer_deadline_ticks(int64_t p_ticks) {
-    if (p_ticks < 0) {
+    if (!guard.refused && p_ticks < 0) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_VALUE,
@@ -250,7 +250,7 @@ Ref<NetwSessionConfig> NetwSessionConfig::transfer(
 }
 
 void NetwSessionConfig::set_bandwidth_kbps(int64_t p_kbps) {
-    if (p_kbps < 0) {
+    if (!guard.refused && p_kbps < 0) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_VALUE,

@@ -25,18 +25,16 @@ bool from_property_configs(
     int64_t p_record
 );
 
-bool compile_script(
+bool compile_node(
     repl::PropertySet &r_set,
-    const godot::Ref<godot::Script> &p_script,
-    int64_t p_record,
-    godot::Node *p_node
+    godot::Node *p_node,
+    int64_t p_record
 );
 
-uint64_t from_script(
-    const godot::Ref<godot::Script> &p_script,
+uint64_t from_node(
+    godot::Node *p_node,
     int64_t p_record,
-    godot::Object *p_api,
-    godot::Node *p_node
+    godot::Object *p_api
 );
 
 } // namespace netw::property_set_builder

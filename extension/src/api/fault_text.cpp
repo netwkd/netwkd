@@ -94,6 +94,70 @@ FaultText rewind_misuse_text(const FaultValues &v) {
     return {};
 }
 
+FaultText unknown_name_text(const FaultValues &v) {
+    switch (netw_unknown_name(v.b)) {
+        case NETW_UNKNOWN_UNDECLARED:
+            break;
+        case NETW_UNKNOWN_CHILD_NODE:
+            return {
+                vformat(
+                    "'%s' is a child of '%s', not a property.",
+                    v.detail,
+                    v.owner
+                ),
+                "Pass the child as the first argument."
+            };
+        case NETW_UNKNOWN_NO_SCRIPT:
+            return {
+                vformat(
+                    "%s names '%s', and '%s' has no script to declare it.",
+                    v.name,
+                    v.detail,
+                    v.owner
+                ),
+                vformat(
+                    "Attach a script to '%s' and declare it there.",
+                    v.owner
+                )
+            };
+        case NETW_UNKNOWN_ENGINE_MEMBER:
+            return {
+                vformat(
+                    "%s names '%s', which the engine declares, and '%s' has "
+                    "no script.",
+                    v.name,
+                    v.detail,
+                    v.owner
+                ),
+                vformat(
+                    "Attach a script to '%s' and name something that script "
+                    "declares.",
+                    v.owner
+                )
+            };
+        case NETW_UNKNOWN_ENGINE_METHOD:
+            return {
+                vformat(
+                    "%s names '%s', which the engine declares and the script "
+                    "on '%s' does not.",
+                    v.name,
+                    v.detail,
+                    v.owner
+                ),
+                "Name a method that script declares."
+            };
+    }
+    return {
+        vformat(
+            "%s names '%s', which '%s' does not declare.",
+            v.name,
+            v.detail,
+            v.owner
+        ),
+        vformat("Check the name, or declare it on '%s' first.", v.owner)
+    };
+}
+
 FaultText interpolation_ignored_text(const FaultValues &v) {
     switch (netw_interpolation_ignored(v.a)) {
         case NETW_INTERPOLATION_TYPE_UNSUPPORTED:
@@ -450,18 +514,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 vformat("Pass %s.", v.detail)
             };
         case NETW_FAULT_UNKNOWN_NAME:
-            return {
-                vformat(
-                    "%s names '%s', which '%s' does not declare.",
-                    v.name,
-                    v.detail,
-                    v.owner
-                ),
-                vformat(
-                    "Check the name, or declare it on '%s' first.",
-                    v.owner
-                )
-            };
+            return unknown_name_text(v);
         case NETW_FAULT_DECLARED_TWICE:
             return {
                 vformat(
@@ -524,6 +577,17 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 vformat("Use %s.", v.detail)
             };
         case NETW_FAULT_ENTITY_MOVED:
+            if (v.b == NETW_MOVED_DECLARATION) {
+                return {
+                    vformat(
+                        "'%s' declared %s and was moved to another session, "
+                        "so this session ignores it.",
+                        v.name,
+                        v.owner
+                    ),
+                    "Declare it on a node that stays in this session."
+                };
+            }
             return {
                 vformat(
                     "'%s' was moved to %s, which the session does not follow.",
@@ -545,6 +609,34 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.owner
                 ),
                 vformat("Use %s.", v.detail)
+            };
+        case NETW_FAULT_REQUEST_AS_VALUE:
+            return {
+                vformat(
+                    "'%s' is a request the AnimationTree clears when it "
+                    "reads it, so it cannot be sent as a value.",
+                    v.name
+                ),
+                "Send it with {Netw.configure_rpc}."
+            };
+        case NETW_FAULT_PLAYER_SPAWN_FAILED:
+            return {
+                vformat(
+                    "The server could not spawn a node for this player with "
+                    "'%s'.",
+                    v.name
+                ),
+                "Read the server's log for the reason."
+            };
+        case NETW_FAULT_LOCAL_WRITE_REPLACED:
+            return {
+                vformat(
+                    "'%s' on '%s' was changed on this peer, which does not "
+                    "control it.",
+                    v.name,
+                    v.owner
+                ),
+                vformat("The value from peer %d replaced it.", v.peer)
             };
         case NETW_FAULT_LINK_FAILED:
             return {

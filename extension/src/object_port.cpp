@@ -295,7 +295,44 @@ void report_missing_resource(
     );
 }
 
+#if defined(DEBUG_ENABLED)
+HashMap<uint64_t, uint32_t> &counted_writes() {
+    static HashMap<uint64_t, uint32_t> counts;
+    return counts;
+}
+
+uint32_t next_write() {
+    static uint32_t written = 0;
+    written += 1;
+    return written;
+}
+#endif
+
 } // namespace
+
+#if defined(DEBUG_ENABLED)
+void port_count_write(Object *p_owner) {
+    HashMap<uint64_t, uint32_t> &counts = counted_writes();
+    if (counts.is_empty()) {
+        return;
+    }
+    uint32_t *count = counts.getptr(uint64_t(gd::instance_id(p_owner)));
+    if (count != nullptr) {
+        *count = next_write();
+    }
+}
+
+uint32_t port_writes_counted(Object *p_owner) {
+    HashMap<uint64_t, uint32_t> &counts = counted_writes();
+    const uint64_t id = uint64_t(gd::instance_id(p_owner));
+    const uint32_t *count = counts.getptr(id);
+    return count != nullptr ? *count : counts.insert(id, next_write())->value;
+}
+
+void port_stop_counting(uint64_t p_owner) {
+    counted_writes().erase(p_owner);
+}
+#endif
 
 bool named_held(Object *p_owner, const StringName &p_key) {
     const gd::IndexedPath *indexed = gd::indexed_path(p_key);
@@ -334,6 +371,7 @@ void named_set(
     if (p_owner == nullptr) {
         return;
     }
+    port_count_write(p_owner);
     const gd::IndexedPath *indexed = gd::indexed_path(p_key);
     if (indexed == nullptr) {
         p_owner->set(p_key, p_value);
@@ -399,6 +437,7 @@ void port_set(
     if (p_owner == nullptr) {
         return;
     }
+    port_count_write(p_owner);
     if (names_body_state(p_key)) {
         if (RigidBody3D *solid = root_body<RigidBody3D>(p_owner)) {
             if (write_3d(

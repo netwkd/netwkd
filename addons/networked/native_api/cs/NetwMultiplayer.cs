@@ -5349,6 +5349,46 @@ public sealed class NetwMultiplayer : NetwRefCounted
         answered.Dispose();
     }
 
+    private static readonly IntPtr _bindSessionJoinDeclare =
+        NetwApi.MethodBind(
+            "NetwMultiplayer",
+            "session_join_declare",
+            2684176371UL);
+
+    /// <summary>
+    /// Declares <paramref name="handler"/> as the join handler and returns its
+    /// <see cref="NetwJoinConfig"/>. <paramref name="argTypes"/> holds one
+    /// <c>Variant.Type</c> for each join argument after the
+    /// <see cref="NetwPlayer"/>, and <c>TYPE_NIL</c> accepts any type.
+    /// <see cref="Netw.ConfigureJoin"/> declares a method this way with the
+    /// types its parameters declare.
+    /// <code>
+    /// NetwMultiplayer.session_join_declare(spawn_at, [TYPE_STRING_NAME, TYPE_INT])
+    /// </code>
+    /// </summary>
+    public static NetwJoinConfig SessionJoinDeclare(
+        Callable handler,
+        int[] argTypes)
+    {
+        godot_variant slot0 = VariantUtils.CreateFromCallable(handler);
+        godot_variant slot1 = VariantUtils.CreateFromPackedInt32Array(argTypes);
+        godot_variant answered = default;
+        NetwThunks.Call2(
+            _bindSessionJoinDeclare,
+            IntPtr.Zero,
+            in slot0,
+            in slot1,
+            ref answered);
+        slot0.Dispose();
+        slot1.Dispose();
+        NetwJoinConfig result =
+            NetwJoinConfig.Adopt(
+                NetwApi.Retained(
+                    VariantUtils.ConvertToGodotObjectPtr(answered)));
+        answered.Dispose();
+        return result;
+    }
+
     private static readonly IntPtr _bindSessionPrepareJoin =
         NetwApi.MethodBind(
             "NetwMultiplayer",

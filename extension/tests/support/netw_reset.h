@@ -42,6 +42,7 @@ inline void smooth_when_headless(bool p_smooth) {
 inline void reset_for_case() {
     netw::gd::seed(NETW_TEST_SEED);
     netw::wire::reset_stream_counters();
+    netw::fault::forget();
     smooth_when_headless(true);
     for (ResetHook hook : reset_hooks()) {
         hook();

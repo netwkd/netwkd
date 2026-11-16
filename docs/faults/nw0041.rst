@@ -21,3 +21,8 @@ that stays in the session.
 .. code-block:: gdscript
 
     Netw.reparent(car, arena.get_node(^"Spawns"))
+
+A node that declared a handler, such as
+:ref:`Netw.configure_join <class_Netw_method_configure_join>`, is reported
+the same way when it is moved to another session. The session it left
+ignores the declaration, so declare it on a node that stays.

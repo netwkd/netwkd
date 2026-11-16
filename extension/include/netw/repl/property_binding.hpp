@@ -205,7 +205,21 @@ public:
         return staged_index;
     }
 
+#if defined(DEBUG_ENABLED)
+    godot::HashMap<godot::StringName, godot::Variant> landed_values;
+    uint32_t landed_at_write = 0;
+
+    bool holds_tree_blend(
+        godot::Node *p_node,
+        const godot::StringName &p_key
+    );
+#endif
+
 private:
+#if defined(DEBUG_ENABLED)
+    godot::HashMap<godot::StringName, bool> tree_blends;
+    uint64_t tree_blends_stage = 0;
+#endif
     const SetBook *sets = nullptr;
     PropertyIndexBook *indexes = nullptr;
     godot::ObjectID node_id;

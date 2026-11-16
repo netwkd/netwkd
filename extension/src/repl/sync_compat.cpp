@@ -12,6 +12,7 @@
 #include "netw/fault_book.hpp"
 #include "netw/liveness_core.hpp"
 #include "netw/log.hpp"
+#include "netw/object_port.hpp"
 #include "netw/profile.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/script/model.hpp"
@@ -1108,6 +1109,7 @@ void SyncCompat::apply(
     for (uint32_t at = 0; at < p_fields.size(); ++at) {
         Node *target = target_of(root, p_fields[at]->target);
         if (target != nullptr) {
+            port_count_write(target);
             gd::set_indexed(target, p_fields[at]->property, p_values[at]);
         }
     }

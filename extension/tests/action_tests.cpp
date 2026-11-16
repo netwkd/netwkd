@@ -593,8 +593,9 @@ LawVerdict second_declaration_null(const World &) {
     const Ref<netw::NetwLagCompensationConfig> again
         = Netw::configure_lagcomp(twice_declared);
     twice_declared = nullptr;
-    if (again.is_valid()) {
-        return law_broken("the second declaration answered a draft");
+    if (again.is_null() || !again->is_refused()
+        || again->max_future_action(2)->get_max_future_action_ticks() == 2) {
+        return law_broken("the second declaration was not refused and inert");
     }
     shot.owner->fire(shot.client_tick());
     shot.rig.step_ticks(ANSWER_TICKS);
@@ -764,6 +765,8 @@ LawVerdict declared_server_runs(const World &) {
 }
 
 LawVerdict undeclared_method_denied(const World &) {
+    FaultWatch faults;
+    faults.expect_error("*'_server_action_carrying'*[NW1041]*", 1);
     Shot shot;
     shot.authority->set_denies(false);
     netw::NetwMultiplayer *client = shot.rig.client(0);
@@ -928,7 +931,8 @@ const Row ROWS[] = {
      "a request draws no ghost, sends nothing and reports NW0041",
      &departed_declaration_refuses},
     {"one node declaring lag compensation twice",
-     "the second answers null with NW0034, and a shot still runs",
+     "the second answers a refused config that takes no setting, with "
+     "NW0034, and a shot still runs",
      &second_declaration_null},
     {"a shot whose server method binds a node it spawns, seen by a second "
      "client",
@@ -946,7 +950,8 @@ const Row ROWS[] = {
      &declared_server_runs},
     {"a request naming a method of the player that the game never declared "
      "as an action",
-     "the server does not run the method and the asker hears denied",
+     "the server does not run the method and reports it once, and the "
+     "asker hears denied",
      &undeclared_method_denied},
     {"a shot carrying one argument more than its server method takes",
      "the server reports NW1002 once and the owner hears denied",

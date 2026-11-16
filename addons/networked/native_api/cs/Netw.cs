@@ -38,8 +38,12 @@ namespace Networked;
 /// </code>
 /// <para>
 /// <b>Replication</b> A node's property replicates once
-/// <see cref="Netw.ConfigureProperty"/> declares it. Data that belongs to no
-/// single node has a class of its own.
+/// <see cref="Netw.ConfigureProperty"/> declares it and
+/// <see cref="NetwPropertyConfig.State"/>,
+/// <see cref="NetwPropertyConfig.Input"/> or
+/// <see cref="NetwPropertyConfig.Broadcast"/> says how. A property declared
+/// with none of them is sent only by <see cref="Netw.SyncProperty"/>. Data that
+/// belongs to no single node has a class of its own.
 /// - <see cref="NetwPropertyConfig"/> how a declared property is sent, from
 /// <see cref="Netw.ConfigureProperty"/>
 /// - <see cref="NetwPrediction"/> how the client that controls an entity runs
@@ -305,7 +309,9 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            Array.Empty<int>());
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -329,7 +335,12 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -360,7 +371,13 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -394,7 +411,14 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+                NetwApi.VariantTypeOf<T3>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -431,7 +455,15 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+                NetwApi.VariantTypeOf<T3>(),
+                NetwApi.VariantTypeOf<T4>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -471,7 +503,16 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+                NetwApi.VariantTypeOf<T3>(),
+                NetwApi.VariantTypeOf<T4>(),
+                NetwApi.VariantTypeOf<T5>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -514,7 +555,17 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+                NetwApi.VariantTypeOf<T3>(),
+                NetwApi.VariantTypeOf<T4>(),
+                NetwApi.VariantTypeOf<T5>(),
+                NetwApi.VariantTypeOf<T6>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -560,7 +611,18 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+                NetwApi.VariantTypeOf<T3>(),
+                NetwApi.VariantTypeOf<T4>(),
+                NetwApi.VariantTypeOf<T5>(),
+                NetwApi.VariantTypeOf<T6>(),
+                NetwApi.VariantTypeOf<T7>(),
+            });
     }
 
     public static NetwJoinConfig ConfigureJoin<
@@ -609,7 +671,19 @@ public sealed class Netw : NetwRefCounted
             bridged0 = Callable.From(
                 NetwApi.Anchored(handler, bridge0, owner => owner.NetwHold));
         }
-        return ConfigureJoin(bridged0);
+        return NetwMultiplayer.SessionJoinDeclare(
+            bridged0,
+            new int[]
+            {
+                NetwApi.VariantTypeOf<T1>(),
+                NetwApi.VariantTypeOf<T2>(),
+                NetwApi.VariantTypeOf<T3>(),
+                NetwApi.VariantTypeOf<T4>(),
+                NetwApi.VariantTypeOf<T5>(),
+                NetwApi.VariantTypeOf<T6>(),
+                NetwApi.VariantTypeOf<T7>(),
+                NetwApi.VariantTypeOf<T8>(),
+            });
     }
 
     private static readonly IntPtr _bindConfigureAdmission =
@@ -3190,7 +3264,9 @@ public sealed class Netw : NetwRefCounted
     /// <see cref="NetwPlayer.UserName"/>. The node is despawned when
     /// <paramref name="player"/> leaves. With
     /// <see cref="NetwPersistenceConfig.LoadOnSpawn"/>, other peers receive it
-    /// once its save is loaded. <b>Server Only.</b>
+    /// once its save is loaded. When the spawn is refused,
+    /// <paramref name="player"/> stays in the session and its client prints a
+    /// warning that names <paramref name="method"/>. <b>Server Only.</b>
     /// </para>
     /// </summary>
     public static Node SpawnPlayer(
@@ -3798,8 +3874,7 @@ public sealed class Netw : NetwRefCounted
     /// <see cref="NetwActionRequest"/> before the arguments of
     /// <see cref="Netw.Action"/>, and <see cref="NetwRequest.Deny"/> rejects
     /// the action. Declaring an action turns lag compensation on for the
-    /// session. A second call for the same method on one node returns
-    /// <c>null</c>.
+    /// session.
     /// </para>
     /// </summary>
     public static NetwActionConfig ConfigureAction(

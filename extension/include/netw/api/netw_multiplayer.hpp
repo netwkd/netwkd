@@ -795,7 +795,8 @@ private:
     NetwHandleLedger property_sets;
     godot::HashMap<int64_t, uint64_t> minted_property_sets;
     godot::HashMap<uint64_t, godot::HashMap<int, godot::RID>>
-        property_set_by_script;
+        property_set_by_declaration;
+    godot::HashMap<uint64_t, godot::RID> schema_by_declaration;
     godot::HashMap<int64_t, godot::HashMap<int64_t, godot::RID>>
         entity_property_sets;
     SchemaCore schema_core;
@@ -1663,6 +1664,11 @@ public:
         bool p_volatile,
         int64_t p_sender
     );
+    void store_push_arrival(
+        repl::PropertyBinding *p_binding,
+        const store::RowAddress &p_at,
+        int64_t p_sender
+    );
     godot::PackedByteArray store_take_image(repl::PropertyBinding *p_binding);
     void store_install_image(
         repl::PropertyBinding *p_binding,
@@ -1843,6 +1849,10 @@ public:
     );
     void spawn_detach_before_despawn(NetwEntity *p_dying);
     void spawn_report_failed(int64_t p_route, const godot::String &p_reason);
+    void spawn_tell_player_failed(
+        int64_t p_player,
+        const godot::StringName &p_method
+    );
     void spawn_receive_failed_frame(
         const godot::PackedByteArray &p_payload,
         int p_sender
@@ -3301,19 +3311,17 @@ public:
     );
     godot::Error property_set_seal(const godot::RID &p_set);
     godot::RID adopt_property_set(
-        const godot::Ref<godot::Script> &p_script,
+        uint64_t p_declaration,
         RecordKind p_record_kind,
-        const repl::PropertySet &p_source,
+        const repl::PropertySet *p_source,
         godot::Node *p_node
     );
-    godot::RID adopted_property_set(
-        const godot::Ref<godot::Script> &p_script,
-        RecordKind p_record_kind
+    bool property_set_adopted(
+        uint64_t p_declaration,
+        RecordKind p_record_kind,
+        godot::RID &r_set
     ) const;
-    godot::RID script_schema(
-        const godot::Ref<godot::Script> &p_script,
-        godot::Node *p_node
-    );
+    godot::RID declared_schema(uint64_t p_declaration, godot::Node *p_node);
     void property_set_clear();
     uint64_t property_set_id_of(const godot::RID &p_set) const;
 
@@ -4816,16 +4824,21 @@ public:
     struct JoinPlan {
         godot::Callable handler;
         godot::Array quantizers;
+        godot::Array arg_types;
         bool available = false;
         bool declared = false;
     };
     JoinPlan session_resolve_join();
+    static godot::Ref<NetwJoinConfig> session_join_declare(
+        const godot::Callable &p_handler,
+        const godot::PackedInt32Array &p_arg_types
+    );
     static godot::Array join_declared_arg_types(
         const godot::Callable &p_handler
     );
     static godot::Array join_arg_types(const godot::Callable &p_handler);
     static int64_t join_schema_hash(
-        const godot::Callable &p_handler,
+        const godot::Array &p_arg_types,
         const godot::Array &p_quantizers
     );
     void session_encode_join_args(JoinRequest &r_request);

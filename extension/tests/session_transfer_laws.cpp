@@ -23,6 +23,7 @@
 #include "netw/persist/memory_store.hpp"
 #include "netw/scene_membership.hpp"
 #include "netw/schema_model.hpp"
+#include "netw/script/model.hpp"
 #include "netw/session_core.hpp"
 #include "netw/sim/row.hpp"
 #include "netw/spawn/pipeline.hpp"
@@ -1056,7 +1057,9 @@ TEST_CASE(
     const int successor = 1;
     const int64_t successor_was = table.was(successor);
     const int saved = table.spawn_body("Saved", -2, 0);
-    netw::Netw::configure_persistence(present(table.body_at(saved, successor)))
+    netw::script::model::configure_node_persistence(
+        present(table.body_at(saved, successor))
+    )
         ->database(StringName("saves"))
         ->table(StringName("transfer_saves"))
         ->load_on_spawn(false);

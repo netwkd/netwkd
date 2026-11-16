@@ -91,6 +91,24 @@ LawVerdict lagcomp_node_left(const Stand &) {
     return law_held();
 }
 
+LawVerdict lagcomp_declared_late(const Stand &) {
+    FaultWatch watch;
+    watch.expect_error("*Netw.configure_lagcomp came after*[NW0019]*", 1);
+    LoopbackRig rig(0);
+    rig.mount();
+    const RID entity = target(rig);
+    const Error declared = rig.server()->predict_declare(entity);
+    netw::Netw::configure_lagcomp(child_of(rig.branch(), "Late"))
+        ->max_future_action(9);
+    rig.server()->session_flush_deferred();
+    rig.server()->config_settle();
+    rig.server()->config_settle();
+    if (declared != OK) {
+        return law_broken("predict_declare answered %d", int(declared));
+    }
+    return law_held();
+}
+
 LawVerdict configuration_door(const Stand &) {
     FaultWatch watch;
     watch.expect_error("*A NetwClockConfig*[NW1020]*", 1);
@@ -134,6 +152,10 @@ const Row ROWS[] = {
     {"the node that called Netw.configure_lagcomp leaves the tree",
      "predict_declare answers ERR_UNAVAILABLE with NW0041",
      &lagcomp_node_left},
+    {"a node calls Netw.configure_lagcomp after an entity was predicted "
+     "with the default settings",
+     "NW0019 says once that the running settings are unchanged",
+     &lagcomp_declared_late},
     {"object_configuration_add with a clock, session or lag compensation "
      "config",
      "each add and remove is refused with NW1020 naming the config",

@@ -42,6 +42,9 @@ Fault index
 - :doc:`nw0041`, MISUSE
 - :doc:`nw0042`, MISUSE
 - :doc:`nw0043`, MISUSE
+- :doc:`nw0044`, MISUSE
+- :doc:`nw0045`, REMOTE
+- :doc:`nw0046`, PRACTICE
 - :doc:`nw1000`, ENVIRONMENT
 - :doc:`nw1001`, ENVIRONMENT
 - :doc:`nw1002`, MISUSE
@@ -131,6 +134,9 @@ Fault index
    nw0041
    nw0042
    nw0043
+   nw0044
+   nw0045
+   nw0046
    nw1000
    nw1001
    nw1002

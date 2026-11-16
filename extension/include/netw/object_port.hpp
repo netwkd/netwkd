@@ -53,4 +53,13 @@ bool port_apply(
     const godot::Dictionary &p_payload
 );
 
+#if defined(DEBUG_ENABLED)
+void port_count_write(godot::Object *p_owner);
+uint32_t port_writes_counted(godot::Object *p_owner);
+void port_stop_counting(uint64_t p_owner);
+#else
+inline void port_count_write(godot::Object *) {
+}
+#endif
+
 } // namespace netw

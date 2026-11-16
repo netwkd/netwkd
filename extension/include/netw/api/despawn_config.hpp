@@ -12,11 +12,19 @@ class NetwDespawnConfig : public godot::RefCounted {
 private:
     godot::StringName hook_method;
     double linger_seconds = 0.0;
+    bool refused = false;
 
 protected:
     static void _bind_methods();
 
 public:
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
     void set_hook_method(const godot::StringName &p_hook_method) {
         hook_method = p_hook_method;
     }

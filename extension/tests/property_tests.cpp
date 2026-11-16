@@ -19,10 +19,12 @@
 #include "godot/script.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/despawn_config.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_options.hpp"
 #include "netw/api/member_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/persistence_config.hpp"
 #include "netw/api/promise.hpp"
 #include "netw/api/property_config.hpp"
 #include "netw/api/quantize.hpp"
@@ -35,6 +37,7 @@
 #include "netw/repl/property_set.hpp"
 #include "netw/repl/snapshot_frame.hpp"
 #include "netw/schema_model.hpp"
+#include "netw/script/model.hpp"
 #include "netw/store/world.hpp"
 #include "netw/wire/code_row.hpp"
 #include "netw/wire/plan.hpp"
@@ -666,7 +669,7 @@ LawVerdict values_carry_no_object(const World &) {
     });
 }
 
-LawVerdict missing_property_lands_nothing(const World &) {
+LawVerdict missing_property_refused(bool p_written_on_arrival) {
     FaultWatch faults;
     faults.expect_warning("*[NW0025]*", 1);
     Books books;
@@ -705,6 +708,7 @@ LawVerdict missing_property_lands_nothing(const World &) {
     const PropertyBindingPtr binding = netw_test::bind(pose, bare);
     netw_test::LandedLog log;
     log.watch(binding);
+    binding->write_gate = p_written_on_arrival;
     netw_test::StoreArrival arrival(binding);
     const bool settled = arrival.settle(frame, -1, false);
     const netw::store::RowAddress at = arrival.at(0);
@@ -719,6 +723,14 @@ LawVerdict missing_property_lands_nothing(const World &) {
         );
     }
     return law_held();
+}
+
+LawVerdict missing_property_lands_nothing(const World &) {
+    return missing_property_refused(true);
+}
+
+LawVerdict missing_predicted_property_lands_nothing(const World &) {
+    return missing_property_refused(false);
 }
 
 const Row CODEC_ROWS[] = {
@@ -782,6 +794,9 @@ const Row CODEC_ROWS[] = {
     {"a row naming a property the receiving node does not carry",
      "nothing lands, nobody is told, and one warning names it",
      &missing_property_lands_nothing},
+    {"the same row for a node whose arrivals prediction writes",
+     "nothing lands, nobody is told, and one warning names it",
+     &missing_predicted_property_lands_nothing},
 };
 
 TEST_CASE(
@@ -814,11 +829,14 @@ struct FieldDecl {
     Policy policy = POLICY_UNDECLARED;
 
     bool marked_for(int64_t p_record) const {
+        if (int(in_state) + int(in_input) + int(in_broadcast) != 1) {
+            return false;
+        }
         if (p_record == PropertySet::RECORD_INPUT) {
             return in_input;
         }
         if (p_record == PropertySet::RECORD_BROADCAST) {
-            return in_broadcast && !in_state && !in_input;
+            return in_broadcast;
         }
         return in_state;
     }
@@ -1142,9 +1160,9 @@ TEST_CASE(
     "set a kind, in declaration order and on the lanes they asked for"
 ) {
     FaultWatch faults;
-    faults.expect_warning("*sets NetwPropertyConfig.windowed*[NW0038]*", 1);
-    faults.expect_warning("*sets NetwPropertyConfig.audience*[NW0038]*", 1);
-    faults.expect_warning("*sets broadcast*[NW0038]*", 1);
+    faults.expect_error("*NetwPropertyConfig.windowed cannot*[NW0043]*", 1);
+    faults.expect_error("*NetwPropertyConfig.audience cannot*[NW0043]*", 1);
+    faults.expect_error("*broadcast together*[NW0043]*", 1);
     faults.expect_warning("*The window of*[NW0035]*", 1);
 
     const int64_t STATE = PropertySet::RECORD_STATE;
@@ -1371,6 +1389,11 @@ LawVerdict unlisted_property_replicates(const World &) {
     return law_held();
 }
 
+bool refused_and_inert(const Ref<NetwPropertyConfig> &p_config) {
+    return p_config.is_valid() && p_config->is_refused()
+        && !p_config->state()->get_in_state_set();
+}
+
 LawVerdict unreadable_declarations_refused(const World &) {
     const Ref<Script> script = netw_test::minted_script(SINK_SOURCE);
     Node *node = Object::cast_to<Node>(script->call("new"));
@@ -1388,15 +1411,15 @@ LawVerdict unreadable_declarations_refused(const World &) {
     };
     for (const Refusal &each : refused) {
         const FaultWatch faults;
-        const bool taken = each.type < 0
-            ? netw::Netw::configure_property(node, StringName(each.name))
-                  .is_valid()
-            : netw::Netw::configure_property(
-                  node,
-                  StringName(each.name),
-                  each.type
-              )
-                  .is_valid();
+        const bool taken = !refused_and_inert(
+            each.type < 0
+                ? netw::Netw::configure_property(node, StringName(each.name))
+                : netw::Netw::configure_property(
+                      node,
+                      StringName(each.name),
+                      each.type
+                  )
+        );
         if (taken || faults.errors() != 1) {
             memdelete(node);
             return law_broken(
@@ -1408,8 +1431,9 @@ LawVerdict unreadable_declarations_refused(const World &) {
         }
     }
     const FaultWatch faults;
-    const bool plain
-        = netw::Netw::configure_property(node, StringName("store")).is_valid();
+    const Ref<NetwPropertyConfig> store
+        = netw::Netw::configure_property(node, StringName("store"));
+    const bool plain = store.is_valid() && !store->is_refused();
     memdelete(node);
     if (!plain || faults.errors() != 0) {
         return law_broken("a plain var was refused");
@@ -1426,7 +1450,9 @@ LawVerdict mounted_node_refused(const World &) {
     {
         FaultWatch faults;
         faults.expect_error("*'LateProperty'*[NW0036]*", 1);
-        taken = netw::Netw::configure_property(node, "position").is_valid();
+        taken = !refused_and_inert(
+            netw::Netw::configure_property(node, "position")
+        );
     }
     node->get_parent()->remove_child(node);
     memdelete(node);
@@ -1716,6 +1742,225 @@ LawVerdict refused_claim_writes_back(const World &) {
     return law_held();
 }
 
+constexpr const char *BOAT_SOURCE = R"(extends Node2D
+
+var hull := 0
+var sail := 0
+
+func _init() -> void:
+	Netw.configure_entity(self)
+	Netw.configure_property(self, &"hull").state()
+
+func rig() -> void:
+	Netw.configure_property(self, &"sail").state()
+)";
+
+Node *build_boat(const Variant &p_name) {
+    Node *made = build_minted(p_name);
+    if (String(p_name) == "Sloop") {
+        made->call("rig");
+    }
+    return made;
+}
+
+LawVerdict instances_send_what_each_declared(const World &) {
+    Stand stand(1, BOAT_SOURCE);
+    const FaultWatch faults;
+    const int raft = stand.spawn(&build_boat, "Raft");
+    const int sloop = stand.spawn(&build_boat, "Sloop");
+    const int routes[] = {raft, sloop};
+    for (const int route : routes) {
+        Node *server = stand.at(route, -1);
+        if (server == nullptr || stand.at(route, 0) == nullptr) {
+            return law_broken("a boat did not spawn on both peers");
+        }
+        server->set("hull", 3);
+        server->set("sail", 7);
+    }
+    stand.rig.step_ticks(6);
+    for (const int route : routes) {
+        Node *client = stand.at(route, 0);
+        const int sail = route == sloop ? 7 : 0;
+        if (int(client->get("hull")) != 3 || int(client->get("sail")) != sail) {
+            return law_broken(
+                "'%s' reads hull %d sail %d on the client",
+                String(client->get_name()).utf8().get_data(),
+                int(client->get("hull")),
+                int(client->get("sail"))
+            );
+        }
+    }
+    if (faults.errors() != 0 || faults.warnings_logged() != 0) {
+        return law_broken("the boats printed an error or a warning");
+    }
+    return law_held();
+}
+
+uint64_t turn_set(NetwMultiplayer *p_session, Node *p_node, int p_bits) {
+    netw::Netw::configure_property(p_node, "rotation")
+        ->state()
+        ->quantize(netw::gd::array_of(by_bits(p_bits, 0.0, 7.0)));
+    return netw::property_set_builder::from_node(
+        p_node,
+        PropertySet::RECORD_STATE,
+        p_session
+    );
+}
+
+LawVerdict scriptless_nodes_share_one_set(const World &) {
+    Ref<NetwMultiplayer> session;
+    session.instantiate();
+    Node2D *nodes[] = {memnew(Node2D), memnew(Node2D), memnew(Node2D)};
+    const uint64_t first = turn_set(session.ptr(), nodes[0], 12);
+    const uint64_t alike = turn_set(session.ptr(), nodes[1], 12);
+    const uint64_t coarse = turn_set(session.ptr(), nodes[2], 6);
+    for (Node2D *node : nodes) {
+        memdelete(node);
+    }
+    if (first == netw::repl::SetBook::NONE) {
+        return law_broken("the first node compiled no set");
+    }
+    if (alike != first) {
+        return law_broken("two nodes declaring alike hold two sets");
+    }
+    if (coarse == first) {
+        return law_broken("a coarser quantizer shares the finer one's set");
+    }
+    return law_held();
+}
+
+LawVerdict scriptless_node_in_no_entity_reported(const World &) {
+    Node2D *node = memnew(Node2D);
+    node->set_name("Drifter");
+    netw::Netw::configure_property(node, "position")->state();
+    {
+        FaultWatch faults;
+        faults.expect_error("*'Drifter'*[NW1010]*", 1);
+        netw::gd::scene_root()->add_child(node);
+        node->get_parent()->remove_child(node);
+        netw::gd::scene_root()->add_child(node);
+    }
+    node->get_parent()->remove_child(node);
+    memdelete(node);
+    return law_held();
+}
+
+constexpr const char *SETTINGS_SOURCE = R"(extends Node2D
+
+var hp := 0
+var speed := 0.0
+var friend: Node
+)";
+
+constexpr const char *ONE_SHOT_SOURCE = R"(extends AnimationTree
+
+func _init() -> void:
+	var blend := AnimationNodeBlendTree.new()
+	blend.add_node(&"shot", AnimationNodeOneShot.new())
+	tree_root = blend
+)";
+
+LawVerdict settings_that_cannot_apply_refused(const World &) {
+    FaultWatch faults;
+    faults.expect_error("*extrapolate cannot*input on 'position'*[NW0043]*", 1);
+    faults.expect_error("*extrapolate cannot*input on 'rotation'*[NW0043]*", 1);
+    faults.expect_error("*unchecked cannot*broadcast on 'scale'*[NW0043]*", 1);
+    faults.expect_error("*'skew' cannot*input together*[NW0043]*", 1);
+    faults.expect_error("*'friend', which holds an Object*[NW1020]*", 1);
+    faults.expect_error("*heartbeat got -3*for 'hp'*[NW0032]*", 1);
+    faults.expect_error("*correction_threshold got -0.5 for 'hp'*[NW0032]*", 1);
+    faults.expect_error("*NetwQuantizeQuaternion*'hp'*[NW1019]*", 1);
+    faults.expect_error("*'speed' for 'z_index'*[NW0043]*", 1);
+    faults.expect_error("*linger got -1*[NW0032]*", 1);
+    faults.expect_error("*interval got -1*[NW0032]*", 1);
+    faults.expect_error("*'parameters/shot/request' is a request*[NW0044]*", 1);
+
+    Node *node = netw_test::minted_node(SETTINGS_SOURCE);
+    const Ref<NetwPropertyConfig> late
+        = netw::Netw::configure_property(node, "position")
+              ->input()
+              ->extrapolate("speed");
+    const Ref<NetwPropertyConfig> early
+        = netw::Netw::configure_property(node, "rotation")
+              ->extrapolate("speed")
+              ->input();
+    const Ref<NetwPropertyConfig> cast
+        = netw::Netw::configure_property(node, "scale")
+              ->broadcast()
+              ->unchecked()
+              ->retained();
+    const Ref<NetwPropertyConfig> twice
+        = netw::Netw::configure_property(node, "skew")->state()->input();
+    const Ref<NetwPropertyConfig> object
+        = netw::Netw::configure_property(node, "friend");
+    const Ref<NetwPropertyConfig> hp
+        = netw::Netw::configure_property(node, "hp")
+              ->state()
+              ->heartbeat(-3)
+              ->correction_threshold(-0.5);
+    Ref<NetwQuantizeQuaternion> turn;
+    turn.instantiate();
+    hp->quantize(netw::gd::array_of(turn));
+    netw::Netw::configure_property(node, "speed");
+    netw::Netw::configure_property(node, "z_index")
+        ->state()
+        ->extrapolate("speed");
+    PropertySet set;
+    netw::property_set_builder::from_property_configs(
+        set,
+        netw::script::model::get_declared_property_configs(node),
+        PropertySet::RECORD_STATE
+    );
+    bool extrapolates = false;
+    for (const PropertyColumn &column : set.columns) {
+        extrapolates = extrapolates || column.rate_property != StringName();
+    }
+    const double linger = netw::Netw::configure_despawn(node)
+                              ->linger(-1.0)
+                              ->get_linger_seconds();
+    const double interval = netw::Netw::configure_persistence(node)
+                                ->interval(-1.0)
+                                ->get_save_interval();
+    Node *tree = netw_test::minted_node(ONE_SHOT_SOURCE);
+    const Ref<NetwPropertyConfig> request = netw::Netw::configure_property(
+        tree,
+        "parameters/shot/request"
+    );
+    const Ref<NetwPropertyConfig> blend = netw::Netw::configure_property(
+        tree,
+        "parameters/shot/active"
+    );
+
+    const char *kept = nullptr;
+    if (!late->get_in_input_set() || !early->get_in_input_set()
+        || late->get_rate_property() != StringName()
+        || early->get_rate_property() != StringName()) {
+        kept = "extrapolate on an input";
+    } else if (!cast->get_in_broadcast_set() || cast->get_unchecked()) {
+        kept = "unchecked on a broadcast";
+    } else if (cast->get_lane() != PropertySet::RETAINED) {
+        kept = "a broadcast without its retained";
+    } else if (!twice->is_refused() || twice->get_in_state_set()
+               || twice->get_in_input_set()) {
+        kept = "two kinds";
+    } else if (!object->is_refused() || !request->is_refused()) {
+        kept = "an Object or a request";
+    } else if (blend->is_refused()) {
+        kept = "no AnimationTree parameter at all";
+    } else if (hp->get_set_heartbeat_ticks() != NetwPropertyConfig::UNSET
+               || hp->get_correction_threshold() >= 0.0
+               || !hp->get_quantizers().is_empty()) {
+        kept = "a negative value or a quantizer of the wrong type";
+    } else if (extrapolates) {
+        kept = "extrapolate naming no state property";
+    } else if (linger != 0.0 || interval != 0.0) {
+        kept = "a negative linger or interval";
+    }
+    memdelete(tree);
+    memdelete(node);
+    return kept == nullptr ? law_held() : law_broken("kept %s", kept);
+}
+
 const Row WORLD_ROWS[] = {
     {"a property the node does not list, declared with its type",
      "its spawn value and its changes reach the client, and a controller's "
@@ -1748,6 +1993,20 @@ const Row WORLD_ROWS[] = {
     {"a client drawing into a board while its claim is denied",
      "the claim fails and the client's board goes back to what it received",
      &refused_claim_writes_back},
+    {"two nodes of one script, one declaring a property the other does not",
+     "each node sends the properties it declared and no error is printed",
+     &instances_send_what_each_declared},
+    {"three nodes with no script, two declaring alike and one coarser",
+     "the two alike share one compiled set and the coarser has its own",
+     &scriptless_nodes_share_one_set},
+    {"a property declared on a node with no script, in no entity",
+     "one error names the node, however often it enters the tree",
+     &scriptless_node_in_no_entity_reported},
+    {"a setting on a kind that never reads it in either order, two kinds, an "
+     "Object, an AnimationTree request, a negative amount, a quantizer of "
+     "the wrong type, and extrapolate naming no state property",
+     "each is refused with one error and nothing of it is kept",
+     &settings_that_cannot_apply_refused},
 };
 
 TEST_CASE(

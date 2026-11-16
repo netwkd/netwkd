@@ -48,6 +48,7 @@ public:
 
     int64_t total_bits(godot::Variant::Type type) const;
     bool is_same_layout(const godot::Ref<NetwQuantize> &other) const;
+    uint64_t layout_hash() const;
 };
 
 class NetwQuantizeScalar : public NetwQuantize {

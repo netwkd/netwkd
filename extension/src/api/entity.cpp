@@ -424,8 +424,9 @@ RID NetwEntity::get_rid_handle() const {
 }
 
 void NetwEntity::set_control_handler(const Callable &p_handler) {
-    if (p_handler.is_valid()) {
-        game_call_declared(p_handler, game_calls::CONTROL_HANDLER);
+    if (!game_call_declared(p_handler, game_calls::CONTROL_HANDLER)
+        && !p_handler.is_valid()) {
+        return;
     }
     control_handler = p_handler;
 }
@@ -462,8 +463,9 @@ void NetwEntity::judge_control(const Variant &p_request) const {
 }
 
 void NetwEntity::set_lifecycle_handler(const Callable &p_handler) {
-    if (p_handler.is_valid()) {
-        game_call_declared(p_handler, game_calls::LIFECYCLE_HANDLER);
+    if (!game_call_declared(p_handler, game_calls::LIFECYCLE_HANDLER)
+        && !p_handler.is_valid()) {
+        return;
     }
     lifecycle_handler = p_handler;
 }

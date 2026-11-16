@@ -631,6 +631,11 @@ void NetwNativeTests::_bind_methods() {
     );
     ClassDB::bind_static_method(
         "NetwNativeTests",
+        D_METHOD("fault_book_clear"),
+        &NetwNativeTests::fault_book_clear
+    );
+    ClassDB::bind_static_method(
+        "NetwNativeTests",
         D_METHOD("prediction_stats", "handle"),
         &NetwNativeTests::prediction_stats
     );
@@ -653,11 +658,6 @@ void NetwNativeTests::_bind_methods() {
         "NetwNativeTests",
         D_METHOD("predict_tap_cost", "session"),
         &NetwNativeTests::predict_tap_cost
-    );
-    ClassDB::bind_static_method(
-        "NetwNativeTests",
-        D_METHOD("property_set_keys_of_script", "script", "record"),
-        &NetwNativeTests::property_set_keys_of_script
     );
     ClassDB::bind_static_method(
         "NetwNativeTests",
@@ -785,6 +785,10 @@ void NetwNativeTests::tracker_book_clear() {
     netw::connect::TrackerBook::shared().clear();
 }
 
+void NetwNativeTests::fault_book_clear() {
+    netw::fault::forget();
+}
+
 Dictionary NetwNativeTests::prediction_stats(Object *p_handle) {
     const NetwPrediction *handle = Object::cast_to<NetwPrediction>(p_handle);
     const predict::Decl *decl = handle != nullptr
@@ -813,22 +817,6 @@ void NetwNativeTests::predict_tap_flush(NetwMultiplayer *p_session) {
 Dictionary NetwNativeTests::predict_tap_cost(NetwMultiplayer *p_session) {
     return p_session != nullptr ? p_session->predict_get_tap_cost()
                                 : Dictionary();
-}
-
-TypedArray<StringName> NetwNativeTests::property_set_keys_of_script(
-    const Ref<Script> &p_script,
-    int64_t p_record
-) {
-    repl::PropertySet compiled;
-    if (!property_set_builder::compile_script(
-            compiled,
-            p_script,
-            p_record,
-            nullptr
-        )) {
-        return TypedArray<StringName>();
-    }
-    return compiled.keys();
 }
 
 void NetwNativeTests::scene_enter(

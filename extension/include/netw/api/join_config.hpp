@@ -13,13 +13,27 @@ class NetwJoinConfig : public godot::RefCounted {
 private:
     godot::Ref<godot::Script> context_script;
     godot::StringName context_name;
+    godot::Array arg_types;
     godot::Array quantizers;
+    bool refused = false;
 
 protected:
     static void _bind_methods();
 
 public:
-    static void set_arg_types_reader(const godot::Callable &p_reader);
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
+    void set_arg_types(const godot::Array &p_arg_types) {
+        arg_types = p_arg_types;
+    }
+    godot::Array get_arg_types() const {
+        return arg_types;
+    }
 
     void set_context_script(const godot::Ref<godot::Script> &p_script) {
         context_script = p_script;

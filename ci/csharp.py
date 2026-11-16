@@ -185,6 +185,9 @@ DECLARED_HANDLERS = {
 AWAITED_HANDLERS = {"Netw.configure_admission.handler"}
 NAMED_HANDLERS = {"NetwActionConfig.predict.handler"}
 GENERIC_HANDLERS = {"Netw.configure_join.handler"}
+TYPED_DECLARES = {
+    "Netw.configure_join.handler": "NetwMultiplayer.SessionJoinDeclare",
+}
 
 
 @dataclass(frozen=True)
@@ -1635,13 +1638,30 @@ class Emitter:
                 ]
             else:
                 opened = [*self.generic_docs.get(target, []), head + "("]
+            if target in TYPED_DECLARES and not extra:
+                called = [
+                    "        %s%s(" % (returned, TYPED_DECLARES[target]),
+                    "            bridged0,",
+                    "            Array.Empty<int>());",
+                ]
+            elif target in TYPED_DECLARES:
+                called = [
+                    "        %s%s(" % (returned, TYPED_DECLARES[target]),
+                    "            bridged0,",
+                    "            new int[]",
+                    "            {",
+                    *["                NetwApi.VariantTypeOf<%s>()," % one for one in extra],
+                    "            });",
+                ]
+            else:
+                called = ["        %s%s(bridged0);" % (returned, spelled)]
             overloads.append(
                 [
                     *opened,
                     taken,
                     "    {",
                     *self.bridge_lines(handler, name, "bridged0", site, extra),
-                    "        %s%s(bridged0);" % (returned, spelled),
+                    *called,
                     "    }",
                 ]
             )

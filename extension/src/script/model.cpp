@@ -30,11 +30,58 @@ HashMap<uint64_t, NodeOverlay> &overlay_book() {
     return book;
 }
 
+struct NodeDeclaration {
+    uint64_t shared_key = 0;
+    Dictionary configs;
+};
+
+HashMap<uint64_t, NodeDeclaration> &declaration_book() {
+    static HashMap<uint64_t, NodeDeclaration> book;
+    return book;
+}
+
+HashMap<uint64_t, Dictionary> &shared_declarations() {
+    static HashMap<uint64_t, Dictionary> book;
+    return book;
+}
+
 constexpr uint32_t OVERLAY_SWEEP_FLOOR = 64;
 
 uint32_t &overlay_sweep_at() {
     static uint32_t at = OVERLAY_SWEEP_FLOOR;
     return at;
+}
+
+uint32_t &declaration_sweep_at() {
+    static uint32_t at = OVERLAY_SWEEP_FLOOR;
+    return at;
+}
+
+template <typename T>
+void sweep_dead_nodes(HashMap<uint64_t, T> &r_book) {
+    LocalVector<uint64_t> dead;
+    for (const KeyValue<uint64_t, T> &entry : r_book) {
+        if (gd::object_of(ObjectID(entry.key)) == nullptr) {
+            dead.push_back(entry.key);
+        }
+    }
+    for (uint32_t index = 0; index < dead.size(); index++) {
+        r_book.erase(dead[index]);
+    }
+}
+
+template <typename T>
+void sweep_when_full(HashMap<uint64_t, T> &r_book, uint32_t &r_sweep_at) {
+    if (r_book.size() < r_sweep_at) {
+        return;
+    }
+    sweep_dead_nodes(r_book);
+    const uint32_t doubled = r_book.size() * 2;
+    r_sweep_at = doubled > OVERLAY_SWEEP_FLOOR ? doubled : OVERLAY_SWEEP_FLOOR;
+}
+
+uint64_t folded(uint64_t p_key, uint64_t p_value) {
+    return (p_key ^ p_value) * 1099511628211ULL;
 }
 
 uint64_t &epoch_of_interpolation() {
@@ -67,12 +114,7 @@ NodeOverlay *overlay_for(Node *p_node, bool p_create) {
     if (!p_create) {
         return nullptr;
     }
-    if (overlay_book().size() >= overlay_sweep_at()) {
-        sweep_dead_overlays();
-        const uint32_t doubled = overlay_book().size() * 2;
-        overlay_sweep_at()
-            = doubled > OVERLAY_SWEEP_FLOOR ? doubled : OVERLAY_SWEEP_FLOOR;
-    }
+    sweep_when_full(overlay_book(), overlay_sweep_at());
     overlay_book().insert(key, NodeOverlay());
     return &overlay_book().find(key)->value;
 }
@@ -138,18 +180,70 @@ void declare_rpc_config(
     );
 }
 
-void declare_property_config(
-    const Ref<Script> &p_script,
+Ref<NetwPropertyConfig> standing_property_config(
+    Node *p_node,
+    const StringName &p_property
+) {
+    const Ref<Script> script = script_of(p_node);
+    if (script.is_valid()) {
+        return get_property_config(script, p_property);
+    }
+    return get_declared_property_config(p_node, p_property);
+}
+
+void declare_node_property(
+    Node *p_node,
     const StringName &p_property,
     const Ref<NetwPropertyConfig> &p_config
 ) {
-    registry::declare_member(
-        p_script,
-        registry::MEMBER_PROPERTY,
-        p_property,
-        p_config
-    );
-    advance_interpolation_epoch();
+    if (p_node == nullptr || p_property == StringName()) {
+        return;
+    }
+    const uint64_t node = uint64_t(gd::instance_id(p_node));
+    const Ref<Script> script = script_of(p_node);
+    HashMap<uint64_t, NodeDeclaration>::Iterator held
+        = declaration_book().find(node);
+    if (held && held->value.configs.has(p_property)) {
+        return;
+    }
+    if (script.is_null()) {
+        if (!held) {
+            sweep_when_full(declaration_book(), declaration_sweep_at());
+            held = declaration_book().insert(node, NodeDeclaration());
+        }
+        held->value.configs[p_property] = p_config;
+        advance_interpolation_epoch();
+        return;
+    }
+    if (get_property_config(script, p_property).is_null()) {
+        registry::declare_member(
+            script,
+            registry::MEMBER_PROPERTY,
+            p_property,
+            p_config
+        );
+        advance_interpolation_epoch();
+    }
+    const uint64_t before = held
+        ? held->value.shared_key
+        : folded(
+              14695981039346656037ULL,
+              uint64_t(gd::instance_id(script.ptr()))
+          );
+    const uint64_t key = folded(before, uint64_t(p_property.hash()));
+    HashMap<uint64_t, Dictionary>::Iterator shared
+        = shared_declarations().find(key);
+    if (!shared) {
+        Dictionary grown
+            = held ? held->value.configs.duplicate() : Dictionary();
+        grown[p_property] = get_property_config(script, p_property);
+        shared = shared_declarations().insert(key, grown);
+    }
+    const NodeDeclaration after{key, shared->value};
+    if (!held) {
+        sweep_when_full(declaration_book(), declaration_sweep_at());
+    }
+    declaration_book().insert(node, after);
 }
 
 void declare_signal_config(
@@ -229,8 +323,37 @@ Dictionary get_rpc_configs(const Ref<Script> &p_script) {
     return registry::member_configs(p_script, registry::MEMBER_RPC);
 }
 
-Dictionary get_property_configs(const Ref<Script> &p_script) {
-    return registry::member_configs(p_script, registry::MEMBER_PROPERTY);
+Dictionary get_declared_property_configs(Node *p_node) {
+    if (p_node == nullptr) {
+        return Dictionary();
+    }
+    HashMap<uint64_t, NodeDeclaration>::ConstIterator held
+        = declaration_book().find(uint64_t(gd::instance_id(p_node)));
+    return held ? held->value.configs : Dictionary();
+}
+
+Ref<NetwPropertyConfig> get_declared_property_config(
+    Node *p_node,
+    const StringName &p_property
+) {
+    if (p_node == nullptr) {
+        return Ref<NetwPropertyConfig>();
+    }
+    HashMap<uint64_t, NodeDeclaration>::ConstIterator held
+        = declaration_book().find(uint64_t(gd::instance_id(p_node)));
+    if (!held) {
+        return Ref<NetwPropertyConfig>();
+    }
+    return held->value.configs.get(p_property, Variant());
+}
+
+uint64_t shared_declaration_key(Node *p_node) {
+    if (p_node == nullptr) {
+        return 0;
+    }
+    HashMap<uint64_t, NodeDeclaration>::ConstIterator held
+        = declaration_book().find(uint64_t(gd::instance_id(p_node)));
+    return held ? held->value.shared_key : 0;
 }
 
 Dictionary get_signal_configs(const Ref<Script> &p_script) {
@@ -292,7 +415,7 @@ Ref<NetwPropertyConfig> configure_node_property(
 
 Dictionary get_node_property_configs(Node *p_node) {
     Dictionary answered;
-    const Dictionary declared = get_property_configs(script_of(p_node));
+    const Dictionary declared = get_declared_property_configs(p_node);
     const Array declared_names = declared.keys();
     for (int index = 0; index < declared_names.size(); index++) {
         answered[declared_names[index]] = declared[declared_names[index]];
@@ -324,7 +447,7 @@ Ref<NetwInterpolate> get_node_property_interpolator(
             return per_instance;
         }
     }
-    return get_property_interpolator(script_of(p_node), p_property);
+    return first_interpolator(standing_property_config(p_node, p_property));
 }
 
 void clear_node_overlay(Node *p_node) {
@@ -345,20 +468,16 @@ void advance_interpolation_epoch() {
 }
 
 void sweep_dead_overlays() {
-    LocalVector<uint64_t> dead;
-    for (const KeyValue<uint64_t, NodeOverlay> &entry : overlay_book()) {
-        if (gd::object_of(ObjectID(entry.key)) == nullptr) {
-            dead.push_back(entry.key);
-        }
-    }
-    for (uint32_t index = 0; index < dead.size(); index++) {
-        overlay_book().erase(dead[index]);
-    }
+    sweep_dead_nodes(overlay_book());
+    sweep_dead_nodes(declaration_book());
 }
 
 void clear() {
     overlay_book().clear();
     overlay_sweep_at() = OVERLAY_SWEEP_FLOOR;
+    declaration_book().clear();
+    declaration_sweep_at() = OVERLAY_SWEEP_FLOOR;
+    shared_declarations().clear();
     cache_book().clear();
 }
 
@@ -374,13 +493,6 @@ Array get_method_interpolators(
 ) {
     const Ref<NetwMemberConfig> declared = get_rpc_options(p_script, p_method);
     return declared.is_valid() ? declared->get_interpolators() : Array();
-}
-
-Ref<NetwInterpolate> get_property_interpolator(
-    const Ref<Script> &p_script,
-    const StringName &p_property
-) {
-    return first_interpolator(get_property_config(p_script, p_property));
 }
 
 Array get_signal_interpolators(
@@ -492,7 +604,7 @@ namespace {
 
 int configured_type(Node *p_node, const StringName &p_property) {
     Ref<NetwPropertyConfig> config
-        = get_property_config(script_of(p_node), p_property);
+        = standing_property_config(p_node, p_property);
     if (config.is_null()) {
         const NodeOverlay *overlay = overlay_for(p_node, false);
         if (overlay != nullptr) {

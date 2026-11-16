@@ -112,6 +112,12 @@ public:
     void seal(const godot::String &p_scope) {
         guard.seal(p_scope);
     }
+    void refuse() {
+        guard.refused = true;
+    }
+    bool is_refused() const {
+        return guard.refused;
+    }
     bool matches_defaults() const;
     godot::String non_default_fields() const;
 };

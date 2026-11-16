@@ -26,3 +26,26 @@ Check the name, or declare it on the owner first.
 
     func _init() -> void:
         Netw.configure_property(self, &"health")
+
+A property path that starts with the name of a child node is reported with
+its own line, because the path names a node and not a property.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"Anim:speed_scale")
+
+Pass the child as the first argument.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property($Anim, &"speed_scale")
+
+:ref:`Netw.configure_rpc <class_Netw_method_configure_rpc>`,
+:ref:`Netw.configure_spawn <class_Netw_method_configure_spawn>` and
+:ref:`Netw.configure_signal <class_Netw_method_configure_signal>` take a
+method or a signal that a script on the node declares. A node with no script
+is reported, and the line says so when the name belongs to the engine. A
+method the engine declares, such as ``queue_free``, is reported on a node
+with a script too, because only a method of the script can be called.

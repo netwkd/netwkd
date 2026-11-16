@@ -1,0 +1,34 @@
+:github_url: hide
+
+.. _fault_nw0044:
+
+NW0044. An AnimationTree request was declared as a property
+===========================================================
+
+Reported as an error when
+:ref:`Netw.configure_property <class_Netw_method_configure_property>`
+names a ``request`` or ``transition_request`` parameter of an
+``AnimationTree``. The declaration was refused and the parameter is not
+sent.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"parameters/shot/request").broadcast()
+
+The tree sets a request back to none on the frame it reads it, so a peer
+that receives the value may never see it. Send the request as a call.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_rpc(fire_shot).controller().call_local()
+
+    func fire_shot() -> void:
+        set(&"parameters/shot/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+
+    func _on_shoot_pressed() -> void:
+        Netw.rpc(fire_shot)
+
+A parameter the tree keeps, such as ``blend_amount``, ``blend_position``
+or ``scale``, is declared as a property.

@@ -19,6 +19,12 @@ constexpr session_decl::Kind CONFIG_KINDS[3] = {
     session_decl::KIND_LAGCOMP_CONFIG,
 };
 
+constexpr const char *CONSUMED_NAMES[3] = {
+    "the session settings",
+    "the clock",
+    "lag compensation",
+};
+
 int slot_of(session_decl::Kind p_kind) {
     return int(p_kind) - int(session_decl::KIND_SESSION_CONFIG);
 }
@@ -85,6 +91,22 @@ Error NetwMultiplayer::apply_pending_config(
     for (const session_decl::Kind kind : CONFIG_KINDS) {
         const int slot = slot_of(kind);
         if (config_consumption[slot].consumed) {
+            const session_decl::Resolved late
+                = declaration_book().resolve(this, kind);
+            if (late.state == session_decl::AMBIGUOUS) {
+                declaration_book().report_unresolved(this, kind, late.state);
+            } else if (late.state == session_decl::READY
+                       && late.generation
+                           != config_consumption[slot].generation) {
+                fault::raise(
+                    this,
+                    NETW_FAULT_DECLARED_ONLINE,
+                    {vformat("{Netw.%s}", session_decl::verb_of(kind)),
+                     String(),
+                     String(CONSUMED_NAMES[slot]),
+                     int(kind)}
+                );
+            }
             continue;
         }
         selected.offered[slot] = declaration_book().resolve(this, kind);

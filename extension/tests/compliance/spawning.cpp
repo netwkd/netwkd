@@ -157,6 +157,109 @@ TEST_CASE(
     NETW_HOLDS(quiet(seen));
 }
 
+constexpr const char *DOCKYARD = R"(
+class Crane extends Node3D:
+	func _init() -> void:
+		Netw.configure_entity(self)
+		var arm := Node3D.new()
+		arm.name = &"Arm"
+		add_child(arm)
+		Netw.configure_property(arm, &"position").broadcast()
+
+
+func _init() -> void:
+	Netw.configure_spawn(make_buoy)
+
+
+func make_buoy(called: String) -> Node:
+	var buoy := Node3D.new()
+	buoy.name = called
+	Netw.configure_entity(buoy)
+	Netw.configure_property(buoy, &"position").state()
+	return buoy
+)";
+
+Step float_buoy(const char *p_name) {
+    return [=](Live &p_live, int p_peer) {
+        Node *level = p_live.need(p_peer, "Level");
+        Node *made = netw::Netw::spawn(
+            Callable(level, "make_buoy"),
+            Array::make(String(p_name))
+        );
+        if (made != nullptr) {
+            level->add_child(made);
+        }
+    };
+}
+
+TEST_CASE(
+    "[Networked][Compliance] S7 a property declared on a child with no "
+    "script reaches every peer"
+) {
+    const Seen seen = World(DOCKYARD, 2)
+                          .watch("Arm", "position")
+                          .at(1, spawn("Crane", "Crane"))
+                          .at(4, set("Arm", "position", Vector3(0, 5, 2)))
+                          .at(8, join("cy"))
+                          .run(16);
+    for (int peer = SERVER; peer <= LATE; ++peer) {
+        NETW_HOLDS(reads(seen, peer, "Arm", "position", Vector3(0, 5, 2)));
+    }
+    NETW_HOLDS(quiet(seen));
+}
+
+TEST_CASE(
+    "[Networked][Compliance] S8 a property declared on an entity with no "
+    "script reaches every peer"
+) {
+    const Seen seen = World(DOCKYARD, 2)
+                          .watch("Buoy", "position")
+                          .at(1, float_buoy("Buoy"))
+                          .at(4, set("Buoy", "position", Vector3(7, 0, 1)))
+                          .at(8, join("cy"))
+                          .run(16);
+    for (int peer = SERVER; peer <= LATE; ++peer) {
+        NETW_HOLDS(reads(seen, peer, "Buoy", "position", Vector3(7, 0, 1)));
+    }
+    NETW_HOLDS(quiet(seen));
+}
+
+constexpr const char *EMPTY_LOT = R"(
+func _init() -> void:
+	Netw.configure_spawn(make_nothing)
+
+
+func make_nothing() -> Node:
+	return null
+)";
+
+Step spawn_nothing_for(int p_client) {
+    return [=](Live &p_live, int p_peer) {
+        netw::Netw::spawn_player(
+            p_live.rig.player(p_client),
+            Callable(p_live.need(p_peer, "Level"), "make_nothing"),
+            Array()
+        );
+    };
+}
+
+TEST_CASE(
+    "[Networked][Compliance] S9 a player whose spawn is refused sees why"
+) {
+    const Seen seen
+        = World(EMPTY_LOT, 2).each(2, 4, spawn_nothing_for(0)).run(12);
+    int on_the_server = 0;
+    int on_the_player = 0;
+    for (const String &fault : seen.faults) {
+        on_the_server += fault.contains("[NW0040]");
+        on_the_player += fault.contains("'make_nothing'")
+            && fault.contains("[NW0045]");
+    }
+    CHECK(on_the_server == 1);
+    CHECK(on_the_player == 1);
+    CHECK(seen.faults.size() == 2);
+}
+
 } // namespace ComplianceSpawning
 
 #endif

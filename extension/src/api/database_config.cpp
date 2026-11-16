@@ -9,6 +9,9 @@ namespace netw {
 Ref<NetwDatabaseConfig> NetwDatabaseConfig::backend(
     const Ref<NetwDatabaseBackend> &p_backend
 ) {
+    if (refused) {
+        return Ref<NetwDatabaseConfig>(this);
+    }
     store = p_backend;
     return Ref<NetwDatabaseConfig>(this);
 }

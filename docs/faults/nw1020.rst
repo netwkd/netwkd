@@ -9,8 +9,10 @@ Reported as an error when a call is made for a case Networked does not
 support. The cases are a synchronizer that stopped, a node outside the
 spawnable scenes, an entity moved to another viewport, a scene change that
 freed the session, a read only schema, a scene's own interest layer, a config
-passed to ``object_configuration_add``, a directory with no friends list, and
-a transport that moves the server under link conditions.
+passed to ``object_configuration_add``, a directory with no friends list, a
+transport that moves the server under link conditions, an interpolator
+on a value inside a resource, such as ``stats:health``, and a property
+that holds an Object declared with ``Netw.configure_property``.
 
 The call was ignored. The log line names the call and the case.
 

@@ -132,7 +132,27 @@ void NetwMemberConfig::publish_policy() {
     );
 }
 
+bool NetwMemberConfig::spawn_never_reads(const char *p_setting) const {
+    if (!spawn_function) {
+        return false;
+    }
+    fault::raise(
+        nullptr,
+        NETW_FAULT_SETTING_REFUSED,
+        {vformat("{NetwMemberConfig.%s}", String(p_setting)),
+         vformat("the spawn function '%s'", String(context_name)),
+         String("only {NetwMemberConfig.quantize} on a spawn function")}
+    );
+    return true;
+}
+
 void NetwMemberConfig::set_write_policy(Policy p_write_policy) {
+    static const char *const names[]
+        = {"authority", "controller", "any_peer", "server"};
+    if (refused
+        || spawn_never_reads(names[CLAMP(int(p_write_policy), 0, 3)])) {
+        return;
+    }
     if (policy_configured && write_policy != p_write_policy) {
         fault::raise(
             nullptr,
@@ -146,6 +166,12 @@ void NetwMemberConfig::set_write_policy(Policy p_write_policy) {
 }
 
 void NetwMemberConfig::set_transfer_mode(TransferMode p_transfer_mode) {
+    if (refused
+        || spawn_never_reads(
+            p_transfer_mode == TRANSFER_RELIABLE ? "reliable" : "unreliable"
+        )) {
+        return;
+    }
     if (transfer_configured && transfer_mode != p_transfer_mode) {
         fault::raise(
             nullptr,
@@ -158,6 +184,10 @@ void NetwMemberConfig::set_transfer_mode(TransferMode p_transfer_mode) {
 }
 
 void NetwMemberConfig::set_is_call_local(bool p_is_call_local) {
+    if (refused
+        || spawn_never_reads(p_is_call_local ? "call_local" : "call_remote")) {
+        return;
+    }
     if (context_type == 1) {
         fault::raise(
             nullptr,
@@ -220,7 +250,53 @@ Ref<NetwMemberConfig> NetwMemberConfig::call_remote() {
 }
 
 Ref<NetwMemberConfig> NetwMemberConfig::defer_until(const Signal &p_signal) {
-    if (!defer_signal_name.is_empty()) {
+    if (refused || spawn_never_reads("defer_until")) {
+        return Ref<NetwMemberConfig>(this);
+    }
+    if (context_type != 0) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_SETTING_REFUSED,
+            {String("{NetwMemberConfig.defer_until}"),
+             vformat("'%s', which is not an RPC", String(context_name)),
+             String("it on a method declared with {Netw.configure_rpc}")}
+        );
+        return Ref<NetwMemberConfig>(this);
+    }
+    Object *holder = p_signal.get_object();
+    if (holder == nullptr || p_signal.get_name().is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{NetwMemberConfig.defer_until}"),
+             String(),
+             String("signal")}
+        );
+        return Ref<NetwMemberConfig>(this);
+    }
+    const Ref<Script> holder_script(
+        Object::cast_to<Script>(holder->get_script())
+    );
+    if (holder_script != get_context_script()
+        || !holder->has_signal(p_signal.get_name())) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwMemberConfig.defer_until}"),
+             vformat(
+                 "a signal named '%s' from another object for '%s'",
+                 String(p_signal.get_name()),
+                 String(context_name)
+             ),
+             vformat(
+                 "a signal of the node that declares '%s'",
+                 String(context_name)
+             )}
+        );
+        return Ref<NetwMemberConfig>(this);
+    }
+    if (!defer_signal_name.is_empty()
+        && defer_signal_name != p_signal.get_name()) {
         fault::raise(
             nullptr,
             NETW_FAULT_DECLARED_AGAIN,
@@ -232,12 +308,10 @@ Ref<NetwMemberConfig> NetwMemberConfig::defer_until(const Signal &p_signal) {
 }
 
 Ref<NetwMemberConfig> NetwMemberConfig::timeout(double p_seconds) {
-    const Ref<NetwMemberConfig> spawn_config
-        = netw::script::model::get_spawn_config(
-            get_context_script(),
-            context_name
-        );
-    if (context_type != 0 || spawn_config.ptr() == this) {
+    if (refused) {
+        return Ref<NetwMemberConfig>(this);
+    }
+    if (context_type != 0 || spawn_function) {
         fault::raise(
             nullptr,
             NETW_FAULT_CONFLICTING_SETTINGS,
@@ -264,6 +338,9 @@ Ref<NetwMemberConfig> NetwMemberConfig::timeout(double p_seconds) {
 }
 
 Ref<NetwMemberConfig> NetwMemberConfig::quantize(const Array &p_quantizers) {
+    if (refused) {
+        return Ref<NetwMemberConfig>(this);
+    }
     if (p_quantizers.is_empty()) {
         fault::raise(
             nullptr,
@@ -291,6 +368,14 @@ Ref<NetwMemberConfig> NetwMemberConfig::quantize(const Array &p_quantizers) {
         )) {
         return Ref<NetwMemberConfig>(this);
     }
+    if (!quantizers_fit_types(
+            p_quantizers,
+            types,
+            context_name,
+            get_context_script()
+        )) {
+        return Ref<NetwMemberConfig>(this);
+    }
     if (!quantizers.is_empty()
         && !same_quantizer_layout(quantizers, p_quantizers)) {
         fault::raise(
@@ -300,11 +385,13 @@ Ref<NetwMemberConfig> NetwMemberConfig::quantize(const Array &p_quantizers) {
         );
     }
     quantizers = p_quantizers;
-    quantizers_fit_types(quantizers, types, context_name, get_context_script());
     return Ref<NetwMemberConfig>(this);
 }
 
 void NetwMemberConfig::set_interpolators(const Array &p_interpolators) {
+    if (refused) {
+        return;
+    }
     interpolators = p_interpolators;
     netw::script::model::advance_interpolation_epoch();
 }
@@ -312,6 +399,9 @@ void NetwMemberConfig::set_interpolators(const Array &p_interpolators) {
 Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
     const Array &p_interpolators
 ) {
+    if (refused || spawn_never_reads("interpolate")) {
+        return Ref<NetwMemberConfig>(this);
+    }
     if (p_interpolators.is_empty()) {
         fault::raise(
             nullptr,
@@ -322,7 +412,7 @@ Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
         );
         return Ref<NetwMemberConfig>(this);
     }
-    if (context_type == 1 && gd::indexed_path(context_name) != nullptr) {
+    if (inside_resource) {
         fault::raise(
             nullptr,
             NETW_FAULT_UNSUPPORTED,
@@ -352,6 +442,14 @@ Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
         )) {
         return Ref<NetwMemberConfig>(this);
     }
+    if (!interpolators_fit_types(
+            p_interpolators,
+            types,
+            context_name,
+            get_context_script()
+        )) {
+        return Ref<NetwMemberConfig>(this);
+    }
     if (!interpolators.is_empty()) {
         fault::raise(
             nullptr,
@@ -361,12 +459,6 @@ Ref<NetwMemberConfig> NetwMemberConfig::interpolate(
     }
     interpolators = p_interpolators;
     netw::script::model::advance_interpolation_epoch();
-    interpolators_fit_types(
-        interpolators,
-        types,
-        context_name,
-        get_context_script()
-    );
     return Ref<NetwMemberConfig>(this);
 }
 

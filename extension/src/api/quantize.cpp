@@ -182,6 +182,24 @@ bool NetwQuantize::is_same_layout(const Ref<NetwQuantize> &other) const {
     return true;
 }
 
+uint64_t NetwQuantize::layout_hash() const {
+    uint64_t hash = uint64_t(get_class().hash());
+    const Variant script = get_script();
+    hash = (hash ^ uint64_t(script.hash())) * 1099511628211ULL;
+    const Array properties = gd::property_list(this);
+    for (int index = 0; index < properties.size(); ++index) {
+        const Dictionary property = properties[index];
+        if (!carries_layout(property)) {
+            continue;
+        }
+        const StringName property_name = property.get("name", StringName());
+        hash = (hash ^ uint64_t(property_name.hash())) * 1099511628211ULL;
+        hash = (hash ^ uint64_t(get(property_name).hash()))
+            * 1099511628211ULL;
+    }
+    return hash;
+}
+
 void NetwQuantizeScalar::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("set_bit_count", "value"),

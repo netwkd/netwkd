@@ -4,7 +4,7 @@
 		Replication and persistence settings for a property.
 	</brief_description>
 	<description>
-		[method state], [method input] and [method broadcast] send changed values each tick. Other properties are sent through [method Netw.sync_property].
+		[method state], [method input] and [method broadcast] send changed values each tick. Other properties are sent through [method Netw.sync_property]. A value that arrives replaces what the receiving peer wrote to the property, and a debug build warns once when that happens to a blend parameter of an [AnimationTree].
 		[codeblock]
 		func _init() -&gt; void:
 		    Netw.configure_property(self, &amp;"position").state().quantize(position_q)
@@ -29,7 +29,7 @@
 			<return type="NetwPropertyConfig" />
 			<param index="0" name="server_only" type="bool" default="true" />
 			<description>
-				Sends the [method state] properties of this kind to the server only. Sets [member set_audience]. With [param server_only] [code]false[/code] it changes nothing, because state properties reach every peer unless one of them calls [method audience] and [method input] properties always reach only the server. A [method broadcast] property ignores [method audience] with a warning.
+				Sends the [method state] properties of this kind to the server only. Sets [member set_audience]. With [param server_only] [code]false[/code] it changes nothing, because state properties reach every peer unless one of them calls [method audience] and [method input] properties always reach only the server.
 			</description>
 		</method>
 		<method name="broadcast">
@@ -74,7 +74,6 @@
 				[codeblock]
 				Netw.configure_property(self, &amp;"position").state().extrapolate(&amp;"velocity")
 				[/codeblock]
-				[param rate_property] must be another [method state] property of the same node.
 			</description>
 		</method>
 		<method name="heartbeat">
@@ -100,7 +99,7 @@
 				        move_dir = Input.get_vector("left", "right", "up", "down")
 				    velocity = move_dir * SPEED
 				[/codeblock]
-				Each send also includes the last two ticks of input, so the next packet makes up for a lost one. [method windowed] changes how many. Correction settings such as [method extrapolate] are ignored on an input.
+				Each send also includes the last two ticks of input, so the next packet makes up for a lost one. [method windowed] changes how many.
 			</description>
 		</method>
 		<method name="on_spawn">
@@ -132,7 +131,7 @@
 		<method name="retained">
 			<return type="NetwPropertyConfig" />
 			<description>
-				Sends changes reliably. Use it for a value that changes rarely and must not be missed. It cannot be used on the state of a predicted [NetwEntity].
+				Sends changes reliably. Use it for a value that changes rarely and must not be missed.
 				[codeblock]
 				Netw.configure_property(self, &amp;"stunned").state().retained()
 				[/codeblock]
@@ -185,7 +184,7 @@
 		<method name="volatile">
 			<return type="NetwPropertyConfig" />
 			<description>
-				Enabled by default.
+				Sends changes unreliably, so only the newest value counts. A property is sent this way until [method retained] is called.
 			</description>
 		</method>
 		<method name="windowed">

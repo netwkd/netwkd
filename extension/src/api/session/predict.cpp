@@ -1801,7 +1801,12 @@ void NetwMultiplayer::predict_write_input(
     const Callable &p_callback
 ) {
     NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
+    if (record == nullptr
+        || refuses_dead_callable(
+            p_wrapper,
+            p_callback,
+            "{NetwPrediction.predict_input}"
+        )) {
         return;
     }
     game_call_declared(p_callback, game_calls::PREDICT_INPUT_CALL);

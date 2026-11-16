@@ -539,8 +539,8 @@ public class NetwMemberConfig : NetwRefCounted
         NetwApi.MethodBind("NetwMemberConfig", "call_local", 3574862355UL);
 
     /// <summary>
-    /// Enabled by default for <see cref="Netw.ConfigureSignal"/>. Invalid for
-    /// properties.
+    /// The sending peer runs the call too. Enabled by default for
+    /// <see cref="Netw.ConfigureSignal"/>.
     /// </summary>
     public NetwMemberConfig CallLocal()
     {
@@ -553,8 +553,8 @@ public class NetwMemberConfig : NetwRefCounted
         NetwApi.MethodBind("NetwMemberConfig", "call_remote", 3574862355UL);
 
     /// <summary>
-    /// Enabled by default for <see cref="Netw.ConfigureRpc"/>. Invalid for
-    /// properties.
+    /// Only the other peers run the call. Enabled by default for
+    /// <see cref="Netw.ConfigureRpc"/>.
     /// </summary>
     public NetwMemberConfig CallRemote()
     {
@@ -590,8 +590,7 @@ public class NetwMemberConfig : NetwRefCounted
     /// <summary>
     /// A request to this method waits <paramref name="seconds"/> for the reply,
     /// then fails with <c>@GlobalScope.ERR_TIMEOUT</c>. A method that declares
-    /// none waits 5 seconds. Invalid for properties, signals and spawn
-    /// functions.
+    /// none waits 5 seconds.
     /// </summary>
     public NetwMemberConfig Timeout(double seconds)
     {

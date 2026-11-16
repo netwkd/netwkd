@@ -12,7 +12,10 @@ namespace Networked;
 /// <see cref="NetwPropertyConfig.State"/>,
 /// <see cref="NetwPropertyConfig.Input"/> and
 /// <see cref="NetwPropertyConfig.Broadcast"/> send changed values each tick.
-/// Other properties are sent through <see cref="Netw.SyncProperty"/>.
+/// Other properties are sent through <see cref="Netw.SyncProperty"/>. A value
+/// that arrives replaces what the receiving peer wrote to the property, and a
+/// debug build warns once when that happens to a blend parameter of an
+/// <see cref="AnimationTree"/>.
 /// <code>
 /// func _init() -&gt; void:
 ///     Netw.configure_property(self, &amp;"position").state().quantize(position_q)
@@ -455,8 +458,7 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     /// <para>
     /// Each send also includes the last two ticks of input, so the next packet
     /// makes up for a lost one. <see cref="NetwPropertyConfig.Windowed"/>
-    /// changes how many. Correction settings such as
-    /// <see cref="NetwPropertyConfig.Extrapolate"/> are ignored on an input.
+    /// changes how many.
     /// </para>
     /// </summary>
     public NetwPropertyConfig Input()
@@ -495,7 +497,8 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
         NetwApi.MethodBind("NetwPropertyConfig", "volatile", 1162647290UL);
 
     /// <summary>
-    /// Enabled by default.
+    /// Sends changes unreliably, so only the newest value counts. A property is
+    /// sent this way until <see cref="NetwPropertyConfig.Retained"/> is called.
     /// </summary>
     public NetwPropertyConfig Volatile()
     {
@@ -509,8 +512,7 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
 
     /// <summary>
     /// Sends changes reliably. Use it for a value that changes rarely and must
-    /// not be missed. It cannot be used on the state of a predicted
-    /// <see cref="NetwEntity"/>.
+    /// not be missed.
     /// <code>
     /// Netw.configure_property(self, &amp;"stunned").state().retained()
     /// </code>
@@ -575,10 +577,6 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     /// <code>
     /// Netw.configure_property(self, &amp;"position").state().extrapolate(&amp;"velocity")
     /// </code>
-    /// <para>
-    /// <paramref name="rateProperty"/> must be another
-    /// <see cref="NetwPropertyConfig.State"/> property of the same node.
-    /// </para>
     /// </summary>
     public NetwPropertyConfig Extrapolate(StringName rateProperty)
     {
@@ -730,8 +728,7 @@ public sealed class NetwPropertyConfig : NetwMemberConfig
     /// because state properties reach every peer unless one of them calls
     /// <see cref="NetwPropertyConfig.Audience"/> and
     /// <see cref="NetwPropertyConfig.Input"/> properties always reach only the
-    /// server. A <see cref="NetwPropertyConfig.Broadcast"/> property ignores
-    /// <see cref="NetwPropertyConfig.Audience"/> with a warning.
+    /// server.
     /// </summary>
     public NetwPropertyConfig Audience(bool serverOnly = true)
     {

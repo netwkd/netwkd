@@ -31,13 +31,13 @@
 		<method name="call_local">
 			<return type="NetwMemberConfig" />
 			<description>
-				Enabled by default for [method Netw.configure_signal]. Invalid for properties.
+				The sending peer runs the call too. Enabled by default for [method Netw.configure_signal].
 			</description>
 		</method>
 		<method name="call_remote">
 			<return type="NetwMemberConfig" />
 			<description>
-				Enabled by default for [method Netw.configure_rpc]. Invalid for properties.
+				Only the other peers run the call. Enabled by default for [method Netw.configure_rpc].
 			</description>
 		</method>
 		<method name="controller">
@@ -107,7 +107,7 @@
 			<return type="NetwMemberConfig" />
 			<param index="0" name="seconds" type="float" />
 			<description>
-				A request to this method waits [param seconds] for the reply, then fails with [constant @GlobalScope.ERR_TIMEOUT]. A method that declares none waits 5 seconds. Invalid for properties, signals and spawn functions.
+				A request to this method waits [param seconds] for the reply, then fails with [constant @GlobalScope.ERR_TIMEOUT]. A method that declares none waits 5 seconds.
 			</description>
 		</method>
 		<method name="unreliable">

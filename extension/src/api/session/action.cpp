@@ -7,6 +7,7 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_slot_engine.hpp"
+#include "netw/api/refusal.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/colors.hpp"
 #include "netw/decl_sites.hpp"
@@ -196,7 +197,7 @@ Ref<NetwActionConfig> NetwMultiplayer::lagcomp_action_declare(
              String("the entity's root node, a method name and a handler")},
             p_root != nullptr ? uint64_t(gd::instance_id(p_root)) : 0
         );
-        return Ref<NetwActionConfig>();
+        return refused<NetwActionConfig>();
     }
     game_call_declared(p_handler, game_calls::ACTION_AUTHORITY);
     decl_sites::record_handler(p_handler);
@@ -204,7 +205,7 @@ Ref<NetwActionConfig> NetwMultiplayer::lagcomp_action_declare(
     config.instantiate();
     config->set_authority(p_handler);
     if (session_decl::declare_action(p_root, p_method, config) != OK) {
-        return Ref<NetwActionConfig>();
+        return refused<NetwActionConfig>();
     }
     return config;
 }
@@ -495,11 +496,18 @@ void NetwMultiplayer::submit_action(
         }
     }
 
-    const Ref<NetwActionConfig> declared = action_declared_on(
-        node_from_tree_path(request.target_path),
-        p_method
-    );
+    Node *target = node_from_tree_path(request.target_path);
+    const Ref<NetwActionConfig> declared
+        = action_declared_on(target, p_method);
     if (declared.is_null()) {
+        if (target != nullptr) {
+            fault::raise(
+                this,
+                NETW_FAULT_ACTION_NOT_DECLARED,
+                {String(p_method), String(target->get_name())},
+                uint64_t(gd::instance_id(target))
+            );
+        }
         NETW_TRACE(
             sys::PREDICTION,
             "Action %s names a method this session cannot reach.",

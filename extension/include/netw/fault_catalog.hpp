@@ -68,6 +68,19 @@ typedef enum netw_threshold_shared {
     NETW_SHARED_CORRECTION = 1,
 } netw_threshold_shared;
 
+typedef enum netw_unknown_name {
+    NETW_UNKNOWN_UNDECLARED = 0,
+    NETW_UNKNOWN_CHILD_NODE = 1,
+    NETW_UNKNOWN_NO_SCRIPT = 2,
+    NETW_UNKNOWN_ENGINE_MEMBER = 3,
+    NETW_UNKNOWN_ENGINE_METHOD = 4,
+} netw_unknown_name;
+
+typedef enum netw_entity_moved {
+    NETW_MOVED_NODE = 0,
+    NETW_MOVED_DECLARATION = 1,
+} netw_entity_moved;
+
 #define YES_FORWARD 1
 #define NO_FORWARD 0
 
@@ -113,6 +126,9 @@ typedef enum netw_threshold_shared {
     X(ENTITY_MOVED, 41, MISUSE, GAME, ENTITY, CALL, NO) \
     X(PERSIST_UNDECLARED, 42, MISUSE, GAME, ENTITY, KIND, NO) \
     X(SETTING_REFUSED, 43, MISUSE, GAME, ENTITY, KIND, NO) \
+    X(REQUEST_AS_VALUE, 44, MISUSE, GAME, NONE, CALL, NO) \
+    X(PLAYER_SPAWN_FAILED, 45, REMOTE, GAME, PEER, NONE, NO) \
+    X(LOCAL_WRITE_REPLACED, 46, PRACTICE, GAME, ENTITY, COLUMN, NO) \
     X(LINK_FAILED, 1000, ENVIRONMENT, GAME, PEER, NONE, NO) \
     X(STORAGE_FAILED, 1001, ENVIRONMENT, GAME, NONE, NONE, NO) \
     X(HANDLER_UNCALLABLE, 1002, MISUSE, GAME, NONE, HANDLER, NO) \

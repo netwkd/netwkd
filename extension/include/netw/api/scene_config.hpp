@@ -16,6 +16,7 @@ class NetwSceneConfig : public godot::RefCounted {
 private:
     godot::ObjectID script_id;
     godot::ObjectID node_id;
+    bool refused = false;
 
     SceneDecl held() const;
     void write(const SceneDecl &p_decl);
@@ -24,6 +25,13 @@ protected:
     static void _bind_methods();
 
 public:
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
     void declare_against(
         godot::Node *p_node,
         const godot::Ref<godot::Script> &p_script

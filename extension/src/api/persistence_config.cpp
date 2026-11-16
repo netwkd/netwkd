@@ -2,6 +2,7 @@
 
 #include "godot/class_db.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 
 using namespace godot;
 
@@ -10,6 +11,9 @@ namespace netw {
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::database(
     const StringName &p_name
 ) {
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
     database_name = p_name;
     return Ref<NetwPersistenceConfig>(this);
 }
@@ -17,6 +21,9 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::database(
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::table(
     const StringName &p_name
 ) {
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
     table_name = p_name;
     return Ref<NetwPersistenceConfig>(this);
 }
@@ -24,6 +31,9 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::table(
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::storage_version(
     int p_version
 ) {
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
     if (p_version < 1) {
         fault::raise(
             nullptr,
@@ -43,6 +53,9 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::migrate(
     int p_from_version,
     const Callable &p_step
 ) {
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
     if (p_from_version < 1) {
         fault::raise(
             nullptr,
@@ -54,7 +67,7 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::migrate(
         );
         return Ref<NetwPersistenceConfig>(this);
     }
-    if (p_step.is_null()) {
+    if (!p_step.is_valid()) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_CALLABLE,
@@ -72,11 +85,31 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::migrate(
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::record_id(
     const Callable &p_provider
 ) {
-    id_provider = p_provider;
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
+    if (game_call_declared(p_provider, game_calls::RECORD_ID)
+        || p_provider.is_valid()) {
+        id_provider = p_provider;
+    }
     return Ref<NetwPersistenceConfig>(this);
 }
 
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::interval(double p_seconds) {
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
+    if (!(p_seconds >= 0.0)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwPersistenceConfig.interval}"),
+             vformat("%s seconds", String::num(p_seconds)),
+             String("a number of seconds from zero")},
+            uint64_t(get_instance_id())
+        );
+        return Ref<NetwPersistenceConfig>(this);
+    }
     save_interval = p_seconds;
     return Ref<NetwPersistenceConfig>(this);
 }
@@ -84,6 +117,9 @@ Ref<NetwPersistenceConfig> NetwPersistenceConfig::interval(double p_seconds) {
 Ref<NetwPersistenceConfig> NetwPersistenceConfig::load_on_spawn(
     bool p_enabled
 ) {
+    if (refused) {
+        return Ref<NetwPersistenceConfig>(this);
+    }
     load_at_spawn = p_enabled;
     return Ref<NetwPersistenceConfig>(this);
 }

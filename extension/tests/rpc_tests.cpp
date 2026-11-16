@@ -15,11 +15,15 @@
 #include "godot/variant.hpp"
 #include "netw/api/channel.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/despawn_config.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/group_promise.hpp"
+#include "netw/api/interpolate.hpp"
 #include "netw/api/member_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/persistence_config.hpp"
 #include "netw/api/promise.hpp"
+#include "netw/api/scene_config.hpp"
 
 namespace TestRpc {
 
@@ -155,7 +159,8 @@ constexpr const char *LAMBDA_SINK = R"(extends Node
 var declared := true
 
 func _init() -> void:
-	declared = Netw.configure_rpc(func(): pass) != null
+	var config := Netw.configure_rpc(func(): pass)
+	declared = config.unreliable().is_transfer_declared()
 )";
 
 constexpr const char *CALL_SINK = R"(extends Node
@@ -520,6 +525,50 @@ LawVerdict timeout_misused(const World &) {
     return law_held();
 }
 
+LawVerdict unread_settings_refused(const World &) {
+    FaultWatch faults;
+    faults.expect_error("*controller cannot*'everyone'*[NW0043]*", 1);
+    faults.expect_error("*unreliable cannot*'everyone'*[NW0043]*", 1);
+    faults.expect_error("*call_local cannot*'everyone'*[NW0043]*", 1);
+    faults.expect_error("*interpolate cannot*'everyone'*[NW0043]*", 1);
+    faults.expect_error("*defer_until cannot*'everyone'*[NW0043]*", 1);
+    faults.expect_error("*defer_until cannot*'changed'*[NW0043]*", 1);
+    faults.expect_error("*defer_until got*'changed'*'hasty'*[NW0032]*", 1);
+    Node *sink = sink_of(DEADLINE_SINK);
+    Node *other = sink_of(SIGNAL_SINK);
+    Ref<netw::NetwInterpolate> lerp;
+    lerp.instantiate();
+    const Ref<netw::NetwMemberConfig> spawn
+        = Netw::configure_spawn(Callable(sink, StringName("everyone")))
+              ->controller()
+              ->unreliable()
+              ->call_local()
+              ->interpolate(netw::gd::array_of(lerp))
+              ->defer_until(Signal(sink, StringName("ready")));
+    const Ref<netw::NetwMemberConfig> signal
+        = Netw::configure_signal(Signal(other, StringName("changed")))
+              ->defer_until(Signal(other, StringName("ready")));
+    const Ref<netw::NetwMemberConfig> rpc
+        = Netw::configure_rpc(Callable(sink, StringName("hasty")))
+              ->defer_until(Signal(other, StringName("changed")));
+    const Ref<netw::NetwMemberConfig> waits
+        = Netw::configure_rpc(Callable(sink, StringName("patient")))
+              ->defer_until(Signal(sink, StringName("ready")));
+    const bool kept = spawn->is_policy_declared()
+        || spawn->is_transfer_declared() || spawn->get_is_call_local()
+        || !spawn->get_interpolators().is_empty()
+        || spawn->get_defer_signal_name() != StringName()
+        || signal->get_defer_signal_name() != StringName()
+        || rpc->get_defer_signal_name() != StringName();
+    const bool waiting = waits->get_defer_signal_name() == StringName("ready");
+    memdelete(other);
+    memdelete(sink);
+    if (kept || !waiting) {
+        return law_broken("kept %d, a fitting signal %d", kept, waiting);
+    }
+    return law_held();
+}
+
 LawVerdict request_all_asks_caller(const World &) {
     const char *methods[2] = {"everyone", "others"};
     for (int at = 0; at < 2; ++at) {
@@ -595,11 +644,18 @@ LawVerdict unsteered_controller(const World &) {
     return law_held();
 }
 
+bool refused_and_inert(const Ref<netw::NetwMemberConfig> &p_config) {
+    return p_config.is_valid() && p_config->is_refused()
+        && !p_config->unreliable()->is_transfer_declared();
+}
+
 LawVerdict bad_declaration(const World &) {
     Node *sink = sink_of(SIGNAL_SINK);
     {
         const FaultWatch faults;
-        if (Netw::configure_rpc(Callable(sink, StringName("nope"))).is_valid()
+        if (!refused_and_inert(
+                Netw::configure_rpc(Callable(sink, StringName("nope")))
+            )
             || faults.errors_containing("'nope'") != 1) {
             memdelete(sink);
             return law_broken("a missing method was declared or not reported");
@@ -617,7 +673,9 @@ LawVerdict bad_declaration(const World &) {
     }
     {
         const FaultWatch faults;
-        if (Netw::configure_spawn(Callable(sink, StringName("nope"))).is_valid()
+        if (!refused_and_inert(
+                Netw::configure_spawn(Callable(sink, StringName("nope")))
+            )
             || faults.errors() != 1) {
             memdelete(sink);
             return law_broken("a missing spawn function was declared");
@@ -625,10 +683,45 @@ LawVerdict bad_declaration(const World &) {
     }
     {
         const FaultWatch faults;
-        if (Netw::configure_signal(Signal(sink, StringName("nope"))).is_valid()
+        if (!refused_and_inert(
+                Netw::configure_signal(Signal(sink, StringName("nope")))
+            )
             || faults.errors_containing("'nope'") != 1) {
             memdelete(sink);
             return law_broken("a missing signal was declared or not reported");
+        }
+    }
+    {
+        const FaultWatch faults;
+        if (!refused_and_inert(
+                Netw::configure_rpc(Callable(sink, StringName("queue_free")))
+            )
+            || faults.errors_containing("'queue_free'") != 1) {
+            memdelete(sink);
+            return law_broken("an engine method was declared or not reported");
+        }
+    }
+    {
+        const FaultWatch faults;
+        const Callable missing(sink, StringName("nope"));
+        const Ref<NetwEntity> entity = Netw::configure_entity(sink);
+        entity->set_control_handler(missing);
+        const bool kept = !entity->get_control_handler().is_null()
+            || Netw::configure_despawn(sink)
+                    ->before_removal(missing)
+                    ->get_hook_method()
+                != StringName()
+            || !Netw::configure_persistence(sink)
+                    ->record_id(missing)
+                    ->get_id_provider()
+                    .is_null();
+        if (kept || faults.errors_containing("[NW1005]") != 3) {
+            memdelete(sink);
+            return law_broken(
+                "a handler the node lacks was kept %d with %d errors",
+                int(kept),
+                int(faults.errors_containing("[NW1005]"))
+            );
         }
     }
     memdelete(sink);
@@ -637,18 +730,27 @@ LawVerdict bad_declaration(const World &) {
 
 LawVerdict mounted_declaration(const World &) {
     const Ref<Script> script = netw_test::minted_script(
-        "extends Node\nfunc hit() -> void:\n\tpass\n"
+        "extends Node\nsignal landed\nfunc hit() -> void:\n\tpass\n"
     );
     Node *node = Object::cast_to<Node>(script->call("new"));
     node->set_name("LateRpc");
     netw::gd::scene_root()->add_child(node);
     FaultWatch faults;
-    faults.expect_error("*'LateRpc'*[NW0036]*", 1);
-    const bool declared = Netw::configure_rpc(Callable(node, "hit")).is_valid();
+    faults.expect_error("*configure_rpc*'LateRpc'*[NW0036]*", 1);
+    faults.expect_error("*configure_signal*'LateRpc'*[NW0036]*", 1);
+    faults.expect_error("*configure_despawn*'LateRpc'*[NW0036]*", 1);
+    faults.expect_error("*configure_scene*'LateRpc'*[NW0036]*", 1);
+    faults.expect_error("*configure_persistence*'LateRpc'*[NW0036]*", 1);
+    const bool declared
+        = !refused_and_inert(Netw::configure_rpc(Callable(node, "hit")))
+        || !refused_and_inert(Netw::configure_signal(Signal(node, "landed")))
+        || !Netw::configure_despawn(node)->is_refused()
+        || !Netw::configure_scene(node)->is_refused()
+        || !Netw::configure_persistence(node)->is_refused();
     node->get_parent()->remove_child(node);
     memdelete(node);
     if (declared) {
-        return law_broken("a mounted node declared an RPC");
+        return law_broken("a mounted node declared something");
     }
     return law_held();
 }
@@ -720,6 +822,11 @@ const Row ROWS[] = {
     {"timeout on a property, on a spawn function, and below zero",
      "the first two warn that it does nothing and the third is refused",
      &timeout_misused},
+    {"a policy, a transfer mode, call_local, interpolate and defer_until on "
+     "a spawn function, defer_until on a signal, and defer_until naming "
+     "another node's signal",
+     "each is refused with one error and nothing of it is kept",
+     &unread_settings_refused},
     {"request_all of a call_local method and of a call_remote one",
      "the caller answers too only for call_local, under peer 1",
      &request_all_asks_caller},
@@ -727,11 +834,13 @@ const Row ROWS[] = {
      "they reach the server from a client and run at once on the server",
      &unsteered_controller},
     {"configure_rpc, configure_spawn and configure_signal naming nothing, "
-     "and configure_rpc on a lambda",
+     "configure_rpc on a lambda and on an engine method, and a handler "
+     "naming a method the node lacks",
      "each reports one error and declares nothing",
      &bad_declaration},
-    {"configure_rpc on a node already in the tree",
-     "it is reported and declares nothing",
+    {"configure_rpc, configure_signal, configure_despawn, configure_scene "
+     "and configure_persistence on a node already in the tree",
+     "each is reported and declares nothing",
      &mounted_declaration},
 };
 

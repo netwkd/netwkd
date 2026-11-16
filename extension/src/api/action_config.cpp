@@ -33,29 +33,50 @@ void NetwActionConfig::_bind_methods() {
 }
 
 Ref<NetwActionConfig> NetwActionConfig::predict(const Callable &p_handler) {
-    game_call_declared(p_handler, game_calls::ACTION_PREDICT);
-    predict_handler = p_handler;
+    if (refused) {
+        return Ref<NetwActionConfig>(this);
+    }
+    if (game_call_declared(p_handler, game_calls::ACTION_PREDICT)
+        || p_handler.is_valid()) {
+        predict_handler = p_handler;
+    }
     return Ref<NetwActionConfig>(this);
 }
 
 Ref<NetwActionConfig> NetwActionConfig::confirm(const Callable &p_handler) {
-    game_call_declared(p_handler, game_calls::ACTION_CONFIRM);
-    confirm_handler = p_handler;
+    if (refused) {
+        return Ref<NetwActionConfig>(this);
+    }
+    if (game_call_declared(p_handler, game_calls::ACTION_CONFIRM)
+        || p_handler.is_valid()) {
+        confirm_handler = p_handler;
+    }
     return Ref<NetwActionConfig>(this);
 }
 
 Ref<NetwActionConfig> NetwActionConfig::revert(const Callable &p_handler) {
-    game_call_declared(p_handler, game_calls::ACTION_REVERT);
-    revert_handler = p_handler;
+    if (refused) {
+        return Ref<NetwActionConfig>(this);
+    }
+    if (game_call_declared(p_handler, game_calls::ACTION_REVERT)
+        || p_handler.is_valid()) {
+        revert_handler = p_handler;
+    }
     return Ref<NetwActionConfig>(this);
 }
 
 Ref<NetwActionConfig> NetwActionConfig::timing(Timing p_mode) {
+    if (refused) {
+        return Ref<NetwActionConfig>(this);
+    }
     timing_mode = p_mode;
     return Ref<NetwActionConfig>(this);
 }
 
 Ref<NetwActionConfig> NetwActionConfig::timeout_ticks(int64_t p_ticks) {
+    if (refused) {
+        return Ref<NetwActionConfig>(this);
+    }
     timeout = p_ticks;
     return Ref<NetwActionConfig>(this);
 }

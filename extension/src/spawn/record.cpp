@@ -4,6 +4,7 @@
 #include "godot/utility.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/object_port.hpp"
 
 using namespace godot;
 
@@ -153,6 +154,7 @@ void Record::apply_native_entry(
     if (target == nullptr) {
         return;
     }
+    port_count_write(target);
     gd::set_indexed(
         target,
         NodePath(":" + path.get_concatenated_subnames()),

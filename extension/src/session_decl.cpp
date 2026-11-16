@@ -258,6 +258,20 @@ Error declare(
         return ERR_INVALID_PARAMETER;
     }
     const KindRow &keys = row_of(p_kind);
+    if (form_of(p_kind) == FORM_CALLABLE && !p_callable.is_null()
+        && p_scope->has_meta(StringName(keys.callable_meta))) {
+        const Callable standing
+            = p_scope->get_meta(StringName(keys.callable_meta));
+        if (standing != p_callable) {
+            fault::raise(
+                nullptr,
+                NETW_FAULT_DECLARED_TWICE,
+                {vformat("{Netw.%s}", p_verb), String(p_scope->get_name())},
+                uint64_t(gd::instance_id(p_scope))
+            );
+            return ERR_ALREADY_EXISTS;
+        }
+    }
     const uint64_t generation = ++next_generation();
     if (!eligible(p_kind, p_callable, p_payload)) {
         p_scope->remove_meta(StringName(keys.callable_meta));
@@ -513,8 +527,28 @@ bool Book::report_unresolved(
         );
         return true;
     }
+    bool in_another_session = false;
     for (const Slot &slot : held) {
         append_sorted(scopes, scope_label(slot.scope));
+        Node *scope = node_of(slot.scope);
+        NetwMultiplayer *holder = scope != nullptr && scope->is_inside_tree()
+            ? NetwMultiplayer::session_holding(scope)
+            : nullptr;
+        in_another_session |= holder != nullptr && holder != p_api;
+    }
+    if (in_another_session) {
+        fault::raise(
+            p_api,
+            NETW_FAULT_ENTITY_MOVED,
+            {joined(scopes),
+             vformat("{Netw.%s}", verb),
+             String(),
+             0,
+             0,
+             NETW_MOVED_DECLARATION},
+            held.is_empty() ? 0 : uint64_t(held[0].scope)
+        );
+        return true;
     }
     fault::raise(
         p_api,

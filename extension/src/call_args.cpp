@@ -342,22 +342,18 @@ bool values_write(
     const Array &p_types,
     NetwMultiplayer *p_session
 ) {
-    static bool unsessioned_reported = false;
     LocalVector<Slot> slots;
     slots.reserve(uint32_t(p_values.size()));
     for (int at = 0; at < p_values.size(); ++at) {
         const Variant value = p_values[at];
         if (value.get_type() == Variant::OBJECT) {
-            if (p_session != nullptr
-                || !std::exchange(unsessioned_reported, true)) {
-                fault::raise(
-                    p_session,
-                    NETW_FAULT_UNSENDABLE_VALUE,
-                    {vformat("Value %d", at),
-                     String("an Object"),
-                     String("the object's data or its node path")}
-                );
-            }
+            fault::raise(
+                p_session,
+                NETW_FAULT_UNSENDABLE_VALUE,
+                {vformat("Value %d", at),
+                 String("an Object"),
+                 String("the object's data or its node path")}
+            );
             slots.push_back(of_value(Variant()));
             continue;
         }

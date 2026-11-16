@@ -12,6 +12,7 @@ struct Guard {
     const char *verb = "";
     bool sealed = false;
     bool late_reported = false;
+    bool refused = false;
     godot::String scope;
 
     void seal(const godot::String &p_scope);

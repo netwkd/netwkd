@@ -119,6 +119,7 @@ func _reset_global_test_state() -> void:
 		LocalLoopbackSession.set_shared_session(null)
 
 	_call_native_tests(&"tracker_book_clear")
+	_call_native_tests(&"fault_book_clear")
 
 
 func _call_native_tests(method: StringName) -> void:

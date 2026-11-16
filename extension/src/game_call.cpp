@@ -199,6 +199,18 @@ bool game_call_accepts(const Callable &p_fn, int64_t p_count) {
 }
 
 bool game_call_declared(const Callable &p_fn, const GameCall &p_site) {
+    if (!p_fn.is_null() && !p_fn.is_valid()) {
+        if (first_report(p_fn, p_site)) {
+            fault::raise(
+                nullptr,
+                NETW_FAULT_BAD_CALLABLE,
+                {String(p_site.what),
+                 String(),
+                 String("a method its object has")}
+            );
+        }
+        return false;
+    }
     if (declaration_fits(p_fn, p_site)) {
         return true;
     }

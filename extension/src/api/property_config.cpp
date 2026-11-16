@@ -12,6 +12,41 @@ namespace netw {
 
 using repl::PropertySet;
 
+namespace {
+
+enum Kind {
+    KIND_STATE,
+    KIND_INPUT,
+    KIND_BROADCAST,
+};
+
+enum StateSetting {
+    SETTING_UNCHECKED,
+    SETTING_CORRECTION_WEIGHT,
+    SETTING_EXTRAPOLATE,
+    SETTING_TELEPORT_ONLY,
+    SETTING_CORRECTION_THRESHOLD,
+    SETTING_TELEPORT_THRESHOLD,
+    STATE_SETTING_COUNT,
+};
+
+constexpr const char *KINDS[] = {"state", "input", "broadcast"};
+constexpr const char *STATE_SETTINGS[] = {
+    "unchecked",
+    "correction_weight",
+    "extrapolate",
+    "teleport_only",
+    "correction_threshold",
+    "teleport_threshold",
+};
+constexpr const char *ON_STATE
+    = "it on a property declared with {NetwPropertyConfig.state}";
+constexpr const char *ON_STATE_OR_INPUT
+    = "it on a property declared with {NetwPropertyConfig.state} or "
+      "{NetwPropertyConfig.input}";
+
+} // namespace
+
 void NetwPropertyConfig::warn_double_set(
     bool p_replaces,
     const char *p_axis
@@ -26,72 +61,213 @@ void NetwPropertyConfig::warn_double_set(
     );
 }
 
+void NetwPropertyConfig::refuse_setting(
+    const char *p_setting,
+    const char *p_kind,
+    const char *p_fits
+) const {
+    fault::raise(
+        nullptr,
+        NETW_FAULT_SETTING_REFUSED,
+        {vformat("{NetwPropertyConfig.%s}", String(p_setting)),
+         vformat(
+             "{NetwPropertyConfig.%s} on '%s'",
+             String(p_kind),
+             String(get_context_name())
+         ),
+         String(p_fits)}
+    );
+}
+
+bool NetwPropertyConfig::takes_kind(int p_kind) {
+    if (is_refused()) {
+        return false;
+    }
+    const int held = in_state_set ? KIND_STATE
+        : in_input_set            ? KIND_INPUT
+        : in_broadcast_set        ? KIND_BROADCAST
+                                  : p_kind;
+    if (held == p_kind) {
+        return true;
+    }
+    fault::raise(
+        nullptr,
+        NETW_FAULT_SETTING_REFUSED,
+        {vformat("'%s'", String(get_context_name())),
+         vformat(
+             "{NetwPropertyConfig.%s} and {NetwPropertyConfig.%s} together",
+             String(KINDS[MIN(held, p_kind)]),
+             String(KINDS[MAX(held, p_kind)])
+         ),
+         String("one of them, and a second property for the other")}
+    );
+    in_state_set = false;
+    in_input_set = false;
+    in_broadcast_set = false;
+    refuse();
+    return false;
+}
+
+void NetwPropertyConfig::drop_settings_unread_by(int p_kind) {
+    for (int setting = 0; setting < STATE_SETTING_COUNT; ++setting) {
+        if ((state_settings & (1u << setting)) != 0) {
+            refuse_setting(STATE_SETTINGS[setting], KINDS[p_kind], ON_STATE);
+        }
+    }
+    if (state_settings != 0) {
+        state_settings = 0;
+        is_unchecked = false;
+        weight = 0.0;
+        rate_property = StringName();
+        explicit_teleport_only = false;
+        correction_threshold_override = -1.0;
+        teleport_threshold_override = -1.0;
+    }
+    if (p_kind != KIND_BROADCAST) {
+        return;
+    }
+    if (set_window != UNSET) {
+        refuse_setting("windowed", KINDS[p_kind], ON_STATE_OR_INPUT);
+        set_window = UNSET;
+    }
+    if (set_audience == PropertySet::AUDIENCE_SERVER_ONLY) {
+        refuse_setting("audience", KINDS[p_kind], ON_STATE);
+        set_audience = PropertySet::AUDIENCE_PUBLIC;
+    }
+}
+
+bool NetwPropertyConfig::takes_state_setting(int p_setting) {
+    if (is_refused()) {
+        return false;
+    }
+    if (in_input_set || in_broadcast_set) {
+        refuse_setting(
+            STATE_SETTINGS[p_setting],
+            KINDS[in_input_set ? KIND_INPUT : KIND_BROADCAST],
+            ON_STATE
+        );
+        return false;
+    }
+    state_settings |= 1u << p_setting;
+    return true;
+}
+
+bool NetwPropertyConfig::takes_amount(
+    const char *p_setting,
+    double p_amount
+) const {
+    if (p_amount >= 0.0) {
+        return true;
+    }
+    fault::raise(
+        nullptr,
+        NETW_FAULT_BAD_VALUE,
+        {vformat("{NetwPropertyConfig.%s}", String(p_setting)),
+         vformat(
+             "%s for '%s'",
+             String::num(p_amount),
+             String(get_context_name())
+         ),
+         String("a number from zero")}
+    );
+    return false;
+}
+
 Ref<NetwPropertyConfig> NetwPropertyConfig::state() {
-    in_state_set = true;
-    lane = PropertySet::VOLATILE;
+    if (takes_kind(KIND_STATE)) {
+        in_state_set = true;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::input() {
-    in_input_set = true;
-    lane = PropertySet::VOLATILE;
-    set_audience = PropertySet::AUDIENCE_SERVER_ONLY;
+    if (takes_kind(KIND_INPUT)) {
+        drop_settings_unread_by(KIND_INPUT);
+        in_input_set = true;
+        set_audience = PropertySet::AUDIENCE_SERVER_ONLY;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::broadcast() {
-    in_broadcast_set = true;
-    lane = PropertySet::VOLATILE;
+    if (takes_kind(KIND_BROADCAST)) {
+        drop_settings_unread_by(KIND_BROADCAST);
+        in_broadcast_set = true;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::volatile_lane() {
+    if (is_refused()) {
+        return Ref<NetwPropertyConfig>(this);
+    }
     lane = PropertySet::VOLATILE;
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::retained() {
+    if (is_refused()) {
+        return Ref<NetwPropertyConfig>(this);
+    }
     lane = PropertySet::RETAINED;
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::unchecked() {
-    is_unchecked = true;
+    if (takes_state_setting(SETTING_UNCHECKED)) {
+        is_unchecked = true;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::correction_weight(double p_weight) {
-    weight = p_weight;
+    if (takes_amount("correction_weight", p_weight)
+        && takes_state_setting(SETTING_CORRECTION_WEIGHT)) {
+        weight = p_weight;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::extrapolate(
     const StringName &p_rate_property
 ) {
-    rate_property = p_rate_property;
+    if (takes_state_setting(SETTING_EXTRAPOLATE)) {
+        rate_property = p_rate_property;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::teleport_only() {
-    explicit_teleport_only = true;
+    if (takes_state_setting(SETTING_TELEPORT_ONLY)) {
+        explicit_teleport_only = true;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::correction_threshold(
     double p_threshold
 ) {
-    correction_threshold_override = p_threshold;
+    if (takes_amount("correction_threshold", p_threshold)
+        && takes_state_setting(SETTING_CORRECTION_THRESHOLD)) {
+        correction_threshold_override = p_threshold;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::teleport_threshold(
     double p_distance
 ) {
-    teleport_threshold_override = p_distance;
+    if (takes_amount("teleport_threshold", p_distance)
+        && takes_state_setting(SETTING_TELEPORT_THRESHOLD)) {
+        teleport_threshold_override = p_distance;
+    }
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::heartbeat(int64_t p_ticks) {
+    if (is_refused() || !takes_amount("heartbeat", double(p_ticks))) {
+        return Ref<NetwPropertyConfig>(this);
+    }
     warn_double_set(
         set_heartbeat_ticks != UNSET && set_heartbeat_ticks != p_ticks,
         "heartbeat"
@@ -101,12 +277,26 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::heartbeat(int64_t p_ticks) {
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::windowed(int64_t p_samples) {
+    if (is_refused() || !takes_amount("windowed", double(p_samples))) {
+        return Ref<NetwPropertyConfig>(this);
+    }
+    if (in_broadcast_set) {
+        refuse_setting("windowed", KINDS[KIND_BROADCAST], ON_STATE_OR_INPUT);
+        return Ref<NetwPropertyConfig>(this);
+    }
     warn_double_set(set_window != UNSET && set_window != p_samples, "window");
     set_window = p_samples;
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::audience(bool p_server_only) {
+    if (is_refused()) {
+        return Ref<NetwPropertyConfig>(this);
+    }
+    if (p_server_only && in_broadcast_set) {
+        refuse_setting("audience", KINDS[KIND_BROADCAST], ON_STATE);
+        return Ref<NetwPropertyConfig>(this);
+    }
     set_audience = p_server_only ? PropertySet::AUDIENCE_SERVER_ONLY
                                  : PropertySet::AUDIENCE_PUBLIC;
     return Ref<NetwPropertyConfig>(this);
@@ -115,12 +305,18 @@ Ref<NetwPropertyConfig> NetwPropertyConfig::audience(bool p_server_only) {
 Ref<NetwPropertyConfig> NetwPropertyConfig::persisted(
     const StringName &p_saved_column_name
 ) {
+    if (is_refused()) {
+        return Ref<NetwPropertyConfig>(this);
+    }
     persist = true;
     saved_column = p_saved_column_name;
     return Ref<NetwPropertyConfig>(this);
 }
 
 Ref<NetwPropertyConfig> NetwPropertyConfig::on_spawn() {
+    if (is_refused()) {
+        return Ref<NetwPropertyConfig>(this);
+    }
     is_spawn_state = true;
     return Ref<NetwPropertyConfig>(this);
 }

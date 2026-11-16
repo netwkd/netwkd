@@ -184,40 +184,33 @@ void SyncPipeline::register_derived(Node *p_node) {
     }
     NETW_ZONE_NC("SyncPipeline register derived", colors::WIRE);
     NETW_ZONE_VALUE(bindings.size());
-    const Ref<Script> script = p_node->get_script();
-    if (script.is_null()) {
-        return;
-    }
     const LocalVector<uint64_t> *registered = node_bindings(p_node);
     if (registered != nullptr && !registered->is_empty()) {
         return;
     }
-    hold_resources(p_node, script);
+    hold_resources(p_node);
     Object *shell = api();
-    const uint64_t state = property_set_builder::from_script(
-        script,
+    const uint64_t state = property_set_builder::from_node(
+        p_node,
         PropertySet::RECORD_STATE,
-        shell,
-        p_node
+        shell
     );
     if (state != repl::SetBook::NONE) {
         register_property_set(p_node, state);
     }
-    const uint64_t input = property_set_builder::from_script(
-        script,
+    const uint64_t input = property_set_builder::from_node(
+        p_node,
         PropertySet::RECORD_INPUT,
-        shell,
-        p_node
+        shell
     );
     if (input != repl::SetBook::NONE) {
         register_property_set(p_node, input);
     }
     queue_prediction_contract_check(p_node, set_of(state), set_of(input));
-    const uint64_t broadcast = property_set_builder::from_script(
-        script,
+    const uint64_t broadcast = property_set_builder::from_node(
+        p_node,
         PropertySet::RECORD_BROADCAST,
-        shell,
-        p_node
+        shell
     );
     if (broadcast != repl::SetBook::NONE) {
         register_property_set(p_node, broadcast);
@@ -478,12 +471,12 @@ void SyncPipeline::unseat_record(
     record->set_record_binding(set->get_record(), 0);
 }
 
-void SyncPipeline::hold_resources(Node *p_node, const Ref<Script> &p_script) {
+void SyncPipeline::hold_resources(Node *p_node) {
     if (gd::indexed_paths().is_empty()) {
         return;
     }
     const Dictionary configs
-        = netw::script::model::get_property_configs(p_script);
+        = netw::script::model::get_declared_property_configs(p_node);
     const Array names = configs.keys();
     const Ref<NetwEntity> entity = NetwEntity::of(p_node);
     Node *named = entity.is_valid() && entity->get_owner() != nullptr
@@ -1190,10 +1183,8 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
         );
         return;
     }
-    const Ref<Script> script = p_node->get_script();
-    const Ref<NetwPropertyConfig> opt = script.is_valid()
-        ? netw::script::model::get_property_config(script, p_property)
-        : Ref<NetwPropertyConfig>();
+    const Ref<NetwPropertyConfig> opt
+        = netw::script::model::get_declared_property_config(p_node, p_property);
     if (opt.is_null()) {
         const int64_t local_id = plane->get_unique_id();
         if (!plane->is_host()
@@ -2036,9 +2027,8 @@ void SyncPipeline::handle_property_sync(
         p_comp_node,
         prop
     )));
-    const Ref<NetwPropertyConfig> opt = script.is_valid()
-        ? netw::script::model::get_property_config(script, prop)
-        : Ref<NetwPropertyConfig>();
+    const Ref<NetwPropertyConfig> opt
+        = netw::script::model::get_declared_property_config(p_comp_node, prop);
     PropertySet declared;
     property_set_builder::from_property_config(declared, prop, opt);
     const PropertySet *set = &declared;
@@ -2064,11 +2054,11 @@ void SyncPipeline::handle_property_sync(
     if (p_sender != SERVER_PEER && opt.is_null()) {
         return;
     }
-    if (!entity::Control::script_admits(
-            p_comp_node,
-            prop,
-            false,
+    if (p_sender != SERVER_PEER
+        && !entity::Control::policy_admits(
+            int(opt->get_write_policy()),
             p_sender,
+            int64_t(p_comp_node->get_multiplayer_authority()),
             p_entity->steering()
         )) {
         writes_refused += 1;

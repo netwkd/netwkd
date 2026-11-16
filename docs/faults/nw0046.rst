@@ -1,0 +1,33 @@
+:github_url: hide
+
+.. _fault_nw0046:
+
+NW0046. A peer changed a value it does not control
+==================================================
+
+Checked in a debug build only, for the ``blend_amount``, ``add_amount``,
+``blend_position`` and ``scale`` parameters of an ``AnimationTree``.
+
+Reported as a warning when a replicated value arrives and this peer had
+changed the property since the last value arrived. The arriving value
+replaced the change. It is reported once for each property of a node.
+
+Every peer declares the parameter, and the peer that controls the tree
+sends it.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        Netw.configure_property(self, &"parameters/blend/blend_amount").broadcast()
+
+    func _physics_process(_delta: float) -> void:
+        set(&"parameters/blend/blend_amount", speed / max_speed)
+
+Here every peer writes it, so the other peers write a value that the next
+arrival replaces. Write it only on the peer that controls the node.
+
+.. code-block:: gdscript
+
+    func _physics_process(_delta: float) -> void:
+        if is_multiplayer_authority():
+            set(&"parameters/blend/blend_amount", speed / max_speed)

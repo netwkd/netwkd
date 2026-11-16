@@ -45,8 +45,18 @@ private:
     double weight = 0.0;
     godot::StringName rate_property;
     bool explicit_teleport_only = false;
+    uint32_t state_settings = 0;
 
     void warn_double_set(bool p_replaces, const char *p_axis) const;
+    void refuse_setting(
+        const char *p_setting,
+        const char *p_kind,
+        const char *p_fits
+    ) const;
+    bool takes_kind(int p_kind);
+    void drop_settings_unread_by(int p_kind);
+    bool takes_state_setting(int p_setting);
+    bool takes_amount(const char *p_setting, double p_amount) const;
 
 protected:
     static void _bind_methods();

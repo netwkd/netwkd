@@ -11,6 +11,17 @@ the tree and holds server authority, ``retained`` on predicted state, a
 variable size column in a replicated schema, and a callback with a policy
 other than the custom one.
 
+It also covers a property declared with two of ``state``, ``input`` and
+``broadcast``, which is left out, and these settings.
+
+- ``unchecked``, ``extrapolate``, ``teleport_only`` and the
+  correction settings on an ``input`` or a ``broadcast`` property
+- ``windowed`` and ``audience`` on a ``broadcast`` property
+- ``extrapolate`` naming a property that is not ``state`` on the same node
+- a policy, ``reliable``, ``unreliable``, ``call_local``, ``call_remote``,
+  ``interpolate`` or ``defer_until`` on a spawn function
+- ``defer_until`` on a signal or a property
+
 The setting was refused. The log line names it, the setting it conflicts with
 and what to use.
 

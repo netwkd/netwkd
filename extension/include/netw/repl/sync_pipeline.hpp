@@ -136,10 +136,7 @@ private:
     godot::HashMap<uint64_t, godot::LocalVector<ResourceHolder>>
         resource_holders;
     godot::HashMap<uint64_t, godot::LocalVector<uint64_t>> node_resources;
-    void hold_resources(
-        godot::Node *p_node,
-        const godot::Ref<godot::Script> &p_script
-    );
+    void hold_resources(godot::Node *p_node);
     void release_resources(const godot::Node *p_node);
 
     NetwMultiplayer *core() const;

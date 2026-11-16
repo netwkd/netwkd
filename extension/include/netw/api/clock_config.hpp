@@ -174,6 +174,12 @@ public:
     void seal(const godot::String &p_scope) {
         guard.seal(p_scope);
     }
+    void refuse() {
+        guard.refused = true;
+    }
+    bool is_refused() const {
+        return guard.refused;
+    }
 };
 
 } // namespace netw

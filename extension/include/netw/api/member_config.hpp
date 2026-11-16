@@ -32,6 +32,9 @@ private:
     godot::StringName context_name;
     int64_t context_type = 0;
     godot::Variant context_node_ref;
+    bool inside_resource = false;
+    bool refused = false;
+    bool spawn_function = false;
     godot::StringName defer_signal_name;
     double timeout_seconds = 0.0;
     godot::Array quantizers;
@@ -43,6 +46,7 @@ private:
 
     void publish_policy();
     godot::Array member_types() const;
+    bool spawn_never_reads(const char *p_setting) const;
 
 protected:
     static void _bind_methods();
@@ -96,6 +100,20 @@ public:
     }
     godot::Variant get_context_node_ref() const {
         return context_node_ref;
+    }
+
+    void set_inside_resource(bool p_inside_resource) {
+        inside_resource = p_inside_resource;
+    }
+
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+    void mark_spawn_function() {
+        spawn_function = true;
     }
 
     void set_defer_signal_name(const godot::StringName &p_defer_signal_name) {

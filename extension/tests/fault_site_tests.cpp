@@ -49,12 +49,18 @@ void raise_from_call() {
     );
 }
 
-TEST_CASE("[Networked][Faults] a fault lands on the line a game wrote") {
+TEST_CASE(
+    "[Networked][Faults] a fault lands on the line a game wrote, and a "
+    "mistake in a script lands once for all its nodes"
+) {
     const godot::Ref<godot::Script> script = netw::gd::load_script(FIXTURE);
     REQUIRE(script.is_valid());
     Object *fixture = script->call("new");
     REQUIRE(fixture != nullptr);
     const uint64_t subject = uint64_t(fixture->get_instance_id());
+    Object *second = script->call("new");
+    REQUIRE(second != nullptr);
+    const uint64_t second_subject = uint64_t(second->get_instance_id());
 
     for (const SiteRow &row : SITE_ROWS) {
         CAPTURE(row.site);
@@ -67,6 +73,7 @@ TEST_CASE("[Networked][Faults] a fault lands on the line a game wrote") {
         } else {
             netw::fault::raise(nullptr, row.code, {row.name}, subject);
         }
+        netw::fault::raise(nullptr, row.code, {row.name}, second_subject);
         int landed = 0;
         for (const netw_test::FaultLine &line : watch.log->recorded()) {
             if (!line.message.ends_with(tag)) {
@@ -76,7 +83,10 @@ TEST_CASE("[Networked][Faults] a fault lands on the line a game wrote") {
             NETW_CHECK_EQ(line.file == String(row.file), true);
             NETW_CHECK_EQ(line.line, row.line);
         }
-        NETW_CHECK_EQ(landed, 1);
+        const int klass = netw::fault_row(row.code).klass;
+        const bool game_wrote_it = klass == NETW_FAULT_MISUSE
+            || klass == NETW_FAULT_PRACTICE;
+        NETW_CHECK_EQ(landed, game_wrote_it ? 1 : 2);
     }
 
     const godot::Ref<godot::Script> twin_script = netw::gd::load_script(TWIN);
@@ -99,6 +109,7 @@ TEST_CASE("[Networked][Faults] a fault lands on the line a game wrote") {
     NETW_CHECK_EQ(landed, 1);
 
     twin->call("free");
+    second->call("free");
     fixture->call("free");
 }
 

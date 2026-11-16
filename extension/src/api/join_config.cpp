@@ -12,26 +12,10 @@ using namespace godot;
 
 namespace netw {
 
-namespace {
-
-Callable &arg_types_reader() {
-    static Callable reader;
-    return reader;
-}
-
-Array wire_arg_types(const Ref<Script> &p_script, const StringName &p_method) {
-    const Array declared
-        = netw::script::model::get_method_arg_types(p_script, p_method);
-    return declared.is_empty() ? declared : declared.slice(1);
-}
-
-} // namespace
-
-void NetwJoinConfig::set_arg_types_reader(const Callable &p_reader) {
-    arg_types_reader() = p_reader;
-}
-
 Ref<NetwJoinConfig> NetwJoinConfig::quantize(const Array &p_quantizers) {
+    if (refused) {
+        return Ref<NetwJoinConfig>(this);
+    }
     if (p_quantizers.is_empty()) {
         fault::raise(
             nullptr,
@@ -49,13 +33,7 @@ Ref<NetwJoinConfig> NetwJoinConfig::quantize(const Array &p_quantizers) {
         )) {
         return Ref<NetwJoinConfig>(this);
     }
-    const Callable &reader = arg_types_reader();
-    Array types;
-    if (!context_name.is_empty()) {
-        types = reader.is_valid()
-            ? Array(reader.call(context_script, context_name))
-            : wire_arg_types(context_script, context_name);
-    }
+    const Array &types = arg_types;
     if (!declared_count_fits_arity(
             p_quantizers.size(),
             types,

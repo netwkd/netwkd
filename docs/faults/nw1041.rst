@@ -27,4 +27,6 @@ Declare the action in ``_init``.
         Netw.configure_action(fire)
 
 Every peer declares the action, the server included, because the
-server runs only a method its own node declared.
+server runs only a method its own node declared. A server that gets a
+request for an action its node did not declare reports this error once
+and refuses the request.

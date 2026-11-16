@@ -2405,25 +2405,34 @@ void NetwMultiplayer::property_set_set_param(
 }
 
 void NetwMultiplayer::property_set_clear() {
-    property_set_by_script.clear();
+    property_set_by_declaration.clear();
+    schema_by_declaration.clear();
     entity_property_sets.clear();
     minted_property_sets.clear();
     set_book.clear();
     property_sets.clear();
 }
 
-RID NetwMultiplayer::script_schema(const Ref<Script> &p_script, Node *p_node) {
-    StringName name("@anonymous_script");
-    if (p_script.is_valid()) {
-        name = StringName(
-            p_script->get_path().is_empty() ? "@script:"
-                    + String::num_int64(int64_t(p_script->get_instance_id()))
-                                            : p_script->get_path()
-        );
+RID NetwMultiplayer::declared_schema(uint64_t p_declaration, Node *p_node) {
+    const RID *standing = schema_by_declaration.getptr(p_declaration);
+    if (standing != nullptr) {
+        return *standing;
     }
-    const RID schema = schema_create(name);
+    const Ref<Script> script
+        = p_node != nullptr ? Ref<Script>(p_node->get_script()) : Ref<Script>();
+    String name("@node");
+    if (script.is_valid()) {
+        name = script->get_path().is_empty() ? "@script:"
+                + String::num_int64(int64_t(script->get_instance_id()))
+                                             : script->get_path();
+    }
+    if (script.is_null() || schema_core.find(StringName(name)).is_valid()) {
+        name += "#" + String::num_uint64(p_declaration, 16);
+    }
+    const RID schema = schema_create(StringName(name));
+    schema_by_declaration[p_declaration] = schema;
     const Dictionary configs
-        = netw::script::model::get_property_configs(p_script);
+        = netw::script::model::get_declared_property_configs(p_node);
     const Array properties = configs.keys();
     for (int at = 0; at < properties.size(); ++at) {
         const StringName property = properties[at];
@@ -2435,7 +2444,7 @@ RID NetwMultiplayer::script_schema(const Ref<Script> &p_script, Node *p_node) {
             schema,
             property,
             static_cast<ColumnType>(
-                PropertySet::column_type_for(p_script, p_node, property)
+                PropertySet::column_type_for(script, p_node, property)
             ),
             1
         );
@@ -2455,46 +2464,55 @@ RID NetwMultiplayer::script_schema(const Ref<Script> &p_script, Node *p_node) {
     return schema;
 }
 
-RID NetwMultiplayer::adopted_property_set(
-    const Ref<Script> &p_script,
-    RecordKind p_record_kind
+bool NetwMultiplayer::property_set_adopted(
+    uint64_t p_declaration,
+    RecordKind p_record_kind,
+    RID &r_set
 ) const {
-    const uint64_t key = p_script.is_valid()
-        ? uint64_t(p_script->get_instance_id())
-        : uint64_t(0);
-    const HashMap<int, RID> *cached = property_set_by_script.getptr(key);
-    if (cached == nullptr) {
-        return RID();
+    const HashMap<int, RID> *cached
+        = property_set_by_declaration.getptr(p_declaration);
+    const RID *found
+        = cached != nullptr ? cached->getptr(p_record_kind) : nullptr;
+    if (found == nullptr) {
+        return false;
     }
-    const RID *found = cached->getptr(p_record_kind);
-    return found != nullptr ? *found : RID();
+    r_set = *found;
+    return true;
 }
 
 RID NetwMultiplayer::adopt_property_set(
-    const Ref<Script> &p_script,
+    uint64_t p_declaration,
     RecordKind p_record_kind,
-    const PropertySet &p_source,
+    const PropertySet *p_source,
     Node *p_node
 ) {
-    const RID adopted = adopted_property_set(p_script, p_record_kind);
-    if (adopted.is_valid()) {
+    RID adopted;
+    if (property_set_adopted(p_declaration, p_record_kind, adopted)) {
         return adopted;
     }
-    const RID schema = script_schema(p_script, p_node);
+    if (p_source == nullptr) {
+        property_set_by_declaration[p_declaration][p_record_kind] = RID();
+        return RID();
+    }
+    const RID schema = declared_schema(p_declaration, p_node);
     const RID set = property_set_create(schema, p_record_kind);
     if (!set.is_valid()) {
         return set;
     }
-    property_set_set_param(set, SET_PARAM_WINDOW, p_source.get_window());
-    property_set_set_param(set, SET_PARAM_AUDIENCE, p_source.get_audience());
-    property_set_set_param(set, SET_PARAM_POLICY, p_source.get_policy());
-    property_set_set_param(set, SET_PARAM_CADENCE, p_source.get_cadence());
-    property_set_set_param(set, SET_PARAM_STAMP, p_source.get_stamp());
-    property_set_set_param(set, SET_PARAM_PROFILE, p_source.get_profile());
-    property_set_set_param(set, SET_PARAM_CHANNEL, p_source.get_channel());
-    property_set_set_param(set, SET_PARAM_RELIABLE, p_source.get_reliable());
-    property_set_set_param(set, SET_PARAM_HEARTBEAT, p_source.get_heartbeat());
-    for (const PropertyColumn &member : p_source.columns) {
+    property_set_set_param(set, SET_PARAM_WINDOW, p_source->get_window());
+    property_set_set_param(set, SET_PARAM_AUDIENCE, p_source->get_audience());
+    property_set_set_param(set, SET_PARAM_POLICY, p_source->get_policy());
+    property_set_set_param(set, SET_PARAM_CADENCE, p_source->get_cadence());
+    property_set_set_param(set, SET_PARAM_STAMP, p_source->get_stamp());
+    property_set_set_param(set, SET_PARAM_PROFILE, p_source->get_profile());
+    property_set_set_param(set, SET_PARAM_CHANNEL, p_source->get_channel());
+    property_set_set_param(set, SET_PARAM_RELIABLE, p_source->get_reliable());
+    property_set_set_param(
+        set,
+        SET_PARAM_HEARTBEAT,
+        p_source->get_heartbeat()
+    );
+    for (const PropertyColumn &member : p_source->columns) {
         const int column = schema_core.find_column(schema, member.get_key());
         const int at = property_set_add_column(set, column);
         if (at < 0) {
@@ -2539,10 +2557,7 @@ RID NetwMultiplayer::adopt_property_set(
         );
     }
     property_set_seal(set);
-    const uint64_t key = p_script.is_valid()
-        ? uint64_t(p_script->get_instance_id())
-        : uint64_t(0);
-    property_set_by_script[key][p_record_kind] = set;
+    property_set_by_declaration[p_declaration][p_record_kind] = set;
     return set;
 }
 

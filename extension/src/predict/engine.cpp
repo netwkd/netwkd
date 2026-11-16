@@ -9534,19 +9534,13 @@ void NetwPredictionEngine::announce_divergence(
 
 namespace {
 
-Ref<Script> declaring_script(const Ref<NetwEntity> &p_entity) {
-    Node *owner = p_entity.is_valid() ? p_entity->get_owner() : nullptr;
-    return owner != nullptr ? Ref<Script>(owner->get_script()) : Ref<Script>();
-}
-
 bool broadcast_set_of(const Ref<NetwEntity> &p_entity, PropertySet &r_set) {
-    const Ref<Script> script = declaring_script(p_entity);
-    return script.is_valid()
-        && property_set_builder::compile_script(
+    Node *owner = p_entity.is_valid() ? p_entity->get_owner() : nullptr;
+    return owner != nullptr
+        && property_set_builder::from_property_configs(
                r_set,
-               script,
-               PropertySet::RECORD_BROADCAST,
-               nullptr
+               netw::script::model::get_declared_property_configs(owner),
+               PropertySet::RECORD_BROADCAST
         );
 }
 

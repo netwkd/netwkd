@@ -11,6 +11,9 @@ namespace netw {
 Ref<NetwAdmissionConfig> NetwAdmissionConfig::accept(
     const Ref<NetwAccountProvider> &p_provider
 ) {
+    if (refused) {
+        return Ref<NetwAdmissionConfig>(this);
+    }
     if (p_provider.is_null()) {
         fault::raise(
             nullptr,
@@ -26,6 +29,9 @@ Ref<NetwAdmissionConfig> NetwAdmissionConfig::accept(
 }
 
 Ref<NetwAdmissionConfig> NetwAdmissionConfig::timeout(double p_seconds) {
+    if (refused) {
+        return Ref<NetwAdmissionConfig>(this);
+    }
     if (p_seconds <= 0.0) {
         fault::raise(
             nullptr,

@@ -28,7 +28,7 @@
 		Raise [member input_buffer_ticks] when a player on a bad connection stutters. The server waits that many ticks before it uses input, so each one adds a tick of delay.
 		[member repeat_missing_input] reuses the last input when one is lost.
 		[b]Debugging[/b]
-		Debug &gt; Networked &gt; Prediction Rings draws rings around each predicted entity.
+		[b]Debug &gt; Networked &gt; Prediction Rings[/b] draws rings around each predicted entity.
 		- [b]cyan[/b] where it is drawn
 		- [b]green[/b] where it is simulated
 		- [b]orange[/b] where the server last said it was
@@ -36,7 +36,6 @@
 		- [b]white line[/b] the gap between orange and magenta
 	</description>
 	<tutorials>
-		<link title="Prediction guide">https://networked.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
 	<methods>
 		<method name="notify_collision">

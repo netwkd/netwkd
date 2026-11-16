@@ -261,7 +261,65 @@ void NetwMultiplayer::store_received(
         row->installs.stats.held += 1;
         return;
     }
+    store_push_arrival(p_binding, p_at, p_sender);
+}
+
+void NetwMultiplayer::store_push_arrival(
+    PropertyBinding *p_binding,
+    const store::RowAddress &p_at,
+    int64_t p_sender
+) {
+#if defined(DEBUG_ENABLED)
+    const store::Table &table = store_world.table(p_at.table);
+    const ObjectID node_id(table.nodes[p_at.row]);
+    Node *node = Object::cast_to<Node>(gd::object_of(node_id));
+    LocalVector<StringName> changed;
+    LocalVector<Variant> found;
+    if (node != nullptr && !p_binding->landed_values.is_empty()
+        && p_binding->landed_at_write == port_writes_counted(node)) {
+        for (const KeyValue<StringName, Variant> &landed :
+             p_binding->landed_values) {
+            const Variant held = port_get(node, landed.key);
+            if (!held.hash_compare(landed.value)) {
+                changed.push_back(landed.key);
+                found.push_back(held);
+            }
+        }
+    }
     store_push(p_at, -1, EVERY_COLUMN, nullptr);
+    node = Object::cast_to<Node>(gd::object_of(node_id));
+    if (node == nullptr) {
+        return;
+    }
+    for (uint32_t at = 0; at < changed.size(); ++at) {
+        if (port_get(node, changed[at]).hash_compare(found[at])) {
+            continue;
+        }
+        fault::raise(
+            this,
+            NETW_FAULT_LOCAL_WRITE_REPLACED,
+            {String(changed[at]), String(node->get_name()), String(), p_sender},
+            uint64_t(node_id)
+        );
+    }
+    p_binding->landed_values.clear();
+    for (uint32_t column = 0; column < table.columns.size(); ++column) {
+        const StringName &key = table.schema.at(int(column))->key;
+        if (!p_binding->holds_tree_blend(node, key)) {
+            continue;
+        }
+        const Variant held = port_get(node, key);
+        if (held.get_type() != Variant::NIL && held.get_type() < Variant::RID
+            && held.hash_compare(table.read_value(p_at.row, column))) {
+            p_binding->landed_values.insert(key, held);
+        }
+    }
+    if (!p_binding->landed_values.is_empty()) {
+        p_binding->landed_at_write = port_writes_counted(node);
+    }
+#else
+    store_push(p_at, -1, EVERY_COLUMN, nullptr);
+#endif
 }
 
 void NetwMultiplayer::sim_drain_installs() {

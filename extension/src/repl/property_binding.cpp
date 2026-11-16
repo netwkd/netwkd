@@ -114,7 +114,43 @@ PropertyBinding::~PropertyBinding() {
     if (indexes != nullptr && staged_index != nullptr) {
         indexes->release(staged_index);
     }
+#if defined(DEBUG_ENABLED)
+    if (landed_at_write != 0) {
+        port_stop_counting(uint64_t(node_id));
+    }
+#endif
 }
+
+#if defined(DEBUG_ENABLED)
+bool PropertyBinding::holds_tree_blend(
+    Node *p_node,
+    const StringName &p_key
+) {
+    stage_properties(p_node);
+    if (tree_blends_stage == stage_count) {
+        return tree_blends.has(p_key);
+    }
+    tree_blends_stage = stage_count;
+    tree_blends.clear();
+    const PropertySet *set = get_set();
+    if (set == nullptr) {
+        return false;
+    }
+    if (!p_node->is_class("AnimationTree")) {
+        return false;
+    }
+    for (const PropertyColumn &column : set->columns) {
+        const String key(column.get_key());
+        if (key.begins_with("parameters/")
+            && (key.ends_with("/blend_amount") || key.ends_with("/add_amount")
+                || key.ends_with("/blend_position")
+                || key.ends_with("/scale"))) {
+            tree_blends.insert(column.get_key(), true);
+        }
+    }
+    return tree_blends.has(p_key);
+}
+#endif
 
 PropertyBinding *BindingBook::create(uint64_t p_set, Node *p_node) {
     const uint64_t minted = held.create();
@@ -412,12 +448,13 @@ bool PropertyBinding::admits_arrival(
     if (held == nullptr) {
         return false;
     }
-    if (!p_retained && !write_gate) {
+    const bool admitted = admitted_schema == &p_schema
+        && admitted_shape == p_schema.shape_hash;
+    if (admitted && !p_retained && !write_gate) {
         return true;
     }
     stage_properties(held);
-    if (admitted_schema == &p_schema && admitted_shape == p_schema.shape_hash
-        && admitted_stage == stage_count) {
+    if (admitted && admitted_stage == stage_count) {
         return true;
     }
     for (int at = 0; at < p_schema.column_count(); at++) {

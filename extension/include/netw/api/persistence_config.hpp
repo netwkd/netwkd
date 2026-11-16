@@ -17,11 +17,19 @@ private:
     godot::Callable id_provider;
     double save_interval = 0.0;
     bool load_at_spawn = true;
+    bool refused = false;
 
 protected:
     static void _bind_methods();
 
 public:
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
     godot::StringName get_database_name() const {
         return database_name;
     }

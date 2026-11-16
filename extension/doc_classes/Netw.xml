@@ -30,7 +30,7 @@
 		        arena.add_child(Netw.spawn_player(player, make_car))
 		[/codeblock]
 		[b]Replication[/b]
-		A node's property replicates once [method configure_property] declares it. Data that belongs to no single node has a class of its own.
+		A node's property replicates once [method configure_property] declares it and [method NetwPropertyConfig.state], [method NetwPropertyConfig.input] or [method NetwPropertyConfig.broadcast] says how. A property declared with none of them is sent only by [method sync_property]. Data that belongs to no single node has a class of its own.
 		- [NetwPropertyConfig] how a declared property is sent, from [method configure_property]
 		- [NetwPrediction] how the client that controls an entity runs it ahead of the server, from [member NetwEntity.prediction]
 		- [NetwTable] rows of values a [NetwSchema] declares, from [method NetwSession.table]
@@ -97,7 +97,7 @@
 				public Node GhostBomb(Vector2 pos) =&gt; MakeBomb(pos);
 				[/csharp]
 				[/codeblocks]
-				The server passes [param method] a [NetwActionRequest] before the arguments of [method action], and [method NetwRequest.deny] rejects the action. Declaring an action turns lag compensation on for the session. A second call for the same method on one node returns [code]null[/code].
+				The server passes [param method] a [NetwActionRequest] before the arguments of [method action], and [method NetwRequest.deny] rejects the action. Declaring an action turns lag compensation on for the session.
 			</description>
 		</method>
 		<method name="configure_admission" qualifiers="static">
@@ -727,7 +727,7 @@
 				    NetwEntity.of(avatar).player = who
 				    return avatar
 				[/codeblock]
-				Returns [code]null[/code] and spawns nothing when the session does not hold [param player], and raises an error unless that player left the session. The node keeps the name [param method] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded.
+				Returns [code]null[/code] and spawns nothing when the session does not hold [param player], and raises an error unless that player left the session. The node keeps the name [param method] gave it, and [member NetwEntity.name] is the player's [member NetwPlayer.username]. The node is despawned when [param player] leaves. With [method NetwPersistenceConfig.load_on_spawn], other peers receive it once its save is loaded. When the spawn is refused, [param player] stays in the session and its client prints a warning that names [param method].
 				[b]Server Only.[/b]
 			</description>
 		</method>

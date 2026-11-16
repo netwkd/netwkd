@@ -1695,6 +1695,17 @@
 				Returns [code]true[/code] while the server has paused the session with [method session_pause].
 			</description>
 		</method>
+		<method name="session_join_declare" qualifiers="static">
+			<return type="NetwJoinConfig" />
+			<param index="0" name="handler" type="Callable" />
+			<param index="1" name="arg_types" type="PackedInt32Array" />
+			<description>
+				Declares [param handler] as the join handler and returns its [NetwJoinConfig]. [param arg_types] holds one [enum Variant.Type] for each join argument after the [NetwPlayer], and [constant TYPE_NIL] accepts any type. [method Netw.configure_join] declares a method this way with the types its parameters declare.
+				[codeblock]
+				NetwMultiplayer.session_join_declare(spawn_at, [TYPE_STRING_NAME, TYPE_INT])
+				[/codeblock]
+			</description>
+		</method>
 		<method name="session_leave">
 			<return type="NetwPromise" />
 			<description>

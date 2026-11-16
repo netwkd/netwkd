@@ -6,6 +6,7 @@
 #include "godot/json.hpp"
 #include "godot/ref_counted.hpp"
 #include "godot/variant.hpp"
+#include "netw/fault_book.hpp"
 
 #if defined(NETW_MODULE)
 #include "core/core_bind.h"
@@ -405,6 +406,7 @@ struct FaultWatch {
     godot::Ref<FaultLog> log;
 
     FaultWatch() {
+        netw::fault::forget();
         log.instantiate();
         FaultLog::attach(log);
     }

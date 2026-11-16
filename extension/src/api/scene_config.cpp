@@ -43,6 +43,9 @@ void NetwSceneConfig::write(const SceneDecl &p_decl) {
 }
 
 Ref<NetwSceneConfig> NetwSceneConfig::labeled(const StringName &p_stem) {
+    if (refused) {
+        return Ref<NetwSceneConfig>(this);
+    }
     if (p_stem == StringName()) {
         fault::raise(
             nullptr,
@@ -59,6 +62,9 @@ Ref<NetwSceneConfig> NetwSceneConfig::labeled(const StringName &p_stem) {
 }
 
 Ref<NetwSceneConfig> NetwSceneConfig::isolated() {
+    if (refused) {
+        return Ref<NetwSceneConfig>(this);
+    }
     SceneDecl decl = held();
     decl.isolation = NetwSceneCore::ISOLATION_OWN_WORLD;
     write(decl);

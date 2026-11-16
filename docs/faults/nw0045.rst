@@ -1,0 +1,27 @@
+:github_url: hide
+
+.. _fault_nw0045:
+
+NW0045. The server could not spawn this player's node
+=====================================================
+
+Reported as a warning on a client when the server calls
+:ref:`Netw.spawn_player <class_Netw_method_spawn_player>` for that client's
+player and the spawn is refused. The log line names the spawn function.
+The player stays in the session with no node.
+
+.. code-block:: gdscript
+
+    func _on_player_joined(player: NetwPlayer) -> void:
+        add_child(Netw.spawn_player(player, make_body))
+
+    func make_body() -> Node:
+        return null
+
+The server's log holds the fault that refused the spawn, such as
+:ref:`NW0040 <fault_nw0040>`. Fix it there.
+
+.. code-block:: gdscript
+
+    func make_body() -> Node:
+        return BodyScene.instantiate()

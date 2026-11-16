@@ -44,6 +44,7 @@
 #include "netw/api/entity_options.hpp"
 #include "netw/api/join_request.hpp"
 #include "netw/api/prediction.hpp"
+#include "netw/api/refusal.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
 #include "netw/auth_protocol.hpp"
@@ -52,6 +53,7 @@
 #include "netw/connect/browse_list.hpp"
 #include "netw/connect/creation.hpp"
 #include "netw/connect/directory_transport.hpp"
+#include "netw/decl_sites.hpp"
 #include "netw/game_call.hpp"
 #include "netw/held_bytes.hpp"
 #include "netw/log.hpp"
@@ -1937,7 +1939,7 @@ bool NetwMultiplayer::session_preflight_join(
         return true;
     }
     if (plan.declared && p_request.arg_values.is_empty()
-        && !join_arg_types(plan.handler).is_empty()) {
+        && !plan.arg_types.is_empty()) {
         fault::raise(
             this,
             NETW_FAULT_JOIN_ARGS_MISMATCH,
@@ -4828,14 +4830,14 @@ Array NetwMultiplayer::session_get_join_schema() {
         return result;
     }
     const Callable handler = plan.handler;
-    const Array types = join_arg_types(handler);
+    const Array types = plan.arg_types;
 
     PackedStringArray names;
     Object *target = handler.get_object();
     const Variant script_var
         = target != nullptr ? target->get_script() : Variant();
     const Ref<Script> script = script_var;
-    if (script.is_valid()) {
+    if (script.is_valid() && !handler.is_custom()) {
         const Array methods = gd::script_method_list(script);
         for (int at = 0; at < methods.size(); ++at) {
             const Dictionary method = methods[at];
@@ -5961,6 +5963,7 @@ NetwMultiplayer::JoinPlan NetwMultiplayer::session_resolve_join() {
     if (override.is_valid()) {
         plan.handler = override;
         plan.quantizers = session_join_override_quantizers();
+        plan.arg_types = join_arg_types(override);
         plan.declared = true;
         return plan;
     }
@@ -5970,6 +5973,7 @@ NetwMultiplayer::JoinPlan NetwMultiplayer::session_resolve_join() {
         const Ref<NetwJoinConfig> config = declared.payload;
         if (config.is_valid()) {
             plan.quantizers = config->get_quantizers();
+            plan.arg_types = config->get_arg_types();
         }
         plan.handler = declared.callable;
         plan.declared = true;
@@ -6003,14 +6007,54 @@ Array NetwMultiplayer::join_arg_types(const Callable &p_handler) {
     return types.is_empty() ? Array() : types.slice(1);
 }
 
-int64_t NetwMultiplayer::join_schema_hash(
+Ref<NetwJoinConfig> NetwMultiplayer::session_join_declare(
     const Callable &p_handler,
+    const PackedInt32Array &p_arg_types
+) {
+    Node *scope = Object::cast_to<Node>(p_handler.get_object());
+    if (!p_handler.is_valid() || scope == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {String("{Netw.configure_join}"),
+             String(),
+             String("a method of a Node inside the session's branch")}
+        );
+        return refused<NetwJoinConfig>();
+    }
+    game_call_declared(p_handler, game_calls::JOIN_HANDLER);
+    decl_sites::record_handler(p_handler);
+    Array arg_types;
+    for (int at = 0; at < p_arg_types.size(); ++at) {
+        arg_types.push_back(p_arg_types[at]);
+    }
+    Ref<NetwJoinConfig> config;
+    config.instantiate();
+    config->set_context_script(netw::script::model::declaring_script(scope));
+    config->set_context_name(
+        p_handler.is_custom() ? StringName() : p_handler.get_method()
+    );
+    config->set_arg_types(arg_types);
+    if (session_decl::declare(
+            scope,
+            session_decl::KIND_JOIN,
+            p_handler,
+            config,
+            "configure_join"
+        )
+        != OK) {
+        return refused<NetwJoinConfig>();
+    }
+    return config;
+}
+
+int64_t NetwMultiplayer::join_schema_hash(
+    const Array &p_arg_types,
     const Array &p_quantizers
 ) {
     String signature;
-    const Array types = join_arg_types(p_handler);
-    for (int at = 0; at < types.size(); ++at) {
-        signature += String::num_int64(int64_t(types[at])) + ",";
+    for (int at = 0; at < p_arg_types.size(); ++at) {
+        signature += String::num_int64(int64_t(p_arg_types[at])) + ",";
     }
     signature += "|";
     for (int at = 0; at < p_quantizers.size(); ++at) {
@@ -6044,7 +6088,7 @@ void NetwMultiplayer::session_encode_join_args(JoinRequest &r_request) {
             stream,
             r_request.arg_values,
             quantizers,
-            join_arg_types(handler),
+            plan.arg_types,
             this
         )
         || !stream.align_verify()) {
@@ -6053,7 +6097,7 @@ void NetwMultiplayer::session_encode_join_args(JoinRequest &r_request) {
         return;
     }
     r_request.arg_bytes = stream.to_bytes();
-    r_request.schema_hash = join_schema_hash(handler, quantizers);
+    r_request.schema_hash = join_schema_hash(plan.arg_types, quantizers);
 }
 
 bool NetwMultiplayer::session_decode_join_args(JoinRequest &r_request) {
@@ -6071,7 +6115,8 @@ bool NetwMultiplayer::session_decode_join_args(JoinRequest &r_request) {
         );
         return false;
     }
-    if (r_request.schema_hash != join_schema_hash(handler, quantizers)) {
+    if (r_request.schema_hash
+        != join_schema_hash(plan.arg_types, quantizers)) {
         NETW_TRACE(
             sys::SESSION,
             "A join's arguments do not match this server's handler."
@@ -6083,7 +6128,7 @@ bool NetwMultiplayer::session_decode_join_args(JoinRequest &r_request) {
     if (!call_args::values_read(
             stream,
             quantizers,
-            join_arg_types(handler),
+            plan.arg_types,
             values
         )
         || !stream.align_verify() || stream.bits_remaining() != 0) {

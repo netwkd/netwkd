@@ -10,11 +10,19 @@ class NetwDatabaseConfig : public godot::Resource {
     GDCLASS(NetwDatabaseConfig, godot::Resource)
 
     godot::Ref<NetwDatabaseBackend> store;
+    bool refused = false;
 
 protected:
     static void _bind_methods();
 
 public:
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
     godot::Ref<NetwDatabaseConfig> backend(
         const godot::Ref<NetwDatabaseBackend> &p_backend
     );

@@ -1,6 +1,8 @@
 #include "netw/api/despawn_config.hpp"
 
 #include "godot/class_db.hpp"
+#include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 
 using namespace godot;
 
@@ -9,11 +11,30 @@ namespace netw {
 Ref<NetwDespawnConfig> NetwDespawnConfig::before_removal(
     const Callable &p_callable
 ) {
-    hook_method = p_callable.get_method();
+    if (refused) {
+        return Ref<NetwDespawnConfig>(this);
+    }
+    if (game_call_declared(p_callable, game_calls::DESPAWN_HOOK)
+        || p_callable.is_valid()) {
+        hook_method = p_callable.get_method();
+    }
     return Ref<NetwDespawnConfig>(this);
 }
 
 Ref<NetwDespawnConfig> NetwDespawnConfig::linger(double p_seconds) {
+    if (refused) {
+        return Ref<NetwDespawnConfig>(this);
+    }
+    if (!(p_seconds >= 0.0)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{NetwDespawnConfig.linger}"),
+             vformat("%s seconds", String::num(p_seconds)),
+             String("a number of seconds from zero")}
+        );
+        return Ref<NetwDespawnConfig>(this);
+    }
     linger_seconds = p_seconds;
     return Ref<NetwDespawnConfig>(this);
 }

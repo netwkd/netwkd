@@ -12,6 +12,9 @@ namespace config_draft {
 namespace {
 
 bool late(Guard &p_guard, const char *p_field) {
+    if (p_guard.refused) {
+        return true;
+    }
     if (!p_guard.sealed) {
         return false;
     }

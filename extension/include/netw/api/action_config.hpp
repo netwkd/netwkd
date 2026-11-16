@@ -26,11 +26,19 @@ private:
     godot::Callable revert_handler;
     Timing timing_mode = TIMING_IMMEDIATE;
     int64_t timeout = 0;
+    bool refused = false;
 
 protected:
     static void _bind_methods();
 
 public:
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
     godot::Ref<NetwActionConfig> predict(const godot::Callable &p_handler);
     godot::Ref<NetwActionConfig> confirm(const godot::Callable &p_handler);
     godot::Ref<NetwActionConfig> revert(const godot::Callable &p_handler);

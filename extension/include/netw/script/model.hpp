@@ -21,8 +21,8 @@ void declare_rpc_config(
     const godot::StringName &p_method,
     const godot::Ref<NetwMemberConfig> &p_config
 );
-void declare_property_config(
-    const godot::Ref<godot::Script> &p_script,
+void declare_node_property(
+    godot::Node *p_node,
     const godot::StringName &p_property,
     const godot::Ref<NetwPropertyConfig> &p_config
 );
@@ -62,9 +62,16 @@ godot::Ref<NetwMemberConfig> get_spawn_config(
     const godot::StringName &p_method
 );
 godot::Dictionary get_rpc_configs(const godot::Ref<godot::Script> &p_script);
-godot::Dictionary get_property_configs(
-    const godot::Ref<godot::Script> &p_script
+godot::Ref<NetwPropertyConfig> standing_property_config(
+    godot::Node *p_node,
+    const godot::StringName &p_property
 );
+godot::Dictionary get_declared_property_configs(godot::Node *p_node);
+godot::Ref<NetwPropertyConfig> get_declared_property_config(
+    godot::Node *p_node,
+    const godot::StringName &p_property
+);
+uint64_t shared_declaration_key(godot::Node *p_node);
 godot::Dictionary get_signal_configs(const godot::Ref<godot::Script> &p_script);
 SceneDecl get_scene_decl(const godot::Ref<godot::Script> &p_script);
 godot::Ref<NetwDespawnConfig> get_despawn_config(
@@ -98,10 +105,6 @@ int64_t node_overlay_count();
 godot::Array get_method_interpolators(
     const godot::Ref<godot::Script> &p_script,
     const godot::StringName &p_method
-);
-godot::Ref<NetwInterpolate> get_property_interpolator(
-    const godot::Ref<godot::Script> &p_script,
-    const godot::StringName &p_property
 );
 godot::Array get_signal_interpolators(
     const godot::Ref<godot::Script> &p_script,

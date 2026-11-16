@@ -1,6 +1,8 @@
 #include "netw/fault_book.hpp"
 
+#include "godot/node.hpp"
 #include "godot/object.hpp"
+#include "godot/script.hpp"
 #include "godot/templates.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/decl_sites.hpp"
@@ -179,7 +181,82 @@ String fault_spell(const String &p_text, FaultLang p_lang) {
     }
 }
 
+namespace {
+
+FaultBook &process_book() {
+    static FaultBook book;
+    return book;
+}
+
+Ref<Script> script_of(Object *p_subject) {
+    return p_subject == nullptr
+        ? Ref<Script>()
+        : Ref<Script>(Object::cast_to<Script>(p_subject->get_script()));
+}
+
+bool written_by_the_game(const netw_fault_row &p_row) {
+    return p_row.klass == NETW_FAULT_MISUSE
+        || p_row.klass == NETW_FAULT_PRACTICE;
+}
+
+uint64_t mixed_value(
+    uint64_t p_hash,
+    const String &p_value,
+    const String &p_node_name
+) {
+    const bool names_the_node = !p_node_name.is_empty()
+        && (p_value == p_node_name
+            || p_value == String("'") + p_node_name + String("'"));
+    return names_the_node ? p_hash : mixed(p_hash, p_value.hash());
+}
+
+FaultKey process_key(
+    netw_fault_code p_code,
+    const FaultValues &p_values,
+    Object *p_subject,
+    uint64_t p_subject_id
+) {
+    const Ref<Script> script = script_of(p_subject);
+    const Node *node = Object::cast_to<Node>(p_subject);
+    const String node_name
+        = node != nullptr ? String(node->get_name()) : String();
+    uint64_t hash = mixed(0, uint64_t(p_values.peer));
+    hash = mixed_value(hash, p_values.name, node_name);
+    hash = mixed_value(hash, p_values.owner, node_name);
+    hash = mixed_value(hash, p_values.detail, node_name);
+    return {
+        p_code,
+        script.is_valid() ? uint64_t(gd::instance_id(script.ptr()))
+                          : p_subject_id,
+        0,
+        uint32_t(hash ^ (hash >> 32))
+    };
+}
+
+String unnamed_node_shown(Object *p_subject) {
+    Node *node = Object::cast_to<Node>(p_subject);
+    if (node == nullptr || !String(node->get_name()).is_empty()) {
+        return String();
+    }
+    const Ref<Script> script = script_of(node);
+    const String file
+        = script.is_valid() ? script->get_path().get_file() : String();
+    return file.is_empty() ? String(node->get_class()) : file;
+}
+
+String named(const String &p_text, const String &p_unnamed) {
+    return p_unnamed.is_empty()
+        ? p_text
+        : p_text.replace("''", String("'") + p_unnamed + String("'"));
+}
+
+} // namespace
+
 namespace fault {
+
+void forget() {
+    process_book().end_session();
+}
 
 void raise(
     NetwMultiplayer *p_session,
@@ -187,19 +264,24 @@ void raise(
     const FaultValues &p_values,
     uint64_t p_subject
 ) {
+    Object *subject
+        = p_subject == 0 ? nullptr : gd::object_of(ObjectID(p_subject));
+    const netw_fault_row row = fault_row(p_code);
     FaultBook::Admit admit = {true, nullptr};
     if (p_session != nullptr) {
         admit = p_session->fault_admit(
             {p_code, p_subject, p_values.peer, p_values.name.hash()}
         );
-        if (admit.what == nullptr) {
-            return;
-        }
+    } else if (written_by_the_game(row)) {
+        admit = process_book().admit(
+            process_key(p_code, p_values, subject, p_subject),
+            0
+        );
+    }
+    if (!admit.print && admit.what == nullptr) {
+        return;
     }
 
-    const netw_fault_row row = fault_row(p_code);
-    Object *subject
-        = p_subject == 0 ? nullptr : gd::object_of(ObjectID(p_subject));
     const gd::ScriptSite site = decl_sites::find(
         netw_fault_site(row.site),
         subject,
@@ -208,7 +290,8 @@ void raise(
     const FaultLang lang = site.file.ends_with(".cs") ? FaultLang::CSHARP
                                                       : FaultLang::GDSCRIPT;
     const FaultText text = fault_text(p_code, p_values);
-    const String what = fault_spell(text.what, lang);
+    const String unnamed = unnamed_node_shown(subject);
+    const String what = named(fault_spell(text.what, lang), unnamed);
     if (admit.what != nullptr) {
         *admit.what = what;
     }
@@ -216,7 +299,8 @@ void raise(
         return;
     }
 
-    const String line = what + String(" ") + fault_spell(text.fix, lang)
+    const String line = what + String(" ")
+        + named(fault_spell(text.fix, lang), unnamed)
         + vformat(" [NW%04d]", int(p_code));
     const log::Level level = row.klass == NETW_FAULT_MISUSE ? log::Level::ERROR
                                                             : log::Level::WARN;

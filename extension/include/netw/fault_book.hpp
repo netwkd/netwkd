@@ -85,6 +85,7 @@ void raise(
     const FaultValues &p_values,
     uint64_t p_subject = 0
 );
+void forget();
 
 } // namespace fault
 

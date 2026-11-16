@@ -258,29 +258,35 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD8 the same scope node replaces "
-    "its declaration atomically, and the node leaving the branch takes both "
-    "the replacement and the provider it replaced with it"
+    "[Networked][Session][Hosted][SceneTree] HD8 a scope node that declares "
+    "a second provider is refused once and its first one keeps answering, "
+    "and the node leaving the branch takes that provider with it"
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error("*'Session'*[NW0041]*", 1);
+    expected_faults.expect_error("*declared twice on 'Session'*[NW0034]*", 1);
 
     Branch branch("HD8");
     const CallLog log;
     Node *scope = child_named(branch.node, "Session");
 
-    Netw::configure_server_info(provider(log, scope, "old"));
+    const Callable old = provider(log, scope, "old");
+    Netw::configure_server_info(old);
     CHECK(probe_answers(branch.api.ptr()));
 
-    Netw::configure_server_info(provider(log, scope, "new"));
+    NETW_CHECK_EQ(
+        int(Netw::configure_server_info(provider(log, scope, "new"))),
+        int(ERR_ALREADY_EXISTS)
+    );
+    NETW_CHECK_EQ(int(Netw::configure_server_info(old)), int(OK));
     CHECK(probe_answers(branch.api.ptr()));
-    NETW_CHECK_EQ(log.count("old"), 1);
-    NETW_CHECK_EQ(log.count("new"), 1);
+    NETW_CHECK_EQ(log.count("old"), 2);
+    NETW_CHECK_EQ(log.count("new"), 0);
 
     branch.node->remove_child(scope);
     CHECK_FALSE(probe_answers(branch.api.ptr()));
-    NETW_CHECK_EQ(log.count("old"), 1);
-    NETW_CHECK_EQ(log.count("new"), 1);
+    NETW_CHECK_EQ(log.count("old"), 2);
+    NETW_CHECK_EQ(log.count("new"), 0);
 
     memdelete(scope);
 }

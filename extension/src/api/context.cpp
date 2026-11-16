@@ -9,6 +9,7 @@
 #include "netw/api/entity_record.hpp"
 #include "netw/api/link_conditions.hpp"
 #include "netw/api/native_api.hpp"
+#include "netw/api/refusal.hpp"
 #include "netw/colors.hpp"
 #include "netw/connect/transport.hpp"
 #include "netw/decl_sites.hpp"
@@ -37,6 +38,84 @@ Ref<Script> script_of(Object *p_object) {
     return Ref<Script>(Object::cast_to<Script>(p_object->get_script()));
 }
 
+String child_a_path_starts_at(Node *p_node, const StringName &p_property) {
+    const String text(p_property);
+    const int colon = text.find(":");
+    const int slash = text.find("/");
+    const int cut = colon < 0 ? slash
+        : slash < 0           ? colon
+                              : MIN(colon, slash);
+    if (cut <= 0) {
+        return String();
+    }
+    const String head = text.substr(0, cut);
+    return p_node->has_node(NodePath(head)) ? head : String();
+}
+
+bool path_enters_an_object(Node *p_node, const StringName &p_property) {
+    const gd::IndexedPath *path = gd::indexed_path(p_property);
+    if (path == nullptr) {
+        return false;
+    }
+    const gd::PropertyResolution head
+        = gd::listed_property(gd::property_list(p_node), path->head);
+    return head.type == int(Variant::OBJECT)
+        || p_node->get(path->head).get_type() == Variant::OBJECT;
+}
+
+bool is_animation_request(Node *p_node, const StringName &p_property) {
+    const String path(p_property);
+    return p_node->is_class("AnimationTree")
+        && (path.ends_with("/request")
+            || path.ends_with("/transition_request"));
+}
+
+netw_unknown_name unknown_member_reason(
+    const Ref<Script> &p_script,
+    bool p_engine_declares_it
+) {
+    if (p_script.is_valid()) {
+        return p_engine_declares_it ? NETW_UNKNOWN_ENGINE_METHOD
+                                    : NETW_UNKNOWN_UNDECLARED;
+    }
+    return p_engine_declares_it ? NETW_UNKNOWN_ENGINE_MEMBER
+                                : NETW_UNKNOWN_NO_SCRIPT;
+}
+
+bool script_declares_method(
+    const Ref<Script> &p_script,
+    const StringName &p_method
+) {
+    Ref<Script> walked = p_script;
+    while (walked.is_valid()) {
+        const Array methods = gd::script_method_list(walked);
+        for (int index = 0; index < methods.size(); index++) {
+            const Dictionary declaration = methods[index];
+            if (StringName(declaration.get("name", StringName()))
+                == p_method) {
+                return true;
+            }
+        }
+        walked = walked->get_base_script();
+    }
+    return false;
+}
+
+bool declared_too_late(Node *p_node, const char *p_verb) {
+    if (p_node == nullptr || !p_node->is_inside_tree()) {
+        return false;
+    }
+    fault::raise(
+        nullptr,
+        NETW_FAULT_TOO_LATE,
+        {vformat("{Netw.%s}", p_verb),
+         String("'") + String(p_node->get_name()) + String("'"),
+         String("the node enters the tree")},
+        uint64_t(gd::instance_id(p_node))
+    );
+    return true;
+}
+
 Ref<Script> named_method_script(
     const Callable &p_callable,
     const char *p_verb
@@ -44,15 +123,34 @@ Ref<Script> named_method_script(
     const StringName method = p_callable.get_method();
     Object *target = p_callable.get_object();
     const Ref<Script> script = script_of(target);
-    if (script.is_null() || method.is_empty() || !target->has_method(method)) {
-        Node *host = Object::cast_to<Node>(target);
+    Node *host = Object::cast_to<Node>(target);
+    const uint64_t host_id
+        = host != nullptr ? uint64_t(gd::instance_id(host)) : 0;
+    if (method.is_empty()) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_CALLABLE,
+            {vformat("{Netw.%s}", p_verb),
+             String(),
+             String("a named method of a script on the node")},
+            host_id
+        );
+        return Ref<Script>();
+    }
+    if (script.is_null() || !script_declares_method(script, method)) {
         fault::raise(
             nullptr,
             NETW_FAULT_UNKNOWN_NAME,
             {vformat("{Netw.%s}", p_verb),
              host != nullptr ? String(host->get_name()) : String("the node"),
-             String(method)},
-            host != nullptr ? uint64_t(gd::instance_id(host)) : 0
+             String(method),
+             0,
+             0,
+             unknown_member_reason(
+                 script,
+                 target != nullptr && target->has_method(method)
+             )},
+            host_id
         );
         return Ref<Script>();
     }
@@ -97,7 +195,7 @@ Ref<T> declare_config(Node *p_node, session_decl::Kind p_kind) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {vformat("{Netw.%s}", verb), String(), String("node")}
         );
-        return Ref<T>();
+        return refused<T>();
     }
     const Ref<T> standing = session_decl::payload_on(p_node, p_kind);
     if (standing.is_valid()) {
@@ -107,12 +205,12 @@ Ref<T> declare_config(Node *p_node, session_decl::Kind p_kind) {
             {vformat("{Netw.%s}", verb), String(p_node->get_name())},
             uint64_t(gd::instance_id(p_node))
         );
-        return Ref<T>();
+        return refused<T>();
     }
     Ref<T> draft;
     draft.instantiate();
     if (session_decl::declare(p_node, p_kind, Callable(), draft, verb) != OK) {
-        return Ref<T>();
+        return refused<T>();
     }
     return draft;
 }
@@ -285,12 +383,8 @@ void lint_property_overlaps(const Variant &p_node) {
     if (node == nullptr) {
         return;
     }
-    const Ref<Script> script = script_of(node);
-    if (script.is_null()) {
-        return;
-    }
     const Dictionary configs
-        = netw::script::model::get_property_configs(script);
+        = netw::script::model::get_declared_property_configs(node);
     if (configs.is_empty()) {
         return;
     }
@@ -433,12 +527,10 @@ Error Netw::configure_server_info(const Callable &p_provider) {
 Ref<NetwJoinConfig> Netw::configure_join(const Callable &p_handler) {
     Node *scope = handler_scope(p_handler, "configure_join");
     if (scope == nullptr) {
-        return Ref<NetwJoinConfig>();
+        return refused<NetwJoinConfig>();
     }
-    const Ref<Script> declaring
-        = netw::script::model::declaring_script(p_handler.get_object());
-    if (NetwMultiplayer::join_declared_arg_types(p_handler).is_empty()
-        && p_handler.get_argument_count() > 1) {
+    const Array declared = NetwMultiplayer::join_declared_arg_types(p_handler);
+    if (declared.is_empty() && p_handler.get_argument_count() > 1) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_CALLABLE,
@@ -448,31 +540,19 @@ Ref<NetwJoinConfig> Netw::configure_join(const Callable &p_handler) {
                     "arguments")},
             uint64_t(gd::instance_id(scope))
         );
-        return Ref<NetwJoinConfig>();
+        return refused<NetwJoinConfig>();
     }
-    game_call_declared(p_handler, game_calls::JOIN_HANDLER);
-    decl_sites::record_handler(p_handler);
-    Ref<NetwJoinConfig> config;
-    config.instantiate();
-    config->set_context_script(declaring);
-    config->set_context_name(p_handler.get_method());
-    if (session_decl::declare(
-            scope,
-            session_decl::KIND_JOIN,
-            p_handler,
-            config,
-            "configure_join"
-        )
-        != OK) {
-        return Ref<NetwJoinConfig>();
+    PackedInt32Array arg_types;
+    for (int at = 1; at < declared.size(); ++at) {
+        arg_types.push_back(int32_t(declared[at]));
     }
-    return config;
+    return NetwMultiplayer::session_join_declare(p_handler, arg_types);
 }
 
 Ref<NetwAdmissionConfig> Netw::configure_admission(const Callable &p_handler) {
     Node *scope = handler_scope(p_handler, "configure_admission");
     if (scope == nullptr) {
-        return Ref<NetwAdmissionConfig>();
+        return refused<NetwAdmissionConfig>();
     }
     decl_sites::record_handler(p_handler);
     Ref<NetwAdmissionConfig> config;
@@ -485,7 +565,7 @@ Ref<NetwAdmissionConfig> Netw::configure_admission(const Callable &p_handler) {
             "configure_admission"
         )
         != OK) {
-        return Ref<NetwAdmissionConfig>();
+        return refused<NetwAdmissionConfig>();
     }
     return config;
 }
@@ -540,33 +620,30 @@ Ref<NetwPropertyConfig> Netw::configure_property(
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{Netw.configure_property}"), String(), String("node")}
         );
-        return Ref<NetwPropertyConfig>();
+        return refused<NetwPropertyConfig>();
     }
     const uint64_t node_id = uint64_t(gd::instance_id(p_node));
-    if (p_node->is_inside_tree()) {
-        fault::raise(
-            nullptr,
-            NETW_FAULT_TOO_LATE,
-            {String("{Netw.configure_property}"),
-             String("'") + String(p_node->get_name()) + String("'"),
-             String("the node enters the tree")},
-            node_id
-        );
-        return Ref<NetwPropertyConfig>();
+    if (declared_too_late(p_node, "configure_property")) {
+        return refused<NetwPropertyConfig>();
     }
     const bool indexed = gd::declare_indexed_path(p_property) != nullptr;
     const gd::PropertyResolution resolved
         = gd::resolve_property(p_node, p_property, gd::property_list(p_node));
     if (!resolved.present) {
+        const String child = child_a_path_starts_at(p_node, p_property);
         fault::raise(
             nullptr,
             NETW_FAULT_UNKNOWN_NAME,
             {String("{Netw.configure_property}"),
              String(p_node->get_name()),
-             String(p_property)},
+             child.is_empty() ? String(p_property) : child,
+             0,
+             0,
+             child.is_empty() ? NETW_UNKNOWN_UNDECLARED
+                              : NETW_UNKNOWN_CHILD_NODE},
             node_id
         );
-        return Ref<NetwPropertyConfig>();
+        return refused<NetwPropertyConfig>();
     }
     if (p_declared_type < -1 || p_declared_type >= Variant::VARIANT_MAX
         || (resolved.type >= 0 && p_declared_type >= 0
@@ -581,7 +658,7 @@ Ref<NetwPropertyConfig> Netw::configure_property(
              String("the Variant type of the property, or -1")},
             node_id
         );
-        return Ref<NetwPropertyConfig>();
+        return refused<NetwPropertyConfig>();
     }
     const int declared_type = p_declared_type >= 0 ? int(p_declared_type)
         : indexed                                  ? -1
@@ -596,23 +673,35 @@ Ref<NetwPropertyConfig> Netw::configure_property(
                     "type")},
             node_id
         );
-        return Ref<NetwPropertyConfig>();
+        return refused<NetwPropertyConfig>();
+    }
+    if (is_animation_request(p_node, p_property)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_REQUEST_AS_VALUE,
+            {String(p_property)},
+            node_id
+        );
+        return refused<NetwPropertyConfig>();
+    }
+    if (declared_type == int(Variant::OBJECT)) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_UNSUPPORTED,
+            {String("{Netw.configure_property}"),
+             vformat("'%s', which holds an Object", String(p_property)),
+             String("a property that holds a plain value, such as the "
+                    "object's data or its node path")},
+            node_id
+        );
+        return refused<NetwPropertyConfig>();
     }
     decl_sites::record(NETW_SITE_COLUMN, p_node, p_property);
-    const Ref<Script> script = script_of(p_node);
-    if (script.is_null()) {
-        const Ref<NetwPropertyConfig> config
-            = netw::script::model::configure_node_property(p_node, p_property);
-        if (config.is_valid()) {
-            config->set_declared_type(declared_type);
-        }
-        return config;
-    }
     inject_property_lint(p_node);
     inject_component_registration(p_node);
     schedule_derived_registration(p_node);
     const Ref<NetwPropertyConfig> existing
-        = netw::script::model::get_property_config(script, p_property);
+        = netw::script::model::standing_property_config(p_node, p_property);
     if (existing.is_valid()) {
         if (existing->get_declared_type() != declared_type) {
             fault::raise(
@@ -623,40 +712,38 @@ Ref<NetwPropertyConfig> Netw::configure_property(
                  String(p_property)},
                 node_id
             );
-            return Ref<NetwPropertyConfig>();
+            return refused<NetwPropertyConfig>();
         }
+        netw::script::model::declare_node_property(
+            p_node,
+            p_property,
+            existing
+        );
         return existing;
     }
     Ref<NetwPropertyConfig> config;
     config.instantiate();
     config->set_declared_type(declared_type);
-    config->set_context_script(script);
+    config->set_context_script(script_of(p_node));
     config->set_context_name(p_property);
     config->set_context_type(1);
     config->set_context_node_ref(gd::weak_ref(p_node));
-    netw::script::model::declare_property_config(script, p_property, config);
+    config->set_inside_resource(path_enters_an_object(p_node, p_property));
+    netw::script::model::declare_node_property(p_node, p_property, config);
     return config;
 }
 
 Ref<NetwMemberConfig> Netw::configure_rpc(const Callable &p_callable) {
     const Ref<Script> script = named_method_script(p_callable, "configure_rpc");
     if (script.is_null()) {
-        return Ref<NetwMemberConfig>();
+        return refused<NetwMemberConfig>();
     }
     const StringName method = p_callable.get_method();
     Node *host = Object::cast_to<Node>(p_callable.get_object());
+    if (declared_too_late(host, "configure_rpc")) {
+        return refused<NetwMemberConfig>();
+    }
     if (host != nullptr) {
-        if (host->is_inside_tree()) {
-            fault::raise(
-                nullptr,
-                NETW_FAULT_TOO_LATE,
-                {String("{Netw.configure_rpc}"),
-                 String("'") + String(host->get_name()) + String("'"),
-                 String("the node enters the tree")},
-                uint64_t(gd::instance_id(host))
-            );
-            return Ref<NetwMemberConfig>();
-        }
         inject_component_registration(host);
     }
     decl_sites::record(NETW_SITE_RPC, p_callable.get_object(), method);
@@ -679,26 +766,45 @@ Ref<NetwMemberConfig> Netw::configure_rpc(const Callable &p_callable) {
 
 Ref<NetwMemberConfig> Netw::configure_signal(const Signal &p_signal) {
     Node *node = Object::cast_to<Node>(p_signal.get_object());
-    if (node == nullptr) {
+    if (p_signal.get_object() == nullptr || p_signal.get_name().is_empty()) {
         fault::raise(
             nullptr,
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{Netw.configure_signal}"), String(), String("signal")}
         );
-        return Ref<NetwMemberConfig>();
+        return refused<NetwMemberConfig>();
+    }
+    if (node == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_BAD_VALUE,
+            {String("{Netw.configure_signal}"),
+             vformat(
+                 "the signal '%s' of an object that is not a Node",
+                 String(p_signal.get_name())
+             ),
+             String("a signal of a Node")}
+        );
+        return refused<NetwMemberConfig>();
     }
     const StringName name = p_signal.get_name();
     const Ref<Script> script = script_of(node);
-    if (script.is_null() || name.is_empty() || !node->has_signal(name)) {
+    if (script.is_null() || !node->has_signal(name)) {
         fault::raise(
             nullptr,
             NETW_FAULT_UNKNOWN_NAME,
             {String("{Netw.configure_signal}"),
              String(node->get_name()),
-             String(name)},
+             String(name),
+             0,
+             0,
+             unknown_member_reason(script, node->has_signal(name))},
             uint64_t(gd::instance_id(node))
         );
-        return Ref<NetwMemberConfig>();
+        return refused<NetwMemberConfig>();
+    }
+    if (declared_too_late(node, "configure_signal")) {
+        return refused<NetwMemberConfig>();
     }
     const Ref<NetwMemberConfig> existing
         = netw::script::model::get_signal_config(script, name);
@@ -719,7 +825,7 @@ Ref<NetwMemberConfig> Netw::configure_spawn(const Callable &p_callable) {
     const Ref<Script> script
         = named_method_script(p_callable, "configure_spawn");
     if (script.is_null()) {
-        return Ref<NetwMemberConfig>();
+        return refused<NetwMemberConfig>();
     }
     const StringName method = p_callable.get_method();
     decl_sites::record_handler(p_callable);
@@ -733,12 +839,21 @@ Ref<NetwMemberConfig> Netw::configure_spawn(const Callable &p_callable) {
     config->set_context_script(script);
     config->set_context_name(method);
     config->set_context_type(0);
+    config->mark_spawn_function();
     netw::script::model::declare_spawn_config(script, method, config);
     return config;
 }
 
 Ref<NetwEntity> Netw::configure_entity(Node *p_node) {
     NETW_ZONE_NC("Netw configure entity", colors::SESSION);
+    if (p_node == nullptr) {
+        fault::raise(
+            nullptr,
+            NETW_FAULT_EMPTY_ARGUMENT,
+            {String("{Netw.configure_entity}"), String(), String("node")}
+        );
+        return Ref<NetwEntity>();
+    }
     decl_sites::record(NETW_SITE_KIND, p_node);
     const Ref<NetwEntity> entity = NetwEntity::declare(p_node);
     if (p_node != nullptr && p_node->is_inside_tree()
@@ -768,7 +883,10 @@ Ref<NetwDespawnConfig> Netw::configure_despawn(Node *p_node) {
              String("a node with a script")},
             p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
         );
-        return Ref<NetwDespawnConfig>();
+        return refused<NetwDespawnConfig>();
+    }
+    if (declared_too_late(p_node, "configure_despawn")) {
+        return refused<NetwDespawnConfig>();
     }
     const Ref<NetwDespawnConfig> existing
         = netw::script::model::get_own_despawn_config(script);
@@ -788,7 +906,10 @@ Ref<NetwPersistenceConfig> Netw::configure_persistence(Node *p_node) {
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{Netw.configure_persistence}"), String(), String("node")}
         );
-        return Ref<NetwPersistenceConfig>();
+        return refused<NetwPersistenceConfig>();
+    }
+    if (declared_too_late(p_node, "configure_persistence")) {
+        return refused<NetwPersistenceConfig>();
     }
     return netw::script::model::configure_node_persistence(p_node);
 }
@@ -925,7 +1046,7 @@ Ref<NetwDatabaseConfig> Netw::configure_database(
             NETW_FAULT_EMPTY_ARGUMENT,
             {String("{Netw.configure_database}"), String(), String("node")}
         );
-        return Ref<NetwDatabaseConfig>();
+        return refused<NetwDatabaseConfig>();
     }
     if (String(p_name).is_empty()) {
         fault::raise(
@@ -936,12 +1057,12 @@ Ref<NetwDatabaseConfig> Netw::configure_database(
              String("database name")},
             uint64_t(gd::instance_id(p_node))
         );
-        return Ref<NetwDatabaseConfig>();
+        return refused<NetwDatabaseConfig>();
     }
     Ref<NetwDatabaseConfig> draft;
     draft.instantiate();
     if (session_decl::declare_database(p_node, p_name, draft) != OK) {
-        return Ref<NetwDatabaseConfig>();
+        return refused<NetwDatabaseConfig>();
     }
     return draft;
 }
@@ -1084,7 +1205,7 @@ Ref<NetwActionConfig> Netw::configure_action(const Callable &p_method) {
              String("a method of a Node")},
             host != nullptr ? uint64_t(gd::instance_id(host)) : 0
         );
-        return Ref<NetwActionConfig>();
+        return refused<NetwActionConfig>();
     }
     return NetwMultiplayer::lagcomp_action_declare(host, method, p_method);
 }
@@ -1184,7 +1305,7 @@ Ref<NetwSceneConfig> Netw::configure_scene(Node *p_node) {
              String(),
              String("root node of the scene")}
         );
-        return Ref<NetwSceneConfig>();
+        return refused<NetwSceneConfig>();
     }
     const Ref<Script> script = script_of(p_node);
     if (script.is_null()) {
@@ -1196,7 +1317,10 @@ Ref<NetwSceneConfig> Netw::configure_scene(Node *p_node) {
              String("the script on the root of the scene")},
             uint64_t(gd::instance_id(p_node))
         );
-        return Ref<NetwSceneConfig>();
+        return refused<NetwSceneConfig>();
+    }
+    if (declared_too_late(p_node, "configure_scene")) {
+        return refused<NetwSceneConfig>();
     }
 
     SceneDecl decl = netw::script::model::get_scene_decl(script);

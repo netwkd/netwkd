@@ -440,6 +440,95 @@ public static class NetwApi
             : bridge;
     }
 
+    /// <summary>
+    /// The <see cref="Variant.Type"/> the addon expects for a handler
+    /// argument declared as <typeparamref name="T"/>, or Nil when the
+    /// argument takes any type.
+    /// </summary>
+    public static int VariantTypeOf<[MustBeVariant] T>()
+    {
+        Type declared = typeof(T);
+        if (declared == typeof(Variant))
+        {
+            return (int)Variant.Type.Nil;
+        }
+        if (declared.IsValueType)
+        {
+            return (int)Variant.From(default(T)).VariantType;
+        }
+        if (declared == typeof(string))
+        {
+            return (int)Variant.Type.String;
+        }
+        if (declared == typeof(StringName))
+        {
+            return (int)Variant.Type.StringName;
+        }
+        if (declared == typeof(NodePath))
+        {
+            return (int)Variant.Type.NodePath;
+        }
+        if (typeof(GodotObject).IsAssignableFrom(declared))
+        {
+            return (int)Variant.Type.Object;
+        }
+        if (declared == typeof(byte[]))
+        {
+            return (int)Variant.Type.PackedByteArray;
+        }
+        if (declared == typeof(int[]))
+        {
+            return (int)Variant.Type.PackedInt32Array;
+        }
+        if (declared == typeof(long[]))
+        {
+            return (int)Variant.Type.PackedInt64Array;
+        }
+        if (declared == typeof(float[]))
+        {
+            return (int)Variant.Type.PackedFloat32Array;
+        }
+        if (declared == typeof(double[]))
+        {
+            return (int)Variant.Type.PackedFloat64Array;
+        }
+        if (declared == typeof(string[]))
+        {
+            return (int)Variant.Type.PackedStringArray;
+        }
+        if (declared == typeof(Vector2[]))
+        {
+            return (int)Variant.Type.PackedVector2Array;
+        }
+        if (declared == typeof(Vector3[]))
+        {
+            return (int)Variant.Type.PackedVector3Array;
+        }
+        if (declared == typeof(Color[]))
+        {
+            return (int)Variant.Type.PackedColorArray;
+        }
+        if (declared == typeof(Vector4[]))
+        {
+            return (int)Variant.Type.PackedVector4Array;
+        }
+        Type shape = declared.IsGenericType
+            ? declared.GetGenericTypeDefinition()
+            : declared;
+        if (shape == typeof(Godot.Collections.Dictionary)
+            || shape == typeof(Godot.Collections.Dictionary<,>))
+        {
+            return (int)Variant.Type.Dictionary;
+        }
+        if (declared.IsArray
+            || shape == typeof(Godot.Collections.Array)
+            || shape == typeof(Godot.Collections.Array<>))
+        {
+            return (int)Variant.Type.Array;
+        }
+        return (int)Variant.Type.Nil;
+    }
+
     [ThreadStatic]
     private static Variant _answer;
 

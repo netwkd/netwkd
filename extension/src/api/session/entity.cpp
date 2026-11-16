@@ -822,6 +822,9 @@ RID NetwMultiplayer::spawn_call(
         return RID();
     }
     Object *node = pipeline->spawn(p_function, p_args, owner);
+    if (node == nullptr) {
+        spawn_tell_player_failed(p_player, p_function.get_method());
+    }
     return node != nullptr ? entity_of(node) : RID();
 }
 
@@ -3157,14 +3160,46 @@ void NetwMultiplayer::spawn_report_failed(
     );
 }
 
+void NetwMultiplayer::spawn_tell_player_failed(
+    int64_t p_player,
+    const StringName &p_method
+) {
+    const int64_t peer = player_get_peer(p_player);
+    if (!is_host() || !player_is_active(p_player) || peer <= 0
+        || peer == get_unique_id()) {
+        return;
+    }
+    session::SpawnFailed frame;
+    frame.route = 0;
+    frame.reason = String(p_method);
+    send_to(
+        peer,
+        0,
+        spawn_failed_channel,
+        session::frame_write(frame),
+        true,
+        0,
+        String()
+    );
+}
+
 void NetwMultiplayer::spawn_receive_failed_frame(
     const PackedByteArray &p_payload,
     int p_sender
 ) {
     spawn::Pipeline *spawns = spawn_plane();
     session::SpawnFailed frame;
-    if (!is_host() || spawns == nullptr
-        || !session::frame_read(p_payload, frame)) {
+    if (!session::frame_read(p_payload, frame)) {
+        return;
+    }
+    if (!is_host() && p_sender == SERVER_PEER && frame.route == 0) {
+        fault::raise(
+            this,
+            NETW_FAULT_PLAYER_SPAWN_FAILED,
+            {frame.reason, String(), String(), SERVER_PEER}
+        );
+    }
+    if (!is_host() || spawns == nullptr) {
         return;
     }
     spawn::Record *record = spawns->get_spawn_book()->spawned_of(frame.route);

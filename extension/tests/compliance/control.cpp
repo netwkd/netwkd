@@ -471,6 +471,45 @@ TEST_CASE(
     CHECK(seen.faults[0].contains("[NW1043]"));
 }
 
+constexpr const char *PUPPET = R"(
+class Rig extends AnimationTree:
+	func _init() -> void:
+		var root := AnimationNodeBlendTree.new()
+		root.add_node(&"blend", AnimationNodeBlend2.new())
+		tree_root = root
+		Netw.configure_entity(self)
+		Netw.configure_property(self, &"parameters/blend/blend_amount") \
+			.broadcast()
+)";
+
+constexpr const char *BLEND = "parameters/blend/blend_amount";
+
+World blended_puppet(double p_client_first, double p_client_second) {
+    return World(PUPPET, 1)
+        .watch("Rig", BLEND)
+        .at(1, spawn("Rig", "Rig"))
+        .at(3, set("Rig", BLEND, 0.25))
+        .at(8, on(0, set("Rig", BLEND, p_client_first)))
+        .at(10, set("Rig", BLEND, 0.5))
+        .at(14, on(0, set("Rig", BLEND, p_client_second)))
+        .at(16, set("Rig", BLEND, 0.75));
+}
+
+TEST_CASE(
+    "[Networked][Compliance] A10 a peer that changes a value it does not "
+    "control is told once, and one that rewrites the value it was sent is "
+    "told nothing"
+) {
+    const Seen fought = blended_puppet(1.0, 1.0).run(24);
+    NETW_HOLDS(reads(fought, 0, "Rig", BLEND, 0.75));
+    REQUIRE(fought.faults.size() == 1);
+    CHECK(fought.faults[0].contains("'Rig'"));
+    CHECK(fought.faults[0].contains("[NW0046]"));
+    const Seen followed = blended_puppet(0.25, 0.5).run(24);
+    NETW_HOLDS(reads(followed, 0, "Rig", BLEND, 0.75));
+    NETW_HOLDS(quiet(followed));
+}
+
 } // namespace ComplianceControl
 
 #endif

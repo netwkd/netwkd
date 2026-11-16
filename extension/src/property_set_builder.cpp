@@ -1,5 +1,7 @@
 #include "netw/property_set_builder.hpp"
 
+#include <cstring>
+
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/property_config.hpp"
 #include "netw/api/schema_core.hpp"
@@ -64,6 +66,39 @@ void warn_broadcast_ignored(const char *p_axis, const StringName &p_property) {
          String(p_property),
          "broadcast"}
     );
+}
+
+uint64_t double_bits(double p_value) {
+    uint64_t bits = 0;
+    memcpy(&bits, &p_value, sizeof(bits));
+    return bits;
+}
+
+StringName state_rate_property(
+    const Dictionary &p_configs,
+    const StringName &p_property,
+    const StringName &p_rate
+) {
+    if (p_rate == StringName()) {
+        return p_rate;
+    }
+    const Ref<NetwPropertyConfig> rate = p_configs.get(p_rate, Variant());
+    if (rate.is_valid() && rate->get_in_state_set()) {
+        return p_rate;
+    }
+    fault::raise(
+        nullptr,
+        NETW_FAULT_SETTING_REFUSED,
+        {String("{NetwPropertyConfig.extrapolate}"),
+         vformat(
+             "'%s' for '%s', which is not a state property of the same node",
+             String(p_rate),
+             String(p_property)
+         ),
+         String("the name of a property declared with "
+                "{NetwPropertyConfig.state} on that node")}
+    );
+    return StringName();
 }
 
 void warn_broadcast_exclusivity(const StringName &p_property) {
@@ -179,7 +214,11 @@ bool from_property_configs(
         );
         column.unchecked = config->get_unchecked();
         column.correction_weight = config->get_correction_weight();
-        column.rate_property = config->get_rate_property();
+        column.rate_property = state_rate_property(
+            p_configs,
+            property,
+            config->get_rate_property()
+        );
         column.explicit_teleport_only = config->get_explicit_teleport_only();
         column.correction_threshold = config->get_correction_threshold();
         column.teleport_threshold = config->get_teleport_threshold();
@@ -243,17 +282,12 @@ bool from_property_configs(
     return true;
 }
 
-bool compile_script(
-    PropertySet &r_set,
-    const Ref<Script> &p_script,
-    int64_t p_record,
-    Node *p_node
-) {
+bool compile_node(PropertySet &r_set, Node *p_node, int64_t p_record) {
     {
         NETW_ZONE_NC("PropertySet build columns", colors::WIRE);
         if (!from_property_configs(
                 r_set,
-                netw::script::model::get_property_configs(p_script),
+                netw::script::model::get_declared_property_configs(p_node),
                 p_record
             )) {
             return false;
@@ -261,7 +295,7 @@ bool compile_script(
     }
     {
         NETW_ZONE_NC("PropertySet stamp column types", colors::WIRE);
-        r_set.stamp_column_types(p_script, p_node);
+        r_set.stamp_column_types(p_node->get_script(), p_node);
     }
     {
         NETW_ZONE_NC("PropertySet seal", colors::WIRE);
@@ -270,13 +304,65 @@ bool compile_script(
     return true;
 }
 
-uint64_t from_script(
-    const Ref<Script> &p_script,
-    int64_t p_record,
-    Object *p_api,
-    Node *p_node
-) {
-    NETW_ZONE_NC("PropertySet from script", colors::WIRE);
+uint64_t declaration_key(Node *p_node) {
+    const uint64_t shared
+        = netw::script::model::shared_declaration_key(p_node);
+    if (shared != 0) {
+        return shared;
+    }
+    const Dictionary configs
+        = netw::script::model::get_declared_property_configs(p_node);
+    const Array declared = configs.keys();
+    uint64_t key = 0x9E3779B97F4A7C15ULL;
+    for (int index = 0; index < declared.size(); ++index) {
+        const StringName property = declared[index];
+        const Ref<NetwPropertyConfig> config = configs[property];
+        const Array quantizers = config->get_quantizers();
+        const int type = config->get_declared_type();
+        uint64_t layouts = 0;
+        for (int at = 0; at < quantizers.size(); ++at) {
+            const Ref<NetwQuantize> quantizer = quantizers[at];
+            layouts = (layouts ^ (quantizer.is_valid()
+                                      ? quantizer->layout_hash()
+                                      : uint64_t(at + 1)))
+                * 1099511628211ULL;
+        }
+        const uint64_t parts[] = {
+            uint64_t(property.hash()),
+            type >= 0
+                ? uint64_t(type)
+                : uint64_t(1) << 32
+                      | uint64_t(PropertySet::column_type_for(
+                          p_node->get_script(),
+                          p_node,
+                          property
+                      )),
+            uint64_t(config->get_in_state_set())
+                | uint64_t(config->get_in_input_set()) << 1
+                | uint64_t(config->get_in_broadcast_set()) << 2
+                | uint64_t(config->get_unchecked()) << 3
+                | uint64_t(config->get_explicit_teleport_only()) << 4
+                | uint64_t(config->is_policy_declared()) << 5
+                | uint64_t(config->get_lane()) << 8
+                | uint64_t(config->get_write_policy()) << 16
+                | uint64_t(config->get_set_audience()) << 24,
+            uint64_t(config->get_set_heartbeat_ticks()),
+            uint64_t(config->get_set_window()),
+            double_bits(config->get_correction_weight()),
+            double_bits(config->get_correction_threshold()),
+            double_bits(config->get_teleport_threshold()),
+            uint64_t(config->get_rate_property().hash()),
+            layouts,
+        };
+        for (const uint64_t part : parts) {
+            key = (key ^ part) * 1099511628211ULL;
+        }
+    }
+    return key;
+}
+
+uint64_t from_node(Node *p_node, int64_t p_record, Object *p_api) {
+    NETW_ZONE_NC("PropertySet from node", colors::WIRE);
     NetwMultiplayer *core = nullptr;
     if (p_api != nullptr) {
         core = godot::Object::cast_to<NetwMultiplayer>(p_api);
@@ -290,26 +376,27 @@ uint64_t from_script(
     if (core == nullptr) {
         return repl::SetBook::NONE;
     }
-    const RID adopted = core->adopted_property_set(
-        p_script,
-        NetwMultiplayer::RecordKind(p_record)
-    );
-    if (adopted.is_valid()) {
-        return core->property_set_id_of(adopted);
-    }
-    PropertySet source;
-    if (!compile_script(source, p_script, p_record, p_node)) {
+    if (netw::script::model::get_declared_property_configs(p_node)
+            .is_empty()) {
         return repl::SetBook::NONE;
     }
-    {
+    const uint64_t declaration = declaration_key(p_node);
+    const NetwMultiplayer::RecordKind record
+        = NetwMultiplayer::RecordKind(p_record);
+    RID adopted;
+    if (!core->property_set_adopted(declaration, record, adopted)) {
+        PropertySet source;
+        const bool compiled = compile_node(source, p_node, p_record);
         NETW_ZONE_NC("PropertySet adopt", colors::WIRE);
-        return core->property_set_id_of(core->adopt_property_set(
-            p_script,
-            NetwMultiplayer::RecordKind(p_record),
-            source,
+        adopted = core->adopt_property_set(
+            declaration,
+            record,
+            compiled ? &source : nullptr,
             p_node
-        ));
+        );
     }
+    return adopted.is_valid() ? core->property_set_id_of(adopted)
+                              : repl::SetBook::NONE;
 }
 
 } // namespace property_set_builder

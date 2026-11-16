@@ -13,11 +13,19 @@ class NetwAdmissionConfig : public godot::RefCounted {
 
     godot::LocalVector<godot::Ref<NetwAccountProvider>> providers;
     double timeout_seconds = 0.0;
+    bool refused = false;
 
 protected:
     static void _bind_methods();
 
 public:
+    void refuse() {
+        refused = true;
+    }
+    bool is_refused() const {
+        return refused;
+    }
+
     godot::Ref<NetwAdmissionConfig> accept(
         const godot::Ref<NetwAccountProvider> &p_provider
     );
