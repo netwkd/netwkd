@@ -43,7 +43,7 @@ PROFILES = {
         ["python3", "ci/reports.py", "reports/tests/report_1", "--log", "tmp/gdunit-tests.log", "--allow-stale"],
     ],
     "examples": [
-        ["python3", "ci/test.py", "--timeout", "2400", "gdunit", "--name", "examples", "--path", "res://examples/"],
+        ["python3", "ci/test.py", "--timeout", "2400", "gdunit", "--name", "examples", "--path", "res://tests/examples/"],
         [
             "python3",
             "ci/reports.py",

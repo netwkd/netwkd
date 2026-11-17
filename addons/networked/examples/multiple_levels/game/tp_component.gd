@@ -1,0 +1,113 @@
+extends Node
+
+signal teleport_committed
+
+const TPLayer := preload("tp_layer.gd")
+const MultipleLevelsSession := preload("multiple_levels_session.gd")
+
+@export_file("*.tscn") var current_scene_path: String = ""
+
+var arrival_marker: NodePath
+var layer: TPLayer
+
+var is_moving: bool:
+	get:
+		return layer != null and layer.is_moving()
+
+@onready var entity := NetwEntity.of(owner)
+@onready var session: NetwSession = Netw.session(self)
+@onready var game: MultipleLevelsSession = \
+		session.service(MultipleLevelsSession) as MultipleLevelsSession
+
+
+func _init() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	Netw.configure_property(self, &"current_scene_path") \
+			.on_spawn().persisted(&"level")
+
+
+func _ready() -> void:
+	entity.reparented.connect(apply_arrival_marker)
+	layer = session.service(TPLayer) as TPLayer
+
+
+func teleport(target_scene: String, target_marker: NodePath) -> NetwPromise:
+	if is_moving:
+		return layer.pending
+	var opened := layer.open(target_scene) if layer else NetwPromise.new()
+	@warning_ignore("missing_await")
+	cover_and_request(target_scene, target_marker)
+	return opened
+
+
+func cover_and_request(target_scene: String, target_marker: NodePath) -> void:
+	if layer:
+		await layer.teleport_out()
+	if not is_multiplayer_authority():
+		return
+	request_teleport.rpc_id(1, target_scene, target_marker)
+
+
+@rpc("authority", "call_local", "reliable")
+func request_teleport(scene_path: String, marker_path: NodePath) -> void:
+	if not multiplayer.is_server():
+		return
+	var mover := owner.get_multiplayer_authority()
+	var destination := game.open_level(scene_path)
+	var marker := destination.root.get_node_or_null(marker_path) as Node2D
+	if marker == null:
+		complete_teleport.rpc_id(
+			mover,
+			ERR_DOES_NOT_EXIST,
+			"Teleport destination has no marker at '%s'." % marker_path,
+		)
+		return
+	current_scene_path = scene_path
+	prepare_teleport.rpc(marker_path)
+	apply_marker(marker)
+	var moved := Netw.reparent(owner, destination.root)
+	moved.then(
+		func(_value: Variant) -> void:
+			complete_teleport.rpc_id(mover)
+	)
+	moved.catch_error(
+		func(code: Error, detail: String) -> void:
+			complete_teleport.rpc_id(mover, code, detail)
+	)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func prepare_teleport(marker_path: NodePath) -> void:
+	if multiplayer.get_remote_sender_id() == 1:
+		arrival_marker = marker_path
+
+
+func apply_arrival_marker() -> void:
+	if not arrival_marker.is_empty():
+		apply_marker(entity.scene.root.get_node(arrival_marker))
+
+
+func apply_marker(marker: Node2D) -> void:
+	(owner as Node2D).global_position = marker.global_position
+
+
+@rpc("any_peer", "call_local", "reliable")
+func complete_teleport(code: Error = OK, detail: String = "") -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	if code == OK:
+		apply_arrival_marker()
+		finish_teleport.rpc()
+	else:
+		arrival_marker = NodePath()
+	layer.answer(code, detail)
+
+
+@rpc("authority", "call_local", "reliable")
+func finish_teleport() -> void:
+	entity.display.reset()
+	owner.reset_physics_interpolation()
+	arrival_marker = NodePath()
+	if multiplayer.is_server():
+		entity.persistence.save()
+	teleport_committed.emit()

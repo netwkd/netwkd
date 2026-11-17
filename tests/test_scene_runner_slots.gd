@@ -1,7 +1,7 @@
 class_name TestSceneRunnerSlots
 extends NetwTestSuite
 
-const ACTION := &"move_right"
+const ACTION := &"scene_runner_slot"
 
 
 class InputProbe extends Node:
@@ -13,14 +13,12 @@ class InputProbe extends Node:
 			pressed = event.is_action_pressed(ACTION, true)
 
 
-func before() -> void:
-	assert(
-		InputMap.has_action(ACTION),
-		"InputMap action '%s' must be defined by project.godot." % ACTION,
-	)
+func before_test() -> void:
+	InputMap.add_action(ACTION)
 
 
 func after_test() -> void:
+	InputMap.erase_action(ACTION)
 	await NetwTestSuite.drain_frames(get_tree(), 2)
 	await super.after_test()
 

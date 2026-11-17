@@ -1,0 +1,27 @@
+extends Node3D
+
+const RocketCar := preload("player_rb.gd")
+const CAR_SCENE := preload("../scenes/player_rb.tscn")
+
+
+func _init() -> void:
+	Netw.configure_scene(self).labeled(&"Arena")
+	Netw.configure_spawn(spawn_car)
+
+
+func spawn_car(team: int, slot: int) -> Node:
+	var car := CAR_SCENE.instantiate() as RocketCar
+	car.team = team
+	car.slot = slot
+	car.transform = RocketCar.kickoff_pose(
+		get_node("Markers/%s%d" % ["r" if team == 0 else "b", slot + 1]),
+	)
+	return car
+
+
+func cars() -> Array[RocketCar]:
+	var out: Array[RocketCar] = []
+	for child in get_node(^"Players").get_children():
+		if child is RocketCar:
+			out.append(child)
+	return out

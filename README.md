@@ -28,14 +28,15 @@ unzip it into your project's root. `networked_steam`, `networked_discord` and
 ## Demos
 
 Play them in the browser at [netw-examples.pages.dev](https://netw-examples.pages.dev).
+They come with the addon, under [`addons/networked/examples`](addons/networked/examples).
 
-- [`bomber`](examples/bomber), Godot's multiplayer bomber demo
-- [`racing`](examples/racing), Kenney's Starter Kit Racing
-- [`rocket_league`](examples/rocket_league), cars and a ball
-- [`fps`](examples/fps), Kenney's Starter Kit FPS
-- [`playground`](examples/playground), players pushing 900 cubes around
-- [`multiple_levels`](examples/multiple_levels), players moving between levels
-- [`whiteboard`](examples/whiteboard), a shared drawing board
+- [`bomber`](addons/networked/examples/bomber), Godot's multiplayer bomber demo
+- [`racing`](addons/networked/examples/racing), Kenney's Starter Kit Racing
+- [`rocket_league`](addons/networked/examples/rocket_league), cars and a ball
+- [`fps`](addons/networked/examples/fps), Kenney's Starter Kit FPS
+- [`playground`](addons/networked/examples/playground), players pushing 900 cubes around
+- [`multiple_levels`](addons/networked/examples/multiple_levels), players moving between levels
+- [`whiteboard`](addons/networked/examples/whiteboard), a shared drawing board
 
 To run them from a clone of this repository,
 [build the GDExtension](extension/BUILDING.md) before opening the project in

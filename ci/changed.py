@@ -48,7 +48,7 @@ LANES: dict[str, tuple[str, ...]] = {
         ".github/**",
     ),
     "examples": (
-        "examples/**",
+        "tests/examples/**",
         "addons/networked/**",
         "addons/networked_discord/**",
         "addons/discord_social_sdk/**",

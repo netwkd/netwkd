@@ -35,6 +35,7 @@ LOAD_FAILURES = (
 
 DISCORD_MANIFEST = ROOT / "addons" / "discord_social_sdk" / "lib" / "discord.gdextension"
 DISCORD_SUITES = "res://tests/discord"
+EXAMPLE_SUITES = "res://tests/examples"
 
 PARSE_SWEEP = """extends SceneTree
 
@@ -117,9 +118,26 @@ func _init() -> void:
 \tvar made: Object = null
 \tif missing.is_empty():
 \t\tmade = ClassDB.instantiate("NetwBitStream")
-\tprint("CONSUMER found=%%d missing=%%s instantiated=%%s"
-\t\t%% [wanted.size() - missing.size(), missing, made != null])
-\tquit(0 if missing.is_empty() and made != null else 1)
+\tvar examples := 0
+\tvar broken: Array[String] = []
+\tvar root := "res://addons/networked/examples"
+\tfor folder in DirAccess.get_directories_at(root):
+\t\tvar main := root.path_join(folder).path_join("main.tscn")
+\t\tif not ResourceLoader.exists(main):
+\t\t\tcontinue
+\t\texamples += 1
+\t\tvar scene := load(main) as PackedScene
+\t\tif scene == null:
+\t\t\tbroken.append(main)
+\t\telse:
+\t\t\tscene.instantiate().free()
+\tfor entry in ProjectSettings.get_global_class_list():
+\t\tif String(entry["path"]).begins_with(root):
+\t\t\tbroken.append(entry["class"])
+\tprint("CONSUMER found=%%d missing=%%s instantiated=%%s examples=%%d broken=%%s"
+\t\t%% [wanted.size() - missing.size(), missing, made != null, examples, broken])
+\tvar ok := missing.is_empty() and made != null
+\tquit(0 if ok and examples > 0 and broken.is_empty() else 1)
 """
 
 
@@ -148,6 +166,16 @@ def leave_out_discord(roots: list[str]) -> list[str]:
             "::notice::%s did not run, because Discord's library is not installed. "
             "Read %s/README.md to install it." % (DISCORD_SUITES, DISCORD_SUITES.removeprefix("res://"))
         )
+    return kept
+
+
+def leave_out_examples(roots: list[str]) -> list[str]:
+    """The example suites run only from a root inside them, because they take
+    most of a whole run."""
+    kept: list[str] = []
+    for root in roots:
+        inside = root.rstrip("/") == EXAMPLE_SUITES or root.startswith(EXAMPLE_SUITES + "/")
+        kept += [root] if inside else _without(root, EXAMPLE_SUITES)
     return kept
 
 
@@ -398,7 +426,7 @@ def lane_gdunit(
         "-rd",
         "res://" + str(report_dir.relative_to(ROOT)).replace(os.sep, "/"),
     ]
-    for path in leave_out_discord(paths):
+    for path in leave_out_discord(leave_out_examples(paths)):
         argv += ["-a", path]
     _godot(
         godot,

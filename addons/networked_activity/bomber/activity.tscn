@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" uid="uid://3a3852p4fypv" path="res://addons/networked/examples/bomber/main.tscn" id="1_main"]
+[ext_resource type="Script" path="res://addons/networked_activity/bomber/activity_session.gd" id="2_sess"]
+[ext_resource type="Script" uid="uid://certc8teajoaj" path="res://addons/networked_activity/discord_activity_service.gd" id="3_activity"]
+[ext_resource type="Script" uid="uid://ge70acye7r1c" path="res://addons/networked_nakama/nakama_account.gd" id="4_nakama"]
+[ext_resource type="Script" uid="uid://d0u2yowat1s3u" path="res://addons/networked_nakama/nakama_lobby_directory.gd" id="5_directory"]
+
+[node name="Main" instance=ExtResource("1_main")]
+script = ExtResource("2_sess")
+
+[node name="NakamaAccount" type="NetwService" parent="." index="1"]
+script = ExtResource("4_nakama")
+host = "nakama.diesjor.com"
+port = 443
+use_ssl = true
+
+[node name="NakamaLobbyDirectory" type="LobbyDirectory" parent="LobbyProviders"]
+script = ExtResource("5_directory")
+browser_tag = "networked-bomber"
+metadata/_custom_type_script = "uid://d0u2yowat1s3u"
+
+[node name="RoomBar" parent="UI/ConnectBrowser"]
+visible = false
+
+[node name="DiscordActivityService" type="NetwService" parent="."]
+script = ExtResource("3_activity")
+application_id = 1519144648411447338
+url_mappings = Dictionary[String, String]({
+"/nakama": "nakama.diesjor.com"
+})

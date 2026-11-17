@@ -41,7 +41,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Check formatting
-        run: gdscript-formatter --check addons/networked tests examples
+        run: gdscript-formatter --check addons/networked tests
 
       - name: Lint
         continue-on-error: true
@@ -49,7 +49,7 @@ jobs:
           gdscript-formatter lint --pretty \
             --max-line-length 100 \
             --disable private-access,signal-name \
-            addons/networked tests examples
+            addons/networked tests
 
   workflows:
     name: "Workflow and shell lint"

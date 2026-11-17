@@ -269,7 +269,7 @@ jobs:
           retention-days: 7
 
   gdscript-examples:
-    name: "GdUnit4 res://examples"
+    name: "GdUnit4 res://tests/examples"
     needs: changes
     if: needs.changes.outputs.examples == 'true'
     runs-on: ubuntu-24.04
@@ -298,7 +298,7 @@ jobs:
         shell: bash
         run: |
           python3 ci/test.py --godot "${{ steps.engine.outputs.binary }}" \
-            gdunit --name examples --path res://examples/
+            gdunit --name examples --path res://tests/examples/
 
       - name: Read The Report
         if: always()

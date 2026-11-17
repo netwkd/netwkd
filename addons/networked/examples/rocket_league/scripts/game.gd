@@ -1,0 +1,47 @@
+extends Node
+
+const KICKOFF_DELAY := 3.5
+
+@onready var session: NetwSession = Netw.session(self)
+@onready var clock: NetwClock = session.clock
+
+var score_red := 0
+var score_blue := 0
+var kickoff_tick := 0
+
+
+func _init() -> void:
+	Netw.configure_entity(self).name = &"game"
+	Netw.configure_property(self, &"score_red").state().on_spawn()
+	Netw.configure_property(self, &"score_blue").state().on_spawn()
+	Netw.configure_property(self, &"kickoff_tick").state().on_spawn()
+
+
+func _ready() -> void:
+	if multiplayer.is_server():
+		queue_kickoff()
+		session.player_joined.connect(on_player_joined)
+
+
+func rule_goal(team: int, _tick: int) -> void:
+	if team == 0:
+		score_red += 1
+	else:
+		score_blue += 1
+	queue_kickoff()
+
+
+func queue_kickoff() -> void:
+	kickoff_tick = clock.tick + seconds_to_ticks(KICKOFF_DELAY)
+
+
+func countdown_seconds() -> float:
+	return maxf(0.0, kickoff_tick - clock.tick) / float(clock.tickrate)
+
+
+func seconds_to_ticks(seconds: float) -> int:
+	return int(seconds * float(clock.tickrate))
+
+
+func on_player_joined(_player: NetwPlayer) -> void:
+	queue_kickoff()

@@ -1,0 +1,56 @@
+extends CharacterBody2D
+
+const TPComponent := preload("tp_component.gd")
+
+@export_custom(PROPERTY_HINT_NONE, "suffix:px/s") var speed: float = 64
+
+var pressed := {
+	&"move_left": false,
+	&"move_right": false,
+	&"move_up": false,
+	&"move_down": false,
+}
+
+@onready var teleport: TPComponent = %TPComponent
+
+
+func _init() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	var declared := Netw.configure_entity(self)
+	declared.authority = NetwEntity.AUTHORITY_CONTROLLER
+	declared.display.visual_root = ^"Icon"
+
+	Netw.configure_property(self, &"position").on_spawn() \
+			.interpolate(NetwInterpolate.new().lerp())
+	Netw.configure_property(self, &"position").persisted(&"where")
+	Netw.configure_persistence(self) \
+			.database(&"saves") \
+			.table(&"players") \
+			.record_id(account_name) \
+			.interval(5.0)
+
+
+func account_name() -> StringName:
+	return NetwEntity.of(self).name
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_multiplayer_authority():
+		return
+	for action: StringName in pressed:
+		if event.is_action(action):
+			pressed[action] = event.is_action_pressed(action, true)
+
+
+func _physics_process(_delta: float) -> void:
+	if not is_multiplayer_authority():
+		return
+	if teleport.is_moving:
+		velocity = Vector2.ZERO
+		return
+	var dir := Vector2(
+		float(pressed[&"move_right"]) - float(pressed[&"move_left"]),
+		float(pressed[&"move_down"]) - float(pressed[&"move_up"]),
+	).normalized()
+	velocity = dir * speed
+	move_and_slide()
