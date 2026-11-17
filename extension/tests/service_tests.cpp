@@ -163,7 +163,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Services] lag compensation and session settings that "
+    "[Netw][Services] lag compensation and session settings that "
     "cannot apply are refused with the reason"
 ) {
     const Stand stand = {String("a server session")};

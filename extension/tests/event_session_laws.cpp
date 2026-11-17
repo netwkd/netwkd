@@ -371,7 +371,7 @@ const SessionLaw L_COMPLETE = {
 
 const SessionLaw LAWS[] = {L_NEUTRAL, L_COMPLETE};
 
-TEST_CASE("[Networked][Event][Hosted] the session's event laws hold") {
+TEST_CASE("[Netw][Event][Hosted] the session's event laws hold") {
     const SessionScenario CORPUS[] = {
         gate_verdicts(),
         carrier_acks(),
@@ -391,7 +391,7 @@ TEST_CASE("[Networked][Event][Hosted] the session's event laws hold") {
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] a commit behind the session's back reds "
+    "[Netw][Event][Hosted] a commit behind the session's back reds "
     "complete"
 ) {
     const SessionScenario scenario = table_commits();
@@ -401,7 +401,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] a gate that sinks its verdict without "
+    "[Netw][Event][Hosted] a gate that sinks its verdict without "
     "naming itself reds complete"
 ) {
     const SessionScenario scenario = gate_refusals();
@@ -411,7 +411,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] a truncated datagram handed to the "
+    "[Netw][Event][Hosted] a truncated datagram handed to the "
     "application reds complete"
 ) {
     const SessionScenario scenario = datagram_intake();
@@ -421,7 +421,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] EV1 event_drain answers the newest 4096 "
+    "[Netw][Event][Hosted] EV1 event_drain answers the newest 4096 "
     "rows oldest first, and a second drain answers nothing"
 ) {
     Ref<NetwMultiplayer> core;
@@ -445,7 +445,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] EV2 a session records only the groups it "
+    "[Netw][Event][Hosted] EV2 a session records only the groups it "
     "was armed with, and nothing at all unarmed"
 ) {
     struct Row {
@@ -490,7 +490,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Event][Hosted] EV3 a row carries its act's tick, route, "
+    "[Netw][Event][Hosted] EV3 a row carries its act's tick, route, "
     "peer, verdict and the two values its kind names"
 ) {
     Ref<NetwMultiplayer> core;

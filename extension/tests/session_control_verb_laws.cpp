@@ -35,7 +35,7 @@ int64_t kick_request_channel() {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] SC2 a kick request read outside a step "
+    "[Netw][Session][Hosted] SC2 a kick request read outside a step "
     "reaches the server as kick_requested at once, naming the player who "
     "asked and the player named, whether the host asked or a client's frame "
     "did, and not at all when the player named already left or belongs to "
@@ -111,7 +111,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] SC4 a client whose tickrate differs from "
+    "[Netw][Session][Hosted] SC4 a client whose tickrate differs from "
     "the server's emits tickrate_mismatch with the server's tickrate when "
     "the game chose to decide, at once when the reply is read outside a step"
 ) {

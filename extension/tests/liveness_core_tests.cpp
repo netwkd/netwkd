@@ -27,9 +27,7 @@ RID spawn(const Ref<NetwLivenessCore> &core, int *out_route) {
     return entity;
 }
 
-TEST_CASE(
-    "[Networked][Liveness][Hosted] L1 routes are monotonic and never repeat"
-) {
+TEST_CASE("[Netw][Liveness][Hosted] L1 routes are monotonic and never repeat") {
     Ref<NetwLivenessCore> core = make_core();
 
     int previous = 0;
@@ -45,7 +43,7 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("[Networked][Liveness][Hosted] L2 set_state moves forward only") {
+TEST_CASE("[Netw][Liveness][Hosted] L2 set_state moves forward only") {
     Ref<NetwLivenessCore> core = make_core();
     const RID entity = spawn(core, nullptr);
 
@@ -92,7 +90,7 @@ TEST_CASE("[Networked][Liveness][Hosted] L2 set_state moves forward only") {
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L3 a dead route stays dead for the session"
+    "[Netw][Liveness][Hosted] L3 a dead route stays dead for the session"
 ) {
     Ref<NetwLivenessCore> core = make_core();
     int route = 0;
@@ -121,7 +119,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L4 the route bridge agrees in both "
+    "[Netw][Liveness][Hosted] L4 the route bridge agrees in both "
     "directions"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -157,7 +155,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L5 a revival is a new epoch on the same "
+    "[Netw][Liveness][Hosted] L5 a revival is a new epoch on the same "
     "record"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -199,7 +197,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L15 an entity bound to a second route "
+    "[Netw][Liveness][Hosted] L15 an entity bound to a second route "
     "leaves its first one, so one entity answers to one route"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -229,7 +227,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L11 a route never renames, alive or "
+    "[Netw][Liveness][Hosted] L11 a route never renames, alive or "
     "tombstoned"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -269,7 +267,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L12 the epoch moves on one edge and by one"
+    "[Netw][Liveness][Hosted] L12 the epoch moves on one edge and by one"
 ) {
     Ref<NetwLivenessCore> core = make_core();
     int route = 0;
@@ -318,7 +316,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L13 hide_route is the only door into "
+    "[Netw][Liveness][Hosted] L13 hide_route is the only door into "
     "absence and live is the only door in"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -369,7 +367,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L14 a return from absence is the same life"
+    "[Netw][Liveness][Hosted] L14 a return from absence is the same life"
 ) {
     Ref<NetwLivenessCore> core = make_core();
     int route = 0;
@@ -415,7 +413,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] live_routes is sorted and holds only live "
+    "[Netw][Liveness][Hosted] live_routes is sorted and holds only live "
     "routes"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -439,7 +437,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L6 the bulk door mints an identity per "
+    "[Netw][Liveness][Hosted] L6 the bulk door mints an identity per "
     "route and lands on one already standing"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -497,7 +495,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L7 a wait is answered once, by the binding "
+    "[Netw][Liveness][Hosted] L7 a wait is answered once, by the binding "
     "that made its route live"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -549,7 +547,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L8 a wait expires against the counter it "
+    "[Netw][Liveness][Hosted] L8 a wait expires against the counter it "
     "was armed on"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -588,7 +586,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L9 one expiry does not take its route's "
+    "[Netw][Liveness][Hosted] L9 one expiry does not take its route's "
     "other waits with it"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -634,7 +632,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] L10 a wait armed on a clock ignores the "
+    "[Netw][Liveness][Hosted] L10 a wait armed on a clock ignores the "
     "frame counter"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -671,7 +669,7 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("[Networked][Liveness][Hosted] clear releases the session") {
+TEST_CASE("[Netw][Liveness][Hosted] clear releases the session") {
     Ref<NetwLivenessCore> core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
@@ -697,7 +695,7 @@ TEST_CASE("[Networked][Liveness][Hosted] clear releases the session") {
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] M1 the mint and the record plane answer "
+    "[Netw][Liveness][Hosted] M1 the mint and the record plane answer "
     "different questions"
 ) {
     const RID loose = netw::entity::mint();
@@ -722,7 +720,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] M2 a handle the mint never issued cannot "
+    "[Netw][Liveness][Hosted] M2 a handle the mint never issued cannot "
     "open a record"
 ) {
     Ref<NetwLivenessCore> core = make_core();
@@ -738,7 +736,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] M3 two planes never see each other's "
+    "[Netw][Liveness][Hosted] M3 two planes never see each other's "
     "entities, and a released handle is never issued again"
 ) {
     Ref<NetwLivenessCore> a = make_core();
@@ -761,7 +759,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] M4 a plane releases every handle it "
+    "[Netw][Liveness][Hosted] M4 a plane releases every handle it "
     "adopted, routed or not"
 ) {
     const int before = netw::entity::outstanding();
@@ -777,7 +775,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Liveness][Hosted] M5 a handle outlives every holder but the "
+    "[Netw][Liveness][Hosted] M5 a handle outlives every holder but the "
     "last"
 ) {
     const int before = netw::entity::outstanding();

@@ -154,7 +154,7 @@ World yard() {
 NETW_FRAME_SCENARIO(WorldFrames, yard_frames, &yard, END);
 
 TEST_CASE(
-    "[Networked][Body][Frame] B1 a game's write to a sleeping body's "
+    "[Netw][Body][Frame] B1 a game's write to a sleeping body's "
     "position, script property or engine property reaches every client"
 ) {
     const Seen &seen = yard_frames.seen();
@@ -171,7 +171,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Body][Frame] B2 a client's copy of a sleeping, frozen or 2D "
+    "[Netw][Body][Frame] B2 a client's copy of a sleeping, frozen or 2D "
     "rigid body stands where the server put it, in its node and in the "
     "physics engine"
 ) {
@@ -188,7 +188,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Body][Frame] B3 a body reparented under a turned parent "
+    "[Netw][Body][Frame] B3 a body reparented under a turned parent "
     "keeps replicating its pose against that parent"
 ) {
     const Seen &seen = yard_frames.seen();

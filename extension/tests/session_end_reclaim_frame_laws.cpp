@@ -624,7 +624,7 @@ using TestSessionEndReclaimFrameLaws::ReclaimEvidence;
 using TestSessionEndReclaimFrameLaws::SEATS;
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR1 every node the session spawned is freed "
+    "[Netw][Session][Frame] SR1 every node the session spawned is freed "
     "on the server and on every client once the session ends, in each of two "
     "host cycles"
 ) {
@@ -644,7 +644,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR2 an entity the game placed by hand "
+    "[Netw][Session][Frame] SR2 an entity the game placed by hand "
     "survives the session ending on every peer"
 ) {
     const ReclaimEvidence &seen = driven();
@@ -660,7 +660,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR3 hosting again leaves no more nodes "
+    "[Netw][Session][Frame] SR3 hosting again leaves no more nodes "
     "behind than the first session did"
 ) {
     const ReclaimEvidence &seen = driven();
@@ -669,7 +669,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR4 a client that leaves frees its own "
+    "[Netw][Session][Frame] SR4 a client that leaves frees its own "
     "replicas, its player's node is despawned on the host and on the other "
     "client, and every other node stays"
 ) {
@@ -686,7 +686,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR5 a spawned node that never entered the "
+    "[Netw][Session][Frame] SR5 a spawned node that never entered the "
     "tree and one moved outside the session root are freed when the session "
     "ends"
 ) {
@@ -697,14 +697,14 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR9 a spawned node that never entered the "
+    "[Netw][Session][Frame] SR9 a spawned node that never entered the "
     "tree is reported once, though the session then ends"
 ) {
     NETW_CHECK_EQ(driven().orphan_warnings, 1);
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR8 a spawned node the game takes out of the "
+    "[Netw][Session][Frame] SR8 a spawned node the game takes out of the "
     "tree is despawned on the clients and stays the game's to free"
 ) {
     const ReclaimEvidence &seen = driven();
@@ -714,7 +714,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR6 a node still lingering after its despawn "
+    "[Netw][Session][Frame] SR6 a node still lingering after its despawn "
     "when the session ends is freed all the same"
 ) {
     const ReclaimEvidence &seen = driven();
@@ -722,7 +722,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SR7 a server lost under TRANSFER_CONTINUE "
+    "[Netw][Session][Frame] SR7 a server lost under TRANSFER_CONTINUE "
     "ends no client session and frees nothing the clients hold"
 ) {
     const ReclaimEvidence &seen = driven();

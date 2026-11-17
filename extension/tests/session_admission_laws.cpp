@@ -133,7 +133,7 @@ struct HostedBranch {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a server served by a directory binds "
+    "[Netw][Session][SceneTree] a server served by a directory binds "
     "the challenge to the directory's account for peer 1, and a server "
     "whose transport identifies nobody leaves it unbound"
 ) {
@@ -157,7 +157,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a client that joined through a "
+    "[Netw][Session][SceneTree] a client that joined through a "
     "directory binds the challenge to the same account for peer 1 as the "
     "server does"
 ) {
@@ -238,7 +238,7 @@ const SecondLogin SECOND_LOGINS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a second join of an account already "
+    "[Netw][Session][SceneTree] a second join of an account already "
     "playing replaces the first player, who leaves with its reason before "
     "the second is seated, and the server's own player is never replaced"
 ) {

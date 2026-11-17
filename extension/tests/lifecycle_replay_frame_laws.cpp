@@ -227,7 +227,7 @@ public:
 NETW_FRAME_SCENARIO(ReplayScenario, lifecycle_replay_scenario);
 
 TEST_CASE(
-    "[Networked][Lifecycle][Frame] replay, a predicted avatar that calls "
+    "[Netw][Lifecycle][Frame] replay, a predicted avatar that calls "
     "Netw.spawn in _network_process spawns once, on the fresh tick, whatever "
     "the replay depth"
 ) {

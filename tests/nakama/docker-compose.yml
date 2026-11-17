@@ -4,7 +4,7 @@
 # key "defaultkey", and the developer console at http://127.0.0.1:7351 with
 # admin / password.
 #
-# The live tests read the networked/tests/nakama_host project setting, then
+# The live tests read the netwkd/tests/nakama_host project setting, then
 # fall back to the NAKAMA_TEST_HOST env var. With neither set they no-op, so
 # CI stays green.
 

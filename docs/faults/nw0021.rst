@@ -5,7 +5,7 @@
 NW0021. A peer called a method it may not call
 ==============================================
 
-Reported as a warning when a peer calls a networked method and the method's
+Reported as a warning when a peer calls a method over the network and the method's
 policy does not allow that peer. It also covers an action on an entity the
 peer does not control.
 

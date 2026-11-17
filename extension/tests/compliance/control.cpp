@@ -52,7 +52,7 @@ World borrowed_ball() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] A1 a client that takes control of an entity "
+    "[Netw][Compliance] A1 a client that takes control of an entity "
     "moves it on every peer, what it writes after handing control back "
     "changes nothing, and control returns to the server when it leaves"
 ) {
@@ -146,7 +146,7 @@ World paddock() {
 NETW_FRAME_SCENARIO(WorldFrames, paddock_frames, &paddock, 44);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] A2 a player who drops loses control to "
+    "[Netw][Compliance][Frame] A2 a player who drops loses control to "
     "the server, gets the same entities back on return, and a stranger on "
     "the reused peer id gets none"
 ) {
@@ -220,7 +220,7 @@ World abandoned_karts() {
 NETW_FRAME_SCENARIO(WorldFrames, abandoned_karts_frames, &abandoned_karts, 36);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] A3 when its controller leaves, an "
+    "[Netw][Compliance][Frame] A3 when its controller leaves, an "
     "entity returns to the server or despawns, as it declared, and does so "
     "once"
 ) {
@@ -350,7 +350,7 @@ void refused_on_the_author_alone(const Seen &seen) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] A5 a spawn, move or despawn the server "
+    "[Netw][Compliance][Frame] A5 a spawn, move or despawn the server "
     "refuses shows at once on the client that made it, is undone there, and "
     "never reaches another peer"
 ) {
@@ -396,7 +396,7 @@ LawVerdict claimed_in_order(const Seen &p_seen) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] A7 the claims a client makes reach the server "
+    "[Netw][Compliance] A7 the claims a client makes reach the server "
     "in the order it made them, however the link reorders its packets"
 ) {
     const Seen seen = racked_balls().run(60);
@@ -433,7 +433,7 @@ World walker_meets_a_wall() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] A8 a player who walked on where the server "
+    "[Netw][Compliance] A8 a player who walked on where the server "
     "stopped them is brought back to where the server holds them"
 ) {
     const Seen seen = walker_meets_a_wall().run(80);
@@ -460,7 +460,7 @@ World slowly_judged_ball() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] A9 a control handler that awaits before it "
+    "[Netw][Compliance] A9 a control handler that awaits before it "
     "denies is reported, and the claim is granted as the request stood "
     "when the handler returned"
 ) {
@@ -496,7 +496,7 @@ World blended_puppet(double p_client_first, double p_client_second) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] A10 a peer that changes a value it does not "
+    "[Netw][Compliance] A10 a peer that changes a value it does not "
     "control is told once, and one that rewrites the value it was sent is "
     "told nothing"
 ) {

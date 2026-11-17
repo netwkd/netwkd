@@ -100,5 +100,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: addons/networked_activity/templates/token_worker
+          workingDirectory: addons/netwkd_activity/templates/token_worker
           command: deploy

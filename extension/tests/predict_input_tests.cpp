@@ -326,7 +326,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Predict][SceneTree] a player's input reaches the server on "
+    "[Netw][Predict][SceneTree] a player's input reaches the server on "
     "its own tick, late or in a burst, and a body the server controls moves"
 ) {
     const World world = {String("a server and one client on a loopback")};

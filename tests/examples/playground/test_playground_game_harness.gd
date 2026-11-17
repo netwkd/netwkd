@@ -1,6 +1,6 @@
 extends NetwTestSuite
 
-const GAME := "res://addons/networked/examples/playground/"
+const GAME := "res://addons/netwkd/examples/playground/"
 const MAIN := preload(GAME + "main.tscn")
 const PlayPlayer := preload(GAME + "game/player.gd")
 

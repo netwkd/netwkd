@@ -76,7 +76,7 @@ bool reports_ambiguity(const Ref<NetwMultiplayer> &p_api) {
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD1 a declaration made off-tree "
+    "[Netw][Session][Hosted][SceneTree] HD1 a declaration made off-tree "
     "runs nothing and governs nothing until its scope node enters a branch, "
     "at which point the probe that session answers is the declared one"
 ) {
@@ -101,7 +101,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD2 a provider is handed a "
+    "[Netw][Session][Hosted][SceneTree] HD2 a provider is handed a "
     "record already built from the session it answers for, so it edits live "
     "state rather than reconstructing it"
 ) {
@@ -122,7 +122,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD3 two branches each answer "
+    "[Netw][Session][Hosted][SceneTree] HD3 two branches each answer "
     "with the declaration made in their own branch, and neither reaches the "
     "other's"
 ) {
@@ -142,7 +142,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD4 an api installed on a "
+    "[Netw][Session][Hosted][SceneTree] HD4 an api installed on a "
     "branch after the declaring node entered it is discovered by the "
     "reconciliation a probe performs, with no re-declaration"
 ) {
@@ -174,7 +174,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD5 two live declarations on one "
+    "[Netw][Session][Hosted][SceneTree] HD5 two live declarations on one "
     "session refuse the probe rather than picking the later entrant, report "
     "the conflict once, and answer again once one of them leaves the branch"
 ) {
@@ -208,7 +208,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD6 a scope node that leaves the "
+    "[Netw][Session][Hosted][SceneTree] HD6 a scope node that leaves the "
     "branch refuses the probe rather than falling back to the built-in reply, "
     "and re-entering the same session restores it"
 ) {
@@ -234,7 +234,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD7 a scope node that moves to "
+    "[Netw][Session][Hosted][SceneTree] HD7 a scope node that moves to "
     "another session activates there and can never be invoked through the "
     "branch it left"
 ) {
@@ -258,7 +258,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD8 a scope node that declares "
+    "[Netw][Session][Hosted][SceneTree] HD8 a scope node that declares "
     "a second provider is refused once and its first one keeps answering, "
     "and the node leaving the branch takes that provider with it"
 ) {
@@ -292,7 +292,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD10 a declaration its node "
+    "[Netw][Session][Hosted][SceneTree] HD10 a declaration its node "
     "never activated is freed with that node and leaves the session answering "
     "its built-in reply, with no report owed to anyone"
 ) {
@@ -307,7 +307,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] HD11 a provider written on "
+    "[Netw][Session][Hosted][SceneTree] HD11 a provider written on "
     "something that is not a Node and one whose object is already dead are "
     "both refused at the door, and the declaration a node already carries "
     "survives the rejected edit"

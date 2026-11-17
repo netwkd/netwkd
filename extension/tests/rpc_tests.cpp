@@ -845,7 +845,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Rpc][SceneTree] an RPC runs where its declaration says, "
+    "[Netw][Rpc][SceneTree] an RPC runs where its declaration says, "
     "once, under the caller's id, and a request always answers"
 ) {
     const World world = {String("two clients and a server on a loopback")};
@@ -977,7 +977,7 @@ Answer answer_of(const Variant &p_answer) {
 }
 
 TEST_CASE(
-    "[Networked][Rpc][SceneTree] a call no peer can route fails at the call "
+    "[Netw][Rpc][SceneTree] a call no peer can route fails at the call "
     "through every door, is reported once per node, and a request answers "
     "a failed promise"
 ) {

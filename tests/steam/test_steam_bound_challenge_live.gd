@@ -48,7 +48,7 @@ func test_steam_binds_the_challenge_to_the_host() -> void:
 		var hosted: NetwPromise = session.connection.host(
 			SteamMultiplayerPeer,
 			{
-				"name": "Networked bound challenge",
+				"name": "netwkd bound challenge",
 				"visibility": NetwServerInfo.VISIBILITY_PUBLIC,
 			},
 		)

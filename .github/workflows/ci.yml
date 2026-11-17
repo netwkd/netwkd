@@ -242,7 +242,7 @@ jobs:
         shell: bash
         run: |
           python3 ci/test.py --godot "${{ steps.engine.outputs.binary }}" \
-            parse res://tests res://addons/networked
+            parse res://tests res://addons/netwkd
 
       - name: Run The Suites
         shell: bash

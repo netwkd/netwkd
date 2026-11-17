@@ -53,25 +53,25 @@ Properties
 .. table::
    :widths: auto
 
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`int`                   | :ref:`max_players<class_SteamLobbyDirectory_property_max_players>`                 | ``8``           |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`String`                | :ref:`browser_tag<class_SteamLobbyDirectory_property_browser_tag>`                 | ``"networked"`` |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`bool`                  | :ref:`allow_relay<class_SteamLobbyDirectory_property_allow_relay>`                 | ``true``        |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`bool`                  | :ref:`no_delay<class_SteamLobbyDirectory_property_no_delay>`                       | ``true``        |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`bool`                  | :ref:`spacewar_when_unset<class_SteamLobbyDirectory_property_spacewar_when_unset>` | ``false``       |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`bool`                  | :ref:`hide_own_lobbies<class_SteamLobbyDirectory_property_hide_own_lobbies>`       | ``true``        |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`int`                   | :ref:`lobby_id<class_SteamLobbyDirectory_property_lobby_id>`                       | ``0``           |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`SteamMultiplayerPeer`  | :ref:`peer<class_SteamLobbyDirectory_property_peer>`                               |                 |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
-   | :godot:`Array`\[:godot:`int`\] | :ref:`members<class_SteamLobbyDirectory_property_members>`                         |                 |
-   +--------------------------------+------------------------------------------------------------------------------------+-----------------+
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`int`                   | :ref:`max_players<class_SteamLobbyDirectory_property_max_players>`                 | ``8``        |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`String`                | :ref:`browser_tag<class_SteamLobbyDirectory_property_browser_tag>`                 | ``"netwkd"`` |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`bool`                  | :ref:`allow_relay<class_SteamLobbyDirectory_property_allow_relay>`                 | ``true``     |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`bool`                  | :ref:`no_delay<class_SteamLobbyDirectory_property_no_delay>`                       | ``true``     |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`bool`                  | :ref:`spacewar_when_unset<class_SteamLobbyDirectory_property_spacewar_when_unset>` | ``false``    |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`bool`                  | :ref:`hide_own_lobbies<class_SteamLobbyDirectory_property_hide_own_lobbies>`       | ``true``     |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`int`                   | :ref:`lobby_id<class_SteamLobbyDirectory_property_lobby_id>`                       | ``0``        |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`SteamMultiplayerPeer`  | :ref:`peer<class_SteamLobbyDirectory_property_peer>`                               |              |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
+   | :godot:`Array`\[:godot:`int`\] | :ref:`members<class_SteamLobbyDirectory_property_members>`                         |              |
+   +--------------------------------+------------------------------------------------------------------------------------+--------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -237,7 +237,7 @@ The player limit when hosting supplies none.
 
 .. rst-class:: classref-property
 
-:godot:`String` **browser_tag** = ``"networked"`` :ref:`🔗<class_SteamLobbyDirectory_property_browser_tag>`
+:godot:`String` **browser_tag** = ``"netwkd"`` :ref:`🔗<class_SteamLobbyDirectory_property_browser_tag>`
 
 Only lobbies with this tag appear in the browser.
 

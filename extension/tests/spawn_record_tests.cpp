@@ -35,7 +35,7 @@ int64_t header_size(const Record &p_record, Object *p_entity) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a record names the node it was stamped for and "
+    "[Netw][Spawn][Hosted] a record names the node it was stamped for and "
     "answers nothing once that node is freed"
 ) {
     Record record;
@@ -50,7 +50,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] binding nothing forgets the node the record "
+    "[Netw][Spawn][Hosted] binding nothing forgets the node the record "
     "named"
 ) {
     Record record;
@@ -64,7 +64,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the function host and the consumed spawner "
+    "[Netw][Spawn][Hosted] the function host and the consumed spawner "
     "outlive nothing either"
 ) {
     Record record;
@@ -83,7 +83,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a recipient is enrolled once and each mutation "
+    "[Netw][Spawn][Hosted] a recipient is enrolled once and each mutation "
     "answers whether it moved the book"
 ) {
     Record record;
@@ -103,7 +103,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the recipients read back in the order they "
+    "[Netw][Spawn][Hosted] the recipients read back in the order they "
     "were enrolled"
 ) {
     Record record;
@@ -119,7 +119,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] replacing the recipients drops the whole "
+    "[Netw][Spawn][Hosted] replacing the recipients drops the whole "
     "previous set and keeps no duplicate"
 ) {
     Record record;
@@ -138,7 +138,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the frame header round trips, and a record "
+    "[Netw][Spawn][Hosted] the frame header round trips, and a record "
     "with no entity carries its own captured controller"
 ) {
     Record record;
@@ -160,7 +160,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the -1 no-action sentinel survives the header, "
+    "[Netw][Spawn][Hosted] the -1 no-action sentinel survives the header, "
     "because the field is biased by one and never hands a negative to the "
     "unsigned varint"
 ) {
@@ -175,7 +175,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the live entity's controller beats the "
+    "[Netw][Spawn][Hosted] the live entity's controller beats the "
     "record's, because a late joiner must see a mid-session grant"
 ) {
     Node *owner = memnew(Node);
@@ -201,7 +201,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the header carries the live decision's "
+    "[Netw][Spawn][Hosted] the header carries the live decision's "
     "revision, tenure and hold, so a late joiner starts on the decision the "
     "session already made, and a record with no entity carries none"
 ) {
@@ -234,7 +234,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the header carries the player id, so a spawn "
+    "[Netw][Spawn][Hosted] the header carries the player id, so a spawn "
     "a client decodes before the accept naming its peer still stamps the "
     "membership it belongs to"
 ) {
@@ -265,7 +265,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a declared scene carries its label and an "
+    "[Netw][Spawn][Hosted] a declared scene carries its label and an "
     "undeclared one carries no bytes for it"
 ) {
     Node *owner = memnew(Node);

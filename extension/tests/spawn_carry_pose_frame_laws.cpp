@@ -307,7 +307,7 @@ NETW_FRAME_SCENARIO(CarryPoseScenario, carry_pose_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Spawn][Frame] a peer applying a reparent frame keeps a "
+    "[Netw][Spawn][Frame] a peer applying a reparent frame keeps a "
     "moving body's velocity"
 ) {
     const PoseEvidence &seen = carry_pose_evidence().kinds[KIND_RIGID_SLIDING];

@@ -169,7 +169,7 @@ NETW_FRAME_SCENARIO(ClockLostPongScenario, clock_lost_pong_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Clock][Frame] LP1 a client whose first pong is lost keeps "
+    "[Netw][Clock][Frame] LP1 a client whose first pong is lost keeps "
     "pinging until one answers, so a single dropped datagram never leaves "
     "the clock unsynchronized for the rest of the session"
 ) {

@@ -69,7 +69,7 @@ int a_body_the_client_holds(LoopbackRig &p_rig, Node *p_parent) {
 }
 
 TEST_CASE(
-    "[Networked][Liveness] HV4 a hidden body keeps the prediction "
+    "[Netw][Liveness] HV4 a hidden body keeps the prediction "
     "declaration its game made, because a declaration is scoped to the "
     "identity and a hide loses only the body"
 ) {

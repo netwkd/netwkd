@@ -35,7 +35,7 @@ int64_t counter_of(LoopbackRig &p_rig, int p_client, const char *p_key) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] VW5 a frame naming a life the receiver has already "
+    "[Netw][Spawn] VW5 a frame naming a life the receiver has already "
     "buried is refused, because an unreliable frame authored before a death "
     "can arrive after the reliable frame that opened the next life"
 ) {

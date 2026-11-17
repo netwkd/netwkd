@@ -123,7 +123,7 @@ LawVerdict never_above(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] C1 a client the server corrects agrees "
+    "[Netw][Predict][Frame] C1 a client the server corrects agrees "
     "with it on a state property of a child node"
 ) {
     const Seen &seen = relay_frames.seen();
@@ -133,7 +133,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] C2 one server change to a moving frame "
+    "[Netw][Predict][Frame] C2 one server change to a moving frame "
     "body costs one correction, never overshoots, and the client then equals "
     "the server, over a slow link and over none"
 ) {
@@ -242,7 +242,7 @@ LawVerdict replays_together(const Seen &p_seen, int p_peer) {
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] C4 a joint island replays the driven body "
+    "[Netw][Predict][Frame] C4 a joint island replays the driven body "
     "and the body behind it together, and the one ahead holds the other back"
 ) {
     const Seen &seen = convoy_frames.seen();
@@ -298,7 +298,7 @@ World lot() {
 NETW_FRAME_SCENARIO(WorldFrames, lot_frames, &lot, 40);
 
 TEST_CASE(
-    "[Networked][Predict][Frame] C5 a client predicting a physics body runs "
+    "[Netw][Predict][Frame] C5 a client predicting a physics body runs "
     "the other bodies it sees, and leaves one whose remote mode is proxy "
     "interpolated"
 ) {

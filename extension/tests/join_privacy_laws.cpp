@@ -17,7 +17,7 @@ using netw::NetwMultiplayer;
 using netw_test::LoopbackRig;
 
 TEST_CASE(
-    "[Networked][Session] JV2 one membership answers one participant object on "
+    "[Netw][Session] JV2 one membership answers one participant object on "
     "every route that mints one, so a client that learned a peer from the "
     "accept and then from the roster holds a single object for it"
 ) {
@@ -50,7 +50,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] JV5 a client reads the join address and the player "
+    "[Netw][Session] JV5 a client reads the join address and the player "
     "limit the server advertises once admitted, and follows the server when "
     "it advertises another address without joining a second time"
 ) {

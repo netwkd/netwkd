@@ -6,7 +6,7 @@
 
 /build/
 
-/addons/networked/bin/
+/addons/netwkd/bin/
 
 /addons/discord_social_sdk/lib/discord.gdextension
 /addons/discord_social_sdk/lib/linux/libdiscord_partner_sdk.so

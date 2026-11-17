@@ -47,7 +47,7 @@ Pumped pump_to_rest(int64_t p_groups) {
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] EV4 recording every group changes "
+    "[Netw][Display][SceneTree] EV4 recording every group changes "
     "neither what a display shows nor how often it pumps, and its record, "
     "pump and write rows name the entity by RID and by route"
 ) {

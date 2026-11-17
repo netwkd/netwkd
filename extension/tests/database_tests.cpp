@@ -775,7 +775,7 @@ const Row ROWS[] = {
      &edited_text},
 };
 
-TEST_CASE("[Networked][Table][SceneTree] a save holds what a game wrote") {
+TEST_CASE("[Netw][Table][SceneTree] a save holds what a game wrote") {
     const Stand stand = {String("a database a node declares")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, stand);

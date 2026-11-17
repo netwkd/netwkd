@@ -11,7 +11,7 @@ so, and the examples play without their Discord panel.
    `addons/discord_social_sdk/lib/linux/`, or
    `bin/release/discord_partner_sdk.dll` into
    `addons/discord_social_sdk/lib/windows/`.
-3. Open the editor once. The Networked Discord plugin writes
+3. Open the editor once. The netwkd Discord plugin writes
    `addons/discord_social_sdk/lib/discord.gdextension` and loads it.
 
 Git ignores the library and the `.gdextension`. On Linux, Discord needs glibc

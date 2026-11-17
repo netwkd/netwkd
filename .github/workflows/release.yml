@@ -57,7 +57,7 @@ jobs:
       - name: Download The Candidate
         uses: actions/download-artifact@v4
         with:
-          name: networked-addon
+          name: netwkd-addon
           path: dist
 
       - name: Hold The Candidate To Its Profile
@@ -96,8 +96,8 @@ jobs:
         shell: bash
         run: |
           set -eu
-          core="$(find dist -maxdepth 1 -name 'networked-*.zip' -print -quit)"
-          steam="$(find dist -maxdepth 1 -name 'networked_steam-*.zip' -print -quit)"
+          core="$(find dist -maxdepth 1 -name 'netwkd-*.zip' -print -quit)"
+          steam="$(find dist -maxdepth 1 -name 'netwkd_steam-*.zip' -print -quit)"
           test -n "$core"
           test -n "$steam"
           python3 ci/test.py --godot "${{ steps.engine.outputs.binary }}" \
@@ -128,7 +128,7 @@ jobs:
       - name: Download The Candidate
         uses: actions/download-artifact@v4
         with:
-          name: networked-addon
+          name: netwkd-addon
           path: dist
 
       - name: Hold The Candidate To Its Profile Again
@@ -220,11 +220,11 @@ jobs:
                 name: tag,
                 draft: true,
                 body: [
-                  "Unzip `networked` into your project's root. The other zips are optional integrations that unzip beside it.",
+                  "Unzip `netwkd` into your project's root. The other zips are optional integrations that unzip beside it.",
                   "",
-                  `- ${readme("networked_steam")} adds Steam. GodotSteam is included.`,
-                  `- ${readme("networked_discord")} adds Discord. Get Discord's own library from its developer portal.`,
-                  `- ${readme("networked_nakama")} adds Nakama. The Nakama Godot client is included.`,
+                  `- ${readme("netwkd_steam")} adds Steam. GodotSteam is included.`,
+                  `- ${readme("netwkd_discord")} adds Discord. Get Discord's own library from its developer portal.`,
+                  `- ${readme("netwkd_nakama")} adds Nakama. The Nakama Godot client is included.`,
                   "",
                   notes,
                 ].join("\n"),

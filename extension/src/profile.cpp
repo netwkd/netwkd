@@ -94,21 +94,21 @@ godot::Ref<NetwProfileLogger> &installed_logger() {
 
 namespace names {
 
-const char *const TICK_FRAME = "Networked tick";
-const char *const PHYSICS_FRAME = "Networked physics frame";
-const char *const POLL_FRAME = "Networked poll";
-const char *const INTEREST_EDGES = "Networked interest edges";
-const char *const INTEREST_TRANSITIONS = "Networked interest transitions";
-const char *const PREDICT_CORRECTIONS = "Networked predict corrections";
-const char *const PREDICT_TAP_DRAINED = "Networked predict tap drained";
-const char *const RPC_CALLS_DEFERRED = "Networked rpc calls deferred";
-const char *const ROWS_PULLED = "Networked rows pulled";
-const char *const AWAKE_ROWS = "Networked awake rows";
-const char *const SWEEP_POSITION = "Networked sweep position table";
-const char *const ROWS_OWED = "Networked rows owed peer";
-const char *const ROWS_SENT = "Networked rows sent peer";
-const char *const BYTES_SENT = "Networked bytes sent peer";
-const char *const BYTE_BUDGET = "Networked byte budget peer";
+const char *const TICK_FRAME = "netwkd tick";
+const char *const PHYSICS_FRAME = "netwkd physics frame";
+const char *const POLL_FRAME = "netwkd poll";
+const char *const INTEREST_EDGES = "netwkd interest edges";
+const char *const INTEREST_TRANSITIONS = "netwkd interest transitions";
+const char *const PREDICT_CORRECTIONS = "netwkd predict corrections";
+const char *const PREDICT_TAP_DRAINED = "netwkd predict tap drained";
+const char *const RPC_CALLS_DEFERRED = "netwkd rpc calls deferred";
+const char *const ROWS_PULLED = "netwkd rows pulled";
+const char *const AWAKE_ROWS = "netwkd awake rows";
+const char *const SWEEP_POSITION = "netwkd sweep position table";
+const char *const ROWS_OWED = "netwkd rows owed peer";
+const char *const ROWS_SENT = "netwkd rows sent peer";
+const char *const BYTES_SENT = "netwkd bytes sent peer";
+const char *const BYTE_BUDGET = "netwkd byte budget peer";
 const char *const MEMORY_STORE_ROWS = "Memory store rows";
 const char *const MEMORY_PEER_ROWS = "Memory peer rows";
 const char *const MEMORY_PEER_FLIGHTS = "Memory peer flights";

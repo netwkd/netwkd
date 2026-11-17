@@ -1051,7 +1051,7 @@ const Row ROWS[] = {
      &relayed_proof},
 };
 
-TEST_CASE("[Networked][Session][SceneTree] who a server admits and why") {
+TEST_CASE("[Netw][Session][SceneTree] who a server admits and why") {
     const Admission admission = {String("a server deciding a join")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, admission);
@@ -1423,7 +1423,7 @@ const ProofRow PROOF_ROWS[] = {
      &sessions_in_one_process},
 };
 
-TEST_CASE("[Networked][Session][Frame] a client proving over a real link") {
+TEST_CASE("[Netw][Session][Frame] a client proving over a real link") {
     const Proving proving = {String("a host and a client over a real link")};
     for (const ProofRow &row : PROOF_ROWS) {
         NETW_CELL(row, proving);

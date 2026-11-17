@@ -189,7 +189,7 @@ NETW_FRAME_SCENARIO(
 } // namespace
 
 TEST_CASE(
-    "[Networked][Connect][Frame] WP1 a host and a client reach a native "
+    "[Netw][Connect][Frame] WP1 a host and a client reach a native "
     "WebRTC link with nothing but each other, because the session owes "
     "signaling only the SDP it hands over and takes no part in carrying it"
 ) {
@@ -201,7 +201,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] WP2 the link opens from exactly one offer "
+    "[Netw][Connect][Frame] WP2 the link opens from exactly one offer "
     "answered once, because a retry that fires while a negotiation is still "
     "healthy is bandwidth spent re-asking a question already answered"
 ) {
@@ -213,7 +213,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] WP3 a same-machine pair gathers host "
+    "[Netw][Connect][Frame] WP3 a same-machine pair gathers host "
     "candidates and needs no relay, so diagnostics report a direct link "
     "rather than one that only worked because TURN carried it"
 ) {
@@ -226,7 +226,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] WP5 a client given a server description "
+    "[Netw][Connect][Frame] WP5 a client given a server description "
     "with another certificate fingerprint never links"
 ) {
     const PairedEvidence &evidence = tampered_evidence();

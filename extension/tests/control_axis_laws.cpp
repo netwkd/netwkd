@@ -115,7 +115,7 @@ Ref<NetwEntity> entity_at(LoopbackRig &p_rig, int p_route, int p_client) {
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA1 a granted request moves the controller on BOTH "
+    "[Netw][Entity] CA1 a granted request moves the controller on BOTH "
     "peers, and moves the node authority with it exactly when the entity "
     "declares AUTHORITY_CONTROLLER"
 ) {
@@ -157,7 +157,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA2 a request the server denies steers nobody, and "
+    "[Netw][Entity] CA2 a request the server denies steers nobody, and "
     "neither does one against an entity that never offered the transfer"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -246,7 +246,7 @@ Error deliver_apply(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA6 a request the confirmed decision already "
+    "[Netw][Entity] CA6 a request the confirmed decision already "
     "excludes is refused before anything is sent, so the server never hears "
     "of it"
 ) {
@@ -279,7 +279,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA7 an exclusive request takes an entity another "
+    "[Netw][Entity] CA7 an exclusive request takes an entity another "
     "peer holds yieldably, and a yieldable one does not"
 ) {
     LoopbackRig rig(2);
@@ -321,7 +321,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA8 the controller changing its own hold keeps its "
+    "[Netw][Entity] CA8 the controller changing its own hold keeps its "
     "tenure and never asks the filter, because nobody else is asking for "
     "anything"
 ) {
@@ -360,7 +360,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA9 a controller write moves an entity a peer "
+    "[Netw][Entity] CA9 a controller write moves an entity a peer "
     "holds exclusively, and the session's own decision holds nothing"
 ) {
     LoopbackRig rig(2);
@@ -388,7 +388,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA9b a controller write off the session authority "
+    "[Netw][Entity] CA9b a controller write off the session authority "
     "is refused and moves nothing, and a write of 1 takes control back"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -419,7 +419,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA9c claim_control and release_control on the "
+    "[Netw][Entity] CA9c claim_control and release_control on the "
     "entity a node belongs to move its controller, and a node under no "
     "entity has no entity to ask"
 ) {
@@ -453,7 +453,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA19 a controller written inside the spawn function "
+    "[Netw][Entity] CA19 a controller written inside the spawn function "
     "arrives identically on the host, a client and a late joiner, under "
     "either authority"
 ) {
@@ -502,7 +502,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA19b a spawn function that writes the controller "
+    "[Netw][Entity] CA19b a spawn function that writes the controller "
     "and also hands the root to that peer keeps AUTHORITY_SERVER, and every "
     "peer warns as it moves the root back to the server"
 ) {
@@ -541,7 +541,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA10 a late joiner starts on the revision, tenure "
+    "[Netw][Entity] CA10 a late joiner starts on the revision, tenure "
     "and hold the session already decided"
 ) {
     LoopbackRig rig(1);
@@ -574,7 +574,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA11 an apply that reaches a joiner before its spawn "
+    "[Netw][Entity] CA11 an apply that reaches a joiner before its spawn "
     "waits for the spawn, and one older than the spawn's own decision is "
     "discarded"
 ) {
@@ -628,7 +628,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA12 an apply that answers another op never settles "
+    "[Netw][Entity] CA12 an apply that answers another op never settles "
     "a pending request, because settlement matches the op it names"
 ) {
     LoopbackRig rig(1);
@@ -658,7 +658,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA13 a request that times out at the issuer and is "
+    "[Netw][Entity] CA13 a request that times out at the issuer and is "
     "granted afterwards is a real decision, so the issuer gives it straight "
     "back and control_changed fires twice"
 ) {
@@ -697,7 +697,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA15 a ninth request outstanding on one entity is "
+    "[Netw][Entity] CA15 a ninth request outstanding on one entity is "
     "refused before it is sent"
 ) {
     LoopbackRig rig(1);
@@ -720,7 +720,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA16 an immediate request on an entity a "
+    "[Netw][Entity] CA16 an immediate request on an entity a "
     "MultiplayerSynchronizer replicates is refused before it is sent, "
     "because nothing it authors can run ahead of the decision"
 ) {
@@ -750,7 +750,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA17 a request still outstanding when its entity is "
+    "[Netw][Entity] CA17 a request still outstanding when its entity is "
     "freed fails as unavailable, because no decision can reach it any more"
 ) {
     LoopbackRig rig(1);
@@ -776,7 +776,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] CA18 an entity its own session outlives only inside "
+    "[Netw][Entity] CA18 an entity its own session outlives only inside "
     "that session's teardown is freed there, and a request it still holds "
     "fails as unavailable"
 ) {

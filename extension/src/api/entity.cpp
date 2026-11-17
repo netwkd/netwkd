@@ -846,7 +846,7 @@ void NetwEntity::hydrate_components() {
             {String("the component list of '") + String(get_name())
                  + String("'"),
              String(),
-             String("the networked components of '") + String(get_name())
+             String("the replicated components of '") + String(get_name())
                  + String("'"),
              SERVER_PEER},
             uint64_t(gd::instance_id(owner))

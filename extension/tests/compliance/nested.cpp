@@ -54,7 +54,7 @@ World parked() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] N1 spawning a root brings every entity inside "
+    "[Netw][Compliance] N1 spawning a root brings every entity inside "
     "it, each with its own spawn values, on every peer and on a late joiner"
 ) {
     const Seen seen = parked().run(16);
@@ -111,7 +111,7 @@ World scrapped() {
 NETW_FRAME_SCENARIO(WorldFrames, scrapped_frames, &scrapped, 16);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] N2 despawning a parent despawns its "
+    "[Netw][Compliance][Frame] N2 despawning a parent despawns its "
     "children first on every peer, and every peer hears despawning for each"
 ) {
     const Seen &seen = scrapped_frames.seen();
@@ -219,7 +219,7 @@ struct Change {
 };
 
 TEST_CASE(
-    "[Networked][Compliance] N4 a child is never visible to a peer that "
+    "[Netw][Compliance] N4 a child is never visible to a peer that "
     "cannot see its parent, whatever order visibility changes in, and the "
     "server hears each peer start and stop seeing it once"
 ) {

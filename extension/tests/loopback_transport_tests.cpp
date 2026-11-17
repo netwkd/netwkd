@@ -297,7 +297,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Transport] a local link drops, delays and reorders what its "
+    "[Netw][Transport] a local link drops, delays and reorders what its "
     "conditions say"
 ) {
     const Stand stand = {String("a LocalLoopbackSession")};

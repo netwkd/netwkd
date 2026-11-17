@@ -1,6 +1,6 @@
 # Building the GDExtension
 
-Networked includes a native library. Build it before opening the project in
+netwkd includes a native library. Build it before opening the project in
 Godot.
 
 You need Git, Python 3, SCons, a C++17 compiler, and Godot 4.7 or newer.
@@ -12,7 +12,7 @@ scons -C extension
 ```
 
 The first build downloads the pinned godot-cpp and Tracy dependencies. The
-finished library and its manifest are written to `addons/networked/bin/`.
+finished library and its manifest are written to `addons/netwkd/bin/`.
 
 Run the same command again after changing native code. SCons rebuilds only
 what changed.
@@ -28,7 +28,7 @@ scons -C extension netw_profiling=yes
 Put personal SCons defaults in `extension/custom.py`.
 
 Set `NETW_STORE_VALIDATE=1` before starting Godot to check cached node and
-row lookups against a fresh lookup, and report a mismatch as a Networked bug.
+row lookups against a fresh lookup, and report a mismatch as a netwkd bug.
 
 ## Tests
 

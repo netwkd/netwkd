@@ -1,6 +1,6 @@
 extends Node
 
-const GAME := preload("res://addons/networked/examples/racing/main.tscn")
+const GAME := preload("res://addons/netwkd/examples/racing/main.tscn")
 
 
 func _ready() -> void:

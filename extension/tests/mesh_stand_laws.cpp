@@ -26,7 +26,7 @@ PackedByteArray marked(int p_value) {
 }
 
 TEST_CASE(
-    "[Networked][Session] L1 the server seats as the authority while every "
+    "[Netw][Session] L1 the server seats as the authority while every "
     "member is an ordinary peer, so the stand declares the graph instead of "
     "inheriting a star"
 ) {
@@ -47,7 +47,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L2 a direct edge carries a packet from 7 to 9 with "
+    "[Netw][Session] L2 a direct edge carries a packet from 7 to 9 with "
     "the sender, channel and transfer mode the sender actually chose, and no "
     "peer 1 appears anywhere in the record"
 ) {
@@ -83,7 +83,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L3 the 1 to 9 edge still carries after peer 7 is "
+    "[Netw][Session] L3 the 1 to 9 edge still carries after peer 7 is "
     "retired, because nothing was routing through it"
 ) {
     MeshStand mesh;
@@ -111,7 +111,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L4 a captured record survives the disposal of the "
+    "[Netw][Session] L4 a captured record survives the disposal of the "
     "peer that sent it, because it is plain data rather than a reach back "
     "into a live object"
 ) {
@@ -144,7 +144,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L5 a broadcast from the server reaches every peer "
+    "[Netw][Session] L5 a broadcast from the server reaches every peer "
     "it is linked to and reaches it exactly once, so a mesh edge is not a "
     "second delivery of the same packet"
 ) {
@@ -165,7 +165,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L6 a seat is an admitted peer once the graph has "
+    "[Netw][Session] L6 a seat is an admitted peer once the graph has "
     "been pumped, so each session reaches the neighbours it is wired to and "
     "holds the role its seat declared rather than an empty roster and no role"
 ) {
@@ -194,7 +194,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L8 a member's join crosses the transport to the "
+    "[Netw][Session] L8 a member's join crosses the transport to the "
     "server, seats a player there, and the accept and roster the server "
     "sends back seat the same membership at the member"
 ) {
@@ -220,7 +220,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L9 an accept frame arriving from a peer that is not "
+    "[Netw][Session] L9 an accept frame arriving from a peer that is not "
     "the server seats nobody, so member 7 cannot write the roster of the "
     "session"
 ) {
@@ -247,7 +247,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] L11 a peer seated after the others have joined "
+    "[Netw][Session] L11 a peer seated after the others have joined "
     "learns them from the roster the server sends it, so the seats it missed "
     "are the ones it reads"
 ) {

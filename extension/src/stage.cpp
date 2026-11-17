@@ -27,7 +27,7 @@ const char *const NAMES[COUNT] = {
     "other",
 };
 
-const char *const CATEGORY = "networked";
+const char *const CATEGORY = "netwkd";
 
 Book book;
 

@@ -347,7 +347,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Connect][SceneTree] the browser keeps the player's rows, "
+    "[Netw][Connect][SceneTree] the browser keeps the player's rows, "
     "marks another build incompatible and caps its probes"
 ) {
     const Stand stand = {String("a browsing session")};

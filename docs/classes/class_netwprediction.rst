@@ -45,7 +45,7 @@ The client corrects its entity when a state property differs from the server's b
 
 An official Godot build cannot run physics again for a past tick, so a :godot:`RigidBody2D` or :godot:`RigidBody3D` uses :ref:`MODE_OFFSET<class_NetwPrediction_constant_MODE_OFFSET>`.
 
-The `Networked engine build <https://github.com/diejor/godot/releases>`__ can roll one back. It adds `physics stepping <https://github.com/godotengine/godot/pull/76462>`__ and `kinematic body updates <https://github.com/godotengine/godot/pull/113784>`__ to Godot. On another build, install a :ref:`NetwPhysicsStepper<class_NetwPhysicsStepper>`.
+The `netwkd engine build <https://github.com/diejor/godot/releases>`__ can roll one back. It adds `physics stepping <https://github.com/godotengine/godot/pull/76462>`__ and `kinematic body updates <https://github.com/godotengine/godot/pull/113784>`__ to Godot. On another build, install a :ref:`NetwPhysicsStepper<class_NetwPhysicsStepper>`.
 
 Rigid bodies in the same :ref:`NetwInterestLayer<class_NetwInterestLayer>` roll back together when the engine can step physics. Turn off :ref:`rollback_together<class_NetwPrediction_property_rollback_together>` to correct each one alone.
 
@@ -57,7 +57,7 @@ Raise :ref:`input_buffer_ticks<class_NetwPrediction_property_input_buffer_ticks>
 
 \ **Debugging**\ 
 
-Debug > Networked > Prediction Rings draws rings around each predicted entity.
+\ **Debug > netwkd > Prediction Rings** draws rings around each predicted entity.
 
 - **cyan** where it is drawn
 
@@ -68,13 +68,6 @@ Debug > Networked > Prediction Rings draws rings around each predicted entity.
 - **dashed magenta** where the client predicted it would be
 
 - **white line** the gap between orange and magenta
-
-.. rst-class:: classref-introduction-group
-
-Tutorials
----------
-
-- `Prediction guide <https://networked.readthedocs.io/en/latest/guides/prediction.html>`__
 
 .. rst-class:: classref-reftable-group
 

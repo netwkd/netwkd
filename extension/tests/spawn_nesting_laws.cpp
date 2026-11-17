@@ -78,7 +78,7 @@ int64_t state_of(LoopbackRig &p_rig, int p_client, int p_route) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN1 a child spawned under a parent entity arrives "
+    "[Netw][Spawn] SN1 a child spawned under a parent entity arrives "
     "under the RECEIVER's own parent instance, not the sender's"
 ) {
     LoopbackRig rig(1);
@@ -103,7 +103,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SNP a child frame that arrives before its parent "
+    "[Netw][Spawn] SNP a child frame that arrives before its parent "
     "PARKS, because a child has nowhere to go until its parent exists"
 ) {
     LoopbackRig rig(1);
@@ -127,7 +127,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN2 a spawn frame for a route this peer already holds "
+    "[Netw][Spawn] SN2 a spawn frame for a route this peer already holds "
     "is an idempotent drop, counted, because a duplicate is normal at a "
     "visibility edge and never an error"
 ) {
@@ -154,7 +154,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN3 a spawn frame from a sender that is not the "
+    "[Netw][Spawn] SN3 a spawn frame from a sender that is not the "
     "server is refused and counted, whatever it names"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -182,7 +182,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN5 a move keeps the route and the receiver's own "
+    "[Netw][Spawn] SN5 a move keeps the route and the receiver's own "
     "instance and MOVES it, because a cross-parent move is a reparent and "
     "not a despawn followed by a respawn"
 ) {
@@ -231,7 +231,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN6 the ancestry chain follows the TREE, so a route "
+    "[Netw][Spawn] SN6 the ancestry chain follows the TREE, so a route "
     "with no entity above it answers nothing and a move re-reads it"
 ) {
     LoopbackRig rig(1);
@@ -257,7 +257,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN7 a parent despawn cascades to what it contains, "
+    "[Netw][Spawn] SN7 a parent despawn cascades to what it contains, "
     "and the seat counts no unknown despawn, because a child leaves before "
     "the ancestor that named it"
 ) {
@@ -291,7 +291,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN8 an entity nobody represents names peer zero, and "
+    "[Netw][Spawn] SN8 an entity nobody represents names peer zero, and "
     "one spawned FOR a peer names that peer on every copy of it"
 ) {
     LoopbackRig rig(1);
@@ -330,7 +330,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN9 a received isolated scene is wrapped like the "
+    "[Netw][Spawn] SN9 a received isolated scene is wrapped like the "
     "authored one, and its container is shown and takes input"
 ) {
     const String path("res://tests/support/declared_level.tscn");
@@ -470,7 +470,7 @@ bool stands_at(const Transform3D &p_seen, const Transform3D &p_before) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN10 a parent despawn moves each detaching descendant "
+    "[Netw][Spawn] SN10 a parent despawn moves each detaching descendant "
     "under the parent's own parent where it stood and takes the rest with it, "
     "on every peer"
 ) {
@@ -551,7 +551,7 @@ Node *seat_pocket(Node *p_under) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SN11 a child whose parent route the book does not "
+    "[Netw][Spawn] SN11 a child whose parent route the book does not "
     "hold reaches no peer, through the sweep, a move or a late join"
 ) {
     LoopbackRig rig(1);

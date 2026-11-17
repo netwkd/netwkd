@@ -101,7 +101,7 @@ Flapped a_hidden_body(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] IF1 a route the peer lost and was re-admitted to comes "
+    "[Netw][Spawn] IF1 a route the peer lost and was re-admitted to comes "
     "back LIVE rather than staying dead, because an admission is a fresh "
     "answer about the entity and not a memory of the last one"
 ) {
@@ -144,7 +144,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] IF5 a real despawn of a route the peer holds still "
+    "[Netw][Spawn] IF5 a real despawn of a route the peer holds still "
     "tombstones, which is the whole difference the two channels name"
 ) {
     LoopbackRig rig(1);
@@ -173,7 +173,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] IF6 a peer holding no copy is sent no despawn when "
+    "[Netw][Spawn] IF6 a peer holding no copy is sent no despawn when "
     "the entity dies, so a death while hidden costs nothing on either side"
 ) {
     LoopbackRig rig(1);
@@ -211,7 +211,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] IF7 an interest path that re-adopts the wrapper a "
+    "[Netw][Spawn] IF7 an interest path that re-adopts the wrapper a "
     "hide dropped does not lock the route out, because the adoption guard "
     "asks presence rather than identity"
 ) {
@@ -254,7 +254,7 @@ int64_t counter_of(LoopbackRig &p_rig, int p_client, const char *p_key) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] IF8 a frame whose anchor is absent parks for the "
+    "[Netw][Spawn] IF8 a frame whose anchor is absent parks for the "
     "anchor's return, and a frame whose anchor is a tombstone is dropped in "
     "the frame that carries it rather than held for the park timeout"
 ) {

@@ -544,7 +544,7 @@ LawVerdict beside(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] S1 only the peer that runs a body moves it, "
+    "[Netw][Sim][Frame] S1 only the peer that runs a body moves it, "
     "and every other copy holds all of its bodies frozen kinematic"
 ) {
     const Seen &seen = yard_frames.seen();
@@ -567,7 +567,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] S2 control passing to another peer thaws the "
+    "[Netw][Sim][Frame] S2 control passing to another peer thaws the "
     "new controller's bodies and freezes the old one's where they stand, "
     "and the body runs on at the speed its step sets"
 ) {
@@ -585,7 +585,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] S3 an active copy thaws, keeps the velocity it "
+    "[Netw][Sim][Frame] S3 an active copy thaws, keeps the velocity it "
     "receives, and moves on evenly between the samples it installs, even "
     "over a jittery link"
 ) {
@@ -601,7 +601,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] S4 a step runs once a tick on each peer that "
+    "[Netw][Sim][Frame] S4 a step runs once a tick on each peer that "
     "runs the body, fresh only where the body is authored, never on a "
     "frozen copy, and before anything in the session predicts"
 ) {
@@ -619,7 +619,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] S5 a sleeping body a game wakes by writing "
+    "[Netw][Sim][Frame] S5 a sleeping body a game wakes by writing "
     "sleeping false claims what it touches, as a root or a child body"
 ) {
     const Seen &seen = yard_frames.seen();
@@ -636,7 +636,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] S6 a resting copy the heartbeat agrees with "
+    "[Netw][Sim][Frame] S6 a resting copy the heartbeat agrees with "
     "stays asleep, and one a game moved returns to the server's pose"
 ) {
     const Seen &seen = yard_frames.seen();

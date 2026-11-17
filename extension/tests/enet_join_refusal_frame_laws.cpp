@@ -241,7 +241,7 @@ NETW_FRAME_SCENARIO(EnetJoinRefusalScenario, enet_join_refusal_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Frame] JR2 a handler answering something that is "
+    "[Netw][Session][Frame] JR2 a handler answering something that is "
     "not a placement leaves the peer seated, because a return value has no "
     "network effect and only an explicit refusal turns a peer away"
 ) {
@@ -253,7 +253,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] JR3 a failed placement on one peer never "
+    "[Netw][Session][Frame] JR3 a failed placement on one peer never "
     "disconnects the server from itself, because the host's own admission "
     "stands and only the refused peer is turned away"
 ) {
@@ -645,7 +645,7 @@ constexpr int LOBBY_ROW_COUNT = 2;
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Frame] JR4 a client the admission handler refuses "
+    "[Netw][Session][Frame] JR4 a client the admission handler refuses "
     "never becomes a peer of the server, so the server fires no "
     "peer_connected for it and no RPC runs either way, while the admitted "
     "client is a peer both ways"
@@ -668,7 +668,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] JR5 a refused client hears the handler's "
+    "[Netw][Session][Frame] JR5 a refused client hears the handler's "
     "own Error and reason once through NetwConnection.failed and "
     "NetwSession.join_failed, and never exits a session it never entered"
 ) {
@@ -689,7 +689,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] JR6 a refused client closes its own peer, "
+    "[Netw][Session][Frame] JR6 a refused client closes its own peer, "
     "so on a server that cannot close the link it still joins again on the "
     "same session once the handler admits it"
 ) {

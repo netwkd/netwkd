@@ -800,7 +800,7 @@ const Row CODEC_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Codec] a quantized value lands on its grid, and a row "
+    "[Netw][Codec] a quantized value lands on its grid, and a row "
     "decodes only against what the receiver declared and holds"
 ) {
     const World world = {String("values with no session")};
@@ -1156,7 +1156,7 @@ void set_persisted_only(FieldDecl &r_field) {
 }
 
 TEST_CASE(
-    "[Networked][Sync] the properties a node declares derive one property "
+    "[Netw][Sync] the properties a node declares derive one property "
     "set a kind, in declaration order and on the lanes they asked for"
 ) {
     FaultWatch faults;
@@ -2010,7 +2010,7 @@ const Row WORLD_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a declared property reaches every peer "
+    "[Netw][Sync][SceneTree] a declared property reaches every peer "
     "whole, and a declaration a node cannot honour is refused"
 ) {
     const World world = {String("a server and clients on a loopback")};

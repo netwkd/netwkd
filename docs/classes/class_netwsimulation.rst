@@ -64,7 +64,7 @@ The peer writing replicated state runs :ref:`MODE_AUTHORITY<class_NetwSimulation
 Tutorials
 ---------
 
-- `Prediction guide <https://networked.readthedocs.io/en/latest/guides/prediction.html>`__
+- `Prediction guide <https://netwkd.readthedocs.io/en/latest/guides/prediction.html>`__
 
 .. rst-class:: classref-reftable-group
 
@@ -200,7 +200,7 @@ The physics server moves the bodies in each frame that brings a tick, and :ref:`
 
 :ref:`Schedule<enum_NetwSimulation_Schedule>` **SCHEDULE_STEPPED** = ``2``
 
-The physics space is stepped once per tick, and again for each tick of a rollback. It needs the `Networked engine build <https://github.com/diejor/godot/releases>`__ or a :ref:`NetwPhysicsStepper<class_NetwPhysicsStepper>` installed with :ref:`NetwSession.install_physics_stepper()<class_NetwSession_method_install_physics_stepper>`. Without either it runs as :ref:`SCHEDULE_FRAME<class_NetwSimulation_constant_SCHEDULE_FRAME>`, and so does an entity that is not predicted. Each case warns once.
+The physics space is stepped once per tick, and again for each tick of a rollback. It needs the `netwkd engine build <https://github.com/diejor/godot/releases>`__ or a :ref:`NetwPhysicsStepper<class_NetwPhysicsStepper>` installed with :ref:`NetwSession.install_physics_stepper()<class_NetwSession_method_install_physics_stepper>`. Without either it runs as :ref:`SCHEDULE_FRAME<class_NetwSimulation_constant_SCHEDULE_FRAME>`, and so does an entity that is not predicted. Each case warns once.
 
 .. _class_NetwSimulation_constant_SCHEDULE_AUTO:
 

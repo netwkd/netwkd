@@ -16,21 +16,21 @@ using namespace godot;
 namespace netw::monitor {
 
 const Spec SPECS[COUNT] = {
-    {"Networked/peers", QUANTITY},
-    {"Networked/round_trip", TIME},
-    {"Networked/jitter", TIME},
-    {"Networked/loss", PERCENTAGE},
-    {"Networked/upload_budget_used", PERCENTAGE},
-    {"Networked/display_delay", TIME},
-    {"Networked/late_inputs_per_second", QUANTITY},
-    {"Networked Replication/entities", QUANTITY},
-    {"Networked Replication/awake_rows", QUANTITY},
-    {"Networked Replication/rows_waiting", QUANTITY},
-    {"Networked Replication/corrections_per_second", QUANTITY},
-    {"Networked Replication/replayed_ticks_per_second", QUANTITY},
-    {"Networked Replication/memory_replication", MEMORY},
-    {"Networked Replication/memory_prediction", MEMORY},
-    {"Networked Replication/memory_display", MEMORY},
+    {"netwkd/peers", QUANTITY},
+    {"netwkd/round_trip", TIME},
+    {"netwkd/jitter", TIME},
+    {"netwkd/loss", PERCENTAGE},
+    {"netwkd/upload_budget_used", PERCENTAGE},
+    {"netwkd/display_delay", TIME},
+    {"netwkd/late_inputs_per_second", QUANTITY},
+    {"netwkd Replication/entities", QUANTITY},
+    {"netwkd Replication/awake_rows", QUANTITY},
+    {"netwkd Replication/rows_waiting", QUANTITY},
+    {"netwkd Replication/corrections_per_second", QUANTITY},
+    {"netwkd Replication/replayed_ticks_per_second", QUANTITY},
+    {"netwkd Replication/memory_replication", MEMORY},
+    {"netwkd Replication/memory_prediction", MEMORY},
+    {"netwkd Replication/memory_display", MEMORY},
 };
 
 namespace {

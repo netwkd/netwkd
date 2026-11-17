@@ -119,7 +119,7 @@ void check_matches(const Nest &p_host, const Nest &p_seat) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] CN2 announcing a nested identity a second time reuses "
+    "[Netw][Spawn] CN2 announcing a nested identity a second time reuses "
     "the route it already has and builds no second node, because an ADOPT "
     "names an entity that exists rather than creating one"
 ) {
@@ -160,7 +160,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] CN3 an explicit adopt of a root already standing in "
+    "[Netw][Spawn] CN3 an explicit adopt of a root already standing in "
     "the tree publishes what is nested inside it on the same pass"
 ) {
     LoopbackRig rig(1);
@@ -184,7 +184,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] CN5 leaving a scene closes the nested publication "
+    "[Netw][Spawn] CN5 leaving a scene closes the nested publication "
     "with its root, and re-entering opens both again under the same routes"
 ) {
     const String path("res://tests/support/declared_level.tscn");
@@ -222,7 +222,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] CN6 the enclosing on-spawn walk stops at a nested "
+    "[Netw][Spawn] CN6 the enclosing on-spawn walk stops at a nested "
     "entity, because that entity's own snapshot owns its columns, and it "
     "keeps a child that roots no entity of its own"
 ) {
@@ -374,7 +374,7 @@ ForeignEvidence run_foreign_parent(const ForeignParent &p_case) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] CN8 a peer that joins while a scene-placed entity "
+    "[Netw][Spawn] CN8 a peer that joins while a scene-placed entity "
     "stands under another entity's child finds it where the scene put it and "
     "moves it there, under the revision the move was made at"
 ) {
@@ -539,7 +539,7 @@ const OfflineClash OFFLINE_CLASHES[] = {
 };
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] NA8 a client whose copy took a route "
+    "[Netw][Spawn][SceneTree] NA8 a client whose copy took a route "
     "before it connected gives it up and binds the server's route, whatever "
     "node its own counting had put there"
 ) {
@@ -584,7 +584,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] NA6 an entity placed before the server "
+    "[Netw][Spawn][SceneTree] NA6 an entity placed before the server "
     "hosts is published once it hosts, so a client that joins later binds its "
     "own copy and reads a value the server set before the join"
 ) {
@@ -610,7 +610,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] NA6b a client whose placed copy "
+    "[Netw][Spawn][SceneTree] NA6b a client whose placed copy "
     "synchronizes other properties than the server's leaves the session "
     "kicked, with a reason naming the node"
 ) {
@@ -637,7 +637,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] NA7 an entity built in code and added "
+    "[Netw][Spawn][SceneTree] NA7 an entity built in code and added "
     "with add_child on the server is reported once and sent to no client"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -661,7 +661,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] NA10 an entity with no owner that was in "
+    "[Netw][Spawn][SceneTree] NA10 an entity with no owner that was in "
     "the tree before the server hosted is a placed scene root, so it is "
     "published by its path and reported to nobody"
 ) {
@@ -730,7 +730,7 @@ void check_level_seat(const LevelSeat &p_seen) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] PL1 a declared level placed under the "
+    "[Netw][Spawn][SceneTree] PL1 a declared level placed under the "
     "session root stays the node every peer placed, is one scene on the server "
     "and on a client, and carries its placed entity to a late joiner"
 ) {
@@ -773,7 +773,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] PL2 an isolated level placed under the "
+    "[Netw][Spawn][SceneTree] PL2 an isolated level placed under the "
     "session root is refused on the server once and sent to no client"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -800,7 +800,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] PL3 a client that stops watching a placed "
+    "[Netw][Spawn][SceneTree] PL3 a client that stops watching a placed "
     "level keeps its own copy, and watching again binds that same level and "
     "its placed entity with the state the server set meanwhile"
 ) {

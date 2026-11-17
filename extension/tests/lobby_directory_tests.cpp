@@ -306,7 +306,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Connect][SceneTree] a lobby directory delivers invites, "
+    "[Netw][Connect][SceneTree] a lobby directory delivers invites, "
     "reports a refusal, and only leaving the session leaves its lobby"
 ) {
     const Stand stand = {String("a session with a lobby directory")};

@@ -5,7 +5,7 @@
 NW1020. A call is not supported for this case
 =============================================
 
-Reported as an error when a call is made for a case Networked does not
+Reported as an error when a call is made for a case netwkd does not
 support. The cases are a synchronizer that stopped, a node outside the
 spawnable scenes, an entity moved to another viewport, a scene change that
 freed the session, a read only schema, a scene's own interest layer, a config

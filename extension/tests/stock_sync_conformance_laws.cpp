@@ -382,7 +382,7 @@ const CarryLaw L_CARRIES = {
 const CarryLaw CARRY_LAWS[] = {L_MATERIALIZES, L_PRE_TREE, L_CARRIES};
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] the stock synchronizer carry laws "
+    "[Netw][Sync][SceneTree] the stock synchronizer carry laws "
     "hold"
 ) {
     const CarryScenario CORPUS[] = {
@@ -400,7 +400,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] an authority that authors nothing reds "
+    "[Netw][Sync][SceneTree] an authority that authors nothing reds "
     "carries"
 ) {
     const CarryScenario scenario = one_synchronizer();
@@ -410,7 +410,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a spawn field authored after the spawn "
+    "[Netw][Sync][SceneTree] a spawn field authored after the spawn "
     "reds pre-tree"
 ) {
     const CarryScenario scenario = one_synchronizer();
@@ -423,7 +423,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a spawn field authored inside _ready "
+    "[Netw][Sync][SceneTree] a spawn field authored inside _ready "
     "still rides the spawn frame, because the snapshot is taken at the "
     "settle after tree entry rather than on the way in"
 ) {
@@ -455,7 +455,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a spawner-less synchronizer on a "
+    "[Netw][Sync][SceneTree] a spawner-less synchronizer on a "
     "matched pair is adopted in place, so the same route lands on the "
     "instance every peer already holds"
 ) {
@@ -484,7 +484,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a session torn down and re-hosted "
+    "[Netw][Sync][SceneTree] a session torn down and re-hosted "
     "synchronizes again rather than staying wedged on the old routes"
 ) {
     const Ref<PackedScene> scene = probe_scene();
@@ -521,7 +521,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] across a whole session of spawns, "
+    "[Netw][Sync][SceneTree] across a whole session of spawns, "
     "syncs, deltas and a later admission the stock replicator receives "
     "nothing, so no peer ever holds a duplicate"
 ) {
@@ -644,7 +644,7 @@ Ref<PackedScene> authority_scene() {
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a scene the stock spawner replicated "
+    "[Netw][Sync][SceneTree] a scene the stock spawner replicated "
     "keeps the authority it claimed in _enter_tree"
 ) {
     LoopbackRig rig(1);
@@ -674,7 +674,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a transferred controller outlasts the "
+    "[Netw][Sync][SceneTree] a transferred controller outlasts the "
     "name the game derives its authority from, on a peer that joins "
     "after the transfer"
 ) {
@@ -727,7 +727,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a spawner-less pair that claimed its "
+    "[Netw][Sync][SceneTree] a spawner-less pair that claimed its "
     "own authority in _enter_tree still holds it after adoption"
 ) {
     LoopbackRig rig(1);
@@ -772,7 +772,7 @@ netw::SyncCompat *compat_of(netw::NetwMultiplayer *p_api) {
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a consumed property's path is resolved "
+    "[Netw][Sync][SceneTree] a consumed property's path is resolved "
     "once per config, however many frames read and write it"
 ) {
     LoopbackRig rig(1);
@@ -859,7 +859,7 @@ int64_t frames_out(netw::NetwMultiplayer *p_api) {
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a synchronizer whose root leaves the tree "
+    "[Netw][Sync][SceneTree] a synchronizer whose root leaves the tree "
     "stops sending on the next frame, while the synchronizer stays"
 ) {
     LoopbackRig rig(1);
@@ -900,7 +900,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a received row whose properties declare no "
+    "[Netw][Sync][SceneTree] a received row whose properties declare no "
     "interpolator asks for one once, not on every frame"
 ) {
     LoopbackRig rig(1);
@@ -943,7 +943,7 @@ void add_leading_sync(Node *p_root) {
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a synchronizer added beside a consumed one "
+    "[Netw][Sync][SceneTree] a synchronizer added beside a consumed one "
     "reorders the set, and the next send carries the moved ordinal"
 ) {
     LoopbackRig rig(1);
@@ -1067,7 +1067,7 @@ struct SteeredPair {
 };
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] SY1 a server-written synchronizer inside an "
+    "[Netw][Sync][SceneTree] SY1 a server-written synchronizer inside an "
     "AUTHORITY_SERVER entity keeps sending from the server while a player "
     "controls the entity, and each peer warns about it once"
 ) {
@@ -1096,7 +1096,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] SY2 a client writes through a synchronizer "
+    "[Netw][Sync][SceneTree] SY2 a client writes through a synchronizer "
     "inside an entity only when the entity declares AUTHORITY_CONTROLLER"
 ) {
     const char *source = SERVER_STEERED_PROBE;
@@ -1137,7 +1137,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] SY3 a synchronizer that only carries spawn "
+    "[Netw][Sync][SceneTree] SY3 a synchronizer that only carries spawn "
     "values draws no warning, because the server writes a spawn under either "
     "authority"
 ) {

@@ -52,7 +52,7 @@ int64_t drops_of(LoopbackRig &p_rig) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] a spawner that takes its spawn "
+    "[Netw][Spawn][SceneTree] a spawner that takes its spawn "
     "function in _ready captures its FIRST custom spawn, because the "
     "wrap waits for the node rather than for a second enrolment"
 ) {
@@ -83,7 +83,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] SV6 a client spawning through a spawner "
+    "[Netw][Spawn][SceneTree] SV6 a client spawning through a spawner "
     "it holds authority over is refused before a route is minted, because "
     "only the session authority spawns"
 ) {

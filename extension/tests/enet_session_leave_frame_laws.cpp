@@ -384,7 +384,7 @@ const Run &run_of(Arm p_arm) {
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Frame] SL1 a player who leaves or steps away is "
+    "[Netw][Session][Frame] SL1 a player who leaves or steps away is "
     "reported with that reason on the server and on every other client"
 ) {
     REQUIRE(leave_evidence().driven);
@@ -408,7 +408,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SL2 the server closes a leaving client's "
+    "[Netw][Session][Frame] SL2 the server closes a leaving client's "
     "connection, so leave settles before the client would give up"
 ) {
     REQUIRE(leave_evidence().driven);
@@ -421,7 +421,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SL3 a client leaving a server that never "
+    "[Netw][Session][Frame] SL3 a client leaving a server that never "
     "answers goes offline after the give-up, long before the connection "
     "times out"
 ) {
@@ -433,7 +433,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SL4 a client that closes its window reads "
+    "[Netw][Session][Frame] SL4 a client that closes its window reads "
     "LEAVE_QUIT on the server, and other clients read it without waiting "
     "for the connection to time out"
 ) {
@@ -446,7 +446,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SL6 every peer publishes player_left once "
+    "[Netw][Session][Frame] SL6 every peer publishes player_left once "
     "for each player who leaves"
 ) {
     REQUIRE(leave_evidence().driven);
@@ -462,7 +462,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Frame] SL5 a server that leaves is reported to its "
+    "[Netw][Session][Frame] SL5 a server that leaves is reported to its "
     "clients as LEAVE_QUIT"
 ) {
     REQUIRE(leave_evidence().driven);

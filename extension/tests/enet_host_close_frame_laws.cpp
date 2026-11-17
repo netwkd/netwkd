@@ -208,7 +208,7 @@ NETW_FRAME_SCENARIO(EnetHostCloseScenario, enet_host_close_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Frame] HC1 a host that closes its window ends "
+    "[Netw][Session][Frame] HC1 a host that closes its window ends "
     "every client's session within a few frames, with SERVER_SHUTDOWN and "
     "the host reported as LEAVE_QUIT"
 ) {

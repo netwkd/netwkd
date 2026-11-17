@@ -7,7 +7,7 @@ namespace TestNetwSpawnArgSchemaLaws {
 using netw::NetwSceneCore;
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SA4 one member of the isolation enum means a "
+    "[Netw][Scene][Hosted] SA4 one member of the isolation enum means a "
     "world of its own, so the viewport wrap and any policy that branches "
     "on isolation cannot disagree about which one it is"
 ) {

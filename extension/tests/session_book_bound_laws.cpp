@@ -99,7 +99,7 @@ void check_bounded(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][SceneTree] a thousand entities spawned and "
+    "[Netw][Lifecycle][SceneTree] a thousand entities spawned and "
     "despawned leave the wrapper owner index, the wrapper handle index and "
     "the per-route byte rows at their size before the first spawn, and the "
     "per-node property overlays no larger, on the server and on the client"

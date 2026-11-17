@@ -68,7 +68,7 @@ int64_t tag_of(const char *p_app) {
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Hosted][SceneTree] CS3 the fluent tail reaches the "
+    "[Netw][Session][Hosted][SceneTree] CS3 the fluent tail reaches the "
     "auth app tag and not only the stored app id, because both readers are "
     "handed the same owned value at consumption"
 ) {
@@ -84,7 +84,7 @@ TEST_CASE(
 #if defined(NETW_TIER_HOSTED)
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CS9 declared link conditions shape the "
+    "[Netw][Session][SceneTree] CS9 declared link conditions shape the "
     "peer the same assignment installs"
 ) {
     Mounted branch("CS9Tree");

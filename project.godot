@@ -10,13 +10,13 @@ config_version=5
 
 [application]
 
-config/name="networked"
-config/tags=PackedStringArray("addon", "multiplayer", "networked")
+config/name="netwkd"
+config/tags=PackedStringArray("addon", "multiplayer", "netwkd")
 run/main_scene="uid://3a3852p4fypv"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/image="uid://b8cn2fun55jsg"
 config/icon="uid://cv7fmxmauvaxo"
-config/macos_native_icon="res://assets/networked.icns"
+config/macos_native_icon="res://assets/netwkd.icns"
 
 [debug]
 
@@ -30,7 +30,7 @@ window/stretch/mode="viewport"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/networked/plugin.cfg", "res://addons/networked_activity/plugin.cfg", "res://addons/networked_discord/plugin.cfg")
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/netwkd/plugin.cfg", "res://addons/netwkd_activity/plugin.cfg", "res://addons/netwkd_discord/plugin.cfg")
 
 [gdunit4]
 
@@ -38,7 +38,7 @@ report/godot/push_error=true
 hooks/session_hooks=Dictionary[String, bool]({
 "res://addons/gdUnit4/src/core/hooks/GdUnitHtmlReporterTestSessionHook.gd": true,
 "res://addons/gdUnit4/src/core/hooks/GdUnitXMLReporterTestSessionHook.gd": true,
-"res://addons/networked_test/gdunit4/session_hook.gd": true
+"res://addons/netwkd_test/gdunit4/session_hook.gd": true
 })
 settings/test/test_lookup_folder="tests"
 
@@ -46,7 +46,7 @@ settings/test/test_lookup_folder="tests"
 
 limits/debugger/max_chars_per_second=262144
 
-[networked]
+[netwkd]
 
 webrtc/turn_credentials_url="https://networked-turn.diejorarr.workers.dev/"
 tests/nakama_host="127.0.0.1"

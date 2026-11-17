@@ -12,7 +12,7 @@ NetwMultiplayer
 
 **Inherits:** :godot:`MultiplayerAPIExtension`
 
-The :godot:`MultiplayerAPI` implementation for a Networked session.
+The :godot:`MultiplayerAPI` implementation for a netwkd session.
 
 .. rst-class:: classref-introduction-group
 
@@ -466,6 +466,8 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`                                          | :ref:`session_is_paused<class_NetwMultiplayer_method_session_is_paused>`\ (\ ) |const|                                                                                                                                                                                           |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwJoinConfig<class_NetwJoinConfig>`            | :ref:`session_join_declare<class_NetwMultiplayer_method_session_join_declare>`\ (\ handler\: :godot:`Callable`, arg_types\: :godot:`PackedInt32Array`\ ) |static|                                                                                                                |
+   +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                  | :ref:`session_leave<class_NetwMultiplayer_method_session_leave>`\ (\ )                                                                                                                                                                                                           |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwMultiplayer<class_NetwMultiplayer>`          | :ref:`session_of<class_NetwMultiplayer_method_session_of>`\ (\ node\: :godot:`Node` = null\ ) |static|                                                                                                                                                                           |
@@ -622,7 +624,7 @@ Same as :godot:`SceneMultiplayer.peer_authentication_failed <SceneMultiplayer#cl
 
 **peer_packet**\ (\ id\: :godot:`int`, packet\: :godot:`PackedByteArray`\ ) :ref:`🔗<class_NetwMultiplayer_signal_peer_packet>`
 
-Same as :godot:`SceneMultiplayer.peer_packet <SceneMultiplayer#class_SceneMultiplayer_signal_peer_packet>`, for packets sent with :ref:`send_bytes()<class_NetwMultiplayer_method_send_bytes>`. A packet whose first byte Networked reserves never arrives here. :ref:`send_bytes()<class_NetwMultiplayer_method_send_bytes>` lists those bytes.
+Same as :godot:`SceneMultiplayer.peer_packet <SceneMultiplayer#class_SceneMultiplayer_signal_peer_packet>`, for packets sent with :ref:`send_bytes()<class_NetwMultiplayer_method_send_bytes>`. A packet whose first byte netwkd reserves never arrives here. :ref:`send_bytes()<class_NetwMultiplayer_method_send_bytes>` lists those bytes.
 
 .. rst-class:: classref-section-separator
 
@@ -2669,7 +2671,7 @@ Counter. The part of :ref:`STAT_DROPS_NOT_LIVE<class_NetwMultiplayer_constant_ST
 
 :ref:`Stat<enum_NetwMultiplayer_Stat>` **STAT_ATTRIBUTED_BYTES_OUT** = ``91``
 
-Counter. Bytes of Networked messages sent, packet headers excluded.
+Counter. Bytes of netwkd messages sent, packet headers excluded.
 
 .. _class_NetwMultiplayer_constant_STAT_ATTRIBUTED_BYTES_IN:
 
@@ -2677,7 +2679,7 @@ Counter. Bytes of Networked messages sent, packet headers excluded.
 
 :ref:`Stat<enum_NetwMultiplayer_Stat>` **STAT_ATTRIBUTED_BYTES_IN** = ``92``
 
-Counter. Bytes of Networked messages received, packet headers excluded.
+Counter. Bytes of netwkd messages received, packet headers excluded.
 
 .. _class_NetwMultiplayer_constant_STAT_ATTRIBUTED_FRAMES_OUT:
 
@@ -2685,7 +2687,7 @@ Counter. Bytes of Networked messages received, packet headers excluded.
 
 :ref:`Stat<enum_NetwMultiplayer_Stat>` **STAT_ATTRIBUTED_FRAMES_OUT** = ``93``
 
-Counter. Networked messages sent.
+Counter. netwkd messages sent.
 
 .. _class_NetwMultiplayer_constant_STAT_ATTRIBUTED_FRAMES_IN:
 
@@ -2693,7 +2695,7 @@ Counter. Networked messages sent.
 
 :ref:`Stat<enum_NetwMultiplayer_Stat>` **STAT_ATTRIBUTED_FRAMES_IN** = ``94``
 
-Counter. Networked messages received.
+Counter. netwkd messages received.
 
 .. _class_NetwMultiplayer_constant_STAT_ATTRIBUTION_FRAMING_OUT:
 
@@ -2832,7 +2834,7 @@ Same as :godot:`SceneMultiplayer.max_delta_packet_size <SceneMultiplayer#class_S
 - |void| **set_max_sync_packet_size**\ (\ value\: :godot:`int`\ )
 - :godot:`int` **get_max_sync_packet_size**\ (\ )
 
-Same as :godot:`SceneMultiplayer.max_sync_packet_size <SceneMultiplayer#class_SceneMultiplayer_property_max_sync_packet_size>`. Networked also keeps its own synchronization packets under this size.
+Same as :godot:`SceneMultiplayer.max_sync_packet_size <SceneMultiplayer#class_SceneMultiplayer_property_max_sync_packet_size>`. netwkd also keeps its own synchronization packets under this size.
 
 .. rst-class:: classref-item-separator
 
@@ -5256,7 +5258,7 @@ Same as :godot:`SceneMultiplayer.send_auth() <SceneMultiplayer#class_SceneMultip
 
 :godot:`Error <@GlobalScope#enum_@globalscope_Error>` **send_bytes**\ (\ bytes\: :godot:`PackedByteArray`, id\: :godot:`int` = 0, mode\: :godot:`MultiplayerPeer.TransferMode <MultiplayerPeer#enum_multiplayerpeer_TransferMode>` = 2, channel\: :godot:`int` = 0\ ) :ref:`🔗<class_NetwMultiplayer_method_send_bytes>`
 
-Same as :godot:`SceneMultiplayer.send_bytes() <SceneMultiplayer#class_SceneMultiplayer_method_send_bytes>`. Returns :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>` when there is no :godot:`MultiplayerAPI.multiplayer_peer <MultiplayerAPI#class_MultiplayerAPI_property_multiplayer_peer>`. Networked reserves thirteen first bytes, ``0x4E``, ``0x56``, ``0x57``, ``0x58``, ``0x6E``, ``0x76``, ``0x77``, ``0x78``, ``0x8E``, ``0x96``, ``0x97``, ``0x98`` and ``0xB8``. A packet that starts with one of them never reaches :ref:`peer_packet<class_NetwMultiplayer_signal_peer_packet>`, so give a raw packet a first byte of your own.
+Same as :godot:`SceneMultiplayer.send_bytes() <SceneMultiplayer#class_SceneMultiplayer_method_send_bytes>`. Returns :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>` when there is no :godot:`MultiplayerAPI.multiplayer_peer <MultiplayerAPI#class_MultiplayerAPI_property_multiplayer_peer>`. netwkd reserves thirteen first bytes, ``0x4E``, ``0x56``, ``0x57``, ``0x58``, ``0x6E``, ``0x76``, ``0x77``, ``0x78``, ``0x8E``, ``0x96``, ``0x97``, ``0x98`` and ``0xB8``. A packet that starts with one of them never reaches :ref:`peer_packet<class_NetwMultiplayer_signal_peer_packet>`, so give a raw packet a first byte of your own.
 
 .. rst-class:: classref-item-separator
 
@@ -5446,6 +5448,22 @@ Returns ``true`` while the session is at :ref:`NetwSession.STATE_ONLINE<class_Ne
 :godot:`bool` **session_is_paused**\ (\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_session_is_paused>`
 
 Returns ``true`` while the server has paused the session with :ref:`session_pause()<class_NetwMultiplayer_method_session_pause>`.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwMultiplayer_method_session_join_declare:
+
+.. rst-class:: classref-method
+
+:ref:`NetwJoinConfig<class_NetwJoinConfig>` **session_join_declare**\ (\ handler\: :godot:`Callable`, arg_types\: :godot:`PackedInt32Array`\ ) |static| :ref:`🔗<class_NetwMultiplayer_method_session_join_declare>`
+
+Declares ``handler`` as the join handler and returns its :ref:`NetwJoinConfig<class_NetwJoinConfig>`. ``arg_types`` holds one :godot:`Variant.Type <@GlobalScope#enum_@globalscope_Variant.Type>` for each join argument after the :ref:`NetwPlayer<class_NetwPlayer>`, and :godot:`@GlobalScope.TYPE_NIL <@GlobalScope#class_@GlobalScope_constant_TYPE_NIL>` accepts any type. :ref:`Netw.configure_join()<class_Netw_method_configure_join>` declares a method this way with the types its parameters declare.
+
+::
+
+    NetwMultiplayer.session_join_declare(spawn_at, [TYPE_STRING_NAME, TYPE_INT])
 
 .. rst-class:: classref-item-separator
 

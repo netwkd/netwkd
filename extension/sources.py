@@ -39,9 +39,9 @@ def get_sources(env, editor_build):
     return [env.File(str(path)) for path in source_paths(env.get("netw_tests", False))]
 
 
-HOSTED_MANIFEST = ROOT / "tests" / "test_networked_hosted.gen.h"
+HOSTED_MANIFEST = ROOT / "tests" / "test_netwkd_hosted.gen.h"
 
-_HOSTED_TAG = re.compile(r'"\[Networked\]\[[A-Za-z0-9]+\]\[Hosted\]')
+_HOSTED_TAG = re.compile(r'"\[Netw\]\[[A-Za-z0-9]+\]\[Hosted\]')
 
 _HOSTED_PROLOGUE = """#pragma once
 

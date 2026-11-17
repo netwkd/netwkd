@@ -1790,7 +1790,7 @@ def make_link(url: str, title: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Folder-driven class index (Networked).
+# Folder-driven class index (netwkd).
 #
 # Upstream groups the class index by base type (Nodes / Resources / Other
 # objects / Variant types). We instead group by where each script lives under
@@ -1804,37 +1804,37 @@ def make_link(url: str, title: str) -> str:
 # more specific prefixes before their parents. Prefixes are repo-relative POSIX
 # paths under addons/.
 FOLDER_GROUPS: list[tuple[str, list[str]]] = [
-    ("Components", ["addons/networked/nodes"]),
+    ("Components", ["addons/netwkd/nodes"]),
     (
         "Session",
         [
-            "addons/networked/session",
-            "addons/networked/sync/clock",
-            "addons/networked/context/session",
+            "addons/netwkd/session",
+            "addons/netwkd/sync/clock",
+            "addons/netwkd/context/session",
         ],
     ),
-    ("Synchronization", ["addons/networked/sync"]),
-    ("Connect & Lobby", ["addons/networked/connect"]),
-    ("Transport", ["addons/networked/transport"]),
+    ("Synchronization", ["addons/netwkd/sync"]),
+    ("Connect & Lobby", ["addons/netwkd/connect"]),
+    ("Transport", ["addons/netwkd/transport"]),
     (
         "Debug & Telemetry",
         [
-            "addons/networked/debug",
-            "addons/networked/context/debug",
+            "addons/netwkd/debug",
+            "addons/netwkd/context/debug",
         ],
     ),
     (
         "Context & Services",
         [
-            "addons/networked/context",
-            "addons/networked/data",
-            "addons/networked/utils",
+            "addons/netwkd/context",
+            "addons/netwkd/data",
+            "addons/netwkd/utils",
         ],
     ),
-    ("Scene Node Path (editor)", ["addons/networked/addons/scene_node_path"]),
-    ("Nakama", ["addons/networked_nakama"]),
-    ("Steam", ["addons/networked_steam"]),
-    ("Testing", ["addons/networked_test"]),
+    ("Scene Node Path (editor)", ["addons/netwkd/addons/scene_node_path"]),
+    ("Nakama", ["addons/netwkd_nakama"]),
+    ("Steam", ["addons/netwkd_steam"]),
+    ("Testing", ["addons/netwkd_test"]),
 ]
 
 # Label for classes whose source path could not be resolved.
@@ -1853,8 +1853,8 @@ def build_class_source_paths() -> dict[str, str]:
     mapping: dict[str, str] = {}
     decl = re.compile(r"^\s*class_name\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE)
     for addon in (
-        "addons/networked", "addons/networked_nakama", "addons/networked_steam",
-        "addons/networked_test",
+        "addons/netwkd", "addons/netwkd_nakama", "addons/netwkd_steam",
+        "addons/netwkd_test",
     ):
         base = os.path.join(repo_root, addon)
         if not os.path.isdir(base):
@@ -1893,7 +1893,7 @@ def folder_group_for(class_name: str, source_paths: dict[str, str]) -> str:
                 return label
 
     # Auto-derive a group from the source directory so new code lands somewhere.
-    # e.g. addons/networked/foo/bar.gd -> "Foo".
+    # e.g. addons/netwkd/foo/bar.gd -> "Foo".
     parts = path.split("/")
     if len(parts) >= 4 and parts[0] == "addons":
         return parts[2].replace("_", " ").title()

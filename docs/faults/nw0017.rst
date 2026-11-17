@@ -2,17 +2,17 @@
 
 .. _fault_nw0017:
 
-NW0017. Networked found an entity in a state it does not allow
+NW0017. netwkd found an entity in a state it does not allow
 ==============================================================
 
-Reported as an error when Networked finds a state its own code should have
-prevented. This is a bug in Networked and not in your game.
+Reported as an error when netwkd finds a state its own code should have
+prevented. This is a bug in netwkd and not in your game.
 
-The log line names the place where Networked stopped.
+The log line names the place where netwkd stopped.
 
 .. code-block:: text
 
-    Networked stopped at <place> because of a bug in Networked, not in this
-    game. Report it to Networked with this log. [NW0017]
+    netwkd stopped at <place> because of a bug in netwkd, not in this
+    game. Report it to netwkd with this log. [NW0017]
 
 Report it with the full log and the steps that led to it.

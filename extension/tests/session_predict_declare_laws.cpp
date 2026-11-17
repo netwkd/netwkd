@@ -223,7 +223,7 @@ const PredictLaw L_ADDRESSED = {
 const PredictLaw LAWS[]
     = {L_DECLARED, L_UNDECLARED, L_PARAMETERISED, L_ADDRESSED};
 
-TEST_CASE("[Networked][Session][SceneTree] the flat prediction laws hold") {
+TEST_CASE("[Netw][Session][SceneTree] the flat prediction laws hold") {
     const PredictScenario CORPUS[] = {
         a_bare_declaration(),
         a_declaration_with_callbacks(),
@@ -238,7 +238,7 @@ TEST_CASE("[Networked][Session][SceneTree] the flat prediction laws hold") {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] an entity nobody declared reds "
+    "[Netw][Session][SceneTree] an entity nobody declared reds "
     "declared"
 ) {
     const PredictScenario scenario = a_bare_declaration();
@@ -248,7 +248,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a parameter written to another "
+    "[Netw][Session][SceneTree] a parameter written to another "
     "entity reds parameterised"
 ) {
     const PredictScenario scenario = a_bare_declaration();
@@ -258,7 +258,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a declaration nobody withdrew reds "
+    "[Netw][Session][SceneTree] a declaration nobody withdrew reds "
     "undeclared"
 ) {
     const PredictScenario scenario = a_bare_declaration();
@@ -409,7 +409,7 @@ const ReplayLaw L_INTEGRATED = {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a replay the space cannot integrate "
+    "[Netw][Session][SceneTree] a replay the space cannot integrate "
     "resolves to recovery"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -477,7 +477,7 @@ void check_auto_resolution(bool p_rigid) {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] an automatic recovery policy resolves "
+    "[Netw][Session][SceneTree] an automatic recovery policy resolves "
     "from the body and whether its space can step, and the handle and the "
     "engine resolve it alike"
 ) {
@@ -486,7 +486,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] the typed prediction and the flat "
+    "[Netw][Session][SceneTree] the typed prediction and the flat "
     "params read and write one declaration, so neither side holds a copy"
 ) {
     Ref<NetwMultiplayer> session;

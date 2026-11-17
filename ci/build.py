@@ -25,8 +25,8 @@ from common import (
 )
 from matrix import Cell, load_catalog, resolve
 
-BIN_DIR = ROOT / "addons" / "networked" / "bin"
-MANIFEST_NAME = "networked.gdextension"
+BIN_DIR = ROOT / "addons" / "netwkd" / "bin"
+MANIFEST_NAME = "netwkd.gdextension"
 
 
 def _probe_all(argv: list[str]) -> str:

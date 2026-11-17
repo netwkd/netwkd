@@ -12,7 +12,7 @@ NetwWaiter
 
 **Inherits:** :godot:`RefCounted`
 
-Frame counted predicate waiter for networked test harnesses.
+Frame counted predicate waiter for multiplayer test harnesses.
 
 .. rst-class:: classref-introduction-group
 

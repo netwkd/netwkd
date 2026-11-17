@@ -885,7 +885,7 @@ const Law LAWS[] = {
 } // namespace
 
 TEST_CASE(
-    "[Networked][Connect][Frame] hosts and browsers over real ENet and LAN "
+    "[Netw][Connect][Frame] hosts and browsers over real ENet and LAN "
     "discovery keep every connection view coherent through each lifecycle "
     "combination"
 ) {

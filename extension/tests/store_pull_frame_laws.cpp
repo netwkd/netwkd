@@ -524,7 +524,7 @@ NETW_FRAME_SCENARIO(SendAllocScenario, store_send_alloc_scenario, ONE_PEER);
 NETW_FRAME_SCENARIO(SendAllocScenario, store_send_alone_scenario, ALONE);
 
 TEST_CASE(
-    "[Networked][Store][Frame] P1 a pile of sleeping bodies is read only "
+    "[Netw][Store][Frame] P1 a pile of sleeping bodies is read only "
     "by its sweep share on a steady tick, while its script and engine "
     "columns are read on every tick"
 ) {
@@ -541,7 +541,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P3 a body woken out of a sleeping pile is "
+    "[Netw][Store][Frame] P3 a body woken out of a sleeping pile is "
     "read through the body port on its first awake tick"
 ) {
     const PullEvidence &seen = pull_evidence();
@@ -552,7 +552,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P5 the validation mode names the entity, the "
+    "[Netw][Store][Frame] P5 the validation mode names the entity, the "
     "column and the gate of a change the rest gate hid"
 ) {
     const PullEvidence &seen = pull_evidence();
@@ -564,7 +564,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P7 a steady pull over a sleeping pile makes "
+    "[Netw][Store][Frame] P7 a steady pull over a sleeping pile makes "
     "no heap allocation through the extension's allocator, while the same "
     "window around it does"
 ) {
@@ -583,7 +583,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P8 a steady tick at one idle peer makes no "
+    "[Netw][Store][Frame] P8 a steady tick at one idle peer makes no "
     "heap allocation through the extension's allocator in the source pass, "
     "the pull, the send pass or the row encode"
 ) {
@@ -597,7 +597,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] P10 a steady tick with no peer and with one "
+    "[Netw][Store][Frame] P10 a steady tick with no peer and with one "
     "idle peer makes no heap allocation through the extension's allocator "
     "in the row frames, the carrier flush or the display"
 ) {

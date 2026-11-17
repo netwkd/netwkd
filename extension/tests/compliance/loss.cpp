@@ -61,7 +61,7 @@ World lamp_at_sea() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] L1 under loss, duplication and reordering a "
+    "[Netw][Compliance] L1 under loss, duplication and reordering a "
     "value never moves backward and ends on the server's final value"
 ) {
     const Seen seen = lamp_at_sea().run(90);
@@ -121,7 +121,7 @@ World runner_in_a_tunnel(const std::string &p_track, int p_lost, bool p_rests) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] L3 lost input packets in a row lose no input "
+    "[Netw][Compliance] L3 lost input packets in a row lose no input "
     "while the window covers them, and one more loses exactly one, whether "
     "the input was changing or had stood still"
 ) {
@@ -181,7 +181,7 @@ World yard_in_a_gale() {
 NETW_FRAME_SCENARIO(WorldFrames, yard_in_a_gale_frames, &yard_in_a_gale, 56);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] L5 spawn, reparent and despawn under "
+    "[Netw][Compliance][Frame] L5 spawn, reparent and despawn under "
     "loss and reordering end with the same tree on every peer"
 ) {
     const Seen &seen = yard_in_a_gale_frames.seen();
@@ -244,7 +244,7 @@ World radio_in_a_storm() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] L6 an unreliable RPC is lost with its packet, "
+    "[Netw][Compliance] L6 an unreliable RPC is lost with its packet, "
     "and a reliable one arrives once and in order"
 ) {
     const Seen seen = radio_in_a_storm().run(50);
@@ -328,7 +328,7 @@ World herd_in_the_rain() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] L7 a table heals a late peer, keeps a removed "
+    "[Netw][Compliance] L7 a table heals a late peer, keeps a removed "
     "row removed, and survives loss"
 ) {
     const Seen seen = herd_in_the_rain().run(50);

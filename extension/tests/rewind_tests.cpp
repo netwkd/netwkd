@@ -477,7 +477,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][LagComp][Rewind][SceneTree] Netw.rewind stands a body where "
+    "[Netw][LagComp][Rewind][SceneTree] Netw.rewind stands a body where "
     "it was, children included, puts the present back, and warns when a "
     "body or a collider cannot be rewound"
 ) {

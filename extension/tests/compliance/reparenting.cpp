@@ -53,7 +53,7 @@ World passenger() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] R1 a reparented entity is the same node on "
+    "[Netw][Compliance] R1 a reparented entity is the same node on "
     "every peer and keeps updating, including when the move crosses its own "
     "updates on the link (godot#86501, godot#88729)"
 ) {
@@ -222,7 +222,7 @@ LawVerdict missing(
 NETW_FRAME_SCENARIO(WorldFrames, parking_frames, &parking, RESTORED + 16);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] R5 a predicted entity reparented "
+    "[Netw][Compliance][Frame] R5 a predicted entity reparented "
     "mid-flight keeps predicting, one taken out of the tree stops without an "
     "error, and one put back predicts again"
 ) {
@@ -322,7 +322,7 @@ LawVerdict alone(const Seen &p_seen, int p_peer) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] R6 moving players between levels leaves "
+    "[Netw][Compliance][Frame] R6 moving players between levels leaves "
     "each client in exactly one level, in either order"
 ) {
     const Seen &seen = venues_frames.seen();

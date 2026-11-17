@@ -38,7 +38,7 @@ PROFILES = {
         ["python3", "ci/reports.py", "reports/native/results.xml", "--floor", "tests/native/hosted_floor.txt"],
     ],
     "gdscript": [
-        ["python3", "ci/test.py", "parse", "res://tests", "res://addons/networked"],
+        ["python3", "ci/test.py", "parse", "res://tests", "res://addons/netwkd"],
         ["python3", "ci/test.py", "gdunit", "--name", "tests", "--path", "res://tests/"],
         ["python3", "ci/reports.py", "reports/tests/report_1", "--log", "tmp/gdunit-tests.log", "--allow-stale"],
     ],
@@ -86,9 +86,9 @@ PROFILES = {
             "ci/test.py",
             "consumer",
             "--zip-glob",
-            "dist/networked-*.zip",
+            "dist/netwkd-*.zip",
             "--zip-glob",
-            "dist/networked_steam-*.zip",
+            "dist/netwkd_steam-*.zip",
         ],
     ],
 }

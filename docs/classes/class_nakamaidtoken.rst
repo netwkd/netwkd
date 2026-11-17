@@ -19,7 +19,7 @@ Proves a player's Nakama account to a server over ENet or WebRTC, with a join to
 Description
 -----------
 
-The server runs ``addons/networked_nakama/server/networked.js`` with its private key, the game includes the matching public key, and a signed in :ref:`NakamaAccount<class_NakamaAccount>` fetches the tokens.
+The server runs ``addons/netwkd_nakama/server/netwkd.js`` with its private key, the game includes the matching public key, and a signed in :ref:`NakamaAccount<class_NakamaAccount>` fetches the tokens.
 
 ::
 
@@ -47,7 +47,7 @@ Constants
 
 .. rst-class:: classref-constant
 
-**ISSUER** = ``"networked-nakama"`` :ref:`🔗<class_NakamaIdToken_constant_ISSUER>`
+**ISSUER** = ``"netwkd-nakama"`` :ref:`🔗<class_NakamaIdToken_constant_ISSUER>`
 
 The issuer the server module signs every join token with.
 
@@ -55,9 +55,9 @@ The issuer the server module signs every join token with.
 
 .. rst-class:: classref-constant
 
-**AUDIENCE** = ``"networked"`` :ref:`🔗<class_NakamaIdToken_constant_AUDIENCE>`
+**AUDIENCE** = ``"netwkd"`` :ref:`🔗<class_NakamaIdToken_constant_AUDIENCE>`
 
-The audience the server module signs for when ``NETWORKED_JOIN_AUDIENCE`` is unset. Games sharing one Nakama server each set their own.
+The audience the server module signs for when ``NETWKD_JOIN_AUDIENCE`` is unset. Games sharing one Nakama server each set their own.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

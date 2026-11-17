@@ -104,7 +104,7 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a synchronizer is consumed once, and released "
+    "[Netw][Sync][Hosted] a synchronizer is consumed once, and released "
     "with the registration that consumed it"
 ) {
     Stand stand;
@@ -130,7 +130,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a consumed row applies its config's always "
+    "[Netw][Sync][Hosted] a consumed row applies its config's always "
     "properties, and a frame whose value count disagrees poisons it"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -160,7 +160,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] an ordinal no consumed row answers to is "
+    "[Netw][Sync][Hosted] an ordinal no consumed row answers to is "
     "dropped and counted rather than misread"
 ) {
     Stand stand;
@@ -176,7 +176,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] only the synchronizer's authority may author "
+    "[Netw][Sync][Hosted] only the synchronizer's authority may author "
     "its stream"
 ) {
     Stand stand;
@@ -192,7 +192,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a sender that wrote the reserved byte speaks a "
+    "[Netw][Sync][Hosted] a sender that wrote the reserved byte speaks a "
     "grammar this version does not have, so the frame drops loudly"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -215,7 +215,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] the config is read live, so a config the "
+    "[Netw][Sync][Hosted] the config is read live, so a config the "
     "synchronizer is given after consumption replaces the field list"
 ) {
     Stand stand;
@@ -251,7 +251,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a config mutated in place is honored only once "
+    "[Netw][Sync][Hosted] a config mutated in place is honored only once "
     "it announces the change, because the engine's own editors never do"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -286,7 +286,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a watch list past the 64-bit delta mask is "
+    "[Netw][Sync][Hosted] a watch list past the 64-bit delta mask is "
     "unrepresentable, so the row poisons at consumption"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -326,7 +326,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] the spawn frame carries one ordinal and schema "
+    "[Netw][Sync][Hosted] the spawn frame carries one ordinal and schema "
     "hash per consumed set, and the hash follows the field order"
 ) {
     Stand stand;
@@ -357,7 +357,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a spawn descriptor the receiver's own set "
+    "[Netw][Sync][Hosted] a spawn descriptor the receiver's own set "
     "disagrees with poisons the binding instead of misreading its bytes"
 ) {
     Stand stand;
@@ -387,8 +387,8 @@ bool minted(const Ref<NetwEntity> &p_entity, int64_t p_part) {
 }
 
 TEST_CASE(
-    "[Networked][Sync][Hosted] a consumed synchronizer that declares no "
-    "Networked key mints no prediction, simulation or display handle"
+    "[Netw][Sync][Hosted] a consumed synchronizer that declares no "
+    "netwkd key mints no prediction, simulation or display handle"
 ) {
     using netw::NetwEntityRecord;
     Stand plain;

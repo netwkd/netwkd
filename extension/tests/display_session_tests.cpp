@@ -438,7 +438,7 @@ LawVerdict changes(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS1 a client draws a body the server moves "
+    "[Netw][Display][Frame] DS1 a client draws a body the server moves "
     "a little further every frame, a short way behind the body, and the "
     "smoothed arguments of its RPC and signal follow it, with no fault"
 ) {
@@ -458,7 +458,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS2 a client behind a slow link draws a "
+    "[Netw][Display][Frame] DS2 a client behind a slow link draws a "
     "moving body on every frame once its snapshots arrive steadily"
 ) {
     const Seen &seen = street_frames.seen();
@@ -466,7 +466,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS3 the server draws a body a client "
+    "[Netw][Display][Frame] DS3 the server draws a body a client "
     "steers a tick behind its own copy, never stepping back or jumping"
 ) {
     const Seen &seen = street_frames.seen();
@@ -475,7 +475,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS4 the client that steers a predicted "
+    "[Netw][Display][Frame] DS4 the client that steers a predicted "
     "body draws a short way behind its own prediction while the server's "
     "snapshots run late, and absorbs a correction over frames"
 ) {
@@ -488,7 +488,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS5 when the last snapshot before a stop "
+    "[Netw][Display][Frame] DS5 when the last snapshot before a stop "
     "is lost, a client holds the body short and then draws it at the "
     "server's final pose"
 ) {
@@ -503,7 +503,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS6 a body that moves again after resting "
+    "[Netw][Display][Frame] DS6 a body that moves again after resting "
     "is drawn moving within a few frames, without a jump"
 ) {
     const Seen &seen = street_frames.seen();
@@ -513,7 +513,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS7 a body moved further than its snap "
+    "[Netw][Display][Frame] DS7 a body moved further than its snap "
     "distance is drawn at the new pose in one frame, never between"
 ) {
     const Seen &seen = street_frames.seen();
@@ -533,7 +533,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS8 a visual root changed while the body "
+    "[Netw][Display][Frame] DS8 a visual root changed while the body "
     "moves draws the new visual, and the old one stops being written"
 ) {
     const Seen &seen = street_frames.seen();
@@ -547,7 +547,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS9 a resting body's visual is never "
+    "[Netw][Display][Frame] DS9 a resting body's visual is never "
     "written, and is written again on the frame the body wakes"
 ) {
     const Seen &seen = street_frames.seen();
@@ -560,7 +560,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS10 the server's visual of a body put to "
+    "[Netw][Display][Frame] DS10 the server's visual of a body put to "
     "sleep while moving ends at the body's final pose"
 ) {
     const Seen &seen = street_frames.seen();
@@ -575,7 +575,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS11 a client without a display writes no "
+    "[Netw][Display][Frame] DS11 a client without a display writes no "
     "smoothed value until smooth_when_headless is set"
 ) {
     const Seen &seen = street_frames.seen();
@@ -591,7 +591,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][Frame] DS12 a body that leaves a client's "
+    "[Netw][Display][Frame] DS12 a body that leaves a client's "
     "interest and returns is drawn moving again"
 ) {
     const Seen &seen = street_frames.seen();

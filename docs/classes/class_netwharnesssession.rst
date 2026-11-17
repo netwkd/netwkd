@@ -12,7 +12,7 @@ NetwHarnessSession
 
 **Inherits:** :godot:`RefCounted`
 
-Shared session plumbing for Networked test harnesses.
+Shared session plumbing for netwkd test harnesses.
 
 .. rst-class:: classref-introduction-group
 

@@ -254,7 +254,7 @@ PackedByteArray move_op(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][SceneTree] arbiter, a controller's lane "
+    "[Netw][Lifecycle][Spawn][SceneTree] arbiter, a controller's lane "
     "opened at the revision number the session already installed for its own "
     "move names another author, so it seats nowhere even when it reaches the "
     "session before the controller's move does"

@@ -1,6 +1,6 @@
 extends NetwTestSuite
 
-const GAME := "res://addons/networked/examples/whiteboard/"
+const GAME := "res://addons/netwkd/examples/whiteboard/"
 const MAIN := preload(GAME + "main.tscn")
 const Whiteboard := preload(GAME + "whiteboard.gd")
 const Stroke := preload(GAME + "stroke.gd")

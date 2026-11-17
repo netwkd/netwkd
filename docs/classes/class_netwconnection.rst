@@ -91,12 +91,12 @@ Each row of :ref:`endpoints<class_NetwConnection_property_endpoints>` is a :ref:
 
 \ **Relay**\ 
 
-A WebRTC player behind a strict NAT reaches the others only through a TURN relay. When ``networked/webrtc/turn_credentials_url`` is set, every WebRTC :ref:`host()<class_NetwConnection_method_host>` and :ref:`join()<class_NetwConnection_method_join>` first fetches ICE servers from it and connects with them.
+A WebRTC player behind a strict NAT reaches the others only through a TURN relay. When ``netwkd/webrtc/turn_credentials_url`` is set, every WebRTC :ref:`host()<class_NetwConnection_method_host>` and :ref:`join()<class_NetwConnection_method_join>` first fetches ICE servers from it and connects with them.
 
 .. code:: text
 
     project.godot   webrtc/turn_credentials_url="https://networked-turn.example.workers.dev"
-    server          cp -r addons/networked/templates/turn_worker my-turn
+    server          cp -r addons/netwkd/templates/turn_worker my-turn
                     cd my-turn
                     npx wrangler secret put TURN_KEY_ID
                     npx wrangler secret put TURN_KEY_API_TOKEN

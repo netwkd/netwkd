@@ -31,7 +31,7 @@ def leaf_masked_subsystems():
     )
     missing = [n for n in LEAF_ZONE_SUBSYSTEMS if n not in indices]
     if missing:
-        Exit("networked: subsystems.hpp has no bit for {}".format(", ".join(missing)))
+        Exit("netwkd: subsystems.hpp has no bit for {}".format(", ".join(missing)))
     mask = 0xFFFFFFFF
     for name in LEAF_ZONE_SUBSYSTEMS:
         mask &= ~(1 << indices[name])
@@ -214,7 +214,7 @@ env.Append(CXXFLAGS=["-std=c++17"])
 env.Append(CPPPATH=[str(ROOT), str(ROOT / "include")])
 sources.hold_determinism_floor(
     env,
-    lambda message: Exit("networked: " + message),
+    lambda message: Exit("netwkd: " + message),
     ARGUMENTS,
 )
 env.Append(
@@ -262,15 +262,15 @@ if netw_profiling:
         tracy_env.SharedObject(str(tracy / "public" / "TracyClient.cpp")),
     )
 
-bin_dir = ROOT.parent / "addons" / "networked" / "bin"
+bin_dir = ROOT.parent / "addons" / "netwkd" / "bin"
 if env["platform"] == "macos":
     library_path = (
         bin_dir
-        / "libnetworked.{}.{}.framework".format(env["platform"], env["target"])
-        / "libnetworked.{}.{}".format(env["platform"], env["target"])
+        / "libnetwkd.{}.{}.framework".format(env["platform"], env["target"])
+        / "libnetwkd.{}.{}".format(env["platform"], env["target"])
     )
 else:
-    library_path = bin_dir / "libnetworked{}{}".format(
+    library_path = bin_dir / "libnetwkd{}{}".format(
         env["suffix"],
         env["SHLIBSUFFIX"],
     )
@@ -278,8 +278,8 @@ else:
 
 library = env.SharedLibrary(str(library_path), source=build_sources)
 manifest = env.InstallAs(
-    str(bin_dir / "networked.gdextension"),
-    str(ROOT / "networked.gdextension"),
+    str(bin_dir / "netwkd.gdextension"),
+    str(ROOT / "netwkd.gdextension"),
 )
 env.NoCache(library)
 Default([library, manifest])

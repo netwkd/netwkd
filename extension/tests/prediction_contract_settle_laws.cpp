@@ -75,7 +75,7 @@ MultiplayerSynchronizer *predicting_child(Node *p_owner) {
 }
 
 TEST_CASE(
-    "[Networked][Sync][Settle] a state-plus-input declaration holds its "
+    "[Netw][Sync][Settle] a state-plus-input declaration holds its "
     "contract report for the session's own settle rather than firing it "
     "inline, and the settle lands it with no frame driven"
 ) {
@@ -102,7 +102,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Settle] the grace is keyed by the node, so two "
+    "[Netw][Sync][Settle] the grace is keyed by the node, so two "
     "declarations in one cascade are both checked rather than the first "
     "losing its turn to the second"
 ) {
@@ -131,7 +131,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Settle] a declaration that claims no contract queues "
+    "[Netw][Sync][Settle] a declaration that claims no contract queues "
     "no check, because the contradiction the report names is the PAIR"
 ) {
     Stand stand;
@@ -151,7 +151,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Settle] the grace is spent against what the node "
+    "[Netw][Sync][Settle] the grace is spent against what the node "
     "declares at the pump, and a synchronizer carrying a prediction field is "
     "what satisfies the claim"
 ) {
@@ -169,7 +169,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][Sim] a synchronizer prediction block's schedule, "
+    "[Netw][Sync][Sim] a synchronizer prediction block's schedule, "
     "restore and restore horizon integers read back through the entity's "
     "simulation handle with the values they carried"
 ) {

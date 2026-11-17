@@ -262,7 +262,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][View][SceneTree] a seat renders at its size and a click "
+    "[Netw][View][SceneTree] a seat renders at its size and a click "
     "lands under the cursor"
 ) {
     const Stand stand = {String("a mounted tree")};

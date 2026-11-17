@@ -112,8 +112,8 @@ def stale_against(path: Path, references: list[Path]) -> str | None:
 
 
 def library_references() -> list[Path]:
-    bin_dir = ROOT / "addons" / "networked" / "bin"
-    return [Path(found) for found in glob.glob(str(bin_dir / "libnetworked.*")) if os.path.isfile(found)]
+    bin_dir = ROOT / "addons" / "netwkd" / "bin"
+    return [Path(found) for found in glob.glob(str(bin_dir / "libnetwkd.*")) if os.path.isfile(found)]
 
 
 def read_floor(path: Path) -> int:
@@ -338,7 +338,7 @@ def self_test(tmp: Path) -> int:
         wrong += 0 if ok else 1
         print("%s %-38s exit=%d expected=%d" % ("ok  " if ok else "FAIL", name, got, expected))
 
-    library = tmp / "libnetworked.linux.template_debug.x86_64.so"
+    library = tmp / "libnetwkd.linux.template_debug.x86_64.so"
     report = tmp / "old.xml"
     report.write_text(FIXTURES[-1][1], encoding="utf-8")
     library.write_bytes(b"newer")

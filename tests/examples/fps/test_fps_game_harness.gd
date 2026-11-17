@@ -1,6 +1,6 @@
 extends NetwTestSuite
 
-const MAIN := preload("res://addons/networked/examples/fps/main.tscn")
+const MAIN := preload("res://addons/netwkd/examples/fps/main.tscn")
 
 var game: NetwGameHarness
 

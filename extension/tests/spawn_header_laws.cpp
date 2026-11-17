@@ -44,7 +44,7 @@ LocalVector<DescriptorRow> rows_of(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SH1 a decoded header stamps every identity "
+    "[Netw][Spawn][Hosted] SH1 a decoded header stamps every identity "
     "field the encoder carried onto the orphan it names"
 ) {
     Node *node = memnew(Node);
@@ -67,7 +67,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SH2 a header the encoder left a field out of "
+    "[Netw][Spawn][Hosted] SH2 a header the encoder left a field out of "
     "stamps that field's absent value rather than keeping the old one"
 ) {
     Node *node = memnew(Node);
@@ -88,7 +88,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SH3 the native state section writes each "
+    "[Netw][Spawn][Hosted] SH3 the native state section writes each "
     "sub-property onto the node its path names, and skips one that is absent"
 ) {
     Node2D *root = memnew(Node2D);
@@ -116,7 +116,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SH4 a descriptor section reads exactly its own "
+    "[Netw][Spawn][Hosted] SH4 a descriptor section reads exactly its own "
     "count, so the section after it starts where this one stopped"
 ) {
     PackedByteArray bytes
@@ -140,7 +140,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SH6 a descriptor run with a byte left over is "
+    "[Netw][Spawn][Hosted] SH6 a descriptor run with a byte left over is "
     "refused whole, because a run that does not end where its blob does was "
     "framed by a peer reading a different declaration"
 ) {
@@ -159,7 +159,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SH5 a descriptor hash carries all thirty-two "
+    "[Netw][Spawn][Hosted] SH5 a descriptor hash carries all thirty-two "
     "bits, so two schemas agreeing in their low sixteen stay distinguishable"
 ) {
     const Dictionary read = Record::descriptors_of_bytes(

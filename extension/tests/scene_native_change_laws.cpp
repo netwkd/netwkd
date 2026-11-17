@@ -259,7 +259,7 @@ NETW_FRAME_SCENARIO(NativeChangeScenario, native_change_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Scene][Frame] NC1 a session mounted outside the presented "
+    "[Netw][Scene][Frame] NC1 a session mounted outside the presented "
     "scene hears nothing when the engine replaces that scene, because nothing "
     "it owns was in the scene that went and a local presentation is a game's "
     "own business"
@@ -274,7 +274,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] NC2 a session whose root has been freed reports "
+    "[Netw][Scene][Frame] NC2 a session whose root has been freed reports "
     "a fault on the next engine scene change, because the mount and every "
     "world under it are gone while the peers it was talking to are not"
 ) {

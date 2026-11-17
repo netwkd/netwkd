@@ -191,7 +191,7 @@ void link_cells(
 }
 
 TEST_CASE(
-    "[Networked][Display][Calculus] a remote body drawn over links from "
+    "[Netw][Display][Calculus] a remote body drawn over links from "
     "clean to heavy loss moves forward at its own speed, trails by a "
     "bounded delay, and never jumps"
 ) {
@@ -367,7 +367,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Display][Calculus] a chased body absorbs corrections "
+    "[Netw][Display][Calculus] a chased body absorbs corrections "
     "without a jump, and a display draws the same frames however it is "
     "replayed or ordered"
 ) {

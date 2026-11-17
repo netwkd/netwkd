@@ -460,7 +460,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Display] a remote visual is drawn where and when the server "
+    "[Netw][Display] a remote visual is drawn where and when the server "
     "had it"
 ) {
     const Stand stand = {String("a visual drawn between snapshots")};

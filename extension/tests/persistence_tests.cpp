@@ -456,7 +456,7 @@ const Row SAVING[] = {
 };
 
 TEST_CASE(
-    "[Networked][Persistence][SceneTree] a saved entity's values reach the "
+    "[Netw][Persistence][SceneTree] a saved entity's values reach the "
     "database, and a write that fails is reported and tried again"
 ) {
     const World world = {String("a server, one player and a database")};
@@ -633,7 +633,7 @@ const Row LOADING[] = {
 };
 
 TEST_CASE(
-    "[Networked][Persistence][SceneTree] a spawned entity reaches its "
+    "[Netw][Persistence][SceneTree] a spawned entity reaches its "
     "clients only with its stored values"
 ) {
     const World world = {String("a server, one player and a database")};

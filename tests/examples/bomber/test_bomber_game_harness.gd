@@ -1,7 +1,7 @@
 class_name TestBomberGameHarness
 extends NetwTestSuite
 
-const GAME := "res://addons/networked/examples/"
+const GAME := "res://addons/netwkd/examples/"
 const MAIN := preload(GAME + "bomber/main.tscn")
 const BomberGamestate := preload(GAME + "bomber/game/gamestate.gd")
 const InLobby := preload(GAME + "shared/in_lobby.gd")

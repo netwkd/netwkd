@@ -389,7 +389,7 @@ Only the node's multiplayer authority may send it.
 
 :ref:`NetwMemberConfig<class_NetwMemberConfig>` **call_local**\ (\ ) :ref:`🔗<class_NetwMemberConfig_method_call_local>`
 
-Enabled by default for :ref:`Netw.configure_signal()<class_Netw_method_configure_signal>`. Invalid for properties.
+The sending peer runs the call too. Enabled by default for :ref:`Netw.configure_signal()<class_Netw_method_configure_signal>`.
 
 .. rst-class:: classref-item-separator
 
@@ -401,7 +401,7 @@ Enabled by default for :ref:`Netw.configure_signal()<class_Netw_method_configure
 
 :ref:`NetwMemberConfig<class_NetwMemberConfig>` **call_remote**\ (\ ) :ref:`🔗<class_NetwMemberConfig_method_call_remote>`
 
-Enabled by default for :ref:`Netw.configure_rpc()<class_Netw_method_configure_rpc>`. Invalid for properties.
+Only the other peers run the call. Enabled by default for :ref:`Netw.configure_rpc()<class_Netw_method_configure_rpc>`.
 
 .. rst-class:: classref-item-separator
 
@@ -531,7 +531,7 @@ Only the server may send it.
 
 :ref:`NetwMemberConfig<class_NetwMemberConfig>` **timeout**\ (\ seconds\: :godot:`float`\ ) :ref:`🔗<class_NetwMemberConfig_method_timeout>`
 
-A request to this method waits ``seconds`` for the reply, then fails with :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>`. A method that declares none waits 5 seconds. Invalid for properties, signals and spawn functions.
+A request to this method waits ``seconds`` for the reply, then fails with :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>`. A method that declares none waits 5 seconds.
 
 .. rst-class:: classref-item-separator
 

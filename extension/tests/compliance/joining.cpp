@@ -47,7 +47,7 @@ World paused_lobby() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] J1 a player who joins a paused game gets the "
+    "[Netw][Compliance] J1 a player who joins a paused game gets the "
     "roster, the pause and the world as they are now, a second login of "
     "the account replaces the first, and a game that ends paused unfreezes"
 ) {

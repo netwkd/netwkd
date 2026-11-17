@@ -20,7 +20,7 @@ using netw::LocalLoopbackSession;
 using netw::LocalMultiplayerPeer;
 
 const char *CONTRACT_PATH
-    = "res://addons/networked_test/transfer/transfer_contract.gd";
+    = "res://addons/netwkd_test/transfer/transfer_contract.gd";
 
 const char *DRIVER_SOURCE = R"(extends NetwTransferDriver
 
@@ -185,7 +185,7 @@ struct Kit {
 };
 
 TEST_CASE(
-    "[Networked][Transfer][Kit][SceneTree] the loopback meets every law the "
+    "[Netw][Transfer][Kit][SceneTree] the loopback meets every law the "
     "transfer kit judges, on loss and on hand off, with a joiner arriving "
     "while the survivors install"
 ) {
@@ -221,7 +221,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transfer][Kit][SceneTree] a loopback that reads packets "
+    "[Netw][Transfer][Kit][SceneTree] a loopback that reads packets "
     "from any term breaks the cut, and the kit names C4"
 ) {
     Kit kit(false);

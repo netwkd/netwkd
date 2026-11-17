@@ -21,7 +21,7 @@ Description
 
 A signed in player is in a party of one, leading it, until a friend joins. Each :ref:`NakamaAccount<class_NakamaAccount>` has one as :ref:`NakamaAccount.party<class_NakamaAccount_property_party>`. 
 
-An invitation and a join request both reach a friend through ``server/networked.js``, which the Nakama server must run. 
+An invitation and a join request both reach a friend through ``server/netwkd.js``, which the Nakama server must run. 
 
 Only the leader invites, kicks and queues for a match, because Nakama sends every join request to the leader. 
 

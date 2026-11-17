@@ -19,7 +19,7 @@ using netw::NetwPredictionEngine;
 using netw_test::Internals;
 
 TEST_CASE(
-    "[Networked][Predict][Hosted] PL1 a predicted entity the session "
+    "[Netw][Predict][Hosted] PL1 a predicted entity the session "
     "despawns is freed once the game drops its node, because its stats "
     "never hold it alive"
 ) {

@@ -373,7 +373,7 @@ Node *route_node_at(NetwMultiplayer *p_session, int64_t p_route) {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW1 the server admits two members, "
+    "[Netw][Session][SceneTree] CW1 the server admits two members, "
     "opens one world and publishes it to both, so the world every peer "
     "presents is the one the server holds"
 ) {
@@ -397,7 +397,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW2 a player the server seats for the "
+    "[Netw][Session][SceneTree] CW2 a player the server seats for the "
     "player at 9 reaches both members under one route, and each member "
     "displays it as the remote body while the server displays its own"
 ) {
@@ -451,7 +451,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW4 the server computes the audience of "
+    "[Netw][Session][SceneTree] CW4 the server computes the audience of "
     "each entity from the layer that entity is in, so an entity only 9 views "
     "is withheld from member 7 while the player every viewer of the world "
     "can see reaches both members"
@@ -491,7 +491,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW5 a call from 9 reaches the server "
+    "[Netw][Session][SceneTree] CW5 a call from 9 reaches the server "
     "carrying a node argument 9 holds, and an argument naming an entity 9 "
     "was never given arrives as nothing rather than as the server's own node"
 ) {
@@ -558,7 +558,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW3 an identity a peer holds for a "
+    "[Netw][Session][SceneTree] CW3 an identity a peer holds for a "
     "routed body does not move while the world runs on and a fourth peer "
     "joins, so a route names the same node it named before"
 ) {
@@ -601,7 +601,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW6 a position the server authors on a "
+    "[Netw][Session][SceneTree] CW6 a position the server authors on a "
     "routed body it owns and controls reaches member 7 as that value, and "
     "the member freezes that body kinematically for the display to drive "
     "while the server leaves its own body unfrozen with no display over it"
@@ -740,7 +740,7 @@ struct ForgedCall {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW7 a forged call frame from 9 naming a "
+    "[Netw][Session][SceneTree] CW7 a forged call frame from 9 naming a "
     "route only 7 may view leaves the server's node untouched, while the "
     "same frame naming a route 9 holds runs and resolves its argument"
 ) {
@@ -800,7 +800,7 @@ Error deliver_control_apply(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW8 a control frame forged by member 9 "
+    "[Netw][Session][SceneTree] CW8 a control frame forged by member 9 "
     "moves nothing at the server or at member 7, and the same frame from the "
     "server moves member 7's copy"
 ) {
@@ -836,7 +836,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW9 a control request from member 9 "
+    "[Netw][Session][SceneTree] CW9 a control request from member 9 "
     "reaches the server, which grants it to every peer"
 ) {
     ComposedWorld cw;
@@ -861,7 +861,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] CW10 the server transfers control to "
+    "[Netw][Session][SceneTree] CW10 the server transfers control to "
     "member 9, and member 7, which is not the server, is refused"
 ) {
     netw_test::FaultWatch expected_faults;

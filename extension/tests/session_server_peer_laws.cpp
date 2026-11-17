@@ -19,7 +19,7 @@ Ref<NetwMultiplayer> a_session() {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] L1 a plain peer 1 arrival resolves to "
+    "[Netw][Session][Hosted] L1 a plain peer 1 arrival resolves to "
     "server role with nobody reconfiguring anything"
 ) {
     Ref<NetwMultiplayer> session = a_session();
@@ -31,7 +31,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] L4 a connected edge without peer 1 stays "
+    "[Netw][Session][Hosted] L4 a connected edge without peer 1 stays "
     "connecting, because a client is online only once the server is admitted"
 ) {
     Ref<NetwMultiplayer> session = a_session();
@@ -52,7 +52,7 @@ int serverless_mesh_warnings(const netw_test::FaultWatch &p_faults) {
 }
 
 TEST_CASE(
-    "[Networked][Session] M1 a mesh client linked only to peers other than 1 "
+    "[Netw][Session] M1 a mesh client linked only to peers other than 1 "
     "warns once after 300 polls and stays connecting"
 ) {
     netw_test::FaultWatch faults;
@@ -78,7 +78,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] M2 a mesh client linked to 1 goes online once 1 is "
+    "[Netw][Session] M2 a mesh client linked to 1 goes online once 1 is "
     "admitted and never warns, even while 1 is still authenticating"
 ) {
     netw_test::FaultWatch faults;
@@ -125,7 +125,7 @@ PackedByteArray pong_payload(uint64_t p_origin, uint64_t p_tick) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] L5 the clock's pong evidence answers the "
+    "[Netw][Session][Hosted] L5 the clock's pong evidence answers the "
     "server, so a pong from any other peer is refused while the same pong "
     "from peer 1 settles"
 ) {
@@ -139,7 +139,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] L8 a session with no role and no connection "
+    "[Netw][Session][Hosted] L8 a session with no role and no connection "
     "is still its own authority, because an offline game holds the authority "
     "Godot's own spawner assumes"
 ) {
@@ -156,7 +156,7 @@ PackedByteArray deny_payload(const StringName &p_key) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] L9 a lag compensation denial reverts the "
+    "[Netw][Session][Hosted] L9 a lag compensation denial reverts the "
     "speculative effect only when it comes from the server that served the "
     "action, so another peer cannot revert a peer's prediction"
 ) {

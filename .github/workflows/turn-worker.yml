@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - addons/networked/templates/turn_worker/**
+      - addons/netwkd/templates/turn_worker/**
       - .github/workflows/turn-worker.yml
       - ci/tests/turn_worker.test.mjs
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
           wranglerVersion: "4"
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: addons/networked/templates/turn_worker
+          workingDirectory: addons/netwkd/templates/turn_worker
           command: >-
             deploy
             --var

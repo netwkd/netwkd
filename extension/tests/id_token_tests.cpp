@@ -655,7 +655,7 @@ const Row ROWS[] = {
      &client_proof},
 };
 
-TEST_CASE("[Networked][IdToken] a login token proves an account or nothing") {
+TEST_CASE("[Netw][IdToken] a login token proves an account or nothing") {
     const Keys keys = {
         String("tokens signed by an issuer"),
         private_key(netw_test::ISSUER_RSA_KEY),

@@ -373,8 +373,8 @@
 			<param index="1" name="reason" type="String" />
 			<description>
 				This peer's join was refused with [param code] and the [param reason] the server gave. [member local_player] stays [code]null[/code]. A client refused while connecting closes its peer and never goes online, so neither [signal entered] nor [signal exited] fires. A refusal heard while [method MultiplayerAPI.poll] runs is emitted when that poll ends.
-				Networked refuses with three codes, and any other [param code] is the one the admission handler or a [NetwAccountProvider] returned.
-				- [constant @GlobalScope.ERR_UNCONFIGURED] the two peers are set up differently, such as another build, another Networked version or other [method Netw.configure_join] arguments
+				netwkd refuses with three codes, and any other [param code] is the one the admission handler or a [NetwAccountProvider] returned.
+				- [constant @GlobalScope.ERR_UNCONFIGURED] the two peers are set up differently, such as another build, another netwkd version or other [method Netw.configure_join] arguments
 				- [constant @GlobalScope.ERR_TIMEOUT] the player was not admitted before [method NetwAdmissionConfig.timeout] or [member NetwMultiplayer.auth_timeout] passed
 				- [constant @GlobalScope.ERR_ALREADY_IN_USE] the account already plays as the server's player
 			</description>

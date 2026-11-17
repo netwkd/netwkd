@@ -17,7 +17,7 @@ const int PEER = 7;
 const int OTHER = 9;
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a pass records nothing until the carrier names "
+    "[Netw][Repl][Hosted] a pass records nothing until the carrier names "
     "the seq"
 ) {
     SendPass pass;
@@ -36,9 +36,7 @@ TEST_CASE(
     NETW_CHECK_EQ(pass.outstanding(), 0);
 }
 
-TEST_CASE(
-    "[Networked][Repl][Hosted] one peer's book never answers for another's"
-) {
+TEST_CASE("[Netw][Repl][Hosted] one peer's book never answers for another's") {
     SendPass pass;
 
     REQUIRE(pass.record_datagram(PEER, 1, 1, 300));
@@ -57,7 +55,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] the delivery history settles the datagrams the "
+    "[Netw][Repl][Hosted] the delivery history settles the datagrams the "
     "ack itself does not name"
 ) {
     SendPass pass;
@@ -77,7 +75,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a datagram the history can no longer reach is "
+    "[Netw][Repl][Hosted] a datagram the history can no longer reach is "
     "reported lost"
 ) {
     SendPass pass;
@@ -95,7 +93,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a seq whose slot is still live is not recorded "
+    "[Netw][Repl][Hosted] a seq whose slot is still live is not recorded "
     "over"
 ) {
     SendPass pass;

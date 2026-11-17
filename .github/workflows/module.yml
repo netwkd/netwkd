@@ -126,9 +126,9 @@ jobs:
         shell: bash
         run: |
           set -eu
-          grep -q 'MODULE_NETWORKED_ENABLED' \
+          grep -q 'MODULE_NETWKD_ENABLED' \
             extension/thirdparty/godot/modules/modules_enabled.gen.h
-          grep -q 'test_networked_module.h' \
+          grep -q 'test_netwkd_module.h' \
             extension/thirdparty/godot/modules/modules_tests.gen.h
 
       - name: Run The Module Tests

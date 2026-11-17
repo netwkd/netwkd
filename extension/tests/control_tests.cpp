@@ -326,7 +326,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] control moves only on the server's "
+    "[Netw][Control][SceneTree] control moves only on the server's "
     "word or a release, and a successor starts from the releaser's values"
 ) {
     const Stand stand = {String("a board on a loopback session")};

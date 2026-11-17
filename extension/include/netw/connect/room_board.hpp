@@ -34,7 +34,7 @@ class RoomBoard {
 public:
     static const double RECONNECT_COOLDOWN;
 
-    godot::String filter_uid = "networked";
+    godot::String filter_uid = "netwkd";
     godot::String signaling_namespace;
     double browse_window = 2.5;
     double advertise_interval = 2.0;

@@ -14,7 +14,7 @@ using namespace godot;
 namespace netw::connect {
 
 const char *TrackerClient::WARN_SETTING
-    = "networked/webrtc/warn_on_tracker_failure";
+    = "netwkd/webrtc/warn_on_tracker_failure";
 
 bool TrackerClient::warns_on_failure() {
     ProjectSettings *settings = ProjectSettings::get_singleton();

@@ -154,7 +154,7 @@ NETW_FRAME_SCENARIO(CarryScenario, carry_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Scene][Frame] CF5 a body freed mid-flight abandons its "
+    "[Netw][Scene][Frame] CF5 a body freed mid-flight abandons its "
     "carry and answers the promise, so nothing dereferences it on the next "
     "frame and no move is left waiting forever"
 ) {

@@ -1,6 +1,6 @@
 extends GdUnitTestSuite
 
-const SteamStart := preload("res://addons/networked_steam/steam_start.gd")
+const SteamStart := preload("res://addons/netwkd_steam/steam_start.gd")
 
 const WAIT_MS := 45000
 

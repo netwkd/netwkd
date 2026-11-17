@@ -33,7 +33,7 @@ Ref<NetwMultiplayer> online() {
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] TD9 observing an entity does not pin its "
+    "[Netw][Session][Hosted] TD9 observing an entity does not pin its "
     "wrapper, so a node that is freed takes its record with it rather than "
     "leaving one behind for the life of the session"
 ) {
@@ -57,7 +57,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] TP4 exiting rides the ending edge ahead of "
+    "[Netw][Session][Hosted] TP4 exiting rides the ending edge ahead of "
     "exited, so it fires once per ending and never for a bring-up that was "
     "not live"
 ) {
@@ -83,7 +83,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] TP6 session shutdown drops interpolation "
+    "[Netw][Session][Hosted] TP6 session shutdown drops interpolation "
     "before releasing its entity wrappers and accepts fresh runtimes"
 ) {
     Ref<NetwMultiplayer> core = online();
@@ -134,7 +134,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] TP7 prediction release detaches its owner "
+    "[Netw][Session][Hosted] TP7 prediction release detaches its owner "
     "without discovering a lost node while clearing state parts"
 ) {
     Ref<NetwMultiplayer> core;

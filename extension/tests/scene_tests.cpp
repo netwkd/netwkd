@@ -354,7 +354,7 @@ constexpr int SEATED = OPEN + 4;
 constexpr int MOVED = CLOSE - 1;
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC1 despawning a level drops its scene from "
+    "[Netw][Scene][Frame] SC1 despawning a level drops its scene from "
     "the server in the same call and from every client that held it, and "
     "nothing in it ever reaches a client that did not"
 ) {
@@ -376,7 +376,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC2 a client whose spawn function or "
+    "[Netw][Scene][Frame] SC2 a client whose spawn function or "
     "registered constructor returns no node is reported once on each side, "
     "is no longer a viewer, and is sent nothing inside, while other clients "
     "keep the level"
@@ -400,7 +400,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC3 a level moved with Node.reparent or "
+    "[Netw][Scene][Frame] SC3 a level moved with Node.reparent or "
     "Netw.reparent keeps its scene, its viewers and every player's scene on "
     "each peer, and an isolated level moves as its view"
 ) {
@@ -446,7 +446,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC4 a level removed from the tree closes its "
+    "[Netw][Scene][Frame] SC4 a level removed from the tree closes its "
     "scene and tells its viewer, one despawned and moved in one call raises "
     "no error, and pulling a level out of its view warns once"
 ) {
@@ -466,7 +466,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC5 a client shows the view of the level its "
+    "[Netw][Scene][Frame] SC5 a client shows the view of the level its "
     "player stands in and hides the rest, turning over when the player moves, "
     "and a server with nobody in it shows its one level until a second opens"
 ) {
@@ -482,7 +482,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC6 the local player's scene_changed names the "
+    "[Netw][Scene][Frame] SC6 the local player's scene_changed names the "
     "scene left and the scene taken, and a player standing in two levels "
     "presents neither and warns once"
 ) {
@@ -495,7 +495,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC7 a body moved into another level with "
+    "[Netw][Scene][Frame] SC7 a body moved into another level with "
     "Netw.reparent lands there on every peer holding both, and its promise "
     "answers OK, or ERR_UNAVAILABLE when the body is freed on the way"
 ) {
@@ -517,7 +517,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] SC8 Netw.scene of an entity is the scene "
+    "[Netw][Scene][Frame] SC8 Netw.scene of an entity is the scene "
     "find_scene answers for its level, null outside every level, and a client "
     "reads that it sees what it holds"
 ) {

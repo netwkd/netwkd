@@ -5,7 +5,7 @@
 NW1002. A handler takes the wrong arguments
 ===========================================
 
-Reported as an error the first time Networked cannot call a handler you
+Reported as an error the first time netwkd cannot call a handler you
 declared because its arguments do not fit.
 
 The handler will not run. The log line names the handler and the signature

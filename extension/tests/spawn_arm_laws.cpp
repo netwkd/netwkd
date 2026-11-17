@@ -42,7 +42,7 @@ Node *build_crate(int64_t p_slot) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] SM5 a spawn for a player this session "
+    "[Netw][Spawn][SceneTree] SM5 a spawn for a player this session "
     "does not hold answers nothing and frees the node it built, and the same "
     "spawn for a seated player goes through"
 ) {

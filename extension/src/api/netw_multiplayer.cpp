@@ -3678,7 +3678,7 @@ void NetwMultiplayer::auth_receive_hello(
         const String outdated = decoded.refusal == auth::Refusal::APP
             ? "The server runs another build of this game. Update the game "
               "on both computers."
-            : "The server runs another version of Networked. Update the "
+            : "The server runs another version of netwkd. Update the "
               "game on both computers.";
         if (!has_server_role() && p_peer == SERVER_PEER) {
             session_fail_own_join(p_peer, ERR_UNCONFIGURED, outdated);

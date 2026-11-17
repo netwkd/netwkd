@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="NetwMultiplayer" inherits="MultiplayerAPIExtension" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		The [MultiplayerAPI] implementation for a Networked session.
+		The [MultiplayerAPI] implementation for a netwkd session.
 	</brief_description>
 	<description>
 		Use [method Netw.of] to get it for a node. Its methods take the [RID] of an object such as a [NetwEntity] or a [NetwScene], and most game code uses those objects instead.
@@ -1588,7 +1588,7 @@
 			<param index="2" name="mode" type="int" enum="MultiplayerPeer.TransferMode" default="2" />
 			<param index="3" name="channel" type="int" default="0" />
 			<description>
-				Same as [method SceneMultiplayer.send_bytes]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member MultiplayerAPI.multiplayer_peer]. Networked reserves thirteen first bytes, [code]0x4E[/code], [code]0x56[/code], [code]0x57[/code], [code]0x58[/code], [code]0x6E[/code], [code]0x76[/code], [code]0x77[/code], [code]0x78[/code], [code]0x8E[/code], [code]0x96[/code], [code]0x97[/code], [code]0x98[/code] and [code]0xB8[/code]. A packet that starts with one of them never reaches [signal peer_packet], so give a raw packet a first byte of your own.
+				Same as [method SceneMultiplayer.send_bytes]. Returns [constant @GlobalScope.ERR_UNCONFIGURED] when there is no [member MultiplayerAPI.multiplayer_peer]. netwkd reserves thirteen first bytes, [code]0x4E[/code], [code]0x56[/code], [code]0x57[/code], [code]0x58[/code], [code]0x6E[/code], [code]0x76[/code], [code]0x77[/code], [code]0x78[/code], [code]0x8E[/code], [code]0x96[/code], [code]0x97[/code], [code]0x98[/code] and [code]0xB8[/code]. A packet that starts with one of them never reaches [signal peer_packet], so give a raw packet a first byte of your own.
 			</description>
 		</method>
 		<method name="service_get" qualifiers="const">
@@ -2291,7 +2291,7 @@
 			Same as [member SceneMultiplayer.max_delta_packet_size].
 		</member>
 		<member name="max_sync_packet_size" type="int" setter="set_max_sync_packet_size" getter="get_max_sync_packet_size" default="1350">
-			Same as [member SceneMultiplayer.max_sync_packet_size]. Networked also keeps its own synchronization packets under this size.
+			Same as [member SceneMultiplayer.max_sync_packet_size]. netwkd also keeps its own synchronization packets under this size.
 		</member>
 		<member name="refuse_new_connections" type="bool" setter="set_refuse_new_connections" getter="is_refusing_new_connections" default="false">
 			Same as [member SceneMultiplayer.refuse_new_connections]. [LocalMultiplayerPeer] ignores it. Use [method Netw.configure_admission] to decide who can join.
@@ -2320,7 +2320,7 @@
 			<param index="0" name="id" type="int" />
 			<param index="1" name="packet" type="PackedByteArray" />
 			<description>
-				Same as [signal SceneMultiplayer.peer_packet], for packets sent with [method send_bytes]. A packet whose first byte Networked reserves never arrives here. [method send_bytes] lists those bytes.
+				Same as [signal SceneMultiplayer.peer_packet], for packets sent with [method send_bytes]. A packet whose first byte netwkd reserves never arrives here. [method send_bytes] lists those bytes.
 			</description>
 		</signal>
 	</signals>
@@ -3028,16 +3028,16 @@
 			Counter. The part of [constant STAT_DROPS_NOT_LIVE] for entities already despawned.
 		</constant>
 		<constant name="STAT_ATTRIBUTED_BYTES_OUT" value="91" enum="Stat">
-			Counter. Bytes of Networked messages sent, packet headers excluded.
+			Counter. Bytes of netwkd messages sent, packet headers excluded.
 		</constant>
 		<constant name="STAT_ATTRIBUTED_BYTES_IN" value="92" enum="Stat">
-			Counter. Bytes of Networked messages received, packet headers excluded.
+			Counter. Bytes of netwkd messages received, packet headers excluded.
 		</constant>
 		<constant name="STAT_ATTRIBUTED_FRAMES_OUT" value="93" enum="Stat">
-			Counter. Networked messages sent.
+			Counter. netwkd messages sent.
 		</constant>
 		<constant name="STAT_ATTRIBUTED_FRAMES_IN" value="94" enum="Stat">
-			Counter. Networked messages received.
+			Counter. netwkd messages received.
 		</constant>
 		<constant name="STAT_ATTRIBUTION_FRAMING_OUT" value="95" enum="Stat">
 			Counter. Bytes sent for acknowledgements alone.

@@ -962,7 +962,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][LagComp][Action][SceneTree] a shot is predicted, then "
+    "[Netw][LagComp][Action][SceneTree] a shot is predicted, then "
     "confirmed or reverted, runs on the tick its timing names, and a shot "
     "the server cannot take is refused"
 ) {

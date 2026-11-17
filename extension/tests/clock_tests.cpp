@@ -382,7 +382,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Clock] a clock keeps the time a short frame left, caps a "
+    "[Netw][Clock] a clock keeps the time a short frame left, caps a "
     "long one, and follows the server"
 ) {
     const Stand stand = {String("a loopback session with a clock")};
@@ -607,7 +607,7 @@ const FrameRow FRAME_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Clock][Frame] a clock pumped by the physics frame ticks on "
+    "[Netw][Clock][Frame] a clock pumped by the physics frame ticks on "
     "its own, follows the server, and reads the frame's real delta"
 ) {
     Evidence &seen = evidence();

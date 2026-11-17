@@ -24,7 +24,7 @@ World harbor() {
 NETW_FRAME_SCENARIO(WorldFrames, harbor_frames, &harbor, 30);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] G1 a stock MultiplayerSynchronizer "
+    "[Netw][Compliance][Frame] G1 a stock MultiplayerSynchronizer "
     "carries its spawn and synced properties, emits synchronized with the "
     "value applied, and heals a late joiner"
 ) {
@@ -55,7 +55,7 @@ World lighthouse() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] G2 a stock MultiplayerSynchronizer on a link "
+    "[Netw][Compliance] G2 a stock MultiplayerSynchronizer on a link "
     "with loss, duplication and reordering never moves a value backward and "
     "ends on the server's value"
 ) {
@@ -80,7 +80,7 @@ World beacons() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] G3 a synchronizer's visibility hides a peer and "
+    "[Netw][Compliance] G3 a synchronizer's visibility hides a peer and "
     "heals it when shown, and nested synchronizers each honour their own "
     "(godot#68508)"
 ) {
@@ -114,7 +114,7 @@ World pilots() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] G4 a player with a server position "
+    "[Netw][Compliance] G4 a player with a server position "
     "synchronizer and a client input synchronizer on one root works in "
     "either sibling order (godot#105117, godot#75884)"
 ) {
@@ -150,7 +150,7 @@ World slipway() {
 NETW_FRAME_SCENARIO(WorldFrames, slipway_frames, &slipway, 20);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] G6 a stock MultiplayerSpawner spawns "
+    "[Netw][Compliance][Frame] G6 a stock MultiplayerSpawner spawns "
     "through its spawn function with its argument, fires spawned and "
     "despawned on each client, and refuses a client's spawn"
 ) {
@@ -182,7 +182,7 @@ World quay() {
 NETW_FRAME_SCENARIO(WorldFrames, quay_frames, &quay, 170);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] G7 a spawn for a level a client has not "
+    "[Netw][Compliance][Frame] G7 a spawn for a level a client has not "
     "loaded waits and lands when the level arrives, or is dropped with one "
     "warning when it never does (godot#78692)"
 ) {
@@ -213,7 +213,7 @@ World radio() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] G9 an @rpc from one client to another runs once "
+    "[Netw][Compliance] G9 an @rpc from one client to another runs once "
     "under the caller's id, a broadcast runs once everywhere, and an "
     "authority RPC refuses a client"
 ) {
@@ -250,7 +250,7 @@ World tiller() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] G5 moving a synchronizer's authority to a "
+    "[Netw][Compliance] G5 moving a synchronizer's authority to a "
     "client moves its stream, so every peer reads what that client writes"
 ) {
     const Seen seen = tiller().run(32);

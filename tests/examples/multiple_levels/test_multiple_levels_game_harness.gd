@@ -1,7 +1,7 @@
 class_name TestMultipleLevelsGameHarness
 extends NetwTestSuite
 
-const GAME := "res://addons/networked/examples/multiple_levels/"
+const GAME := "res://addons/netwkd/examples/multiple_levels/"
 const MAIN := preload(GAME + "main.tscn")
 const LEVEL_1 := preload(GAME + "game/level1.tscn")
 const LEVEL_2 := preload(GAME + "game/level2.tscn")

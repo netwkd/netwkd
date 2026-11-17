@@ -335,7 +335,7 @@ const IntakeLaw L_BOTH_BOOKS = {
 
 const IntakeLaw LAWS[] = {L_ADMITS, L_SENDER, L_COUNTED, L_BOTH_BOOKS};
 
-TEST_CASE("[Networked][Session][SceneTree] the carrier intake laws hold") {
+TEST_CASE("[Netw][Session][SceneTree] the carrier intake laws hold") {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_warning("*[NW0007]*", 2);
 
@@ -357,7 +357,7 @@ TEST_CASE("[Networked][Session][SceneTree] the carrier intake laws hold") {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a command the controller did send "
+    "[Netw][Session][SceneTree] a command the controller did send "
     "reds admits"
 ) {
     const IntakeScenario scenario = a_command_from_a_stranger();
@@ -367,7 +367,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] an ack the server did send reds "
+    "[Netw][Session][SceneTree] an ack the server did send reds "
     "admits"
 ) {
     const IntakeScenario scenario = an_ack_from_a_client();
@@ -377,7 +377,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a channel that never asked to defer "
+    "[Netw][Session][SceneTree] a channel that never asked to defer "
     "reds admits"
 ) {
     const IntakeScenario scenario = a_deferring_channel_ahead_of_its_route();
@@ -387,7 +387,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a route that is never bound reds "
+    "[Netw][Session][SceneTree] a route that is never bound reds "
     "admits"
 ) {
     const IntakeScenario scenario = a_deferring_channel_ahead_of_its_route();
@@ -397,7 +397,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a channel that asked to defer reds "
+    "[Netw][Session][SceneTree] a channel that asked to defer reds "
     "counted"
 ) {
     const IntakeScenario scenario = a_plain_channel_ahead_of_its_route();
@@ -407,7 +407,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a sync frame for a route the "
+    "[Netw][Session][SceneTree] a sync frame for a route the "
     "session bound reds both-books"
 ) {
     IntakeScenario scenario = a_sync_frame_for_a_route_nobody_bound();

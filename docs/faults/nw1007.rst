@@ -6,7 +6,7 @@ NW1007. A handler returned the wrong kind of value
 ==================================================
 
 Reported as an error when a handler you declared returns nothing, or a value
-of another type than Networked asks for.
+of another type than netwkd asks for.
 
 The result was ignored. The log line names the handler, what it returned and
 what to return.

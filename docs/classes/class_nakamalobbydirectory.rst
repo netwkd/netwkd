@@ -38,15 +38,15 @@ Properties
 .. table::
    :widths: auto
 
-   +-----------------+---------------------------------------------------------------------------------------+-----------------+
-   | :godot:`float`  | :ref:`connect_timeout<class_NakamaLobbyDirectory_property_connect_timeout>`           | ``10.0``        |
-   +-----------------+---------------------------------------------------------------------------------------+-----------------+
-   | :godot:`int`    | :ref:`max_players<class_NakamaLobbyDirectory_property_max_players>`                   | ``8``           |
-   +-----------------+---------------------------------------------------------------------------------------+-----------------+
-   | :godot:`String` | :ref:`browser_tag<class_NakamaLobbyDirectory_property_browser_tag>`                   | ``"networked"`` |
-   +-----------------+---------------------------------------------------------------------------------------+-----------------+
-   | :godot:`bool`   | :ref:`migrate_on_host_loss<class_NakamaLobbyDirectory_property_migrate_on_host_loss>` | ``false``       |
-   +-----------------+---------------------------------------------------------------------------------------+-----------------+
+   +-----------------+---------------------------------------------------------------------------------------+--------------+
+   | :godot:`float`  | :ref:`connect_timeout<class_NakamaLobbyDirectory_property_connect_timeout>`           | ``10.0``     |
+   +-----------------+---------------------------------------------------------------------------------------+--------------+
+   | :godot:`int`    | :ref:`max_players<class_NakamaLobbyDirectory_property_max_players>`                   | ``8``        |
+   +-----------------+---------------------------------------------------------------------------------------+--------------+
+   | :godot:`String` | :ref:`browser_tag<class_NakamaLobbyDirectory_property_browser_tag>`                   | ``"netwkd"`` |
+   +-----------------+---------------------------------------------------------------------------------------+--------------+
+   | :godot:`bool`   | :ref:`migrate_on_host_loss<class_NakamaLobbyDirectory_property_migrate_on_host_loss>` | ``false``    |
+   +-----------------+---------------------------------------------------------------------------------------+--------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -97,7 +97,7 @@ The player limit shown in the lobby list, when the host sets none.
 
 .. rst-class:: classref-property
 
-:godot:`String` **browser_tag** = ``"networked"`` :ref:`🔗<class_NakamaLobbyDirectory_property_browser_tag>`
+:godot:`String` **browser_tag** = ``"netwkd"`` :ref:`🔗<class_NakamaLobbyDirectory_property_browser_tag>`
 
 Only lobbies with the same tag are listed, so games sharing a Nakama server do not see each other's lobbies.
 

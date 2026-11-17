@@ -87,7 +87,7 @@ void retire(Node *p_root) {
 }
 
 TEST_CASE(
-    "[Networked][Entity][SceneTree] LC1 a body the host controls already "
+    "[Netw][Entity][SceneTree] LC1 a body the host controls already "
     "reads as locally controlled when its child enters the tree during a "
     "host-side move into another isolated world"
 ) {

@@ -2,7 +2,7 @@ class_name TestNakamaDatabaseLive
 extends NetwTestSuite
 
 const _ERROR_SCRUBBER := preload(
-	"res://addons/networked_test/gdunit4/gdunit_error_scrubber.gd"
+	"res://addons/netwkd_test/gdunit4/gdunit_error_scrubber.gd"
 )
 
 var _tree: MultiplayerViewport

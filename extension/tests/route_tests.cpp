@@ -187,7 +187,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Route][SceneTree] every entity has its own route, whoever "
+    "[Netw][Route][SceneTree] every entity has its own route, whoever "
     "spawned it and whenever they joined"
 ) {
     const Stand stand = {String("a loopback session")};

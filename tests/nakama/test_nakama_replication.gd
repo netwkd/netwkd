@@ -2,7 +2,7 @@ class_name TestNakamaReplication
 extends NetwTestSuite
 
 const MAIN := preload(
-	"res://addons/networked/examples/multiple_levels/main.tscn"
+	"res://addons/netwkd/examples/multiple_levels/main.tscn"
 )
 const _TIMEOUT := 10.0
 

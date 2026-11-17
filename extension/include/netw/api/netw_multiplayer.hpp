@@ -330,9 +330,9 @@ public:
     static constexpr int64_t CHANNEL_USER_FIRST = 100;
     static constexpr int64_t CHANNEL_USER_LAST = 254;
     static constexpr const char *INSTALL_AS_DEFAULT_SETTING
-        = "networked/install_as_default";
+        = "netwkd/install_as_default";
     static constexpr const char *SMOOTH_WHEN_HEADLESS_SETTING
-        = "networked/display/smooth_when_headless";
+        = "netwkd/display/smooth_when_headless";
 
 private:
     session::Books books;

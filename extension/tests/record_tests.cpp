@@ -104,7 +104,7 @@ const Row RECORD_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Record][Hosted] a DictionaryRecord stores what a game sets, "
+    "[Netw][Record][Hosted] a DictionaryRecord stores what a game sets, "
     "tells a stored null from an absent name, and survives its own bytes"
 ) {
     const World world = {String("a bare DictionaryRecord")};
@@ -290,7 +290,7 @@ const Row SAMPLE_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Record][SceneTree] Netw.sample answers a state property as "
+    "[Netw][Record][SceneTree] Netw.sample answers a state property as "
     "it was on the server, and an empty record where no history is kept"
 ) {
     const World world = {String("a server with lag compensation and a client")};

@@ -453,7 +453,7 @@ const NestedLaw L_HEALS = {
 const NestedLaw NESTED_LAWS[]
     = {L_CLAMPED, L_PARENT_FIRST, L_CHILD_FIRST, L_HEALS};
 
-TEST_CASE("[Networked][Sync][SceneTree] the nested visibility laws hold") {
+TEST_CASE("[Netw][Sync][SceneTree] the nested visibility laws hold") {
     const NestedScenario CORPUS[] = {
         admit_after_spawn(),
         hide_then_show(),
@@ -469,7 +469,7 @@ TEST_CASE("[Networked][Sync][SceneTree] the nested visibility laws hold") {
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a root every peer may see reds "
+    "[Netw][Sync][SceneTree] a root every peer may see reds "
     "clamped"
 ) {
     const NestedScenario scenario = admit_after_spawn();
@@ -479,7 +479,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a second root admitted alongside the "
+    "[Netw][Sync][SceneTree] a second root admitted alongside the "
     "first reds clamped"
 ) {
     const NestedScenario scenario = admit_beside_a_hidden_root();
@@ -489,7 +489,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] a public nested stream reaches only "
+    "[Netw][Sync][SceneTree] a public nested stream reaches only "
     "the peers that hold its gated root, and reaches every node of the "
     "admitted subtree"
 ) {
@@ -549,7 +549,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] nested synchronizers need no dummy "
+    "[Netw][Sync][SceneTree] nested synchronizers need no dummy "
     "root synchronizer, and each honors its own visibility"
 ) {
     LoopbackRig rig(2);

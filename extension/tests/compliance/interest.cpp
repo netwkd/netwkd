@@ -81,7 +81,7 @@ World halls() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] I1 a level's content reaches only the players "
+    "[Netw][Compliance] I1 a level's content reaches only the players "
     "in it or watching it, and a session ending over nested levels frees them"
 ) {
     const Seen seen = halls().run(MOVE + 4);
@@ -204,7 +204,7 @@ LawVerdict still(
 }
 
 TEST_CASE(
-    "[Networked][Compliance] I2 an entity hidden and shown again is the same "
+    "[Netw][Compliance] I2 an entity hidden and shown again is the same "
     "entity with current values, and its updates stop within a tick of the "
     "hide"
 ) {
@@ -223,7 +223,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Compliance] I3 a player is never hidden from an entity they "
+    "[Netw][Compliance] I3 a player is never hidden from an entity they "
     "control"
 ) {
     const Seen seen = buoys().run(SHOW + 8);

@@ -40,7 +40,7 @@
 		[/codeblock]
 		Report back by calling [method receive], [method report_ready], [method report_lost] and [method report_unreachable].
 		[code]kind[/code] in [method receive] and [method _send] is [code]"offer"[/code], [code]"answer"[/code] or [code]"candidate"[/code]. Offers and answers already include the gathered candidates, so one message per peer is enough.
-		The default signaler warns once when every tracker fails. Enable [code]networked/webrtc/warn_on_tracker_failure[/code] to also warn for each tracker that fails.
+		The default signaler warns once when every tracker fails. Enable [code]netwkd/webrtc/warn_on_tracker_failure[/code] to also warn for each tracker that fails.
 	</description>
 	<tutorials>
 	</tutorials>

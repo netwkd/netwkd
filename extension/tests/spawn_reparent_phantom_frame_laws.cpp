@@ -391,7 +391,7 @@ NETW_FRAME_SCENARIO(AreaHushScenario, area_hush_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Spawn][Frame] SR1 a body overlapping an area enters it once "
+    "[Netw][Spawn][Frame] SR1 a body overlapping an area enters it once "
     "while it stands still, which is the reading the move is measured against"
 ) {
     const PhantomEvidence &evidence = phantom_evidence();
@@ -400,7 +400,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Frame] SR2 a peer applying a reparent frame carries "
+    "[Netw][Spawn][Frame] SR2 a peer applying a reparent frame carries "
     "the body off the physics server first, so the area it leaves reports no "
     "arrival it never saw and one exit, while an area the body carries "
     "reports the body it lands on"
@@ -415,7 +415,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] LH1 an entity moved in place by the server's "
+    "[Netw][Scene][Frame] LH1 an entity moved in place by the server's "
     "carry or a client's carry fires no area enter or exit, keeps the "
     "overlap, and the area reports a real exit after the move, also when "
     "two entities are carried in one frame"

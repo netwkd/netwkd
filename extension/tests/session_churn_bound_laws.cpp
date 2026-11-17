@@ -207,7 +207,7 @@ Readings churn(void (ChurnStage::*p_round)(), int p_clients = 1) {
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][SceneTree] CB1 a body that dies inside a "
+    "[Netw][Lifecycle][SceneTree] CB1 a body that dies inside a "
     "despawned parent while it belongs to two interest layers gives up its "
     "wrapper slot, so N and 2N rounds leave the same slot and owner counts"
 ) {
@@ -217,7 +217,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] CB2 a body that dies drops its display "
+    "[Netw][Display][SceneTree] CB2 a body that dies drops its display "
     "row, so N and 2N rounds of bodies leave the same display book"
 ) {
     const Readings read = churn(&ChurnStage::bodies_live_and_die);
@@ -225,7 +225,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][SceneTree] CB3 a destroyed scene closes its interest "
+    "[Netw][Scene][SceneTree] CB3 a destroyed scene closes its interest "
     "layer, so N and 2N scenes created and destroyed leave the same layers"
 ) {
     const Readings read = churn(&ChurnStage::scene_lives_and_dies);
@@ -234,7 +234,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] CB4 a scripted part and an entity on an "
+    "[Netw][Sync][SceneTree] CB4 a scripted part and an entity on an "
     "interest layer that leave the tree keep no path from where they were, "
     "so each reports its new path once it enters elsewhere"
 ) {
@@ -270,7 +270,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transport][SceneTree] CB5 a loopback client that leaves is "
+    "[Netw][Transport][SceneTree] CB5 a loopback client that leaves is "
     "dropped by its loopback session, so N and 2N peers joining and leaving "
     "leave the same client list"
 ) {
@@ -279,7 +279,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][SceneTree] CB6 a peer that leaves takes its byte "
+    "[Netw][Wire][SceneTree] CB6 a peer that leaves takes its byte "
     "counts with it, so N and 2N peers joining and leaving leave the same "
     "attribution book"
 ) {
@@ -291,7 +291,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][LagComp][SceneTree] CB7 a body with a rewind history that "
+    "[Netw][LagComp][SceneTree] CB7 a body with a rewind history that "
     "dies releases the history and its hold on the body, so N and 2N rounds "
     "leave the same histories"
 ) {

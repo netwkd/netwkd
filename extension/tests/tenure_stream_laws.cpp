@@ -101,7 +101,7 @@ bool author_if_steering(
 }
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] TS1 after A to B to A no row A wrote in "
+    "[Netw][Control][SceneTree] TS1 after A to B to A no row A wrote in "
     "its first tenure applies at the server, with or without a sample from "
     "B in between, and A's second tenure still reaches it"
 ) {
@@ -174,7 +174,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] TS2 the new owner's first row applies "
+    "[Netw][Control][SceneTree] TS2 the new owner's first row applies "
     "even when it carries the same tick as the old owner's last row"
 ) {
     LoopbackRig rig(2);
@@ -218,7 +218,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] TS5 a writer that loses authorship "
+    "[Netw][Control][SceneTree] TS5 a writer that loses authorship "
     "parks its lanes and tells no one, the receiver holds them, and the "
     "writer's next tenure resumes the same tokens with no OPEN"
 ) {
@@ -283,7 +283,7 @@ Array one_string() {
 }
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] TS6 a peer hidden while the tenure "
+    "[Netw][Control][SceneTree] TS6 a peer hidden while the tenure "
     "moves and then admitted again seats the new author's lane, so no park "
     "is left waiting for a decision it will never hear"
 ) {
@@ -426,7 +426,7 @@ struct Regrant {
 };
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] TS3 an OPEN for a tenure the receiver "
+    "[Netw][Control][SceneTree] TS3 an OPEN for a tenure the receiver "
     "has not heard of parks, and is seated the moment the decisions naming "
     "its author land"
 ) {
@@ -464,7 +464,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Control][SceneTree] TS4 a park that outlives the repair "
+    "[Netw][Control][SceneTree] TS4 a park that outlives the repair "
     "interval answers RESET, the writer opens again and the receiver seats "
     "the fresh request once the decisions land"
 ) {

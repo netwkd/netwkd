@@ -22,7 +22,7 @@ world. The entity runs at
         entity.simulation.schedule = NetwSimulation.SCHEDULE_STEPPED
         Netw.configure_property(self, &"position").state()
 
-Use the Networked build of Godot, published at
+Use the netwkd build of Godot, published at
 https://github.com/diejor/godot/releases. When the game's own physics can
 advance a world on demand, install a stepper that calls it with
 :ref:`NetwSession.install_physics_stepper <class_NetwSession_method_install_physics_stepper>`.

@@ -34,7 +34,7 @@ const SiteRow SITE_ROWS[] = {
     {"RPC", NETW_FAULT_RPC_REFUSED, "hit", FIXTURE, 8},
     {"CLOCK", NETW_FAULT_TICK_SPLITS_PHYSICS, "", FIXTURE, 9},
     {"HANDLER", NETW_FAULT_SPAWN_RETURN, "make", FIXTURE, 10},
-    {"NONE", NETW_FAULT_MALFORMED_DATAGRAM, "", "Networked", 0},
+    {"NONE", NETW_FAULT_MALFORMED_DATAGRAM, "", "netwkd", 0},
 };
 
 const SiteRow *calling_row = nullptr;
@@ -50,7 +50,7 @@ void raise_from_call() {
 }
 
 TEST_CASE(
-    "[Networked][Faults] a fault lands on the line a game wrote, and a "
+    "[Netw][Faults] a fault lands on the line a game wrote, and a "
     "mistake in a script lands once for all its nodes"
 ) {
     const godot::Ref<godot::Script> script = netw::gd::load_script(FIXTURE);

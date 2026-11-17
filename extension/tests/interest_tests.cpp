@@ -519,7 +519,7 @@ const Row ENGINE_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Interest] the interest engine grants each peer what its "
+    "[Netw][Interest] the interest engine grants each peer what its "
     "layers say, in any order, parents before children"
 ) {
     const Stand stand = {String("the interest engine and spawn plan")};
@@ -1360,7 +1360,7 @@ const Row WORLD_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Interest][SceneTree] a peer sees what its layers grant, a "
+    "[Netw][Interest][SceneTree] a peer sees what its layers grant, a "
     "hidden body comes back as it was, and only the server changes a layer"
 ) {
     const Stand stand = {String("a server and a client on the loopback rig")};

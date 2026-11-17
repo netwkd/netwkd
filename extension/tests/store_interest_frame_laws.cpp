@@ -337,7 +337,7 @@ public:
 NETW_FRAME_SCENARIO(CrowdScenario, store_crowd_scenario);
 
 TEST_CASE(
-    "[Networked][Store][Frame] SI2 a peer that holds no spawned copy is not "
+    "[Netw][Store][Frame] SI2 a peer that holds no spawned copy is not "
     "admitted to the row, however interest reads"
 ) {
     const AdmitEvidence &seen = admit_evidence();
@@ -349,7 +349,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] SI3 a row whose entity stops being live is "
+    "[Netw][Store][Frame] SI3 a row whose entity stops being live is "
     "admitted to nobody"
 ) {
     const AdmitEvidence &seen = admit_evidence();
@@ -361,7 +361,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store][Frame] SI4 a viewer joining a 900 member layer costs "
+    "[Netw][Store][Frame] SI4 a viewer joining a 900 member layer costs "
     "work in proportion to the members, and a steady tick after it costs none"
 ) {
     const CrowdEvidence &seen = crowd_evidence();

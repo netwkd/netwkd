@@ -4,7 +4,7 @@ extends NetwTestSuite
 const KEY := "res://tests/nakama/join_token/test_only_join_key.pub"
 const WAIT_MS := 15000
 const _ERROR_SCRUBBER := preload(
-	"res://addons/networked_test/gdunit4/gdunit_error_scrubber.gd"
+	"res://addons/netwkd_test/gdunit4/gdunit_error_scrubber.gd"
 )
 
 
@@ -77,7 +77,7 @@ func test_a_server_without_the_module_lets_the_player_join_unproven(
 		assert_array(host_gate.requests[0].accounts).is_empty()
 	assert_int(
 		await _ERROR_SCRUBBER.erase_matching(
-			["Install addons/networked_nakama/server"],
+			["Install addons/netwkd_nakama/server"],
 		),
 	).override_failure_message(
 		"The missing module was not reported exactly once.",

@@ -4,7 +4,7 @@
 		Steps a physics space on demand, for a physics server without [code]space_step[/code].
 	</brief_description>
 	<description>
-		Networked steps a space through [code]PhysicsServer3D.space_step[/code] when the server has it, so a game installs a stepper only for a server that does not. The [url=https://github.com/diejor/godot/releases]Networked engine build[/url] has it. An installed stepper outranks that built-in stepping. While an entity with [constant NetwSimulation.SCHEDULE_STEPPED] is in that space, Networked stops the engine from stepping it and calls [method _step] once per tick instead, and again for each tick it replays.
+		netwkd steps a space through [code]PhysicsServer3D.space_step[/code] when the server has it, so a game installs a stepper only for a server that does not. The [url=https://github.com/diejor/godot/releases]netwkd engine build[/url] has it. An installed stepper outranks that built-in stepping. While an entity with [constant NetwSimulation.SCHEDULE_STEPPED] is in that space, netwkd stops the engine from stepping it and calls [method _step] once per tick instead, and again for each tick it replays.
 		[codeblock]
 		extends NetwPhysicsStepper
 
@@ -18,7 +18,7 @@
 		[/codeblock]
 		Install it with [method NetwSession.install_physics_stepper], and install [code]null[/code] to remove it. Without a stepper or [code]space_step[/code], a [constant NetwSimulation.SCHEDULE_STEPPED] entity runs as [constant NetwSimulation.SCHEDULE_FRAME]. Once no such entity is left in the space, the engine steps it again as usual.
 		Each tick, every entity in the space applies its input first, then [method _step] and [method _snapshot] run once for the whole space. Under [member NetwPrediction.rollback_together] a replay restores every entity, calls [method _restore] once, then steps each replayed tick the same way.
-		Implement [method _snapshot] and [method _restore] only when the space holds bodies that are not entities, such as loose debris. Entities are restored by Networked.
+		Implement [method _snapshot] and [method _restore] only when the space holds bodies that are not entities, such as loose debris. Entities are restored by netwkd.
 	</description>
 	<tutorials>
 	</tutorials>

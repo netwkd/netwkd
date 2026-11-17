@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="NetwAuthProtocol" inherits="RefCounted" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Reads and writes the packets Networked sends during [SceneMultiplayer] authentication.
+		Reads and writes the packets netwkd sends during [SceneMultiplayer] authentication.
 	</brief_description>
 	<description>
 		A packet starts with four bytes that say what it is. A joining player sends [code]"NHEL"[/code], then a version byte, an 8-byte build tag, a flags byte and a 4-byte deadline in milliseconds. The server replies with its own [code]"NHEL"[/code], whose deadline is the time the player has left to be admitted, followed by a random challenge when [NetwAdmissionConfig] accepts a provider. A server browser sends [code]"NPRB"[/code], then a version byte and a flags or status byte, and the reply follows.
@@ -111,7 +111,7 @@
 	</methods>
 	<constants>
 		<constant name="KIND_UNKNOWN" value="0" enum="Kind">
-			Not a Networked packet.
+			Not a netwkd packet.
 		</constant>
 		<constant name="KIND_HELLO" value="1" enum="Kind">
 			A player joining.

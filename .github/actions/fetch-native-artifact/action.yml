@@ -1,6 +1,6 @@
 name: Fetch native artifact
 description: >
-  Download staged cells and deploy the named ones into addons/networked/bin.
+  Download staged cells and deploy the named ones into addons/netwkd/bin.
   Each artifact lands in a directory of its own, and ci/package.py checks the
   build record before anything reaches the addon, so a job cannot run against
   a library from another revision or another cell.
@@ -61,9 +61,9 @@ runs:
         set -eu
         args=(python3 ci/package.py --cells "$NETW_CELLS"
               --staging "$NETW_STAGING"
-              --deploy-into addons/networked/bin)
+              --deploy-into addons/netwkd/bin)
         if [ -n "$NETW_SHA" ]; then
           args+=(--expect-sha "$NETW_SHA")
         fi
         "${args[@]}"
-        ls -l addons/networked/bin
+        ls -l addons/netwkd/bin

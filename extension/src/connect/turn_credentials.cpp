@@ -11,7 +11,7 @@ using namespace godot;
 namespace netw::connect {
 
 const char *TurnCredentials::URL_SETTING
-    = "networked/webrtc/turn_credentials_url";
+    = "netwkd/webrtc/turn_credentials_url";
 
 String TurnCredentials::configured_url() {
     ProjectSettings *settings = ProjectSettings::get_singleton();
@@ -95,7 +95,7 @@ TurnCredentials::Answer TurnCredentials::read_answer(
         = error.get_type() == Variant::STRING ? String(error) : String();
     if (p_code == 404) {
         answer.message = "The TURN credential URL answered 404. Check "
-                         "networked/webrtc/turn_credentials_url.";
+                         "netwkd/webrtc/turn_credentials_url.";
     } else if (p_code == 403) {
         answer.message = "The TURN credential server refused this game.";
     } else {
@@ -117,7 +117,7 @@ Error TurnCredentials::begin(const String &p_url, int64_t p_now_msec) {
     if ((!url.begins_with("https://") && !url.begins_with("http://"))
         || url.get_slice("://", 1).get_slice("/", 0).is_empty()) {
         refuse(
-            "networked/webrtc/turn_credentials_url is not an absolute URL. "
+            "netwkd/webrtc/turn_credentials_url is not an absolute URL. "
             "Set it to an https address."
         );
         return ERR_INVALID_PARAMETER;

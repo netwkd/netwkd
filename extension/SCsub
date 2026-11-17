@@ -11,35 +11,35 @@ import SCons.Script
 
 import sources
 
-env_networked = env_modules.Clone()
+env_netwkd = env_modules.Clone()
 
 sources.hold_determinism_floor(
-    env_networked,
-    lambda message: SCons.Script.Exit("networked: " + message),
+    env_netwkd,
+    lambda message: SCons.Script.Exit("netwkd: " + message),
     SCons.Script.ARGUMENTS,
 )
 
 if env["builtin_enet"]:
-    env_networked.Prepend(CPPPATH=["#thirdparty/enet"])
+    env_netwkd.Prepend(CPPPATH=["#thirdparty/enet"])
 
 if env["tests"]:
     env.Append(CPPDEFINES=[sources.TESTS])
-    env_networked.Append(CPPDEFINES=[sources.TESTS])
+    env_netwkd.Append(CPPDEFINES=[sources.TESTS])
 
 if env["profiler"] == "tracy":
-    env_networked.Append(CPPDEFINES=[sources.PROFILING])
+    env_netwkd.Append(CPPDEFINES=[sources.PROFILING])
     profiler_path = Path(env["profiler_path"])
     if (profiler_path / "public" / "TracyClient.cpp").is_file():
         profiler_path = profiler_path / "public"
-    env_networked.Append(CPPPATH=[str(profiler_path.resolve())])
+    env_netwkd.Append(CPPPATH=[str(profiler_path.resolve())])
 
 for path in sources.source_paths():
-    env_networked.add_source_files(
+    env_netwkd.add_source_files(
         env.modules_sources,
         path.relative_to(sources.ROOT).as_posix(),
     )
 
-env_fault_text = env_networked.Clone()
+env_fault_text = env_netwkd.Clone()
 env_fault_text.Append(CCFLAGS=sources.SWITCH_ERROR_FLAGS[sources.dialect(env)])
 env_fault_text.add_source_files(
     env.modules_sources,

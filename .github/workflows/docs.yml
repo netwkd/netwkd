@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, total-native]
     paths:
-      - "addons/networked/**/*.gd"
+      - "addons/netwkd/**/*.gd"
       - "extension/**"
       - "ci/**"
       - "docs/**"
@@ -14,7 +14,7 @@ on:
   pull_request:
     branches: [main, total-native]
     paths:
-      - "addons/networked/**/*.gd"
+      - "addons/netwkd/**/*.gd"
       - "extension/**"
       - "ci/**"
       - "docs/**"

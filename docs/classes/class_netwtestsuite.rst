@@ -12,7 +12,7 @@ NetwTestSuite
 
 **Inherits:** :godot:`GdUnitTestSuite`
 
-GdUnit4 base class for tests that use the Networked addon.
+GdUnit4 base class for tests that use the netwkd addon.
 
 .. rst-class:: classref-introduction-group
 

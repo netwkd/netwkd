@@ -909,7 +909,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Predict][SceneTree] a predicting client stops at its "
+    "[Netw][Predict][SceneTree] a predicting client stops at its "
     "horizon and resumes, hears its correction in order, and a joint it "
     "cannot replay is reported once"
 ) {

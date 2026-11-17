@@ -358,7 +358,7 @@ const MoveLaw MOVE_LAWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Spawn][Sync][SceneTree] a moved entity keeps the stream it "
+    "[Netw][Spawn][Sync][SceneTree] a moved entity keeps the stream it "
     "had, whichever destination the move names"
 ) {
     const MoveScenario CORPUS[] = {
@@ -672,7 +672,7 @@ FrameEvidence run_frame_scenario(const FrameScenario &p_scenario) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Sync][SceneTree] HC2 a row is seated only in the "
+    "[Netw][Spawn][Sync][SceneTree] HC2 a row is seated only in the "
     "frame it was written in, whichever side writes it, when the move and "
     "the rows written around it cross on the link"
 ) {
@@ -692,7 +692,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Sync][SceneTree] HC2 a row written under the new "
+    "[Netw][Spawn][Sync][SceneTree] HC2 a row written under the new "
     "parent waits while the reader still carries the body under its guard, "
     "so the move reaches it before any row does"
 ) {
@@ -784,7 +784,7 @@ LateEvidence run_late_join() {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] a peer that joins after the moves spawns "
+    "[Netw][Spawn][SceneTree] a peer that joins after the moves spawns "
     "the entity at the newest anchor and revision, and a REPARENT that "
     "reaches it before or after that SPAWN moves nothing"
 ) {
@@ -871,7 +871,7 @@ LateParkedEvidence run_late_parked() {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] a REPARENT that reaches a peer while its "
+    "[Netw][Spawn][SceneTree] a REPARENT that reaches a peer while its "
     "SPAWN waits on an absent parent is kept, and the entity lands at that "
     "REPARENT's anchor and revision once the parent arrives"
 ) {

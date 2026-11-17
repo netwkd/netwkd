@@ -264,7 +264,7 @@ void ticks_after_loss_keep_bodies(NetwSession::TransferMode p_mode) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TW1 a session that only ticks "
+    "[Netw][Session][Transfer][SceneTree] TW1 a session that only ticks "
     "after the server is lost keeps every server-spawned body on every "
     "client, rejoining"
 ) {
@@ -272,7 +272,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TW1 a session that only ticks "
+    "[Netw][Session][Transfer][SceneTree] TW1 a session that only ticks "
     "after the server is lost keeps every server-spawned body on every "
     "client, continuing"
 ) {
@@ -325,14 +325,14 @@ void lost_body_leaves_nothing_waiting(NetwSession::TransferMode p_mode) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TW3 a body the lost server's "
+    "[Netw][Session][Transfer][SceneTree] TW3 a body the lost server's "
     "player owned leaves no client waiting on it, rejoining"
 ) {
     lost_body_leaves_nothing_waiting(NetwSession::TRANSFER_REJOIN);
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TW3 a body the lost server's "
+    "[Netw][Session][Transfer][SceneTree] TW3 a body the lost server's "
     "player owned leaves no client waiting on it, continuing"
 ) {
     lost_body_leaves_nothing_waiting(NetwSession::TRANSFER_CONTINUE);
@@ -1000,7 +1000,7 @@ void judge(const MatrixRow &p_row) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TW2 a server and three clients "
+    "[Netw][Session][Transfer][SceneTree] TW2 a server and three clients "
     "with a filtered, predicted, tabled and viewed world carry on after the "
     "server leaves, by loss or by hand, in each transfer mode"
 ) {

@@ -87,7 +87,7 @@ struct DelayedGlide {
 };
 
 TEST_CASE(
-    "[Networked][Display] FX6 a remote behind a link longer than the clock "
+    "[Netw][Display] FX6 a remote behind a link longer than the clock "
     "assumes stops starving once its arrival ages settle"
 ) {
     DelayedGlide glide;

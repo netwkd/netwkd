@@ -308,7 +308,7 @@ NETW_FRAME_SCENARIO(ColliderScenario, collider_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][LagComp][Frame] K-RW2 a ray inside a rewind sees a kinematic "
+    "[Netw][LagComp][Frame] K-RW2 a ray inside a rewind sees a kinematic "
     "root at the rewound pose on a build that flushes, and at its live pose "
     "on one that does not"
 ) {
@@ -320,7 +320,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][LagComp][Frame] K-RW3 a character that moved this tick and "
+    "[Netw][LagComp][Frame] K-RW3 a character that moved this tick and "
     "was rewound keeps the velocity the step gives it without the rewind"
 ) {
     const ColliderEvidence &evidence = collider_evidence();
@@ -330,7 +330,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][LagComp][Frame] K-CL1 a hitbox attached after the first "
+    "[Netw][LagComp][Frame] K-CL1 a hitbox attached after the first "
     "rewind moves with the next one"
 ) {
     const ColliderEvidence &evidence = collider_evidence();
@@ -339,7 +339,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] K-TR1 a shape query on replay tick one sees "
+    "[Netw][Predict][Frame] K-TR1 a shape query on replay tick one sees "
     "the hitbox at the restored pose, and the kinematic root there on a "
     "build that flushes"
 ) {

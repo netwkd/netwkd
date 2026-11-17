@@ -462,7 +462,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] Netw.session answers the live session "
+    "[Netw][Session][SceneTree] Netw.session answers the live session "
     "or nothing, settings declared before the peer apply, and a handler "
     "with the wrong signature is reported"
 ) {

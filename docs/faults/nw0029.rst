@@ -13,7 +13,7 @@ ticks it was given.
 
 Raise
 :ref:`NetwSessionConfig.transfer_deadline_ticks <class_NetwSessionConfig_property_transfer_deadline_ticks>`,
-or run the same Networked version on every peer.
+or run the same netwkd version on every peer.
 
 .. code-block:: gdscript
 

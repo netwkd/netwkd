@@ -241,7 +241,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Predict] a predicted value is corrected only past its "
+    "[Netw][Predict] a predicted value is corrected only past its "
     "tolerance"
 ) {
     const Stand stand = {String("a client predicting one property")};

@@ -3,7 +3,7 @@ extends NetwTestSuite
 
 const PUMP_TIMEOUT_MS := 5000
 const ERROR_SCRUBBER := preload(
-	"res://addons/networked_test/gdunit4/gdunit_error_scrubber.gd"
+	"res://addons/netwkd_test/gdunit4/gdunit_error_scrubber.gd"
 )
 
 var session: NetwHarnessSession

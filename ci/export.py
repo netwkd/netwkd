@@ -125,7 +125,7 @@ code {{ font-family: inherit; }}
     </div>
     <footer>
       Built from <code>{revision}</code>.
-      <a href="https://github.com/diejor/networked">github.com/diejor/networked</a>
+      <a href="https://github.com/netwkd/netwkd">github.com/netwkd/netwkd</a>
     </footer>
   </main>
 </body>
@@ -288,13 +288,13 @@ def export_web(
     timeout: float,
 ) -> dict:
     overrides: dict[str, str] = {
-        "enabled": 'PackedStringArray("res://addons/networked/plugin.cfg")',
+        "enabled": 'PackedStringArray("res://addons/netwkd/plugin.cfg")',
     }
     if scene:
         overrides["run/main_scene"] = '"%s"' % scene
         for entry in load_examples()["examples"]:
             if entry["scene"] == scene:
-                overrides["config/name"] = '"%s | Networked"' % entry["title"]
+                overrides["config/name"] = '"%s | netwkd"' % entry["title"]
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)

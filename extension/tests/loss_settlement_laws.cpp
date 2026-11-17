@@ -71,7 +71,7 @@ Ref<NetwEntity> entity_at(LoopbackRig &p_rig, int p_route, int p_client) {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] L1 a server that leaves takes a "
+    "[Netw][Session][SceneTree] L1 a server that leaves takes a "
     "client's session down"
 ) {
     LoopbackRig rig(1);
@@ -92,7 +92,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] L3 a controller that departs through "
+    "[Netw][Session][SceneTree] L3 a controller that departs through "
     "the real transport signal reverts its entity exactly once, because "
     "settlement invokes the entity consequence directly rather than a "
     "per-entity subscription that a duplicated signal could fire twice"
@@ -117,7 +117,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] L4 a server's loss settles once even "
+    "[Netw][Session][SceneTree] L4 a server's loss settles once even "
     "when the same departure reaches settlement twice through two different "
     "entries, because a duplicate report and a reentrant terminal leave "
     "describe one session ending and not two"
@@ -150,7 +150,7 @@ void leave_on_departure(int64_t) {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] L5 a departure handler that starts "
+    "[Netw][Session][SceneTree] L5 a departure handler that starts "
     "leaving cannot cancel the server's terminal settlement, because the "
     "loss edge classifies the departure before any world consequence runs "
     "rather than re-reading the state the handler just moved"

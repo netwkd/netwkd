@@ -234,7 +234,7 @@ NETW_FRAME_SCENARIO(IndependentScenario, independent_scenario);
 } // namespace TestPredictIndependentFrameLaws
 
 TEST_CASE(
-    "[Networked][Predict][Frame] K-IR1 an INDEPENDENT correction that arrives "
+    "[Netw][Predict][Frame] K-IR1 an INDEPENDENT correction that arrives "
     "between physics frames replays in the next physics frame"
 ) {
     using namespace TestPredictIndependentFrameLaws;

@@ -155,7 +155,7 @@ World wings() {
 NETW_FRAME_SCENARIO(WorldFrames, wings_frames, &wings, END);
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MS1 two instances of one level are watched "
+    "[Netw][Scene][Frame] MS1 two instances of one level are watched "
     "apart, so a player watching one never holds the other or what is in it"
 ) {
     const Seen &seen = wings_frames.seen();
@@ -172,7 +172,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MS2 an entity belongs to the level above it, "
+    "[Netw][Scene][Frame] MS2 an entity belongs to the level above it, "
     "and moving it with Netw.reparent or Node.reparent moves it between the "
     "levels' entities on every peer"
 ) {
@@ -188,7 +188,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MS3 a second watch adds a level to what a "
+    "[Netw][Scene][Frame] MS3 a second watch adds a level to what a "
     "player holds, and an unwatch takes away only that level"
 ) {
     const Seen &seen = wings_frames.seen();
@@ -201,7 +201,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MS4 a player who joins late and watches a "
+    "[Netw][Scene][Frame] MS4 a player who joins late and watches a "
     "level reads every viewer the level already had"
 ) {
     const Seen &seen = wings_frames.seen();
@@ -211,7 +211,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MS5 a level reports each entity and each "
+    "[Netw][Scene][Frame] MS5 a level reports each entity and each "
     "player entity entering and leaving once while its root stands, on the "
     "server and on a client holding it"
 ) {
@@ -225,7 +225,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MS6 a despawned player entity leaves its "
+    "[Netw][Scene][Frame] MS6 a despawned player entity leaves its "
     "player's entities and its level's player entities in the same call"
 ) {
     const Seen &seen = wings_frames.seen();

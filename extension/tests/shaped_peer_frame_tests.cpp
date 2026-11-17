@@ -259,7 +259,7 @@ public:
 
 NETW_FRAME_SCENARIO(PeerScenario, shaped_peer_scenario);
 
-TEST_CASE("[Networked][Link][Frame] Latency applies in both directions") {
+TEST_CASE("[Netw][Link][Frame] Latency applies in both directions") {
     const Evidence &out = evidence()[LATENCY];
     NETW_CHECK_EQ(out.errors, 0);
     CHECK(out.done);
@@ -280,9 +280,7 @@ TEST_CASE("[Networked][Link][Frame] Latency applies in both directions") {
     }
 }
 
-TEST_CASE(
-    "[Networked][Link][Frame] Loss drops unreliable and delays reliable"
-) {
+TEST_CASE("[Netw][Link][Frame] Loss drops unreliable and delays reliable") {
     const Evidence &out = evidence()[LOSS];
     NETW_CHECK_EQ(out.errors, 0);
     CHECK(out.done);
@@ -305,7 +303,7 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("[Networked][Link][Frame] Duplication applies outbound and inbound") {
+TEST_CASE("[Netw][Link][Frame] Duplication applies outbound and inbound") {
     const Evidence &out = evidence()[DUPLICATE];
     NETW_CHECK_EQ(out.errors, 0);
     CHECK(out.done);
@@ -320,7 +318,7 @@ TEST_CASE("[Networked][Link][Frame] Duplication applies outbound and inbound") {
     }
 }
 
-TEST_CASE("[Networked][Link][Frame] Disconnect purges in-flight packets") {
+TEST_CASE("[Netw][Link][Frame] Disconnect purges in-flight packets") {
     for (int row : {DISCONNECT, KICK}) {
         const Evidence &out = evidence()[row];
         NETW_CHECK_EQ(out.errors, 0);
@@ -334,7 +332,7 @@ TEST_CASE("[Networked][Link][Frame] Disconnect purges in-flight packets") {
     NETW_CHECK_EQ(evidence()[DISCONNECT].disconnects, 1);
 }
 
-TEST_CASE("[Networked][Link][Frame] Close clears packets and disconnects") {
+TEST_CASE("[Netw][Link][Frame] Close clears packets and disconnects") {
     const Evidence &out = evidence()[CLOSE];
     NETW_CHECK_EQ(out.errors, 0);
     CHECK(out.done);

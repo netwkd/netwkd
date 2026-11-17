@@ -184,7 +184,7 @@ Subject stand_predicted(const Bench &p_bench) {
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a slerp channel brackets a "
+    "[Netw][Display][SceneTree] a slerp channel brackets a "
     "quaternion, which no component-wise lerp would reach"
 ) {
     Bench bench;
@@ -208,7 +208,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a predicted chase moves the visual "
+    "[Netw][Display][SceneTree] a predicted chase moves the visual "
     "toward the live source without moving the source"
 ) {
     Bench bench;
@@ -222,7 +222,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a reset snaps the chase to the live "
+    "[Netw][Display][SceneTree] a reset snaps the chase to the live "
     "source"
 ) {
     Bench bench;
@@ -236,7 +236,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a demote to remote resumes from the "
+    "[Netw][Display][SceneTree] a demote to remote resumes from the "
     "rows recorded while predicted and seeds its role offset on the "
     "first frame"
 ) {
@@ -277,7 +277,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a promote to predicted adopts the "
+    "[Netw][Display][SceneTree] a promote to predicted adopts the "
     "display the remote role left, then glides to the live source"
 ) {
     Bench bench;
@@ -312,7 +312,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a callback or a rendering item set on "
+    "[Netw][Display][SceneTree] a callback or a rendering item set on "
     "an entity takes its drawn values, and its visual node is left alone"
 ) {
     for (const bool called : {true, false}) {

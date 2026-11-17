@@ -57,7 +57,7 @@ World yard(const Exit &p_exit) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] H1 when the server moves, by hand or by loss, "
+    "[Netw][Compliance] H1 when the server moves, by hand or by loss, "
     "every survivor holds the new server's world with the same owners and "
     "controllers, and the world moves again"
 ) {
@@ -107,7 +107,7 @@ constexpr int STAYED = 0;
 constexpr int SWAPPED = 1;
 
 TEST_CASE(
-    "[Networked][Compliance] H2 in rejoin mode the new server keeps only "
+    "[Netw][Compliance] H2 in rejoin mode the new server keeps only "
     "the entities its configure_transfer handler answers true for"
 ) {
     const Seen seen = World(SALVAGE, 2)

@@ -100,7 +100,7 @@ Seated seat(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SV1 a mirror's identity is already stamped at "
+    "[Netw][Spawn] SV1 a mirror's identity is already stamped at "
     "_enter_tree, so a receiver that derives anything from route or entity id "
     "inside its own tree notification reads the same answer the authority has"
 ) {
@@ -126,7 +126,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SV2 an owner stamp is authority by the time the mirror "
+    "[Netw][Spawn] SV2 an owner stamp is authority by the time the mirror "
     "enters the tree, so authority derived inside _enter_tree needs no pending "
     "spawn window to be correct"
 ) {
@@ -158,7 +158,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SV3 a duplicate spawn frame is dropped and counted, "
+    "[Netw][Spawn] SV3 a duplicate spawn frame is dropped and counted, "
     "and leaves the receiver holding one instance, because a retransmit must "
     "not build a second body for one route"
 ) {

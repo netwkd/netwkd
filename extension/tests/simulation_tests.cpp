@@ -433,7 +433,7 @@ Facts undeclared_but_steered_here() {
 }
 
 TEST_CASE(
-    "[Networked][Sim] a body resolves one simulation mode for its role on "
+    "[Netw][Sim] a body resolves one simulation mode for its role on "
     "every peer"
 ) {
     const Closure CLOSURES[] = {OPEN, FALLBACK, DELAY_CLOSED};
@@ -557,7 +557,7 @@ int64_t steps_over(LoopbackRig &p_rig, Node2D *p_node, int p_ticks) {
 }
 
 TEST_CASE(
-    "[Networked][Sim] a copy runs once a tick, never as fresh, while its "
+    "[Netw][Sim] a copy runs once a tick, never as fresh, while its "
     "remote mode is active"
 ) {
     LoopbackRig rig(1);

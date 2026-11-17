@@ -3,7 +3,7 @@ class_name TestConnectBrowserSmoke
 extends NetwTestSuite
 
 const BROWSER := preload(
-	"res://addons/networked/gdscript/connect/ui/connect_browser.tscn"
+	"res://addons/netwkd/gdscript/connect/ui/connect_browser.tscn"
 )
 
 var tree: MultiplayerViewport

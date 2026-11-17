@@ -530,7 +530,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Table][SceneTree] a table the server commits reaches every "
+    "[Netw][Table][SceneTree] a table the server commits reaches every "
     "client whole and in order, and a save loads back as it was"
 ) {
     const World world = {String("a server and clients on a loopback")};

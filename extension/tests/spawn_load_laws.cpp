@@ -137,7 +137,7 @@ struct LoadStand {
 };
 
 TEST_CASE(
-    "[Networked][Spawn] LC1 LC2 LC3 a MultiplayerSpawner scene still loading "
+    "[Netw][Spawn] LC1 LC2 LC3 a MultiplayerSpawner scene still loading "
     "on a client waits for it past every park deadline, and its children "
     "arrive under it once it loads, built by a spawn function that finds it "
     "ready"
@@ -164,7 +164,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] LC4 LC5 LC10 a spawn that ends while its scene loads "
+    "[Netw][Spawn] LC4 LC5 LC10 a spawn that ends while its scene loads "
     "builds nothing once the load lands, and lets go of the scene"
 ) {
     const char *ENDINGS[] = {"despawned", "session ended", "server lost"};
@@ -193,7 +193,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] LC6 a MultiplayerSpawner scene that fails to load on "
+    "[Netw][Spawn] LC6 a MultiplayerSpawner scene that fails to load on "
     "a client drops its spawn with one warning, and its children with it"
 ) {
     LoadStand stand;
@@ -214,7 +214,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] LC11 a client's own poll settles a MultiplayerSpawner "
+    "[Netw][Spawn] LC11 a client's own poll settles a MultiplayerSpawner "
     "scene that finished loading, with nothing else polling the loads"
 ) {
     LoadStand stand;
@@ -230,7 +230,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] LC7 a scene stays loaded while an entity built from "
+    "[Netw][Spawn] LC7 a scene stays loaded while an entity built from "
     "it lives, so a second spawn of it builds at once"
 ) {
     LoadStand stand;

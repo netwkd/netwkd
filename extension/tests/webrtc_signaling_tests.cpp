@@ -128,20 +128,20 @@ LawVerdict joiner_reaches_host(const Stand &) {
 }
 
 LawVerdict one_board(const Stand &) {
-    if (board_hash_of("networked") != board_hash_of("networked")) {
+    if (board_hash_of("netwkd") != board_hash_of("netwkd")) {
         return law_broken("one filter uid gave two boards");
     }
     if (board_hash_of("game-a") == board_hash_of("game-b")) {
         return law_broken("two games share one board");
     }
-    if (board_hash_of("networked").length() != 20) {
+    if (board_hash_of("netwkd").length() != 20) {
         return law_broken("the board hash is not twenty glyphs");
     }
     return law_held();
 }
 
 LawVerdict card_round_trip(const Stand &) {
-    const RoomCard sent = card_of("room00000000000000ab", "networked");
+    const RoomCard sent = card_of("room00000000000000ab", "netwkd");
     RoomCard read;
     if (!RoomCard::from_dictionary(sent.to_dictionary(), read)) {
         return law_broken("a room card was refused");
@@ -251,7 +251,7 @@ const Row ROWS[] = {
      &turn_filter},
 };
 
-TEST_CASE("[Networked][Connect] two builds find one WebRTC room") {
+TEST_CASE("[Netw][Connect] two builds find one WebRTC room") {
     const Stand stand = {String("a room over a tracker")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, stand);

@@ -57,7 +57,7 @@ int64_t ticks_over_frames(NetwMultiplayer *p_core, int p_frames) {
 }
 
 TEST_CASE(
-    "[Networked][Session] the tree stays paused while any session in the "
+    "[Netw][Session] the tree stays paused while any session in the "
     "process is paused, and a pause the game set outlasts them all"
 ) {
     const TreeUnpausedAfter restore;
@@ -80,7 +80,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] the clock keeps ticking through a SceneTree "
+    "[Netw][Session] the clock keeps ticking through a SceneTree "
     "pause the game set, and stops for a session pause"
 ) {
     const TreeUnpausedAfter restore;

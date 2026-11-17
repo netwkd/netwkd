@@ -33,7 +33,7 @@ This kinematic entity sets ``SCHEDULE_STEPPED`` in a world that a
     func _network_process(delta: float, tick: int, is_fresh: bool) -> void:
         move_and_slide()
 
-Use the Networked build of Godot, which adds ``flush_kinematic_transform``.
+Use the netwkd build of Godot, which adds ``flush_kinematic_transform``.
 It is published at https://github.com/diejor/godot/releases. On an official
 Godot build, leave the schedule unset, so
 :ref:`SCHEDULE_AUTO <class_NetwSimulation_constant_SCHEDULE_AUTO>` picks one

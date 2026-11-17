@@ -87,7 +87,7 @@ Ref<NetwMultiplayer> playing(NetwMultiplayer::Role p_role) {
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] W1 an isolated scene root is "
+    "[Netw][Scene][Hosted][SceneTree] W1 an isolated scene root is "
     "wrapped in a "
     "hidden StretchViewportContainer holding a SubViewport that owns both "
     "worlds, and neither wrapper carries an identity"
@@ -135,7 +135,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] W2 retiring a wrapped scene frees "
+    "[Netw][Scene][Hosted][SceneTree] W2 retiring a wrapped scene frees "
     "its StretchViewportContainer, so no empty view is left behind"
 ) {
     const Ref<NetwMultiplayer> core
@@ -152,7 +152,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] W3 the node Netw.spawn answers for "
+    "[Netw][Scene][Hosted][SceneTree] W3 the node Netw.spawn answers for "
     "an isolated scene leads Netw.scene to that scene"
 ) {
     Node *branch = memnew(Node);
@@ -182,7 +182,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] W6 a view the game shows itself "
+    "[Netw][Scene][Hosted][SceneTree] W6 a view the game shows itself "
     "stays shown "
     "through a settle that does not change the shown scene"
 ) {

@@ -175,7 +175,7 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Spawn] SA1 Netw.spawn_async spawns nothing until the spawn "
+    "[Netw][Spawn] SA1 Netw.spawn_async spawns nothing until the spawn "
     "function returns, then settles with the node outside the tree, or "
     "fails with the reason it could not"
 ) {
@@ -243,7 +243,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SA1 Netw.spawn_async on a client fails "
+    "[Netw][Spawn] SA1 Netw.spawn_async on a client fails "
     "ERR_UNAUTHORIZED and calls nothing"
 ) {
     const Ref<Script> spawner = netw_test::minted_script(SPAWNER_SOURCE);
@@ -291,7 +291,7 @@ Node *spawn_made(Stand &r_stand) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SA2 a client whose spawn function awaits holds the "
+    "[Netw][Spawn] SA2 a client whose spawn function awaits holds the "
     "route with no deadline, so a child and an RPC sent while it builds land "
     "once it returns, and the function runs once"
 ) {
@@ -335,7 +335,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SA3 a spawn that ends while a client builds it is "
+    "[Netw][Spawn] SA3 a spawn that ends while a client builds it is "
     "dropped there, and the node its spawn function returns later is freed"
 ) {
     const ClientsWait scripts;
@@ -396,7 +396,7 @@ const Failure FAILURES[] = {
 };
 
 TEST_CASE(
-    "[Networked][Spawn] SA3 a client whose spawn function returns no node, "
+    "[Netw][Spawn] SA3 a client whose spawn function returns no node, "
     "fails, or loses its host drops the route with one warning"
 ) {
     const ClientsWait scripts;
@@ -430,7 +430,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SA4 a spawn function still waiting after "
+    "[Netw][Spawn] SA4 a spawn function still waiting after "
     "park_timeout_seconds warns once on the peer running it"
 ) {
     const ClientsWait scripts;
@@ -470,7 +470,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] NetwActionRequest.bind_result refuses a node "
+    "[Netw][Spawn] NetwActionRequest.bind_result refuses a node "
     "Netw.spawn_async built"
 ) {
     const Ref<Script> spawner = netw_test::minted_script(SPAWNER_SOURCE);

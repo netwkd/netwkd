@@ -105,7 +105,7 @@ int edges_for(const CallLog &p_seen, const RID &p_scene, bool p_subscribed) {
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR2 two entities of one player in one scene are two "
+    "[Netw][Scene] JR2 two entities of one player in one scene are two "
     "reasons, so the first one leaving keeps the player subscribed and the "
     "last one leaving takes the subscription away"
 ) {
@@ -144,7 +144,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR3 an entity that leaves a scene and returns inside "
+    "[Netw][Scene] JR3 an entity that leaves a scene and returns inside "
     "one settle never reports leaving it, because a move is classified from "
     "the tree the entity ended in rather than from the hops it took"
 ) {
@@ -177,7 +177,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR4 moving an ordinary parent moves every represented "
+    "[Netw][Scene] JR4 moving an ordinary parent moves every represented "
     "descendant inside it, so both players it carried subscribe to where the "
     "parent landed and neither is left subscribed to where it was"
 ) {
@@ -214,7 +214,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR5 an explicit watch outlives the entity that "
+    "[Netw][Scene] JR5 an explicit watch outlives the entity that "
     "happened to be there, because a departure drops the entity's own reason "
     "and never the reason a caller asked for"
 ) {
@@ -243,7 +243,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR6 an entity parented under another "
+    "[Netw][Scene] JR6 an entity parented under another "
     "session's tree is refused rather than adopted, so the session it left "
     "revokes its "
     "membership and the destination claims nothing"
@@ -278,7 +278,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR7 an entity whose player holds no live "
+    "[Netw][Scene] JR7 an entity whose player holds no live "
     "membership subscribes nobody when it lands, because an armed orphan can "
     "outlive the acceptance that asked for it"
 ) {
@@ -303,7 +303,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR9 watching a nested scene delivers that scene and "
+    "[Netw][Scene] JR9 watching a nested scene delivers that scene and "
     "the structural ancestors it hangs from, because a scene root has to "
     "exist on a receiver before anything inside it can"
 ) {
@@ -333,7 +333,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR10 a nested watch reaches nothing else the ancestor "
+    "[Netw][Scene] JR10 a nested watch reaches nothing else the ancestor "
     "holds, so the sibling content of an outer scene stays with the peers the "
     "outer scene admits and the nested watcher never sees it"
 ) {
@@ -371,7 +371,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene] JR8 the run's placements agree with the tree, so "
+    "[Netw][Scene] JR8 the run's placements agree with the tree, so "
     "every entity reason names an entity that resides in that scene and "
     "every resident entity holds one"
 ) {

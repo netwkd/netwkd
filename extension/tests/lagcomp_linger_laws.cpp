@@ -38,7 +38,7 @@ Dictionary at(double p_x) {
 }
 
 TEST_CASE(
-    "[Networked][LagComp][Linger] LG1 a lingering despawn keeps its "
+    "[Netw][LagComp][Linger] LG1 a lingering despawn keeps its "
     "target rewindable for a window the session counts in its OWN ticks, so a "
     "shot fired at a target that has just died still validates against where "
     "that target stood"

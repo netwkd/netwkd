@@ -509,7 +509,7 @@ const Waiter WAITS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Spawn][SceneTree] a spawned body and its parts read the "
+    "[Netw][Spawn][SceneTree] a spawned body and its parts read the "
     "right entity, and a slow, missing or waiting build is reported and "
     "strands nothing"
 ) {

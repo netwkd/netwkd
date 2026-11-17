@@ -231,7 +231,7 @@ int route_of(Node *p_node) {
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][SceneTree] deny, a despawn the session's "
+    "[Netw][Lifecycle][Spawn][SceneTree] deny, a despawn the session's "
     "handler denies serves the entity back to the author with the reason "
     "and never touches an observer"
 ) {
@@ -261,7 +261,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][SceneTree] values, the session's handler "
+    "[Netw][Lifecycle][Spawn][SceneTree] values, the session's handler "
     "reads the author's spawn state on a copy not yet placed, and its "
     "destination"
 ) {
@@ -292,7 +292,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][SceneTree] quiet, the session's own "
+    "[Netw][Lifecycle][Spawn][SceneTree] quiet, the session's own "
     "spawn, move and despawn never ask the handler"
 ) {
     FilterStage stage;
@@ -326,7 +326,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][SceneTree] latch, a write after a denial "
+    "[Netw][Lifecycle][Spawn][SceneTree] latch, a write after a denial "
     "does not undo it, and the first reason reaches the author"
 ) {
     FilterStage stage;

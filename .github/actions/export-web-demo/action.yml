@@ -18,7 +18,7 @@ inputs:
     default: Web
   cells:
     description: >
-      Cell ids to deploy into addons/networked/bin. Empty skips the fetch,
+      Cell ids to deploy into addons/netwkd/bin. Empty skips the fetch,
       for a caller that already put the libraries there.
     required: false
     default: linux:x86_64:template_debug,web:wasm32:template_release
@@ -101,11 +101,11 @@ runs:
       shell: bash
       run: |
         set -eu
-        if ! ls addons/networked/bin/*.wasm >/dev/null 2>&1; then
-          echo "::error::no web library under addons/networked/bin, so the page would load nothing"
+        if ! ls addons/netwkd/bin/*.wasm >/dev/null 2>&1; then
+          echo "::error::no web library under addons/netwkd/bin, so the page would load nothing"
           exit 1
         fi
-        ls -l addons/networked/bin
+        ls -l addons/netwkd/bin
 
     - name: Export web
       shell: bash

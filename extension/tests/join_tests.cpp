@@ -477,7 +477,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Session] a joiner keeps its name, its arguments and its "
+    "[Netw][Session] a joiner keeps its name, its arguments and its "
     "account, and a join the server cannot read is refused"
 ) {
     const Stand stand = {String("a loopback session")};

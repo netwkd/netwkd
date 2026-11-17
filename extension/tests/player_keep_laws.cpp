@@ -267,7 +267,7 @@ void on_client_left(const Ref<NetwPlayer> &p_who, int64_t) {
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a player who drops or steps away "
+    "[Netw][Session][SceneTree] a player who drops or steps away "
     "leaves its entities spawned and owned by the server, and one who quits "
     "or is kicked loses them"
 ) {
@@ -307,7 +307,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] an entity the dropped player only "
+    "[Netw][Session][SceneTree] an entity the dropped player only "
     "controls keeps its owner and returns to the server's control"
 ) {
     World world(60.0, 2);
@@ -334,7 +334,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] in player_left the server lists every "
+    "[Netw][Session][SceneTree] in player_left the server lists every "
     "entity it keeps for the departed player, and a client lists none"
 ) {
     World world(60.0, 2);
@@ -363,7 +363,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] when the return window runs out, "
+    "[Netw][Session][SceneTree] when the return window runs out, "
     "counted in wall time through a session pause, a kept entity the player "
     "owned despawns and one it only drove stays with its owner"
 ) {
@@ -403,7 +403,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a stranger who connects on a dropped "
+    "[Netw][Session][SceneTree] a stranger who connects on a dropped "
     "player's peer id claims none of the entities kept for it"
 ) {
     World world(60.0, 1);
@@ -427,7 +427,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a car set to despawn when its driver "
+    "[Netw][Session][SceneTree] a car set to despawn when its driver "
     "disconnects is kept while the driver is dropped, and despawns when the "
     "return window runs out or the driver quits"
 ) {
@@ -461,7 +461,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a spawn_async whose player drops "
+    "[Netw][Session][SceneTree] a spawn_async whose player drops "
     "before it returns spawns nothing and keeps nothing"
 ) {
     World world(60.0, 2);
@@ -525,7 +525,7 @@ struct ReturnRow {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a returning player already lists its "
+    "[Netw][Session][SceneTree] a returning player already lists its "
     "kept entities in the join handler and in player_joined, inside a scene "
     "or not, so a game that spawns only when the list is empty spawns nothing"
 ) {
@@ -574,7 +574,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a returning player gets its avatar back "
+    "[Netw][Session][SceneTree] a returning player gets its avatar back "
     "as the same node on a peer that stayed, owns and controls it, and late "
     "joiners and its scene follow"
 ) {
@@ -612,7 +612,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a car the returning player only drove "
+    "[Netw][Session][SceneTree] a car the returning player only drove "
     "comes back driven by it and still owned by its owner"
 ) {
     World world(60.0, 2);
@@ -641,7 +641,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] an avatar the server was driving when "
+    "[Netw][Session][SceneTree] an avatar the server was driving when "
     "its player dropped comes back owned by the player and still driven by "
     "the server"
 ) {
@@ -934,7 +934,7 @@ public:
 NETW_FRAME_SCENARIO(KeptTransferScenario, kept_transfer_to_late, SEAT_LATE);
 
 TEST_CASE(
-    "[Networked][Session][Transfer][Frame] after a server transfer to a "
+    "[Netw][Session][Transfer][Frame] after a server transfer to a "
     "client that joined after the player dropped, no peer shows an entity "
     "kept for the departed player, and a server entity with no player stays "
     "on every peer"
@@ -1093,7 +1093,7 @@ NETW_FRAME_SCENARIO(MoveScenario, move_spawn_rejoin, 4);
 NETW_FRAME_SCENARIO(MoveScenario, move_spawn_continue, 5);
 
 TEST_CASE(
-    "[Networked][Session][Transfer][Frame] a server despawn or spawn in the "
+    "[Netw][Session][Transfer][Frame] a server despawn or spawn in the "
     "frame of transfer_server leaves the entity on no peer, under "
     "TRANSFER_REJOIN and TRANSFER_CONTINUE, and a server entity left alone "
     "stays on every peer"

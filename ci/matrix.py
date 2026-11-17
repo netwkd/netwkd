@@ -65,9 +65,9 @@ class Cell:
     def outputs(self) -> list[str]:
         """Every path this cell must leave in the addon bin directory."""
         if self.package == "framework":
-            base = "libnetworked.%s.%s.framework" % (self.platform, self.target)
+            base = "libnetwkd.%s.%s.framework" % (self.platform, self.target)
             return [base]
-        return ["libnetworked%s%s" % (self.suffix, SHARED_SUFFIX[self.platform])]
+        return ["libnetwkd%s%s" % (self.suffix, SHARED_SUFFIX[self.platform])]
 
     @property
     def scons_args(self) -> list[str]:

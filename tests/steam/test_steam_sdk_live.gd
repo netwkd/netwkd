@@ -20,7 +20,7 @@ func test_host_uses_the_connection() -> void:
 	var result: NetwPromise = session.connection.host(
 		SteamMultiplayerPeer,
 		{
-			"name": "Networked live test",
+			"name": "netwkd live test",
 			"visibility": NetwServerInfo.VISIBILITY_PRIVATE,
 		},
 	)

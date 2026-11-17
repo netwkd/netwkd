@@ -56,9 +56,7 @@ const LawRow L_NEST = {
     law_a_nested_scene_owns_its_own,
 };
 
-TEST_CASE(
-    "[Networked][Scene][Declared][Law] a nested scene owns its own members"
-) {
+TEST_CASE("[Netw][Scene][Declared][Law] a nested scene owns its own members") {
     const Scenario scenario = nested_scene();
     LoopbackRig rig(scenario.clients);
     const ScenarioRun run = ScenarioRun::scenes(rig, scenario);
@@ -68,7 +66,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Declared][Law] a walk that ignores nesting claims the "
+    "[Netw][Scene][Declared][Law] a walk that ignores nesting claims the "
     "inner members"
 ) {
     const Scenario scenario = nested_scene();

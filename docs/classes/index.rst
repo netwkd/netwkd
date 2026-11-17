@@ -17,7 +17,7 @@ Nakama
     :maxdepth: 1
     :name: toc-class-ref-nakama
 
-    class_addons--networked_nakama--nakama_relay_bridge.gd
+    class_addons--netwkd_nakama--nakama_relay_bridge.gd
     class_nakamaaccount
     class_nakamadatabase
     class_nakamadatabase.connection
@@ -35,7 +35,7 @@ Steam
     :maxdepth: 1
     :name: toc-class-ref-steam
 
-    class_addons--networked_steam--steam_start.gd
+    class_addons--netwkd_steam--steam_start.gd
     class_steamlobbydirectory
     class_steamparty
     class_steamprofile
@@ -49,8 +49,8 @@ Testing
     :maxdepth: 1
     :name: toc-class-ref-testing
 
-    class_addons--networked_test--gdunit4--gdunit_awaiter.gd
-    class_addons--networked_test--gdunit4--gdunit_error_scrubber.gd
+    class_addons--netwkd_test--gdunit4--gdunit_awaiter.gd
+    class_addons--netwkd_test--gdunit4--gdunit_error_scrubber.gd
     class_enettestsupport
     class_framelockstepstepper
     class_nakamatestsupport
@@ -81,13 +81,13 @@ Gdscript
     :maxdepth: 1
     :name: toc-class-ref-gdscript
 
-    class_addons--networked--gdscript--async.gd
-    class_addons--networked--gdscript--connect--ui--ice_servers_edit.gd
-    class_addons--networked--gdscript--connect--ui--room_bar.gd
-    class_addons--networked--gdscript--connect--ui--string_list_edit.gd
-    class_addons--networked--gdscript--editor--debug_menu.gd
-    class_addons--networked--gdscript--editor--traffic_debugger.gd
-    class_addons--networked--gdscript--editor--traffic_strip.gd
+    class_addons--netwkd--gdscript--async.gd
+    class_addons--netwkd--gdscript--connect--ui--ice_servers_edit.gd
+    class_addons--netwkd--gdscript--connect--ui--room_bar.gd
+    class_addons--netwkd--gdscript--connect--ui--string_list_edit.gd
+    class_addons--netwkd--gdscript--editor--debug_menu.gd
+    class_addons--netwkd--gdscript--editor--traffic_debugger.gd
+    class_addons--netwkd--gdscript--editor--traffic_strip.gd
     class_connectbrowser
     class_connectbrowserrow
     class_connectenetconfig

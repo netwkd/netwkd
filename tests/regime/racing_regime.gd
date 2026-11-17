@@ -2,7 +2,7 @@ class_name RacingRegime
 extends RefCounted
 
 const Vehicle := preload(
-	"res://addons/networked/examples/racing/scripts/vehicle.gd"
+	"res://addons/netwkd/examples/racing/scripts/vehicle.gd"
 )
 const TRAVEL_SAMPLE_SECONDS := 0.25
 

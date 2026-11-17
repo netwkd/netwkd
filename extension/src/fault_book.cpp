@@ -305,7 +305,7 @@ void raise(
     const log::Level level = row.klass == NETW_FAULT_MISUSE ? log::Level::ERROR
                                                             : log::Level::WARN;
     if (site.file.is_empty()) {
-        log::report(level, line, "", "Networked", 0);
+        log::report(level, line, "", "netwkd", 0);
         return;
     }
     const CharString file = site.file.utf8();

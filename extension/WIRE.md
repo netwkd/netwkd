@@ -1,6 +1,6 @@
 # WIRE v23, the carrier format
 
-The byte layout of every datagram, frame and payload Networked writes.
+The byte layout of every datagram, frame and payload netwkd writes.
 `FORMAT_VERSION` is 23. `src/wire/registry.cpp` is the one declaration of the
 channel table and `tools/wire_decode.py` reads a capture against this page.
 

@@ -73,7 +73,7 @@ StreamLane lane_of(int64_t p_route) {
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X1 a lane sends nothing until READY seats its "
+    "[Netw][Wire][Hosted] X1 a lane sends nothing until READY seats its "
     "token, and the token the receiver minted is the one the row carries"
 ) {
     ComposedLink link;
@@ -117,7 +117,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X2 a row the consumer refuses commits nothing "
+    "[Netw][Wire][Hosted] X2 a row the consumer refuses commits nothing "
     "and elicits no receipt, and the next row still composes on the last "
     "committed snapshot"
 ) {
@@ -147,7 +147,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X3 a row lost on the way out is repaired under "
+    "[Netw][Wire][Hosted] X3 a row lost on the way out is repaired under "
     "one pinned absolute revision and the final image converges"
 ) {
     ComposedLink link;
@@ -182,7 +182,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X4 receipts lost, delayed, duplicated and "
+    "[Netw][Wire][Hosted] X4 receipts lost, delayed, duplicated and "
     "reordered never regress the confirmed revision and the lane still quiets"
 ) {
     ComposedLink link;
@@ -218,7 +218,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X5 a duplicated row is applied once and repeats "
+    "[Netw][Wire][Hosted] X5 a duplicated row is applied once and repeats "
     "the receipt the receiver already owes"
 ) {
     ComposedLink link;
@@ -243,7 +243,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X6 a reset invalidates the token both sides "
+    "[Netw][Wire][Hosted] X6 a reset invalidates the token both sides "
     "hold, and the successor stream opens with an absolute row"
 ) {
     ComposedLink link;
@@ -287,7 +287,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X7 a reconnect mints a new token, and a row or "
+    "[Netw][Wire][Hosted] X7 a reconnect mints a new token, and a row or "
     "a receipt carrying the old one changes nothing"
 ) {
     ComposedLink link;
@@ -323,7 +323,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X8 a second writer taking the lane opens its "
+    "[Netw][Wire][Hosted] X8 a second writer taking the lane opens its "
     "own stream, and the first writer's token no longer reaches the receiver"
 ) {
     const int SUCCESSOR = 5;
@@ -358,7 +358,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] X9 a frozen source behind a link that loses "
+    "[Netw][Wire][Hosted] X9 a frozen source behind a link that loses "
     "rows and receipts converges on the exact final image once it heals"
 ) {
     ComposedLink link;

@@ -203,7 +203,7 @@ LawVerdict never(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] X09 two players grabbing one free body in one "
+    "[Netw][Sim][Frame] X09 two players grabbing one free body in one "
     "tick both run ahead, the first grab the server hears keeps it, and the "
     "loser takes the winner's state and never sends its own"
 ) {
@@ -230,7 +230,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] X11 a body released at rest stays where its "
+    "[Netw][Sim][Frame] X11 a body released at rest stays where its "
     "releaser left it on every peer, and one that wakes while its release "
     "is pending stays with the peer that woke it"
 ) {
@@ -254,7 +254,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][Frame] CI3 state a slow player sent before another "
+    "[Netw][Sim][Frame] CI3 state a slow player sent before another "
     "player took the body is never installed once control comes back to "
     "the slow player"
 ) {

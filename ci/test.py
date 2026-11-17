@@ -99,7 +99,7 @@ config/features=PackedStringArray("4.7")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/networked/plugin.cfg")
+enabled=PackedStringArray("res://addons/netwkd/plugin.cfg")
 """
 
 CONSUMER_PROBE = """extends SceneTree
@@ -120,7 +120,7 @@ func _init() -> void:
 \t\tmade = ClassDB.instantiate("NetwBitStream")
 \tvar examples := 0
 \tvar broken: Array[String] = []
-\tvar root := "res://addons/networked/examples"
+\tvar root := "res://addons/netwkd/examples"
 \tfor folder in DirAccess.get_directories_at(root):
 \t\tvar main := root.path_join(folder).path_join("main.tscn")
 \t\tif not ResourceLoader.exists(main):
@@ -290,8 +290,8 @@ def lane_consumer(godot: str, *, archives: list[Path], workspace: Path, timeout:
         if not archive.is_file():
             raise fail("no release archive at %s" % archive)
         shutil.unpack_archive(str(archive), str(workspace))
-    if not (workspace / "addons" / "networked").is_dir():
-        raise fail("no archive unpacked addons/networked")
+    if not (workspace / "addons" / "netwkd").is_dir():
+        raise fail("no archive unpacked addons/netwkd")
     (workspace / "project.godot").write_text(CONSUMER_PROJECT, encoding="utf-8")
 
     classes = [*PROBE_CLASSES, "NetwBitStream"]
@@ -509,7 +509,7 @@ def build_parser() -> argparse.ArgumentParser:
     sharp.add_argument("--sharp-version")
 
     parse = sub.add_parser("parse")
-    parse.add_argument("roots", nargs="*", default=["res://tests", "res://addons/networked"])
+    parse.add_argument("roots", nargs="*", default=["res://tests", "res://addons/netwkd"])
 
     native = sub.add_parser("native")
     native.add_argument("--filter", dest="native_filter")
@@ -522,7 +522,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     module = sub.add_parser("module")
     module.add_argument("--raw-diagnostics", action="store_true")
-    module.add_argument("--tag", default="[Networked]")
+    module.add_argument("--tag", default="[Netw]")
     return parser
 
 

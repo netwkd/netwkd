@@ -71,7 +71,7 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Entity] a move reports at the settle and not where "
+    "[Netw][Entity] a move reports at the settle and not where "
     "it happens, because the subtree is still rebuilding there, and it "
     "reports the completed fact rather than the options that asked"
 ) {
@@ -92,7 +92,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] several hops before one settle are one move, "
+    "[Netw][Entity] several hops before one settle are one move, "
     "because the report answers where the owner ended up and a parent it "
     "never rested under is not a fact about it"
 ) {
@@ -109,7 +109,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Entity] a moved owner is initialized once and reports no "
+    "[Netw][Entity] a moved owner is initialized once and reports no "
     "move for standing up, because _ready is where a node builds itself "
     "and neither arriving nor moving is a rebirth"
 ) {

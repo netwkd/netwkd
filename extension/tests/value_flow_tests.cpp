@@ -601,7 +601,7 @@ FlowScenario heartbeat() {
 }
 
 TEST_CASE(
-    "[Networked][Sync][SceneTree] state, input and broadcasts reach the "
+    "[Netw][Sync][SceneTree] state, input and broadcasts reach the "
     "peers they are meant for, and stop when they stop changing"
 ) {
     const FlowScenario CORPUS[] = {

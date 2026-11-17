@@ -4,9 +4,9 @@ const APPLICATION_ID := 1561065725962092666
 const SECRET := "p1|" + "0123456789abcdef0123456789abcdef" \
 		+ "0123456789abcdef0123456789abcdef"
 const INVITE_LIST := preload(
-	"res://addons/networked_discord/ui/discord_invite_list.tscn"
+	"res://addons/netwkd_discord/ui/discord_invite_list.tscn"
 )
-const PANEL := preload("res://addons/networked_discord/ui/discord_panel.tscn")
+const PANEL := preload("res://addons/netwkd_discord/ui/discord_panel.tscn")
 
 var viewport: MultiplayerViewport
 

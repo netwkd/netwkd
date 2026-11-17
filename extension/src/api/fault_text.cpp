@@ -258,11 +258,11 @@ FaultText interpolation_ignored_text(const FaultValues &v) {
 FaultText bug_text(const String &p_where) {
     return {
         vformat(
-            "Networked stopped at %s because of a bug in Networked, not in "
+            "netwkd stopped at %s because of a bug in netwkd, not in "
             "this game.",
             p_where
         ),
-        "Report it to Networked with this log."
+        "Report it to netwkd with this log."
     };
 }
 
@@ -295,7 +295,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     "was dropped.",
                     v.peer
                 ),
-                "Run the same Networked version on every peer."
+                "Run the same netwkd version on every peer."
             };
         case NETW_FAULT_DUPLICATE_PEER:
             return {
@@ -492,7 +492,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.a
                 ),
                 "Raise {NetwSessionConfig.transfer_deadline_ticks}, or run "
-                "the same Networked version on every peer."
+                "the same netwkd version on every peer."
             };
         case NETW_FAULT_SERVER_MOVE_REFUSED:
             return {
@@ -796,7 +796,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                           v.detail,
                           v.name
                       ),
-                "Use the Networked build of Godot, which adds "
+                "Use the netwkd build of Godot, which adds "
                 "flush_kinematic_transform."
             };
         case NETW_FAULT_LIMIT_EXCEEDED:
@@ -968,7 +968,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                     v.name
                 ),
                 "Install a {NetwPhysicsStepper} with "
-                "{NetwSession.install_physics_stepper}, or use the Networked "
+                "{NetwSession.install_physics_stepper}, or use the netwkd "
                 "build of Godot."
             };
         case NETW_FAULT_TOGETHER_REFUSED:

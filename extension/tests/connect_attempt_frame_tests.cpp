@@ -395,7 +395,7 @@ void check_states(
 } // namespace
 
 TEST_CASE(
-    "[Networked][Connect][Frame] AT1 hosting over ENet walks the attempt "
+    "[Netw][Connect][Frame] AT1 hosting over ENet walks the attempt "
     "through creating and connecting to online, in order, and resolves its "
     "promise"
 ) {
@@ -410,7 +410,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] AT5 a peer the game assigns itself walks "
+    "[Netw][Connect][Frame] AT5 a peer the game assigns itself walks "
     "the attempt through connecting to online with no verb"
 ) {
     const AttemptEvidence &evidence = attempt_evidence();
@@ -425,7 +425,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] AT2 a join to a closed port fails once with "
+    "[Netw][Connect][Frame] AT2 a join to a closed port fails once with "
     "ERR_CANT_CONNECT and ends offline"
 ) {
     const AttemptEvidence &evidence = attempt_evidence();
@@ -438,7 +438,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] a join the server refuses during "
+    "[Netw][Connect][Frame] a join the server refuses during "
     "authentication fails once with ERR_UNCONFIGURED and leaves the "
     "session offline rather than connecting forever"
 ) {
@@ -456,7 +456,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] joining an invited server acknowledges "
+    "[Netw][Connect][Frame] joining an invited server acknowledges "
     "only that invitation when the connection reaches ONLINE"
 ) {
     const AttemptEvidence &evidence = attempt_evidence();
@@ -472,7 +472,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] an invitation to the server the session is "
+    "[Netw][Connect][Frame] an invitation to the server the session is "
     "on answers its endpoint and emits nothing"
 ) {
     const AttemptEvidence &evidence = attempt_evidence();
@@ -484,7 +484,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] an ENet peer the session creates drops no "
+    "[Netw][Connect][Frame] an ENet peer the session creates drops no "
     "unreliable packet when its round trip slows"
 ) {
     const AttemptEvidence &evidence = attempt_evidence();

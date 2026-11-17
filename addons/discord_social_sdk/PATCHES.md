@@ -12,7 +12,7 @@ after copying a newer release.
   `lib/windows/discord_partner_sdk.dll`. Each developer downloads it from the
   Discord Developer Portal, and git ignores it.
 - `lib/discord.gdextension` is shipped as `lib/discord.gdextension.template`.
-  The Networked Discord editor plugin copies it to `lib/discord.gdextension`
+  The netwkd Discord editor plugin copies it to `lib/discord.gdextension`
   once Discord's library is in place, so Godot never loads the binding without
   it. Git ignores the copy.
 - Only the Linux and Windows libraries are kept. The release has no macOS,

@@ -319,7 +319,7 @@ void register_as_component(const Variant &p_node) {
         fault::raise(
             nullptr,
             NETW_FAULT_NOT_ENTITY,
-            {String("Networked configuration"),
+            {String("netwkd configuration"),
              String(node->get_name()),
              String()},
             gd::instance_id(node)

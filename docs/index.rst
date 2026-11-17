@@ -1,14 +1,14 @@
 :github_url: hide
 
-Networked
+netwkd
 =========
 
-Networked is a multiplayer framework for Godot 4, built as a GDExtension. It
+netwkd is a multiplayer framework for Godot 4, built as a GDExtension. It
 replaces :godot:`SceneMultiplayer <SceneMultiplayer>` with
 :ref:`NetwMultiplayer <class_NetwMultiplayer>`, which keeps its whole API, so
 existing ``@rpc`` code works unchanged once the addon is installed.
 
-Set ``networked/install_as_default`` to ``false`` in the project settings to
+Set ``netwkd/install_as_default`` to ``false`` in the project settings to
 install the multiplayer yourself.
 
 Start with :ref:`Netw <class_Netw>`. It finds the session of any node and
@@ -85,7 +85,7 @@ Writing in C#
 -------------
 
 The addon includes generated C# bindings under
-``addons/networked/native_api/cs/``. The project's ``.csproj`` needs no
+``addons/netwkd/native_api/cs/``. The project's ``.csproj`` needs no
 changes.
 
 .. toctree::

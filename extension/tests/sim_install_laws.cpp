@@ -194,7 +194,7 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Sim][SceneTree] an install hands a jump inside the offset "
+    "[Netw][Sim][SceneTree] an install hands a jump inside the offset "
     "bound to the drawn value, so the visual stays where it was while the "
     "body takes the row as authored"
 ) {
@@ -230,7 +230,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][SceneTree] a held row whose sender no longer authors "
+    "[Netw][Sim][SceneTree] a held row whose sender no longer authors "
     "the entity is dropped at install"
 ) {
     Stand stand(2, BROADCAST_SOURCE);
@@ -280,7 +280,7 @@ netw::predict::Arrival simulated_arrival(
 }
 
 TEST_CASE(
-    "[Networked][Sim][SceneTree] a simulated member installs through the "
+    "[Netw][Sim][SceneTree] a simulated member installs through the "
     "same function as an active copy, so it accepts no row before its "
     "stream has reconstructed and reports the divergence it installed"
 ) {
@@ -349,7 +349,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Sim][SceneTree] an extrapolated install is carried along "
+    "[Netw][Sim][SceneTree] an extrapolated install is carried along "
     "its carry channel by the row's age, capped at the restore horizon, and "
     "an exact or same-tick install lands as authored"
 ) {

@@ -158,7 +158,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] a MultiplayerViewport holds its own "
+    "[Netw][Session][SceneTree] a MultiplayerViewport holds its own "
     "session for the branch under it"
 ) {
     const Stand stand = {String("a mounted viewport")};
@@ -234,7 +234,7 @@ public:
 NETW_FRAME_SCENARIO(PollScenario, poll_scenario);
 
 TEST_CASE(
-    "[Networked][Session][Frame] each of two MultiplayerViewport sessions is "
+    "[Netw][Session][Frame] each of two MultiplayerViewport sessions is "
     "polled once per frame"
 ) {
     const PollEvidence &evidence = poll_evidence();

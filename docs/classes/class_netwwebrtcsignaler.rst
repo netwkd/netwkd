@@ -59,7 +59,7 @@ The WebRTC transport sends every offer, answer and ICE candidate through a signa
 
 \ ``kind`` in :ref:`receive()<class_NetwWebRTCSignaler_method_receive>` and :ref:`_send()<class_NetwWebRTCSignaler_private_method__send>` is ``"offer"``, ``"answer"`` or ``"candidate"``. Offers and answers already include the gathered candidates, so one message per peer is enough.
 
-The default signaler warns once when every tracker fails. Enable ``networked/webrtc/warn_on_tracker_failure`` to also warn for each tracker that fails.
+The default signaler warns once when every tracker fails. Enable ``netwkd/webrtc/warn_on_tracker_failure`` to also warn for each tracker that fails.
 
 .. rst-class:: classref-reftable-group
 

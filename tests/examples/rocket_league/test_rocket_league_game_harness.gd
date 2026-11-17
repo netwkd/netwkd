@@ -1,6 +1,6 @@
 extends NetwTestSuite
 
-const GAME := "res://addons/networked/examples/"
+const GAME := "res://addons/netwkd/examples/"
 const MAIN := preload(GAME + "rocket_league/main.tscn")
 const RocketBall := preload(GAME + "rocket_league/scripts/ball.gd")
 const RocketCar := preload(GAME + "rocket_league/scripts/player_rb.gd")

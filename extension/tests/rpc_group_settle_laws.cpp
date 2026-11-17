@@ -48,7 +48,7 @@ Node *a_probe() {
 }
 
 TEST_CASE(
-    "[Networked][Rpc] a group nobody is live for is already satisfied and "
+    "[Netw][Rpc] a group nobody is live for is already satisfied and "
     "still settles at the pump, because the caller has not been handed the "
     "promise yet and nothing has chained onto it"
 ) {
@@ -92,7 +92,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Rpc] an authority-mode method admits the node's own "
+    "[Netw][Rpc] an authority-mode method admits the node's own "
     "multiplayer authority and the server, and no other sender, because "
     "authority names one peer rather than the peer set"
 ) {
@@ -148,7 +148,7 @@ Node *an_arg_probe() {
 }
 
 TEST_CASE(
-    "[Networked][Rpc] a node argument naming a route the sender's own "
+    "[Netw][Rpc] a node argument naming a route the sender's own "
     "interest view does not admit is refused whole, because an argument is a "
     "disclosure and a peer may not name what it cannot see"
 ) {

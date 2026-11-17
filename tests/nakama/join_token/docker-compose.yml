@@ -1,4 +1,4 @@
-# A second Nakama for the join token and party suites, with networked.js loaded
+# A second Nakama for the join token and party suites, with netwkd.js loaded
 # and the test-only key in its runtime environment. Client API on 17350.
 #
 #   docker compose -p netwjointoken -f tests/nakama/join_token/docker-compose.yml up -d
@@ -23,7 +23,7 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ../../../addons/networked_nakama/server:/nakama/data/modules
+      - ../../../addons/netwkd_nakama/server:/nakama/data/modules
       - ./test_only_join_key.pem:/nakama/data/join_key.pem:ro
     entrypoint:
       - "/bin/sh"
@@ -38,9 +38,9 @@ services:
         --session.token_expiry_sec 7200
         --socket.server_key defaultkey
         --matchmaker.interval_sec 1
-        --runtime.js_entrypoint networked.js
-        --runtime.env "NETWORKED_JOIN_KEY=$$(cat /nakama/data/join_key.pem)"
-        --runtime.env "NETWORKED_JOIN_AUDIENCE=netw-test"
+        --runtime.js_entrypoint netwkd.js
+        --runtime.env "NETWKD_JOIN_KEY=$$(cat /nakama/data/join_key.pem)"
+        --runtime.env "NETWKD_JOIN_AUDIENCE=netw-test"
     ports:
       - "17350:7350"
     healthcheck:

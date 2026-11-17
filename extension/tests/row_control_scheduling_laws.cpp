@@ -39,7 +39,7 @@ int64_t payload_bytes(const godot::LocalVector<ControlRecord> &p_records) {
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a receipt coalesces to the latest revision its "
+    "[Netw][Wire][Hosted] a receipt coalesces to the latest revision its "
     "token has accepted"
 ) {
     ControlScheduler scheduler;
@@ -63,7 +63,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a peer flushes control at most every fifty "
+    "[Netw][Wire][Hosted] a peer flushes control at most every fifty "
     "milliseconds"
 ) {
     ControlScheduler scheduler;
@@ -108,7 +108,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a batch splits at 32 entries and at 256 "
+    "[Netw][Wire][Hosted] a batch splits at 32 entries and at 256 "
     "payload bytes, whichever it reaches first"
 ) {
     ControlScheduler scheduler;
@@ -142,7 +142,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a smaller grant preserves the work it could "
+    "[Netw][Wire][Hosted] a smaller grant preserves the work it could "
     "not carry"
 ) {
     ControlScheduler scheduler;
@@ -162,7 +162,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] lifecycle work coalesces per lane and rides "
+    "[Netw][Wire][Hosted] lifecycle work coalesces per lane and rides "
     "ahead of the receipts"
 ) {
     ControlScheduler scheduler;
@@ -186,7 +186,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a torn down reader token takes its unsent "
+    "[Netw][Wire][Hosted] a torn down reader token takes its unsent "
     "receipt with it, and a CLOSE this peer writes on the same number still "
     "goes out"
 ) {
@@ -221,7 +221,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] a torn down writer token takes its unsent "
+    "[Netw][Wire][Hosted] a torn down writer token takes its unsent "
     "CLOSE and leaves the receipts this peer owes as a reader"
 ) {
     ControlScheduler scheduler;
@@ -237,7 +237,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Wire][Hosted] one flush is one frame, and the peer reads "
+    "[Netw][Wire][Hosted] one flush is one frame, and the peer reads "
     "back every record it carried"
 ) {
     ControlScheduler writer;
@@ -272,7 +272,7 @@ TEST_CASE(
     NETW_CHECK_EQ(sorted ? read[3].receipts[1].token : 0, 9);
 }
 
-TEST_CASE("[Networked][Wire][Hosted] a forgotten peer owes no control at all") {
+TEST_CASE("[Netw][Wire][Hosted] a forgotten peer owes no control at all") {
     ControlScheduler scheduler;
     scheduler.accept(PEER, 7, 4);
     scheduler.queue(PEER, open_of(3, 0, 1));

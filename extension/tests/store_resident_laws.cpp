@@ -88,7 +88,7 @@ struct Bench {
 };
 
 TEST_CASE(
-    "[Networked][Store] a body freed inside the tree leaves its row's "
+    "[Netw][Store] a body freed inside the tree leaves its row's "
     "resolved node behind before the next pull reads it"
 ) {
     Node3D *parent = memnew(Node3D);
@@ -112,7 +112,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Store] a body moved to another parent keeps its row reading "
+    "[Netw][Store] a body moved to another parent keeps its row reading "
     "that body against its new parent"
 ) {
     Node3D *first = memnew(Node3D);

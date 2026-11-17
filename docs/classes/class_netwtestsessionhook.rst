@@ -12,7 +12,7 @@ NetwTestSessionHook
 
 **Inherits:** :godot:`GdUnitTestSessionHook`
 
-GdUnit4 session hook that owns Networked debug state during tests.
+GdUnit4 session hook that owns netwkd debug state during tests.
 
 .. rst-class:: classref-introduction-group
 

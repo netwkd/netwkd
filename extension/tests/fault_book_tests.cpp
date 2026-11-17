@@ -67,7 +67,7 @@ const BookRow BOOK_ROWS[] = {
      "Assign a MultiplayerPeer."},
 };
 
-TEST_CASE("[Networked][Faults][Hosted] the fault book prints each key once") {
+TEST_CASE("[Netw][Faults][Hosted] the fault book prints each key once") {
     for (const BookRow &row : BOOK_ROWS) {
         CAPTURE(row.law);
         FaultBook book;

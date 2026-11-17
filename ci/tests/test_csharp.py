@@ -485,7 +485,7 @@ class Ownership(unittest.TestCase):
     'extension', so the registry is what tells this addon's classes apart."""
 
     REGISTRY = """
-void initialize_networked_module() {
+void initialize_netwkd_module() {
     GDREGISTER_CLASS(netw::Netw);
     GDREGISTER_ABSTRACT_CLASS(netw::NetwAuthProtocol);
     GDREGISTER_INTERNAL_CLASS(netw::connect::WebRTCLink);
@@ -847,7 +847,7 @@ class ConstructionAndNames(unittest.TestCase):
         self.assertIn("new Callable(node, method)", text)
         self.assertNotIn("Callable method", text)
 
-    def test_a_networked_method_takes_the_method_itself(self):
+    def test_a_multiplayer_method_takes_the_method_itself(self):
         rows = [
             ("rpc", None, [], "voidRpc<[MustBeVariant]T1>(Action<T1>method,T1a1)"),
             ("rpc", None, [], "voidRpc(Actionmethod)"),

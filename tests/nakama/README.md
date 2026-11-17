@@ -30,15 +30,15 @@ These match `NakamaAccount` defaults (`server_key=defaultkey`,
 
 ## Pointing the tests at it
 
-The live tests gate on the `networked/tests/nakama_host` project setting, with the
+The live tests gate on the `netwkd/tests/nakama_host` project setting, with the
 `NAKAMA_TEST_HOST` environment variable as a fallback. The project setting wins
 when both are set. With the container up, set whichever you prefer:
 
 Project setting (persists in `project.godot`, editable under Project Settings ▸
-Advanced ▸ Networked ▸ Tests):
+Advanced ▸ netwkd ▸ Tests):
 
 ```
-networked/tests/nakama_host = "127.0.0.1"
+netwkd/tests/nakama_host = "127.0.0.1"
 ```
 
 Environment variable (handy for CI, no commit):

@@ -206,21 +206,19 @@ const Row ROWS[] = {
      "each name turns on its overlay, none or nothing turns on none, and a "
      "typo is reported",
      &typed_hints},
-    {"the Networked monitors over two samples",
+    {"the netwkd monitors over two samples",
      "each rate is per second from the change between them and never runs "
      "backwards",
      &monitor_rates},
 #if defined(NETW_TIER_HOSTED)
     {"the Monitors tab of a debug build",
-     "it lists every Networked monitor",
+     "it lists every netwkd monitor",
      &monitors_listed},
 #endif
 #endif
 };
 
-TEST_CASE(
-    "[Networked][Diag] what a developer types and reads while debugging"
-) {
+TEST_CASE("[Netw][Diag] what a developer types and reads while debugging") {
     const Stand stand = {String("a debug build")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, stand);

@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath("_extensions"))
 
 # -- Project info ----------------------------------------------------------
 
-project = "Networked"
+project = "netwkd"
 copyright = (
     "2026-present Diego Rodrigues, modified from an original work by "
     "Juan Linietsky, Ariel Manzur and the Godot community (CC BY 3.0)"
@@ -89,16 +89,16 @@ html_theme_options = {
     "language_selector": False,
 }
 
-html_logo = "img/networked.svg"
+html_logo = "img/netwkd.svg"
 
-html_title = f"Networked {version} documentation"
+html_title = f"netwkd {version} documentation"
 
 # Edit-on-GitHub link in the RTD theme. Update github_version when cutting
 # release branches.
 html_context = {
     "display_github": True,
     "github_user": "diejor",
-    "github_repo": "networked",
+    "github_repo": "netwkd",
     "github_version": "main",
     "conf_py_path": "/docs/",
     # Giscus toggles, read by _templates/layout.html.
@@ -111,7 +111,7 @@ html_use_index = False
 
 # -- OpenGraph -------------------------------------------------------------
 
-ogp_site_name = "Networked documentation"
+ogp_site_name = "netwkd documentation"
 ogp_social_cards = {"enable": False}
 
 # -- linkcheck -------------------------------------------------------------

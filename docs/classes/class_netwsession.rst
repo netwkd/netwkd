@@ -212,9 +212,9 @@ Emitted before the session is cleaned up, so :ref:`players<class_NetwSession_pro
 
 This peer's join was refused with ``code`` and the ``reason`` the server gave. :ref:`local_player<class_NetwSession_property_local_player>` stays ``null``. A client refused while connecting closes its peer and never goes online, so neither :ref:`entered<class_NetwSession_signal_entered>` nor :ref:`exited<class_NetwSession_signal_exited>` fires. A refusal heard while :godot:`MultiplayerAPI.poll() <MultiplayerAPI#class_MultiplayerAPI_method_poll>` runs is emitted when that poll ends.
 
-Networked refuses with three codes, and any other ``code`` is the one the admission handler or a :ref:`NetwAccountProvider<class_NetwAccountProvider>` returned.
+netwkd refuses with three codes, and any other ``code`` is the one the admission handler or a :ref:`NetwAccountProvider<class_NetwAccountProvider>` returned.
 
-- :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>` the two peers are set up differently, such as another build, another Networked version or other :ref:`Netw.configure_join()<class_Netw_method_configure_join>` arguments
+- :godot:`@GlobalScope.ERR_UNCONFIGURED <@GlobalScope#class_@GlobalScope_constant_ERR_UNCONFIGURED>` the two peers are set up differently, such as another build, another netwkd version or other :ref:`Netw.configure_join()<class_Netw_method_configure_join>` arguments
 
 - :godot:`@GlobalScope.ERR_TIMEOUT <@GlobalScope#class_@GlobalScope_constant_ERR_TIMEOUT>` the player was not admitted before :ref:`NetwAdmissionConfig.timeout()<class_NetwAdmissionConfig_method_timeout>` or :ref:`NetwMultiplayer.auth_timeout<class_NetwMultiplayer_property_auth_timeout>` passed
 

@@ -167,7 +167,7 @@ public:
 NETW_FRAME_SCENARIO(MatchScenario, match_preload_scenario);
 
 TEST_CASE(
-    "[Networked][Scene][Frame] MP1 a host preloads a level on every client, "
+    "[Netw][Scene][Frame] MP1 a host preloads a level on every client, "
     "spawns it once each one has it, and spawns players the clients see "
     "under it"
 ) {

@@ -22,13 +22,13 @@
 		[member mode] picks the correction. [constant MODE_ROLLBACK] returns to the server's state and runs the newer inputs again. [constant MODE_OFFSET] moves the entity by the difference. [constant MODE_DISABLED] stops predicting and shows the server's state.
 		[b]Rigid bodies[/b]
 		An official Godot build cannot run physics again for a past tick, so a [RigidBody2D] or [RigidBody3D] uses [constant MODE_OFFSET].
-		The [url=https://github.com/diejor/godot/releases]Networked engine build[/url] can roll one back. It adds [url=https://github.com/godotengine/godot/pull/76462]physics stepping[/url] and [url=https://github.com/godotengine/godot/pull/113784]kinematic body updates[/url] to Godot. On another build, install a [NetwPhysicsStepper].
+		The [url=https://github.com/diejor/godot/releases]netwkd engine build[/url] can roll one back. It adds [url=https://github.com/godotengine/godot/pull/76462]physics stepping[/url] and [url=https://github.com/godotengine/godot/pull/113784]kinematic body updates[/url] to Godot. On another build, install a [NetwPhysicsStepper].
 		Rigid bodies in the same [NetwInterestLayer] roll back together when the engine can step physics. Turn off [member rollback_together] to correct each one alone.
 		[b]Late and lost input[/b]
 		Raise [member input_buffer_ticks] when a player on a bad connection stutters. The server waits that many ticks before it uses input, so each one adds a tick of delay.
 		[member repeat_missing_input] reuses the last input when one is lost.
 		[b]Debugging[/b]
-		[b]Debug &gt; Networked &gt; Prediction Rings[/b] draws rings around each predicted entity.
+		[b]Debug &gt; netwkd &gt; Prediction Rings[/b] draws rings around each predicted entity.
 		- [b]cyan[/b] where it is drawn
 		- [b]green[/b] where it is simulated
 		- [b]orange[/b] where the server last said it was

@@ -126,7 +126,7 @@ struct Streaming {
 };
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] DP1 a peer that leaves gracefully "
+    "[Netw][Session][SceneTree] DP1 a peer that leaves gracefully "
     "is addressed no more, because a roster the transport has already torn "
     "down is not a list of who can receive"
 ) {
@@ -146,7 +146,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] DP2 a peer dropped with force is "
+    "[Netw][Session][SceneTree] DP2 a peer dropped with force is "
     "addressed no more either, and this is the row that matters, because "
     "MultiplayerPeer.disconnect_peer documents that force emits no "
     "peer_disconnected and every teardown here hangs off that signal"
@@ -166,7 +166,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] DP3 a peer that stays is "
+    "[Netw][Session][SceneTree] DP3 a peer that stays is "
     "addressed exactly as before its neighbour left, so the retirement above "
     "is a departure and not a stall"
 ) {
@@ -181,7 +181,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] DP4 a departure is announced "
+    "[Netw][Session][SceneTree] DP4 a departure is announced "
     "exactly once however it is learned, because a refused send and the "
     "transport's own signal describe one event and a game counts what it is "
     "told"
@@ -200,7 +200,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] DP5 a fault the transport "
+    "[Netw][Session][SceneTree] DP5 a fault the transport "
     "reports for the whole link retires nobody, because one condition that "
     "fails every send at once is the session ending and not every peer "
     "leaving at the same instant"
@@ -216,7 +216,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][SceneTree] DP6 a peer the server lets go while "
+    "[Netw][Session][SceneTree] DP6 a peer the server lets go while "
     "sends to it are pending leaves quietly, because a send refused by a "
     "peer the transport already released is the departure and not a lost "
     "packet"

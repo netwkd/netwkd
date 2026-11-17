@@ -227,7 +227,7 @@ LawVerdict capped_link() {
 }
 
 TEST_CASE(
-    "[Networked][Repl] a link that loses packets halves its budget, climbs "
+    "[Netw][Repl] a link that loses packets halves its budget, climbs "
     "back an eighth a round trip, and is never throttled for good"
 ) {
     const Row ROWS[] = {
@@ -481,7 +481,7 @@ LawVerdict resting_row() {
 }
 
 TEST_CASE(
-    "[Networked][Repl] under a tight budget every entity still updates, "
+    "[Netw][Repl] under a tight budget every entity still updates, "
     "and priority, a player's own entity and waiting decide the share"
 ) {
     const Row ROWS[] = {
@@ -823,7 +823,7 @@ struct WakeRow {
 };
 
 TEST_CASE(
-    "[Networked][Repl][SceneTree] a peer is sent no more than its "
+    "[Netw][Repl][SceneTree] a peer is sent no more than its "
     "bandwidth and still sees every body move, reliable traffic alone "
     "leaves a link its whole budget, traffic reads what left by cause, "
     "and a send rate sends on fewer ticks or is refused"

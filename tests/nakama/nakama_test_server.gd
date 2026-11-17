@@ -2,11 +2,11 @@ class_name NakamaTestServer
 
 const DEFAULT_PORT := 7350
 
-const HOST_SETTING := "networked/tests/nakama_host"
+const HOST_SETTING := "netwkd/tests/nakama_host"
 
 const HOST_ENV := "NAKAMA_TEST_HOST"
 
-const SKIP_REASON := "Live Nakama tests need a server: set the networked/tests/nakama_host " \
+const SKIP_REASON := "Live Nakama tests need a server: set the netwkd/tests/nakama_host " \
 		+ "project setting (or NAKAMA_TEST_HOST) and start " \
 		+ "tests/nakama/docker-compose.yml."
 

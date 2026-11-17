@@ -12,7 +12,7 @@ NetwAuthProtocol
 
 **Inherits:** :godot:`RefCounted`
 
-Reads and writes the packets Networked sends during :godot:`SceneMultiplayer` authentication.
+Reads and writes the packets netwkd sends during :godot:`SceneMultiplayer` authentication.
 
 .. rst-class:: classref-introduction-group
 
@@ -83,7 +83,7 @@ enum **Kind**: :ref:`🔗<enum_NetwAuthProtocol_Kind>`
 
 :ref:`Kind<enum_NetwAuthProtocol_Kind>` **KIND_UNKNOWN** = ``0``
 
-Not a Networked packet.
+Not a netwkd packet.
 
 .. _class_NetwAuthProtocol_constant_KIND_HELLO:
 

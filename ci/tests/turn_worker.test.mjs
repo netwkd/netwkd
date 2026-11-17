@@ -3,7 +3,7 @@ import {readFile} from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL(
-  "../../addons/networked/templates/turn_worker/index.js", import.meta.url));
+  "../../addons/netwkd/templates/turn_worker/index.js", import.meta.url));
 const {default: worker} = await import(
   "data:text/javascript;base64," + source.toString("base64"));
 const url = "https://turn.example/";

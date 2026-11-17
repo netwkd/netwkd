@@ -55,7 +55,7 @@ NETW_FRAME_SCENARIO(EndedInterestScenario, ended_interest_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Session][Frame] L7 a session that ends forgets every layer "
+    "[Netw][Session][Frame] L7 a session that ends forgets every layer "
     "it opened by the next frame, so a re-host on the same session starts "
     "from an empty interest plane"
 ) {

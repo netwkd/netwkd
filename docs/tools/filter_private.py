@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Filter Godot doctool XML to only include classes from addons/networked."""
+"""Filter Godot doctool XML to only include classes from addons/netwkd."""
 from __future__ import annotations
 
 import argparse
@@ -60,7 +60,8 @@ def scan_addon_for_class_names(addon_dir: str) -> tuple[set[str], set[str]]:
         except Exception:
             pass
 
-    for root, _dirs, files in os.walk(addon_root):
+    for root, dirs, files in os.walk(addon_root):
+        dirs[:] = [d for d in dirs if d != "examples"]
         for filename in files:
             if not filename.endswith(".gd"):
                 continue
@@ -144,7 +145,7 @@ def filter_private_elements(root: ET.Element) -> None:
 
 
 DEFAULT_ADDONS = (
-    "networked", "networked_nakama", "networked_steam", "networked_test",
+    "netwkd", "netwkd_nakama", "netwkd_steam", "netwkd_test",
 )
 
 

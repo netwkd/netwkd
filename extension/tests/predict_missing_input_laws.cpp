@@ -181,7 +181,7 @@ void runs_the_hole_at_once(Lane &p_lane) {
 }
 
 TEST_CASE(
-    "[Networked][Predict][Lane] L1 a FRAME consumer runs a missing input in "
+    "[Netw][Predict][Lane] L1 a FRAME consumer runs a missing input in "
     "the frame its cursor reaches it when a later input is held, so it "
     "consumes every frame and never starves behind the hole"
 ) {
@@ -193,7 +193,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Lane] L2 a missing FRAME input runs the declared "
+    "[Netw][Predict][Lane] L2 a missing FRAME input runs the declared "
     "missing policy, the input before it under REPEAT_LAST and the stall row "
     "written whole under STALL"
 ) {
@@ -237,7 +237,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Lane] L5 a missing input inside input_buffer_ticks "
+    "[Netw][Predict][Lane] L5 a missing input inside input_buffer_ticks "
     "is run as missing rather than held, so consumption continues down to "
     "the buffer"
 ) {
@@ -262,7 +262,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Lane][Stepped] L7 a STEPPED consumer runs a missing "
+    "[Netw][Predict][Lane][Stepped] L7 a STEPPED consumer runs a missing "
     "input at once exactly as a FRAME consumer does"
 ) {
     const Scenario scenario = framed_lane(MissingInput::REPEAT_LAST);

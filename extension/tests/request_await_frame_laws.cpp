@@ -195,7 +195,7 @@ public:
 NETW_FRAME_SCENARIO(AwaitScenario, request_await_transfers);
 
 TEST_CASE(
-    "[Networked][Rpc][Frame] RQ2 a method still awaiting when the server is "
+    "[Netw][Rpc][Frame] RQ2 a method still awaiting when the server is "
     "lost sends no reply, so it cannot settle the successor's own request"
 ) {
     const AwaitEvidence &seen = evidence();

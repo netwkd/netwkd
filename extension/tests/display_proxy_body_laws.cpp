@@ -212,7 +212,7 @@ const WriterLaw L_DRAWN_ON_BODY = {
 const WriterLaw WRITER_LAWS[] = {L_PROXY_WORLD, L_PUSHED, L_DRAWN_ON_BODY};
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a proxy rigid body holds the newest "
+    "[Netw][Display][SceneTree] a proxy rigid body holds the newest "
     "received row, and the pump draws the interpolated column onto it"
 ) {
     const WriterScenario scenario = a_proxy_rigid_body();
@@ -233,7 +233,7 @@ func _init() -> void:
 )";
 
 TEST_CASE(
-    "[Networked][Display][SceneTree] a channel that writes a simulated body "
+    "[Netw][Display][SceneTree] a channel that writes a simulated body "
     "under another name is refused at build, and the same channel written "
     "in place is kept"
 ) {

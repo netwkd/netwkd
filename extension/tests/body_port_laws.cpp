@@ -222,7 +222,7 @@ void step_held_space() {
 } // namespace
 
 TEST_CASE(
-    "[Networked][BodyPort] a root RigidBody3D reads its built-in columns from "
+    "[Netw][BodyPort] a root RigidBody3D reads its built-in columns from "
     "the physics state before its node syncs"
 ) {
     Solid world(true);
@@ -247,7 +247,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][BodyPort] a write to a thawed root RigidBody3D lands in the "
+    "[Netw][BodyPort] a write to a thawed root RigidBody3D lands in the "
     "physics state before the next step"
 ) {
     Solid world(true);
@@ -276,7 +276,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][BodyPort] a write to a frozen root RigidBody3D moves its node"
+    "[Netw][BodyPort] a write to a frozen root RigidBody3D moves its node"
 ) {
     Solid world(true);
     world.body->set_freeze_mode(RigidBody3D::FREEZE_MODE_KINEMATIC);
@@ -296,7 +296,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][BodyPort] a RigidBody3D that is not an entity root keeps "
+    "[Netw][BodyPort] a RigidBody3D that is not an entity root keeps "
     "reading its node"
 ) {
     Solid world(false);
@@ -308,7 +308,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][BodyPort] a root RigidBody2D reads and writes its built-in "
+    "[Netw][BodyPort] a root RigidBody2D reads and writes its built-in "
     "columns through the physics state"
 ) {
     Flat world;
@@ -334,7 +334,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][BodyPort] a write to a frozen root RigidBody2D moves its node"
+    "[Netw][BodyPort] a write to a frozen root RigidBody2D moves its node"
 ) {
     Flat world;
     world.body->set_freeze_mode(RigidBody2D::FREEZE_MODE_KINEMATIC);
@@ -351,7 +351,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][BodyPort] fork only, a pose written into a held space is "
+    "[Netw][BodyPort] fork only, a pose written into a held space is "
     "where the next manual step integrates from"
 ) {
     if (!engine_steps_spaces()) {

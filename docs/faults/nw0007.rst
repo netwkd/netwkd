@@ -9,8 +9,8 @@ Reported as a warning the first time a peer sends a packet this peer cannot
 use. The rest from that peer are counted, and the session end summary adds
 how many.
 
-The packet was dropped. This happens when two peers run different Networked
+The packet was dropped. This happens when two peers run different netwkd
 versions, when a packet is cut short or arrives damaged, and when a packet
 arrives that this peer was not waiting for.
 
-Run the same Networked version on every peer.
+Run the same netwkd version on every peer.

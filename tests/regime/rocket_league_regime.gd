@@ -1,7 +1,7 @@
 class_name RocketLeagueRegime
 extends RefCounted
 
-const GAME := "res://addons/networked/examples/"
+const GAME := "res://addons/netwkd/examples/"
 const RocketBall := preload(GAME + "rocket_league/scripts/ball.gd")
 const RocketCar := preload(GAME + "rocket_league/scripts/player_rb.gd")
 const RocketCarAI := preload(GAME + "rocket_league/scripts/car_ai.gd")

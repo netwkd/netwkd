@@ -381,7 +381,7 @@ Ref<NetwPromise> held(Table &p_table, int p_at, int p_route, int p_tag) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX1 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX1 after the server is lost "
     "every survivor reads its new label, the successor serves with its own "
     "player, the session stays online, and each survivor hears "
     "server_transferred once naming the successor and no former server"
@@ -422,7 +422,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX2 a server handed on through "
+    "[Netw][Session][Transfer][SceneTree] TX2 a server handed on through "
     "NetwSession.transfer_server becomes a client under its new label and "
     "keeps its player there, while every other seat reads the successor as "
     "peer 1, holds the links its transport holds, and reaches peer 1 with no "
@@ -519,7 +519,7 @@ void hear_state(int64_t p_state, int64_t p_seat) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX36 NetwSession.state reads "
+    "[Netw][Session][Transfer][SceneTree] TX36 NetwSession.state reads "
     "STATE_ONLINE on every seat straight through a server transfer, handed "
     "on or lost, rejoined or continued, and state_changed stays silent"
 ) {
@@ -656,7 +656,7 @@ void lost_host_body_departs(bool p_keep_world) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX4 a lost server's player "
+    "[Netw][Session][Transfer][SceneTree] TX4 a lost server's player "
     "leaves every survivor once, after server_transferred, and the body it "
     "was represented by despawns on the successor and is gone from every "
     "survivor once the successor frees it, in both transfer modes"
@@ -670,7 +670,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX5 a call waiting on a lost "
+    "[Netw][Session][Transfer][SceneTree] TX5 a call waiting on a lost "
     "server fails, a call to peer 1 afterwards reaches the successor, and a "
     "reply owed to the lost server does not settle the successor's own call"
 ) {
@@ -713,7 +713,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX6 transfer_server answers "
+    "[Netw][Session][Transfer][SceneTree] TX6 transfer_server answers "
     "ERR_UNAVAILABLE on a transport that cannot move the server, "
     "ERR_UNAUTHORIZED on a client, and ERR_INVALID_PARAMETER for the server's "
     "own player or a player that is not in the session, and moves nothing"
@@ -777,7 +777,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX7 a relabel naming a "
+    "[Netw][Session][Transfer][SceneTree] TX7 a relabel naming a "
     "successor the session does not know ends that seat's session with one "
     "error and renames nothing"
 ) {
@@ -877,7 +877,7 @@ RID handle_at(const Table &p_table, int p_route, int p_at) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX8 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX8 after the server is lost "
     "with the world kept, an entity a survivor subscribed to is still "
     "subscribed to relayed input on the successor"
 ) {
@@ -924,7 +924,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX9 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX9 after the server is lost "
     "the successor files each entity under the scene it resides in and shows "
     "it to that scene's players only"
 ) {
@@ -958,7 +958,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX10 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX10 after the server is lost "
     "with the world kept, the successor counts each player's entity in its "
     "scene, a survivor that missed the last viewer list takes the one the "
     "successor publishes"
@@ -1009,7 +1009,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX11 a client still waiting "
+    "[Netw][Session][Transfer][SceneTree] TX11 a client still waiting "
     "for admission when the server is lost is admitted by the successor with "
     "the join it sent, under a player id no other player holds"
 ) {
@@ -1047,7 +1047,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX12 transfer_server answers "
+    "[Netw][Session][Transfer][SceneTree] TX12 transfer_server answers "
     "ERR_BUSY while a database write is unsettled and moves nothing, and "
     "once it settles the successor reports once that saving stopped"
 ) {
@@ -1120,7 +1120,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX13 a control claim waiting "
+    "[Netw][Session][Transfer][SceneTree] TX13 a control claim waiting "
     "on a lost server fails with ERR_UNAVAILABLE and says the server moved"
 ) {
     Table table;
@@ -1141,7 +1141,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX13b a claim running ahead "
+    "[Netw][Session][Transfer][SceneTree] TX13b a claim running ahead "
     "on a lost server fails with ERR_UNAVAILABLE and stops steering, whether "
     "the world is kept or rebuilt, and a kept world gives the claimant back "
     "the value the successor holds"
@@ -1201,7 +1201,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX14 a survivor that missed a "
+    "[Netw][Session][Transfer][SceneTree] TX14 a survivor that missed a "
     "player's admission before the server was lost learns that player from "
     "the successor's roster"
 ) {
@@ -1353,7 +1353,7 @@ struct Kinds {
 };
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX15 a peer that joins after "
+    "[Netw][Session][Transfer][SceneTree] TX15 a peer that joins after "
     "the server is lost receives every entity the successor held, one of "
     "each recipe kind"
 ) {
@@ -1402,7 +1402,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX16 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX16 after the server is lost "
     "with the world kept, the successor's despawn of an entity it held as a "
     "client reaches a survivor, also when that entity is on its second life"
 ) {
@@ -1453,7 +1453,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX17 after a server hands "
+    "[Netw][Session][Transfer][SceneTree] TX17 after a server hands "
     "itself on with the world kept, the successor's despawn of an entity the "
     "former server spawned reaches the former server and every other client"
 ) {
@@ -1576,7 +1576,7 @@ struct Vitals {
 };
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX18 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX18 after the server is lost "
     "every survivor holds exactly the entities the successor serves it, each "
     "as a fresh node, drops one the successor never held, and receives state "
     "again"
@@ -1644,7 +1644,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX20 an entity a survivor "
+    "[Netw][Session][Transfer][SceneTree] TX20 an entity a survivor "
     "spawned as its controller is gone from every peer after the server is "
     "lost, while one the server spawned for that survivor to steer stays"
 ) {
@@ -1703,7 +1703,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX20b an NPC whose spawn "
+    "[Netw][Session][Transfer][SceneTree] TX20b an NPC whose spawn "
     "function asks for DISCONNECT_DESPAWN begins despawning on the successor "
     "when the survivor steering it leaves, whether the world is kept or "
     "rebuilt"
@@ -1756,7 +1756,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX21 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX21 after the server is lost "
     "a survivor's clock holds until the successor's roster reaches it and "
     "ticks again after, while the successor's clock keeps ticking"
 ) {
@@ -1789,7 +1789,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX22 a server that hands "
+    "[Netw][Session][Transfer][SceneTree] TX22 a server that hands "
     "itself on frees the world it spawned and receives the successor's as "
     "fresh nodes"
 ) {
@@ -1825,7 +1825,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX23 a quiet rejoin sends each "
+    "[Netw][Session][Transfer][SceneTree] TX23 a quiet rejoin sends each "
     "survivor one spawn per entity the successor serves it and no despawn, "
     "hide or reparent"
 ) {
@@ -1944,7 +1944,7 @@ int spawn_on(Table &p_table, int p_at, const char *p_id, const char *p_name) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX24 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX24 after the server is lost "
     "with the world kept, a spawn on the successor takes a route no survivor "
     "held and reaches every survivor"
 ) {
@@ -1975,7 +1975,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX25 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX25 after the server is lost "
     "with the world kept, a survivor spawns as controller from the lease the "
     "old server granted it and every peer holds the body"
 ) {
@@ -2008,7 +2008,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX26 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX26 after the server is lost "
     "with the world kept, an entity the successor never held is gone from "
     "every survivor"
 ) {
@@ -2039,7 +2039,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX27 a survivor that saw a "
+    "[Netw][Session][Transfer][SceneTree] TX27 a survivor that saw a "
     "move the successor missed keeps receiving that entity's state after the "
     "server is lost with the world kept"
 ) {
@@ -2080,7 +2080,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX28 a join that reaches the "
+    "[Netw][Session][Transfer][SceneTree] TX28 a join that reaches the "
     "successor before every survivor reported waits, and is then admitted "
     "under a player id no peer held"
 ) {
@@ -2140,7 +2140,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX29 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX29 after the server is lost "
     "with 900 entities kept and nobody disagreeing, each survivor sends its "
     "report and receives no spawn, despawn or control change"
 ) {
@@ -2177,7 +2177,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX30 a survivor's report "
+    "[Netw][Session][Transfer][SceneTree] TX30 a survivor's report "
     "larger than one message reaches the successor whole, in frames that "
     "each fit one message"
 ) {
@@ -2209,7 +2209,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX31 after the server is lost "
+    "[Netw][Session][Transfer][SceneTree] TX31 after the server is lost "
     "with the world kept, a control change only the survivors saw leaves "
     "every peer on the successor's controller under a revision above every "
     "report, published to each survivor once"
@@ -2317,7 +2317,7 @@ void modes_disagree(bool p_server_keeps) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX32 when the successor and "
+    "[Netw][Session][Transfer][SceneTree] TX32 when the successor and "
     "the survivors were set to different transfer modes, the successor still "
     "finishes the move and every survivor holds exactly the world it serves"
 ) {
@@ -2454,7 +2454,7 @@ void survivors_resume(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX33 a survivor that never "
+    "[Netw][Session][Transfer][SceneTree] TX33 a survivor that never "
     "finishes its report is disconnected once the successor's deadline "
     "passes, with one warning, and the successor admits joins and spawns "
     "again"
@@ -2543,7 +2543,7 @@ void report_refused(Tamper p_tamper) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX34 a report naming far more "
+    "[Netw][Session][Transfer][SceneTree] TX34 a report naming far more "
     "routes than the successor holds is refused with one warning, its sender "
     "is disconnected, and the successor's route and player ids do not move"
 ) {
@@ -2551,7 +2551,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] TX35 a report raising route or "
+    "[Netw][Session][Transfer][SceneTree] TX35 a report raising route or "
     "player ids far above the successor's is refused with one warning, its "
     "sender is disconnected, and the successor mints sane ids"
 ) {

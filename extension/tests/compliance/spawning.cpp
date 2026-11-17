@@ -29,7 +29,7 @@ func _init() -> void:
 constexpr int LATE = 2;
 
 TEST_CASE(
-    "[Networked][Compliance] S1 a spawn reaches every peer once, with the "
+    "[Netw][Compliance] S1 a spawn reaches every peer once, with the "
     "same arguments, under that peer's own parent"
 ) {
     const Seen seen = World(GARAGE, 2)
@@ -61,7 +61,7 @@ World parked_car() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] S3 a late joiner gets every entity with the "
+    "[Netw][Compliance] S3 a late joiner gets every entity with the "
     "value the server holds now, the current controller and the newest parent"
 ) {
     const Seen seen = parked_car().run(16);
@@ -90,7 +90,7 @@ World broken_car() {
 NETW_FRAME_SCENARIO(WorldFrames, broken_car_frames, &broken_car, 20);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] S4 a late joiner gets parents before "
+    "[Netw][Compliance][Frame] S4 a late joiner gets parents before "
     "children, after some children were freed (godot#91342)"
 ) {
     const Seen &seen = broken_car_frames.seen();
@@ -140,7 +140,7 @@ World depot() {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] S6 an entity placed in a scene goes online with "
+    "[Netw][Compliance] S6 an entity placed in a scene goes online with "
     "no call, and a late joiner's own copy shows the server's state "
     "(godot#80701)"
 ) {
@@ -193,7 +193,7 @@ Step float_buoy(const char *p_name) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] S7 a property declared on a child with no "
+    "[Netw][Compliance] S7 a property declared on a child with no "
     "script reaches every peer"
 ) {
     const Seen seen = World(DOCKYARD, 2)
@@ -209,7 +209,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Compliance] S8 a property declared on an entity with no "
+    "[Netw][Compliance] S8 a property declared on an entity with no "
     "script reaches every peer"
 ) {
     const Seen seen = World(DOCKYARD, 2)
@@ -244,7 +244,7 @@ Step spawn_nothing_for(int p_client) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance] S9 a player whose spawn is refused sees why"
+    "[Netw][Compliance] S9 a player whose spawn is refused sees why"
 ) {
     const Seen seen
         = World(EMPTY_LOT, 2).each(2, 4, spawn_nothing_for(0)).run(12);

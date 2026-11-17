@@ -215,7 +215,7 @@ void settle(Stand &p_stand) {
 }
 
 TEST_CASE(
-    "[Networked][Scene][SceneTree] SR13 a player who returns after its level "
+    "[Netw][Scene][SceneTree] SR13 a player who returns after its level "
     "moved lands in the moved level with its kept entity"
 ) {
     Stand stand(1, 60.0);
@@ -253,7 +253,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][SceneTree] SR9 a level despawned at the call leaves "
+    "[Netw][Scene][SceneTree] SR9 a level despawned at the call leaves "
     "a departed player's kept entity that detaches from it spawned on the "
     "server and on every client that held it"
 ) {

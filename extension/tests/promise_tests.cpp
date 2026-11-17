@@ -373,7 +373,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Promise] a promise settles once, tells every caller on its "
+    "[Netw][Promise] a promise settles once, tells every caller on its "
     "own side, and never fails silently"
 ) {
     const Stand stand = {String("a promise and a loopback session")};
@@ -604,7 +604,7 @@ const FrameRow FRAME_ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Promise][Frame] a promise that settled before anyone "
+    "[Netw][Promise][Frame] a promise that settled before anyone "
     "waited, and a request answered frames later, both reach the waiter"
 ) {
     Evidence &seen = evidence();

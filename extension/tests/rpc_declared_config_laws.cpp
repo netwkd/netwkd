@@ -93,7 +93,7 @@ int calls_at(Node *p_node) {
 }
 
 TEST_CASE(
-    "[Networked][Rpc] RD3 an RPC declared server through Netw.configure_rpc "
+    "[Netw][Rpc] RD3 an RPC declared server through Netw.configure_rpc "
     "refuses the client that controls the entity, warns once however often "
     "it asks, and runs everywhere the server sends it"
 ) {

@@ -410,7 +410,7 @@ NETW_FRAME_SCENARIO(LostCarryScenario, lifecycle_lost_carry_scenario);
 } // namespace TestLifecycleMoveFrameLaws
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][Frame] HC1 on an observer the hand to cube "
+    "[Netw][Lifecycle][Spawn][Frame] HC1 on an observer the hand to cube "
     "offset stays constant within quantization while the holder spins and "
     "strafes, after the holder moved its cube into its hand"
 ) {
@@ -431,7 +431,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][Spawn][Frame] lost carry, an admitted move whose "
+    "[Netw][Lifecycle][Spawn][Frame] lost carry, an admitted move whose "
     "destination is freed on the session before the carry places the node is "
     "refused to its author, who moves back to the session's anchor"
 ) {

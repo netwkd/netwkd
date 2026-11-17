@@ -416,7 +416,7 @@ NETW_FRAME_SCENARIO(EnetLifecycleScenario, enet_lifecycle_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL1 a session handed an ENet server peer "
+    "[Netw][Connect][Frame] EL1 a session handed an ENet server peer "
     "comes online over a real socket, so hosting needs no owning node and no "
     "connector, only a prepared player and an assigned peer"
 ) {
@@ -427,7 +427,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL6 a host that brings up no scene is still "
+    "[Netw][Connect][Frame] EL6 a host that brings up no scene is still "
     "admitted to its own roster, because the startup announcement its join "
     "waits on is queued after the join installs its listener rather than "
     "raised inside session entry"
@@ -440,7 +440,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL2 a client that assigned an ENet client "
+    "[Netw][Connect][Frame] EL2 a client that assigned an ENet client "
     "peer is seated in the host roster, which is what a join is, rather than "
     "an outcome a connector reports"
 ) {
@@ -451,7 +451,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL3 a kicked peer leaves the host roster, so "
+    "[Netw][Connect][Frame] EL3 a kicked peer leaves the host roster, so "
     "the kick reaches the socket rather than only the session's own book"
 ) {
     const LifecycleEvidence &evidence = lifecycle_evidence();
@@ -461,7 +461,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL4 the host admits a second peer after a "
+    "[Netw][Connect][Frame] EL4 the host admits a second peer after a "
     "kick, so a kick closes one connection rather than the listener"
 ) {
     const LifecycleEvidence &evidence = lifecycle_evidence();
@@ -470,7 +470,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL5 a peer that leaves of its own accord "
+    "[Netw][Connect][Frame] EL5 a peer that leaves of its own accord "
     "reads offline on its own side and is gone from the host roster, so the "
     "two sides agree without either being told twice"
 ) {
@@ -482,7 +482,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL7 a kicked peer's own session exits once "
+    "[Netw][Connect][Frame] EL7 a kicked peer's own session exits once "
     "with KICKED, exiting before exited, and the host reports the departure "
     "as player_left with LEAVE_KICKED rather than as an exit of its own"
 ) {
@@ -513,7 +513,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL8 a peer that leaves exits once with "
+    "[Netw][Connect][Frame] EL8 a peer that leaves exits once with "
     "LOCAL_LEAVE, and clearing its peer afterwards exits nothing more"
 ) {
     const LifecycleEvidence &evidence = lifecycle_evidence();
@@ -537,7 +537,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Frame] EL9 a host that leaves exits with "
+    "[Netw][Connect][Frame] EL9 a host that leaves exits with "
     "LOCAL_LEAVE, a client still seated exits with SERVER_SHUTDOWN rather "
     "than CONNECTION_LOST, and the host's leave settles"
 ) {

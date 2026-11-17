@@ -12,14 +12,14 @@ NetwEntity
 
 **Inherits:** :godot:`RefCounted`
 
-The identity of one networked node, player or server-owned.
+The identity of one replicated node, player or server-owned.
 
 .. rst-class:: classref-introduction-group
 
 Description
 -----------
 
-One networked entity is one root node holding one **NetwEntity**. Nodes under the root read it to learn who the entity is, who controls it, and when it spawns and despawns.
+One entity is one root node holding one **NetwEntity**. Nodes under the root read it to learn who the entity is, who controls it, and when it spawns and despawns.
 
 ::
 
@@ -93,7 +93,7 @@ Only the server spawns, moves and despawns an entity by default. When :ref:`life
 Tutorials
 ---------
 
-- `Prediction guide <https://networked.readthedocs.io/en/latest/guides/prediction.html>`__
+- `Prediction guide <https://netwkd.readthedocs.io/en/latest/guides/prediction.html>`__
 
 .. rst-class:: classref-reftable-group
 

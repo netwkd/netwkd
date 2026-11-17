@@ -193,7 +193,7 @@ LawVerdict warned(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] T1 a stepped body on a build that cannot "
+    "[Netw][Predict][Frame] T1 a stepped body on a build that cannot "
     "step physics says so once on each peer, and physics keeps running"
 ) {
     const Seen &seen = yard_frames.seen();
@@ -219,7 +219,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] T2 an installed stepper steps the space once "
+    "[Netw][Predict][Frame] T2 an installed stepper steps the space once "
     "a tick in place of the engine, so a stepped body replays and a loose "
     "body holds wherever the game puts it"
 ) {
@@ -240,7 +240,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] T3 once the last stepped entity is "
+    "[Netw][Predict][Frame] T3 once the last stepped entity is "
     "despawned the engine steps the space again and the stepper rests"
 ) {
     const Seen &seen = yard_frames.seen();
@@ -313,7 +313,7 @@ LawVerdict pauses(const Seen &p_seen, int p_peer, const char *p_name) {
 }
 
 TEST_CASE(
-    "[Networked][Predict][Frame] T4 a predicted body that pauses on an "
+    "[Netw][Predict][Frame] T4 a predicted body that pauses on an "
     "unpredicted contact follows the server once a body no peer replicates "
     "lands on it"
 ) {

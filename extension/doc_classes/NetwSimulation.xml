@@ -37,7 +37,7 @@
 		The peer writing replicated state runs [constant MODE_AUTHORITY]. A predicting client runs [constant MODE_PREDICT]. Every other copy is [constant MODE_PROXY] or [constant MODE_ACTIVE], as [member remote_mode] says.
 	</description>
 	<tutorials>
-		<link title="Prediction guide">https://networked.readthedocs.io/en/latest/guides/prediction.html</link>
+		<link title="Prediction guide">https://netwkd.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
 	<members>
 		<member name="bodies" type="NodePath[]" setter="set_bodies" getter="get_bodies">
@@ -112,7 +112,7 @@
 			The physics server moves the bodies in each frame that brings a tick, and [member network_process] runs once in that frame.
 		</constant>
 		<constant name="SCHEDULE_STEPPED" value="2" enum="Schedule">
-			The physics space is stepped once per tick, and again for each tick of a rollback. It needs the [url=https://github.com/diejor/godot/releases]Networked engine build[/url] or a [NetwPhysicsStepper] installed with [method NetwSession.install_physics_stepper]. Without either it runs as [constant SCHEDULE_FRAME], and so does an entity that is not predicted. Each case warns once.
+			The physics space is stepped once per tick, and again for each tick of a rollback. It needs the [url=https://github.com/diejor/godot/releases]netwkd engine build[/url] or a [NetwPhysicsStepper] installed with [method NetwSession.install_physics_stepper]. Without either it runs as [constant SCHEDULE_FRAME], and so does an entity that is not predicted. Each case warns once.
 		</constant>
 		<constant name="SCHEDULE_AUTO" value="3" enum="Schedule">
 			[constant SCHEDULE_STEPPED] when the entity has a physics body this Godot build can step and restore, [constant SCHEDULE_FRAME] for any other physics body, and [constant SCHEDULE_TICK] otherwise.

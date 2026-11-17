@@ -1,0 +1,80 @@
+## Main editor plugin for the netwkd addon.
+##
+## Registers the addon's project settings and its Debug menu items.
+@tool
+extends EditorPlugin
+
+const _DebugMenu := preload("gdscript/editor/debug_menu.gd")
+
+const VendoredExport := preload("gdscript/editor/vendored_extension_export.gd")
+const TrafficDebugger := preload("gdscript/editor/traffic_debugger.gd")
+
+var vendored_export: EditorExportPlugin
+var traffic_debugger: TrafficDebugger
+var _debug_menu: _DebugMenu
+
+
+func _enter_tree() -> void:
+	vendored_export = VendoredExport.new()
+	add_export_plugin(vendored_export)
+	traffic_debugger = TrafficDebugger.new()
+	add_debugger_plugin(traffic_debugger)
+	if DisplayServer.get_name() == "headless":
+		return
+
+	_register_settings()
+	_debug_menu = _DebugMenu.new(self)
+	_debug_menu.attach()
+
+
+func _exit_tree() -> void:
+	remove_export_plugin(vendored_export)
+	traffic_debugger.release()
+	remove_debugger_plugin(traffic_debugger)
+	if _debug_menu != null:
+		_debug_menu.detach()
+		_debug_menu = null
+
+
+func _run_scene(
+		_scene: String,
+		args: PackedStringArray,
+) -> PackedStringArray:
+	if _debug_menu == null:
+		return args
+	return _debug_menu.run_args(args)
+
+
+func _get_plugin_icon() -> Texture2D:
+	return get_editor_interface().get_base_control().get_theme_icon(
+		"Log",
+		"EditorIcons",
+	)
+
+
+func _register_settings() -> void:
+	var install_setting := "netwkd/install_as_default"
+	if not ProjectSettings.has_setting(install_setting):
+		ProjectSettings.set_setting(install_setting, true)
+
+	ProjectSettings.set_initial_value(install_setting, true)
+	ProjectSettings.add_property_info(
+		{
+			"name": install_setting,
+			"type": TYPE_BOOL,
+			"hint": PROPERTY_HINT_NONE,
+		},
+	)
+
+	var turn_credentials_setting := "netwkd/webrtc/turn_credentials_url"
+	if not ProjectSettings.has_setting(turn_credentials_setting):
+		ProjectSettings.set_setting(turn_credentials_setting, "")
+
+	ProjectSettings.set_initial_value(turn_credentials_setting, "")
+	ProjectSettings.add_property_info(
+		{
+			"name": turn_credentials_setting,
+			"type": TYPE_STRING,
+			"hint": PROPERTY_HINT_NONE,
+		},
+	)

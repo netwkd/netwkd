@@ -57,7 +57,7 @@ World smashed_crate() {
 NETW_FRAME_SCENARIO(WorldFrames, smashed_crate_frames, &smashed_crate, 30);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] D2 an entity despawned while a client is "
+    "[Netw][Compliance][Frame] D2 an entity despawned while a client is "
     "still building it never shows up there, and a client that already shows "
     "it frees it"
 ) {
@@ -121,7 +121,7 @@ World unloaded_truck() {
 NETW_FRAME_SCENARIO(WorldFrames, unloaded_truck_frames, &unloaded_truck, 30);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] D1 a despawn that arrives while its "
+    "[Netw][Compliance][Frame] D1 a despawn that arrives while its "
     "spawn still waits for its parent cancels it, and the parent lands empty"
 ) {
     const Seen &seen = unloaded_truck_frames.seen();
@@ -164,7 +164,7 @@ World popped_ball() {
 NETW_FRAME_SCENARIO(WorldFrames, popped_ball_frames, &popped_ball, 50);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] D4 the last values a client sends for an "
+    "[Netw][Compliance][Frame] D4 the last values a client sends for an "
     "entity the server freed are dropped quietly and never reach a later "
     "entity (godot#101847)"
 ) {
@@ -202,7 +202,7 @@ World cracked_crate() {
 NETW_FRAME_SCENARIO(WorldFrames, cracked_crate_frames, &cracked_crate, 30);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] D5 a despawn is heard once, runs "
+    "[Netw][Compliance][Frame] D5 a despawn is heard once, runs "
     "before_removal on every client, and the client keeps the node for its "
     "linger before freeing it"
 ) {
@@ -305,7 +305,7 @@ void raced_onto_no_peer(const Seen &seen) {
 }
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] D3 a spawn or despawn that races a "
+    "[Netw][Compliance][Frame] D3 a spawn or despawn that races a "
     "player dropping or a server transfer leaves the entity on no peer"
 ) {
     {
@@ -367,7 +367,7 @@ NETW_FRAME_SCENARIO(
 );
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] P3 a shot rewound to before a lingering "
+    "[Netw][Compliance][Frame] P3 a shot rewound to before a lingering "
     "target despawned hits where that target stood"
 ) {
     const Seen &seen = lingering_target_frames.seen();

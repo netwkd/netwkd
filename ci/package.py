@@ -29,19 +29,19 @@ from common import (
 from matrix import Cell, load_catalog, resolve
 import vendor_extensions
 
-ADDON = Path("addons") / "networked"
+ADDON = Path("addons") / "netwkd"
 BIN = ADDON / "bin"
-MANIFEST_NAME = "networked.gdextension"
+MANIFEST_NAME = "netwkd.gdextension"
 DISCORD = Path("addons") / "discord_social_sdk"
 DISCORD_TEMPLATE = DISCORD / "lib" / "discord.gdextension.template"
 DISCORD_MANIFEST = DISCORD / "lib" / "discord.gdextension"
 
 PACKAGES = {
-    "networked": {"addons": [ADDON], "vendors": []},
-    "networked_steam": {"addons": [Path("addons") / "networked_steam"], "vendors": ["godotsteam"]},
-    "networked_discord": {"addons": [Path("addons") / "networked_discord", DISCORD], "vendors": []},
-    "networked_nakama": {
-        "addons": [Path("addons") / "networked_nakama", Path("addons") / "com.heroiclabs.nakama"],
+    "netwkd": {"addons": [ADDON], "vendors": []},
+    "netwkd_steam": {"addons": [Path("addons") / "netwkd_steam"], "vendors": ["godotsteam"]},
+    "netwkd_discord": {"addons": [Path("addons") / "netwkd_discord", DISCORD], "vendors": []},
+    "netwkd_nakama": {
+        "addons": [Path("addons") / "netwkd_nakama", Path("addons") / "com.heroiclabs.nakama"],
         "vendors": [],
     },
 }
@@ -182,7 +182,7 @@ def assemble_xcframework(
     if not simulator:
         raise fail("ios %s has no simulator slice" % target)
 
-    name = "libnetworked.ios.%s.xcframework" % target
+    name = "libnetwkd.ios.%s.xcframework" % target
     output = destination / name
     if output.exists():
         shutil.rmtree(output)
@@ -193,10 +193,10 @@ def assemble_xcframework(
             raise fail("ios slice %s is missing" % path)
         return path
 
-    device_binary = _lipo_or_single([staged(cell) for cell in device], work / target / "device" / "libnetworked.dylib")
+    device_binary = _lipo_or_single([staged(cell) for cell in device], work / target / "device" / "libnetwkd.dylib")
     simulator_binary = _lipo_or_single(
         [staged(cell) for cell in simulator],
-        work / target / "simulator" / "libnetworked.dylib",
+        work / target / "simulator" / "libnetwkd.dylib",
     )
     run(
         [
@@ -245,7 +245,7 @@ def assemble(
     if stage_root.exists():
         shutil.rmtree(stage_root)
     gdignore(stage_root.parent)
-    core_root = stage_root / "networked"
+    core_root = stage_root / "netwkd"
     addon_root = core_root / ADDON
     (addon_root / "bin").mkdir(parents=True)
 
@@ -260,7 +260,7 @@ def assemble(
                 "sha256": digest_of(target),
                 "bytes": target.stat().st_size,
             }
-    payload = payloads["networked"]
+    payload = payloads["netwkd"]
 
     (addon_root / MANIFEST_NAME).write_text(shipped_manifest(), encoding="utf-8")
 
@@ -352,7 +352,7 @@ def release_manifest(
     pins = read_pins()
     minimum = compatibility_minimum()
     return {
-        "product": "networked",
+        "product": "netwkd",
         "version": version,
         "source": {"sha": sha},
         "godot": {

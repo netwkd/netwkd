@@ -361,7 +361,7 @@ const Row ROWS[] = {
      &stock_members},
 };
 
-TEST_CASE("[Networked][Surface] a game calls the published classes as typed") {
+TEST_CASE("[Netw][Surface] a game calls the published classes as typed") {
     const Stand stand = {String("the published classes")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, stand);

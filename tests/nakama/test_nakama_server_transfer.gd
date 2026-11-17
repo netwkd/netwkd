@@ -137,7 +137,7 @@ class RelayDriver:
 	const SEATS := 4
 	const CLOSE_PUMPS := 100
 
-	const Bridge := preload("res://addons/networked_nakama/nakama_relay_bridge.gd")
+	const Bridge := preload("res://addons/netwkd_nakama/nakama_relay_bridge.gd")
 
 	var prepared: Array = []
 	var seated: Array = []

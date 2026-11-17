@@ -19,7 +19,7 @@ Replication and persistence settings for a property.
 Description
 -----------
 
-:ref:`state()<class_NetwPropertyConfig_method_state>`, :ref:`input()<class_NetwPropertyConfig_method_input>` and :ref:`broadcast()<class_NetwPropertyConfig_method_broadcast>` send changed values each tick. Other properties are sent through :ref:`Netw.sync_property()<class_Netw_method_sync_property>`.
+:ref:`state()<class_NetwPropertyConfig_method_state>`, :ref:`input()<class_NetwPropertyConfig_method_input>` and :ref:`broadcast()<class_NetwPropertyConfig_method_broadcast>` send changed values each tick. Other properties are sent through :ref:`Netw.sync_property()<class_Netw_method_sync_property>`. A value that arrives replaces what the receiving peer wrote to the property, and a debug build warns once when that happens to a blend parameter of an :godot:`AnimationTree`.
 
 ::
 
@@ -360,7 +360,7 @@ Method Descriptions
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **audience**\ (\ server_only\: :godot:`bool` = true\ ) :ref:`🔗<class_NetwPropertyConfig_method_audience>`
 
-Sends the :ref:`state()<class_NetwPropertyConfig_method_state>` properties of this kind to the server only. Sets :ref:`set_audience<class_NetwPropertyConfig_property_set_audience>`. With ``server_only`` ``false`` it changes nothing, because state properties reach every peer unless one of them calls :ref:`audience()<class_NetwPropertyConfig_method_audience>` and :ref:`input()<class_NetwPropertyConfig_method_input>` properties always reach only the server. A :ref:`broadcast()<class_NetwPropertyConfig_method_broadcast>` property ignores :ref:`audience()<class_NetwPropertyConfig_method_audience>` with a warning.
+Sends the :ref:`state()<class_NetwPropertyConfig_method_state>` properties of this kind to the server only. Sets :ref:`set_audience<class_NetwPropertyConfig_property_set_audience>`. With ``server_only`` ``false`` it changes nothing, because state properties reach every peer unless one of them calls :ref:`audience()<class_NetwPropertyConfig_method_audience>` and :ref:`input()<class_NetwPropertyConfig_method_input>` properties always reach only the server.
 
 .. rst-class:: classref-item-separator
 
@@ -432,8 +432,6 @@ When a correction restores this value, advances it to the present using the rate
 
     Netw.configure_property(self, &"position").state().extrapolate(&"velocity")
 
-\ ``rate_property`` must be another :ref:`state()<class_NetwPropertyConfig_method_state>` property of the same node.
-
 .. rst-class:: classref-item-separator
 
 ----
@@ -472,7 +470,7 @@ The controlling peer owns the value and only the server sees it. Use it for play
             move_dir = Input.get_vector("left", "right", "up", "down")
         velocity = move_dir * SPEED
 
-\ Each send also includes the last two ticks of input, so the next packet makes up for a lost one. :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` changes how many. Correction settings such as :ref:`extrapolate()<class_NetwPropertyConfig_method_extrapolate>` are ignored on an input.
+\ Each send also includes the last two ticks of input, so the next packet makes up for a lost one. :ref:`windowed()<class_NetwPropertyConfig_method_windowed>` changes how many.
 
 .. rst-class:: classref-item-separator
 
@@ -524,7 +522,7 @@ Saves the server's value of this property into the :ref:`NetwEntity<class_NetwEn
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **retained**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_retained>`
 
-Sends changes reliably. Use it for a value that changes rarely and must not be missed. It cannot be used on the state of a predicted :ref:`NetwEntity<class_NetwEntity>`.
+Sends changes reliably. Use it for a value that changes rarely and must not be missed.
 
 ::
 
@@ -611,7 +609,7 @@ A difference in this value never causes a correction, but a correction caused by
 
 :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` **volatile**\ (\ ) :ref:`🔗<class_NetwPropertyConfig_method_volatile>`
 
-Enabled by default.
+Sends changes unreliably, so only the newest value counts. A property is sent this way until :ref:`retained()<class_NetwPropertyConfig_method_retained>` is called.
 
 .. rst-class:: classref-item-separator
 

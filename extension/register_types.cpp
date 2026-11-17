@@ -139,7 +139,7 @@
 
 using namespace godot;
 
-void initialize_networked_module(ModuleInitializationLevel level) {
+void initialize_netwkd_module(ModuleInitializationLevel level) {
     if (level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
@@ -286,7 +286,7 @@ void initialize_networked_module(ModuleInitializationLevel level) {
 #endif
 }
 
-void uninitialize_networked_module(ModuleInitializationLevel level) {
+void uninitialize_netwkd_module(ModuleInitializationLevel level) {
     if (level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
@@ -313,7 +313,7 @@ void uninitialize_networked_module(ModuleInitializationLevel level) {
 
 extern "C" {
 
-GDExtensionBool GDE_EXPORT networked_library_init(
+GDExtensionBool GDE_EXPORT netwkd_library_init(
     GDExtensionInterfaceGetProcAddress get_proc_address,
     GDExtensionClassLibraryPtr library,
     GDExtensionInitialization *initialization
@@ -323,8 +323,8 @@ GDExtensionBool GDE_EXPORT networked_library_init(
         library,
         initialization
     );
-    init.register_initializer(initialize_networked_module);
-    init.register_terminator(uninitialize_networked_module);
+    init.register_initializer(initialize_netwkd_module);
+    init.register_terminator(uninitialize_netwkd_module);
     init.set_minimum_library_initialization_level(
         MODULE_INITIALIZATION_LEVEL_SCENE
     );

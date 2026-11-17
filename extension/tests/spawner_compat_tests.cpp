@@ -59,7 +59,7 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a captured argument is consumed by the one "
+    "[Netw][Spawn][Hosted] a captured argument is consumed by the one "
     "registration it belongs to, and a second registration has none"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -83,7 +83,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a container argument is deep copied, so the "
+    "[Netw][Spawn][Hosted] a container argument is deep copied, so the "
     "record carries what was spawned rather than what the caller kept"
 ) {
     Stand stand;
@@ -107,7 +107,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a second wrap does not chain, so a receiver "
+    "[Netw][Spawn][Hosted] a second wrap does not chain, so a receiver "
     "reconstructing through the original captures nothing"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -130,7 +130,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a node this peer already books is ignored "
+    "[Netw][Spawn][Hosted] a node this peer already books is ignored "
     "rather than given a second identity"
 ) {
     Stand stand;
@@ -148,7 +148,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a registration with no seams to arm through "
+    "[Netw][Spawn][Hosted] a registration with no seams to arm through "
     "is refused rather than silently lost"
 ) {
     Stand stand;
@@ -178,7 +178,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the receiver-side spawn limit counts what "
+    "[Netw][Spawn][Hosted] the receiver-side spawn limit counts what "
     "this peer produced through that spawner"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -210,7 +210,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a scene index the spawner does not offer is "
+    "[Netw][Spawn][Hosted] a scene index the spawner does not offer is "
     "refused rather than reconstructed through the spawn function"
 ) {
     Stand stand;
@@ -228,7 +228,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a spawner with no spawn function is enrolled "
+    "[Netw][Spawn][Hosted] a spawner with no spawn function is enrolled "
     "and left unwrapped, so the wrap can wait for it"
 ) {
     Stand stand;
@@ -249,7 +249,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a session that ends gives the spawners back "
+    "[Netw][Spawn][Hosted] a session that ends gives the spawners back "
     "their own functions and leaves an empty roster, because the peer holds "
     "no claim on a spawner past the session it enrolled it for"
 ) {

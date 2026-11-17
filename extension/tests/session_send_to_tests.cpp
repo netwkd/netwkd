@@ -35,7 +35,7 @@ Ref<NetwMultiplayer> configured_core() {
 }
 
 TEST_CASE(
-    "[Networked][Transport][Hosted] S1 a frame on an aggregating channel waits "
+    "[Netw][Transport][Hosted] S1 a frame on an aggregating channel waits "
     "in the peer's run rather than leaving on its own"
 ) {
     const Ref<NetwMultiplayer> core = configured_core();
@@ -58,7 +58,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transport][Hosted] S2 a frame sent before the clock is "
+    "[Netw][Transport][Hosted] S2 a frame sent before the clock is "
     "configured still joins the peer's run, because the poll pump drains it "
     "on every frame whether the clock ticks or not"
 ) {
@@ -75,7 +75,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transport][Hosted] S3 an immediate channel leaves now even "
+    "[Netw][Transport][Hosted] S3 an immediate channel leaves now even "
     "with a running clock, and even when the sender asks to batch"
 ) {
     const Ref<NetwMultiplayer> core = configured_core();
@@ -95,7 +95,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transport][Hosted] S4 a negative route is refused and stages "
+    "[Netw][Transport][Hosted] S4 a negative route is refused and stages "
     "nothing, because it addresses no entity and no peer-scoped stream"
 ) {
     const Ref<NetwMultiplayer> core = configured_core();
@@ -117,7 +117,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transport][Hosted] S5 the reliable and unreliable runs of one "
+    "[Netw][Transport][Hosted] S5 the reliable and unreliable runs of one "
     "peer are separate, so a reliable frame never rides an unreliable stamp"
 ) {
     const Ref<NetwMultiplayer> core = configured_core();
@@ -129,7 +129,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Transport][Hosted] S6 an immediate reliable frame drains "
+    "[Netw][Transport][Hosted] S6 an immediate reliable frame drains "
     "the reliable run already queued for its peer, so source order is "
     "transport order across batching modes"
 ) {

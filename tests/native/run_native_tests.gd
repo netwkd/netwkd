@@ -4,7 +4,7 @@ var runner: Object = null
 
 
 func _initialize() -> void:
-	ProjectSettings.set_setting("networked/webrtc/turn_credentials_url", "")
+	ProjectSettings.set_setting("netwkd/webrtc/turn_credentials_url", "")
 
 
 func _physics_process(_delta: float) -> bool:

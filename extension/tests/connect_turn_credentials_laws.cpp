@@ -15,7 +15,7 @@ PackedByteArray bytes_of(const char *p_text) {
 }
 
 TEST_CASE(
-    "[Networked][Connect][Hosted] a credential url splits into the host the "
+    "[Netw][Connect][Hosted] a credential url splits into the host the "
     "client dials and the path it requests, and the scheme stays on the host "
     "so an https url selects TLS and port 443 without either being named"
 ) {
@@ -44,7 +44,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Hosted] a credential answer carries ICE servers "
+    "[Netw][Connect][Hosted] a credential answer carries ICE servers "
     "only in iceServers and each refusal names its cause and remedy"
 ) {
     netw_test::FaultWatch faults;
@@ -79,7 +79,7 @@ TEST_CASE(
          "missing",
          0,
          "The TURN credential URL answered 404. Check "
-         "networked/webrtc/turn_credentials_url."},
+         "netwkd/webrtc/turn_credentials_url."},
         {403,
          "{\"error\":\"Add it to ALLOWED_ORIGINS.\"}",
          0,
@@ -119,7 +119,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Connect][Hosted] a credential URL reads feature overrides "
+    "[Netw][Connect][Hosted] a credential URL reads feature overrides "
     "so an exported build can fetch while the editor stays offline"
 ) {
     ProjectSettings *settings = ProjectSettings::get_singleton();
@@ -384,7 +384,7 @@ struct CredentialScenario : netw_test::FrameScenario {
 NETW_FRAME_SCENARIO(CredentialScenario, credential_scenario);
 
 TEST_CASE(
-    "[Networked][Connect][Frame] each WebRTC host or join fetches before "
+    "[Netw][Connect][Frame] each WebRTC host or join fetches before "
     "building and a timeout or cancellation keeps no fetched credentials"
 ) {
     CHECK(evidence.driven);

@@ -239,7 +239,7 @@ NETW_FRAME_SCENARIO(ClockPumpScenario, clock_pump_scenario);
 } // namespace
 
 TEST_CASE(
-    "[Networked][Clock][Frame] CP6 a reconnect re-synchronizes on a fresh "
+    "[Netw][Clock][Frame] CP6 a reconnect re-synchronizes on a fresh "
     "transport without reopening initialization, so the tickrate the session "
     "consumed once is the tickrate it comes back on"
 ) {

@@ -59,28 +59,28 @@ class MatrixRequests(unittest.TestCase):
             resolve(CATALOG, cells=["linux/x86_64/template_debug"])
 
     def test_the_suffix_matches_what_the_manifest_declares(self):
-        manifest = (Path(__file__).resolve().parents[2] / "extension" / "networked.gdextension").read_text()
+        manifest = (Path(__file__).resolve().parents[2] / "extension" / "netwkd.gdextension").read_text()
         for cell_id, expected in (
-            ("linux:x86_64:template_debug", "libnetworked.linux.template_debug.x86_64.so"),
-            ("windows:x86_64:template_release", "libnetworked.windows.template_release.x86_64.dll"),
-            ("android:arm64:template_debug", "libnetworked.android.template_debug.arm64.so"),
-            ("web:wasm32:template_release", "libnetworked.web.template_release.wasm32.nothreads.wasm"),
+            ("linux:x86_64:template_debug", "libnetwkd.linux.template_debug.x86_64.so"),
+            ("windows:x86_64:template_release", "libnetwkd.windows.template_release.x86_64.dll"),
+            ("android:arm64:template_debug", "libnetwkd.android.template_debug.arm64.so"),
+            ("web:wasm32:template_release", "libnetwkd.web.template_release.wasm32.nothreads.wasm"),
         ):
             with self.subTest(cell_id):
                 self.assertEqual(cell(cell_id).outputs, [expected])
                 self.assertIn(expected, manifest)
 
     def test_the_apple_shapes_are_what_the_manifest_promises(self):
-        manifest = (Path(__file__).resolve().parents[2] / "extension" / "networked.gdextension").read_text()
+        manifest = (Path(__file__).resolve().parents[2] / "extension" / "netwkd.gdextension").read_text()
         self.assertEqual(
             cell("macos:arm64:template_debug").outputs,
-            ["libnetworked.macos.template_debug.framework"],
+            ["libnetwkd.macos.template_debug.framework"],
         )
-        self.assertIn("libnetworked.macos.template_debug.framework", manifest)
-        self.assertIn("libnetworked.ios.template_debug.xcframework", manifest)
+        self.assertIn("libnetwkd.macos.template_debug.framework", manifest)
+        self.assertIn("libnetwkd.ios.template_debug.xcframework", manifest)
         self.assertEqual(
             cell("ios:arm64-simulator:template_debug").outputs,
-            ["libnetworked.ios.template_debug.arm64.simulator.dylib"],
+            ["libnetwkd.ios.template_debug.arm64.simulator.dylib"],
         )
 
     def test_the_web_cell_carries_its_threading_flag(self):
@@ -115,15 +115,13 @@ class ShippedManifest(unittest.TestCase):
         named = {Path(value).name for value in self.entries.values()}
         for target in resolve(CATALOG, profile="release"):
             expected = (
-                "libnetworked.ios.%s.xcframework" % target.target
-                if target.package == "xcframework"
-                else target.outputs[0]
+                "libnetwkd.ios.%s.xcframework" % target.target if target.package == "xcframework" else target.outputs[0]
             )
             with self.subTest(target.id):
                 self.assertIn(expected, named)
 
     def test_it_keeps_the_configuration_the_repository_builds_against(self):
-        dev = (Path(__file__).resolve().parents[2] / "extension" / "networked.gdextension").read_text()
+        dev = (Path(__file__).resolve().parents[2] / "extension" / "netwkd.gdextension").read_text()
         for field in ("entry_symbol", "compatibility_minimum"):
             with self.subTest(field):
                 self.assertEqual(
@@ -132,10 +130,10 @@ class ShippedManifest(unittest.TestCase):
                 )
 
     def test_an_unrelocatable_path_is_refused(self):
-        source = Path(__file__).resolve().parents[2] / "extension" / "networked.gdextension"
+        source = Path(__file__).resolve().parents[2] / "extension" / "netwkd.gdextension"
         original = source.read_text()
         source.write_text(
-            original.replace("res://addons/networked/bin/libnetworked.linux", "res://elsewhere/libnetworked.linux")
+            original.replace("res://addons/netwkd/bin/libnetwkd.linux", "res://elsewhere/libnetwkd.linux")
         )
         try:
             with self.assertRaises(CIError) as caught:
@@ -161,9 +159,9 @@ class DiscordPayload(unittest.TestCase):
 
     def test_the_tracked_payload_carries_nakama_with_its_sdk(self):
         payload = [path.as_posix() for path in package.tracked_payload()]
-        self.assertIn("addons/networked_nakama/nakama_account.gd", payload)
+        self.assertIn("addons/netwkd_nakama/nakama_account.gd", payload)
         self.assertIn("addons/com.heroiclabs.nakama/Nakama.gd", payload)
-        self.assertFalse([path for path in payload if path.startswith("addons/networked/gdscript/nakama/")])
+        self.assertFalse([path for path in payload if path.startswith("addons/netwkd/gdscript/nakama/")])
 
     def test_what_only_a_game_may_ship_is_refused(self):
         for path in [
@@ -270,15 +268,15 @@ class Inventory(unittest.TestCase):
 
     def candidate(self, *, cells: list[str], version: str = VERSION, unqualified=None, sums_correct: bool = True):
         manifest = {
-            "product": "networked",
+            "product": "netwkd",
             "version": version,
             "source": {"sha": "c" * 40},
             "cells": [{"id": cell_id} for cell_id in cells],
             "unqualified": unqualified or [],
         }
-        manifest_path = self.tmp / ("networked-%s.manifest.json" % version)
+        manifest_path = self.tmp / ("netwkd-%s.manifest.json" % version)
         manifest_path.write_text(json.dumps(manifest))
-        archive = self.tmp / ("networked-%s.zip" % version)
+        archive = self.tmp / ("netwkd-%s.zip" % version)
         archive.write_bytes(b"payload")
         sums = self.tmp / "SHA256SUMS.txt"
         from common import digest_of
@@ -373,7 +371,7 @@ class Lanes(unittest.TestCase):
     def test_a_binding_change_reaches_the_csharp_lane(self):
         import changed
 
-        lanes = changed.lanes_for(["addons/networked/native_api/cs/Netw.cs"])
+        lanes = changed.lanes_for(["addons/netwkd/native_api/cs/Netw.cs"])
         self.assertTrue(lanes["csharp"])
         self.assertFalse(lanes["module"])
 

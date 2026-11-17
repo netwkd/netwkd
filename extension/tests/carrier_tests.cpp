@@ -933,7 +933,7 @@ const Row ROWS[] = {
      &revisions_past_wrap},
 };
 
-TEST_CASE("[Networked][Wire] what a peer sends is read or refused whole") {
+TEST_CASE("[Netw][Wire] what a peer sends is read or refused whole") {
     const Carrier carrier = {String("a peer sends any bytes")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, carrier);

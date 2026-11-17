@@ -22,7 +22,7 @@ Pipeline *fresh(const Ref<NetwMultiplayer> &p_core) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a spawn frame from a sender that is not the "
+    "[Netw][Spawn][Hosted] a spawn frame from a sender that is not the "
     "server is refused and counted"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -56,7 +56,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a frame on a channel this pipeline does not "
+    "[Netw][Spawn][Hosted] a frame on a channel this pipeline does not "
     "carry is refused, because the gate reads the channel it was given"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -78,7 +78,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a scene park watches the live edge while it "
+    "[Netw][Spawn][Hosted] a scene park watches the live edge while it "
     "holds a frame and stops watching once the last one is gone"
 ) {
     Ref<NetwMultiplayer> core;
@@ -105,7 +105,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a session end drops the scene park and its "
+    "[Netw][Spawn][Hosted] a session end drops the scene park and its "
     "watch, so no park outlives the session that made it"
 ) {
     Ref<NetwMultiplayer> core;
@@ -124,7 +124,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a scene park that outlived its window is "
+    "[Netw][Spawn][Hosted] a scene park that outlived its window is "
     "given up rather than retried, and counted as expired"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -168,7 +168,7 @@ struct ParkedRelease {
 };
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a refused frame counts as a bad sender only "
+    "[Netw][Spawn][Hosted] a refused frame counts as a bad sender only "
     "when it did not come from the server"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -187,7 +187,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a spawn waiting for its consumed spawner's "
+    "[Netw][Spawn][Hosted] a spawn waiting for its consumed spawner's "
     "scene is admitted again when the wait releases, so a sender that is not "
     "the server applies nothing"
 ) {
@@ -213,7 +213,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a spawn waiting for the node it adopts is "
+    "[Netw][Spawn][Hosted] a spawn waiting for the node it adopts is "
     "admitted again when the wait releases, so a sender that is not the "
     "server applies nothing"
 ) {
@@ -239,7 +239,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] a spawn waiting for the route it anchors to "
+    "[Netw][Spawn][Hosted] a spawn waiting for the route it anchors to "
     "is admitted again when the wait releases, so a sender that is not the "
     "server applies nothing"
 ) {
@@ -267,7 +267,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] the ledger answers what this peer tracks, and "
+    "[Netw][Spawn][Hosted] the ledger answers what this peer tracks, and "
     "the counters read it rather than keeping a second tally"
 ) {
     Ref<NetwMultiplayer> core;
@@ -294,7 +294,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] spawn state is collected in tree preorder, so "
+    "[Netw][Spawn][Hosted] spawn state is collected in tree preorder, so "
     "the receiver applies in the order the authority declared"
 ) {
     Ref<NetwMultiplayer> core;

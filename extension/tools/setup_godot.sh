@@ -38,7 +38,7 @@ if [ "$version" != "$GODOT_VERSION" ]; then
         "The module is only certified against the pin." >&2
 fi
 
-MOUNT="$GODOT_SRC/modules/networked"
+MOUNT="$GODOT_SRC/modules/netwkd"
 rm -rf "$MOUNT"
 mkdir -p "$MOUNT"
 for entry in config.py SCsub sources.py register_types.h register_types.cpp \

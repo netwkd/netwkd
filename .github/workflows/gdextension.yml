@@ -144,7 +144,7 @@ jobs:
       - name: Upload Addon Zip
         uses: actions/upload-artifact@v4
         with:
-          name: networked-addon
+          name: netwkd-addon
           path: |
             dist/*.zip
             dist/*.manifest.json

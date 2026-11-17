@@ -702,7 +702,7 @@ Stand stand_of(const Part &p_part, const char *p_label) {
 }
 
 TEST_CASE(
-    "[Networked][Entity][SceneTree] a node joining an entity takes its "
+    "[Netw][Entity][SceneTree] a node joining an entity takes its "
     "authority, a lost copy waits for its next admission, and a part "
     "configures the entity it is placed in"
 ) {

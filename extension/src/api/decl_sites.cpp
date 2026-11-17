@@ -11,7 +11,7 @@ namespace netw::decl_sites {
 
 namespace {
 
-const char *ADDON_PREFIX = "res://addons/networked/";
+const char *ADDON_PREFIX = "res://addons/netwkd/";
 
 HashMap<String, gd::ScriptSite> &book() {
     static HashMap<String, gd::ScriptSite> sites;

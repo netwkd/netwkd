@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Godot;
-using Networked;
+using Netwkd;
 
 public partial class Backpack : Node
 {

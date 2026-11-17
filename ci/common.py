@@ -123,22 +123,22 @@ def git_dirty(root: Path | None = None) -> bool:
 
 
 def addon_version() -> str:
-    text = (ROOT / "addons" / "networked" / "plugin.cfg").read_text(encoding="utf-8")
+    text = (ROOT / "addons" / "netwkd" / "plugin.cfg").read_text(encoding="utf-8")
     for line in text.splitlines():
         if line.startswith("version="):
             return line.split("=", 1)[1].strip().strip('"')
-    raise fail("addons/networked/plugin.cfg declares no version")
+    raise fail("addons/netwkd/plugin.cfg declares no version")
 
 
 def compatibility_minimum() -> str:
-    text = (ROOT / "extension" / "networked.gdextension").read_text(encoding="utf-8")
+    text = (ROOT / "extension" / "netwkd.gdextension").read_text(encoding="utf-8")
     for line in text.splitlines():
         if line.startswith("compatibility_minimum"):
             return line.split("=", 1)[1].strip().strip('"')
     raise fail("the extension manifest declares no compatibility_minimum")
 
 
-def release_stem(version: str | None = None, product: str = "networked") -> str:
+def release_stem(version: str | None = None, product: str = "netwkd") -> str:
     """The name a release asset carries, engine version included."""
     return "%s-v%s-godot%s" % (product, version or addon_version(), compatibility_minimum())
 

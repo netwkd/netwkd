@@ -108,7 +108,7 @@ Spawned spawn_marked(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SP1 a mirror carries the authority's spawn-marked "
+    "[Netw][Spawn] SP1 a mirror carries the authority's spawn-marked "
     "value at every hook from tree entry onward, and at none before, because "
     "the pipeline applies spawn state while the instance is still orphaned"
 ) {
@@ -130,7 +130,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SP2 a peer seated after the authority changed a "
+    "[Netw][Spawn] SP2 a peer seated after the authority changed a "
     "spawn-marked value receives the value the authority holds NOW, because "
     "the frame is encoded off the live node rather than off what the spawn "
     "captured"
@@ -163,7 +163,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SP3 an instance nothing bound is UNBOUND, so a bare "
+    "[Netw][Spawn] SP3 an instance nothing bound is UNBOUND, so a bare "
     "copy never becomes a live entity by existing"
 ) {
     Node *bare = build_probe_player(String("Bare"));

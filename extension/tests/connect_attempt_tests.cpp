@@ -395,7 +395,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Connect][SceneTree] a join attempt settles once, a cancel "
+    "[Netw][Connect][SceneTree] a join attempt settles once, a cancel "
     "is not a failure, and a lobby server advertises its own address"
 ) {
     const Stand stand = {String("a mounted session")};

@@ -117,7 +117,7 @@ World trigger_zone() {
 NETW_FRAME_SCENARIO(WorldFrames, trigger_zone_frames, &trigger_zone, 44);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] R2 reparenting an entity fires no area "
+    "[Netw][Compliance][Frame] R2 reparenting an entity fires no area "
     "enter or exit during the move, and one real exit after it (godot#14578)"
 ) {
     const Seen &seen = trigger_zone_frames.seen();
@@ -189,7 +189,7 @@ World footrace() {
 NETW_FRAME_SCENARIO(WorldFrames, footrace_frames, &footrace, 180);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] L4 a predicting client the server "
+    "[Netw][Compliance][Frame] L4 a predicting client the server "
     "disagrees with is corrected onto the server, a clean one is never "
     "corrected, and a replay repeats no one-shot effect"
 ) {
@@ -284,7 +284,7 @@ World moments() {
 NETW_FRAME_SCENARIO(WorldFrames, moments_frames, &moments, 12);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] S2 a spawned node knows its name, player, "
+    "[Netw][Compliance][Frame] S2 a spawned node knows its name, player, "
     "controller and authority in _enter_tree, and its spawn values in _ready"
 ) {
     const Seen &seen = moments_frames.seen();
@@ -352,7 +352,7 @@ World carrier() {
 NETW_FRAME_SCENARIO(WorldFrames, carrier_frames, &carrier, 24);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] N3 a child marked to detach outlives its "
+    "[Netw][Compliance][Frame] N3 a child marked to detach outlives its "
     "parent's despawn and stays where it was in the world"
 ) {
     const Seen &seen = carrier_frames.seen();
@@ -445,7 +445,7 @@ World ferry() {
 NETW_FRAME_SCENARIO(WorldFrames, ferry_frames, &ferry, DOCKS + 12);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] R3 an entity reparented under a moving "
+    "[Netw][Compliance][Frame] R3 an entity reparented under a moving "
     "parent keeps its world pose and velocity on every peer"
 ) {
     const Seen &seen = ferry_frames.seen();
@@ -532,7 +532,7 @@ World relay() {
 NETW_FRAME_SCENARIO(WorldFrames, relay_frames, &relay, STOP + 14);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] P1 a predicted player spawned late runs "
+    "[Netw][Compliance][Frame] P1 a predicted player spawned late runs "
     "from its first input, and a late joiner sees it where the server has it"
 ) {
     const Seen &seen = relay_frames.seen();
@@ -610,7 +610,7 @@ World range() {
 NETW_FRAME_SCENARIO(WorldFrames, range_frames, &range, MOVES + 8);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] P2 a lag compensated shot hits where the "
+    "[Netw][Compliance][Frame] P2 a lag compensated shot hits where the "
     "target was, and the present is restored after (godot#76256)"
 ) {
     const Seen &seen = range_frames.seen();
@@ -704,7 +704,7 @@ World hall() {
 NETW_FRAME_SCENARIO(WorldFrames, hall_frames, &hall, CLOSED + 10);
 
 TEST_CASE(
-    "[Networked][Compliance][Frame] J5 ending a session frees what it "
+    "[Netw][Compliance][Frame] J5 ending a session frees what it "
     "spawned and nothing the game placed, and frees the session (godot#87184)"
 ) {
     const Seen &seen = hall_frames.seen();

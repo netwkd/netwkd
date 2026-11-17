@@ -84,7 +84,7 @@ const Row ROWS[] = {
      &out_of_bounds},
 };
 
-TEST_CASE("[Networked][Wire] a bit stream reads back what it wrote") {
+TEST_CASE("[Netw][Wire] a bit stream reads back what it wrote") {
     const Stand stand = {String("a game's own bit stream")};
     for (const Row &row : ROWS) {
         NETW_CELL(row, stand);

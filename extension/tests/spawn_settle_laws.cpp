@@ -46,7 +46,7 @@ int64_t state_of(LoopbackRig &p_rig, int p_client, int p_route) {
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SW1 a root that leaves the tree despawns at the PUMP "
+    "[Netw][Spawn] SW1 a root that leaves the tree despawns at the PUMP "
     "with no frame anywhere in the run, because the edge belongs to the pump "
     "the session already drives"
 ) {
@@ -79,7 +79,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SW2 a visibility loss committed between two pumps "
+    "[Netw][Spawn] SW2 a visibility loss committed between two pumps "
     "reaches the peer, because only the sweep can revoke an admission the "
     "entity itself never moved out of"
 ) {
@@ -123,7 +123,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SW3 a spawn leaves one row for each stage that ran "
+    "[Netw][Spawn] SW3 a spawn leaves one row for each stage that ran "
     "it ON THE PEER THAT RAN IT, so an observer can tell which half of a "
     "materialization it is looking at"
 ) {
@@ -169,7 +169,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SW4 the frame is snapshotted at the first pump AFTER "
+    "[Netw][Spawn] SW4 the frame is snapshotted at the first pump AFTER "
     "tree entry, so everything written between the verb and that pump rides "
     "it rather than being lost to a window nobody could see into"
 ) {
@@ -209,7 +209,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn] SF1 an interest re-admission REVIVES the route it "
+    "[Netw][Spawn] SF1 an interest re-admission REVIVES the route it "
     "killed rather than minting a new one, because a route names one entity "
     "for its whole life and a visibility edge is not a lifecycle event"
 ) {

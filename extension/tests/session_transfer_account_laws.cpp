@@ -126,7 +126,7 @@ void check_reads_every_account(NetwMultiplayer *p_api) {
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] after transfer_server the "
+    "[Netw][Session][Transfer][SceneTree] after transfer_server the "
     "successor reads every player's account from the serving directory, and "
     "the demoted server keeps only its own"
 ) {
@@ -167,7 +167,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Transfer][SceneTree] after the server is lost the "
+    "[Netw][Session][Transfer][SceneTree] after the server is lost the "
     "successor reads every survivor's account from the serving directory"
 ) {
     Seated seated(NetwSession::TRANSFER_CONTINUE);

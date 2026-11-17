@@ -337,7 +337,7 @@ RuleCell cell_at(int p_index) {
 constexpr int CELL_COUNT = 3 * 5 * 2 * 2 * 2 * 2 * 2 * 2 * 2 * 5 * 2;
 
 TEST_CASE(
-    "[Networked][Lifecycle][Law] every spawn, move and despawn a peer asks "
+    "[Netw][Lifecycle][Law] every spawn, move and despawn a peer asks "
     "for answers the code its facts earn, and only the session can refuse "
     "it as a race"
 ) {
@@ -1529,7 +1529,7 @@ const Row ROWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Lifecycle][SceneTree] every spawn, move and despawn "
+    "[Netw][Lifecycle][SceneTree] every spawn, move and despawn "
     "reaches every peer once, and one the server refuses is undone "
     "on the author alone"
 ) {
@@ -1819,7 +1819,7 @@ const RefusalLaw REFUSAL_LAWS[] = {
 };
 
 TEST_CASE(
-    "[Networked][Lifecycle][SceneTree] a spawn, move or despawn a client "
+    "[Netw][Lifecycle][SceneTree] a spawn, move or despawn a client "
     "may not make is refused at the call, reported once, and changes "
     "nothing"
 ) {
@@ -1901,7 +1901,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Lifecycle][SceneTree] a raw Node.reparent by a client that "
+    "[Netw][Lifecycle][SceneTree] a raw Node.reparent by a client that "
     "may not move the entity is reported once and the server's copy stays"
 ) {
     FaultWatch faults;

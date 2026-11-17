@@ -16,7 +16,7 @@ import csharp_docs
 from common import CI_DIR, ROOT, fail, load_json, main, run
 
 DUMP_NAME = "extension_api.json"
-OUTPUT_DIR = ROOT / "addons" / "networked" / "native_api" / "cs"
+OUTPUT_DIR = ROOT / "addons" / "netwkd" / "native_api" / "cs"
 REGISTRY = ROOT / "extension" / "register_types.cpp"
 HAND_WRITTEN = {
     "NetwApi.cs",
@@ -833,7 +833,7 @@ class Emitter:
             "using Godot;",
             "using Godot.NativeInterop;",
             "",
-            "namespace Networked;",
+            "namespace Netwkd;",
             "",
             *(
                 csharp_docs.block(
@@ -1668,7 +1668,7 @@ class Emitter:
         return overloads[::-1] if target in AWAITED_HANDLERS else overloads
 
     def typed_overloads(self, method: dict) -> list[list[str]]:
-        """The overloads of one networked method that take the method
+        """The overloads of one multiplayer method that take the method
         itself. Each sends the delegate's node and name through the
         overload that takes them, after NetwApi.Receiver has checked them."""
         kind = TYPED_METHODS.get(method["name"])
@@ -1908,7 +1908,7 @@ using System.Runtime.InteropServices;
 using Godot;
 using Godot.NativeInterop;
 
-namespace Networked;
+namespace Netwkd;
 
 /// <summary>
 /// The fixed-arity entry points every generated body calls through.
@@ -2255,7 +2255,7 @@ SAMPLE_HEAD = """using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
-using Networked;
+using Netwkd;
 using static SampleStands;
 """
 

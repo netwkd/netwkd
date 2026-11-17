@@ -78,7 +78,7 @@ Mounted mount_plain(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT1 an unwrapped scene root is its own outer "
+    "[Netw][Scene][Hosted] SNT1 an unwrapped scene root is its own outer "
     "node, so nothing above it competes for the scene's identity"
 ) {
     Node *arena = memnew(Node);
@@ -98,7 +98,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT2 scene_containing answers the container "
+    "[Netw][Scene][Hosted] SNT2 scene_containing answers the container "
     "the session MOUNTED, and answers null for a node in no scene at all"
 ) {
     Ref<NetwMultiplayer> core;
@@ -123,7 +123,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT3 a scene the book stopped holding live is "
+    "[Netw][Scene][Hosted] SNT3 a scene the book stopped holding live is "
     "no longer what scene_containing answers, so a retired container stops "
     "standing in for its own subtree"
 ) {
@@ -142,7 +142,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT9 a scene leaving the live book leaves its "
+    "[Netw][Scene][Hosted] SNT9 a scene leaving the live book leaves its "
     "node mounted where the game put it, so forgetting a scene is a book "
     "edit and never a free"
 ) {
@@ -171,7 +171,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted][SceneTree] SNT10 a scene owns its world by "
+    "[Netw][Scene][Hosted][SceneTree] SNT10 a scene owns its world by "
     "what it declares, whether or not a viewport hosts it, and an unknown "
     "scene owns none"
 ) {
@@ -203,7 +203,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT14 forgetting a container emits "
+    "[Netw][Scene][Hosted] SNT14 forgetting a container emits "
     "scene_removed with its scene at once, and a null container or a node "
     "the session never held emits nothing"
 ) {
@@ -241,7 +241,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT16 remembering a scene root enters it "
+    "[Netw][Scene][Hosted] SNT16 remembering a scene root enters it "
     "under its own name, and a node the session seated no entity on is "
     "refused rather than entered"
 ) {
@@ -275,7 +275,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT17 an arriving move resolves the waiting "
+    "[Netw][Scene][Hosted] SNT17 an arriving move resolves the waiting "
     "promise with OK"
 ) {
     Ref<NetwMultiplayer> core;
@@ -301,7 +301,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT18 a joining player spends the "
+    "[Netw][Scene][Hosted] SNT18 a joining player spends the "
     "admission parked for it against every live scene and is announced as a "
     "viewer there, and a player nothing parked for is announced nowhere"
 ) {
@@ -343,7 +343,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT19 opening a scene's admission on a server "
+    "[Netw][Scene][Hosted] SNT19 opening a scene's admission on a server "
     "announces every peer its boundary already reaches, opens the row once so "
     "a second open announces nothing, and closing it forgets the viewers"
 ) {
@@ -394,7 +394,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Scene][Hosted] SNT20 adopting a reparented entity admits its "
+    "[Netw][Scene][Hosted] SNT20 adopting a reparented entity admits its "
     "peer to the scene that now encloses it, and admits nobody for a prop, "
     "for an entity already its own scene, or on a peer that is not authority"
 ) {

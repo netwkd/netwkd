@@ -33,7 +33,7 @@ int64_t ordinal_of(const SetModel &p_model, const char *p_key, int64_t p_kind) {
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] the order declarations arrive in does not "
+    "[Netw][Repl][Hosted] the order declarations arrive in does not "
     "reach the ordinals"
 ) {
     SetModel left;
@@ -57,7 +57,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] every consumed set holds a lower ordinal "
+    "[Netw][Repl][Hosted] every consumed set holds a lower ordinal "
     "than every derived one"
 ) {
     SetModel model;
@@ -68,7 +68,7 @@ TEST_CASE(
     NETW_CHECK_EQ(ordinal_of(model, "A", SET_DERIVED), 1);
 }
 
-TEST_CASE("[Networked][Repl][Hosted] one key under two records is two rows") {
+TEST_CASE("[Netw][Repl][Hosted] one key under two records is two rows") {
     SetModel model;
     model.declare(ROUTE, SET_DERIVED, StringName("A"), 0, RID(), 0, 1);
     model.declare(ROUTE, SET_DERIVED, StringName("A"), 0, RID(), 1, 2);
@@ -84,7 +84,7 @@ TEST_CASE("[Networked][Repl][Hosted] one key under two records is two rows") {
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] redeclaring a row updates it rather than "
+    "[Netw][Repl][Hosted] redeclaring a row updates it rather than "
     "adding a second"
 ) {
     SetModel model;
@@ -102,7 +102,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] dropping a row closes the ordinal gap it "
+    "[Netw][Repl][Hosted] dropping a row closes the ordinal gap it "
     "left"
 ) {
     SetModel model;
@@ -117,7 +117,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a route with no declarations left is "
+    "[Netw][Repl][Hosted] a route with no declarations left is "
     "forgotten rather than kept empty"
 ) {
     SetModel model;
@@ -129,7 +129,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a declaration naming no route or no key "
+    "[Netw][Repl][Hosted] a declaration naming no route or no key "
     "is refused"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -149,7 +149,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an ordinal outside the route answers "
+    "[Netw][Repl][Hosted] an ordinal outside the route answers "
     "nothing rather than a neighbour"
 ) {
     SetModel model;
@@ -161,7 +161,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a route's declarations die with the "
+    "[Netw][Repl][Hosted] a route's declarations die with the "
     "route"
 ) {
     SetModel model;
@@ -175,7 +175,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a declaration's gate columns are carried "
+    "[Netw][Repl][Hosted] a declaration's gate columns are carried "
     "by the row rather than resolved per pass"
 ) {
     SetModel model;
@@ -198,7 +198,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a declaration that names no gate columns "
+    "[Netw][Repl][Hosted] a declaration that names no gate columns "
     "is authority-policed and public"
 ) {
     SetModel model;
@@ -211,7 +211,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] redeclaring a row restates its gate "
+    "[Netw][Repl][Hosted] redeclaring a row restates its gate "
     "columns rather than keeping the first ones"
 ) {
     SetModel model;
@@ -235,7 +235,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a row's gate columns survive the reindex "
+    "[Netw][Repl][Hosted] a row's gate columns survive the reindex "
     "a later declaration forces"
 ) {
     SetModel model;
@@ -271,7 +271,7 @@ SetRow gated(int64_t p_record, int64_t p_policy, int64_t p_audience) {
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a state row is server-authored whatever its "
+    "[Netw][Repl][Hosted] a state row is server-authored whatever its "
     "policy says, and any other peer is an ordinary non-authority actor"
 ) {
     const SetRow row = gated(
@@ -284,7 +284,7 @@ TEST_CASE(
     CHECK_FALSE(netw::repl::row_authors(row, 7, 9, 7));
 }
 
-TEST_CASE("[Networked][Repl][Hosted] a non-state row follows its policy") {
+TEST_CASE("[Netw][Repl][Hosted] a non-state row follows its policy") {
     const SetRow by_authority = gated(
         netw::repl::SET_RECORD_BROADCAST,
         int64_t(WritePolicy::AUTHORITY),
@@ -309,7 +309,7 @@ TEST_CASE("[Networked][Repl][Hosted] a non-state row follows its policy") {
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a server-only row reaches the server alone, "
+    "[Netw][Repl][Hosted] a server-only row reaches the server alone, "
     "and nobody when the server authors it"
 ) {
     const SetRow row = gated(
@@ -333,7 +333,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a public row reaches every live peer but "
+    "[Netw][Repl][Hosted] a public row reaches every live peer but "
     "its own author"
 ) {
     const SetRow row = gated(
@@ -355,7 +355,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an ordinal naming no row authors nothing "
+    "[Netw][Repl][Hosted] an ordinal naming no row authors nothing "
     "and reaches nobody"
 ) {
     netw::NetwSyncModel model;
@@ -387,7 +387,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a received state row accepts the server "
+    "[Netw][Repl][Hosted] a received state row accepts the server "
     "alone, whatever its policy says, and denies every other peer"
 ) {
     const SetRow row = gated(
@@ -401,7 +401,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a received controller-authored row trusts the "
+    "[Netw][Repl][Hosted] a received controller-authored row trusts the "
     "server only while nobody controls the entity, and then its own policy"
 ) {
     const SetRow by_authority = gated(
@@ -426,7 +426,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a described route admits only the "
+    "[Netw][Repl][Hosted] a described route admits only the "
     "ordinals its description names, at the hash it names them with"
 ) {
     SetModel model;
@@ -446,7 +446,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a described route refuses an ordinal its "
+    "[Netw][Repl][Hosted] a described route refuses an ordinal its "
     "description never named"
 ) {
     SetModel model;
@@ -462,7 +462,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an ordinal a descriptor names but no row "
+    "[Netw][Repl][Hosted] an ordinal a descriptor names but no row "
     "declares is refused"
 ) {
     SetModel model;
@@ -474,7 +474,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a route described as carrying nothing "
+    "[Netw][Repl][Hosted] a route described as carrying nothing "
     "refuses every ordinal, because it was described"
 ) {
     SetModel model;
@@ -490,7 +490,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a route's noted descriptors die with the "
+    "[Netw][Repl][Hosted] a route's noted descriptors die with the "
     "route"
 ) {
     SetModel model;
@@ -506,7 +506,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an on-demand event fans out from the "
+    "[Netw][Repl][Hosted] an on-demand event fans out from the "
     "host and funnels to the server from a client"
 ) {
     godot::PackedInt32Array live;
@@ -525,7 +525,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a relayed event skips the peer it came "
+    "[Netw][Repl][Hosted] a relayed event skips the peer it came "
     "from, so a sender never receives its own event back"
 ) {
     godot::PackedInt32Array live;
@@ -542,7 +542,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] the server itself sends no on-demand event "
+    "[Netw][Repl][Hosted] the server itself sends no on-demand event "
     "to the server, and an event the server sent is not funneled back to it"
 ) {
     godot::PackedInt32Array live;
@@ -559,7 +559,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a binding is found by the ordinal its "
+    "[Netw][Repl][Hosted] a binding is found by the ordinal its "
     "row currently holds, not the one it was attached under"
 ) {
     netw_test::Books books;
@@ -579,7 +579,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] detaching a binding leaves its row, and "
+    "[Netw][Repl][Hosted] detaching a binding leaves its row, and "
     "attaching nothing detaches"
 ) {
     netw_test::Books books;
@@ -608,7 +608,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a route's bindings answer in ordinal "
+    "[Netw][Repl][Hosted] a route's bindings answer in ordinal "
     "order and only for the kind asked for"
 ) {
     netw_test::Books books;
@@ -637,7 +637,7 @@ TEST_CASE(
     NETW_CHECK_EQ(int(model.route_bindings(ROUTE, SET_CONSUMED).size()), 1);
 }
 
-TEST_CASE("[Networked][Repl][Hosted] a route's bindings die with the route") {
+TEST_CASE("[Netw][Repl][Hosted] a route's bindings die with the route") {
     netw_test::Books books;
     netw::NetwSyncModel model;
     model.attach_book(&books.bindings);
@@ -653,7 +653,7 @@ TEST_CASE("[Networked][Repl][Hosted] a route's bindings die with the route") {
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] one key under two records keeps two "
+    "[Netw][Repl][Hosted] one key under two records keeps two "
     "bindings, because the record is part of a row's identity"
 ) {
     netw_test::Books books;
@@ -721,7 +721,7 @@ netw::NetwSyncModel model_with_binding(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a frame whose header could not be read names "
+    "[Netw][Repl][Hosted] a frame whose header could not be read names "
     "no set, and is counted as one"
 ) {
     netw_test::Books books;
@@ -739,7 +739,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an ordinal naming no binding is refused, and "
+    "[Netw][Repl][Hosted] an ordinal naming no binding is refused, and "
     "so is one whose node is gone"
 ) {
     netw_test::Books books;
@@ -763,7 +763,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a state row admits the server as sender and "
+    "[Netw][Repl][Hosted] a state row admits the server as sender and "
     "refuses everyone else"
 ) {
     netw_test::Books books;
@@ -786,7 +786,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] a schema the spawn descriptor disagrees with "
+    "[Netw][Repl][Hosted] a schema the spawn descriptor disagrees with "
     "is refused after the sender is admitted"
 ) {
     netw_test::Books books;
@@ -810,7 +810,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an admitted row hands back the binding the "
+    "[Netw][Repl][Hosted] an admitted row hands back the binding the "
     "model holds, and counts nothing until it applies"
 ) {
     netw_test::Books books;
@@ -837,7 +837,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an offer a peer may not author reaches nobody, "
+    "[Netw][Repl][Hosted] an offer a peer may not author reaches nobody, "
     "and is counted as an authorship refusal rather than an empty audience"
 ) {
     netw::NetwSyncModel model;
@@ -868,7 +868,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an author with nobody live is counted apart "
+    "[Netw][Repl][Hosted] an author with nobody live is counted apart "
     "from one who may not author at all"
 ) {
     netw::NetwSyncModel model;
@@ -891,7 +891,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] an ordinal naming no row is an authorship "
+    "[Netw][Repl][Hosted] an ordinal naming no row is an authorship "
     "refusal, because a row nobody declared has no author"
 ) {
     netw::NetwSyncModel model;
@@ -903,7 +903,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] L8 a route's declarations die with the route, "
+    "[Netw][Repl][Hosted] L8 a route's declarations die with the route, "
     "so the next entity at that route inherits no rows"
 ) {
     netw::NetwSyncModel model;
@@ -928,7 +928,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Repl][Hosted] P14 declaration order does not change the "
+    "[Netw][Repl][Hosted] P14 declaration order does not change the "
     "committed shape, because a route re-sorts its rows on every declare"
 ) {
     netw::NetwSyncModel left;

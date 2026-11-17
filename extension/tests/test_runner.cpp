@@ -63,7 +63,7 @@ void probe_default_zone(int64_t value) {
 }
 
 void probe_named_zone() {
-    NETW_ZONE_N("Networked named instrumentation probe");
+    NETW_ZONE_N("netwkd named instrumentation probe");
 }
 
 void probe_colored_zone() {
@@ -72,12 +72,12 @@ void probe_colored_zone() {
 
 void compile_ambient_profile_macros() {
     if (false) {
-        NETW_THREAD("Networked test", 1);
+        NETW_THREAD("netwkd test", 1);
         NETW_LOCKABLE(std::mutex, lock);
         void *pointer = &lock;
-        NETW_ALLOC_N(pointer, sizeof(lock), "Networked test lock");
-        NETW_FREE_N(pointer, "Networked test lock");
-        NETW_APP_INFO("Networked native tests", 22);
+        NETW_ALLOC_N(pointer, sizeof(lock), "netwkd test lock");
+        NETW_FREE_N(pointer, "netwkd test lock");
+        NETW_APP_INFO("netwkd native tests", 22);
     }
 }
 
@@ -407,7 +407,7 @@ public:
         );
         std::fprintf(
             output,
-            "  <testsuite name=\"networked-native\" tests=\"%u\" "
+            "  <testsuite name=\"netwkd-native\" tests=\"%u\" "
             "failures=\"%d\" errors=\"%d\">\n",
             reported,
             failures,
@@ -994,13 +994,13 @@ Dictionary NetwNativeTests::wire_spec() const {
 
 void NetwNativeTests::instrumentation_probe(int64_t value) const {
     NETW_FRAME(profile::names::TICK_FRAME);
-    NETW_ZONE_NC("Networked instrumentation probe", colors::TICK);
+    NETW_ZONE_NC("netwkd instrumentation probe", colors::TICK);
     NETW_ZONE_VALUE(value);
 #if defined(NETW_PROFILING)
     const CharString text = String::num_int64(value).utf8();
     NETW_ZONE_TEXT(text.get_data(), text.length());
 #endif
-    NETW_TRACE(netw::sys::TEST, "Networked native trace probe");
+    NETW_TRACE(netw::sys::TEST, "netwkd native trace probe");
     probe_default_zone(value);
     probe_named_zone();
     probe_colored_zone();

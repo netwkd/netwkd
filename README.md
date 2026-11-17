@@ -1,12 +1,11 @@
 <p align="center">
-  <img src="assets/networked.svg" alt="networked logo" width="300">
+  <img src="assets/netwkd.svg" alt="netwkd logo" width="300">
 </p>
 
-# networked
+# netwkd
 
-
-[![documentation](https://img.shields.io/badge/documentation-class%20reference-green?logo=readthedocs&logoColor=white&labelColor=CFC9C8&color=6BCD69)](https://networked.readthedocs.io/en/latest/classes/index.html)
-[![build](https://img.shields.io/github/actions/workflow/status/diejor/networked/ci.yml?label=build&logo=github&logoColor=white&labelColor=CFC9C8&color=DBDCB8)](https://github.com/diejor/networked/actions/workflows/ci.yml)
+[![documentation](https://img.shields.io/badge/documentation-class%20reference-green?logo=readthedocs&logoColor=white&labelColor=CFC9C8&color=6BCD69)](https://netwkd.readthedocs.io/en/latest/classes/index.html)
+[![build](https://img.shields.io/github/actions/workflow/status/netwkd/netwkd/ci.yml?label=build&logo=github&logoColor=white&labelColor=CFC9C8&color=DBDCB8)](https://github.com/netwkd/netwkd/actions/workflows/ci.yml)
 [![play](https://img.shields.io/badge/play-examples-fa5c5c?logo=cloudflare&logoColor=white)](https://netw-examples.pages.dev)
 [![chat](https://img.shields.io/badge/chat-discord-646FA9?logo=discord&logoColor=white&labelColor=CFC9C8&color=646FA9)](https://discord.gg/7bXbVy9Zfu)
 
@@ -20,23 +19,23 @@ the addon is installed.
 
 ## Install
 
-Download `networked` from the
-[latest release](https://github.com/diejor/networked/releases/latest) and
-unzip it into your project's root. `networked_steam`, `networked_discord` and
-`networked_nakama` are optional and unzip beside it.
+Download `netwkd` from the
+[latest release](https://github.com/netwkd/netwkd/releases/latest) and
+unzip it into your project's root. `netwkd_steam`, `netwkd_discord` and
+`netwkd_nakama` are optional and unzip beside it.
 
 ## Demos
 
 Play them in the browser at [netw-examples.pages.dev](https://netw-examples.pages.dev).
-They come with the addon, under [`addons/networked/examples`](addons/networked/examples).
+They come with the addon, under [`addons/netwkd/examples`](addons/netwkd/examples).
 
-- [`bomber`](addons/networked/examples/bomber), Godot's multiplayer bomber demo
-- [`racing`](addons/networked/examples/racing), Kenney's Starter Kit Racing
-- [`rocket_league`](addons/networked/examples/rocket_league), cars and a ball
-- [`fps`](addons/networked/examples/fps), Kenney's Starter Kit FPS
-- [`playground`](addons/networked/examples/playground), players pushing 900 cubes around
-- [`multiple_levels`](addons/networked/examples/multiple_levels), players moving between levels
-- [`whiteboard`](addons/networked/examples/whiteboard), a shared drawing board
+- [`bomber`](addons/netwkd/examples/bomber), Godot's multiplayer bomber demo
+- [`racing`](addons/netwkd/examples/racing), Kenney's Starter Kit Racing
+- [`rocket_league`](addons/netwkd/examples/rocket_league), cars and a ball
+- [`fps`](addons/netwkd/examples/fps), Kenney's Starter Kit FPS
+- [`playground`](addons/netwkd/examples/playground), players pushing 900 cubes around
+- [`multiple_levels`](addons/netwkd/examples/multiple_levels), players moving between levels
+- [`whiteboard`](addons/netwkd/examples/whiteboard), a shared drawing board
 
 To run them from a clone of this repository,
 [build the GDExtension](extension/BUILDING.md) before opening the project in
@@ -137,17 +136,17 @@ player.reparent(arena.get_node(^"Spawns"))
 
 ## More
 
-- [Prediction and rollback](https://networked.readthedocs.io/en/latest/classes/class_netwprediction.html#class-netwprediction).
+- [Prediction and rollback](https://netwkd.readthedocs.io/en/latest/classes/class_netwprediction.html#class-netwprediction).
   A controller runs its entity ahead and corrects when the server disagrees.
-- [Interest management](https://networked.readthedocs.io/en/latest/classes/class_netwinterest.html#class-netwinterest).
+- [Interest management](https://netwkd.readthedocs.io/en/latest/classes/class_netwinterest.html#class-netwinterest).
   Each peer receives only the entities it can see.
-- [Persistence](https://networked.readthedocs.io/en/latest/classes/class_netwpersistence.html#class-netwpersistence).
+- [Persistence](https://netwkd.readthedocs.io/en/latest/classes/class_netwpersistence.html#class-netwpersistence).
   Properties save and load with their entity, through a
-  [database](https://networked.readthedocs.io/en/latest/classes/class_netwdatabase.html#class-netwdatabase)
+  [database](https://netwkd.readthedocs.io/en/latest/classes/class_netwdatabase.html#class-netwdatabase)
   you choose.
-- [Steam](https://networked.readthedocs.io/en/latest/classes/class_steamsocial.html#class-steamsocial).
+- [Steam](https://netwkd.readthedocs.io/en/latest/classes/class_steamsocial.html#class-steamsocial).
   Friends, invites, lobbies and parties, with Steam sign in.
-- [Discord](addons/networked_discord/README.md).
+- [Discord](addons/netwkd_discord/README.md).
   Presence, friends, parties with voice and Discord sign in.
 
 ## Credits

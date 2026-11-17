@@ -988,7 +988,7 @@ def capture(path, verbose):
             print("      %-28s %9d" % (key, lane[key]))
     print("CAPTURE %d records %d frames %d errors" % (len(rows), frames, errors))
     if raw:
-        print("CAPTURE %d raw records that are not Networked datagrams" % raw)
+        print("CAPTURE %d raw records that are not netwkd datagrams" % raw)
     return 1 if errors else 0
 
 

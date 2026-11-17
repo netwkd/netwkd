@@ -12,7 +12,7 @@ Netw
 
 **Inherits:** :godot:`RefCounted`
 
-Static entry points for the Networked API.
+Static entry points for the netwkd API.
 
 .. rst-class:: classref-introduction-group
 
@@ -49,7 +49,7 @@ A level is spawned like any other node, with :ref:`configure_scene()<class_Netw_
 
 \ **Replication**\ 
 
-A node's property replicates once :ref:`configure_property()<class_Netw_method_configure_property>` declares it. Data that belongs to no single node has a class of its own.
+A node's property replicates once :ref:`configure_property()<class_Netw_method_configure_property>` declares it and :ref:`NetwPropertyConfig.state()<class_NetwPropertyConfig_method_state>`, :ref:`NetwPropertyConfig.input()<class_NetwPropertyConfig_method_input>` or :ref:`NetwPropertyConfig.broadcast()<class_NetwPropertyConfig_method_broadcast>` says how. A property declared with none of them is sent only by :ref:`sync_property()<class_Netw_method_sync_property>`. Data that belongs to no single node has a class of its own.
 
 - :ref:`NetwPropertyConfig<class_NetwPropertyConfig>` how a declared property is sent, from :ref:`configure_property()<class_Netw_method_configure_property>`\ 
 
@@ -237,7 +237,7 @@ Declares ``method`` as an action and returns its :ref:`NetwActionConfig<class_Ne
 
 \ 
 
-The server passes ``method`` a :ref:`NetwActionRequest<class_NetwActionRequest>` before the arguments of :ref:`action()<class_Netw_method_action>`, and :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` rejects the action. Declaring an action turns lag compensation on for the session. A second call for the same method on one node returns ``null``.
+The server passes ``method`` a :ref:`NetwActionRequest<class_NetwActionRequest>` before the arguments of :ref:`action()<class_Netw_method_action>`, and :ref:`NetwRequest.deny()<class_NetwRequest_method_deny>` rejects the action. Declaring an action turns lag compensation on for the session.
 
 .. rst-class:: classref-item-separator
 
@@ -1113,7 +1113,7 @@ Like :ref:`spawn()<class_Netw_method_spawn>`, and writes :ref:`NetwEntity.player
         NetwEntity.of(avatar).player = who
         return avatar
 
-\ Returns ``null`` and spawns nothing when the session does not hold ``player``, and raises an error unless that player left the session. The node keeps the name ``method`` gave it, and :ref:`NetwEntity.name<class_NetwEntity_property_name>` is the player's :ref:`NetwPlayer.username<class_NetwPlayer_property_username>`. The node is despawned when ``player`` leaves. With :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>`, other peers receive it once its save is loaded.
+\ Returns ``null`` and spawns nothing when the session does not hold ``player``, and raises an error unless that player left the session. The node keeps the name ``method`` gave it, and :ref:`NetwEntity.name<class_NetwEntity_property_name>` is the player's :ref:`NetwPlayer.username<class_NetwPlayer_property_username>`. The node is despawned when ``player`` leaves. With :ref:`NetwPersistenceConfig.load_on_spawn()<class_NetwPersistenceConfig_method_load_on_spawn>`, other peers receive it once its save is loaded. When the spawn is refused, ``player`` stays in the session and its client prints a warning that names ``method``.
 
 \ **Server Only.**
 

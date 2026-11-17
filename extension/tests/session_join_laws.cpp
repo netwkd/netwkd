@@ -21,7 +21,7 @@ Ref<netw::NetwPlayer> player_of(NetwMultiplayer *p_api, int p_peer) {
 }
 
 TEST_CASE(
-    "[Networked][Session] a declared scene is not a live one until it "
+    "[Netw][Session] a declared scene is not a live one until it "
     "enters"
 ) {
     LoopbackRig rig(1);
@@ -39,7 +39,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] two instances of one stem are two live "
+    "[Netw][Session] two instances of one stem are two live "
     "scenes and the stem answers with the later one"
 ) {
     LoopbackRig rig(1);
@@ -64,7 +64,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] a client mirrors a scene without being "
+    "[Netw][Session] a client mirrors a scene without being "
     "admitted to it, and holds no seat there"
 ) {
     LoopbackRig rig(0);
@@ -88,7 +88,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] a client declares a scene only for a route the "
+    "[Netw][Session] a client declares a scene only for a route the "
     "server admitted it"
 ) {
     netw_test::FaultWatch expected_faults;
@@ -112,7 +112,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] a mirrored scene is the server's scene, not a "
+    "[Netw][Session] a mirrored scene is the server's scene, not a "
     "second one"
 ) {
     LoopbackRig rig(1);
@@ -130,7 +130,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session][Hosted] W0 a join whose build differs is refused by "
+    "[Netw][Session][Hosted] W0 a join whose build differs is refused by "
     "the part that differs"
 ) {
     Ref<NetwMultiplayer> core;
@@ -157,7 +157,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Session] a peer refused for another build is told why with "
+    "[Netw][Session] a peer refused for another build is told why with "
     "ERR_UNCONFIGURED, and a peer that floods joins has the extra ones "
     "dropped without being refused, so a seated peer keeps its seat"
 ) {

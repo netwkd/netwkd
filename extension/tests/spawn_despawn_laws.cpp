@@ -33,7 +33,7 @@ Record *tracked(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SD1 an untracked route despawns nothing and "
+    "[Netw][Spawn][Hosted] SD1 an untracked route despawns nothing and "
     "says so, so the caller flushes no carrier for it"
 ) {
     Ref<NetwMultiplayer> core;
@@ -62,7 +62,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SD2 a despawn empties the book of the whole "
+    "[Netw][Spawn][Hosted] SD2 a despawn empties the book of the whole "
     "subtree"
 ) {
     Ref<NetwMultiplayer> core;
@@ -96,7 +96,7 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Networked][Spawn][Hosted] SD3 a record whose node carries no entity is "
+    "[Netw][Spawn][Hosted] SD3 a record whose node carries no entity is "
     "still dropped, because the book's plan is what the despawn honours"
 ) {
     Ref<NetwMultiplayer> core;
