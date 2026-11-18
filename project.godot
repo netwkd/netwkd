@@ -42,14 +42,14 @@ hooks/session_hooks=Dictionary[String, bool]({
 })
 settings/test/test_lookup_folder="tests"
 
-[network]
-
-limits/debugger/max_chars_per_second=262144
-
 [netwkd]
 
 webrtc/turn_credentials_url="https://networked-turn.diejorarr.workers.dev/"
 tests/nakama_host="127.0.0.1"
+
+[network]
+
+limits/debugger/max_chars_per_second=262144
 
 [physics]
 

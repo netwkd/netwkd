@@ -1032,6 +1032,7 @@ private:
         int64_t hush = 0;
         bool moved = false;
         bool awaits_session = false;
+        bool hidden_between_worlds = false;
     };
     godot::HashMap<int64_t, SceneCarry> scene_carries;
     int64_t scene_carry_next = 0;

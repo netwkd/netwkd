@@ -68,6 +68,25 @@ bool running_under_gdunit() {
     return answer;
 }
 
+bool drawn(Node *p_node) {
+    return p_node != nullptr
+        && (p_node->is_class("CanvasItem") || p_node->is_class("Node3D"));
+}
+
+bool hide_while_carried(Node *p_moved) {
+    if (!drawn(p_moved) || !bool(p_moved->get(StringName("visible")))) {
+        return false;
+    }
+    p_moved->set(StringName("visible"), false);
+    return true;
+}
+
+void show_after_carry(Node *p_moved) {
+    if (drawn(p_moved)) {
+        p_moved->set(StringName("visible"), true);
+    }
+}
+
 } // namespace
 
 RID NetwMultiplayer::scene_of(const RID &p_entity) const {
@@ -1380,6 +1399,11 @@ void NetwMultiplayer::scene_carry_begin(
     carry.awaits_session = p_awaits_session;
     carry.hush = guard_hush_areas(body);
     carry.guard = guard_hold(body);
+    SubViewport *leaving = scene_world_of(p_source);
+    if (leaving != nullptr && leaving != scene_world_of(p_target)) {
+        carry.hidden_between_worlds
+            = hide_while_carried(scene_outer_of(body));
+    }
     const int64_t id = ++scene_carry_next;
     scene_carries.insert(id, carry);
     scene_carry_open(id);
@@ -1677,6 +1701,10 @@ void NetwMultiplayer::scene_carry_advance(int64_t p_id) {
     Node *parent = Object::cast_to<Node>(gd::object_of(carry->parent));
     const Ref<NetwEntity> mover = carry->entity;
     entity_move(mover->get_owner(), parent);
+    if (carry->hidden_between_worlds) {
+        carry->hidden_between_worlds = false;
+        show_after_carry(scene_outer_of(mover->get_owner()));
+    }
     scene_carry_open(p_id);
 }
 
@@ -1689,6 +1717,11 @@ void NetwMultiplayer::scene_carry_abandon(int64_t p_id) {
     scene_carries.erase(p_id);
     guard_let_go(carry.guard);
     guard_hush_release(carry.hush);
+    if (carry.hidden_between_worlds) {
+        show_after_carry(scene_outer_of(
+            Object::cast_to<Node>(gd::object_of(carry.body))
+        ));
+    }
     NETW_TRACE(
         sys::SCENE,
         "Move %d was abandoned before it finished.",
