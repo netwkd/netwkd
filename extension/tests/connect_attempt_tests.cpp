@@ -279,10 +279,8 @@ LawVerdict settings_layers(const Stand &) {
     preset["b"] = String("defaults");
     preset["c"] = String("defaults");
     REQUIRE(
-        attempt.connection->set_defaults(
-            StringName("AttemptTestPeer"),
-            preset
-        ) == OK
+        attempt.connection->set_defaults(StringName("AttemptTestPeer"), preset)
+        == OK
     );
     Dictionary passed;
     passed["c"] = String("call");

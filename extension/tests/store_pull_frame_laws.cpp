@@ -25,8 +25,8 @@ namespace TestNetwStorePull {
 
 using netw::NetwMultiplayer;
 using netw::store::RowAddress;
-using netw::store::Table;
 using netw::store::Store;
+using netw::store::Table;
 
 constexpr const char *CUBE_ID = "store_pull_cube";
 

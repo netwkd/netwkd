@@ -26,12 +26,12 @@ using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwPlayer;
 using netw::NetwSession;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
 using netw_test::LoopbackRig;
-using netw_test::Internals;
 
 constexpr int CLIENTS = 3;
 constexpr int SEATS = CLIENTS + 1;

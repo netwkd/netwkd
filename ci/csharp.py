@@ -232,6 +232,7 @@ def game_calls(path: Path = GAME_CALLS) -> dict[str, Handler]:
             found[target] = handler
     return found
 
+
 PTRCALL_MAX_ARITY = 3
 CALL_MAX_ARITY = 4
 
@@ -976,8 +977,8 @@ class Emitter:
         return [
             "",
             "    /// <summary>",
-            "    /// Makes a <see cref=\"%s\"/> that runs the script of" % name,
-            "    /// <typeparamref name=\"T\"/>, and returns it. A method the",
+            '    /// Makes a <see cref="%s"/> that runs the script of' % name,
+            '    /// <typeparamref name="T"/>, and returns it. A method the',
             "    /// addon calls keeps its exact name, such as",
             "    /// <c>%s</c>. An object of the addon is" % virtuals[0],
             "    /// typed <c>RefCounted</c> or <c>Node</c> and read with",
@@ -1395,7 +1396,7 @@ class Emitter:
             element = VARARG_TYPES.get((class_name, method["name"]), "Variant")
             varargs = self.surface.box({"type": element})
             tail = "params %s[] %s" % (varargs.declared, VARARG_PARAMETER)
-            signature ="%s, %s" % (signature, tail) if signature else tail
+            signature = "%s, %s" % (signature, tail) if signature else tail
         body = (
             preflight
             + filled

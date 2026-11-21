@@ -424,18 +424,6 @@ public:
 
     uint32_t flight_count(uint32_t p_peer) const;
 
-    uint32_t lanes_in_flight(uint32_t p_peer) const {
-        return p_peer < sides.size() ? sides[p_peer].flights.size() : 0;
-    }
-
-    uint32_t spare_image_count() const {
-        return spare_images.size();
-    }
-
-    const wire::CodeRow *spare_image(uint32_t p_at) const {
-        return p_at < spare_images.size() ? &spare_images[p_at] : nullptr;
-    }
-
     void name_lane(const RowAddress &p_at, uint8_t p_ordinal);
 
     RowAddress lane_row(const wire::StreamLane &p_lane) const;

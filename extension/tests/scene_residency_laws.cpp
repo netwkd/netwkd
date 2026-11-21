@@ -239,8 +239,7 @@ TEST_CASE(
         "other"
     );
     const Ref<NetwEntity> entity = NetwEntity::ensure(rig.route_node(route));
-    const Ref<NetwEntity> neighbour
-        = NetwEntity::ensure(rig.route_node(other));
+    const Ref<NetwEntity> neighbour = NetwEntity::ensure(rig.route_node(other));
     netw_test::CallLog log;
     host->scene_handle_of(arena)->connect(
         StringName("entity_entered"),

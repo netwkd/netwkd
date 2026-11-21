@@ -57,9 +57,7 @@ Property Descriptions
 
 :godot:`PackedStringArray` **urls** = ``[...]`` :ref:`🔗<class_ConnectIceServerConfig_property_urls>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The STUN or TURN URLs of this server.
 
 **Note:** The returned array is copied and any changes to it will not update the original property value. See :godot:`PackedStringArray` for more details.
 
@@ -73,9 +71,7 @@ Property Descriptions
 
 :godot:`String` **username** = ``""`` :ref:`🔗<class_ConnectIceServerConfig_property_username>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The TURN user name. Left out when empty.
 
 .. rst-class:: classref-item-separator
 
@@ -87,9 +83,7 @@ Property Descriptions
 
 :godot:`String` **credential** = ``""`` :ref:`🔗<class_ConnectIceServerConfig_property_credential>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The TURN password. Left out when empty.
 
 .. rst-class:: classref-section-separator
 
@@ -106,9 +100,7 @@ Method Descriptions
 
 :godot:`Dictionary` **settings**\ (\ ) :ref:`🔗<class_ConnectIceServerConfig_method_settings>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns this server as one entry of the ``ice_servers`` setting.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

@@ -12,23 +12,7 @@
 
 **Inherits:** :godot:`EditorDebuggerPlugin`
 
-.. container:: contribute
-
-	There is currently no description for this class. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-reftable-group
-
-Properties
-----------
-
-.. table::
-   :widths: auto
-
-   +----------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------+--------+
-   | :godot:`Dictionary`\[:godot:`int`, :ref:`"addons/netwkd/gdscript/editor/traffic_strip.gd"<class_addons_netwkd_gdscript_editor_traffic_strip_gd>`\] | :ref:`strips<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_property_strips>` | ``{}`` |
-   +----------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------+--------+
-   | :godot:`Array`\[:ref:`"addons/netwkd/gdscript/editor/traffic_strip.gd"<class_addons_netwkd_gdscript_editor_traffic_strip_gd>`\]                    | :ref:`docked<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_property_docked>` | ``[]`` |
-   +----------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------+--------+
+Shows a traffic strip for each debug session, in the Network Profiler when the editor has one.
 
 .. rst-class:: classref-reftable-group
 
@@ -38,65 +22,9 @@ Methods
 .. table::
    :widths: auto
 
-   +--------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`dock<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_dock>`\ (\ strip\: :ref:`"addons/netwkd/gdscript/editor/traffic_strip.gd"<class_addons_netwkd_gdscript_editor_traffic_strip_gd>`\ ) |
-   +--------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`release<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_release>`\ (\ )                                                                                                                  |
-   +--------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Constants
----------
-
-.. _class_addons_netwkd_gdscript_editor_traffic_debugger_gd_constant_TrafficStrip:
-
-.. rst-class:: classref-constant
-
-**TrafficStrip** = ``<Object>`` :ref:`🔗<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_constant_TrafficStrip>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Property Descriptions
----------------------
-
-.. _class_addons_netwkd_gdscript_editor_traffic_debugger_gd_property_strips:
-
-.. rst-class:: classref-property
-
-:godot:`Dictionary`\[:godot:`int`, :ref:`"addons/netwkd/gdscript/editor/traffic_strip.gd"<class_addons_netwkd_gdscript_editor_traffic_strip_gd>`\] **strips** = ``{}`` :ref:`🔗<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_property_strips>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_addons_netwkd_gdscript_editor_traffic_debugger_gd_property_docked:
-
-.. rst-class:: classref-property
-
-:godot:`Array`\[:ref:`"addons/netwkd/gdscript/editor/traffic_strip.gd"<class_addons_netwkd_gdscript_editor_traffic_strip_gd>`\] **docked** = ``[]`` :ref:`🔗<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_property_docked>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+   +--------+----------------------------------------------------------------------------------------------+
+   | |void| | :ref:`release<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_release>`\ (\ ) |
+   +--------+----------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -107,29 +35,13 @@ Property Descriptions
 Method Descriptions
 -------------------
 
-.. _class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_dock:
-
-.. rst-class:: classref-method
-
-|void| **dock**\ (\ strip\: :ref:`"addons/netwkd/gdscript/editor/traffic_strip.gd"<class_addons_netwkd_gdscript_editor_traffic_strip_gd>`\ ) :ref:`🔗<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_dock>`
-
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
 .. _class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_release:
 
 .. rst-class:: classref-method
 
 |void| **release**\ (\ ) :ref:`🔗<class_addons_netwkd_gdscript_editor_traffic_debugger_gd_method_release>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Moves the docked strips back out and forgets every strip.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

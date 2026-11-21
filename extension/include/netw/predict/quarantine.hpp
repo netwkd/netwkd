@@ -1,12 +1,5 @@
 #pragma once
 
-/* The bounded proof that authority is coherent enough to resume prediction.
- *
- * State and witness lanes arrive independently. A clean consecutive witness
- * run licenses a recent state, while a finite wait permits an older retained
- * clean or unknown state and never one known dirty.
- */
-
 #include <cstdint>
 
 #include "godot/local_vector.hpp"

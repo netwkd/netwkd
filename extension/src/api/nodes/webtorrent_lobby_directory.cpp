@@ -93,9 +93,6 @@ PackedStringArray WebTorrentLobbyDirectory::effective_trackers() const {
     if (!preset.is_empty()) {
         return preset;
     }
-    if (connect::under_test_runner()) {
-        return PackedStringArray();
-    }
     return connect::WebRTCTransport::default_trackers();
 }
 

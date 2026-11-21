@@ -1,5 +1,6 @@
 #include "netw/predict/compare.hpp"
 
+#include "godot/math.hpp"
 #include "netw/wire/code_row.hpp"
 #include "netw/wire/value_row.hpp"
 
@@ -30,15 +31,8 @@ StateRow &StateRow::operator=(const StateRow &p_other) {
 
 namespace {
 
-constexpr double TAU = 6.2831853071795864769252867666;
-
 bool is_number(Variant::Type p_type) {
     return p_type == Variant::INT || p_type == Variant::FLOAT;
-}
-
-double angle_difference(double p_from, double p_to) {
-    const double diff = std::fmod(p_to - p_from, TAU);
-    return std::fmod(2.0 * diff, TAU) - diff;
 }
 
 bool has_causal_field(const Wiring &p_wiring) {
@@ -346,7 +340,7 @@ double value_error(
     const Variant::Type left_type = p_left.get_type();
     const Variant::Type right_type = p_right.get_type();
     if (p_angle && is_number(left_type) && is_number(right_type)) {
-        return std::abs(angle_difference(double(p_left), double(p_right)));
+        return std::abs(gd::angle_difference(double(p_left), double(p_right)));
     }
     if (left_type == Variant::VECTOR2 && right_type == Variant::VECTOR2) {
         return Vector2(p_left).distance_to(Vector2(p_right));
@@ -382,7 +376,10 @@ double value_error(
         const Transform2D right = p_right;
         return left.get_origin().distance_to(right.get_origin())
             + std::abs(
-                   angle_difference(left.get_rotation(), right.get_rotation())
+                   gd::angle_difference(
+                       left.get_rotation(),
+                       right.get_rotation()
+                   )
             );
     }
     return p_left == p_right ? 0.0 : std::numeric_limits<double>::infinity();
@@ -454,14 +451,11 @@ AckVerdict admit_ack(
         return out;
     }
 
-    // Two peers that declared no witness both fingerprint zero, and an equality
-    // between two absences is not a matched witness. The bit claims the local
-    // witness detail describes the peer's too, which nothing recorded.
-    const bool both_witness = p_peer.complete
+    const bool both_declared_witness = p_peer.complete
         && (local.evidence_mask & EVIDENCE_WITNESS) != 0
         && (p_peer.evidence_mask & EVIDENCE_WITNESS) != 0;
     const bool witness_equal
-        = both_witness && local.witness_fp == p_peer.witness_fp;
+        = both_declared_witness && local.witness_fp == p_peer.witness_fp;
     p_journal.mark_witness_match(p_transition, witness_equal);
     out.attribution = attribute(
         p_peer.complete && local.pre_fp == p_peer.pre_fp,

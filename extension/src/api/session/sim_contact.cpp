@@ -113,8 +113,10 @@ void NetwMultiplayer::sim_contact_arm(sim::Row &r_row) {
             NETW_FAULT_CONFLICTING_SETTINGS,
             {String("claim_on_contact or release_on_rest"),
              String(entity_record(r_row.entity)->get_entity_id()),
-             String("a NetwEntity.transfer other than TRANSFER_IMMEDIATE, or "
-                    "an entity with prediction or state properties")},
+             String(
+                 "a NetwEntity.transfer other than TRANSFER_IMMEDIATE, or "
+                 "an entity with prediction or state properties"
+             )},
             uint64_t(gd::instance_id(wrapper_owner(r_row.entity)))
         );
     }
@@ -231,8 +233,7 @@ void NetwMultiplayer::sim_settle_walk(int64_t p_local_peer, int64_t p_tick) {
     }
     for (uint32_t at = 0; at < sim_noted.size(); ++at) {
         sim::Row *row = sim_rows.at(sim_noted[at]);
-        if (row == nullptr || row->contact_tick == p_tick
-            || !row->viewed) {
+        if (row == nullptr || row->contact_tick == p_tick || !row->viewed) {
             continue;
         }
         if (row->mode == sim::Mode::ACTIVE) {
@@ -324,18 +325,15 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
             for (uint32_t which = 0; which < sim_colliders.size(); ++which) {
                 const RID target = sim_contact_owner(sim_colliders[which]);
                 const sim::Row *other = sim_rows.row_of(target);
-                if (other == nullptr || !other->viewed
-                    || target == source || !other->contact.eligible
+                if (other == nullptr || !other->viewed || target == source
+                    || !other->contact.eligible
                     || !other->declaration.claim_on_contact
                     || (!sim_onsets[which] && !sim::moving(other->bodies))
                     || other->steering.controller != 0
                     || other->steering.pending) {
                     continue;
                 }
-                control_claim_by_contact(
-                    id::Entity(target),
-                    id::Entity(source)
-                )
+                control_claim_by_contact(id::Entity(target), id::Entity(source))
                     ->mark_failure_observed();
                 if (sim::steered_locally(other->steering, local)
                     && sim_sources.find(target) < 0) {

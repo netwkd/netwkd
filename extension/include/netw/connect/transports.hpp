@@ -42,9 +42,9 @@ public:
     static constexpr int64_t ENET_HEADER_BYTES = 2;
     static constexpr int64_t ENET_UNSEQUENCED_COMMAND_BYTES = 8;
     static constexpr int64_t GODOT_PACKET_FLAG_BYTES = 1;
-    static constexpr int64_t ENET_PACKET_OVERHEAD
-        = UDP_PACKET_OVERHEAD + ENET_HEADER_BYTES
-        + ENET_UNSEQUENCED_COMMAND_BYTES + GODOT_PACKET_FLAG_BYTES;
+    static constexpr int64_t ENET_PACKET_OVERHEAD = UDP_PACKET_OVERHEAD
+        + ENET_HEADER_BYTES + ENET_UNSEQUENCED_COMMAND_BYTES
+        + GODOT_PACKET_FLAG_BYTES;
 
     int64_t packet_overhead() const override;
     godot::StringName peer_class() const override;

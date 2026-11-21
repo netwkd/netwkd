@@ -130,8 +130,7 @@ bool schema_matches(
     }
     for (uint32_t at = 0; at < p_bound.size(); ++at) {
         const int column = p_schemas.find_column(p_schema, p_bound[at].key);
-        if (column < 0
-            || p_schemas.column_type(p_schema, column) != p_types[at]
+        if (column < 0 || p_schemas.column_type(p_schema, column) != p_types[at]
             || p_schemas.column_stride(p_schema, column) != 1) {
             return false;
         }
@@ -331,8 +330,10 @@ RID Bindings::compile(Node *p_root) {
             NETW_FAULT_PERSIST_UNDECLARED,
             {name_of(p_root),
              String("no persistence"),
-             String("{Netw.configure_persistence} on it before it enters the "
-                    "tree")},
+             String(
+                 "{Netw.configure_persistence} on it before it enters the "
+                 "tree"
+             )},
             subject
         );
         return RID();
@@ -360,8 +361,10 @@ RID Bindings::compile(Node *p_root) {
             {name_of(p_root),
              String("the undeclared database '") + String(database_name)
                  + String("'"),
-             String("{Netw.configure_database} on a node above this entity "
-                    "before the node enters the tree")},
+             String(
+                 "{Netw.configure_database} on a node above this entity "
+                 "before the node enters the tree"
+             )},
             subject
         );
         return RID();
@@ -374,8 +377,10 @@ RID Bindings::compile(Node *p_root) {
             NETW_FAULT_PERSIST_UNDECLARED,
             {name_of(p_root),
              String("no record id"),
-             String("{NetwPersistenceConfig.record_id} with a Callable that "
-                    "returns the id")},
+             String(
+                 "{NetwPersistenceConfig.record_id} with a Callable that "
+                 "returns the id"
+             )},
             subject
         );
         return RID();

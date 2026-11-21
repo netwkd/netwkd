@@ -129,9 +129,6 @@ public:
         const godot::PackedByteArray &p_body,
         int64_t p_now_msec
     );
-    bool holds_key(const godot::String &p_kid) const {
-        return keys.has(p_kid);
-    }
 };
 
 } // namespace netw

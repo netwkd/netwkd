@@ -86,9 +86,9 @@
 #include "netw/scene_membership.hpp"
 #include "netw/schema_book.hpp"
 #include "netw/session/announcement.hpp"
-#include "netw/session/idle_work.hpp"
 #include "netw/session/event_plane.hpp"
 #include "netw/session/frames.hpp"
+#include "netw/session/idle_work.hpp"
 #include "netw/session/views.hpp"
 #include "netw/session_core.hpp"
 #include "netw/session_decl.hpp"
@@ -2067,6 +2067,7 @@ public:
         godot::RID entity;
         EntitySpace held;
     };
+
 private:
     godot::LocalVector<GatedBody> gated_bodies;
     int64_t predict_gate_arms = 0;
@@ -3435,9 +3436,6 @@ public:
         const godot::Variant &p_data
     );
 
-private:
-    SyncPipeline *sync_plane() const;
-
 public:
     void sync_pipeline_on_entity_live(
         int64_t p_route,
@@ -3872,9 +3870,6 @@ public:
         return inner;
     }
 
-    EmbedPhase embed_phase() const {
-        return embed_phase_value;
-    }
     void embed_settle();
     godot::Error embed_poll_transport();
     bool embed_is_disposing() const {
@@ -4233,12 +4228,8 @@ private:
     NetwCallPark *get_rpc_park() {
         return &rpc_park;
     }
-    NetwTxnBook *get_rpc_txns() {
-        return &rpc_txns;
-    }
 
 public:
-
     int64_t send_datagram(
         int64_t p_peer,
         const godot::PackedByteArray &p_payload,
@@ -5001,10 +4992,7 @@ public:
         NetwMultiplayer *p_session,
         bool p_is_authority
     );
-    bool control_sends_claim_image(
-        const godot::RID &p_entity,
-        int64_t p_tick
-    );
+    bool control_sends_claim_image(const godot::RID &p_entity, int64_t p_tick);
     godot::PackedByteArray control_claim_image(
         const godot::RID &p_entity,
         int64_t p_tick
@@ -5137,8 +5125,9 @@ private:
         int64_t p_sender,
         const session::ClaimImage &p_image
     );
-    godot::LocalVector<repl::PropertyBindingPtr>
-    control_authored_bindings(const godot::RID &p_entity);
+    godot::LocalVector<repl::PropertyBindingPtr> control_authored_bindings(
+        const godot::RID &p_entity
+    );
     void control_follow_claim(const godot::RID &p_entity, bool p_was_ahead);
     void control_send_op(
         const godot::RID &p_entity,
@@ -5297,11 +5286,6 @@ public:
         int64_t p_base_tick
     );
 
-    repl::PropertyBindingPtr entity_derived_binding(
-        godot::Node *p_owner,
-        int64_t p_record,
-        int64_t p_route
-    );
     repl::PropertyBindingPtr entity_record_binding(
         NetwEntityRecord *p_held,
         godot::Node *p_owner,

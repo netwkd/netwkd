@@ -157,12 +157,9 @@ Ref<NetwPromise> NetwDatabase::erase(
     const StringName &p_id
 ) {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->database_erase(
-                                database,
-                                api->schema_declare(p_schema),
-                                p_id
-                            )
-                          : no_session();
+    return api != nullptr
+        ? api->database_erase(database, api->schema_declare(p_schema), p_id)
+        : no_session();
 }
 
 Ref<NetwPromise> NetwDatabase::scan(

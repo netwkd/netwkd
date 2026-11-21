@@ -82,7 +82,7 @@ TEST_CASE("[Netw][Faults][Hosted] the fault book prints each key once") {
                     {NETW_FAULT_MALFORMED_DATAGRAM,
                      step.subject,
                      step.peer,
-                     String("k").hash() + uint32_t(at)},
+                     uint32_t(String("k").hash()) + uint32_t(at)},
                     step.tick + at * step.ticks_apart
                 );
                 if (admit.what != nullptr) {

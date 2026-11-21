@@ -619,12 +619,11 @@ struct ValueCase {
 
 LawVerdict values_checked(std::initializer_list<ValueCase> p_cases) {
     for (const ValueCase &check : p_cases) {
-        const Error got
-            = netw::SchemaBook::validate_value(
-                check.type,
-                check.stride,
-                check.value
-            );
+        const Error got = netw::SchemaBook::validate_value(
+            check.type,
+            check.stride,
+            check.value
+        );
         if (got != check.expected) {
             return law_broken(
                 "type %d stride %d answers %d, not %d",
@@ -685,18 +684,22 @@ LawVerdict missing_property_refused(bool p_written_on_arrival) {
     faults.expect_warning("*[NW0025]*", 1);
     Books books;
     const DeclaredSet pose = netw_test::declare(books);
-    pose->bind_column(PropertyColumn::create(
-        StringName("position"),
-        Ref<NetwQuantize>(),
-        false,
-        NetwMultiplayer::ColumnType(SchemaCore::VECTOR2)
-    ));
-    pose->bind_column(PropertyColumn::create(
-        StringName("rotation"),
-        Ref<NetwQuantize>(),
-        false,
-        NetwMultiplayer::ColumnType(SchemaCore::F32)
-    ));
+    pose->bind_column(
+        PropertyColumn::create(
+            StringName("position"),
+            Ref<NetwQuantize>(),
+            false,
+            NetwMultiplayer::ColumnType(SchemaCore::VECTOR2)
+        )
+    );
+    pose->bind_column(
+        PropertyColumn::create(
+            StringName("rotation"),
+            Ref<NetwQuantize>(),
+            false,
+            NetwMultiplayer::ColumnType(SchemaCore::F32)
+        )
+    );
     const SchemaRecord &schema = pose->get_volatile_schema();
     const WirePlan plan = WirePlan::compile(schema);
     CodeRow row = CodeRow::for_plan(plan);
@@ -819,8 +822,10 @@ public:
         return int64_t(std::round(double(p_value) * 10.0));
     }
 
-    Variant decode(const PackedInt64Array &p_codes, Variant::Type)
-        const override {
+    Variant decode(
+        const PackedInt64Array &p_codes,
+        Variant::Type
+    ) const override {
         return double(p_codes[0]) / 10.0;
     }
 };
@@ -830,12 +835,14 @@ LawVerdict custom_quantizer_lands(const World &) {
     const DeclaredSet pose = netw_test::declare(books);
     Ref<Tenths> tenths;
     tenths.instantiate();
-    pose->bind_column(PropertyColumn::create(
-        StringName("rotation"),
-        tenths,
-        false,
-        NetwMultiplayer::ColumnType(SchemaCore::F32)
-    ));
+    pose->bind_column(
+        PropertyColumn::create(
+            StringName("rotation"),
+            tenths,
+            false,
+            NetwMultiplayer::ColumnType(SchemaCore::F32)
+        )
+    );
     const SchemaRecord &schema = pose->get_volatile_schema();
     const WirePlan plan = WirePlan::compile(schema);
     CodeRow row = CodeRow::for_plan(plan);
@@ -1228,8 +1235,7 @@ LawVerdict law_lanes(const Derived &p_run) {
         const PropertyColumn &column = p_run.set.columns[index];
         const int64_t lane
             = owed.retained ? PropertySet::RETAINED : PropertySet::VOLATILE;
-        const bool quantized
-            = Ref<NetwQuantize>(quantizers[index]).is_valid();
+        const bool quantized = Ref<NetwQuantize>(quantizers[index]).is_valid();
         if (column.lane != lane || column.watch != owed.retained
             || quantized != owed.quantized) {
             return law_broken(
@@ -2067,14 +2073,10 @@ LawVerdict settings_that_cannot_apply_refused(const World &) {
                                 ->interval(-1.0)
                                 ->get_save_interval();
     Node *tree = netw_test::minted_node(ONE_SHOT_SOURCE);
-    const Ref<NetwPropertyConfig> request = netw::Netw::configure_property(
-        tree,
-        "parameters/shot/request"
-    );
-    const Ref<NetwPropertyConfig> blend = netw::Netw::configure_property(
-        tree,
-        "parameters/shot/active"
-    );
+    const Ref<NetwPropertyConfig> request
+        = netw::Netw::configure_property(tree, "parameters/shot/request");
+    const Ref<NetwPropertyConfig> blend
+        = netw::Netw::configure_property(tree, "parameters/shot/active");
 
     const char *kept = nullptr;
     if (!late->get_in_input_set() || !early->get_in_input_set()
@@ -2085,16 +2087,20 @@ LawVerdict settings_that_cannot_apply_refused(const World &) {
         kept = "unchecked on a broadcast";
     } else if (cast->get_lane() != PropertySet::RETAINED) {
         kept = "a broadcast without its retained";
-    } else if (!twice->is_refused() || twice->get_in_state_set()
-               || twice->get_in_input_set()) {
+    } else if (
+        !twice->is_refused() || twice->get_in_state_set()
+        || twice->get_in_input_set()
+    ) {
         kept = "two kinds";
     } else if (!object->is_refused() || !request->is_refused()) {
         kept = "an Object or a request";
     } else if (blend->is_refused()) {
         kept = "no AnimationTree parameter at all";
-    } else if (hp->get_set_heartbeat_ticks() != NetwPropertyConfig::UNSET
-               || hp->get_correction_threshold() >= 0.0
-               || !hp->get_quantizers().is_empty()) {
+    } else if (
+        hp->get_set_heartbeat_ticks() != NetwPropertyConfig::UNSET
+        || hp->get_correction_threshold() >= 0.0
+        || !hp->get_quantizers().is_empty()
+    ) {
         kept = "a negative value or a quantizer of the wrong type";
     } else if (extrapolates) {
         kept = "extrapolate naming no state property";

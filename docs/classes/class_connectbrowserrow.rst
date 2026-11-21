@@ -22,37 +22,9 @@ Properties
 .. table::
    :widths: auto
 
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :ref:`NetwEndpoint<class_NetwEndpoint>` | :ref:`endpoint<class_ConnectBrowserRow_property_endpoint>`           |               |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :godot:`Button`                         | :ref:`button<class_ConnectBrowserRow_property_button>`               | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :ref:`StatusDot<class_StatusDot>`       | :ref:`status_dot<class_ConnectBrowserRow_property_status_dot>`       | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :godot:`Label`                          | :ref:`name_label<class_ConnectBrowserRow_property_name_label>`       | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :godot:`Label`                          | :ref:`badge_label<class_ConnectBrowserRow_property_badge_label>`     | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :godot:`Label`                          | :ref:`address_label<class_ConnectBrowserRow_property_address_label>` | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :godot:`Label`                          | :ref:`players_label<class_ConnectBrowserRow_property_players_label>` | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-   | :godot:`Label`                          | :ref:`ping_label<class_ConnectBrowserRow_property_ping_label>`       | ``<unknown>`` |
-   +-----------------------------------------+----------------------------------------------------------------------+---------------+
-
-.. rst-class:: classref-reftable-group
-
-Methods
--------
-
-.. table::
-   :widths: auto
-
-   +--------+-------------------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`on_changed<class_ConnectBrowserRow_method_on_changed>`\ (\ )                                                |
-   +--------+-------------------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`on_button_gui_input<class_ConnectBrowserRow_method_on_button_gui_input>`\ (\ event\: :godot:`InputEvent`\ ) |
-   +--------+-------------------------------------------------------------------------------------------------------------------+
+   +-----------------------------------------+------------------------------------------------------------+
+   | :ref:`NetwEndpoint<class_NetwEndpoint>` | :ref:`endpoint<class_ConnectBrowserRow_property_endpoint>` |
+   +-----------------------------------------+------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -69,9 +41,7 @@ Signals
 
 **selected**\ (\ ) :ref:`🔗<class_ConnectBrowserRow_signal_selected>`
 
-.. container:: contribute
-
-	There is currently no description for this signal. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Emitted when the row is clicked.
 
 .. rst-class:: classref-item-separator
 
@@ -83,9 +53,7 @@ Signals
 
 **activated**\ (\ ) :ref:`🔗<class_ConnectBrowserRow_signal_activated>`
 
-.. container:: contribute
-
-	There is currently no description for this signal. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Emitted when the row is double clicked.
 
 .. rst-class:: classref-section-separator
 
@@ -102,140 +70,7 @@ Property Descriptions
 
 :ref:`NetwEndpoint<class_NetwEndpoint>` **endpoint** :ref:`🔗<class_ConnectBrowserRow_property_endpoint>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_button:
-
-.. rst-class:: classref-property
-
-:godot:`Button` **button** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_button>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_status_dot:
-
-.. rst-class:: classref-property
-
-:ref:`StatusDot<class_StatusDot>` **status_dot** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_status_dot>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_name_label:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **name_label** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_name_label>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_badge_label:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **badge_label** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_badge_label>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_address_label:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **address_label** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_address_label>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_players_label:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **players_label** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_players_label>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_property_ping_label:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **ping_label** = ``<unknown>`` :ref:`🔗<class_ConnectBrowserRow_property_ping_label>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Method Descriptions
--------------------
-
-.. _class_ConnectBrowserRow_method_on_changed:
-
-.. rst-class:: classref-method
-
-|void| **on_changed**\ (\ ) :ref:`🔗<class_ConnectBrowserRow_method_on_changed>`
-
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectBrowserRow_method_on_button_gui_input:
-
-.. rst-class:: classref-method
-
-|void| **on_button_gui_input**\ (\ event\: :godot:`InputEvent`\ ) :ref:`🔗<class_ConnectBrowserRow_method_on_button_gui_input>`
-
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The endpoint this row shows.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

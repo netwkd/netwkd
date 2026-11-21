@@ -29,8 +29,8 @@ spawn::Built::Outcome NetwMultiplayer::spawn_build(
     spawn::Ops &r_ops
 ) {
     using spawn::Book;
-    using spawn::Park;
     using spawn::Built;
+    using spawn::Park;
     using spawn::SpawnFrame;
 
     spawn::Pipeline *pipeline = spawn_plane();
@@ -114,12 +114,9 @@ spawn::Built::Outcome NetwMultiplayer::spawn_build(
             }
         }
         spawn::SpawnerCompat *adapter = spawner_adapter();
-        node = adapter != nullptr ? adapter->instantiate(
-                                        recv_spawner,
-                                        int(scene_index),
-                                        r_built.data
-                                    )
-                                  : nullptr;
+        node = adapter != nullptr
+            ? adapter->instantiate(recv_spawner, int(scene_index), r_built.data)
+            : nullptr;
         spawn_record_construct(node);
         if (node == nullptr) {
             fault::raise(
@@ -196,8 +193,10 @@ spawn::Built::Outcome NetwMultiplayer::spawn_build(
                     NETW_FAULT_SPAWN_RETURN,
                     {String("spawn constructor '") + String(id) + String("'"),
                      String("an await"),
-                     String("a constructor that returns the node without "
-                            "waiting")}
+                     String(
+                         "a constructor that returns the node without "
+                         "waiting"
+                     )}
                 );
             } else if (called) {
                 fault::raise(
@@ -232,8 +231,7 @@ spawn::Built::Outcome NetwMultiplayer::spawn_build(
         }
         r_built.host = host;
         const StringName method = StringName(frame.method);
-        const Variant schema
-            = spawn_script_schema(host->get_script(), method);
+        const Variant schema = spawn_script_schema(host->get_script(), method);
         if (schema.get_type() == Variant::NIL) {
             fault::raise(
                 this,
@@ -303,8 +301,10 @@ spawn::Built::Outcome NetwMultiplayer::spawn_build(
                     NETW_FAULT_SPAWN_RETURN,
                     {String("spawn function '") + String(method) + String("'"),
                      String("an await"),
-                     String("{Netw.spawn_async} for a spawn function that "
-                            "awaits")}
+                     String(
+                         "{Netw.spawn_async} for a spawn function that "
+                         "awaits"
+                     )}
                 );
             } else if (called) {
                 fault::raise(

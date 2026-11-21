@@ -139,7 +139,6 @@ private:
         bool p_is_local,
         int64_t p_now_msec
     );
-    void bind_peer(const godot::Ref<godot::MultiplayerPeer> &p_peer);
 
     void handle_description(
         Row &r_row,

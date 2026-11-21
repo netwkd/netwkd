@@ -1,7 +1,5 @@
 #include "netw/repl/sync_pipeline.hpp"
 
-#include <cstdlib>
-
 #include "godot/class_db.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/utility.hpp"
@@ -21,8 +19,8 @@
 #include "netw/property_set_builder.hpp"
 #include "netw/repl/snapshot_frame.hpp"
 #include "netw/script/model.hpp"
-#include "netw/session/idle_work.hpp"
 #include "netw/session/event_plane.hpp"
+#include "netw/session/idle_work.hpp"
 #include "netw/subsystems.hpp"
 #include "netw/sync_authoring.hpp"
 
@@ -932,25 +930,6 @@ LocalVector<PropertyBindingPtr> SyncPipeline::entity_bindings_checked(
             matched.push_back(candidates[at]);
         }
     }
-    static const bool verify
-        = std::getenv("NETW_VERIFY_BINDING_INDEX") != nullptr;
-    if (!verify) {
-        return matched;
-    }
-    LocalVector<PropertyBindingPtr> scanned;
-    for (uint32_t at = 0; at < bindings.size(); ++at) {
-        PropertyBinding *const held = live(bindings[at]);
-        if (binding_belongs_to(held, p_entity)) {
-            scanned.push_back(held);
-        }
-    }
-    bool same = scanned.size() == matched.size();
-    for (uint32_t at = 0; same && at < scanned.size(); ++at) {
-        same = scanned[at] == matched[at];
-    }
-    if (!same) {
-        NETW_BUG_V(scanned);
-    }
     return matched;
 }
 
@@ -1690,13 +1669,8 @@ void SyncPipeline::apply_row(
         );
         return;
     }
-    const store::Landing landed = decode_row(
-        p_entity,
-        at,
-        p_sender,
-        p_payload,
-        windowed
-    );
+    const store::Landing landed
+        = decode_row(p_entity, at, p_sender, p_payload, windowed);
     if (landed != store::Landing::ACCEPTED) {
         if (landed == store::Landing::BASELINE_UNKNOWN) {
             row_send()->note_baseline_drop();
@@ -2095,8 +2069,7 @@ void SyncPipeline::handle_property_sync(
     }
 
     if (session->has_server_role()) {
-        const int64_t route
-            = liveness_core->route_of(p_entity);
+        const int64_t route = liveness_core->route_of(p_entity);
         const PackedInt32Array recipients = NetwSyncModel::event_recipients(
             true,
             session->get_unique_id(),
@@ -2200,8 +2173,7 @@ void SyncPipeline::handle_signal(
     Callable(p_comp_node, StringName("emit_signal")).callv(call_args);
 
     if (session->has_server_role()) {
-        const int64_t route
-            = liveness_core->route_of(p_entity);
+        const int64_t route = liveness_core->route_of(p_entity);
         const PackedInt32Array recipients = NetwSyncModel::event_recipients(
             true,
             session->get_unique_id(),

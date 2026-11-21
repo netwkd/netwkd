@@ -7,7 +7,7 @@ const DEADLINE_WATCH_SECONDS := 3.0
 const CRATE_STRIDE := 20.0
 const MOVED_BEFORE := Vector2(200, 100)
 const MOVED_AFTER := Vector2(400, 300)
-const DEADLINE_WARNING := "did not finish its world report"
+const DEADLINE_WARNING := "did not report its world to the new server"
 
 var trees: Array[MultiplayerViewport] = []
 var driver: RelayDriver

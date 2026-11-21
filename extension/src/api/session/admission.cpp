@@ -168,11 +168,7 @@ String NetwMultiplayer::session_mint_challenge() {
     const PackedByteArray bytes
         = gd::secure_random_bytes(auth::CHALLENGE_BYTES);
     if (bytes.size() != auth::CHALLENGE_BYTES) {
-        fault::raise(
-            this,
-            NETW_FAULT_NO_CRYPTO,
-            {"The admission challenge"}
-        );
+        fault::raise(this, NETW_FAULT_NO_CRYPTO, {"The admission challenge"});
         return String();
     }
     constexpr char digits[] = "0123456789abcdef";

@@ -55,9 +55,6 @@ public:
     bool get_poisoned() const {
         return poisoned;
     }
-    void set_poisoned(bool p_poisoned) {
-        poisoned = p_poisoned;
-    }
     int64_t get_table_hash() const {
         return table_hash;
     }

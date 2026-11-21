@@ -222,10 +222,7 @@ class NetwPredictionEngine {
     godot::RID owner_rid(int64_t p_slot) const;
     godot::StringName owner_name(int64_t p_slot) const;
     godot::Node *owner_node(int64_t p_slot) const;
-    void announce_owner(
-        int64_t p_slot,
-        session::Announcement p_row
-    );
+    void announce_owner(int64_t p_slot, session::Announcement p_row);
     godot::Object *handle_of(int64_t p_slot) const;
     predict::Decl *decl_of(int64_t p_slot) const;
     static int episode_change(int64_t p_event);

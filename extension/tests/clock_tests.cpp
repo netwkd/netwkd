@@ -139,8 +139,7 @@ LawVerdict stall_discards_the_bank(const Stand &) {
     }
 
     const int64_t kept_ran = kept->clock_get_tick() - kept_start;
-    const int64_t discarded_ran
-        = discarded->clock_get_tick() - discarded_start;
+    const int64_t discarded_ran = discarded->clock_get_tick() - discarded_start;
     if (kept_ran != 6 || discarded_ran != 5) {
         return law_broken(
             "the kept clock ran %d ticks and the stalled one %d",

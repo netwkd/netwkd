@@ -261,12 +261,8 @@ LawVerdict holding_token(const Keys &p_keys) {
     for (const Variation &variation : variations) {
         const Ref<netw::NetwJoinRequest> request
             = request_for(String(CHALLENGE));
-        const Variant answer = server->verify_at(
-            request,
-            proof_for(p_keys, variation),
-            NOW,
-            1
-        );
+        const Variant answer
+            = server->verify_at(request, proof_for(p_keys, variation), NOW, 1);
         const PackedStringArray proven = request->get_accounts();
         if (!answered_ok(answer) || proven.size() != 1) {
             return law_broken("%s proved nothing", variation.label);
@@ -343,12 +339,8 @@ LawVerdict forged_or_stale_token(const Keys &p_keys) {
     for (const Variation &variation : variations) {
         const Ref<netw::NetwJoinRequest> request
             = request_for(String(CHALLENGE));
-        const Variant answer = server->verify_at(
-            request,
-            proof_for(p_keys, variation),
-            NOW,
-            1
-        );
+        const Variant answer
+            = server->verify_at(request, proof_for(p_keys, variation), NOW, 1);
         if (!answered_ok(answer)) {
             return law_broken("%s refused the whole join", variation.label);
         }
@@ -481,9 +473,8 @@ LawVerdict rotated_key(const Keys &p_keys) {
     server->set_audience(APP);
     server->set_prefix("discord");
     server->set_keys_url("https://keys.invalid/jwks");
-    const PackedByteArray listed = jwks_of(
-        listing({jwk_of("fixture-rsa", modulus_of(p_keys.issuer))})
-    );
+    const PackedByteArray listed
+        = jwks_of(listing({jwk_of("fixture-rsa", modulus_of(p_keys.issuer))}));
     const PackedByteArray rotated = jwks_of(listing({
         jwk_of("fixture-rsa", modulus_of(p_keys.issuer)),
         jwk_of("rotated-key", modulus_of(p_keys.other)),
@@ -542,18 +533,14 @@ LawVerdict rotated_key(const Keys &p_keys) {
 
 LawVerdict failed_download(const Keys &p_keys) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "*https://keys.invalid/jwks*[NW1000]*",
-        2
-    );
+    expected_faults.expect_warning("*https://keys.invalid/jwks*[NW1000]*", 2);
     const Ref<FetchingIdToken> server(memnew(FetchingIdToken));
     server->set_issuer("https://discord.com");
     server->set_audience(APP);
     server->set_prefix("discord");
     server->set_keys_url("https://keys.invalid/jwks");
-    const PackedByteArray listed = jwks_of(
-        listing({jwk_of("fixture-rsa", modulus_of(p_keys.issuer))})
-    );
+    const PackedByteArray listed
+        = jwks_of(listing({jwk_of("fixture-rsa", modulus_of(p_keys.issuer))}));
     server->keys_answered(0, 200, listed, 0);
 
     server->keys_answered(2, 0, PackedByteArray(), 0);

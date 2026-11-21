@@ -62,10 +62,6 @@ bool typed_from_variant(
     uint8_t *r_value
 );
 
-void resolve_ports(
-    Table &r_table,
-    ResidentRows &r_rows,
-    godot::Object *p_node
-);
+void resolve_ports(Table &r_table, ResidentRows &r_rows, godot::Object *p_node);
 
 } // namespace netw::store

@@ -196,11 +196,7 @@ Heard hear(const PackedByteArray &p_datagram) {
     Ref<NetwMultiplayer> session;
     session.instantiate();
     Recorder recorder(session.ptr(), Vector<StringName>({"peer_packet"}));
-    session->session_get_inner()->emit_signal(
-        "peer_packet",
-        PEER,
-        p_datagram
-    );
+    session->session_get_inner()->emit_signal("peer_packet", PEER, p_datagram);
     Heard out;
     out.announced = recorder.count("peer_packet");
     if (out.announced > 0) {
@@ -239,9 +235,9 @@ LawVerdict game_bytes(const Carrier &) {
 }
 
 LawVerdict acknowledging(const Carrier &) {
-    const Heard heard
-        = hear(NetwCarrierFrame::build(PackedByteArray(), false, 11, 900, 0, -1)
-        );
+    const Heard heard = hear(
+        NetwCarrierFrame::build(PackedByteArray(), false, 11, 900, 0, -1)
+    );
     if (heard.announced != 0) {
         return law_broken("our own datagram reached peer_packet");
     }
@@ -259,9 +255,9 @@ LawVerdict cut_header(const Carrier &) {
     if (!unacked.held) {
         return unacked;
     }
-    const LawVerdict acked
-        = unannounced(bytes({NetwCarrierFrame::MAGIC_UNRELIABLE_ACKED, 0, 0, 0})
-        );
+    const LawVerdict acked = unannounced(
+        bytes({NetwCarrierFrame::MAGIC_UNRELIABLE_ACKED, 0, 0, 0})
+    );
     if (!acked.held) {
         return acked;
     }
@@ -465,8 +461,7 @@ Node *build_body(const Variant &) {
     return made;
 }
 
-LawVerdict spawn_refused(PackedByteArray (*p_damage)(const PackedByteArray &)
-) {
+LawVerdict spawn_refused(PackedByteArray (*p_damage)(const PackedByteArray &)) {
     netw_test::FaultWatch faults;
     faults.expect_warning("*[NW0007]*", 1);
     netw_test::LoopbackRig rig(1);

@@ -644,8 +644,7 @@ predict::Judged NetwPredictionEngine::judge_state(
             || exact_verdict != int(NetwPrediction::EXACT_VERDICT_UNJUDGED);
     }
     record_predict(p_slot, EventPlane::PREDICT_EVALUATE, p_ack);
-    if (row != nullptr && !out.corrected
-        && row->journal.slot_of(p_ack) >= 0) {
+    if (row != nullptr && !out.corrected && row->journal.slot_of(p_ack) >= 0) {
         predict::LaneCursor &lane = row->lane_cursor;
         lane.tolerated_at = p_ack;
         lane.tolerated_local_fp = row->journal.post_fp_of(p_ack);

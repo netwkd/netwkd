@@ -471,8 +471,10 @@ Error NetwMultiplayer::database_batch_write(
             NETW_FAULT_BAD_VALUE,
             {String("{NetwWriteBatch.write}"),
              String("a row where ") + detail,
-             String("a row with one value of the declared type for each "
-                    "column of its schema")}
+             String(
+                 "a row with one value of the declared type for each "
+                 "column of its schema"
+             )}
         );
         return checked;
     }
@@ -1152,9 +1154,8 @@ void NetwMultiplayer::persist_batch_settled(
                  "Saving to database '%s'",
                  String(databases.name_of(p_database))
              ),
-             unsaved == 1
-                 ? vformat("saving record '%s'", String(first_record))
-                 : vformat("saving %d records", unsaved),
+             unsaved == 1 ? vformat("saving record '%s'", String(first_record))
+                          : vformat("saving %d records", unsaved),
              vformat("its file or service (%s)", first_failure)}
         );
         persist_notify_failed(

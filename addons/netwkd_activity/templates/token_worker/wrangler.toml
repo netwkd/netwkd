@@ -1,4 +1,4 @@
-name = "networked-activity-token"
+name = "netwkd-activity-token"
 main = "src/index.js"
 compatibility_date = "2024-09-23"
 

@@ -112,9 +112,8 @@ int64_t frames_in(
 }
 
 int64_t counter_of(NetwMultiplayer *p_api, const char *p_name) {
-    const Dictionary counted = Internals::replication_plane(p_api)
-                                   ->get_spawn_pipeline()
-                                   ->counters();
+    const Dictionary counted
+        = Internals::replication_plane(p_api)->get_spawn_pipeline()->counters();
     return int64_t(counted.get(StringName(p_name), -1));
 }
 

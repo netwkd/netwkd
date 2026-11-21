@@ -44,9 +44,7 @@ String child_a_path_starts_at(Node *p_node, const StringName &p_property) {
     const String text(p_property);
     const int colon = text.find(":");
     const int slash = text.find("/");
-    const int cut = colon < 0 ? slash
-        : slash < 0           ? colon
-                              : MIN(colon, slash);
+    const int cut = colon < 0 ? slash : slash < 0 ? colon : MIN(colon, slash);
     if (cut <= 0) {
         return String();
     }
@@ -129,8 +127,7 @@ bool script_declares_method(
         const Array methods = gd::script_method_list(walked);
         for (int index = 0; index < methods.size(); index++) {
             const Dictionary declaration = methods[index];
-            if (StringName(declaration.get("name", StringName()))
-                == p_method) {
+            if (StringName(declaration.get("name", StringName())) == p_method) {
                 return true;
             }
         }
@@ -578,8 +575,10 @@ Ref<NetwJoinConfig> Netw::configure_join(const Callable &p_handler) {
             NETW_FAULT_BAD_CALLABLE,
             {String("{Netw.configure_join}"),
              String(),
-             String("a named method with typed parameters for the join "
-                    "arguments")},
+             String(
+                 "a named method with typed parameters for the join "
+                 "arguments"
+             )},
             uint64_t(gd::instance_id(scope))
         );
         return refused<NetwJoinConfig>();
@@ -695,9 +694,11 @@ Ref<NetwPropertyConfig> Netw::configure_property(
             nullptr,
             NETW_FAULT_BAD_VALUE,
             {String("{Netw.configure_property}"),
-             vformat("a declared type of %d for '%s'",
-                     p_declared_type,
-                     String(p_property)),
+             vformat(
+                 "a declared type of %d for '%s'",
+                 p_declared_type,
+                 String(p_property)
+             ),
              String("the Variant type of the property, or -1")},
             node_id
         );
@@ -712,8 +713,10 @@ Ref<NetwPropertyConfig> Netw::configure_property(
             NETW_FAULT_BAD_VALUE,
             {String("{Netw.configure_property}"),
              vformat("no declared type for '%s'", String(p_property)),
-             String("a declared_type, because the property has no fixed "
-                    "type")},
+             String(
+                 "a declared_type, because the property has no fixed "
+                 "type"
+             )},
             node_id
         );
         return refused<NetwPropertyConfig>();
@@ -735,8 +738,10 @@ Ref<NetwPropertyConfig> Netw::configure_property(
             NETW_FAULT_UNSUPPORTED,
             {String("{Netw.configure_property}"),
              vformat("'%s', which holds %s", String(p_property), holding),
-             String("a property that holds a plain value, such as the "
-                    "object's data or its node path")},
+             String(
+                 "a property that holds a plain value, such as the "
+                 "object's data or its node path"
+             )},
             node_id
         );
         return refused<NetwPropertyConfig>();
@@ -1001,8 +1006,10 @@ Ref<NetwPromise> Netw::request_id(
             NETW_FAULT_BAD_VALUE,
             {String("Netw.request_id"),
              String("peer id 0"),
-             String("a single peer id, or {Netw.request_all} to ask every "
-                    "peer")},
+             String(
+                 "a single peer id, or {Netw.request_all} to ask every "
+                 "peer"
+             )},
             asker != nullptr ? uint64_t(gd::instance_id(asker)) : 0
         );
         return NetwPromise::refused(ERR_INVALID_PARAMETER, detail);
@@ -1171,8 +1178,9 @@ Ref<NetwPromise> Netw::spawn_async(const Callable &p_fn, const Array &p_args) {
             NETW_FAULT_SPAWN_REFUSED,
             {String("The node"),
              String("a spawn function outside a session"),
-             String("a spawn function on a node under a {MultiplayerViewport}")
-            },
+             String(
+                 "a spawn function on a node under a {MultiplayerViewport}"
+             )},
             host != nullptr ? uint64_t(gd::instance_id(host)) : 0
         );
         return NetwPromise::refused(ERR_UNCONFIGURED, refusal);
@@ -1522,11 +1530,7 @@ void Netw::_bind_methods() {
         D_METHOD("sync_property", "node", "property"),
         &Netw::sync_property
     );
-    gd::bind_static_vararg(
-        "Netw",
-        D_METHOD("emit", "sig"),
-        &Netw::emit
-    );
+    gd::bind_static_vararg("Netw", D_METHOD("emit", "sig"), &Netw::emit);
     ClassDB::bind_static_method(
         "Netw",
         D_METHOD("channel", "node", "channel_id"),

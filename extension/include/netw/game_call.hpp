@@ -44,11 +44,11 @@ constexpr int64_t game_call_argument_count(const char *p_signature) {
 
 namespace game_calls {
 
-#define NETW_GAME_CALL(m_id, m_member, m_what, m_signature)                    \
-    inline constexpr GameCall m_id                                             \
-        = {m_what,                                                             \
-           m_signature,                                                        \
-           game_call_argument_count(m_signature),                              \
+#define NETW_GAME_CALL(m_id, m_member, m_what, m_signature) \
+    inline constexpr GameCall m_id \
+        = {m_what, \
+           m_signature, \
+           game_call_argument_count(m_signature), \
            m_member};
 #include "netw/game_calls.def"
 #undef NETW_GAME_CALL

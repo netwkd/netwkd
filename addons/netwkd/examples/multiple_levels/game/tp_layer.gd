@@ -16,7 +16,7 @@ var scene: NetwScene
 
 
 func _init() -> void:
-	configured.connect(on_multiplayer_configured)
+	configured.connect(_on_multiplayer_configured)
 
 
 func _enter_tree() -> void:
@@ -37,24 +37,24 @@ func _exit_tree() -> void:
 	NetwService.unregister(self)
 
 
-func on_multiplayer_configured() -> void:
+func _on_multiplayer_configured() -> void:
 	var session: NetwSession = Netw.session(self)
 	if session == null:
 		return
 	if session.role == NetwSession.ROLE_DEDICATED_SERVER:
 		queue_free()
 		return
-	if not session.local_joined.is_connected(on_local_player_joined):
-		session.local_joined.connect(on_local_player_joined)
+	if not session.local_joined.is_connected(_on_local_player_joined):
+		session.local_joined.connect(_on_local_player_joined)
 
 
-func on_local_player_joined(player: NetwPlayer) -> void:
+func _on_local_player_joined(player: NetwPlayer) -> void:
 	scene = player.scene
-	player.scene_changed.connect(on_scene_changed)
+	player.scene_changed.connect(_on_scene_changed)
 	await teleport_in()
 
 
-func on_scene_changed(_from: NetwScene, to: NetwScene) -> void:
+func _on_scene_changed(_from: NetwScene, to: NetwScene) -> void:
 	scene = to
 	reveal_when_arrived()
 

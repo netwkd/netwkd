@@ -789,8 +789,7 @@ PackedInt32Array SyncCompat::recipients_for(
     const spawn::Record *record = spawn_book->spawned_of(p_route);
     if (record != nullptr) {
         const RID rid = liveness_core->rid_from_route(int(p_route));
-        if (liveness_core->state_of(rid)
-            != NetwLivenessCore::STATE_LIVE) {
+        if (liveness_core->state_of(rid) != NetwLivenessCore::STATE_LIVE) {
             return out;
         }
         base = record->recipient_list().ptr();
@@ -1041,7 +1040,11 @@ void SyncCompat::send_deltas(
     }
 }
 
-void SyncCompat::note_encoded(int64_t p_peer, int64_t p_route, int64_t p_bytes) {
+void SyncCompat::note_encoded(
+    int64_t p_peer,
+    int64_t p_route,
+    int64_t p_bytes
+) {
     session->event_record(
         EventPlane::SYNC_ENCODE,
         RID(),

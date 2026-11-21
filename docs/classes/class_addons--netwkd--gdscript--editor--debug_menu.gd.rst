@@ -12,9 +12,7 @@
 
 **Inherits:** :godot:`RefCounted`
 
-.. container:: contribute
-
-	There is currently no description for this class. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Adds the netwkd debug draw toggles to the editor's Debug menu.
 
 .. rst-class:: classref-reftable-group
 
@@ -47,9 +45,7 @@ Method Descriptions
 
 |void| **attach**\ (\ ) :ref:`🔗<class_addons_netwkd_gdscript_editor_debug_menu_gd_method_attach>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Adds the toggles to the Debug menu, or to a submenu of Project > Tools when the Debug menu is missing.
 
 .. rst-class:: classref-item-separator
 
@@ -61,9 +57,7 @@ Method Descriptions
 
 |void| **detach**\ (\ ) :ref:`🔗<class_addons_netwkd_gdscript_editor_debug_menu_gd_method_detach>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Removes the toggles.
 
 .. rst-class:: classref-item-separator
 
@@ -75,9 +69,7 @@ Method Descriptions
 
 :godot:`PackedStringArray` **run_args**\ (\ args\: :godot:`PackedStringArray`\ ) :ref:`🔗<class_addons_netwkd_gdscript_editor_debug_menu_gd_method_run_args>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns ``args`` with a ``--netw-hints`` argument for the checked toggles.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

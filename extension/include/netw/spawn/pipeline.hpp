@@ -266,11 +266,7 @@ private:
         int64_t p_sender,
         Built &r_built
     );
-    void settle_build(
-        Built::Outcome p_outcome,
-        int64_t p_sender,
-        Ops &r_ops
-    );
+    void settle_build(Built::Outcome p_outcome, int64_t p_sender, Ops &r_ops);
     void park_built(
         const godot::PackedByteArray &p_payload,
         int64_t p_sender,
@@ -361,9 +357,6 @@ public:
     void set_park_timeout_seconds(double p_seconds) {
         park_timeout_seconds = p_seconds;
     }
-    double get_park_timeout_seconds() const {
-        return park_timeout_seconds;
-    }
 
     void seat(
         NetwMultiplayer *p_session,
@@ -432,9 +425,6 @@ public:
 #ifdef NETW_TESTS
     void arm_spawn_state(const godot::Array &p_rows);
     void disarm_spawn_state();
-    int spawn_state_asks() const {
-        return spawn_state_asked;
-    }
     void delay_placement(int64_t p_route, int64_t p_ticks);
     bool take_held_placement(Ops &r_ops);
 #endif
@@ -454,11 +444,7 @@ public:
         int64_t p_sender,
         Ops &r_ops
     );
-    void built(
-        const NodeOp &p_op,
-        Built::Outcome p_outcome,
-        Ops &r_ops
-    );
+    void built(const NodeOp &p_op, Built::Outcome p_outcome, Ops &r_ops);
     void enroll_received(const Built &p_built);
     void kept_reparent(int64_t p_route, Ops &r_ops);
     void handle_despawn_frame(

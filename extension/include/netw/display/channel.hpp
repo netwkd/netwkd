@@ -93,9 +93,6 @@ public:
     void set_output(const godot::Callable &p_output) {
         output = p_output;
     }
-    godot::Callable get_output() const {
-        return output;
-    }
 
     Port &display_port() {
         return port;

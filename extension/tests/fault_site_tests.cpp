@@ -84,8 +84,8 @@ TEST_CASE(
             NETW_CHECK_EQ(line.line, row.line);
         }
         const int klass = netw::fault_row(row.code).klass;
-        const bool game_wrote_it = klass == NETW_FAULT_MISUSE
-            || klass == NETW_FAULT_PRACTICE;
+        const bool game_wrote_it
+            = klass == NETW_FAULT_MISUSE || klass == NETW_FAULT_PRACTICE;
         NETW_CHECK_EQ(landed, game_wrote_it ? 1 : 2);
     }
 
@@ -104,7 +104,7 @@ TEST_CASE(
     for (const netw_test::FaultLine &line : watch.log->recorded()) {
         landed += 1;
         NETW_CHECK_EQ(line.file == String(TWIN), true);
-        NETW_CHECK_EQ(line.line, 5);
+        NETW_CHECK_EQ(line.line, 4);
     }
     NETW_CHECK_EQ(landed, 1);
 

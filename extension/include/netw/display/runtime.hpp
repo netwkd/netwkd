@@ -143,15 +143,9 @@ public:
     void set_rebuild_queued(bool p_queued) {
         rebuild_queued = p_queued;
     }
-    bool get_rebuild_queued() const {
-        return rebuild_queued;
-    }
 
     void set_authored_by_state(bool p_authored) {
         authored_by_state = p_authored;
-    }
-    bool get_authored_by_state() const {
-        return authored_by_state;
     }
 
     void set_trace_frame(int64_t p_frame) {

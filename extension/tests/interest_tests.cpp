@@ -798,8 +798,7 @@ LawVerdict owner_in_scene(const Stand &) {
         return law_broken("the scene layer hid the layer the car joined");
     }
     const Array shared = stand.shared_on_owner();
-    if (shared.size() != 1
-        || StringName(shared[0]) != StringName("OtherCar")) {
+    if (shared.size() != 1 || StringName(shared[0]) != StringName("OtherCar")) {
         return law_broken("the owner does not find the other car");
     }
     return law_held();
@@ -921,12 +920,10 @@ LawVerdict kept_view(const Stand &) {
             || server->interest_has_layer(name)) {
             return law_broken("a freed layer came back");
         }
-        const RID held = rig.declare_entity(
-            EntityDecl().named("Held").on_route(85)
-        );
-        const RID late = rig.declare_entity(
-            EntityDecl().named("Late").on_route(86)
-        );
+        const RID held
+            = rig.declare_entity(EntityDecl().named("Held").on_route(85));
+        const RID late
+            = rig.declare_entity(EntityDecl().named("Late").on_route(86));
         const Error answers[] = {
             server->interest_layer_remove_viewer(gone, viewer),
             server->interest_join(held, gone),
@@ -955,9 +952,7 @@ LawVerdict kept_view(const Stand &) {
         const RID freed_on_add = server->interest_layer_create(doomed);
         server->interest_layer(doomed)->connect(
             "entity_added",
-            Callable(server, "interest_layer_free")
-                .bind(freed_on_add)
-                .unbind(1)
+            Callable(server, "interest_layer_free").bind(freed_on_add).unbind(1)
         );
         server->interest_layer_add_entity(freed_on_add, held);
         const StringName refilled("refilled");
@@ -1005,7 +1000,7 @@ LawVerdict kept_view(const Stand &) {
         if (removed != ERR_LOCKED || added != ERR_LOCKED
             || !server->scene_subscribes(scene, viewer)
             || server->interest_layer_find(server->scene_layer_id(scene))
-                   != owned) {
+                != owned) {
             return law_broken("a scene's layer changed by its RID");
         }
     }
@@ -1077,8 +1072,7 @@ LawVerdict client_edits_layer(const Stand &) {
     if (client->interest_layer_add_entity(seen, copy) != ERR_UNAUTHORIZED) {
         return law_broken("a client added an entity to a layer");
     }
-    if (client->interest_layer_remove_entity(seen, copy)
-        != ERR_UNAUTHORIZED) {
+    if (client->interest_layer_remove_entity(seen, copy) != ERR_UNAUTHORIZED) {
         return law_broken("a client removed an entity from a layer");
     }
     rig.pump(4);
@@ -1180,9 +1174,8 @@ LawVerdict observers_heard(StopSeeing p_stop) {
     rig.flush_interest();
     rig.pump(4);
 
-    const int host_saw = p_stop == VIEWER_REMOVED || p_stop == PEER_LEFT
-        ? 0
-        : 1;
+    const int host_saw
+        = p_stop == VIEWER_REMOVED || p_stop == PEER_LEFT ? 0 : 1;
     if (heard.count("server_out") != host_saw + 1
         || heard_from(heard, "server_out", HOST_PEER) != host_saw
         || heard_from(heard, "server_out", guest) != 1) {

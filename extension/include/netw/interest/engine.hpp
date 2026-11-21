@@ -96,18 +96,6 @@ public:
         return keys.is_empty();
     }
 
-    godot::PackedInt64Array get_keys() const {
-        return keys;
-    }
-    godot::Array get_old_rows() const {
-        return old_rows;
-    }
-    godot::Array get_new_rows() const {
-        return new_rows;
-    }
-    godot::Array get_order_keys() const {
-        return order_keys;
-    }
     godot::Array get_shows() const {
         return shows;
     }
@@ -125,9 +113,6 @@ public:
     }
     godot::Array get_layer_exits() const {
         return layer_exits;
-    }
-    godot::PackedInt64Array get_removed_keys() const {
-        return removed_keys;
     }
     godot::Array to_array() const;
 };

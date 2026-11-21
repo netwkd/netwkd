@@ -29,13 +29,13 @@ namespace TestNetwSimInstallLaws {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
-using netw_test::Internals;
 using netw::repl::PropertyBindingPtr;
 using netw::repl::PropertySet;
 using netw::sim::InstallStats;
 using netw::sim::Mode;
 using netw::sim::Restore;
 using netw_test::FlowPair;
+using netw_test::Internals;
 using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;

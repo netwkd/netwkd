@@ -35,8 +35,6 @@ Properties
    +-------------------------------------------------------------------------------+--------------------------------------------------------------------------------------+-----------+
    | :godot:`float`                                                                | :ref:`gather_timeout<class_ConnectWebRTCConfig_property_gather_timeout>`             | ``6.0``   |
    +-------------------------------------------------------------------------------+--------------------------------------------------------------------------------------+-----------+
-   | :godot:`int`                                                                  | :ref:`max_players<class_ConnectWebRTCConfig_property_max_players>`                   | ``0``     |
-   +-------------------------------------------------------------------------------+--------------------------------------------------------------------------------------+-----------+
 
 .. rst-class:: classref-reftable-group
 
@@ -67,9 +65,7 @@ Property Descriptions
 
 :godot:`String` **signaling_namespace** = ``""`` :ref:`🔗<class_ConnectWebRTCConfig_property_signaling_namespace>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The tracker namespace rooms are found in. Empty uses :ref:`NetwSessionConfig.app_id<class_NetwSessionConfig_property_app_id>`.
 
 .. rst-class:: classref-item-separator
 
@@ -81,9 +77,7 @@ Property Descriptions
 
 :godot:`PackedStringArray` **trackers** = ``[...]`` :ref:`🔗<class_ConnectWebRTCConfig_property_trackers>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The WebTorrent trackers peers use to find each other.
 
 **Note:** The returned array is copied and any changes to it will not update the original property value. See :godot:`PackedStringArray` for more details.
 
@@ -97,9 +91,7 @@ Property Descriptions
 
 :godot:`Array`\[:ref:`ConnectIceServerConfig<class_ConnectIceServerConfig>`\] **ice_servers** = ``[...]`` :ref:`🔗<class_ConnectWebRTCConfig_property_ice_servers>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The STUN and TURN servers each peer connection uses.
 
 .. rst-class:: classref-item-separator
 
@@ -111,9 +103,7 @@ Property Descriptions
 
 :godot:`float` **connect_retry** = ``8.0`` :ref:`🔗<class_ConnectWebRTCConfig_property_connect_retry>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Seconds between attempts to connect to the host.
 
 .. rst-class:: classref-item-separator
 
@@ -125,9 +115,7 @@ Property Descriptions
 
 :godot:`int` **max_connect_attempts** = ``3`` :ref:`🔗<class_ConnectWebRTCConfig_property_max_connect_attempts>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Attempts to connect to the host before the join fails.
 
 .. rst-class:: classref-item-separator
 
@@ -139,23 +127,7 @@ Property Descriptions
 
 :godot:`float` **gather_timeout** = ``6.0`` :ref:`🔗<class_ConnectWebRTCConfig_property_gather_timeout>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectWebRTCConfig_property_max_players:
-
-.. rst-class:: classref-property
-
-:godot:`int` **max_players** = ``0`` :ref:`🔗<class_ConnectWebRTCConfig_property_max_players>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Seconds to gather ICE candidates before sending the last of them.
 
 .. rst-class:: classref-section-separator
 
@@ -172,9 +144,7 @@ Method Descriptions
 
 :godot:`StringName` **peer_class**\ (\ ) :ref:`🔗<class_ConnectWebRTCConfig_method_peer_class>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns ``&"WebRTCMultiplayerPeer"``.
 
 .. rst-class:: classref-item-separator
 
@@ -186,9 +156,7 @@ Method Descriptions
 
 :godot:`Dictionary` **settings**\ (\ ) :ref:`🔗<class_ConnectWebRTCConfig_method_settings>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the exported properties as WebRTC settings.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

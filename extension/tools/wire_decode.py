@@ -448,7 +448,7 @@ AGAINST_SPEC = [
         "bytes": bytes([0x15, 0x07, 0x05, 0x02]),
         "values": {"acked": 21, "epoch": 7, "base": 5, "count": 2},
         "why": "varuint acked is ack_of_acks 4 plus one, times four, with "
-               "asks_detail set and no hold, then u8, varuint, u8",
+        "asks_detail set and no hold, then u8, varuint, u8",
     },
     {
         "record": "FrameHeader",
@@ -623,9 +623,7 @@ AGAINST_SPEC = [
     },
     {
         "record": "ControlApply",
-        "bytes": bytes(
-            [0x02, 0x03, 0x00, 0x25, 0x00, 0x00, 0x09, 0x04, 0x00, 0x00, 0x00]
-        ),
+        "bytes": bytes([0x02, 0x03, 0x00, 0x25, 0x00, 0x00, 0x09, 0x04, 0x00, 0x00, 0x00]),
         "values": {
             "controller": 2,
             "revision": 3,
@@ -724,13 +722,7 @@ AGAINST_SPEC = [
 ]
 
 
-# A capture names its own format, and a format owns its datagram magics.
-# Every other byte of the carrier is described by the header's own record sheet,
-# so this table and REPLY_FAILED_BIT_SINCE are the two things a format bump
-# moves that the sheet cannot say.
-# A capture whose format is absent here is refused rather than guessed at.
-# Reading a magic against the wrong table names a record of the wrong shape and
-# then decodes plausible garbage out of every frame behind it.
+# Datagram magics by capture format. A format missing here is refused.
 CAPTURE_MAGICS_BY_FORMAT = {
     10: {
         0x57: "DatagramReliable",
@@ -1456,12 +1448,7 @@ def self_test(spec_path=None):
             spec = json.load(handle)
         records = spec.get("records", {})
 
-        # The spec names the format this build speaks, and a capture it writes
-        # opens with one of that format's three magics. Every fixture below
-        # decodes a record the caller already named, so none of them reads a
-        # magic at all, and a format bump that moves the magics leaves them all
-        # green while no live capture decodes. This is the case that reads the
-        # magic the way a capture does, through the same table `capture()` uses.
+        # Reads each magic of the spec's format through the table capture() uses.
         spec_format = spec.get("format")
         try:
             magics = datagram_magics(spec_format)
@@ -1474,10 +1461,7 @@ def self_test(spec_path=None):
                 wrong += 1
                 print("FAIL %-52s the spec holds no such record" % record)
                 continue
-            # The shortest datagram this format can carry, built from the spec's
-            # own field list so the case needs no transcribed layout of its own.
-            # Every field past the magic reads zero, and nothing follows the
-            # carrier header, so a walk yields the header and no frame.
+            # The shortest datagram of this record, zero past the magic.
             width = 0
             for field in records[record]:
                 width += field["width"] if field["kind"] == "bits" else 8

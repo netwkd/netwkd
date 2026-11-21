@@ -79,8 +79,10 @@ FaultValues moved_values(Node *p_root, Error p_code, bool p_halted) {
     if (p_code == ERR_UNAVAILABLE && p_halted) {
         return {
             root_name(p_root),
-            String("a new parent while session authority moves to another "
-                   "peer"),
+            String(
+                "a new parent while session authority moves to another "
+                "peer"
+            ),
             String("the move again once session authority has moved")
         };
     }
@@ -126,8 +128,8 @@ lifecycle::Facts NetwMultiplayer::lifecycle_entity_facts(
     facts.predicted = predict_implied(this, *p_record, p_node)
         || predict_is_declared(p_record->get_handle());
     const int64_t route = liveness_core.route_of(p_record->get_handle());
-    facts.native = !p_synchronizers.is_empty()
-        || (route > 0 && spawner_produced(route));
+    facts.native
+        = !p_synchronizers.is_empty() || (route > 0 && spawner_produced(route));
     facts.player_bound = p_record->get_peer_id() != 0;
     if (p_kind == lifecycle::Kind::SPAWN) {
         const Ref<NetwPersistenceConfig> persisted

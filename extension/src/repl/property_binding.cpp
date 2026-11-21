@@ -122,10 +122,7 @@ PropertyBinding::~PropertyBinding() {
 }
 
 #if defined(DEBUG_ENABLED)
-bool PropertyBinding::holds_tree_blend(
-    Node *p_node,
-    const StringName &p_key
-) {
+bool PropertyBinding::holds_tree_blend(Node *p_node, const StringName &p_key) {
     stage_properties(p_node);
     if (tree_blends_stage == stage_count) {
         return tree_blends.has(p_key);
@@ -448,8 +445,8 @@ bool PropertyBinding::admits_arrival(
     if (held == nullptr) {
         return false;
     }
-    const bool admitted = admitted_schema == &p_schema
-        && admitted_shape == p_schema.shape_hash;
+    const bool admitted
+        = admitted_schema == &p_schema && admitted_shape == p_schema.shape_hash;
     if (admitted && !p_retained && !write_gate) {
         return true;
     }
@@ -514,7 +511,6 @@ bool PropertyBinding::retains_arrivals() const {
     const Ref<NetwEntity> entity = NetwEntity::of(node());
     return entity.is_valid() && entity->is_claim_running_ahead();
 }
-
 
 Array PropertyBinding::quantizers_of() const {
     Array out;

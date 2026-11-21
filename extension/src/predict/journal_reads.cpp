@@ -180,7 +180,7 @@ void NetwPredictionEngine::mark_domain(
 ) {
     NETW_BUG_COND(
         p_domain < int(predict::Domain::IN_DOMAIN)
-            || p_domain > int(predict::Domain::OUT_OF_DOMAIN)
+        || p_domain > int(predict::Domain::OUT_OF_DOMAIN)
     );
     predict::Slot *row = mutable_row_of(p_slot);
     if (row != nullptr) {
@@ -207,7 +207,7 @@ void NetwPredictionEngine::mark_provenance(
 ) {
     NETW_BUG_COND(
         p_operator < int(predict::Operator::NONE)
-            || p_operator > int(predict::Operator::JOINT_REBASE)
+        || p_operator > int(predict::Operator::JOINT_REBASE)
     );
     predict::Slot *row = mutable_row_of(p_slot);
     NETW_BUG_COND(row == nullptr);
@@ -246,7 +246,7 @@ void NetwPredictionEngine::mark_differing_family(
 ) {
     NETW_BUG_COND(
         p_family < int(predict::DifferingFamily::NONE)
-            || p_family > int(predict::DifferingFamily::CONTROLLER_LATCH)
+        || p_family > int(predict::DifferingFamily::CONTROLLER_LATCH)
     );
     predict::Slot *row = mutable_row_of(p_slot);
     NETW_BUG_COND(row == nullptr);

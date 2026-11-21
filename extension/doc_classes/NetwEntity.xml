@@ -56,7 +56,6 @@
 		[/codeblock]
 	</description>
 	<tutorials>
-		<link title="Prediction guide">https://netwkd.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
 	<methods>
 		<method name="claim_control">

@@ -57,7 +57,6 @@ NETW_CLOCK_ACCESSOR(int, max_ticks_per_frame, max_ticks_per_frame)
 NETW_CLOCK_ACCESSOR(double, stall_threshold, stall_threshold)
 NETW_CLOCK_ACCESSOR(int, panic_snap_threshold, panic_snap_threshold)
 NETW_CLOCK_ACCESSOR(double, stretch_nudge_factor, stretch_nudge_factor)
-NETW_CLOCK_ACCESSOR(double, ping_interval, ping_interval)
 NETW_CLOCK_ACCESSOR(double, lead_ticks, lead_ticks)
 NETW_CLOCK_ACCESSOR(int, display_offset, display_offset)
 NETW_CLOCK_ACCESSOR(double, jitter_multiplier, jitter_multiplier)
@@ -547,10 +546,9 @@ Clock::Pong Clock::pong_received(
 
     stats.record(sample, jitter_stability_threshold, jitter_window);
 
-    const double lead
-        = p_apply_lead ? stats.avg * 0.5 / ticktime() + lead_ticks
-                + double(send_interval - 1)
-                       : 0.0;
+    const double lead = p_apply_lead
+        ? stats.avg * 0.5 / ticktime() + lead_ticks + double(send_interval - 1)
+        : 0.0;
     const double target
         = double(server_tick_at_pong) + server_tick_phase + lead;
     const int pre_calibrate_diff = int(std::lround(target)) - tick;

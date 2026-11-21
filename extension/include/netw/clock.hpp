@@ -214,8 +214,6 @@ public:
     int get_panic_snap_threshold() const;
     void set_stretch_nudge_factor(double value);
     double get_stretch_nudge_factor() const;
-    void set_ping_interval(double value);
-    double get_ping_interval() const;
     void set_lead_ticks(double value);
     double get_lead_ticks() const;
     void set_display_offset(int value);

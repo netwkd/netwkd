@@ -16,22 +16,6 @@ Labelled form inputs built from settings or connection requirements.
 
 .. rst-class:: classref-reftable-group
 
-Properties
-----------
-
-.. table::
-   :widths: auto
-
-   +---------------------------------------+-----------------------------------------------------------+--------+
-   | :godot:`Array`\[:godot:`StringName`\] | :ref:`keys<class_ConnectFieldList_property_keys>`         | ``[]`` |
-   +---------------------------------------+-----------------------------------------------------------+--------+
-   | :godot:`Array`\[:godot:`Control`\]    | :ref:`controls<class_ConnectFieldList_property_controls>` | ``[]`` |
-   +---------------------------------------+-----------------------------------------------------------+--------+
-   | :godot:`Array`\[:godot:`int`\]        | :ref:`types<class_ConnectFieldList_property_types>`       | ``[]`` |
-   +---------------------------------------+-----------------------------------------------------------+--------+
-
-.. rst-class:: classref-reftable-group
-
 Methods
 -------
 
@@ -60,98 +44,6 @@ Methods
 
 .. rst-class:: classref-descriptions-group
 
-Constants
----------
-
-.. _class_ConnectFieldList_constant_LABEL_WIDTH:
-
-.. rst-class:: classref-constant
-
-**LABEL_WIDTH** = ``90.0`` :ref:`🔗<class_ConnectFieldList_constant_LABEL_WIDTH>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_ConnectFieldList_constant_STRING_LIST_EDIT:
-
-.. rst-class:: classref-constant
-
-**STRING_LIST_EDIT** = ``<Object>`` :ref:`🔗<class_ConnectFieldList_constant_STRING_LIST_EDIT>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_ConnectFieldList_constant_ICE_SERVERS_EDIT:
-
-.. rst-class:: classref-constant
-
-**ICE_SERVERS_EDIT** = ``<Object>`` :ref:`🔗<class_ConnectFieldList_constant_ICE_SERVERS_EDIT>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Property Descriptions
----------------------
-
-.. _class_ConnectFieldList_property_keys:
-
-.. rst-class:: classref-property
-
-:godot:`Array`\[:godot:`StringName`\] **keys** = ``[]`` :ref:`🔗<class_ConnectFieldList_property_keys>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectFieldList_property_controls:
-
-.. rst-class:: classref-property
-
-:godot:`Array`\[:godot:`Control`\] **controls** = ``[]`` :ref:`🔗<class_ConnectFieldList_property_controls>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectFieldList_property_types:
-
-.. rst-class:: classref-property
-
-:godot:`Array`\[:godot:`int`\] **types** = ``[]`` :ref:`🔗<class_ConnectFieldList_property_types>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
 Method Descriptions
 -------------------
 
@@ -161,9 +53,7 @@ Method Descriptions
 
 |void| **render_settings**\ (\ container\: :godot:`Container`, settings\: :godot:`Dictionary`\ ) :ref:`🔗<class_ConnectFieldList_method_render_settings>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Replaces the children of ``container`` with one labelled input per value of ``settings`` that can be edited.
 
 .. rst-class:: classref-item-separator
 
@@ -175,9 +65,7 @@ Method Descriptions
 
 |void| **render_schema**\ (\ container\: :godot:`Container`, schema\: :godot:`Array`\ ) :ref:`🔗<class_ConnectFieldList_method_render_schema>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Fills ``container`` with one input per entry of ``schema``, as :ref:`NetwConnection.join_schema()<class_NetwConnection_method_join_schema>` returns it.
 
 .. rst-class:: classref-item-separator
 
@@ -189,9 +77,7 @@ Method Descriptions
 
 :godot:`Dictionary` **as_dictionary**\ (\ ) :ref:`🔗<class_ConnectFieldList_method_as_dictionary>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the input values keyed by setting name.
 
 .. rst-class:: classref-item-separator
 
@@ -203,9 +89,7 @@ Method Descriptions
 
 :godot:`Array` **as_array**\ (\ ) :ref:`🔗<class_ConnectFieldList_method_as_array>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the input values in order.
 
 .. rst-class:: classref-item-separator
 
@@ -217,9 +101,7 @@ Method Descriptions
 
 :godot:`Control` **make_value_control**\ (\ value\: :godot:`Variant`, field_name\: :godot:`StringName` = &""\ ) |static| :ref:`🔗<class_ConnectFieldList_method_make_value_control>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns an input holding ``value``, chosen by its type.
 
 .. rst-class:: classref-item-separator
 
@@ -231,9 +113,7 @@ Method Descriptions
 
 :godot:`Variant` **value_from_control**\ (\ control\: :godot:`Control`, value_type\: :godot:`int`\ ) |static| :ref:`🔗<class_ConnectFieldList_method_value_from_control>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the value of ``control`` as ``value_type``.
 
 .. rst-class:: classref-item-separator
 
@@ -245,9 +125,7 @@ Method Descriptions
 
 :godot:`bool` **can_author_value**\ (\ value\: :godot:`Variant`\ ) |static| :ref:`🔗<class_ConnectFieldList_method_can_author_value>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns ``true`` when ``value`` can be edited in an input.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

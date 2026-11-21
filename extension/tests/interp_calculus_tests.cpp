@@ -267,9 +267,10 @@ LawVerdict correction_glides(const Bench &) {
     harness.absorb_recovery(Vector2(1, 0), false);
     harness.step_chase(0.6);
     if (harness.displayed.back().length() >= 0.3) {
-        return law_broken("the first frame jumped to %f", double(
-            harness.displayed.back().length()
-        ));
+        return law_broken(
+            "the first frame jumped to %f",
+            double(harness.displayed.back().length())
+        );
     }
     for (int at = 0; at < 90; ++at) {
         harness.step_chase(0.7 + double(at) / harness.fps);

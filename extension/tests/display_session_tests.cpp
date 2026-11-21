@@ -446,13 +446,19 @@ TEST_CASE(
     NETW_HOLDS(glides(seen, NEAR, "Glider", GLIDE + 8, LOST - 1, 0.3));
     for (const char *argument : {"aim", "mark"}) {
         NETW_HOLDS(glides(
-            seen, NEAR, "Glider", GLIDE + 8, LOST - 1, 0.3, 0.4 * SLIDE,
+            seen,
+            NEAR,
+            "Glider",
+            GLIDE + 8,
+            LOST - 1,
+            0.3,
+            0.4 * SLIDE,
             argument
         ));
     }
-    NETW_HOLDS(glides(
-        seen, NEAR, "Bare", GLIDE + 8, LOST - 1, 0.3, 0.4 * SLIDE, "x"
-    ));
+    NETW_HOLDS(
+        glides(seen, NEAR, "Bare", GLIDE + 8, LOST - 1, 0.3, 0.4 * SLIDE, "x")
+    );
     NETW_HOLDS(glides(seen, NEAR, "Sign", GLIDE + 8, REPOINT - 1, 0.3));
     NETW_HOLDS(quiet(seen));
 }
@@ -583,9 +589,7 @@ TEST_CASE(
         for (const char *name : {"Glider", "Flapper"}) {
             NETW_HOLDS(changes(seen, client, name, "x", DARK + 2, LIT - 1));
             NETW_HOLDS(keeps(seen, client, name, "offset", DARK + 2, LIT - 1));
-            NETW_HOLDS(
-                changes(seen, client, name, "offset", LIT - 1, LIT + 6)
-            );
+            NETW_HOLDS(changes(seen, client, name, "offset", LIT - 1, LIT + 6));
         }
     }
 }

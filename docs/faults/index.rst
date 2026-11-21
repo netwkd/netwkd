@@ -1,21 +1,12 @@
 Fault index
 ===========
 
-- :doc:`nw0001`, MISUSE
-- :doc:`nw0002`, MISUSE
-- :doc:`nw0003`, MISUSE
-- :doc:`nw0004`, MISUSE
-- :doc:`nw0005`, MISUSE
-- :doc:`nw0006`, MISUSE
 - :doc:`nw0007`, REMOTE
-- :doc:`nw0008`, REMOTE
-- :doc:`nw0009`, MISUSE
 - :doc:`nw0010`, PRACTICE
 - :doc:`nw0011`, MISUSE
 - :doc:`nw0012`, MISUSE
 - :doc:`nw0013`, REMOTE
 - :doc:`nw0014`, PRACTICE
-- :doc:`nw0017`, MISUSE
 - :doc:`nw0018`, MISUSE
 - :doc:`nw0019`, MISUSE
 - :doc:`nw0020`, MISUSE
@@ -96,21 +87,12 @@ Fault index
 .. toctree::
    :hidden:
 
-   nw0001
-   nw0002
-   nw0003
-   nw0004
-   nw0005
-   nw0006
    nw0007
-   nw0008
-   nw0009
    nw0010
    nw0011
    nw0012
    nw0013
    nw0014
-   nw0017
    nw0018
    nw0019
    nw0020

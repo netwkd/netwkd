@@ -393,17 +393,16 @@ void NetwMultiplayer::transfer_follow_persistence(bool p_succeeds) {
         return;
     }
     bool persisted = false;
-    views.entities.each([&persisted](
-                            uint64_t,
-                            const session::EntityView &p_view
-                        ) {
-        if (persisted || p_view.live.is_null()) {
-            return;
+    views.entities.each(
+        [&persisted](uint64_t, const session::EntityView &p_view) {
+            if (persisted || p_view.live.is_null()) {
+                return;
+            }
+            Node *owner = p_view.live->get_owner();
+            persisted = owner != nullptr
+                && script::model::get_persistence_config(owner).is_valid();
         }
-        Node *owner = p_view.live->get_owner();
-        persisted = owner != nullptr
-            && script::model::get_persistence_config(owner).is_valid();
-    });
+    );
     if (persisted) {
         fault::raise(
             this,
@@ -1038,10 +1037,14 @@ Error NetwMultiplayer::session_transfer_from(int64_t p_player, bool p_door) {
             {verb,
              p_door ? String("a player that is not in this session")
                     : vformat("player %d", p_player),
-             p_door ? String("a connected client's player from "
-                             "{NetwSession.players}")
-                    : String("the id of a connected client's player, such "
-                             "as one from {NetwMultiplayer.player_list}")}
+             p_door ? String(
+                          "a connected client's player from "
+                          "{NetwSession.players}"
+                      )
+                    : String(
+                          "the id of a connected client's player, such "
+                          "as one from {NetwMultiplayer.player_list}"
+                      )}
         );
         return ERR_INVALID_PARAMETER;
     }

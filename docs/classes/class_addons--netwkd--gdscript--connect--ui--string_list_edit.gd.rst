@@ -12,9 +12,7 @@
 
 **Inherits:** :godot:`VBoxContainer`
 
-.. container:: contribute
-
-	There is currently no description for this class. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+An input for a list of strings, one row each.
 
 .. rst-class:: classref-reftable-group
 
@@ -24,15 +22,13 @@ Methods
 .. table::
    :widths: auto
 
-   +----------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                     | :ref:`set_placeholder<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_set_placeholder>`\ (\ text\: :godot:`String`\ ) |
-   +----------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                     | :ref:`set_value<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_set_value>`\ (\ entries\: :godot:`Variant`\ )         |
-   +----------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`PackedStringArray` | :ref:`get_value<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_get_value>`\ (\ )                                     |
-   +----------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                     | :ref:`add_entry<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_add_entry>`\ (\ text\: :godot:`String` = ""\ )        |
-   +----------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
+   +----------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+   | |void|                     | :ref:`set_value<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_set_value>`\ (\ entries\: :godot:`Variant`\ )  |
+   +----------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`PackedStringArray` | :ref:`get_value<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_get_value>`\ (\ )                              |
+   +----------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
+   | |void|                     | :ref:`add_entry<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_add_entry>`\ (\ text\: :godot:`String` = ""\ ) |
+   +----------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -42,18 +38,6 @@ Methods
 
 Method Descriptions
 -------------------
-
-.. _class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_set_placeholder:
-
-.. rst-class:: classref-method
-
-|void| **set_placeholder**\ (\ text\: :godot:`String`\ ) :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_set_placeholder>`
-
-Sets the placeholder text of every row, including rows added later.
-
-.. rst-class:: classref-item-separator
-
-----
 
 .. _class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_set_value:
 
@@ -85,9 +69,7 @@ Returns the rows that are not empty.
 
 |void| **add_entry**\ (\ text\: :godot:`String` = ""\ ) :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_string_list_edit_gd_method_add_entry>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Adds a row holding ``text``.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

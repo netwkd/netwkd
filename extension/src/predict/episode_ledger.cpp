@@ -474,7 +474,7 @@ bool NetwPredictionEngine::episode_operator_pending(
 ) const {
     const predict::Slot *row = row_of(p_slot);
     return row != nullptr
-        && row->episode.operator_pending(predict::Operator(p_operator));
+        && row->episode.newest_write_pending(predict::Operator(p_operator));
 }
 
 int64_t NetwPredictionEngine::held_fact_of(int64_t p_slot, int p_fact) const {

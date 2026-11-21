@@ -88,8 +88,9 @@ void NetwEffectLedger::resolve(const StringName &p_key, bool p_keep) {
     }
     if (observer.is_valid()) {
         settled.push_back(
-            {observer, p_keep ? &game_calls::EFFECT_CONFIRMED
-                   : &game_calls::EFFECT_DENIED}
+            {observer,
+             p_keep ? &game_calls::EFFECT_CONFIRMED
+                    : &game_calls::EFFECT_DENIED}
         );
     }
 }

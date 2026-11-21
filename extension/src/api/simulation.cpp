@@ -56,7 +56,6 @@ Variant NetwSimulation::read(int p_param) const {
     );
 }
 
-
 TypedArray<NodePath> NetwSimulation::get_bodies() const {
     return read(NetwMultiplayer::SIMULATION_PARAM_BODIES);
 }
@@ -147,8 +146,7 @@ void NetwSimulation::set_physics_driven(bool p_value) {
 
 NetwSimulation::Mode NetwSimulation::get_mode() const {
     const Ref<NetwEntity> bound = entity();
-    NetwMultiplayer *home
-        = bound.is_valid() ? bound->home_session() : nullptr;
+    NetwMultiplayer *home = bound.is_valid() ? bound->home_session() : nullptr;
     return home != nullptr ? home->simulation_get_mode(entity_rid())
                            : MODE_NONE;
 }

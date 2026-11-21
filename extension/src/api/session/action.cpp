@@ -314,11 +314,9 @@ Error NetwMultiplayer::action_ask(
         = lagcomp_action_key(entity->get_rid_handle(), p_view_tick, method);
     const Callable predict = declared->get_predict();
     Node *predicted = predict.is_valid()
-        ? Object::cast_to<Node>(
-              gd::live_object(
-                  game_call(predict, p_args, game_calls::ACTION_PREDICT)
-              )
-          )
+        ? Object::cast_to<Node>(gd::live_object(
+              game_call(predict, p_args, game_calls::ACTION_PREDICT)
+          ))
         : nullptr;
     const int64_t predicted_id = predicted != nullptr
         ? int64_t(uint64_t(gd::instance_id(predicted)))
@@ -350,9 +348,8 @@ void NetwMultiplayer::action_run_revert(
         denial = *found;
         action_denials.erase(p_key);
     }
-    Node *predicted = Object::cast_to<Node>(
-        gd::object_of(ObjectID(uint64_t(p_predicted)))
-    );
+    Node *predicted
+        = Object::cast_to<Node>(gd::object_of(ObjectID(uint64_t(p_predicted))));
     const Callable revert
         = p_declared.is_valid() ? p_declared->get_revert() : Callable();
     if (revert.is_valid()) {
@@ -372,9 +369,8 @@ void NetwMultiplayer::action_run_confirm(
     const Ref<NetwActionConfig> &p_declared,
     int64_t p_predicted
 ) {
-    Node *predicted = Object::cast_to<Node>(
-        gd::object_of(ObjectID(uint64_t(p_predicted)))
-    );
+    Node *predicted
+        = Object::cast_to<Node>(gd::object_of(ObjectID(uint64_t(p_predicted))));
     const Callable confirm
         = p_declared.is_valid() ? p_declared->get_confirm() : Callable();
     if (confirm.is_valid()) {
@@ -502,8 +498,7 @@ void NetwMultiplayer::submit_action(
     }
 
     Node *target = node_from_tree_path(request.target_path);
-    const Ref<NetwActionConfig> declared
-        = action_declared_on(target, p_method);
+    const Ref<NetwActionConfig> declared = action_declared_on(target, p_method);
     if (declared.is_null()) {
         if (target != nullptr) {
             fault::raise(

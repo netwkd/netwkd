@@ -148,8 +148,8 @@ bool NetwMultiplayer::sim_predicts(const RID &p_subject) const {
 bool NetwMultiplayer::sim_selects_unasked(const RID &p_subject) const {
     return sim_predicts(p_subject)
         && sim_physics_driven(
-            *entity_record(p_subject),
-            wrapper_owner(p_subject)
+               *entity_record(p_subject),
+               wrapper_owner(p_subject)
         );
 }
 

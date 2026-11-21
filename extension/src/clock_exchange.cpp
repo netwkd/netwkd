@@ -94,8 +94,7 @@ session::ClockPong ClockExchange::take_pong(
         return pong;
     }
     const uint64_t waited = p_now_usec > found->heard_usec
-        ? (p_now_usec - found->heard_usec + WAIT_UNIT_USEC / 2)
-            / WAIT_UNIT_USEC
+        ? (p_now_usec - found->heard_usec + WAIT_UNIT_USEC / 2) / WAIT_UNIT_USEC
         : 0;
     pong.origin = found->origin;
     pong.wait = waited < WAIT_LIMIT ? waited : WAIT_LIMIT;

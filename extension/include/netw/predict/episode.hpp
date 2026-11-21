@@ -1,12 +1,5 @@
 #pragma once
 
-/* The bounded evidence for one actionable divergence.
- *
- * An episode pins its generator outside the journal ring, retains bounded
- * comparison and operator evidence, and either proves agreement or exhausts a
- * structural recovery budget. Quality settings cannot expand either budget.
- */
-
 #include <cstdint>
 
 #include "godot/local_vector.hpp"
@@ -122,9 +115,6 @@ struct Episode {
     int quarantine_clean_run = 0;
     int64_t reseed_transition = -1;
     int64_t aligned_transition = -1;
-    // The transition whose realized contact demoted this episode's owner out
-    // of speculation. The contact ITSELF stays with the caller that sampled
-    // it, because a peer compares a witness fingerprint and never the detail.
     int64_t breach_transition = -1;
     bool transport_decided = false;
     bool dissipate_decided = false;
@@ -176,10 +166,7 @@ struct Episode {
     void record_escalation(TriggerShape p_live_shape);
     bool budget_exhausted() const;
 
-    // Whether the NEWEST write naming p_operator is still awaiting a verdict.
-    // Newest rather than any, because an operator retried after a refusal is
-    // pending on its retry and not on what it already answered for.
-    bool operator_pending(Operator p_operator) const;
+    bool newest_write_pending(Operator p_operator) const;
     void record_breach(int64_t p_transition);
     void retire_agreement_run();
     void repin_generator(

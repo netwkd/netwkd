@@ -106,7 +106,7 @@ func _scenario_spawn_reaches_every_peer(world: NetwEmbeddingWorld) -> void:
 			var entity := NetwEntity.of(probe).rid
 			return c1.entity_get_route(entity) == route \
 					and c1.entity_get_state(entity) \
-					== NetwMultiplayer.ENTITY_STATE_LIVE
+							== NetwMultiplayer.ENTITY_STATE_LIVE
 	)
 	assert_bool(c1_live).override_failure_message(
 		"[%s] host spawn never reached client 1" % world.provider(),
@@ -120,7 +120,7 @@ func _scenario_spawn_reaches_every_peer(world: NetwEmbeddingWorld) -> void:
 			var entity := NetwEntity.of(probe).rid
 			return c2.entity_get_route(entity) == route \
 					and c2.entity_get_state(entity) \
-					== NetwMultiplayer.ENTITY_STATE_LIVE
+							== NetwMultiplayer.ENTITY_STATE_LIVE
 	)
 	assert_bool(c2_live).override_failure_message(
 		"[%s] host spawn never reached client 2" % world.provider(),

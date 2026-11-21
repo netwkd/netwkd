@@ -6,7 +6,6 @@
 #include "godot/script.hpp"
 #include "godot/utility.hpp"
 #include "netw/api/display.hpp"
-#include "netw/game_call.hpp"
 #include "netw/api/interest.hpp"
 #include "netw/api/lifecycle_request.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -19,6 +18,7 @@
 #include "netw/entity/ids.hpp"
 #include "netw/entity/stage.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 #include "netw/interest/decl.hpp"
 #include "netw/lifecycle/rule.hpp"
 #include "netw/log.hpp"
@@ -97,9 +97,11 @@ void raise_part_fault(
         NetwMultiplayer::session_holding(p_target->get_owner()),
         p_code,
         {p_option, String(p_part->get_name()), owner_name(p_target)},
-        uint64_t(gd::instance_id(
-            script.is_valid() ? static_cast<Object *>(script.ptr()) : p_part
-        ))
+        uint64_t(
+            gd::instance_id(
+                script.is_valid() ? static_cast<Object *>(script.ptr()) : p_part
+            )
+        )
     );
 }
 
@@ -560,15 +562,10 @@ void NetwEntity::settle_parts(Node *p_root, bool p_spawned) {
             under.push_back(node);
             continue;
         }
-        const Ref<NetwEntity> target = p_spawned ? Ref<NetwEntity>()
-                                                 : part_target(node);
+        const Ref<NetwEntity> target
+            = p_spawned ? Ref<NetwEntity>() : part_target(node);
         if (target.is_valid()) {
-            raise_part_fault(
-                NETW_FAULT_PART_TOO_LATE,
-                node,
-                target,
-                String()
-            );
+            raise_part_fault(NETW_FAULT_PART_TOO_LATE, node, target, String());
         }
     }
     for (uint32_t at = 1; at < under.size(); ++at) {
@@ -612,13 +609,11 @@ Ref<NetwEntity> NetwEntity::stamp_header(
             ? p_session->player_incarnation(entity->get_peer_id())
             : int64_t(p_header.get(StringName("player_id"), 0))
     );
-    entity->get_record()
-        ->get_control()
-        ->set_authority(
-            bool(p_header.get(StringName("controller_authority"), false))
-                ? int64_t(AUTHORITY_CONTROLLER)
-                : int64_t(AUTHORITY_SERVER)
-        );
+    entity->get_record()->get_control()->set_authority(
+        bool(p_header.get(StringName("controller_authority"), false))
+            ? int64_t(AUTHORITY_CONTROLLER)
+            : int64_t(AUTHORITY_SERVER)
+    );
     entity->write_controller(
         int64_t(p_header.get(StringName("controller"), 0))
     );
@@ -906,10 +901,7 @@ NetwEntity::Transfer NetwEntity::get_transfer() const {
 }
 
 void NetwEntity::set_transfer(Transfer p_value) {
-    set_control_param(
-        NetwMultiplayer::ENTITY_PARAM_TRANSFER,
-        int64_t(p_value)
-    );
+    set_control_param(NetwMultiplayer::ENTITY_PARAM_TRANSFER, int64_t(p_value));
 }
 
 NetwEntity::Authority NetwEntity::get_authority() const {
@@ -1241,8 +1233,7 @@ bool NetwEntity::begin_despawn(
     const RID captured_handle = p_record.get_handle();
     tree::despawning(this);
     if (get_record() == &p_record && p_record.get_handle() == captured_handle
-        && get_multiplayer() == stamped
-        && gd::instance_id(get_owner()) == owner
+        && get_multiplayer() == stamped && gd::instance_id(get_owner()) == owner
         && p_record.get_stage() == int64_t(entity::Stage::DESPAWNING)) {
         session::Announcement row;
         row.kind = session::AnnouncementKind::DESPAWNING;

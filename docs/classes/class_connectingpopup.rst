@@ -16,22 +16,6 @@ The progress of a connection attempt, with a button to cancel it.
 
 .. rst-class:: classref-reftable-group
 
-Properties
-----------
-
-.. table::
-   :widths: auto
-
-   +----------------------+--------------------------------------------------------------------+---------------+
-   | :godot:`Label`       | :ref:`title_label<class_ConnectingPopup_property_title_label>`     | ``<unknown>`` |
-   +----------------------+--------------------------------------------------------------------+---------------+
-   | :godot:`ProgressBar` | :ref:`progress_bar<class_ConnectingPopup_property_progress_bar>`   | ``<unknown>`` |
-   +----------------------+--------------------------------------------------------------------+---------------+
-   | :godot:`Button`      | :ref:`cancel_button<class_ConnectingPopup_property_cancel_button>` | ``<unknown>`` |
-   +----------------------+--------------------------------------------------------------------+---------------+
-
-.. rst-class:: classref-reftable-group
-
 Methods
 -------
 
@@ -61,56 +45,7 @@ Signals
 
 **cancelled**\ (\ ) :ref:`🔗<class_ConnectingPopup_signal_cancelled>`
 
-.. container:: contribute
-
-	There is currently no description for this signal. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Property Descriptions
----------------------
-
-.. _class_ConnectingPopup_property_title_label:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **title_label** = ``<unknown>`` :ref:`🔗<class_ConnectingPopup_property_title_label>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectingPopup_property_progress_bar:
-
-.. rst-class:: classref-property
-
-:godot:`ProgressBar` **progress_bar** = ``<unknown>`` :ref:`🔗<class_ConnectingPopup_property_progress_bar>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_ConnectingPopup_property_cancel_button:
-
-.. rst-class:: classref-property
-
-:godot:`Button` **cancel_button** = ``<unknown>`` :ref:`🔗<class_ConnectingPopup_property_cancel_button>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Emitted when the player presses the cancel button.
 
 .. rst-class:: classref-section-separator
 
@@ -127,9 +62,7 @@ Method Descriptions
 
 |void| **open**\ (\ ) :ref:`🔗<class_ConnectingPopup_method_open>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Opens the popup for a new attempt.
 
 .. rst-class:: classref-item-separator
 
@@ -141,9 +74,7 @@ Method Descriptions
 
 |void| **progressed**\ (\ message\: :godot:`String`, ratio\: :godot:`float`\ ) :ref:`🔗<class_ConnectingPopup_method_progressed>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Shows ``message`` and ``ratio``. A negative ``ratio`` hides the progress bar.
 
 .. rst-class:: classref-item-separator
 
@@ -155,9 +86,7 @@ Method Descriptions
 
 |void| **failed**\ (\ reason\: :godot:`String`\ ) :ref:`🔗<class_ConnectingPopup_method_failed>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Shows ``reason`` with a button to close the popup.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

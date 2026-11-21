@@ -51,10 +51,6 @@ public:
     godot::Dictionary diagnostics(int64_t p_peer_id) const override;
     double timeout_hint() const override;
     void close() override;
-
-    const godot::Ref<NetwTransport> &script_seam() const {
-        return seam;
-    }
 };
 
 } // namespace netw::connect

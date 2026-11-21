@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "godot/display_server.hpp"
+#include "godot/math.hpp"
 #include "godot/mesh_instance.hpp"
 #include "godot/node.hpp"
 #include "godot/object.hpp"
@@ -862,10 +863,8 @@ void InterpolationView::hold_marks(
     const store::Table *heading_table = nullptr;
     uint32_t heading_row = 0;
     if (p_entry.heading_from == HEADING_COLUMN) {
-        const store::RowAddress at = p_store.row_of(
-            p_entry.heading_owner,
-            p_entry.heading_lane
-        );
+        const store::RowAddress at
+            = p_store.row_of(p_entry.heading_owner, p_entry.heading_lane);
         if (at.valid()) {
             heading_table = &p_store.table(at.table);
             heading_row = at.row;
@@ -995,8 +994,6 @@ void InterpolationView::cast_ghost(
 
 namespace {
 
-constexpr double FULL_TURN = 6.28318530717958647692;
-
 double turn_angle(const Quaternion &p_turn) {
     return 2.0 * std::acos(MIN(1.0, std::abs(double(p_turn.w))));
 }
@@ -1098,7 +1095,7 @@ void InterpolationView::cast_flat_ghost(
         }
         turn = std::remainder(
             heading - double(body->get_global_rotation()),
-            FULL_TURN
+            gd::TAU
         );
     }
     if (sits_on_body(p_newest.point - p_row.anchor, p_row, std::abs(turn))) {

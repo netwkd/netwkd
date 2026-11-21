@@ -233,11 +233,8 @@ LawVerdict no_entities(const World &) {
 
 LawVerdict reads_the_past(const World &) {
     Range range(SHOOTER);
-    const Variant answered = range.body->call(
-        StringName("shoot"),
-        range.entities,
-        range.past
-    );
+    const Variant answered
+        = range.body->call(StringName("shoot"), range.entities, range.past);
     if (answered.get_type() != Variant::FLOAT) {
         return law_broken("the body's return value did not come back");
     }
@@ -263,20 +260,14 @@ LawVerdict reads_the_past(const World &) {
 
 LawVerdict second_shot_reads_the_past(const World &) {
     Range range(SHOOTER);
-    const Variant first = range.body->call(
-        StringName("shoot"),
-        range.entities,
-        range.past
-    );
+    const Variant first
+        = range.body->call(StringName("shoot"), range.entities, range.past);
     for (int tick = TICKS + 1; tick <= TICKS + 3; ++tick) {
         range.body->call(StringName("move"), tick);
         range.rig.step_ticks(1);
     }
-    const Variant second = range.body->call(
-        StringName("shoot"),
-        range.entities,
-        range.past
-    );
+    const Variant second
+        = range.body->call(StringName("shoot"), range.entities, range.past);
     if (double(first) >= double(TICKS)
         || Math::abs(double(second) - double(first)) > 0.0001) {
         return law_broken(
@@ -290,11 +281,9 @@ LawVerdict second_shot_reads_the_past(const World &) {
 
 LawVerdict before_history(const World &) {
     Range range(SHOOTER);
-    const int64_t ran = int64_t(range.body->call(
-        StringName("runs"),
-        range.entities,
-        range.born - 20
-    ));
+    const int64_t ran = int64_t(
+        range.body->call(StringName("runs"), range.entities, range.born - 20)
+    );
     if (ran != 1) {
         return law_broken("the body ran %d time(s)", int(ran));
     }
@@ -313,11 +302,8 @@ LawVerdict write_inside_warns(const World &) {
     Range range(SHOOTER);
     const FaultWatch faults;
     for (int shot = 0; shot < 2; ++shot) {
-        range.body->call(
-            StringName("write_inside"),
-            range.entities,
-            range.past
-        );
+        range.body
+            ->call(StringName("write_inside"), range.entities, range.past);
     }
     if (Math::abs(range.offset() - double(TICKS)) > 0.0001) {
         return law_broken("the write %f stayed", range.offset());
@@ -344,11 +330,7 @@ LawVerdict basis_read_back_quiet(const World &) {
 LawVerdict await_warns(const World &) {
     Range range(SHOOTER);
     const FaultWatch faults;
-    range.body->call(
-        StringName("await_inside"),
-        range.entities,
-        range.past
-    );
+    range.body->call(StringName("await_inside"), range.entities, range.past);
     if (faults.warnings_containing("[NW1015]") != 1) {
         return law_broken(
             "%d NW1015 warning(s)",
@@ -371,16 +353,12 @@ LawVerdict child_state_rewound(const World &) {
         return law_broken("Netw.sample holds no stride or Part:offset");
     }
     const double stride = double(sampled->get_value(StringName("stride")));
-    const double offset
-        = double(sampled->get_value(StringName("Part:offset")));
+    const double offset = double(sampled->get_value(StringName("Part:offset")));
     if (Math::abs(offset - stride * 10.0) > 0.0001 || stride >= TICKS) {
         return law_broken("sampled stride %f and offset %f", stride, offset);
     }
-    const Array seen = range.body->call(
-        StringName("look"),
-        range.entities,
-        range.past
-    );
+    const Array seen
+        = range.body->call(StringName("look"), range.entities, range.past);
     if (seen.size() != 2 || Math::abs(double(seen[0]) - stride) > 0.0001
         || Math::abs(double(seen[1]) - offset) > 0.0001) {
         return law_broken("the rewind did not stand the child at the sample");

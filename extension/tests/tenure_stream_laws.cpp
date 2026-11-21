@@ -343,9 +343,9 @@ TEST_CASE(
     rig.step_ticks(4);
     NetwMultiplayer *watcher = flow_core(rig.client(1));
     NETW_CHECK_EQ(
-        int64_t(watcher->entity_get_state(
-            Internals::entity_at(watcher, route)
-        )),
+        int64_t(
+            watcher->entity_get_state(Internals::entity_at(watcher, route))
+        ),
         int64_t(NetwMultiplayer::ENTITY_STATE_ABSENT)
     );
     host->set_controller(1);

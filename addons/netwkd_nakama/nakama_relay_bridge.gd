@@ -6,41 +6,46 @@ extends RefCounted
 ## the Nakama socket and [member multiplayer_peer].
 
 enum MatchState {
+	## Not in a match.
 	DISCONNECTED,
+	## Creating, joining or matchmaking a match.
 	JOINING,
+	## In a match with a peer id.
 	CONNECTED,
+	## The Nakama socket closed.
 	SOCKET_CLOSED,
 }
 
-enum MetaMessageType {
-	CLAIM_HOST,
-	ASSIGN_PEER_ID,
-	TRANSFER,
-}
-
+const _CLAIM_HOST := 0
+const _ASSIGN_PEER_ID := 1
+const _TRANSFER := 2
 const _TERM_STRIDE := 1000
 const _SERVER_MARK := 1
 
 # Read-only variables.
 var _nakama_socket
+## The Nakama socket the match runs on.
 var nakama_socket:
 	get:
 		return _nakama_socket
 	set(_v):
 		pass
 var _match_state: MatchState = MatchState.DISCONNECTED
+## Where the bridge is in joining a match.
 var match_state: MatchState:
 	get:
 		return _match_state
 	set(_v):
 		pass
 var _match_id := ''
+## The ID of the current match, or empty.
 var match_id: String:
 	get:
 		return _match_id
 	set(_v):
 		pass
 var _multiplayer_peer: NakamaRelayPeer = NakamaRelayPeer.new()
+## The peer that carries the match's packets.
 var multiplayer_peer: NakamaRelayPeer:
 	get:
 		return _multiplayer_peer
@@ -48,7 +53,10 @@ var multiplayer_peer: NakamaRelayPeer:
 		pass
 
 # Configuration that can be set by the developer.
+## The Nakama op code of the bridge's own messages.
 var meta_op_code: int = 9001
+
+## The lowest Nakama op code of game packets.
 var rpc_op_code: int = 9002
 
 ## When the host leaves, the peers left elect a new server and keep the match.
@@ -354,7 +362,7 @@ func _host_add_peer(presence) -> void:
 		meta_op_code,
 		JSON.stringify(
 			{
-				type = MetaMessageType.CLAIM_HOST,
+				type = _CLAIM_HOST,
 				term = _term,
 			},
 		),
@@ -371,7 +379,7 @@ func _host_add_peer(presence) -> void:
 			meta_op_code,
 			JSON.stringify(
 				{
-					type = MetaMessageType.ASSIGN_PEER_ID,
+					type = _ASSIGN_PEER_ID,
 					term = _term,
 					session_id = other_session_id,
 					peer_id = other_peer_id,
@@ -386,7 +394,7 @@ func _host_add_peer(presence) -> void:
 		meta_op_code,
 		JSON.stringify(
 			{
-				type = MetaMessageType.ASSIGN_PEER_ID,
+				type = _ASSIGN_PEER_ID,
 				term = _term,
 				session_id = presence.session_id,
 				peer_id = peer_id,
@@ -486,7 +494,7 @@ func _transfer_server(peer_id: int) -> Error:
 		meta_op_code,
 		JSON.stringify(
 			{
-				type = MetaMessageType.TRANSFER,
+				type = _TRANSFER,
 				term = term,
 				successor_session = successor_session,
 				former = former,
@@ -596,11 +604,11 @@ func _on_nakama_socket_received_match_state(data) -> void:
 		var type = content['type']
 		var term := int(content.get("term", 0))
 
-		if type == MetaMessageType.TRANSFER:
+		if type == _TRANSFER:
 			_receive_transfer(data, content)
 			return
 
-		if type == MetaMessageType.CLAIM_HOST:
+		if type == _CLAIM_HOST:
 			if _id_map.has(1):
 				# @todo Can we mediate this dispute?
 				push_error(
@@ -626,7 +634,7 @@ func _on_nakama_socket_received_match_state(data) -> void:
 		if data.presence.session_id != _id_map.get(1, ""):
 			return
 
-		if type == MetaMessageType.ASSIGN_PEER_ID:
+		if type == _ASSIGN_PEER_ID:
 			var session_id = content['session_id']
 			var peer_id = content['peer_id']
 

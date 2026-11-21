@@ -37,10 +37,9 @@ TEST_CASE(
         REQUIRE(entity.is_valid());
         wrapper = entity->get_instance_id();
         REQUIRE(Internals::seat(pool, entity) >= 0);
-        Internals::record(entity.ptr())->predict_declaration().facts.bind_slot(
-            pool,
-            entity
-        );
+        Internals::record(entity.ptr())
+            ->predict_declaration()
+            .facts.bind_slot(pool, entity);
         Internals::unseat(pool, entity);
     }
     REQUIRE(netw::gd::object_registered(wrapper));

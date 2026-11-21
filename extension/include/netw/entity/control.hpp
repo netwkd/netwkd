@@ -184,9 +184,6 @@ public:
             authority = p_authority;
         }
     }
-    bool get_authority_declared() const {
-        return authority_declared;
-    }
     bool authority_follows_controller() const {
         return authority == int(Authority::CONTROLLER);
     }

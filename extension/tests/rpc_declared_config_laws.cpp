@@ -118,10 +118,7 @@ TEST_CASE(
     rig.pump(6);
 
     NETW_CHECK_EQ(calls_at(seated.hub), 0);
-    NETW_CHECK_EQ(
-        faults.warnings_containing(String("[NW0021]")),
-        int64_t(1)
-    );
+    NETW_CHECK_EQ(faults.warnings_containing(String("[NW0021]")), int64_t(1));
 
     netw::Netw::rpc(Callable(seated.hub, StringName("note_call")), args);
     rig.pump(6);

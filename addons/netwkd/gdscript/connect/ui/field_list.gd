@@ -2,32 +2,34 @@
 class_name ConnectFieldList
 extends RefCounted
 
-const LABEL_WIDTH := 90.0
-const STRING_LIST_EDIT := preload(
+const _LABEL_WIDTH := 90.0
+const _STRING_LIST_EDIT := preload(
 	"res://addons/netwkd/gdscript/connect/ui/string_list_edit.tscn"
 )
-const ICE_SERVERS_EDIT := preload(
+const _ICE_SERVERS_EDIT := preload(
 	"res://addons/netwkd/gdscript/connect/ui/ice_servers_edit.tscn"
 )
 
-var keys: Array[StringName] = []
-var controls: Array[Control] = []
-var types: Array[int] = []
+var _keys: Array[StringName] = []
+var _controls: Array[Control] = []
+var _types: Array[int] = []
 
 
+## Replaces the children of [param container] with one labelled input per
+## value of [param settings] that can be edited.
 func render_settings(container: Container, settings: Dictionary) -> void:
 	for child in container.get_children():
 		child.queue_free()
-	keys.clear()
-	controls.clear()
-	types.clear()
+	_keys.clear()
+	_controls.clear()
+	_types.clear()
 	for key in settings:
 		var value: Variant = settings[key]
 		if not can_author_value(value):
 			continue
 		var label := Label.new()
 		label.text = String(key).capitalize()
-		label.custom_minimum_size.x = LABEL_WIDTH
+		label.custom_minimum_size.x = _LABEL_WIDTH
 		label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		var control := make_value_control(value, key)
 		control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -35,11 +37,13 @@ func render_settings(container: Container, settings: Dictionary) -> void:
 		row.add_child(label)
 		row.add_child(control)
 		container.add_child(row)
-		keys.append(StringName(key))
-		controls.append(control)
-		types.append(typeof(value))
+		_keys.append(StringName(key))
+		_controls.append(control)
+		_types.append(typeof(value))
 
 
+## Fills [param container] with one input per entry of [param schema],
+## as [method NetwConnection.join_schema] returns it.
 func render_schema(container: Container, schema: Array) -> void:
 	var settings := { }
 	for entry: Dictionary in schema:
@@ -47,20 +51,23 @@ func render_schema(container: Container, schema: Array) -> void:
 	render_settings(container, settings)
 
 
+## Returns the input values keyed by setting name.
 func as_dictionary() -> Dictionary:
 	var values := { }
-	for at in controls.size():
-		values[keys[at]] = value_from_control(controls[at], types[at])
+	for at in _controls.size():
+		values[_keys[at]] = value_from_control(_controls[at], _types[at])
 	return values
 
 
+## Returns the input values in order.
 func as_array() -> Array:
 	var values := []
-	for at in controls.size():
-		values.append(value_from_control(controls[at], types[at]))
+	for at in _controls.size():
+		values.append(value_from_control(_controls[at], _types[at]))
 	return values
 
 
+## Returns an input holding [param value], chosen by its type.
 static func make_value_control(
 		value: Variant,
 		field_name: StringName = &"",
@@ -78,11 +85,11 @@ static func make_value_control(
 			spin.value = value
 			return spin
 		TYPE_PACKED_STRING_ARRAY:
-			var entries := STRING_LIST_EDIT.instantiate()
+			var entries := _STRING_LIST_EDIT.instantiate()
 			entries.set_value(value)
 			return entries
 		TYPE_ARRAY when field_name == &"ice_servers":
-			var servers := ICE_SERVERS_EDIT.instantiate()
+			var servers := _ICE_SERVERS_EDIT.instantiate()
 			servers.set_value(value)
 			return servers
 		TYPE_ARRAY:
@@ -95,6 +102,7 @@ static func make_value_control(
 			return edit
 
 
+## Returns the value of [param control] as [param value_type].
 static func value_from_control(control: Control, value_type: int) -> Variant:
 	match value_type:
 		TYPE_BOOL:
@@ -121,6 +129,7 @@ static func value_from_control(control: Control, value_type: int) -> Variant:
 			return type_convert((control as LineEdit).text, value_type)
 
 
+## Returns [code]true[/code] when [param value] can be edited in an input.
 static func can_author_value(value: Variant) -> bool:
 	return typeof(value) not in [
 		TYPE_NIL,

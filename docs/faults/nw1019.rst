@@ -7,8 +7,7 @@ NW1019. A value cannot be sent
 
 Reported as an error when a property, a column, an RPC argument, an action
 argument, a join argument or a spawn value holds a value that cannot be
-sent. Null or nothing was sent in its place, and the log line names the
-value, what it holds and what to use.
+sent. The log line names the value, what it holds and what to use.
 
 A value may hold null, bool, int, float, text, every vector, rect, plane,
 basis, transform and color type, Array, Dictionary and every packed array.

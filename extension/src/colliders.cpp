@@ -270,6 +270,19 @@ void teleport(Object *p_owner) {
     }
 }
 
+void commit(Object *p_owner) {
+    const LocalVector<ObjectID> *list = list_of(p_owner);
+    if (list == nullptr) {
+        return;
+    }
+    for (const ObjectID &id : *list) {
+        Node *collider = node_of(id);
+        if (collider != nullptr && collider->is_inside_tree()) {
+            force(collider);
+        }
+    }
+}
+
 void settle(Object *p_owner) {
     if (!gd::can_flush_kinematic()) {
         return;

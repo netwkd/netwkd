@@ -9,9 +9,9 @@ Checked in every build, on the peer that receives the spawn. Reported once
 for each peer and each value.
 
 A spawn carries the custom data passed to
-:ref:`MultiplayerSpawner.spawn <class_MultiplayerSpawner_method_spawn>` and
+:godot:`MultiplayerSpawner.spawn() <MultiplayerSpawner#class_MultiplayerSpawner_method_spawn>` and
 the starting value of each property a
-:ref:`MultiplayerSynchronizer <class_MultiplayerSynchronizer>` sends on
+:godot:`MultiplayerSynchronizer` sends on
 spawn. When one of these values cannot be read, the node still spawns and
 that value is null. This happens when two peers run different netwkd
 versions, or when the packet was changed on the way.

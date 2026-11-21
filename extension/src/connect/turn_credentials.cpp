@@ -10,8 +10,7 @@ using namespace godot;
 
 namespace netw::connect {
 
-const char *TurnCredentials::URL_SETTING
-    = "netwkd/webrtc/turn_credentials_url";
+const char *TurnCredentials::URL_SETTING = "netwkd/webrtc/turn_credentials_url";
 
 String TurnCredentials::configured_url() {
     ProjectSettings *settings = ProjectSettings::get_singleton();
@@ -221,7 +220,7 @@ void TurnCredentials::settle(const Array &p_servers) {
 void TurnCredentials::unreachable() {
     refuse(
         String("The TURN credential server at ") + host
-            + " is unreachable. Check the URL and the network."
+        + " is unreachable. Check the URL and the network."
     );
 }
 

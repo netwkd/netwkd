@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "godot/class_db.hpp"
+#include "godot/math.hpp"
 #include "godot/object.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/table/quant_spec.hpp"
@@ -16,8 +17,6 @@ namespace netw {
 
 namespace {
 
-constexpr double PI_VALUE = 3.14159265358979323846;
-constexpr double TAU_VALUE = PI_VALUE * 2.0;
 constexpr double QUATERNION_COMPONENT_LIMIT = 0.7071067811865476;
 
 bool is_scalar_or_vector(Variant::Type type) {
@@ -229,8 +228,7 @@ uint64_t NetwQuantize::layout_hash() const {
         }
         const StringName property_name = property.get("name", StringName());
         hash = (hash ^ uint64_t(property_name.hash())) * 1099511628211ULL;
-        hash = (hash ^ uint64_t(get(property_name).hash()))
-            * 1099511628211ULL;
+        hash = (hash ^ uint64_t(get(property_name).hash())) * 1099511628211ULL;
     }
     return hash;
 }
@@ -517,7 +515,7 @@ int NetwQuantizeAngle::stride(Variant::Type type) const {
 
 double NetwQuantizeAngle::max_error(Variant::Type type) const {
     (void)type;
-    return TAU_VALUE / double(uint64_t(1) << bit_count) * 0.5;
+    return gd::TAU / double(uint64_t(1) << bit_count) * 0.5;
 }
 
 void NetwQuantizeQuaternion::_bind_methods() {

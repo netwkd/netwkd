@@ -41,15 +41,7 @@ TEST_CASE(
     const Ref<NetwMultiplayer> core = configured_core();
 
     NETW_CHECK_EQ(
-        core->send_to(
-            PEER,
-            3,
-            SYNC_CHANNEL,
-            payload(4),
-            false,
-            0,
-            String()
-        ),
+        core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), false, 0, String()),
         godot::OK
     );
 
@@ -116,15 +108,7 @@ TEST_CASE(
     core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String());
     NETW_CHECK_EQ(core->wire().carrier.pending(PEER, true), 8);
 
-    core->send_to(
-        PEER,
-        3,
-        LAGCOMP_DENY_CHANNEL,
-        payload(4),
-        true,
-        0,
-        String()
-    );
+    core->send_to(PEER, 3, LAGCOMP_DENY_CHANNEL, payload(4), true, 0, String());
 
     NETW_CHECK_EQ(core->wire().carrier.pending(PEER, true), 0);
 }

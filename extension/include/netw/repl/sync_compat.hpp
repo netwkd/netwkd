@@ -234,10 +234,7 @@ public:
         NetwLivenessCore *p_liveness
     );
 #if defined(DEBUG_ENABLED)
-    void seat_profiler(
-        wire::NetworkProfiler *p_profiler,
-        uint32_t *p_outgoing
-    );
+    void seat_profiler(wire::NetworkProfiler *p_profiler, uint32_t *p_outgoing);
 #endif
     void unseat();
     void set_sync_model(NetwSyncModel *p_model);
@@ -273,9 +270,6 @@ public:
     void dispose();
 
     godot::Dictionary counters() const;
-    int64_t get_rows_examined() const {
-        return rows_examined;
-    }
     int64_t get_fields_resolved() const {
         return fields_resolved;
     }

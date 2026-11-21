@@ -15,8 +15,8 @@ namespace TestNetwSessionPauseLaws {
 
 using namespace godot;
 using netw::NetwMultiplayer;
-using netw_test::LoopbackRig;
 using netw_test::Internals;
+using netw_test::LoopbackRig;
 
 struct TreeUnpausedAfter {
     ~TreeUnpausedAfter() {

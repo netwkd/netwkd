@@ -1,7 +1,7 @@
 ## Utility class providing async/await helpers for signal-based flow control.
 extends Object
 
-const Async := preload("res://addons/netwkd/gdscript/async.gd")
+const _Async := preload("res://addons/netwkd/gdscript/async.gd")
 
 
 ## Awaits [param target_signal] and aborts early if [param timer] expires first.
@@ -72,7 +72,7 @@ class _Resolver extends RefCounted:
 		_target = target
 		_timer = timer
 
-		var count := Async._signal_arg_count(_target)
+		var count := _Async._signal_arg_count(_target)
 		if count > 0:
 			_target.connect(_on_signal.unbind(count), CONNECT_ONE_SHOT)
 		else:
@@ -82,7 +82,7 @@ class _Resolver extends RefCounted:
 
 
 	func cleanup() -> void:
-		Async._disconnect_owned(_target, self)
+		_Async._disconnect_owned(_target, self)
 		if is_instance_valid(_timer) and _timer.timeout.is_connected(_on_timeout):
 			_timer.timeout.disconnect(_on_timeout)
 		_target = Signal()
@@ -110,7 +110,7 @@ class _FailureResolver extends RefCounted:
 		_failure = failure
 		_timer = timer
 
-		var count := Async._signal_arg_count(_target)
+		var count := _Async._signal_arg_count(_target)
 		if count > 0:
 			_target.connect(_on_signal.unbind(count), CONNECT_ONE_SHOT)
 		else:
@@ -121,8 +121,8 @@ class _FailureResolver extends RefCounted:
 
 
 	func cleanup() -> void:
-		Async._disconnect_owned(_target, self)
-		Async._disconnect_owned(_failure, self)
+		_Async._disconnect_owned(_target, self)
+		_Async._disconnect_owned(_failure, self)
 		if is_instance_valid(_timer) and _timer.timeout.is_connected(_on_timeout):
 			_timer.timeout.disconnect(_on_timeout)
 		_target = Signal()

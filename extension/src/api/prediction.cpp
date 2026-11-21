@@ -55,8 +55,7 @@ Ref<NetwEntity> NetwPrediction::get_entity() const {
 
 bool NetwPrediction::is_registered() const {
     const Ref<NetwEntity> bound = get_entity();
-    NetwMultiplayer *home
-        = bound.is_valid() ? bound->home_session() : nullptr;
+    NetwMultiplayer *home = bound.is_valid() ? bound->home_session() : nullptr;
     return home != nullptr
         && home->predict_is_declared(bound->get_rid_handle());
 }
@@ -173,8 +172,7 @@ bool NetwPrediction::get_rollback_together() const {
 
 void NetwPrediction::notify_collision() {
     const Ref<NetwEntity> bound = get_entity();
-    NetwMultiplayer *home
-        = bound.is_valid() ? bound->home_session() : nullptr;
+    NetwMultiplayer *home = bound.is_valid() ? bound->home_session() : nullptr;
     if (home != nullptr && home->predict_is_declared(bound->get_rid_handle())) {
         home->predict_notify_collision(bound->get_rid_handle());
     }

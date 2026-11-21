@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "godot/math.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/display/history.hpp"
 
@@ -90,7 +91,7 @@ Variant residual_of(
     switch (p_target.get_type()) {
         case Variant::FLOAT:
             return p_mode == NetwInterpolate::MODE_ANGLE
-                ? angle_difference(double(p_target), double(p_displayed))
+                ? gd::angle_difference(double(p_target), double(p_displayed))
                 : double(p_displayed) - double(p_target);
         case Variant::VECTOR2:
             return Vector2(p_displayed) - Vector2(p_target);

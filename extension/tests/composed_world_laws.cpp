@@ -862,10 +862,7 @@ TEST_CASE(
     "member 9, and member 7, which is not the server, is refused"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "*NetwEntity.controller*[NW0012]*",
-        1
-    );
+    expected_faults.expect_error("*NetwEntity.controller*[NW0012]*", 1);
 
     ComposedWorld cw;
     const RID seated = cw.spawn_for("Transferred", OTHER);

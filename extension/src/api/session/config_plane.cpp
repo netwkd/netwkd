@@ -95,9 +95,10 @@ Error NetwMultiplayer::apply_pending_config(
                 = declaration_book().resolve(this, kind);
             if (late.state == session_decl::AMBIGUOUS) {
                 declaration_book().report_unresolved(this, kind, late.state);
-            } else if (late.state == session_decl::READY
-                       && late.generation
-                           != config_consumption[slot].generation) {
+            } else if (
+                late.state == session_decl::READY
+                && late.generation != config_consumption[slot].generation
+            ) {
                 fault::raise(
                     this,
                     NETW_FAULT_DECLARED_ONLINE,

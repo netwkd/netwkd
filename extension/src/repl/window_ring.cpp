@@ -34,8 +34,6 @@ bool WindowRing::record(int64_t p_tick, const wire::CodeRow &p_row) {
     sample.row = p_row;
     samples.push_back(sample);
 
-    // The oldest goes when the ring is full. It is the one the receiver has had
-    // the most chances to hear, so dropping it forfeits the least.
     while (samples.size() > depth) {
         samples.remove_at(0);
     }

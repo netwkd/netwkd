@@ -176,8 +176,7 @@ Error NetwEntity::transfer_control_to(int64_t p_steering) {
         fault::raise(
             session_core(),
             NETW_FAULT_NOT_RUNNING,
-            {String("Giving '") + String(get_name())
-                 + String("' to a peer"),
+            {String("Giving '") + String(get_name()) + String("' to a peer"),
              String(),
              String("the entity")},
             uint64_t(gd::instance_id(get_owner()))
@@ -303,8 +302,10 @@ Error NetwEntity::set_control_param(int64_t p_param, const Variant &p_value) {
                     NETW_FAULT_BAD_VALUE,
                     {String("{NetwEntity.authority}"),
                      String::num_int64(value),
-                     String("{NetwEntity.AUTHORITY_SERVER} or "
-                            "{NetwEntity.AUTHORITY_CONTROLLER}")},
+                     String(
+                         "{NetwEntity.AUTHORITY_SERVER} or "
+                         "{NetwEntity.AUTHORITY_CONTROLLER}"
+                     )},
                     subject
                 );
                 return ERR_INVALID_PARAMETER;
@@ -334,8 +335,10 @@ Error NetwEntity::set_control_param(int64_t p_param, const Variant &p_value) {
                     {String("{NetwEntity.TRANSFER_IMMEDIATE} on '")
                          + String(get_name()) + String("'"),
                      String("{NetwEntity.AUTHORITY_SERVER}"),
-                     String("{NetwEntity.AUTHORITY_CONTROLLER} before the "
-                            "node enters the tree")},
+                     String(
+                         "{NetwEntity.AUTHORITY_CONTROLLER} before the "
+                         "node enters the tree"
+                     )},
                     subject
                 );
                 return ERR_UNAVAILABLE;
@@ -362,8 +365,10 @@ Error NetwEntity::set_control_param(int64_t p_param, const Variant &p_value) {
                     NETW_FAULT_BAD_VALUE,
                     {String("{NetwEntity.replication_priority}"),
                      String::num(weight),
-                     String("a weight above 0, or {NetwEntity.interest} to "
-                            "hide the entity from peers")},
+                     String(
+                         "a weight above 0, or {NetwEntity.interest} to "
+                         "hide the entity from peers"
+                     )},
                     subject
                 );
                 return ERR_INVALID_PARAMETER;
@@ -503,10 +508,9 @@ void NetwEntity::project_control(bool p_announce) {
         api->entity_watch_authority_joins();
     }
     if (!control()->authority_follows_controller()
-        && get_controller() != SERVER_PEER
-        && get_owner() != nullptr
-        && get_owner()->is_inside_tree()
-        && streams_after_spawn(synchronizers()) && api != nullptr) {
+        && get_controller() != SERVER_PEER && get_owner() != nullptr
+        && get_owner()->is_inside_tree() && streams_after_spawn(synchronizers())
+        && api != nullptr) {
         fault::raise(
             api,
             NETW_FAULT_CONFLICTING_SETTINGS,
@@ -593,10 +597,7 @@ void NetwMultiplayer::control_peer_departed(
         return;
     }
     const entity::Control::Verdict verdict
-        = entity->control()->disconnect_verdict(
-            p_peer,
-            entity->get_peer_id()
-        );
+        = entity->control()->disconnect_verdict(p_peer, entity->get_peer_id());
     NetwMultiplayer *core = entity->session_core();
     if (verdict != entity::Control::NOTHING && core != nullptr
         && core->player_keep_entity(entity->get_rid_handle(), p_peer)) {
@@ -636,8 +637,7 @@ bool NetwMultiplayer::control_rename_peers(
     const int64_t controller = held->controller;
     p_record.set_peer_id(p_rename.of(peer));
     held->controller = p_rename.of(controller);
-    return p_record.get_peer_id() != peer
-        || held->controller != controller;
+    return p_record.get_peer_id() != peer || held->controller != controller;
 }
 
 void NetwMultiplayer::control_follow_rename(const RID &p_entity) {
@@ -717,8 +717,7 @@ Error NetwEntity::control_local_refusal(int64_t p_local, int64_t p_hold) {
     if (control_immediate_unavailable()) {
         return ERR_UNAVAILABLE;
     }
-    if (control_deciding_locally()
-        && !control()->admits_request()) {
+    if (control_deciding_locally() && !control()->admits_request()) {
         return ERR_UNAVAILABLE;
     }
     if (entity::Control::excludes(
@@ -834,9 +833,10 @@ Ref<NetwPromise> NetwEntity::claim_control(Hold p_hold) {
         return NetwPromise::rejected(
             denied != OK ? denied : ERR_UNAUTHORIZED,
             !reason.is_empty() ? reason
-                : NetwMultiplayer::control_refusal_detail(
-                      *get_record(), int64_t(p_hold)
-                  )
+                               : NetwMultiplayer::control_refusal_detail(
+                                     *get_record(),
+                                     int64_t(p_hold)
+                                 )
         );
     }
     decide_control_here(local, int64_t(p_hold), local, 0);
@@ -910,7 +910,8 @@ Ref<NetwPromise> NetwEntity::release_control(int64_t p_successor) {
         return NetwPromise::rejected(
             ERR_UNAUTHORIZED,
             NetwMultiplayer::control_refusal_detail(
-                *draft, entity::Control::HOLD_NONE
+                *draft,
+                entity::Control::HOLD_NONE
             )
         );
     }
@@ -1045,18 +1046,16 @@ Ref<NetwPromise> NetwMultiplayer::control_release(
     NetwEntityRecord &record = *entity->get_record();
     entity::Control &control = *record.get_control();
     const int64_t local = p_successor < 0 ? 0 : entity->local_peer();
-    const Ref<NetwPromise> refused = entity->check_control_release(
-        p_successor, local
-    );
+    const Ref<NetwPromise> refused
+        = entity->check_control_release(p_successor, local);
     if (refused.is_valid()) {
         return refused;
     }
     if (!control_holds_copy(p_entity, p_successor)) {
         return entity->control_release_missing_copy(p_successor);
     }
-    const PackedByteArray image = control_final_image(
-        p_entity, clock_get_tick()
-    );
+    const PackedByteArray image
+        = control_final_image(p_entity, clock_get_tick());
     if (entity->control_deciding_locally()) {
         const entity::Control::Outcome outcome
             = control_decide_release(p_entity, local, 0, p_successor, image);
@@ -1097,8 +1096,9 @@ bool NetwMultiplayer::control_holds_copy(const RID &p_entity, int64_t p_peer) {
         return true;
     }
     const Ref<NetwEntity> entity = slot_pinned_entity(p_entity);
-    return entity.is_valid() && (p_peer == entity->local_peer()
-        || rpc_recipients(entity->get_rid_handle()).has(int32_t(p_peer)));
+    return entity.is_valid()
+        && (p_peer == entity->local_peer()
+            || rpc_recipients(entity->get_rid_handle()).has(int32_t(p_peer)));
 }
 
 LocalVector<PropertyBindingPtr> NetwMultiplayer::control_image_bindings(
@@ -1231,10 +1231,8 @@ void NetwMultiplayer::control_start_claim_images(const RID &p_entity) {
         return;
     }
     const int64_t now = clock_get_tick();
-    const int64_t tickrate
-        = int64_t(clock_get_param(CLOCK_PARAM_TICKRATE));
-    record->get_control_book().claim_image_until
-        = now + 2 * tickrate;
+    const int64_t tickrate = int64_t(clock_get_param(CLOCK_PARAM_TICKRATE));
+    record->get_control_book().claim_image_until = now + 2 * tickrate;
     plane->watch_claim_image(slot_pinned_entity(p_entity));
 }
 
@@ -1291,8 +1289,7 @@ void NetwMultiplayer::control_install_claim_image(
         p_state,
         record->get_control_book().claim_image_tick
     );
-    NetwEntityRecord::ControlBook &book
-        = record->get_control_book();
+    NetwEntityRecord::ControlBook &book = record->get_control_book();
     if (installed > book.claim_image_tick) {
         book.claim_image_tick = installed;
     }
@@ -1712,8 +1709,7 @@ entity::Control::Outcome NetwMultiplayer::control_decide_request(
     using Ruling = entity::Control::Ruling;
     Error denied = OK;
     String reason;
-    const Ruling ruling
-        = control.rule(p_requester, p_hold, control.resolve());
+    const Ruling ruling = control.rule(p_requester, p_hold, control.resolve());
     Outcome outcome = Outcome::GRANTED;
     if (ruling == Ruling::UNAVAILABLE
         || wrapper->control_immediate_unavailable()) {
@@ -1734,12 +1730,8 @@ entity::Control::Outcome NetwMultiplayer::control_decide_request(
         outcome = Outcome::UNAUTHORIZED;
     } else if (
         ruling == Ruling::ASK_FILTER
-        && wrapper->control_admit_request(
-               p_requester,
-               p_hold,
-               denied,
-               reason
-           ) == 0
+        && wrapper->control_admit_request(p_requester, p_hold, denied, reason)
+            == 0
     ) {
         outcome = Outcome::UNAUTHORIZED;
     }
@@ -1883,18 +1875,14 @@ void NetwEntity::decide_control_here(
     adopt_controller(p_peer);
     NetwMultiplayer *core = session_core();
     if (tenure_changed && core != nullptr) {
-        core->row_streams_follow_tenure(
-            get_route(),
-            control()->tenure
-        );
+        core->row_streams_follow_tenure(get_route(), control()->tenure);
     }
     if (core != nullptr) {
         const RID entity = get_rid_handle();
         core->control_install_final_image(entity, p_final_state);
         core->control_install_held_claim_image(entity, tenure_changed);
     } else {
-        NetwEntityRecord::ControlBook &book
-            = get_record()->get_control_book();
+        NetwEntityRecord::ControlBook &book = get_record()->get_control_book();
         if (tenure_changed) {
             book.claim_image_tick = -1;
         }

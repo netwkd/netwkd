@@ -22,8 +22,6 @@ namespace {
 constexpr double SETTLED = 0.001;
 constexpr double NEGLIGIBLE = 0.0001;
 
-constexpr double TURN = 6.2831853071795864769252867666;
-
 bool is_spatial(int type) {
     return type == Variant::VECTOR2 || type == Variant::VECTOR2I
         || type == Variant::VECTOR3 || type == Variant::VECTOR3I;
@@ -63,11 +61,6 @@ SampleWork &sample_work() {
     return work;
 }
 #endif
-
-double angle_difference(double p_from, double p_to) {
-    const double difference = std::fmod(p_to - p_from, TURN);
-    return std::fmod(2.0 * difference, TURN) - difference;
-}
 
 History::History() : ring(TickRing::DEFAULT_CAPACITY) {
 }
@@ -138,14 +131,13 @@ Variant History::value_in(const Rows &p_rows, int64_t p_age) const {
     if (p_age < 0 || p_age >= p_rows.count) {
         return Variant();
     }
-    return p_rows.table != nullptr
-        ? store::history_value(
-              *p_rows.table,
-              p_rows.row,
-              uint32_t(p_age),
-              column
-          )
-        : ring.value_of_age(p_age);
+    return p_rows.table != nullptr ? store::history_value(
+                                         *p_rows.table,
+                                         p_rows.row,
+                                         uint32_t(p_age),
+                                         column
+                                     )
+                                   : ring.value_of_age(p_age);
 }
 
 uint32_t History::newest_held(
@@ -467,7 +459,7 @@ Variant History::finite_velocity(
     switch (recent.get_type()) {
         case Variant::FLOAT: {
             const double difference = mode == NetwInterpolate::MODE_ANGLE
-                ? angle_difference(double(earlier), double(recent))
+                ? gd::angle_difference(double(earlier), double(recent))
                 : double(recent) - double(earlier);
             return difference / span;
         }
@@ -576,7 +568,7 @@ bool History::exceeds(
     }
     if (type == Variant::FLOAT || type == Variant::INT) {
         const double difference = mode == NetwInterpolate::MODE_ANGLE
-            ? angle_difference(double(from), double(to))
+            ? gd::angle_difference(double(from), double(to))
             : double(from) - double(to);
         return std::fabs(difference) > distance;
     }
@@ -599,7 +591,7 @@ bool History::is_close(const Variant &from, const Variant &to) const {
     }
     if (type == Variant::FLOAT || type == Variant::INT) {
         const double difference = mode == NetwInterpolate::MODE_ANGLE
-            ? angle_difference(double(from), double(to))
+            ? gd::angle_difference(double(from), double(to))
             : double(from) - double(to);
         return std::fabs(difference) < SETTLED;
     }

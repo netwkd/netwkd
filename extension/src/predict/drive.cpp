@@ -497,7 +497,7 @@ bool RelayWindow::due(uint32_t p_refresh_ticks) const {
 bool RelayWindow::refreshes(uint32_t p_refresh_ticks) const {
     return stood_ticks >= ticks.size()
         && stood_ticks / p_refresh_ticks
-            != (stood_ticks - send_interval) / p_refresh_ticks;
+        != (stood_ticks - send_interval) / p_refresh_ticks;
 }
 
 bool RelayWindow::passed(uint32_t p_stood_ticks) const {

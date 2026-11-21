@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "godot/math.hpp"
 #include "netw/colors.hpp"
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
@@ -15,7 +16,6 @@ namespace netw::predict {
 
 namespace {
 
-constexpr double TAU = 6.2831853071795864769252867666;
 constexpr int ESCALATE_NONSHRINK = 3;
 
 void copy_row_into(const StateRow &p_source, int p_width, StateRow &r_row) {
@@ -62,11 +62,6 @@ double field_error_or(
     return found >= 0.0 ? found : p_fallback;
 }
 
-double angle_difference(double p_from, double p_to) {
-    const double diff = std::fmod(p_to - p_from, TAU);
-    return std::fmod(2.0 * diff, TAU) - diff;
-}
-
 Variant pose_delta(
     const Variant &p_target,
     const Variant &p_current,
@@ -75,7 +70,7 @@ Variant pose_delta(
     switch (p_target.get_type()) {
         case Variant::FLOAT:
             return p_angle
-                ? angle_difference(double(p_current), double(p_target))
+                ? gd::angle_difference(double(p_current), double(p_target))
                 : double(p_target) - double(p_current);
         case Variant::VECTOR2:
             return Vector2(p_target) - Vector2(p_current);
@@ -150,10 +145,12 @@ Variant carried_value(
             const Transform2D authority = p_authority;
             const Transform2D predicted = p_predicted;
             const Transform2D current = p_current;
-            const real_t turn = real_t(angle_difference(
-                predicted.get_rotation(),
-                authority.get_rotation()
-            ));
+            const real_t turn = real_t(
+                gd::angle_difference(
+                    predicted.get_rotation(),
+                    authority.get_rotation()
+                )
+            );
             Transform2D out = current;
             out.set_rotation(current.get_rotation() + turn);
             out.set_origin(
@@ -189,12 +186,11 @@ bool teleport_reached(
     for (int at = 0; at < p_wiring.count(); ++at) {
         const double error = teleport_error(p_wiring, p_request, at);
         if (p_wiring.pose[uint32_t(at)] != 0 && error >= 0.0
-            && error
-                >= teleport_distance(
-                    p_wiring,
-                    at,
-                    p_request.fallback_teleport
-                )) {
+            && error >= teleport_distance(
+                   p_wiring,
+                   at,
+                   p_request.fallback_teleport
+               )) {
             return true;
         }
     }

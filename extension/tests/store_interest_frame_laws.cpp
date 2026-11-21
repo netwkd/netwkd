@@ -19,8 +19,8 @@ namespace TestNetwStoreInterest {
 
 using netw::NetwMultiplayer;
 using netw::store::RowAddress;
-using netw::store::Table;
 using netw::store::Store;
+using netw::store::Table;
 
 constexpr const char *MARK_ID = "store_interest_mark";
 

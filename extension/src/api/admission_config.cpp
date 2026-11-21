@@ -18,9 +18,7 @@ Ref<NetwAdmissionConfig> NetwAdmissionConfig::accept(
         fault::raise(
             nullptr,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwAdmissionConfig.accept}",
-             String(),
-             "{NetwAccountProvider}"}
+            {"{NetwAdmissionConfig.accept}", String(), "{NetwAccountProvider}"}
         );
         return Ref<NetwAdmissionConfig>(this);
     }

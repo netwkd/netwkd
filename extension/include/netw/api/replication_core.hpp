@@ -121,10 +121,7 @@ public:
         NetwPredictionEngine *p_prediction
     );
 #if defined(DEBUG_ENABLED)
-    void seat_profiler(
-        wire::NetworkProfiler *p_profiler,
-        uint32_t *p_outgoing
-    );
+    void seat_profiler(wire::NetworkProfiler *p_profiler, uint32_t *p_outgoing);
 #endif
 #if defined(NETW_TESTS)
     void seat_idle(session::IdleWork *p_idle);

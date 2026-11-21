@@ -67,9 +67,7 @@ class MatchScenario final : public netw_test::FrameScenario {
         Node *node = Object::cast_to<Node>(netw::gd::live_object(p_node));
         NetwMultiplayer *server = stand->session(-1);
         return node != nullptr
-            ? int(server->entity_get_route(
-                  Internals::entity_of(server, node)
-              ))
+            ? int(server->entity_get_route(Internals::entity_of(server, node)))
             : 0;
     }
 

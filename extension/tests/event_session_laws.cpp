@@ -18,11 +18,11 @@ using netw::NetwCarrierFrame;
 using netw::NetwMultiplayer;
 using netw::SchemaCore;
 using netw_test::EventRing;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
-using netw_test::Internals;
 
 constexpr int64_t GATE_ROUTE = 5;
 constexpr int64_t ACK_PEER = 4;

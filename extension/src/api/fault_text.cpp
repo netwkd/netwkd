@@ -268,26 +268,6 @@ FaultText bug_text(const String &p_where) {
 
 FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
     switch (p_code) {
-        case NETW_FAULT_STALE_HANDLE:
-        case NETW_FAULT_STALE_REF:
-        case NETW_FAULT_LATE_ANSWER:
-        case NETW_FAULT_UNANSWERED_ASK:
-        case NETW_FAULT_SCRATCH_FULL:
-        case NETW_FAULT_CALL_ORDER:
-        case NETW_FAULT_ROUTE_STATE:
-            return bug_text(v.name);
-        case NETW_FAULT_REQUEST_EXPIRED:
-            return {
-                vformat(
-                    "The %s handler did not answer within %d ticks, so peer "
-                    "%d was refused with %s.",
-                    v.name,
-                    v.a,
-                    v.peer,
-                    v.detail
-                ),
-                "Answer sooner."
-            };
         case NETW_FAULT_MALFORMED_DATAGRAM:
             return {
                 vformat(
@@ -297,22 +277,12 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 ),
                 "Run the same netwkd version on every peer."
             };
-        case NETW_FAULT_DUPLICATE_PEER:
-            return {
-                vformat(
-                    "A client connected as peer %d, which another peer "
-                    "already holds, so the new connection was refused.",
-                    v.peer
-                ),
-                "Call {NetwConnection.join} again on that client, which picks "
-                "a new peer id with {ENetMultiplayerPeer}."
-            };
         case NETW_FAULT_SETTLE_BOUND:
             return {
                 vformat(
                     "Handlers the session called kept giving it more work "
-                    "for %d passes, so it finishes the rest on its next "
-                    "update.",
+                    "%d times in one update, so it finishes the rest on its "
+                    "next update.",
                     v.a
                 ),
                 "Defer that work in such a handler with {Node.queue_free} "
@@ -384,14 +354,13 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
             };
         case NETW_FAULT_HOST_REFUSED:
             return {
-                "The host could not join its own session, so it has no "
-                "{NetwPlayer}.",
                 vformat(
-                    "Call {NetwJoinRequest.admit} for peer 1 in the "
-                    "{Netw.configure_admission} handler. The join was refused "
-                    "with %s.",
+                    "The host could not join its own session because the join "
+                    "was refused with %s, so it has no {NetwPlayer}.",
                     v.detail
-                )
+                ),
+                "Call {NetwJoinRequest.admit} for peer 1 in the "
+                "{Netw.configure_admission} handler."
             };
         case NETW_FAULT_RPC_REFUSED:
             return {
@@ -457,9 +426,8 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_SPAWN_MISMATCH:
             return {
                 vformat(
-                    "A spawn for route %d was dropped, because %s does not "
-                    "exist on this peer.",
-                    v.a,
+                    "A spawn was dropped, because %s does not exist on this "
+                    "peer.",
                     v.detail
                 ),
                 vformat("Create %s the same way on every peer.", v.detail)
@@ -486,8 +454,8 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
         case NETW_FAULT_TRANSFER_TIMEOUT:
             return {
                 vformat(
-                    "Peer %d did not finish its world report within %d ticks "
-                    "of the server moving, so it was disconnected.",
+                    "Peer %d did not report its world to the new server within "
+                    "%d ticks, so it was disconnected.",
                     v.peer,
                     v.a
                 ),
@@ -649,11 +617,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
             };
         case NETW_FAULT_STORAGE_FAILED:
             return {
-                vformat(
-                    "%s failed, so %s did not happen.",
-                    v.name,
-                    v.owner
-                ),
+                vformat("%s failed, so %s did not happen.", v.name, v.owner),
                 vformat("Check %s.", v.detail)
             };
         case NETW_FAULT_HANDLER_UNCALLABLE:
@@ -694,11 +658,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
             };
         case NETW_FAULT_BAD_SCRIPT:
             return {
-                vformat(
-                    "%s got %s, which it cannot use.",
-                    v.name,
-                    v.owner
-                ),
+                vformat("%s got %s, which it cannot use.", v.name, v.owner),
                 vformat("Use %s.", v.detail)
             };
         case NETW_FAULT_BAD_RETURN:
@@ -812,12 +772,7 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
             };
         case NETW_FAULT_UNSENDABLE_VALUE:
             return {
-                vformat(
-                    "%s holds %s, which cannot be sent, so null or nothing was "
-                    "sent.",
-                    v.name,
-                    v.owner
-                ),
+                vformat("%s holds %s, which cannot be sent.", v.name, v.owner),
                 vformat("Use %s.", v.detail)
             };
         case NETW_FAULT_UNSUPPORTED:
@@ -831,13 +786,10 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
             };
         case NETW_FAULT_LIVENESS_TIMEOUT:
             return {
-                vformat(
-                    "Route %d did not become live within its timeout, so its "
-                    "waiting packet was dropped.",
-                    v.a
-                ),
-                "Make sure the server sends the entity at that route to this "
-                "peer."
+                "A packet named an entity that did not spawn on this peer in "
+                "time, so the packet was dropped.",
+                "Have the server spawn that entity on this peer before it "
+                "sends packets about it."
             };
         case NETW_FAULT_NO_FREE_PORT:
             return {

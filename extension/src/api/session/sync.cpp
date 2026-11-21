@@ -29,17 +29,17 @@
 #include "netw/api/join_request.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
-#include "netw/repl/sync_compat.hpp"
-#include "netw/repl/sync_pipeline.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
-#include "netw/game_call.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/decl.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
 #include "netw/repl/set_model.hpp"
+#include "netw/repl/sync_compat.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/schema_model.hpp"
 #include "netw/script/model.hpp"
 #include "netw/stage.hpp"
@@ -219,12 +219,9 @@ Node *NetwMultiplayer::replication_resolve_comp_node(
     const String &p_path
 ) {
     ReplicationCore *plane = get_replication_plane();
-    return plane != nullptr ? plane->resolve_comp_node(
-                                  entity_get_view(p_entity),
-                                  p_comp,
-                                  p_path
-                              )
-                            : nullptr;
+    return plane != nullptr
+        ? plane->resolve_comp_node(entity_get_view(p_entity), p_comp, p_path)
+        : nullptr;
 }
 
 Ref<NetwEntity> NetwMultiplayer::replication_adopt_in_place(Node *p_root) {
@@ -889,11 +886,8 @@ void NetwMultiplayer::row_control_receive(
     const int peer = int(p_sender);
     LocalVector<wire::ControlRecord> records;
     if (!send->control_scheduler().read(peer, p_payload, records)) {
-        world.wire.attribution.note_refusal(
-            p_sender,
-            channel,
-            wire::Refusal::MALFORMED
-        );
+        world.wire.attribution
+            .note_refusal(p_sender, channel, wire::Refusal::MALFORMED);
         return;
     }
     for (uint32_t at = 0; at < records.size(); ++at) {
@@ -1011,15 +1005,7 @@ void NetwMultiplayer::row_control_flush(
             &receipts
         );
         if (!frame.is_empty()) {
-            send_to(
-                int64_t(ready[at]),
-                0,
-                p_channel,
-                frame,
-                true,
-                0,
-                String()
-            );
+            send_to(int64_t(ready[at]), 0, p_channel, frame, true, 0, String());
         }
         if (!receipts.is_empty()) {
             send_to(
@@ -1205,9 +1191,8 @@ double NetwMultiplayer::peer_get_link_stat(
                 ? double(send->link_budget_bits(p_peer, budget_bits))
                 : double(budget_bits);
         case LINK_STAT_BUDGET_BYTES:
-            return send != nullptr
-                ? double(send->fill_of(p_peer, budget_bits))
-                : double(datagram_budget());
+            return send != nullptr ? double(send->fill_of(p_peer, budget_bits))
+                                   : double(datagram_budget());
         case LINK_STAT_SENT_BYTES:
             return account != nullptr ? double(account->sent_bytes) : 0.0;
         case LINK_STAT_DEBT_BYTES:
@@ -1775,10 +1760,7 @@ void NetwMultiplayer::adopt_schema_declarations() {
             fault::raise(
                 this,
                 NETW_FAULT_DECLARED_TWICE,
-                {vformat(
-                     "Schema '%s'",
-                     String(declaration->get_schema_name())
-                 ),
+                {vformat("Schema '%s'", String(declaration->get_schema_name())),
                  "this session"}
             );
         } else if (!declaration->adopters.has(gd::instance_id(this))) {
@@ -1973,11 +1955,7 @@ bool NetwMultiplayer::lagcomp_effect_watch(
         fault::raise(
             this,
             NETW_FAULT_REWIND_MISUSE,
-            {String(p_key),
-             String(),
-             String(),
-             0,
-             NETW_REWIND_EFFECT_NOT_ARMED}
+            {String(p_key), String(), String(), 0, NETW_REWIND_EFFECT_NOT_ARMED}
         );
     }
     return watching;
@@ -2451,9 +2429,9 @@ RID NetwMultiplayer::declared_schema(uint64_t p_declaration, Node *p_node) {
         = p_node != nullptr ? Ref<Script>(p_node->get_script()) : Ref<Script>();
     String name("@node");
     if (script.is_valid()) {
-        name = script->get_path().is_empty() ? "@script:"
-                + String::num_int64(int64_t(script->get_instance_id()))
-                                             : script->get_path();
+        name = script->get_path().is_empty()
+            ? "@script:" + String::num_int64(int64_t(script->get_instance_id()))
+            : script->get_path();
     }
     if (script.is_null() || schema_core.find(StringName(name)).is_valid()) {
         name += "#" + String::num_uint64(p_declaration, 16);
@@ -2542,11 +2520,7 @@ RID NetwMultiplayer::adopt_property_set(
     property_set_set_param(set, SET_PARAM_PROFILE, p_source->get_profile());
     property_set_set_param(set, SET_PARAM_CHANNEL, p_source->get_channel());
     property_set_set_param(set, SET_PARAM_RELIABLE, p_source->get_reliable());
-    property_set_set_param(
-        set,
-        SET_PARAM_HEARTBEAT,
-        p_source->get_heartbeat()
-    );
+    property_set_set_param(set, SET_PARAM_HEARTBEAT, p_source->get_heartbeat());
     for (const PropertyColumn &member : p_source->columns) {
         const int column = schema_core.find_column(schema, member.get_key());
         const int at = property_set_add_column(set, column);

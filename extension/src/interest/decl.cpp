@@ -64,7 +64,9 @@ bool guard_pair(
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_CALLABLE,
-            {name, String(), String("the callback that decides a CUSTOM policy")}
+            {name,
+             String(),
+             String("the callback that decides a CUSTOM policy")}
         );
         return false;
     }

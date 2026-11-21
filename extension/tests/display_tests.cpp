@@ -97,9 +97,8 @@ LawVerdict flat_parent(const Stand &) {
     make_port(flat.visual, flat.body, "rotation", "rotation")
         .write(HALF_TURN * 0.25);
 
-    const Vector2 expected = flat.holder->get_global_transform().xform(
-        Vector2(5.0, 0.0)
-    );
+    const Vector2 expected
+        = flat.holder->get_global_transform().xform(Vector2(5.0, 0.0));
     if (!flat.visual->get_global_position().is_equal_approx(expected)) {
         return law_broken("the visual left its parent's frame");
     }
@@ -308,8 +307,7 @@ LawVerdict factor_above_one(const Stand &) {
         );
     }
     const double second = head.place(10, 2.25, true);
-    if (!Math::is_equal_approx(second, 0.25)
-        || head.get_display_tick() != 11) {
+    if (!Math::is_equal_approx(second, 0.25) || head.get_display_tick() != 11) {
         return law_broken(
             "a factor of 2.25 read %f at tick %lld",
             second,

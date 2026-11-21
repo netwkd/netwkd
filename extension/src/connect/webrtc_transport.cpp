@@ -175,7 +175,6 @@ Dictionary WebRTCTransport::client_settings() const {
 Dictionary WebRTCTransport::host_settings() const {
     Dictionary settings = client_settings();
     settings["signaler"] = Variant();
-    settings["max_players"] = int64_t(0);
     return settings;
 }
 

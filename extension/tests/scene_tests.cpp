@@ -262,12 +262,12 @@ World halls() {
         .watch("Toy", "seen")
         .watch("Shelf", "scene_label")
         .watch("Shelf", "seen");
-    for (const char *hall : {"Lobby", "Yard", "Den", "Pit", "Arena", "Annex",
-                             "Vault", "Cell"}) {
+    for (const char *hall :
+         {"Lobby", "Yard", "Den", "Pit", "Arena", "Annex", "Vault", "Cell"}) {
         world.watch(hall, "viewers").watch(hall, "gone");
     }
-    for (const char *view : {"ArenaView", "AnnexView", "VaultView",
-                             "CellView"}) {
+    for (const char *view :
+         {"ArenaView", "AnnexView", "VaultView", "CellView"}) {
         world.watch(view, "visible");
     }
     world.at(1, join("ana"))
@@ -299,8 +299,7 @@ World halls() {
     for (const int client : {ANA, BO}) {
         world.at(OPEN, on(client, level("listen")));
     }
-    return world
-        .at(OPEN + 1, level("seat", Array::make("ana", "Ana", "Arena")))
+    return world.at(OPEN + 1, level("seat", Array::make("ana", "Ana", "Arena")))
         .at(OPEN + 1, level("seat", Array::make("bo", "Bo", "Lobby")))
         .at(OPEN + 1, spawn("Toy", "Toy", "Yard"))
         .at(OPEN + 1, spawn("Cart", "Cart", "Yard"))
@@ -501,14 +500,9 @@ TEST_CASE(
 ) {
     const Seen &seen = halls_frames.seen();
     NETW_HOLDS(reads(seen, SERVER, "Level", "carry_code", int(OK), MOVED));
-    NETW_HOLDS(reads(
-        seen,
-        SERVER,
-        "Level",
-        "drop_code",
-        int(ERR_UNAVAILABLE),
-        MOVED
-    ));
+    NETW_HOLDS(
+        reads(seen, SERVER, "Level", "drop_code", int(ERR_UNAVAILABLE), MOVED)
+    );
     for (const int peer : {SERVER, ANA, BO}) {
         NETW_HOLDS(
             reads(seen, peer, "Cart", "parent", "Level/Shelf/Lobby", MOVED)

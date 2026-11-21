@@ -16,34 +16,6 @@ A form to join a listed server.
 
 .. rst-class:: classref-reftable-group
 
-Properties
-----------
-
-.. table::
-   :widths: auto
-
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :ref:`ConnectFieldList<class_ConnectFieldList>` | :ref:`settings<class_JoinPopup_property_settings>`                     | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :ref:`ConnectFieldList<class_ConnectFieldList>` | :ref:`join_args<class_JoinPopup_property_join_args>`                   | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :godot:`LineEdit`                               | :ref:`username_edit<class_JoinPopup_property_username_edit>`           | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :godot:`VBoxContainer`                          | :ref:`settings_container<class_JoinPopup_property_settings_container>` | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :godot:`VBoxContainer`                          | :ref:`args_container<class_JoinPopup_property_args_container>`         | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :godot:`Button`                                 | :ref:`confirm_button<class_JoinPopup_property_confirm_button>`         | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :godot:`Button`                                 | :ref:`cancel_button<class_JoinPopup_property_cancel_button>`           | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :godot:`Label`                                  | :ref:`leave_warning<class_JoinPopup_property_leave_warning>`           | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-   | :ref:`NetwSession<class_NetwSession>`           | :ref:`session<class_JoinPopup_property_session>`                       | ``<unknown>`` |
-   +-------------------------------------------------+------------------------------------------------------------------------+---------------+
-
-.. rst-class:: classref-reftable-group
-
 Methods
 -------
 
@@ -52,8 +24,6 @@ Methods
 
    +--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void| | :ref:`open<class_JoinPopup_method_open>`\ (\ connection\: :ref:`NetwConnection<class_NetwConnection>`, endpoint\: :ref:`NetwEndpoint<class_NetwEndpoint>`, username\: :godot:`String`\ ) |
-   +--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void| | :ref:`on_confirm_pressed<class_JoinPopup_method_on_confirm_pressed>`\ (\ )                                                                                                               |
    +--------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
@@ -71,138 +41,7 @@ Signals
 
 **submitted**\ (\ settings\: :godot:`Dictionary`, username\: :godot:`String`, join_args\: :godot:`Array`\ ) :ref:`🔗<class_JoinPopup_signal_submitted>`
 
-.. container:: contribute
-
-	There is currently no description for this signal. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
-Property Descriptions
----------------------
-
-.. _class_JoinPopup_property_settings:
-
-.. rst-class:: classref-property
-
-:ref:`ConnectFieldList<class_ConnectFieldList>` **settings** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_settings>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_join_args:
-
-.. rst-class:: classref-property
-
-:ref:`ConnectFieldList<class_ConnectFieldList>` **join_args** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_join_args>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_username_edit:
-
-.. rst-class:: classref-property
-
-:godot:`LineEdit` **username_edit** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_username_edit>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_settings_container:
-
-.. rst-class:: classref-property
-
-:godot:`VBoxContainer` **settings_container** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_settings_container>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_args_container:
-
-.. rst-class:: classref-property
-
-:godot:`VBoxContainer` **args_container** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_args_container>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_confirm_button:
-
-.. rst-class:: classref-property
-
-:godot:`Button` **confirm_button** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_confirm_button>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_cancel_button:
-
-.. rst-class:: classref-property
-
-:godot:`Button` **cancel_button** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_cancel_button>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_leave_warning:
-
-.. rst-class:: classref-property
-
-:godot:`Label` **leave_warning** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_leave_warning>`
-
-Warns that joining leaves the current lobby.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_property_session:
-
-.. rst-class:: classref-property
-
-:ref:`NetwSession<class_NetwSession>` **session** = ``<unknown>`` :ref:`🔗<class_JoinPopup_property_session>`
-
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Emitted when the player confirms the form.
 
 .. rst-class:: classref-section-separator
 
@@ -219,23 +58,7 @@ Method Descriptions
 
 |void| **open**\ (\ connection\: :ref:`NetwConnection<class_NetwConnection>`, endpoint\: :ref:`NetwEndpoint<class_NetwEndpoint>`, username\: :godot:`String`\ ) :ref:`🔗<class_JoinPopup_method_open>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_JoinPopup_method_on_confirm_pressed:
-
-.. rst-class:: classref-method
-
-|void| **on_confirm_pressed**\ (\ ) :ref:`🔗<class_JoinPopup_method_on_confirm_pressed>`
-
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Opens the form for joining ``endpoint``.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

@@ -167,8 +167,8 @@ Ref<LocalMultiplayerPeer> LocalLoopbackSession::get_client_peer() {
     return create_client_peer();
 }
 
-TypedArray<LocalMultiplayerPeer> LocalLoopbackSession::get_client_peers()
-    const {
+TypedArray<LocalMultiplayerPeer> LocalLoopbackSession::
+    get_client_peers() const {
     TypedArray<LocalMultiplayerPeer> peers;
     for (const Ref<LocalMultiplayerPeer> &client : client_peers) {
         peers.push_back(client);
@@ -856,8 +856,10 @@ void LocalLoopbackSession::script_delay(
     scripted.push_back(row);
 }
 
-uint64_t LocalLoopbackSession::datagrams_on(int p_client, bool p_to_server)
-    const {
+uint64_t LocalLoopbackSession::datagrams_on(
+    int p_client,
+    bool p_to_server
+) const {
     const uint64_t *sent
         = datagrams_by_leg.getptr(p_client * 2 + int(p_to_server));
     return sent == nullptr ? 0 : *sent;

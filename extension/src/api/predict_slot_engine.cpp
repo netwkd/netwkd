@@ -126,9 +126,11 @@ Ref<NetwEntity> prediction_entity(const Ref<NetwPrediction> &p_handle) {
 
 Callable released_simulation_step(const Ref<NetwPrediction> &p_handle) {
     const Ref<NetwEntity> entity = prediction_entity(p_handle);
-    return entity.is_valid()
-        ? NetwMultiplayer::sim_step_of(*entity->get_record(), entity->get_owner())
-        : Callable();
+    return entity.is_valid() ? NetwMultiplayer::sim_step_of(
+                                   *entity->get_record(),
+                                   entity->get_owner()
+                               )
+                             : Callable();
 }
 
 } // namespace
@@ -279,12 +281,11 @@ int64_t NetwPredictSlotEngine::schedule() const {
         );
     }
     const Ref<NetwEntity> entity = prediction_entity(handle);
-    return entity.is_valid()
-        ? NetwMultiplayer::predict_schedule_of(
-              *entity->get_record(),
-              entity->get_owner()
-          )
-        : int(NetwSimulation::SCHEDULE_TICK);
+    return entity.is_valid() ? NetwMultiplayer::predict_schedule_of(
+                                   *entity->get_record(),
+                                   entity->get_owner()
+                               )
+                             : int(NetwSimulation::SCHEDULE_TICK);
 }
 
 int64_t NetwPredictSlotEngine::ack() const {
@@ -399,9 +400,7 @@ void NetwPredictSlotEngine::publish_topology_roster() {
     pool->publish_topology_roster(native_slot());
 }
 
-void NetwPredictSlotEngine::network_process(
-    const NetwPredictTiming &p_timing
-) {
+void NetwPredictSlotEngine::network_process(const NetwPredictTiming &p_timing) {
     NETW_ZONE_LEAF_F(
         "Predict slot tick",
         colors::PREDICTION,
@@ -894,9 +893,7 @@ int64_t NetwPredictSlotEngine::recorded_transition() const {
         && role() == NetwPrediction::ROLE_CONSUME) {
         return ack();
     }
-    return decl->facts.get_int_fact(
-        NetwPredictStats::FACT_LAST_DRIVE_LABEL
-    );
+    return decl->facts.get_int_fact(NetwPredictStats::FACT_LAST_DRIVE_LABEL);
 }
 
 predict::SlotCursors NetwPredictSlotEngine::cursors() const {
@@ -935,9 +932,8 @@ bool NetwPredictSlotEngine::has_consumed_state_tick(
 }
 
 int NetwPredictSlotEngine::declared_correction() const {
-    return decl != nullptr
-        ? predict::correction_for_mode(decl->mode)
-        : int(CorrectionMode::AUTO);
+    return decl != nullptr ? predict::correction_for_mode(decl->mode)
+                           : int(CorrectionMode::AUTO);
 }
 
 int NetwPredictSlotEngine::resolve_correction() const {
@@ -1661,9 +1657,8 @@ bool NetwPredictSlotEngine::is_steppable() const {
 
 void NetwPredictSlotEngine::joint_pass(const NetwPredictTiming &p_timing) {
     const int64_t present = p_timing.get_tick() - 1;
-    if (!pool->rolls_back_together(native_slot())
-        || !role_drives_island(role()) || core_seated() == nullptr
-        || present < 0) {
+    if (!pool->rolls_back_together(native_slot()) || !role_drives_island(role())
+        || core_seated() == nullptr || present < 0) {
         return;
     }
     NETW_ZONE_LEAF(
@@ -1924,12 +1919,8 @@ void NetwPredictSlotEngine::run_replay(
         }
         open_entry = step.entry;
         if ((p_plan.flags & predict::REPLAY_RUNS_THROUGH_SEAT) != 0) {
-            member->run_command(
-                *command,
-                member->tick_delta(),
-                step.tick,
-                false
-            );
+            member
+                ->run_command(*command, member->tick_delta(), step.tick, false);
         } else {
             pool->run_command(
                 step.slot,
@@ -2020,9 +2011,7 @@ int64_t NetwPredictSlotEngine::ledger_drive_frontier() const {
     return pool->drive_frontier(native_slot());
 }
 
-predict::ReplayPlan NetwPredictSlotEngine::pool_joint_pass(
-    int64_t p_present
-) {
+predict::ReplayPlan NetwPredictSlotEngine::pool_joint_pass(int64_t p_present) {
     const int64_t slot = native_slot();
     if (slot < 0
         || pool->island_of(slot) == NetwPredictionEngine::ISLAND_NONE) {

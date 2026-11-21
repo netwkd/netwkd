@@ -1,10 +1,12 @@
 @tool
+## Shows a traffic strip for each debug session, in the Network Profiler
+## when the editor has one.
 extends EditorDebuggerPlugin
 
-const TrafficStrip := preload("traffic_strip.gd")
+const _TrafficStrip := preload("traffic_strip.gd")
 
-var strips: Dictionary[int, TrafficStrip] = { }
-var docked: Array[TrafficStrip] = []
+var _strips: Dictionary[int, _TrafficStrip] = { }
+var _docked: Array[_TrafficStrip] = []
 
 
 func _has_capture(prefix: String) -> bool:
@@ -12,24 +14,24 @@ func _has_capture(prefix: String) -> bool:
 
 
 func _capture(message: String, data: Array, session_id: int) -> bool:
-	if message != "netw:traffic" or not strips.has(session_id):
+	if message != "netw:traffic" or not _strips.has(session_id):
 		return false
 
-	strips[session_id].show_rates(data)
+	_strips[session_id].show_rates(data)
 	return true
 
 
 func _setup_session(session_id: int) -> void:
 	var session: EditorDebuggerSession = get_session(session_id)
-	var strip := TrafficStrip.new()
+	var strip := _TrafficStrip.new()
 	strip.name = "Traffic"
-	strips[session_id] = strip
+	_strips[session_id] = strip
 	session.add_session_tab(strip)
 	session.stopped.connect(strip.clear)
-	dock.call_deferred(strip)
+	_dock.call_deferred(strip)
 
 
-func dock(strip: TrafficStrip) -> void:
+func _dock(strip: _TrafficStrip) -> void:
 	var tabs: Node = strip.get_parent()
 	if tabs == null:
 		return
@@ -48,12 +50,13 @@ func dock(strip: TrafficStrip) -> void:
 	strip.reparent(profilers[0], false)
 	profilers[0].move_child(strip, 1)
 	strip.show()
-	docked.append(strip)
+	_docked.append(strip)
 
 
+## Moves the docked strips back out and forgets every strip.
 func release() -> void:
-	for strip: Variant in docked:
+	for strip: Variant in _docked:
 		if is_instance_valid(strip):
 			strip.reparent(strip.get_parent().get_parent(), false)
-	docked.clear()
-	strips.clear()
+	_docked.clear()
+	_strips.clear()

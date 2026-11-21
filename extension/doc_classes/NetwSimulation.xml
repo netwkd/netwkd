@@ -37,7 +37,6 @@
 		The peer writing replicated state runs [constant MODE_AUTHORITY]. A predicting client runs [constant MODE_PREDICT]. Every other copy is [constant MODE_PROXY] or [constant MODE_ACTIVE], as [member remote_mode] says.
 	</description>
 	<tutorials>
-		<link title="Prediction guide">https://netwkd.readthedocs.io/en/latest/guides/prediction.html</link>
 	</tutorials>
 	<members>
 		<member name="bodies" type="NodePath[]" setter="set_bodies" getter="get_bodies">

@@ -1,8 +1,9 @@
+## An input for a list of ICE servers.
 extends VBoxContainer
 
-const URLS := &"urls"
-const USERNAME := &"username"
-const CREDENTIAL := &"credential"
+const _URLS := &"urls"
+const _USERNAME := &"username"
+const _CREDENTIAL := &"credential"
 const _SERVER_EDIT := preload(
 	"res://addons/netwkd/gdscript/connect/ui/ice_server_edit.tscn"
 )
@@ -16,6 +17,7 @@ func _ready() -> void:
 	_add_button.pressed.connect(add_server)
 
 
+## Replaces the servers with [param servers].
 func set_value(servers: Array) -> void:
 	for card in _cards:
 		card.queue_free()
@@ -25,6 +27,7 @@ func set_value(servers: Array) -> void:
 			add_server(server)
 
 
+## Returns the servers as [code]ice_servers[/code] entries.
 func get_value() -> Array:
 	var servers: Array = []
 	for card in _cards:
@@ -34,13 +37,14 @@ func get_value() -> Array:
 		var credential_edit := card.get_node(
 			"Fields/CredentialEdit",
 		) as LineEdit
-		server[URLS] = _split(urls_edit.text)
-		_set_optional(server, USERNAME, username_edit.text)
-		_set_optional(server, CREDENTIAL, credential_edit.text)
+		server[_URLS] = _split(urls_edit.text)
+		_set_optional(server, _USERNAME, username_edit.text)
+		_set_optional(server, _CREDENTIAL, credential_edit.text)
 		servers.append(server)
 	return servers
 
 
+## Adds an input for [param server].
 func add_server(server: Dictionary = { }) -> void:
 	var card := _SERVER_EDIT.instantiate() as VBoxContainer
 	card.name = "Server%d" % _cards.size()
@@ -54,13 +58,13 @@ func add_server(server: Dictionary = { }) -> void:
 	var username_edit := card.get_node("Fields/UsernameEdit") as LineEdit
 	username_edit.text = str(
 		server.get(
-			USERNAME,
+			_USERNAME,
 			"",
 		),
 	)
 	var credential_edit := card.get_node("Fields/CredentialEdit") as LineEdit
 	credential_edit.text = str(
-		server.get(CREDENTIAL, ""),
+		server.get(_CREDENTIAL, ""),
 	)
 
 	_cards.append(card)
@@ -84,7 +88,7 @@ func _renumber() -> void:
 
 
 func _joined_urls(server: Dictionary) -> String:
-	var urls: Variant = server.get(URLS, [])
+	var urls: Variant = server.get(_URLS, [])
 	if urls is Array or urls is PackedStringArray:
 		return ", ".join(urls)
 	return str(urls)

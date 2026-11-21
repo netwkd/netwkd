@@ -116,7 +116,7 @@ bool row_is_news(const predict::Journal &p_journal, int p_at) {
     }
     return p_journal.post_fp_at(p_at) != p_journal.post_fp_at(p_at - 1)
         || p_journal.witness_class_bits_at(p_at)
-            != p_journal.witness_class_bits_at(p_at - 1);
+        != p_journal.witness_class_bits_at(p_at - 1);
 }
 
 } // namespace
@@ -365,15 +365,7 @@ void NetwPredictionEngine::send_lane(
     if (host == nullptr || p_bytes.is_empty()) {
         return;
     }
-    host->send_to(
-        p_peer,
-        p_route,
-        p_channel,
-        p_bytes,
-        false,
-        0,
-        String()
-    );
+    host->send_to(p_peer, p_route, p_channel, p_bytes, false, 0, String());
 }
 
 PackedByteArray NetwPredictionEngine::publish_ack_frame(int64_t p_slot) {
@@ -685,9 +677,7 @@ PackedInt64Array NetwPredictionEngine::admit_command_frame(
     mutable_row_of(p_slot)->lane_cursor.command_arrived = true;
     const NetwEntityRecord *seated = owner_record(p_slot);
     if (p_frame.hold() > 0 && seated != nullptr && session != nullptr) {
-        session->wire().seq_book.await_answer(
-            seated->get_control()->resolve()
-        );
+        session->wire().seq_book.await_answer(seated->get_control()->resolve());
     }
     set_owner_ack_floor(
         p_slot,
@@ -978,7 +968,7 @@ bool NetwPredictionEngine::ack_due(int64_t p_slot, int64_t p_frontier) {
     }
     return lane.ack_news > lane.owner_ack_floor
         && p_frontier - lane.ack_news
-            < predict::ACK_NEWS_SENDS * clock_engine->get_send_interval();
+        < predict::ACK_NEWS_SENDS * clock_engine->get_send_interval();
 }
 
 PackedByteArray NetwPredictionEngine::build_ack_frame(

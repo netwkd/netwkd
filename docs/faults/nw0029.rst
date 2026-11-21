@@ -2,11 +2,11 @@
 
 .. _fault_nw0029:
 
-NW0029. A peer did not finish its report after the server moved
-===============================================================
+NW0029. A peer did not report its world after the server moved
+==============================================================
 
 Reported as a warning when the server moves to a new host and a peer has not
-sent its world report within the transfer deadline.
+reported its world to the new server within the transfer deadline.
 
 The peer was disconnected. The log line names the peer and the number of
 ticks it was given.

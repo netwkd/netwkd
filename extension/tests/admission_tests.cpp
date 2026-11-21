@@ -819,11 +819,7 @@ LawVerdict accounts_in_order(const Admission &) {
          "Bea",
          false},
         {true, {{"a", "a:1", "Ann", true}}, {"a:1", "test:9"}, "Ann", true},
-        {true,
-         {{"t", "test:9", "", false}},
-         {"test:9"},
-         "Verified Name",
-         true},
+        {true, {{"t", "test:9", "", false}}, {"test:9"}, "Verified Name", true},
         {true, {}, {"test:9"}, "Verified Name", true},
         {false, {}, {}, "", false},
     };

@@ -203,11 +203,10 @@ void BrowseList::publish_directory(
         const Dictionary target = p_targets[at];
         const String address = target.get(TARGET_ADDRESS, String());
         const String named = target.get(TARGET_DISPLAY_NAME, String());
-        const Ref<NetwServerInfo> advertised = Ref<NetwServerInfo>(
-            Object::cast_to<NetwServerInfo>(
+        const Ref<NetwServerInfo> advertised
+            = Ref<NetwServerInfo>(Object::cast_to<NetwServerInfo>(
                 gd::live_object(target.get(TARGET_INFO, Variant()))
-            )
-        );
+            ));
         RID held = find(p_transport, address);
         const bool minted = !held.is_valid();
         if (minted) {

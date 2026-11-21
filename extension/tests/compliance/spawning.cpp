@@ -243,17 +243,15 @@ Step spawn_nothing_for(int p_client) {
     };
 }
 
-TEST_CASE(
-    "[Netw][Compliance] S9 a player whose spawn is refused sees why"
-) {
+TEST_CASE("[Netw][Compliance] S9 a player whose spawn is refused sees why") {
     const Seen seen
         = World(EMPTY_LOT, 2).each(2, 4, spawn_nothing_for(0)).run(12);
     int on_the_server = 0;
     int on_the_player = 0;
     for (const String &fault : seen.faults) {
         on_the_server += fault.contains("[NW0040]");
-        on_the_player += fault.contains("'make_nothing'")
-            && fault.contains("[NW0045]");
+        on_the_player
+            += fault.contains("'make_nothing'") && fault.contains("[NW0045]");
     }
     CHECK(on_the_server == 1);
     CHECK(on_the_player == 1);

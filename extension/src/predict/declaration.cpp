@@ -68,10 +68,8 @@ LocalVector<predict::FieldDecl> field_declaration(
         const StringName key = column.get_key();
         out.push_back(field_decl(
             key,
-            int(
-                column.unchecked ? predict::PropertyClass::DERIVED
-                                 : predict::PropertyClass::CAUSAL
-            ),
+            int(column.unchecked ? predict::PropertyClass::DERIVED
+                                 : predict::PropertyClass::CAUSAL),
             column.rate_property,
             column.correction_weight,
             column.explicit_teleport_only,

@@ -120,10 +120,7 @@ void NetwSessionConfig::_bind_methods() {
     );
 
     ClassDB::bind_method(
-        D_METHOD(
-            "set_bandwidth_kilobytes_per_second",
-            "kilobytes_per_second"
-        ),
+        D_METHOD("set_bandwidth_kilobytes_per_second", "kilobytes_per_second"),
         &NetwSessionConfig::set_bandwidth_kilobytes_per_second
     );
     ClassDB::bind_method(
@@ -277,8 +274,7 @@ Ref<NetwSessionConfig> NetwSessionConfig::transfer(
 void NetwSessionConfig::set_bandwidth_kilobytes_per_second(
     double p_kilobytes_per_second
 ) {
-    const double bytes_per_second
-        = p_kilobytes_per_second * BYTES_PER_KILOBYTE;
+    const double bytes_per_second = p_kilobytes_per_second * BYTES_PER_KILOBYTE;
     if (!guard.refused
         && (bytes_per_second < 0.0 || !std::isfinite(bytes_per_second))) {
         fault::raise(

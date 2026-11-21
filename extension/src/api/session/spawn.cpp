@@ -356,8 +356,7 @@ bool NetwMultiplayer::spawn_move(const spawn::NodeOp &p_op) {
             NETW_FAULT_SPAWN_MISMATCH,
             {String(),
              String(),
-             String("its new parent, route ")
-                 + String::num_int64(p_op.parent.route),
+             String("its new parent"),
              p_op.sender,
              p_op.route}
         );
@@ -435,9 +434,7 @@ void NetwMultiplayer::spawn_expire_parked(int64_t p_route) {
     }
 }
 
-void NetwMultiplayer::spawn_expire_spawner_parked(
-    spawn::Pipeline *p_pipeline
-) {
+void NetwMultiplayer::spawn_expire_spawner_parked(spawn::Pipeline *p_pipeline) {
     const PackedInt64Array waiting
         = p_pipeline->get_park().waiting_on(spawn::Park::WAIT_SPAWNER);
     if (waiting.is_empty()) {

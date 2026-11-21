@@ -29,8 +29,8 @@ using netw::NetwDisplay;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
 using netw::NetwNativeTests;
-using netw_test::LoopbackRig;
 using netw_test::Internals;
+using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
 constexpr int REMOTE_PEER = 2;
@@ -261,18 +261,23 @@ TEST_CASE(
     subject.entity->get_display()->set_display_role(
         NetwMultiplayer::DISPLAY_ROLE_REMOTE
     );
-    CHECK(bool(runtime->track_stat(
-        track->get_name(),
-        netw::display::TRACK_OFFSET_ARMED
-    )));
+    CHECK(
+        bool(runtime->track_stat(
+            track->get_name(),
+            netw::display::TRACK_OFFSET_ARMED
+        ))
+    );
     bench.display_at(2, 0, 0.0);
     CHECK(!bool(runtime->track_stat(
         track->get_name(),
         netw::display::TRACK_OFFSET_ARMED
     )));
-    CHECK(bool(
-        runtime->track_stat(track->get_name(), netw::display::TRACK_OFFSET_HELD)
-    ));
+    CHECK(
+        bool(runtime->track_stat(
+            track->get_name(),
+            netw::display::TRACK_OFFSET_HELD
+        ))
+    );
     NETW_CHECK_LT(subject.visual->get_global_position().distance_to(p0()), 0.1);
 
     bench.render_many(subject.rid(), 90);

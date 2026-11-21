@@ -662,15 +662,14 @@ void SessionSend::pass_peer(
     double saved = 0.0;
     if (reservation.token != 0) {
         RowSend send;
-        const bool encoded = has_reserved && encode(
-            p_peer,
-            reserved.table,
-            reserved.row,
-            reserved.form,
-            p_base_tick,
-            send,
-            r_out
-        );
+        const bool encoded = has_reserved
+            && encode(p_peer,
+                      reserved.table,
+                      reserved.row,
+                      reserved.form,
+                      p_base_tick,
+                      send,
+                      r_out);
         if (!encoded || send.framed > datagram) {
             release_reservation();
             if (encoded) {
@@ -755,13 +754,13 @@ void SessionSend::pass_peer(
                 || (send.framed > room && room < datagram && !opens)) {
                 if (credit_short && reservation.token == 0 && send.token != 0
                     && double(send.framed) > row_floor
-                    && send.framed <= datagram
-                    && !send.windowed && !send.reliable
+                    && send.framed <= datagram && !send.windowed
+                    && !send.reliable
                     && world->table(held.table)
-                        .peers[p_peer].owed.get(held.row)) {
-                    reservation.lane = {
-                        send.route, send.comp, wire::StreamFamily::VOLATILE
-                    };
+                           .peers[p_peer]
+                           .owed.get(held.row)) {
+                    reservation.lane
+                        = {send.route, send.comp, wire::StreamFamily::VOLATILE};
                     reservation.token = send.token;
                 }
                 misses += 1;
@@ -1152,8 +1151,7 @@ void SessionSend::restate(
         return;
     }
     const uint32_t peer = world->peer_of(p_peer);
-    const int64_t wait
-        = wire::repair_interval_ms(int64_t(link.rtt_ms(p_peer)));
+    const int64_t wait = wire::repair_interval_ms(int64_t(link.rtt_ms(p_peer)));
     for (uint32_t lane = 0; lane < 2; ++lane) {
         const store::RowAddress at = world->row_of(p_owner, lane);
         if (!at.valid()) {

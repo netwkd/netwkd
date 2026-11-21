@@ -45,6 +45,7 @@ jobs:
           workingDirectory: addons/netwkd/templates/turn_worker
           command: >-
             deploy
+            --name networked-turn
             --var
             ALLOWED_ORIGINS:${{ env.TURN_ORIGIN }},${{ env.TURN_PREVIEW }}
             --var ISSUING:${{ inputs.issuing || 'on' }}

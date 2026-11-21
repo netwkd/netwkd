@@ -75,9 +75,8 @@ void NetwMultiplayer::prediction_emit(
         );
     }
 #if defined(NETW_TESTS)
-    const predict::Decl *decl = p_prediction->get_entity()
-                                    ->get_record()
-                                    ->find_predict_declaration();
+    const predict::Decl *decl
+        = p_prediction->get_entity()->get_record()->find_predict_declaration();
     if (decl == nullptr || !decl->test_report) {
         return;
     }

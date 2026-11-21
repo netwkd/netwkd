@@ -54,10 +54,6 @@ public:
         return uint32_t(lanes.size());
     }
 
-    uint32_t retained_size() const {
-        return uint32_t(retained.size());
-    }
-
     uint32_t window_size() const {
         return uint32_t(windows.size());
     }

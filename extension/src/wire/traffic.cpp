@@ -34,10 +34,10 @@ void TrafficMeter::sample(
     const int64_t packets_in = now.packets_in - was.packets_in;
     const int64_t unframed_out = now.wire_out - was.wire_out - framed_out;
     const int64_t unframed_in = now.wire_in - was.wire_in - framed_in;
-    const int64_t headers_out = std::max<int64_t>(0, unframed_out)
-        + packets_out * p_packet_overhead;
-    const int64_t headers_in = std::max<int64_t>(0, unframed_in)
-        + packets_in * p_packet_overhead;
+    const int64_t headers_out
+        = std::max<int64_t>(0, unframed_out) + packets_out * p_packet_overhead;
+    const int64_t headers_in
+        = std::max<int64_t>(0, unframed_in) + packets_in * p_packet_overhead;
     rate.sent[HEADERS] = double(headers_out) / elapsed;
     rate.received[HEADERS] = double(headers_in) / elapsed;
     rate.sent_packets = double(packets_out) / elapsed;

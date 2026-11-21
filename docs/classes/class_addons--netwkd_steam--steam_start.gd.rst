@@ -12,9 +12,7 @@
 
 **Inherits:** :godot:`RefCounted`
 
-.. container:: contribute
-
-	There is currently no description for this class. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Starts Steam and opens Steam lobbies through GodotSteam.
 
 .. rst-class:: classref-reftable-group
 

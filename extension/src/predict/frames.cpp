@@ -255,13 +255,11 @@ bool serialize_ack_evidence(
     if constexpr (!Stream::is_reading) {
         same |= p_record.pre_fp == p_previous->post_fp ? ACK_SAME_PRE : 0;
         same |= p_record.c_hash == p_detailed->c_hash ? ACK_SAME_COMMAND : 0;
-        same |= p_record.e_digest == p_detailed->e_digest
-            ? ACK_SAME_ENVIRONMENT
-            : 0;
+        same |= p_record.e_digest == p_detailed->e_digest ? ACK_SAME_ENVIRONMENT
+                                                          : 0;
         same |= p_record.topo_fp == p_detailed->topo_fp ? ACK_SAME_TOPOLOGY : 0;
-        same |= p_record.witness_fp == p_detailed->witness_fp
-            ? ACK_SAME_WITNESS
-            : 0;
+        same |= p_record.witness_fp == p_detailed->witness_fp ? ACK_SAME_WITNESS
+                                                              : 0;
         same |= p_record.evidence_mask == p_detailed->evidence_mask
             ? ACK_SAME_MASK
             : 0;
@@ -311,10 +309,10 @@ bool serialize_ack_evidence(
     }
     return (p_record.evidence_mask & EVIDENCE_RAW) == 0
         || carry_fingerprint(
-            p_stream,
-            p_record.raw_fp,
-            (same & ACK_SAME_RAW) != 0,
-            p_detailed->raw_fp
+               p_stream,
+               p_record.raw_fp,
+               (same & ACK_SAME_RAW) != 0,
+               p_detailed->raw_fp
         );
 }
 
@@ -536,8 +534,8 @@ bool serialize_ack(Stream &p_stream, AckFrame &p_frame) {
             return false;
         }
         if ((record.flags & ACK_RUN) != 0) {
-            if ((record.flags & ACK_RUNS) != ACK_RUNS
-                || !p_stream.bits(run, 8) || run == 0) {
+            if ((record.flags & ACK_RUNS) != ACK_RUNS || !p_stream.bits(run, 8)
+                || run == 0) {
                 return false;
             }
             record.flags &= uint8_t(~ACK_RUN);

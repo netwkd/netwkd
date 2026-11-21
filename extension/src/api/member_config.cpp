@@ -149,8 +149,7 @@ bool NetwMemberConfig::spawn_never_reads(const char *p_setting) const {
 void NetwMemberConfig::set_write_policy(Policy p_write_policy) {
     static const char *const names[]
         = {"authority", "controller", "any_peer", "server"};
-    if (refused
-        || spawn_never_reads(names[CLAMP(int(p_write_policy), 0, 3)])) {
+    if (refused || spawn_never_reads(names[CLAMP(int(p_write_policy), 0, 3)])) {
         return;
     }
     if (policy_configured && write_policy != p_write_policy) {
@@ -326,9 +325,11 @@ Ref<NetwMemberConfig> NetwMemberConfig::timeout(double p_seconds) {
             nullptr,
             NETW_FAULT_BAD_VALUE,
             {String("{NetwMemberConfig.timeout}"),
-             vformat("%s seconds for '%s'",
-                     String::num(p_seconds),
-                     String(context_name)),
+             vformat(
+                 "%s seconds for '%s'",
+                 String::num(p_seconds),
+                 String(context_name)
+             ),
              String("a number of seconds above zero")}
         );
         return Ref<NetwMemberConfig>(this);

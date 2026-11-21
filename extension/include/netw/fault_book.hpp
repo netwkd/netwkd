@@ -30,7 +30,7 @@ enum class FaultLang {
 };
 
 struct FaultKey {
-    netw_fault_code code = NETW_FAULT_STALE_HANDLE;
+    netw_fault_code code = NETW_FAULT_MALFORMED_DATAGRAM;
     uint64_t subject = 0;
     int64_t peer = 0;
     uint32_t arg = 0;
@@ -53,7 +53,7 @@ public:
 
 private:
     struct Entry {
-        netw_fault_code code = NETW_FAULT_STALE_HANDLE;
+        netw_fault_code code = NETW_FAULT_MALFORMED_DATAGRAM;
         uint32_t repeats = 0;
         int64_t last_tick = 0;
         godot::String what;

@@ -32,39 +32,6 @@ Properties
 
 .. rst-class:: classref-descriptions-group
 
-Constants
----------
-
-.. _class_StatusDot_constant_WORDS:
-
-.. rst-class:: classref-constant
-
-**WORDS** = ``{0: "Checking", 1: "Online", 2: "Full", 3: "Unreachable", 4: "Incompatible", 5: "Unsupported"}`` :ref:`🔗<class_StatusDot_constant_WORDS>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_StatusDot_constant_COLORS:
-
-.. rst-class:: classref-constant
-
-**COLORS** = ``{0: Color(0.6, 0.6, 0.6, 1), 1: Color(0.24, 0.81, 0.44, 1), 2: Color(0.95, 0.77, 0.06, 1), 3: Color(0.91, 0.3, 0.24, 1), 4: Color(0.6, 0.35, 0.85, 1), 5: Color(0.45, 0.45, 0.5, 1)}`` :ref:`🔗<class_StatusDot_constant_COLORS>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
 Property Descriptions
 ---------------------
 
@@ -78,9 +45,7 @@ Property Descriptions
 
 - |void| **@status_setter**\ (\ value\: :ref:`Status<enum_NetwEndpoint_Status>`\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The status the dot shows. Its word is the tooltip.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

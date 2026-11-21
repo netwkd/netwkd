@@ -459,9 +459,7 @@ void NetwMultiplayer::store_restate(uint64_t p_binding, int64_t p_peer) {
     }
 }
 
-void NetwMultiplayer::store_resource_entity(
-    const NetwEntityRecord &p_record
-) {
+void NetwMultiplayer::store_resource_entity(const NetwEntityRecord &p_record) {
     const int64_t live = liveness_core.route_of(p_record.get_handle());
     const int64_t route = live > 0 ? live : p_record.get_route();
     store().stale_route(route);
@@ -478,8 +476,7 @@ bool NetwMultiplayer::store_mark(
     const int64_t changed
         = store().note_tenure(p_slot, control->tenure, p_tick);
     const int64_t second = int64_t(clock_engine().get_tickrate());
-    const bool interacting = control->claims_pending()
-        || control->hold != 0
+    const bool interacting = control->claims_pending() || control->hold != 0
         || (changed >= 0 && p_tick - changed < (second > 0 ? second : 60));
     store().set_marks(
         p_slot,
@@ -744,8 +741,7 @@ PackedInt32Array NetwMultiplayer::store_reach(uint32_t p_slot) const {
     PackedInt32Array out;
     for (uint32_t at = 0; at < store_roster.size(); ++at) {
         const uint32_t peer = store().peer_of(store_roster[at]);
-        if (peer != store::Table::NO_SLOT
-            && store().reaches(p_slot, peer)) {
+        if (peer != store::Table::NO_SLOT && store().reaches(p_slot, peer)) {
             out.push_back(store_roster[at]);
         }
     }

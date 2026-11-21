@@ -3,8 +3,8 @@
 #include "godot/class_db.hpp"
 #include "godot/object.hpp"
 #include "godot/utility.hpp"
-#include "netw/game_call.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;

@@ -712,8 +712,7 @@ LevelSeat read_level_seat(
     const Ref<netw::NetwScene> scene = netw::Netw::scene(crate_in(p_level));
     seen.same_scene = scene.is_valid() && scene == netw::Netw::scene(p_level)
         && p_api->scene_list().size() == 1
-        && RID(p_api->scene_list()[0])
-            == Internals::entity_of(p_api, p_level);
+        && RID(p_api->scene_list()[0]) == Internals::entity_of(p_api, p_level);
     seen.crate_bound = route_of(crate_in(p_level)) > 0
         && route_of(crate_in(p_level)) == route_of(crate_in(p_hosted));
     const CanvasItem *crate = Object::cast_to<CanvasItem>(crate_in(p_level));

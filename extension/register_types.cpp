@@ -6,8 +6,8 @@
 #include "godot/os.hpp"
 #include "netw/decl_sites.hpp"
 
-#include "netw/api/action_request.hpp"
 #include "netw/api/action_config.hpp"
+#include "netw/api/action_request.hpp"
 #include "netw/api/admission_config.hpp"
 #include "netw/api/auth_protocol.hpp"
 #include "netw/api/bit_stream.hpp"

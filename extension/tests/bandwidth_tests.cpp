@@ -70,14 +70,8 @@ void drive(
         if (lost) {
             owed -= 1.0;
         }
-        r_link.note_ack(
-            PEER,
-            lost ? 0 : 1,
-            lost ? 1 : 0,
-            rtt_ms,
-            jitter_ms,
-            at
-        );
+        r_link
+            .note_ack(PEER, lost ? 0 : 1, lost ? 1 : 0, rtt_ms, jitter_ms, at);
     }
 }
 
@@ -591,8 +585,7 @@ LawVerdict resting_row() {
     session.run(registry(), movers(2, true), 0, 2);
     netw_test::seat_streams(session, movers(3, true));
     const int64_t bound = int64_t(
-        netw::store::class_weight(netw::store::RowClass::MOVING) * 10
-            / PER_TICK
+        netw::store::class_weight(netw::store::RowClass::MOVING) * 10 / PER_TICK
         + 2
     );
     for (int64_t tick = 20; tick < 20 + bound + 40; ++tick) {
@@ -799,8 +792,7 @@ LawVerdict peer_rate(Wake &r_wake) {
     const Spent held = watch(r_wake, slow, 60);
     const LocalVector<double> after = r_wake.mirrored_heights(0);
     const Spent kept = watch(r_wake, fast, 60);
-    const int64_t fill
-        = int64_t(SLOW_KILOBYTES_PER_SECOND * 1000.0 / TICKRATE);
+    const int64_t fill = int64_t(SLOW_KILOBYTES_PER_SECOND * 1000.0 / TICKRATE);
     for (uint32_t at = 0; at < before.size(); ++at) {
         if (after[at] <= before[at]) {
             return law_broken("body %d never updated on the held peer", at);
@@ -965,11 +957,7 @@ LawVerdict sent_on(Wake &r_wake, int p_expected) {
         }
     }
     if (sends != p_expected) {
-        return law_broken(
-            "the server sent on %d of %d ticks",
-            sends,
-            TICKRATE
-        );
+        return law_broken("the server sent on %d of %d ticks", sends, TICKRATE);
     }
     return law_held();
 }

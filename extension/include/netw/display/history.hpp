@@ -13,8 +13,6 @@ class Table;
 
 namespace netw::display {
 
-double angle_difference(double p_from, double p_to);
-
 #if defined(NETW_TESTS)
 struct SampleWork {
     int64_t samples = 0;
@@ -168,9 +166,6 @@ public:
     void unfollow();
     bool follows_table() const {
         return world != nullptr;
-    }
-    bool holds_ring() const {
-        return ring.holds_storage();
     }
     bool follows(uint64_t p_owner, uint32_t p_lane, uint32_t p_column) const {
         return world != nullptr && owner == p_owner && lane == p_lane

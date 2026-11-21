@@ -1,7 +1,8 @@
 @tool
+## Draws the bandwidth of a running game as one bar per direction.
 extends Control
 
-const CAUSES: PackedStringArray = [
+const _CAUSES: PackedStringArray = [
 	"state",
 	"input",
 	"calls",
@@ -9,144 +10,147 @@ const CAUSES: PackedStringArray = [
 	"upkeep",
 	"headers",
 ]
-const DIRECTIONS: PackedStringArray = ["up", "down"]
-const CAUSE_COLORS: Array[Color] = [
+const _DIRECTIONS: PackedStringArray = ["up", "down"]
+const _CAUSE_COLORS: Array[Color] = [
 	Color("0072b2"),
 	Color("e69f00"),
 	Color("cc79a7"),
 	Color("f0e442"),
 	Color("56b4e9"),
 ]
-const BAR_ORDER: PackedInt32Array = [5, 4, 0, 1, 2, 3]
-const LEGEND_ORDER: PackedInt32Array = [5, 0, 1, 2, 3, 4]
-const HEADERS := 5
-const PACKETS := 12
-const RATE_COUNT := 14
-const RECENT_COUNT := 40
-const IDLE_SECONDS := 1.0
-const GAP := 4.0
-const TICK_SPACING := 3.0
+const _BAR_ORDER: PackedInt32Array = [5, 4, 0, 1, 2, 3]
+const _LEGEND_ORDER: PackedInt32Array = [5, 0, 1, 2, 3, 4]
+const _HEADERS := 5
+const _PACKETS := 12
+const _RATE_COUNT := 14
+const _RECENT_COUNT := 40
+const _IDLE_SECONDS := 1.0
+const _GAP := 4.0
+const _TICK_SPACING := 3.0
 
-var rates: PackedFloat64Array = []
-var totals: PackedFloat64Array = [0.0, 0.0]
-var pinned_totals: PackedFloat64Array = [0.0, 0.0]
-var recent: PackedFloat64Array = []
-var peak := 0.0
-var is_pinned := false
-var hint_blocks: Array[Rect2] = []
-var hint_texts: PackedStringArray = []
-var idle := Timer.new()
+var _rates: PackedFloat64Array = []
+var _totals: PackedFloat64Array = [0.0, 0.0]
+var _pinned_totals: PackedFloat64Array = [0.0, 0.0]
+var _recent: PackedFloat64Array = []
+var _peak := 0.0
+var _is_pinned := false
+var _hint_blocks: Array[Rect2] = []
+var _hint_texts: PackedStringArray = []
+var _idle := Timer.new()
 
 
 func _init() -> void:
-	idle.one_shot = true
-	idle.wait_time = IDLE_SECONDS
-	idle.timeout.connect(clear)
-	add_child(idle)
-	rates.resize(RATE_COUNT)
-	rates.fill(0.0)
+	_idle.one_shot = true
+	_idle.wait_time = _IDLE_SECONDS
+	_idle.timeout.connect(clear)
+	add_child(_idle)
+	_rates.resize(_RATE_COUNT)
+	_rates.fill(0.0)
 
 
 func _ready() -> void:
 	var font_size: int = get_theme_default_font_size()
 	var line: float = get_theme_default_font().get_height(font_size)
-	custom_minimum_size.y = line * 3.0 + GAP * 2.0
+	custom_minimum_size.y = line * 3.0 + _GAP * 2.0
 
 
+## Draws [param data], the bytes per second of each kind of traffic up then
+## down, followed by the packets per second up and down.
 func show_rates(data: Array) -> void:
-	if data.size() != RATE_COUNT:
+	if data.size() != _RATE_COUNT:
 		return
 
-	rates = PackedFloat64Array(data)
-	totals = [0.0, 0.0]
-	for direction: int in DIRECTIONS.size():
-		for cause: int in CAUSES.size():
-			totals[direction] += rates[direction * CAUSES.size() + cause]
+	_rates = PackedFloat64Array(data)
+	_totals = [0.0, 0.0]
+	for direction: int in _DIRECTIONS.size():
+		for cause: int in _CAUSES.size():
+			_totals[direction] += _rates[direction * _CAUSES.size() + cause]
 
-	recent.append(maxf(totals[0], totals[1]))
-	if recent.size() > RECENT_COUNT:
-		recent.remove_at(0)
-	peak = 0.0
-	for seen: float in recent:
-		peak = maxf(peak, seen)
+	_recent.append(maxf(_totals[0], _totals[1]))
+	if _recent.size() > _RECENT_COUNT:
+		_recent.remove_at(0)
+	_peak = 0.0
+	for seen: float in _recent:
+		_peak = maxf(_peak, seen)
 
-	idle.start()
+	_idle.start()
 	queue_redraw()
 
 
+## Resets the strip to zero and unpins it.
 func clear() -> void:
-	rates.fill(0.0)
-	totals = [0.0, 0.0]
-	recent = []
-	peak = 0.0
-	is_pinned = false
-	pinned_totals = [0.0, 0.0]
+	_rates.fill(0.0)
+	_totals = [0.0, 0.0]
+	_recent = []
+	_peak = 0.0
+	_is_pinned = false
+	_pinned_totals = [0.0, 0.0]
 	queue_redraw()
 
 
 func _gui_input(event: InputEvent) -> void:
 	var click: InputEventMouseButton = event as InputEventMouseButton
-	if click == null or not click.pressed or totals[0] + totals[1] <= 0.0:
+	if click == null or not click.pressed or _totals[0] + _totals[1] <= 0.0:
 		return
 	if click.button_index != MOUSE_BUTTON_LEFT:
 		return
 
-	is_pinned = not is_pinned
-	pinned_totals = [0.0, 0.0]
-	if is_pinned:
-		pinned_totals = totals.duplicate()
+	_is_pinned = not _is_pinned
+	_pinned_totals = [0.0, 0.0]
+	if _is_pinned:
+		_pinned_totals = _totals.duplicate()
 	queue_redraw()
 
 
 func _get_tooltip(at_position: Vector2) -> String:
-	for at: int in hint_blocks.size():
-		if hint_blocks[at].has_point(at_position):
-			return hint_texts[at]
+	for at: int in _hint_blocks.size():
+		if _hint_blocks[at].has_point(at_position):
+			return _hint_texts[at]
 	return ""
 
 
 func _draw() -> void:
-	hint_blocks.clear()
-	hint_texts.clear()
+	_hint_blocks.clear()
+	_hint_texts.clear()
 
 	var font: Font = get_theme_default_font()
 	var font_size: int = get_theme_default_font_size()
 	var line: float = font.get_height(font_size)
 	var ascent: float = font.get_ascent(font_size)
 	var ink: Color = get_theme_color("font_color", "Editor")
-	var colors: Array[Color] = CAUSE_COLORS.duplicate()
+	var colors: Array[Color] = _CAUSE_COLORS.duplicate()
 	colors.append(Color(ink, 0.3))
 
 	var widest := "000.0 KB/s  000 pkt/s"
-	var left: float = font.get_string_size("down ", 0, -1, font_size).x + GAP
-	var right: float = font.get_string_size(widest, 0, -1, font_size).x + GAP
+	var left: float = font.get_string_size("down ", 0, -1, font_size).x + _GAP
+	var right: float = font.get_string_size(widest, 0, -1, font_size).x + _GAP
 	var span: float = maxf(size.x - left - right, 0.0)
-	var pinned_peak: float = maxf(pinned_totals[0], pinned_totals[1])
-	var full: float = maxf(maxf(peak, pinned_peak), 1.0)
+	var pinned_peak: float = maxf(_pinned_totals[0], _pinned_totals[1])
+	var full: float = maxf(maxf(_peak, pinned_peak), 1.0)
 
-	for direction: int in DIRECTIONS.size():
-		var top: float = direction * (line + GAP)
-		var first: int = direction * CAUSES.size()
-		var total: float = maxf(totals[direction], 0.001)
+	for direction: int in _DIRECTIONS.size():
+		var top: float = direction * (line + _GAP)
+		var first: int = direction * _CAUSES.size()
+		var total: float = maxf(_totals[direction], 0.001)
 		var x: float = left
-		for cause: int in BAR_ORDER:
-			var rate: float = rates[first + cause]
+		for cause: int in _BAR_ORDER:
+			var rate: float = _rates[first + cause]
 			var block := Rect2(x, top, span * rate / full, line)
 			draw_rect(block, colors[cause])
-			hint_blocks.append(block)
-			hint_texts.append(
+			_hint_blocks.append(block)
+			_hint_texts.append(
 				"%s %s  %.2f KB/s  %d%%" % [
-					DIRECTIONS[direction],
-					CAUSES[cause],
+					_DIRECTIONS[direction],
+					_CAUSES[cause],
 					rate / 1000.0,
 					roundi(100.0 * rate / total),
 				],
 			)
 			x = block.end.x
 
-		var packets: float = rates[PACKETS + direction]
-		var head: float = span * rates[first + HEADERS] / full
-		var ticks: int = mini(roundi(packets), int(head / TICK_SPACING))
+		var packets: float = _rates[_PACKETS + direction]
+		var head: float = span * _rates[first + _HEADERS] / full
+		var ticks: int = mini(roundi(packets), int(head / _TICK_SPACING))
 		for tick: int in ticks:
 			var at: float = left + head * (tick + 0.5) / ticks
 			draw_line(
@@ -158,7 +162,7 @@ func _draw() -> void:
 		draw_string(
 			font,
 			Vector2(0.0, top + ascent),
-			DIRECTIONS[direction],
+			_DIRECTIONS[direction],
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
 			font_size,
@@ -166,9 +170,9 @@ func _draw() -> void:
 		)
 		draw_string(
 			font,
-			Vector2(left + span + GAP, top + ascent),
+			Vector2(left + span + _GAP, top + ascent),
 			"%.1f KB/s  %d pkt/s" % [
-				totals[direction] / 1000.0,
+				_totals[direction] / 1000.0,
 				roundi(packets),
 			],
 			HORIZONTAL_ALIGNMENT_LEFT,
@@ -177,21 +181,23 @@ func _draw() -> void:
 			ink,
 		)
 
-	var both: float = totals[0] + totals[1]
-	var header_rate: float = rates[HEADERS] + rates[CAUSES.size() + HEADERS]
-	var words: PackedStringArray = CAUSES.duplicate()
-	words[HEADERS] = "headers %d%%" % roundi(
+	var both: float = _totals[0] + _totals[1]
+	var header_rate: float = (
+			_rates[_HEADERS] + _rates[_CAUSES.size() + _HEADERS]
+	)
+	var words: PackedStringArray = _CAUSES.duplicate()
+	words[_HEADERS] = "headers %d%%" % roundi(
 		100.0 * header_rate / maxf(both, 0.001),
 	)
-	var legend: float = 2.0 * (line + GAP)
+	var legend: float = 2.0 * (line + _GAP)
 	var swatch: float = line * 0.6
 	var x: float = left
-	for cause: int in LEGEND_ORDER:
+	for cause: int in _LEGEND_ORDER:
 		draw_rect(
 			Rect2(x, legend + line * 0.2, swatch, swatch),
 			colors[cause],
 		)
-		x += swatch + GAP
+		x += swatch + _GAP
 		draw_string(
 			font,
 			Vector2(x, legend + ascent),
@@ -202,7 +208,7 @@ func _draw() -> void:
 			ink,
 		)
 		x += font.get_string_size(words[cause], 0, -1, font_size).x
-		x += GAP * 3.0
+		x += _GAP * 3.0
 
 	if both <= 0.0:
 		draw_string(
@@ -214,21 +220,21 @@ func _draw() -> void:
 			font_size,
 			Color(ink, 0.6),
 		)
-	if not is_pinned:
+	if not _is_pinned:
 		return
 
 	var accent: Color = get_theme_color("accent_color", "Editor")
-	for direction: int in DIRECTIONS.size():
-		var top: float = direction * (line + GAP)
+	for direction: int in _DIRECTIONS.size():
+		var top: float = direction * (line + _GAP)
 		var outline := Rect2(
 			left,
 			top,
-			span * pinned_totals[direction] / full,
+			span * _pinned_totals[direction] / full,
 			line,
 		)
 		draw_rect(outline, accent, false, 2.0)
 
-	var before: float = pinned_totals[0] + pinned_totals[1]
+	var before: float = _pinned_totals[0] + _pinned_totals[1]
 	draw_string(
 		font,
 		Vector2(0.0, legend + ascent),

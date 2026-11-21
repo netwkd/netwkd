@@ -389,11 +389,8 @@ struct InterpHarness {
             const double wall = double(at) / fps;
             while (next < schedule.size()
                    && schedule[next].arrival_sec <= wall) {
-                channel->display_history().record(
-                    schedule[next].tick,
-                    schedule[next].value,
-                    false
-                );
+                channel->display_history()
+                    .record(schedule[next].tick, schedule[next].value, false);
                 ++next;
             }
             const netw::display::Timing timing = pump_at(wall);

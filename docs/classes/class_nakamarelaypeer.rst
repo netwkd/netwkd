@@ -91,11 +91,7 @@ Constants
 
 **MAX_PACKET_SIZE** = ``16777216`` :ref:`🔗<class_NakamaRelayPeer_constant_MAX_PACKET_SIZE>`
 
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
+The largest packet the peer sends, in bytes.
 
 .. rst-class:: classref-section-separator
 

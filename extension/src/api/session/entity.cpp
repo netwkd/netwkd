@@ -1,7 +1,5 @@
 #include "netw/api/interest.hpp"
 
-#include <cstdlib>
-
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/scene.hpp"
 
@@ -971,23 +969,6 @@ TypedArray<Dictionary> NetwMultiplayer::spawn_get_state(const RID &p_entity) {
     return pipeline->collect_spawn_state(owner);
 }
 
-PropertyBindingPtr NetwMultiplayer::entity_derived_binding(
-    Node *p_owner,
-    int64_t p_record,
-    int64_t p_route
-) {
-    ReplicationCore *plane = get_replication_plane();
-    if (p_owner == nullptr || plane == nullptr) {
-        return PropertyBindingPtr();
-    }
-    const PropertyBindingPtr declared
-        = plane->derived_binding(p_owner, p_record);
-    if (declared != nullptr) {
-        return declared;
-    }
-    return entity_group_binding(p_record, p_route);
-}
-
 PropertyBindingPtr NetwMultiplayer::entity_record_binding(
     NetwEntityRecord *p_held,
     Node *p_owner,
@@ -997,21 +978,12 @@ PropertyBindingPtr NetwMultiplayer::entity_record_binding(
     if (p_owner == nullptr || get_replication_plane() == nullptr) {
         return nullptr;
     }
-    const int64_t route = liveness_core.route_of(p_entity);
     PropertyBindingPtr seated = p_held != nullptr
         ? binding_book.live(p_held->get_record_binding(p_record))
         : nullptr;
     if (seated == nullptr) {
-        seated = entity_group_binding(p_record, route);
-    }
-    static const bool verify
-        = std::getenv("NETW_VERIFY_BINDING_INDEX") != nullptr;
-    if (verify) {
-        const PropertyBindingPtr scanned
-            = entity_derived_binding(p_owner, p_record, route);
-        if (scanned != seated) {
-            NETW_BUG_V(scanned);
-        }
+        seated
+            = entity_group_binding(p_record, liveness_core.route_of(p_entity));
     }
     return seated;
 }
@@ -1213,10 +1185,7 @@ void NetwMultiplayer::wrapper_sweep_retired() {
     }
 }
 
-void NetwMultiplayer::wrapper_unindex_owner(
-    int64_t p_id,
-    ObjectID p_wrapper
-) {
+void NetwMultiplayer::wrapper_unindex_owner(int64_t p_id, ObjectID p_wrapper) {
     EntityRow *slot = world.entities.find(uint64_t(p_id));
     if (slot == nullptr) {
         return;
@@ -1229,11 +1198,9 @@ void NetwMultiplayer::wrapper_unindex_owner(
         );
         slot = world.entities.find(uint64_t(p_id));
     }
-    session::EntityView *view = slot != nullptr
-        ? views.entities.find(uint64_t(p_id))
-        : nullptr;
-    if (view != nullptr && p_wrapper.is_valid()
-        && view->indexed == p_wrapper) {
+    session::EntityView *view
+        = slot != nullptr ? views.entities.find(uint64_t(p_id)) : nullptr;
+    if (view != nullptr && p_wrapper.is_valid() && view->indexed == p_wrapper) {
         view->indexed = ObjectID();
     }
     slot_settle(p_id);
@@ -1312,8 +1279,7 @@ Error NetwMultiplayer::liveness_adopt_route(
         return ERR_UNAVAILABLE;
     }
     if (held.is_valid()) {
-        const NetwLivenessCore::State held_state
-            = liveness_core.state_of(held);
+        const NetwLivenessCore::State held_state = liveness_core.state_of(held);
         const bool absent = held_state == NetwLivenessCore::STATE_ABSENT;
         const Ref<NetwEntity> bound = entity_get_view(held);
         if (bound == p_wrapper && !absent
@@ -1517,8 +1483,7 @@ Error NetwMultiplayer::liveness_spend_lease(int64_t p_peer, int64_t p_route) {
     if (!liveness_core.spend_lease(int(p_peer), int(p_route))) {
         return ERR_UNAUTHORIZED;
     }
-    if (liveness_core.granted_remaining(int(p_peer))
-        <= ROUTE_LEASE_REFILL_AT) {
+    if (liveness_core.granted_remaining(int(p_peer)) <= ROUTE_LEASE_REFILL_AT) {
         liveness_grant_lease(p_peer);
     }
     return OK;
@@ -2316,9 +2281,8 @@ NetwMultiplayer::ControlState NetwMultiplayer::entity_get_control_state(
     if (control->has_pending()) {
         return CONTROL_STATE_PENDING;
     }
-    return control->hold != entity::Control::HOLD_NONE
-        ? CONTROL_STATE_HELD
-        : CONTROL_STATE_SETTLED;
+    return control->hold != entity::Control::HOLD_NONE ? CONTROL_STATE_HELD
+                                                       : CONTROL_STATE_SETTLED;
 }
 
 Variant NetwMultiplayer::entity_get_param(
@@ -2625,15 +2589,7 @@ void NetwMultiplayer::spawn_execute_plan(
         record->remove_recipient(int(peer_id));
         store().stale_route(route);
         world.wire.note_subject(route);
-        send_to(
-            peer_id,
-            0,
-            p_hide_channel,
-            held->value,
-            true,
-            0,
-            String()
-        );
+        send_to(peer_id, 0, p_hide_channel, held->value, true, 0, String());
     }
 }
 
@@ -2675,8 +2631,8 @@ PackedInt32Array NetwMultiplayer::spawn_fan_out(
     int64_t p_first
 ) {
     PackedInt32Array recipients;
-    if (spawn_held_book() == nullptr || p_record == nullptr
-        || p_node == nullptr || p_payload.is_empty()) {
+    if (spawn_held_book() == nullptr || p_record == nullptr || p_node == nullptr
+        || p_payload.is_empty()) {
         return recipients;
     }
     for (int at = 0; at < p_connected.size(); at++) {
@@ -3220,10 +3176,7 @@ void NetwMultiplayer::spawn_receive_failed_frame(
     }
 }
 
-bool NetwMultiplayer::spawn_failed_for(
-    int64_t p_route,
-    int64_t p_peer
-) const {
+bool NetwMultiplayer::spawn_failed_for(int64_t p_route, int64_t p_peer) const {
     spawn::Pipeline *spawns = spawn_plane();
     const spawn::Record *record = spawns != nullptr && p_route > 0
         ? spawns->get_spawn_book()->spawned_of(p_route)
@@ -3299,8 +3252,7 @@ void NetwMultiplayer::spawn_refresh_anchor(
         above.is_valid() ? liveness_route_of(above.ptr()) : 0
     );
     const Ref<NetwEntity> anchored = NetwEntity::of(p_node);
-    const RID entity
-        = anchored.is_valid() ? anchored->get_rid_handle() : RID();
+    const RID entity = anchored.is_valid() ? anchored->get_rid_handle() : RID();
     interest_sync_scene_membership(entity);
     membership_place_entity(entity);
     spawn_reanchor(p_record, p_node, p_roster);

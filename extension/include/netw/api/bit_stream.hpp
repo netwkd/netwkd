@@ -49,10 +49,6 @@ public:
         return mode;
     }
 
-    wire::ReadStream *read_stream() {
-        return mode == READ ? &reading : nullptr;
-    }
-
     int64_t bits(int64_t p_value, int p_count);
     int64_t int_range(int64_t p_value, int64_t p_low, int64_t p_high);
     int64_t varuint(int64_t p_value, int p_max_bytes);

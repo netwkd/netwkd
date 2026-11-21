@@ -336,9 +336,8 @@ World yard() {
         .watch("Puck", "height")
         .watch("Puck", "mode")
         .watch("Puck", "heard");
-    const char *spawned[] = {
-        "Car", "Ball", "Pusher", "Mark", "Tug", "Peg", "Puck"
-    };
+    const char *spawned[]
+        = {"Car", "Ball", "Pusher", "Mark", "Tug", "Peg", "Puck"};
     for (const char *name : spawned) {
         world.at(1, spawn(name, name));
     }
@@ -468,8 +467,8 @@ LawVerdict glides(
             return missing(p_peer, p_name, tick);
         }
         const double moved = double(is) - double(was);
-        const bool held = p_step == 0.0 ? moved < 0.0
-                                        : Math::abs(moved - p_step) < 0.01;
+        const bool held
+            = p_step == 0.0 ? moved < 0.0 : Math::abs(moved - p_step) < 0.01;
         if (!held) {
             return law_broken(
                 "%s moved '%s' %s by %f at tick %d",

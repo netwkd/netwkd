@@ -10,16 +10,16 @@ var game: RocketGame
 
 func _ready() -> void:
 	set_process(false)
-	session.scene_ready.connect(on_scene_ready)
+	session.scene_ready.connect(_on_scene_ready)
 
 
-func on_scene_ready(arena: NetwScene) -> void:
+func _on_scene_ready(arena: NetwScene) -> void:
 	game = arena.root.get_node(^"game")
-	arena.root.tree_exited.connect(on_arena_closed)
+	arena.root.tree_exited.connect(_on_arena_closed)
 	set_process(true)
 
 
-func on_arena_closed() -> void:
+func _on_arena_closed() -> void:
 	set_process(false)
 	text = ""
 	countdown.text = ""

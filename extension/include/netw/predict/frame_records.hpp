@@ -84,10 +84,6 @@ public:
         return int(frame.evidence.size());
     }
 
-    const CommandEvidenceWire &evidence_at(int p_index) const {
-        return frame.evidence[uint32_t(p_index)];
-    }
-
     godot::PackedByteArray to_bytes() const;
 };
 

@@ -55,7 +55,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	session.exited.connect(on_exited)
+	session.exited.connect(_on_exited)
 
 
 func spawn_level() -> Node:
@@ -72,6 +72,6 @@ func enter_level(player: NetwPlayer) -> void:
 	)
 
 
-func on_exited(_reason: NetwSession.ExitReason, _detail: String) -> void:
+func _on_exited(_reason: NetwSession.ExitReason, _detail: String) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	browser.visible = true

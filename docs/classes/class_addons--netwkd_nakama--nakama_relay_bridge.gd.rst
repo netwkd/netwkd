@@ -121,11 +121,7 @@ enum **MatchState**: :ref:`🔗<enum_addons_netwkd_nakama_nakama_relay_bridge_gd
 
 :ref:`MatchState<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MatchState>` **DISCONNECTED** = ``0``
 
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
+Not in a match.
 
 .. _class_addons_netwkd_nakama_nakama_relay_bridge_gd_constant_JOINING:
 
@@ -133,11 +129,7 @@ enum **MatchState**: :ref:`🔗<enum_addons_netwkd_nakama_nakama_relay_bridge_gd
 
 :ref:`MatchState<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MatchState>` **JOINING** = ``1``
 
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
+Creating, joining or matchmaking a match.
 
 .. _class_addons_netwkd_nakama_nakama_relay_bridge_gd_constant_CONNECTED:
 
@@ -145,11 +137,7 @@ enum **MatchState**: :ref:`🔗<enum_addons_netwkd_nakama_nakama_relay_bridge_gd
 
 :ref:`MatchState<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MatchState>` **CONNECTED** = ``2``
 
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
+In a match with a peer id.
 
 .. _class_addons_netwkd_nakama_nakama_relay_bridge_gd_constant_SOCKET_CLOSED:
 
@@ -157,57 +145,7 @@ enum **MatchState**: :ref:`🔗<enum_addons_netwkd_nakama_nakama_relay_bridge_gd
 
 :ref:`MatchState<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MatchState>` **SOCKET_CLOSED** = ``3``
 
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MetaMessageType:
-
-.. rst-class:: classref-enumeration
-
-enum **MetaMessageType**: :ref:`🔗<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MetaMessageType>`
-
-.. _class_addons_netwkd_nakama_nakama_relay_bridge_gd_constant_CLAIM_HOST:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`MetaMessageType<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MetaMessageType>` **CLAIM_HOST** = ``0``
-
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_addons_netwkd_nakama_nakama_relay_bridge_gd_constant_ASSIGN_PEER_ID:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`MetaMessageType<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MetaMessageType>` **ASSIGN_PEER_ID** = ``1``
-
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_addons_netwkd_nakama_nakama_relay_bridge_gd_constant_TRANSFER:
-
-.. rst-class:: classref-enumeration-constant
-
-:ref:`MetaMessageType<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MetaMessageType>` **TRANSFER** = ``2``
-
-.. container:: contribute
-
-	There is currently no description for this enum. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
+The Nakama socket closed.
 
 .. rst-class:: classref-section-separator
 
@@ -229,9 +167,7 @@ Property Descriptions
 - |void| **@nakama_socket_setter**\ (\ value\: :godot:`Variant`\ )
 - :godot:`Variant` **@nakama_socket_getter**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The Nakama socket the match runs on.
 
 .. rst-class:: classref-item-separator
 
@@ -248,9 +184,7 @@ Property Descriptions
 - |void| **@match_state_setter**\ (\ value\: :ref:`MatchState<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MatchState>`\ )
 - :ref:`MatchState<enum_addons_netwkd_nakama_nakama_relay_bridge_gd_MatchState>` **@match_state_getter**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Where the bridge is in joining a match.
 
 .. rst-class:: classref-item-separator
 
@@ -267,9 +201,7 @@ Property Descriptions
 - |void| **@match_id_setter**\ (\ value\: :godot:`String`\ )
 - :godot:`String` **@match_id_getter**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The ID of the current match, or empty.
 
 .. rst-class:: classref-item-separator
 
@@ -286,9 +218,7 @@ Property Descriptions
 - |void| **@multiplayer_peer_setter**\ (\ value\: :ref:`NakamaRelayPeer<class_NakamaRelayPeer>`\ )
 - :ref:`NakamaRelayPeer<class_NakamaRelayPeer>` **@multiplayer_peer_getter**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The peer that carries the match's packets.
 
 .. rst-class:: classref-item-separator
 
@@ -300,9 +230,7 @@ Property Descriptions
 
 :godot:`int` **meta_op_code** = ``9001`` :ref:`🔗<class_addons_netwkd_nakama_nakama_relay_bridge_gd_property_meta_op_code>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The Nakama op code of the bridge's own messages.
 
 .. rst-class:: classref-item-separator
 
@@ -314,9 +242,7 @@ Property Descriptions
 
 :godot:`int` **rpc_op_code** = ``9002`` :ref:`🔗<class_addons_netwkd_nakama_nakama_relay_bridge_gd_property_rpc_op_code>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The lowest Nakama op code of game packets.
 
 .. rst-class:: classref-item-separator
 

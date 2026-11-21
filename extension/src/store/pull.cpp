@@ -34,8 +34,7 @@ bool resources_held(const Table &p_table, Object *p_node) {
 }
 
 bool in_sweep(uint32_t p_row, uint32_t p_from, uint32_t p_count) {
-    return (p_row + p_count - p_from) % p_count
-        < Store::sweep_share(p_count);
+    return (p_row + p_count - p_from) % p_count < Store::sweep_share(p_count);
 }
 
 } // namespace

@@ -1523,9 +1523,7 @@ bool left_tree(ObjectID p_node) {
     return node == nullptr || !node->is_inside_tree();
 }
 
-int64_t spawn_frames_in(
-    NetwMultiplayer *p_api, netw::wire::Channel p_channel
-) {
+int64_t spawn_frames_in(NetwMultiplayer *p_api, netw::wire::Channel p_channel) {
     const Dictionary rows
         = p_api->attribution_snapshot()["frames_in_by_channel"];
     const Dictionary channels = rows.get(int64_t(1), Dictionary());
@@ -1766,10 +1764,8 @@ TEST_CASE(
 
     NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));
     table.rig.pump(SETTLE_PUMPS);
-    const netw::Clock &held
-        = Internals::clock_engine(table.seat(survivor));
-    const netw::Clock &serving
-        = Internals::clock_engine(table.seat(successor));
+    const netw::Clock &held = Internals::clock_engine(table.seat(survivor));
+    const netw::Clock &serving = Internals::clock_engine(table.seat(successor));
     const int stopped = held.get_tick();
     const int serving_from = serving.get_tick();
     table.rig.step_ticks(5);
@@ -2245,7 +2241,8 @@ TEST_CASE(
     int64_t applies[CLIENTS];
     for (int at = 0; at < CLIENTS; ++at) {
         applies[at] = spawn_frames_in(
-            table.seat(at), netw::wire::CHANNEL_CONTROL_APPLY
+            table.seat(at),
+            netw::wire::CHANNEL_CONTROL_APPLY
         );
         if (at == successor) {
             continue;
@@ -2278,9 +2275,8 @@ TEST_CASE(
             served->get_control_revision()
         );
         NETW_CHECK_EQ(
-            spawn_frames_in(
-                table.seat(at), netw::wire::CHANNEL_CONTROL_APPLY
-            ) - applies[at],
+            spawn_frames_in(table.seat(at), netw::wire::CHANNEL_CONTROL_APPLY)
+                - applies[at],
             int64_t(1)
         );
     }
@@ -2506,10 +2502,10 @@ TEST_CASE(
     NETW_CHECK_EQ(int(linked_to(host, table.was(silent))), 0);
     NETW_CHECK_EQ(int(linked_to(host, table.was(honest))), 1);
     NETW_CHECK_EQ(int(alive(table, shared, honest)), 1);
-    NETW_CHECK_EQ(faults.warnings_containing("did not finish"), int64_t(1));
+    NETW_CHECK_EQ(faults.warnings_containing("[NW0029]"), int64_t(1));
     NETW_CHECK_EQ(
         faults.warnings_containing(
-            vformat("Peer %d did not finish", table.was(silent))
+            vformat("Peer %d did not report", table.was(silent))
         ),
         int64_t(1)
     );

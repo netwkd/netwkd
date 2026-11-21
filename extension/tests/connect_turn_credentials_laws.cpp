@@ -329,9 +329,8 @@ struct CredentialState {
         if (answered && attempt == 2) {
             faults = std::make_unique<netw_test::FaultWatch>();
             TurnCredentialProbe::expire(transport);
-            evidence.timeout_warnings = int(
-                faults->warnings_containing("[NW1000]")
-            );
+            evidence.timeout_warnings
+                = int(faults->warnings_containing("[NW1000]"));
             faults.reset();
         } else if (answered && attempt == 3) {
             transport.close();

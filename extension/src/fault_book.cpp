@@ -270,7 +270,7 @@ void raise(
     FaultBook::Admit admit = {true, nullptr};
     if (p_session != nullptr) {
         admit = p_session->fault_admit(
-            {p_code, p_subject, p_values.peer, p_values.name.hash()}
+            {p_code, p_subject, p_values.peer, uint32_t(p_values.name.hash())}
         );
     } else if (written_by_the_game(row)) {
         admit = process_book().admit(
@@ -287,8 +287,8 @@ void raise(
         subject,
         StringName(p_values.name)
     );
-    const FaultLang lang = site.file.ends_with(".cs") ? FaultLang::CSHARP
-                                                      : FaultLang::GDSCRIPT;
+    const FaultLang lang
+        = site.file.ends_with(".cs") ? FaultLang::CSHARP : FaultLang::GDSCRIPT;
     const FaultText text = fault_text(p_code, p_values);
     const String unnamed = unnamed_node_shown(subject);
     const String what = named(fault_spell(text.what, lang), unnamed);
@@ -302,8 +302,8 @@ void raise(
     const String line = what + String(" ")
         + named(fault_spell(text.fix, lang), unnamed)
         + vformat(" [NW%04d]", int(p_code));
-    const log::Level level = row.klass == NETW_FAULT_MISUSE ? log::Level::ERROR
-                                                            : log::Level::WARN;
+    const log::Level level
+        = row.klass == NETW_FAULT_MISUSE ? log::Level::ERROR : log::Level::WARN;
     if (site.file.is_empty()) {
         log::report(level, line, "", "netwkd", 0);
         return;

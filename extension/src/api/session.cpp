@@ -98,11 +98,7 @@ Error NetwSession::kick(const Ref<NetwPlayer> &p_who, const String &p_reason) {
         return ERR_UNCONFIGURED;
     }
     const bool ours = p_who.is_valid() && p_who->belongs_to(api);
-    return api->player_kick_from(
-        ours ? p_who->get_id() : 0,
-        p_reason,
-        true
-    );
+    return api->player_kick_from(ours ? p_who->get_id() : 0, p_reason, true);
 }
 
 void NetwSession::request_kick(
@@ -157,10 +153,7 @@ Error NetwSession::transfer_server(const Ref<NetwPlayer> &p_player) {
         return ERR_UNCONFIGURED;
     }
     const bool ours = p_player.is_valid() && p_player->belongs_to(api);
-    return api->session_transfer_from(
-        ours ? p_player->get_id() : 0,
-        true
-    );
+    return api->session_transfer_from(ours ? p_player->get_id() : 0, true);
 }
 
 void NetwSession::announce_scene_ready(const Ref<NetwScene> &p_scene) {

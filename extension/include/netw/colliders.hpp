@@ -14,6 +14,8 @@ struct ServerPose {
 
 void teleport(godot::Object *p_owner);
 
+void commit(godot::Object *p_owner);
+
 void settle(godot::Object *p_owner);
 
 void report_unseen(godot::Object *p_owner);

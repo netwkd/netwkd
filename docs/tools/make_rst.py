@@ -1832,13 +1832,14 @@ FOLDER_GROUPS: list[tuple[str, list[str]]] = [
         ],
     ),
     ("Scene Node Path (editor)", ["addons/netwkd/addons/scene_node_path"]),
+    ("GDScript", ["addons/netwkd/gdscript"]),
     ("Nakama", ["addons/netwkd_nakama"]),
     ("Steam", ["addons/netwkd_steam"]),
     ("Testing", ["addons/netwkd_test"]),
 ]
 
-# Label for classes whose source path could not be resolved.
-FOLDER_GROUP_FALLBACK = "Other classes"
+# Label for the native classes, which have no GDScript source path.
+FOLDER_GROUP_FALLBACK = "Core"
 
 
 def build_class_source_paths() -> dict[str, str]:
@@ -1938,23 +1939,21 @@ def make_rst_index(grouped_classes: dict[str, list[str]], dry_run: bool, output_
         for label, names in folder_grouped.items():
             folder_grouped[label] = sorted(dict.fromkeys(names), key=str.lower)
 
-        # Emit curated groups first in configured order, then any auto-derived
-        # groups alphabetically, then the unresolved fallback last.
+        # The core first, then curated groups in configured order, then any
+        # auto-derived groups alphabetically.
         ordered_labels = [label for label, _ in FOLDER_GROUPS]
         extra_labels = sorted(
             label
             for label in folder_grouped
             if label not in ordered_labels and label != FOLDER_GROUP_FALLBACK
         )
-        emit_order = ordered_labels + extra_labels
-        if FOLDER_GROUP_FALLBACK in folder_grouped:
-            emit_order.append(FOLDER_GROUP_FALLBACK)
+        emit_order = [FOLDER_GROUP_FALLBACK] + ordered_labels + extra_labels
 
         for label in emit_order:
             if label not in folder_grouped:
                 continue
 
-            f.write(make_heading(label, "="))
+            f.write(make_heading(label, "-"))
 
             f.write(".. toctree::\n")
             f.write("    :maxdepth: 1\n")

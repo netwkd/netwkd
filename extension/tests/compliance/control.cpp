@@ -546,18 +546,16 @@ TEST_CASE(
     words.push_back("tea");
     const Variant cargoes[] = {Dictionary(), words};
     for (const Variant &cargo : cargoes) {
-        const Seen seen
-            = World(DOCK, 1)
-                  .watch("Crate", "cargo")
-                  .at(1, spawn("Crate", "Crate"))
-                  .at(3, control("Crate", 0))
-                  .each(8, 12, on(0, set("Crate", "cargo", cargo)))
-                  .run(20);
+        const Seen seen = World(DOCK, 1)
+                              .watch("Crate", "cargo")
+                              .at(1, spawn("Crate", "Crate"))
+                              .at(3, control("Crate", 0))
+                              .each(8, 12, on(0, set("Crate", "cargo", cargo)))
+                              .run(20);
         NETW_HOLDS(reads(seen, SERVER, "Crate", "cargo", Array()));
         int refused = 0;
         for (const String &fault : seen.faults) {
-            refused
-                += fault.contains("'cargo'") && fault.contains("[NW1044]");
+            refused += fault.contains("'cargo'") && fault.contains("[NW1044]");
         }
         CHECK(refused == 1);
         CHECK(seen.faults.size() == refused);

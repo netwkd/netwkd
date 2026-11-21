@@ -71,10 +71,6 @@ public:
     int64_t record_count() const {
         return records;
     }
-
-    int64_t oversized_count() const {
-        return oversized;
-    }
 };
 
 } // namespace netw::wire

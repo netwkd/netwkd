@@ -27,11 +27,11 @@ using netw::NetwPrediction;
 using netw::NetwSimulation;
 using netw_test::EntityDecl;
 using netw_test::FaultWatch;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
-using netw_test::Internals;
 using netw_test::LoopbackRig;
 using netw_test::PredictionReports;
 using netw_test::Recorder;
@@ -212,9 +212,7 @@ LawVerdict refused_joint_once(bool p_spawned) {
         const int at = String(copy[1]).to_int();
         const Ref<NetwEntity> entity = NetwEntity::of(body(rig, copy[0], at));
         entity->get_prediction()->set_rollback_together(true);
-        entity->get_simulation()->set_schedule(
-            NetwSimulation::SCHEDULE_STEPPED
-        );
+        entity->get_simulation()->set_schedule(NetwSimulation::SCHEDULE_FRAME);
     }
     rig.step_ticks(SETTLE_TICKS);
 
@@ -524,11 +522,10 @@ LawVerdict runs_one_input_a_tick(const World &) {
     constexpr int SENDS = 10;
     LoopbackRig rig(1);
     rig.declare_world(
-        WorldDecl()
-            .clocked(TICKS, 3)
-            .sending(SENDS)
-            .lag_compensated()
-            .player(runner("P"), 0)
+        WorldDecl().clocked(TICKS, 3).sending(SENDS).lag_compensated().player(
+            runner("P"),
+            0
+        )
     );
     run(rig, "P", 0);
     rig.step_ticks(SETTLE_TICKS);
@@ -558,11 +555,10 @@ LawVerdict rests_at_a_wide_interval(const World &) {
     constexpr int WINDOW_TICKS = TICKS * 5;
     LoopbackRig rig(1);
     rig.declare_world(
-        WorldDecl()
-            .clocked(TICKS, 3)
-            .sending(SENDS)
-            .lag_compensated()
-            .player(runner("P"), 0)
+        WorldDecl().clocked(TICKS, 3).sending(SENDS).lag_compensated().player(
+            runner("P"),
+            0
+        )
     );
     delay_every_link(rig);
     Node2D *predicted = body(rig, "P", 0);
@@ -570,17 +566,11 @@ LawVerdict rests_at_a_wide_interval(const World &) {
     rig.step_ticks(SETTLE_TICKS * 2);
     bool halted = false;
     double last = predicted->get_position().x - 1.0;
-    const double running = sent_from(
-        rig,
-        rig.client(0),
-        1,
-        SENT_INPUT,
-        WINDOW_TICKS,
-        [&](int) {
-            halted = halted || predicted->get_position().x == last;
-            last = predicted->get_position().x;
-        }
-    );
+    const double running
+        = sent_from(rig, rig.client(0), 1, SENT_INPUT, WINDOW_TICKS, [&](int) {
+              halted = halted || predicted->get_position().x == last;
+              last = predicted->get_position().x;
+          });
     if (halted) {
         return law_broken("a running client stopped predicting");
     }

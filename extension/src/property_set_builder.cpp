@@ -87,8 +87,10 @@ StringName state_rate_property(
              String(p_rate),
              String(p_property)
          ),
-         String("the name of a property declared with "
-                "{NetwPropertyConfig.state} on that node")}
+         String(
+             "the name of a property declared with "
+             "{NetwPropertyConfig.state} on that node"
+         )}
     );
     return StringName();
 }
@@ -297,8 +299,7 @@ bool compile_node(PropertySet &r_set, Node *p_node, int64_t p_record) {
 }
 
 uint64_t declaration_key(Node *p_node) {
-    const uint64_t shared
-        = netw::script::model::shared_declaration_key(p_node);
+    const uint64_t shared = netw::script::model::shared_declaration_key(p_node);
     if (shared != 0) {
         return shared;
     }
@@ -314,21 +315,22 @@ uint64_t declaration_key(Node *p_node) {
         uint64_t layouts = 0;
         for (int at = 0; at < quantizers.size(); ++at) {
             const Ref<NetwQuantize> quantizer = quantizers[at];
-            layouts = (layouts ^ (quantizer.is_valid()
-                                      ? quantizer->layout_hash()
-                                      : uint64_t(at + 1)))
+            layouts = (layouts
+                       ^ (quantizer.is_valid() ? quantizer->layout_hash()
+                                               : uint64_t(at + 1)))
                 * 1099511628211ULL;
         }
         const uint64_t parts[] = {
             uint64_t(property.hash()),
-            type >= 0
-                ? uint64_t(type)
-                : uint64_t(1) << 32
-                      | uint64_t(PropertySet::column_type_for(
-                          p_node->get_script(),
-                          p_node,
-                          property
-                      )),
+            type >= 0 ? uint64_t(type)
+                      : uint64_t(1) << 32
+                    | uint64_t(
+                            PropertySet::column_type_for(
+                                p_node->get_script(),
+                                p_node,
+                                property
+                            )
+                    ),
             uint64_t(config->get_in_state_set())
                 | uint64_t(config->get_in_input_set()) << 1
                 | uint64_t(config->get_in_broadcast_set()) << 2
@@ -368,8 +370,7 @@ uint64_t from_node(Node *p_node, int64_t p_record, Object *p_api) {
     if (core == nullptr) {
         return repl::SetBook::NONE;
     }
-    if (netw::script::model::get_declared_property_configs(p_node)
-            .is_empty()) {
+    if (netw::script::model::get_declared_property_configs(p_node).is_empty()) {
         return repl::SetBook::NONE;
     }
     const uint64_t declaration = declaration_key(p_node);

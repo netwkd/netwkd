@@ -466,9 +466,7 @@ Error NetwMultiplayer::predict_stepper_install(
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwSession.install_physics_stepper}",
-             String(),
-             "physics space"}
+            {"{NetwSession.install_physics_stepper}", String(), "physics space"}
         );
         return ERR_INVALID_PARAMETER;
     }
@@ -1409,15 +1407,9 @@ void NetwMultiplayer::predict_readmit(
         return;
     }
     Node *owner = p_owner;
-    const String named = owner != nullptr
-        ? String(owner->get_path())
-        : String(p_record.get_entity_id());
-    if (entity_record_binding(
-            &p_record,
-            owner,
-            repl::SET_RECORD_STATE,
-            entity
-        )
+    const String named = owner != nullptr ? String(owner->get_path())
+                                          : String(p_record.get_entity_id());
+    if (entity_record_binding(&p_record, owner, repl::SET_RECORD_STATE, entity)
         == nullptr) {
         fault::raise(
             this,
@@ -1449,7 +1441,8 @@ bool NetwMultiplayer::predict_lacks_state_rows(
                p_owner,
                repl::SET_RECORD_STATE,
                p_record.get_handle()
-           ) == nullptr;
+           )
+        == nullptr;
 }
 
 bool NetwMultiplayer::predict_implied(
@@ -1463,7 +1456,8 @@ bool NetwMultiplayer::predict_implied(
                p_owner,
                repl::SET_RECORD_STATE,
                p_record.get_handle()
-           ) != nullptr;
+           )
+        != nullptr;
 }
 
 void NetwMultiplayer::predict_settle_kind(
@@ -1872,11 +1866,13 @@ NetwPrediction::Mode NetwMultiplayer::predict_resolve_mode(
     const predict::Decl *decl = p_record.find_predict_declaration();
     const int declared
         = decl != nullptr ? decl->mode : int(NetwPrediction::MODE_AUTO);
-    return NetwPrediction::Mode(predict::integrable_mode(
-        predict::resolve_mode(declared, solves, schedule),
-        schedule,
-        solves
-    ));
+    return NetwPrediction::Mode(
+        predict::integrable_mode(
+            predict::resolve_mode(declared, solves, schedule),
+            schedule,
+            solves
+        )
+    );
 }
 
 bool NetwMultiplayer::predict_rolls_back_together(

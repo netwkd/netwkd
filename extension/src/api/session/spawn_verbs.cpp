@@ -89,13 +89,17 @@ bool NetwMultiplayer::spawn_admitted(Node *p_node, const char *p_verb) {
     fault::raise(
         this,
         NETW_FAULT_SPAWN_REFUSED,
-        {p_node != nullptr ? String("'") + String(p_node->get_name())
-                    + String("'")
-                           : String("<null>"),
-         String("using up all the spawns the session authority granted this "
-                "peer"),
-         String("it again once the session authority admits more of its "
-                "spawns")},
+        {p_node != nullptr
+             ? String("'") + String(p_node->get_name()) + String("'")
+             : String("<null>"),
+         String(
+             "using up all the spawns the session authority granted this "
+             "peer"
+         ),
+         String(
+             "it again once the session authority admits more of its "
+             "spawns"
+         )},
         p_node != nullptr ? uint64_t(gd::instance_id(p_node)) : 0
     );
     return false;
@@ -356,9 +360,8 @@ Ref<NetwPromise> NetwMultiplayer::spawn_verb_async(
     }
     if (!is_waiting(built)) {
         Node *node = spawn_verb_finish(built, call, refusal);
-        return node != nullptr
-            ? NetwPromise::resolved(scene_outer_of(node))
-            : refusal.promise();
+        return node != nullptr ? NetwPromise::resolved(scene_outer_of(node))
+                               : refusal.promise();
     }
 
     spawn_pending_serial += 1;
@@ -560,8 +563,10 @@ Node *NetwMultiplayer::spawn_verb_registered(
             {String("A node from spawn constructor '") + String(p_id)
                  + String("'"),
              String("an unregistered spawn constructor"),
-             String("a spawn constructor registered with "
-                    "{NetwMultiplayer.spawn_register_constructor}")}
+             String(
+                 "a spawn constructor registered with "
+                 "{NetwMultiplayer.spawn_register_constructor}"
+             )}
         );
         return nullptr;
     }
@@ -589,8 +594,10 @@ Node *NetwMultiplayer::spawn_verb_registered(
             NETW_FAULT_SPAWN_RETURN,
             {String("spawn constructor '") + String(p_id) + String("'"),
              String("no returned Node outside the tree"),
-             String("a constructor that returns the new node outside the "
-                    "tree")}
+             String(
+                 "a constructor that returns the new node outside the "
+                 "tree"
+             )}
         );
         return nullptr;
     }

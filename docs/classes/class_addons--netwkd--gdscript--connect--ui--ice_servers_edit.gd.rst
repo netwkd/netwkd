@@ -12,9 +12,7 @@
 
 **Inherits:** :godot:`VBoxContainer`
 
-.. container:: contribute
-
-	There is currently no description for this class. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+An input for a list of ICE servers.
 
 .. rst-class:: classref-reftable-group
 
@@ -38,51 +36,6 @@ Methods
 
 .. rst-class:: classref-descriptions-group
 
-Constants
----------
-
-.. _class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_constant_URLS:
-
-.. rst-class:: classref-constant
-
-**URLS** = ``&"urls"`` :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_constant_URLS>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_constant_USERNAME:
-
-.. rst-class:: classref-constant
-
-**USERNAME** = ``&"username"`` :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_constant_USERNAME>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. _class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_constant_CREDENTIAL:
-
-.. rst-class:: classref-constant
-
-**CREDENTIAL** = ``&"credential"`` :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_constant_CREDENTIAL>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
 Method Descriptions
 -------------------
 
@@ -92,9 +45,7 @@ Method Descriptions
 
 |void| **set_value**\ (\ servers\: :godot:`Array`\ ) :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_method_set_value>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Replaces the servers with ``servers``.
 
 .. rst-class:: classref-item-separator
 
@@ -106,9 +57,7 @@ Method Descriptions
 
 :godot:`Array` **get_value**\ (\ ) :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_method_get_value>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the servers as ``ice_servers`` entries.
 
 .. rst-class:: classref-item-separator
 
@@ -120,9 +69,7 @@ Method Descriptions
 
 |void| **add_server**\ (\ server\: :godot:`Dictionary` = {}\ ) :ref:`🔗<class_addons_netwkd_gdscript_connect_ui_ice_servers_edit_gd_method_add_server>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Adds an input for ``server``.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

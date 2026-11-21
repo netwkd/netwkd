@@ -83,9 +83,10 @@ LawVerdict bytes_round_trip(const World &) {
         || int(copy->get_value("health")) != 75
         || copy->get_value("place").get_type() != Variant::VECTOR2
         || !Vector2(copy->get_value("place")).is_equal_approx(Vector2(1, 2))) {
-        return law_broken("the rebuilt record is %s", String(Variant(
-            copy->to_dict()
-        )).utf8().get_data());
+        return law_broken(
+            "the rebuilt record is %s",
+            String(Variant(copy->to_dict())).utf8().get_data()
+        );
     }
     return law_held();
 }
@@ -225,8 +226,7 @@ LawVerdict client_answers_nothing(const World &) {
     if (seen.is_null()) {
         return law_broken("the client's copy has no entity");
     }
-    const Ref<DictionaryRecord> sampled
-        = Netw::sample(seen, range.now() - AGO);
+    const Ref<DictionaryRecord> sampled = Netw::sample(seen, range.now() - AGO);
     if (sampled.is_valid() && !sampled->is_empty()) {
         return law_broken(
             "the client answered %s",

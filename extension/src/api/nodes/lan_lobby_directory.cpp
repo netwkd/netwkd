@@ -126,12 +126,7 @@ void LANLobbyDirectory::keep_host_socket() {
         fault::raise(
             session,
             NETW_FAULT_NO_FREE_PORT,
-            {String(),
-             String(),
-             String(),
-             0,
-             port,
-             port + port_count - 1}
+            {String(), String(), String(), 0, port, port + port_count - 1}
         );
     }
 }
@@ -171,11 +166,9 @@ void LANLobbyDirectory::list_lobbies() {
     nonce = random_u64();
     asked_usec = now_usec();
     window_left = BROWSE_WINDOW;
-    const String reached
-        = connect::under_test_runner() ? String("127.0.0.1") : query_address;
     const PackedByteArray query = connect::lan::encode_query(app_tag(), nonce);
     for (int64_t at = 0; at < port_count; at++) {
-        gd::udp_send(browse_socket, reached, port + at, query);
+        gd::udp_send(browse_socket, query_address, port + at, query);
     }
 }
 

@@ -17,7 +17,8 @@ protected:
     godot::String reason;
 
     static void _bind_methods();
-    virtual void denied() {}
+    virtual void denied() {
+    }
 
 public:
     void deny(

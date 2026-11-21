@@ -351,7 +351,9 @@ void ReplicationCore::expire_control(int64_t p_tick) {
         );
         if (entity.is_valid()
             && session->control_expire(
-                entity->get_rid_handle(), p_tick, deadline
+                entity->get_rid_handle(),
+                p_tick,
+                deadline
             )) {
             watch_control(entity);
         }
@@ -722,11 +724,8 @@ void ReplicationCore::receive_protocol(
         case wire::CHANNEL_SESSION_KICK_REQUEST:
         case wire::CHANNEL_SESSION_LEAVE:
         case wire::CHANNEL_SESSION_PLAYER_LEFT:
-            return p_session->session_receive_control(
-                p_payload,
-                p_sender,
-                p_channel
-            );
+            return p_session
+                ->session_receive_control(p_payload, p_sender, p_channel);
         case wire::CHANNEL_ACTION:
         case wire::CHANNEL_CALL:
         case wire::CHANNEL_REPLY:
@@ -981,11 +980,8 @@ void ReplicationCore::receive_routed(
             return;
         case wire::CHANNEL_PREDICT_ACK:
             if (p_session->lagcomp_is_wired()) {
-                p_session->predict_receive_ack_carrier(
-                    handle,
-                    p_payload,
-                    p_sender
-                );
+                p_session
+                    ->predict_receive_ack_carrier(handle, p_payload, p_sender);
             }
             return;
         case wire::CHANNEL_PREDICT_RELAY:
@@ -1236,12 +1232,8 @@ void ReplicationCore::handle_table_frame(
     }
     const Error verdict
         = session->table_admit_frame(p_sender, wire::CHANNEL_TABLE, p_payload);
-    if (session->finish_stage_verdict(
-            EventPlane::GATE_TABLE,
-            verdict,
-            0,
-            p_sender
-        )
+    if (session
+            ->finish_stage_verdict(EventPlane::GATE_TABLE, verdict, 0, p_sender)
         != OK) {
         return;
     }
@@ -1422,9 +1414,7 @@ Ref<NetwEntity> ReplicationCore::adopt_in_place(Node *p_root) {
 TypedArray<Dictionary> ReplicationCore::spawn_state_of(Node *p_root) {
     const Ref<NetwEntity> wrapper = NetwEntity::of(p_root);
     if (session != nullptr && wrapper.is_valid()
-        && liveness_core->entity_is_valid(
-            wrapper->get_rid_handle()
-        )) {
+        && liveness_core->entity_is_valid(wrapper->get_rid_handle())) {
         return session->spawn_get_state(wrapper->get_rid_handle());
     }
     return spawn_pipeline.collect_spawn_state(p_root);

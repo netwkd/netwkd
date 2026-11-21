@@ -739,10 +739,8 @@ LawVerdict older_version(const Stand &) {
     }
     const String path = the_one_file(root);
     const String saved = FileAccess::get_file_as_string(path);
-    const String older = saved.replace(
-        "\"schema_version\": 2",
-        "\"schema_version\": 1"
-    );
+    const String older
+        = saved.replace("\"schema_version\": 2", "\"schema_version\": 1");
     if (older == saved) {
         return law_broken("the save names no storage version 2");
     }

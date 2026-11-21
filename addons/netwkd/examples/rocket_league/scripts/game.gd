@@ -20,7 +20,7 @@ func _init() -> void:
 func _ready() -> void:
 	if multiplayer.is_server():
 		queue_kickoff()
-		session.player_joined.connect(on_player_joined)
+		session.player_joined.connect(_on_player_joined)
 
 
 func rule_goal(team: int, _tick: int) -> void:
@@ -43,5 +43,5 @@ func seconds_to_ticks(seconds: float) -> int:
 	return int(seconds * float(clock.tickrate))
 
 
-func on_player_joined(_player: NetwPlayer) -> void:
+func _on_player_joined(_player: NetwPlayer) -> void:
 	queue_kickoff()

@@ -157,7 +157,6 @@ void Pipeline::sink_verdict(Error p_verdict, int64_t p_route) {
     }
 }
 
-
 Error Pipeline::declare_stage(const RID &p_handle, const Dictionary &p_facts) {
     if (session == nullptr) {
         return OK;
@@ -665,8 +664,10 @@ PackedByteArray Pipeline::encode_record_frame(
                 session,
                 NETW_FAULT_SPAWN_REFUSED,
                 {String("route ") + String::num_int64(p_record->get_route()),
-                 String("a MultiplayerSpawner that is gone or outside the "
-                        "multiplayer root"),
+                 String(
+                     "a MultiplayerSpawner that is gone or outside the "
+                     "multiplayer root"
+                 ),
                  String("a MultiplayerSpawner inside the multiplayer root")},
                 uint64_t(gd::instance_id(p_node))
             );
@@ -694,8 +695,10 @@ PackedByteArray Pipeline::encode_record_frame(
                 NETW_FAULT_SPAWN_REFUSED,
                 {String("route ") + String::num_int64(p_record->get_route()),
                  String("an unregistered spawn constructor"),
-                 String("a spawn constructor registered with "
-                        "{NetwMultiplayer.spawn_register_constructor}")},
+                 String(
+                     "a spawn constructor registered with "
+                     "{NetwMultiplayer.spawn_register_constructor}"
+                 )},
                 uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
@@ -707,8 +710,10 @@ PackedByteArray Pipeline::encode_record_frame(
                 NETW_FAULT_SPAWN_REFUSED,
                 {String("route ") + String::num_int64(p_record->get_route()),
                  String("a spawn constructor with no argument types"),
-                 String("{NetwMultiplayer.spawn_register_constructor} with "
-                        "arg_types")},
+                 String(
+                     "{NetwMultiplayer.spawn_register_constructor} with "
+                     "arg_types"
+                 )},
                 uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
@@ -726,10 +731,14 @@ PackedByteArray Pipeline::encode_record_frame(
                 session,
                 NETW_FAULT_SPAWN_REFUSED,
                 {String("route ") + String::num_int64(p_record->get_route()),
-                 String("a node holding the spawn function that is gone or "
-                        "outside the multiplayer root"),
-                 String("a node inside the multiplayer root holding the "
-                        "spawn function")},
+                 String(
+                     "a node holding the spawn function that is gone or "
+                     "outside the multiplayer root"
+                 ),
+                 String(
+                     "a node inside the multiplayer root holding the "
+                     "spawn function"
+                 )},
                 uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
@@ -745,8 +754,10 @@ PackedByteArray Pipeline::encode_record_frame(
                 {String("route ") + String::num_int64(p_record->get_route()),
                  String("the unregistered spawn function '")
                      + String(p_record->get_fn_method()) + String("'"),
-                 String("{Netw.configure_spawn} on it before calling "
-                        "{Netw.spawn}")},
+                 String(
+                     "{Netw.configure_spawn} on it before calling "
+                     "{Netw.spawn}"
+                 )},
                 uint64_t(gd::instance_id(p_node))
             );
             return PackedByteArray();
@@ -948,11 +959,7 @@ bool decode_spawn_frame(
     return true;
 }
 
-bool Pipeline::frame_read(
-    bool p_healthy,
-    int64_t p_route,
-    int64_t p_sender
-) {
+bool Pipeline::frame_read(bool p_healthy, int64_t p_route, int64_t p_sender) {
     if (p_healthy) {
         return true;
     }
@@ -1131,11 +1138,7 @@ void Pipeline::decide_spawn(
     r_ops.rows.push_back(op);
 }
 
-void Pipeline::built(
-    const NodeOp &p_op,
-    Built::Outcome p_outcome,
-    Ops &r_ops
-) {
+void Pipeline::built(const NodeOp &p_op, Built::Outcome p_outcome, Ops &r_ops) {
     settle_build(p_outcome, p_op.sender, r_ops);
 }
 
@@ -1409,8 +1412,7 @@ void Pipeline::handle_reparent_frame(
     if (!NetwMultiplayer::verb_head_read(reader, route, epoch)
         || !session->anchor_decode(reader, anchor)
         || !reader.varuint(revision, 5) || !reader.varuint(author, 5)
-        || !reader.align_verify()
-        || reader.bits_remaining() != 0) {
+        || !reader.align_verify() || reader.bits_remaining() != 0) {
         frame_read(false, route, p_sender);
         return;
     }
@@ -1681,8 +1683,10 @@ void Pipeline::retry_build(int64_t p_route, Ops &r_ops) {
                 NETW_FAULT_SPAWN_RETURN,
                 {String("spawn function '") + String(method) + String("'"),
                  String("a freed holder node"),
-                 String("a node holding the spawn function that stays "
-                        "until it returns")}
+                 String(
+                     "a node holding the spawn function that stays "
+                     "until it returns"
+                 )}
             );
         } else {
             warn_slow_build(
@@ -1755,10 +1759,7 @@ int64_t Pipeline::build_waits(
     return serial;
 }
 
-Built::Outcome Pipeline::build_settled(
-    int64_t p_serial,
-    Built &r_built
-) const {
+Built::Outcome Pipeline::build_settled(int64_t p_serial, Built &r_built) const {
     const Build *settled = builds.getptr(r_built.frame.route);
     if (settled == nullptr || settled->serial != p_serial) {
         return Built::DROPPED;
@@ -1898,10 +1899,7 @@ int64_t Pipeline::gate_display_tick() const {
     return -1;
 }
 
-void Pipeline::apply_action_gate(
-    int64_t p_route,
-    const RID &p_entity
-) {
+void Pipeline::apply_action_gate(int64_t p_route, const RID &p_entity) {
     if (session == nullptr) {
         return;
     }
@@ -2015,9 +2013,8 @@ PackedInt64Array Pipeline::promote_received() {
         const Ref<NetwEntity> above = NetwEntity::of(node->get_parent());
         record.set_node_name(String(node->get_name()));
         record.set_parent_route(
-            above.is_valid()
-                ? liveness_core->route_of(above->get_rid_handle())
-                : 0
+            above.is_valid() ? liveness_core->route_of(above->get_rid_handle())
+                             : 0
         );
         record.set_entity_id(entity->get_name());
         record.set_peer_id(entity->get_peer_id());

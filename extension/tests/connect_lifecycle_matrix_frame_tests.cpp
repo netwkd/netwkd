@@ -376,8 +376,7 @@ class ConnectLifecycleMatrix final : public netw_test::FrameScenario {
             = sides[p_side].connection->endpoints();
         for (int64_t at = 0; at < rows.size(); at++) {
             const Ref<NetwEndpoint> row = rows[at];
-            if (row->get_source() == p_source
-                && row->get_address() == wanted) {
+            if (row->get_source() == p_source && row->get_address() == wanted) {
                 return row;
             }
         }

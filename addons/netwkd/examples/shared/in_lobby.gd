@@ -11,30 +11,30 @@ signal start_pressed()
 
 func _ready() -> void:
 	hide()
-	session.player_joined.connect(on_roster_changed)
-	session.player_left.connect(on_roster_changed.unbind(1))
-	session.local_joined.connect(on_local_joined)
-	session.scene_ready.connect(on_scene_ready)
+	session.player_joined.connect(_on_roster_changed)
+	session.player_left.connect(_on_roster_changed.unbind(1))
+	session.local_joined.connect(_on_local_joined)
+	session.scene_ready.connect(_on_scene_ready)
 	session.exiting.connect(hide.unbind(2))
 	start_btn.pressed.connect(start_pressed.emit)
 	leave_btn.pressed.connect(session.leave)
 
 
-func on_local_joined(_player: NetwPlayer) -> void:
+func _on_local_joined(_player: NetwPlayer) -> void:
 	refresh()
 	show()
 
 
-func on_scene_ready(scene: NetwScene) -> void:
+func _on_scene_ready(scene: NetwScene) -> void:
 	hide()
-	scene.root.tree_exited.connect(on_scene_closed, CONNECT_DEFERRED)
+	scene.root.tree_exited.connect(_on_scene_closed, CONNECT_DEFERRED)
 
 
-func on_scene_closed() -> void:
+func _on_scene_closed() -> void:
 	visible = session.is_online
 
 
-func on_roster_changed(_player: NetwPlayer) -> void:
+func _on_roster_changed(_player: NetwPlayer) -> void:
 	refresh()
 
 

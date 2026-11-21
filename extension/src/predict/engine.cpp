@@ -869,9 +869,8 @@ Dictionary NetwPredictionEngine::witness_sample(
         return Dictionary();
     }
     LocalVector<ObjectID> bodies;
-    const sim::Row *row = session != nullptr
-        ? sim_rows->row_of(seated->get_handle())
-        : nullptr;
+    const sim::Row *row
+        = session != nullptr ? sim_rows->row_of(seated->get_handle()) : nullptr;
     if (row != nullptr && row->bodies.recorded) {
         for (const sim::AuthoredBody &held : row->bodies.held) {
             bodies.push_back(held.node);
@@ -929,13 +928,12 @@ bool NetwPredictionEngine::predict_command(int64_t p_slot, int64_t p_tick) {
     arguments.push_back(subject);
     arguments.push_back(p_tick);
     bool called = false;
-    const Variant predicted
-        = game_call(
-            predictor,
-            arguments,
-            game_calls::PREDICT_INPUT_CALL,
-            &called
-        );
+    const Variant predicted = game_call(
+        predictor,
+        arguments,
+        game_calls::PREDICT_INPUT_CALL,
+        &called
+    );
     row = mutable_row_of(p_slot);
     if (row == nullptr) {
         return false;
@@ -1754,10 +1752,10 @@ bool NetwPredictionEngine::supports(
 predict::KindDefaults NetwPredictionEngine::slot_kind(int64_t p_slot) const {
     return predict::kind_defaults(
         decl_of(p_slot) != nullptr
-            && NetwMultiplayer::sim_physics_driven(
-                *owner_record(p_slot),
-                owner_node(p_slot)
-            )
+        && NetwMultiplayer::sim_physics_driven(
+            *owner_record(p_slot),
+            owner_node(p_slot)
+        )
     );
 }
 
@@ -2008,9 +2006,7 @@ bool NetwPredictionEngine::recovery_replays(int64_t p_slot) const {
     if (decl == nullptr) {
         return true;
     }
-    const int declared = predict::correction_for_mode(
-        decl->mode
-    );
+    const int declared = predict::correction_for_mode(decl->mode);
     return resolve_correction(p_slot, declared) == int(CorrectionMode::REPLAY);
 }
 
@@ -2025,8 +2021,8 @@ bool NetwPredictionEngine::demote_for_breach(
     const predict::Decl *decl = decl_of(p_slot);
     if (!p_breached || decl == nullptr
         || role_of(p_slot) != NetwPrediction::ROLE_PREDICT
-        || fallback_latched_of(p_slot)
-        || !decl->pause_on_unpredicted_contact || !samples_contacts(p_slot)) {
+        || fallback_latched_of(p_slot) || !decl->pause_on_unpredicted_contact
+        || !samples_contacts(p_slot)) {
         return false;
     }
     if (journal_has(p_slot, p_transition)) {
@@ -2052,11 +2048,8 @@ bool NetwPredictionEngine::demote_for_breach(
     );
     sync_episode(p_slot);
     send_command_frame(p_slot);
-    p_engine.enter_fallback(
-        p_transition,
-        int(predict::Attribution::CONTACT),
-        true
-    );
+    p_engine
+        .enter_fallback(p_transition, int(predict::Attribution::CONTACT), true);
     return true;
 }
 
@@ -2863,8 +2856,7 @@ int64_t NetwPredictionEngine::refresh_owner_ack_age(int64_t p_slot) {
 bool NetwPredictionEngine::speculation_horizon_full(int64_t p_slot) {
     refresh_owner_ack_age(p_slot);
     const predict::Decl *decl = decl_of(p_slot);
-    return decl != nullptr
-        && decl->ack_age_ticks >= predict::ACK_AGE_MAX;
+    return decl != nullptr && decl->ack_age_ticks >= predict::ACK_AGE_MAX;
 }
 
 namespace {
@@ -3347,8 +3339,7 @@ bool NetwPredictionEngine::run_recovery_ladder(
         if (planned->escalated) {
             set_cooldown_until_tick(
                 p_slot,
-                latest_input_tick_of(p_slot)
-                    + decl->correction_cooldown_ticks
+                latest_input_tick_of(p_slot) + decl->correction_cooldown_ticks
             );
         }
         skip = planned->skip;
@@ -3759,8 +3750,7 @@ Dictionary NetwPredictionEngine::try_transport(
     );
     const bool below_teleport = transport_moved(deltas)
         && !teleport_reached_of(p_slot, deltas, p_teleport_default);
-    const bool observing
-        = p_mode == int(NetwPrediction::MODE_OBSERVE);
+    const bool observing = p_mode == int(NetwPrediction::MODE_OBSERVE);
     const bool valid = candidate.get(StringName("valid"), false);
     const bool prior_ok = transport_admissible(
         p_slot,
@@ -3779,12 +3769,9 @@ Dictionary NetwPredictionEngine::try_transport(
         Array arguments;
         arguments.push_back(p_current);
         arguments.push_back(proposed);
-        corridor_clear
-            = bool(game_call(
-                p_corridor,
-                arguments,
-                game_calls::CORRECTION_PATH_CALL
-            ));
+        corridor_clear = bool(
+            game_call(p_corridor, arguments, game_calls::CORRECTION_PATH_CALL)
+        );
     }
     const bool eligible = prior_ok && corridor_clear;
 
@@ -4496,11 +4483,7 @@ void NetwPredictionEngine::emit_recovered(
     const Dictionary deltas
         = predict::payload_of(row->wiring, row->recovering.deltas);
     if (absorbs) {
-        host->display_on_recovered(
-            entity,
-            deltas,
-            p_teleported
-        );
+        host->display_on_recovered(entity, deltas, p_teleported);
     }
     if (!heard) {
         return;
@@ -4758,10 +4741,8 @@ int NetwPredictionEngine::open_recovery_rows(
     if (row == nullptr || decl == nullptr) {
         return RECOVERY_PLAN;
     }
-    row->config.correction = settle_correction(
-        p_slot,
-        predict::correction_for_mode(decl->mode)
-    );
+    row->config.correction
+        = settle_correction(p_slot, predict::correction_for_mode(decl->mode));
     capture_canonical(p_slot, row->recovering.before);
     row = mutable_row_of(p_slot);
     if (row == nullptr) {
@@ -4778,8 +4759,7 @@ int NetwPredictionEngine::open_recovery_rows(
 
     Dictionary carried;
     const PackedInt64Array stats = episode_stats(p_slot);
-    if (decl->correction_path.is_valid()
-        && stats[STAT_EPISODE_ACTIVE] != 0
+    if (decl->correction_path.is_valid() && stats[STAT_EPISODE_ACTIVE] != 0
         && stats[STAT_EPISODE_TRANSPORT_DECIDED] == 0) {
         carried = try_transport(
             p_slot,

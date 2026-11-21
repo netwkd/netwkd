@@ -120,11 +120,10 @@ public:
         AbandonEvidence &seen = abandon_evidence();
         if (step == 0) {
             live = new CarryRun();
-            live->settling
-                = live->core->scene_move_entity(
-                    live->mover_handle,
-                    live->target_handle
-                );
+            live->settling = live->core->scene_move_entity(
+                live->mover_handle,
+                live->target_handle
+            );
             seen.driven = true;
             ++step;
             return true;

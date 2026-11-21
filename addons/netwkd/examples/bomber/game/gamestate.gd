@@ -16,10 +16,10 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	session.exited.connect(on_session_exited)
+	session.exited.connect(_on_session_exited)
 
 
-func on_session_exited(reason: NetwSession.ExitReason, detail: String) -> void:
+func _on_session_exited(reason: NetwSession.ExitReason, detail: String) -> void:
 	if reason != NetwSession.LOCAL_LEAVE:
 		game_error.emit(detail if not detail.is_empty() else "Connection lost")
 

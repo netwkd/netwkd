@@ -34,27 +34,6 @@ Methods
 
 .. rst-class:: classref-descriptions-group
 
-Constants
----------
-
-.. _class_addons_netwkd_gdscript_async_gd_constant_Async:
-
-.. rst-class:: classref-constant
-
-**Async** = ``<Object>`` :ref:`🔗<class_addons_netwkd_gdscript_async_gd_constant_Async>`
-
-.. container:: contribute
-
-	There is currently no description for this constant. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
-
-
-
-.. rst-class:: classref-section-separator
-
-----
-
-.. rst-class:: classref-descriptions-group
-
 Method Descriptions
 -------------------
 

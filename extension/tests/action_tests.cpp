@@ -320,11 +320,7 @@ LawVerdict two_actions_apart(const World &) {
     Ref<NetwActionConfig> other;
     other.instantiate();
     other->set_authority(second);
-    netw::session_decl::declare_action(
-        shot.owner,
-        second.get_method(),
-        other
-    );
+    netw::session_decl::declare_action(shot.owner, second.get_method(), other);
     other->predict(second)
         ->confirm(log.callable(StringName("confirmed")))
         ->revert(log.callable(StringName("denied")));
@@ -339,8 +335,8 @@ LawVerdict two_actions_apart(const World &) {
             shot.owner->denials()
         );
     }
-    const int answered = log.count(StringName("denied"))
-        + log.count(StringName("confirmed"));
+    const int answered
+        = log.count(StringName("denied")) + log.count(StringName("confirmed"));
     if (answered != 1) {
         return law_broken("the second action heard %d answer(s)", answered);
     }

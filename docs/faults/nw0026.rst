@@ -8,7 +8,7 @@ NW0026. A spawn named something this peer does not have
 Reported as a warning when the server sends a spawn that needs a scene, node,
 spawn function, spawn constructor or parent that does not exist on this peer.
 
-The spawn was dropped. The log line gives the route and the missing piece.
+The spawn was dropped. The log line names the missing piece.
 
 A client that lacks the scene or the function cannot build the node.
 

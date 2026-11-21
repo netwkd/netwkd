@@ -80,10 +80,7 @@ TEST_CASE(
     "inline, and the settle lands it with no frame driven"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_warning(
-        "*'PredictedWithoutComponent'*[NW1038]*",
-        1
-    );
+    expected_faults.expect_warning("*'PredictedWithoutComponent'*[NW1038]*", 1);
 
     Stand stand;
     Node *node = declaring(

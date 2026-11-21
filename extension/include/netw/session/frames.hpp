@@ -308,10 +308,7 @@ struct ControlApply {
             netw::wire::varuint(5)
         ),
         netw::wire::field<&ControlApply::code>("code", netw::wire::varuint(2)),
-        netw::wire::field<&ControlApply::reason>(
-            "reason",
-            netw::wire::string()
-        )
+        netw::wire::field<&ControlApply::reason>("reason", netw::wire::string())
     );
 };
 

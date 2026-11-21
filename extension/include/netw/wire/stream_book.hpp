@@ -220,18 +220,6 @@ public:
         return expired_parks;
     }
 
-    uint64_t refused_open_count() const {
-        return refused_opens;
-    }
-
-    uint64_t held_row_count() const {
-        return held_rows;
-    }
-
-    uint64_t fenced_row_count() const {
-        return fenced_rows;
-    }
-
     uint32_t parked_count() const;
 
     uint32_t stream_count() const;

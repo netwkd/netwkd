@@ -251,8 +251,8 @@ Variant history_value(
             ? Variant()
             : wire::tail_value(
                   p_table.plan.column(p_column).text,
-                  p_table.history_tails
-                      [sample * p_table.tail_columns + p_column]
+                  p_table
+                      .history_tails[sample * p_table.tail_columns + p_column]
               );
     }
     return read_bytes(

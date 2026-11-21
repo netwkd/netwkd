@@ -91,9 +91,6 @@ public:
     Sketch &operator=(const Sketch &) = delete;
 
     void draw(const Drawing &p_drawing);
-    uint32_t space_count() const {
-        return spaces.size() + planes.size();
-    }
 
     static int64_t live_rids();
 

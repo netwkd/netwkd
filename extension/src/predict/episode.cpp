@@ -464,7 +464,7 @@ bool Episode::budget_exhausted() const {
             || closure_used >= EPISODE_FULL_CLOSURE_BUDGET);
 }
 
-bool Episode::operator_pending(Operator p_operator) const {
+bool Episode::newest_write_pending(Operator p_operator) const {
     for (int at = int(writes.size()) - 1; at >= 0; --at) {
         if (writes[uint32_t(at)].op != p_operator) {
             continue;

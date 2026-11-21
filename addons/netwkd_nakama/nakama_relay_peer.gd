@@ -5,6 +5,7 @@ extends MultiplayerPeerExtension
 ## [NakamaLobbyDirectory] creates it.
 class_name NakamaRelayPeer
 
+## The largest packet the peer sends, in bytes.
 const MAX_PACKET_SIZE := 1 << 24
 
 var _self_id := 0
@@ -20,9 +21,15 @@ var _relabels: Array[Callable] = []
 var _transfer_handler := Callable()
 
 
+## A packet received from the match, waiting for Godot to poll it.
 class Packet extends RefCounted:
+	## The packet bytes.
 	var data: PackedByteArray
+
+	## The peer id of the sender.
 	var from: int
+
+	## The server transfer the sender wrote the packet under.
 	var term: int
 
 

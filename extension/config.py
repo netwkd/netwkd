@@ -22,7 +22,7 @@ def configure(env):
 
 
 def get_doc_classes():
-    """Every documented class, read from the XML rather than listed."""
+    """Every documented class, read from the XML."""
     return sorted(path.stem for path in (ROOT / DOC_PATH).glob("*.xml"))
 
 

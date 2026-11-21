@@ -11,8 +11,8 @@
 #include "godot/rid.hpp"
 #include "godot/script.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/action_request.hpp"
 #include "netw/api/action_config.hpp"
+#include "netw/api/action_request.hpp"
 #include "netw/api/channel.hpp"
 #include "netw/api/clock.hpp"
 #include "netw/api/clock_config.hpp"
@@ -59,9 +59,7 @@ public:
     );
     static godot::Ref<NetwScene> scene(godot::Node *p_node);
 
-    static godot::Error configure_server_info(
-        const godot::Callable &p_handler
-    );
+    static godot::Error configure_server_info(const godot::Callable &p_handler);
     static godot::Ref<NetwJoinConfig> configure_join(
         const godot::Callable &p_handler
     );
@@ -132,10 +130,7 @@ public:
         godot::Node *p_node,
         const godot::StringName &p_property
     );
-    static void emit(
-        const godot::Signal &p_signal,
-        const godot::Array &p_args
-    );
+    static void emit(const godot::Signal &p_signal, const godot::Array &p_args);
     static godot::Ref<NetwChannel> channel(
         godot::Node *p_node,
         int64_t p_channel_id

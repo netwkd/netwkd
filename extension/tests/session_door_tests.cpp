@@ -366,10 +366,7 @@ LawVerdict provider_without_types(const Stand &) {
 
 LawVerdict completed_without_parameters(const Stand &) {
     FaultWatch watch;
-    watch.expect_error(
-        "*The NetwConnection.create_peer callback*[NW1002]*",
-        1
-    );
+    watch.expect_error("*The NetwConnection.create_peer callback*[NW1002]*", 1);
     const Ref<RefCounted> on = handlers();
     const Mounted branch("DoorCreatePeer");
 

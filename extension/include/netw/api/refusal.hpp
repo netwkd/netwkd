@@ -4,8 +4,7 @@
 
 namespace netw {
 
-template <typename T>
-godot::Ref<T> refused() {
+template <typename T> godot::Ref<T> refused() {
     godot::Ref<T> config;
     config.instantiate();
     config->refuse();

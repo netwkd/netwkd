@@ -66,9 +66,6 @@ public:
     const TargetRow *row(const godot::RID &p_target) const;
 
     godot::TypedArray<godot::RID> list() const;
-    const godot::LocalVector<godot::RID> &caller_targets() const {
-        return caller_rows;
-    }
     int size() const;
 
     void publish_directory(

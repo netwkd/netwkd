@@ -98,12 +98,10 @@ constexpr int GONE = 60;
 
 Variant policy(Node *p_ball) {
     const Ref<netw::NetwEntity> ball = netw::NetwEntity::of(p_ball);
-    return int(
-        netw::NetwMultiplayer::predict_resolve_mode(
-            *ball->get_record(),
-            ball->get_owner()
-        )
-    );
+    return int(netw::NetwMultiplayer::predict_resolve_mode(
+        *ball->get_record(),
+        ball->get_owner()
+    ));
 }
 
 World yard() {

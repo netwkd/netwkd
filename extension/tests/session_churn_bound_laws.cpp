@@ -20,8 +20,8 @@ namespace TestNetwSessionChurnBoundLaws {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
-using netw_test::LoopbackRig;
 using netw_test::Internals;
+using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
 constexpr int PER_ROUND = 4;

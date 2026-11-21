@@ -111,8 +111,7 @@ class FlowRun {
         if (declared.controller == NOBODY) {
             return;
         }
-        const Ref<netw::NetwPlayer> player
-            = p_rig.player(declared.controller);
+        const Ref<netw::NetwPlayer> player = p_rig.player(declared.controller);
         REQUIRE(player.is_valid());
         netw::NetwEntity::of(p_pair.authored)
             ->set(StringName("controller"), player);
@@ -575,8 +574,10 @@ FlowScenario restless() {
 }
 
 FlowScenario from_server() {
-    FlowScenario out = broadcast("the server broadcasting for a body nobody "
-                                 "steers");
+    FlowScenario out = broadcast(
+        "the server broadcasting for a body nobody "
+        "steers"
+    );
     out.clients = 1;
     out.controller = NOBODY;
     out.author = SERVER;

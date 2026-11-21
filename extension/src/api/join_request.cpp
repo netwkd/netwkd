@@ -58,9 +58,7 @@ void NetwJoinRequest::merge(
         fault::raise(
             nullptr,
             NETW_FAULT_EMPTY_ARGUMENT,
-            {"{NetwJoinRequest.add_account}",
-             String(),
-             "account id"}
+            {"{NetwJoinRequest.add_account}", String(), "account id"}
         );
         return;
     }

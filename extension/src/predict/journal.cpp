@@ -331,9 +331,6 @@ void Journal::mark_substituted(int64_t p_transition) {
         return;
     }
     flags[uint32_t(slot)] |= uint8_t(ROW_SUBSTITUTED | ROW_CLOSED);
-    // A transition authority ran with a command its owner never authored has
-    // an unequal antecedent by definition, so it is never entitled to
-    // exactness.
     domains[uint32_t(slot)] = uint8_t(Domain::OUT_OF_DOMAIN);
 }
 

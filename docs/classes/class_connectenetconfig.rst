@@ -57,9 +57,7 @@ Property Descriptions
 
 :godot:`int` **port** = ``21253`` :ref:`🔗<class_ConnectENetConfig_property_port>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The port the host listens on.
 
 .. rst-class:: classref-item-separator
 
@@ -71,9 +69,7 @@ Property Descriptions
 
 :godot:`int` **max_players** = ``32`` :ref:`🔗<class_ConnectENetConfig_property_max_players>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The most clients the host accepts.
 
 .. rst-class:: classref-section-separator
 
@@ -90,9 +86,7 @@ Method Descriptions
 
 :godot:`StringName` **peer_class**\ (\ ) :ref:`🔗<class_ConnectENetConfig_method_peer_class>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns ``&"ENetMultiplayerPeer"``.
 
 .. rst-class:: classref-item-separator
 
@@ -104,9 +98,7 @@ Method Descriptions
 
 :godot:`Dictionary` **settings**\ (\ ) :ref:`🔗<class_ConnectENetConfig_method_settings>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns :ref:`port<class_ConnectENetConfig_property_port>` and :ref:`max_players<class_ConnectENetConfig_property_max_players>`.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

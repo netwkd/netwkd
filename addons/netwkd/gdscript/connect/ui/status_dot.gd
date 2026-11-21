@@ -2,7 +2,7 @@
 class_name StatusDot
 extends Panel
 
-const WORDS := {
+const _WORDS := {
 	NetwEndpoint.STATUS_UNKNOWN: "Checking",
 	NetwEndpoint.STATUS_ONLINE: "Online",
 	NetwEndpoint.STATUS_FULL: "Full",
@@ -10,7 +10,7 @@ const WORDS := {
 	NetwEndpoint.STATUS_INCOMPATIBLE: "Incompatible",
 	NetwEndpoint.STATUS_UNSUPPORTED: "Unsupported",
 }
-const COLORS := {
+const _COLORS := {
 	NetwEndpoint.STATUS_UNKNOWN: Color(0.6, 0.6, 0.6),
 	NetwEndpoint.STATUS_ONLINE: Color(0.24, 0.81, 0.44),
 	NetwEndpoint.STATUS_FULL: Color(0.95, 0.77, 0.06),
@@ -19,8 +19,9 @@ const COLORS := {
 	NetwEndpoint.STATUS_UNSUPPORTED: Color(0.45, 0.45, 0.5),
 }
 
+## The status the dot shows. Its word is the tooltip.
 var status: NetwEndpoint.Status = NetwEndpoint.STATUS_UNKNOWN:
 	set(value):
 		status = value
-		self_modulate = COLORS[value]
-		tooltip_text = WORDS[value]
+		self_modulate = _COLORS[value]
+		tooltip_text = _WORDS[value]

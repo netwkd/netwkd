@@ -27,42 +27,47 @@
 class_name ConnectBrowser
 extends Control
 
-const ROW := preload("res://addons/netwkd/gdscript/connect/ui/row.tscn")
+const _ROW := preload("res://addons/netwkd/gdscript/connect/ui/row.tscn")
 
 ## Answers each [signal NetwConnection.invited] by joining that server, or by
 ## opening the join form when the session is online or the join needs inputs.
 @export var join_invites := true
+
 ## Hides the server list while the session is online.
 @export var hide_when_session_active := true
+
 ## Settings every connection through a transport starts from.
 @export var transport_defaults: Array[ConnectTransportConfig] = []
+
 ## On the web, keeps the hosted room after [code]#[/code] in the page URL.
 @export var use_url_fragment := true
 
-var rows: Dictionary[NetwEndpoint, ConnectBrowserRow] = { }
-var selected: NetwEndpoint
+## The player name sent with the next join or host.
 var username := "Player"
 
-@onready var session: NetwSession = Netw.session(self)
-@onready var connection: NetwConnection = session.connection
-@onready var server_list: VBoxContainer = $VBox
-@onready var list_box: VBoxContainer = %ListBox
-@onready var empty_state: Control = %EmptyState
-@onready var banner: Control = %Banner
-@onready var banner_label: Label = %BannerLabel
-@onready var details: Control = %Details
-@onready var details_status_dot: StatusDot = %DetailsStatusDot
-@onready var details_name_label: Label = %DetailsNameLabel
-@onready var details_source_label: Label = %DetailsSourceLabel
-@onready var details_address_label: Label = %DetailsAddressLabel
-@onready var details_status_label: Label = %DetailsStatusLabel
-@onready var details_ping_label: Label = %DetailsPingLabel
-@onready var details_players_label: Label = %DetailsPlayersLabel
-@onready var join_button: Button = %DetailsJoinButton
-@onready var host_popup: HostPopup = %HostPopup
-@onready var join_popup: JoinPopup = %JoinPopup
-@onready var join_direct_popup: JoinDirectPopup = %JoinDirectPopup
-@onready var connecting_popup: ConnectingPopup = %ConnectingPopup
+var _rows: Dictionary[NetwEndpoint, ConnectBrowserRow] = { }
+var _selected: NetwEndpoint
+
+@onready var _session: NetwSession = Netw.session(self)
+@onready var _connection: NetwConnection = _session.connection
+@onready var _server_list: VBoxContainer = $VBox
+@onready var _list_box: VBoxContainer = %ListBox
+@onready var _empty_state: Control = %EmptyState
+@onready var _banner: Control = %Banner
+@onready var _banner_label: Label = %BannerLabel
+@onready var _details: Control = %Details
+@onready var _details_status_dot: StatusDot = %DetailsStatusDot
+@onready var _details_name_label: Label = %DetailsNameLabel
+@onready var _details_source_label: Label = %DetailsSourceLabel
+@onready var _details_address_label: Label = %DetailsAddressLabel
+@onready var _details_status_label: Label = %DetailsStatusLabel
+@onready var _details_ping_label: Label = %DetailsPingLabel
+@onready var _details_players_label: Label = %DetailsPlayersLabel
+@onready var _join_button: Button = %DetailsJoinButton
+@onready var _host_popup: HostPopup = %HostPopup
+@onready var _join_popup: JoinPopup = %JoinPopup
+@onready var _join_direct_popup: JoinDirectPopup = %JoinDirectPopup
+@onready var _connecting_popup: ConnectingPopup = %ConnectingPopup
 
 
 func _enter_tree() -> void:
@@ -71,38 +76,40 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	for config in transport_defaults:
-		connection.set_defaults(config.peer_class(), config.settings())
-	connection.endpoint_added.connect(on_endpoint_added)
-	connection.endpoint_removed.connect(on_endpoint_removed)
-	session.state_changed.connect(on_state_changed)
-	connection.progressed.connect(on_progressed)
-	connection.failed.connect(on_failed, CONNECT_DEFERRED)
-	session.join_failed.connect(on_failed, CONNECT_DEFERRED)
-	connection.join_address_changed.connect(on_join_address_changed)
-	connection.invited.connect(_on_invited)
-	server_list.visibility_changed.connect(on_server_list_visibility_changed)
-	for endpoint in connection.endpoints:
-		on_endpoint_added(endpoint)
-	connection.browsing = server_list.is_visible_in_tree()
-	on_state_changed(session.state)
-	on_endpoint_changed()
-	banner.hide()
+		_connection.set_defaults(config.peer_class(), config.settings())
+	_connection.endpoint_added.connect(_on_endpoint_added)
+	_connection.endpoint_removed.connect(_on_endpoint_removed)
+	_session.state_changed.connect(_on_state_changed)
+	_connection.progressed.connect(_on_progressed)
+	_connection.failed.connect(_on_failed, CONNECT_DEFERRED)
+	_session.join_failed.connect(_on_failed, CONNECT_DEFERRED)
+	_connection.join_address_changed.connect(_on_join_address_changed)
+	_connection.invited.connect(_on_invited)
+	_server_list.visibility_changed.connect(
+		_on_server_list_visibility_changed,
+	)
+	for endpoint in _connection.endpoints:
+		_on_endpoint_added(endpoint)
+	_connection.browsing = _server_list.is_visible_in_tree()
+	_on_state_changed(_session.state)
+	_on_endpoint_changed()
+	_banner.hide()
 
-	%HostButton.pressed.connect(on_host_pressed)
-	%JoinDirectButton.pressed.connect(on_join_direct_pressed)
-	join_button.pressed.connect(on_join_pressed)
-	host_popup.submitted.connect(on_host_popup_submitted)
-	join_popup.submitted.connect(on_join_popup_submitted)
-	join_direct_popup.submitted.connect(on_join_direct_popup_submitted)
-	connecting_popup.cancelled.connect(connection.cancel)
+	%HostButton.pressed.connect(_on_host_pressed)
+	%JoinDirectButton.pressed.connect(_on_join_direct_pressed)
+	_join_button.pressed.connect(_on_join_pressed)
+	_host_popup.submitted.connect(_on_host_popup_submitted)
+	_join_popup.submitted.connect(_on_join_popup_submitted)
+	_join_direct_popup.submitted.connect(_on_join_direct_popup_submitted)
+	_connecting_popup.cancelled.connect(_connection.cancel)
 
 	var room := (
 			str(JavaScriptBridge.eval("location.hash")).trim_prefix("#")
 			if use_url_fragment and OS.has_feature("web") else ""
 	)
 	if not room.is_empty():
-		join_direct_popup.open(
-			connection,
+		_join_direct_popup.open(
+			_connection,
 			username,
 			&"WebRTCMultiplayerPeer",
 			room,
@@ -110,58 +117,58 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	connection.browsing = false
+	_connection.browsing = false
 
 
-func on_endpoint_added(endpoint: NetwEndpoint) -> void:
-	if rows.has(endpoint):
+func _on_endpoint_added(endpoint: NetwEndpoint) -> void:
+	if _rows.has(endpoint):
 		return
 
-	var row: ConnectBrowserRow = ROW.instantiate()
+	var row: ConnectBrowserRow = _ROW.instantiate()
 	row.endpoint = endpoint
-	rows[endpoint] = row
-	list_box.add_child(row)
-	row.selected.connect(on_row_selected.bind(endpoint))
-	row.activated.connect(on_row_activated.bind(endpoint))
-	endpoint.changed.connect(on_endpoint_changed)
-	empty_state.hide()
+	_rows[endpoint] = row
+	_list_box.add_child(row)
+	row.selected.connect(_on_row_selected.bind(endpoint))
+	row.activated.connect(_on_row_activated.bind(endpoint))
+	endpoint.changed.connect(_on_endpoint_changed)
+	_empty_state.hide()
 
 
-func on_endpoint_removed(endpoint: NetwEndpoint) -> void:
-	if not rows.has(endpoint):
+func _on_endpoint_removed(endpoint: NetwEndpoint) -> void:
+	if not _rows.has(endpoint):
 		return
 
-	rows[endpoint].queue_free()
-	rows.erase(endpoint)
-	empty_state.visible = rows.is_empty()
-	if endpoint == selected:
-		on_row_selected(null)
+	_rows[endpoint].queue_free()
+	_rows.erase(endpoint)
+	_empty_state.visible = _rows.is_empty()
+	if endpoint == _selected:
+		_on_row_selected(null)
 
 
-func on_state_changed(state: NetwSession.State) -> void:
+func _on_state_changed(state: NetwSession.State) -> void:
 	match state:
 		NetwSession.STATE_OFFLINE:
-			connecting_popup.hide()
-			server_list.show()
+			_connecting_popup.hide()
+			_server_list.show()
 		NetwSession.STATE_CREATING, NetwSession.STATE_CONNECTING:
-			banner.hide()
-			connecting_popup.open()
+			_banner.hide()
+			_connecting_popup.open()
 		NetwSession.STATE_ONLINE, NetwSession.STATE_DISCONNECTING:
-			connecting_popup.hide()
-			server_list.visible = not hide_when_session_active
+			_connecting_popup.hide()
+			_server_list.visible = not hide_when_session_active
 
 
-func on_progressed(message: String, ratio: float) -> void:
-	connecting_popup.progressed(message, ratio)
+func _on_progressed(message: String, ratio: float) -> void:
+	_connecting_popup.progressed(message, ratio)
 
 
-func on_failed(_error: Error, reason: String) -> void:
-	banner_label.text = reason
-	banner.show()
-	connecting_popup.failed(reason)
+func _on_failed(_error: Error, reason: String) -> void:
+	_banner_label.text = reason
+	_banner.show()
+	_connecting_popup.failed(reason)
 
 
-func on_join_address_changed(address: String) -> void:
+func _on_join_address_changed(address: String) -> void:
 	if use_url_fragment and OS.has_feature("web"):
 		JavaScriptBridge.get_interface("history").replaceState(
 			null,
@@ -170,95 +177,100 @@ func on_join_address_changed(address: String) -> void:
 		)
 
 
-func on_server_list_visibility_changed() -> void:
-	connection.browsing = server_list.is_visible_in_tree()
+func _on_server_list_visibility_changed() -> void:
+	_connection.browsing = _server_list.is_visible_in_tree()
 
 
 func _on_invited(endpoint: NetwEndpoint) -> void:
 	if not join_invites:
 		return
-	on_row_selected(endpoint)
-	if session.is_online or not connection.join_schema().is_empty():
-		on_join_pressed()
+	_on_row_selected(endpoint)
+	if _session.is_online or not _connection.join_schema().is_empty():
+		_on_join_pressed()
 		return
 	join(endpoint, { }, [])
 
 
+## Joins [param endpoint] as [member username]. [param join_args] follow the
+## username in [method Netw.prepare_join].
 func join(
 		endpoint: NetwEndpoint,
 		settings: Dictionary,
 		join_args: Array,
 ) -> void:
 	Netw.prepare_join.callv([self, username] + join_args)
-	connection.join(endpoint, settings)
+	_connection.join(endpoint, settings)
 
 
+## Hosts over [param transport] as [member username], advertising
+## [param info]. [param join_args] follow the username in
+## [method Netw.prepare_join].
 func host(
 		transport: StringName,
 		settings: Dictionary,
 		info: NetwServerInfo,
 		join_args: Array,
 ) -> void:
-	session.set_server_info(info)
+	_session.set_server_info(info)
 	Netw.prepare_join.callv([self, username] + join_args)
-	connection.host(transport, settings)
+	_connection.host(transport, settings)
 
 
-func on_row_selected(endpoint: NetwEndpoint) -> void:
-	selected = endpoint
-	on_endpoint_changed()
+func _on_row_selected(endpoint: NetwEndpoint) -> void:
+	_selected = endpoint
+	_on_endpoint_changed()
 
 
-func on_row_activated(endpoint: NetwEndpoint) -> void:
-	on_row_selected(endpoint)
-	on_join_pressed()
+func _on_row_activated(endpoint: NetwEndpoint) -> void:
+	_on_row_selected(endpoint)
+	_on_join_pressed()
 
 
-func on_endpoint_changed() -> void:
-	details.visible = selected != null
-	if selected == null:
+func _on_endpoint_changed() -> void:
+	_details.visible = _selected != null
+	if _selected == null:
 		return
-	var row := rows[selected]
-	details_status_dot.status = selected.status
-	details_name_label.text = row.name_label.text
-	details_source_label.text = row.badge_label.text
-	details_address_label.text = selected.address
-	details_status_label.text = StatusDot.WORDS[selected.status]
-	details_ping_label.text = row.ping_label.text
-	details_players_label.text = row.players_label.text
-	join_button.disabled = selected.status in [
+	var row := _rows[_selected]
+	_details_status_dot.status = _selected.status
+	_details_name_label.text = row._name_label.text
+	_details_source_label.text = row._badge_label.text
+	_details_address_label.text = _selected.address
+	_details_status_label.text = _details_status_dot.tooltip_text
+	_details_ping_label.text = row._ping_label.text
+	_details_players_label.text = row._players_label.text
+	_join_button.disabled = _selected.status in [
 		NetwEndpoint.STATUS_FULL,
 		NetwEndpoint.STATUS_INCOMPATIBLE,
 		NetwEndpoint.STATUS_UNSUPPORTED,
 	]
 
 
-func on_join_pressed() -> void:
-	join_popup.open(connection, selected, username)
+func _on_join_pressed() -> void:
+	_join_popup.open(_connection, _selected, username)
 
 
-func on_join_direct_pressed() -> void:
-	join_direct_popup.open(connection, username)
+func _on_join_direct_pressed() -> void:
+	_join_direct_popup.open(_connection, username)
 
 
-func on_host_pressed() -> void:
-	host_popup.open(connection, username)
+func _on_host_pressed() -> void:
+	_host_popup.open(_connection, username)
 
 
-func on_join_popup_submitted(
+func _on_join_popup_submitted(
 		settings: Dictionary,
 		player_name: String,
 		join_args: Array,
 ) -> void:
-	var endpoint := selected
-	if session.is_online:
-		await session.leave().wait()
+	var endpoint := _selected
+	if _session.is_online:
+		await _session.leave().wait()
 
 	username = player_name
 	join(endpoint, settings, join_args)
 
 
-func on_join_direct_popup_submitted(
+func _on_join_direct_popup_submitted(
 		transport: StringName,
 		address: String,
 		settings: Dictionary,
@@ -266,10 +278,10 @@ func on_join_direct_popup_submitted(
 		join_args: Array,
 ) -> void:
 	username = player_name
-	join(connection.add(transport, address), settings, join_args)
+	join(_connection.add(transport, address), settings, join_args)
 
 
-func on_host_popup_submitted(
+func _on_host_popup_submitted(
 		transport: StringName,
 		settings: Dictionary,
 		info: NetwServerInfo,

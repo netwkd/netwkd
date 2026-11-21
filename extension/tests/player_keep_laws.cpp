@@ -600,10 +600,7 @@ TEST_CASE(
         NETW_CHECK_EQ(held->get_peer_id(), peer);
         NETW_CHECK_EQ(held->get_controller(), peer);
     }
-    NETW_CHECK_EQ(
-        world.entity(route, -1)->get_player_id(),
-        returned->get_id()
-    );
+    NETW_CHECK_EQ(world.entity(route, -1)->get_player_id(), returned->get_id());
     CHECK(world.entity(route, back)->get_is_controlled_locally());
     REQUIRE(returned->get_scene().is_valid());
     CHECK(world.rig.server()

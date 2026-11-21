@@ -59,13 +59,6 @@ An entity is simulated once it sets or calls anything here, is predicted as :ref
 
 The peer writing replicated state runs :ref:`MODE_AUTHORITY<class_NetwSimulation_constant_MODE_AUTHORITY>`. A predicting client runs :ref:`MODE_PREDICT<class_NetwSimulation_constant_MODE_PREDICT>`. Every other copy is :ref:`MODE_PROXY<class_NetwSimulation_constant_MODE_PROXY>` or :ref:`MODE_ACTIVE<class_NetwSimulation_constant_MODE_ACTIVE>`, as :ref:`remote_mode<class_NetwSimulation_property_remote_mode>` says.
 
-.. rst-class:: classref-introduction-group
-
-Tutorials
----------
-
-- `Prediction guide <https://netwkd.readthedocs.io/en/latest/guides/prediction.html>`__
-
 .. rst-class:: classref-reftable-group
 
 Properties

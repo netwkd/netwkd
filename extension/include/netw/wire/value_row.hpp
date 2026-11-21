@@ -25,27 +25,6 @@ bool cell_value(
     godot::Variant &r_value
 );
 
-template <class Stream>
-bool carry_value(
-    Stream &p_stream,
-    const ColumnPlan &p_slot,
-    godot::Variant &r_value
-) {
-    godot::PackedByteArray encoded;
-    if constexpr (!Stream::is_reading) {
-        if (!cell_bytes(p_slot, r_value, encoded)) {
-            return false;
-        }
-    }
-    if (!p_stream.bytes_capped(encoded, VARIABLE_BYTES_CAP)) {
-        return false;
-    }
-    if constexpr (Stream::is_reading) {
-        return cell_value(p_slot, encoded, r_value);
-    }
-    return true;
-}
-
 bool cell_tail(bool p_text, const godot::Variant &p_value, TailRef &r_tail);
 
 godot::Error value_tail(const godot::Variant &p_value, TailRef &r_tail);

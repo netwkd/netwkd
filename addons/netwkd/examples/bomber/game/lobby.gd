@@ -9,7 +9,7 @@ const BomberGamestate := preload("gamestate.gd")
 
 
 func _ready() -> void:
-	session.scene_ready.connect(on_scene_ready)
+	session.scene_ready.connect(_on_scene_ready)
 
 	var gamestate := session.service(BomberGamestate) as BomberGamestate
 	gamestate.game_error.connect(set_status)
@@ -18,7 +18,7 @@ func _ready() -> void:
 	status.visible = false
 
 
-func on_scene_ready(_scene: NetwScene) -> void:
+func _on_scene_ready(_scene: NetwScene) -> void:
 	set_status("")
 
 

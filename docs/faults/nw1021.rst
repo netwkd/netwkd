@@ -2,12 +2,13 @@
 
 .. _fault_nw1021:
 
-NW1021. A route did not become live in time
-===========================================
+NW1021. A packet named an entity that did not spawn in time
+===========================================================
 
 Reported as a warning when a packet names an entity that has not spawned on
 this peer, and the entity does not spawn before the packet's wait times out.
 
-The packet was dropped. The log line gives the route.
+The packet was dropped.
 
-Make sure the server sends the entity at that route to this peer.
+Have the server spawn that entity on this peer before it sends packets about
+it.

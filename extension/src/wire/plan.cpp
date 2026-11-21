@@ -3,8 +3,8 @@
 #include "netw/wire/plan.hpp"
 
 #include "netw/colors.hpp"
-#include "netw/schema_core.hpp"
 #include "netw/profile.hpp"
+#include "netw/schema_core.hpp"
 
 using namespace godot;
 
@@ -75,8 +75,7 @@ bool ColumnPlan::mistypes(const TailRef &p_tail) const {
     if (held[0] != typed || p_tail.size() <= parts) {
         return true;
     }
-    return held[1] != element_tags[0]
-        || (!list && held[2] != element_tags[1]);
+    return held[1] != element_tags[0] || (!list && held[2] != element_tags[1]);
 }
 
 int WirePlan::element_width(int column_type) {

@@ -22,9 +22,11 @@ Ref<NetwChannel> NetwChannel::over(int64_t p_id, NetwMultiplayer *p_session) {
             NETW_FAULT_BAD_VALUE,
             {String("{Netw.channel}"),
              vformat("channel id %d", int(p_id)),
-             vformat("an id from %d to %d",
-                     int(NetwMultiplayer::CHANNEL_USER_FIRST),
-                     int(NetwMultiplayer::CHANNEL_USER_LAST))}
+             vformat(
+                 "an id from %d to %d",
+                 int(NetwMultiplayer::CHANNEL_USER_FIRST),
+                 int(NetwMultiplayer::CHANNEL_USER_LAST)
+             )}
         );
         return Ref<NetwChannel>();
     }

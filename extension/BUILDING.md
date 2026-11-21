@@ -30,6 +30,9 @@ Put personal SCons defaults in `extension/custom.py`.
 Set `NETW_STORE_VALIDATE=1` before starting Godot to check cached node and
 row lookups against a fresh lookup, and report a mismatch as a netwkd bug.
 
+A debug build draws prediction and interpolation overlays when Godot starts with
+`--netw-hints=prediction,interpolation` or the same list in `NETW_HINTS`.
+
 ## Tests
 
 Build the library with its tests, then run them.

@@ -58,12 +58,6 @@ struct PropertyColumn {
     void set_lane(int64_t p_value) {
         lane = p_value;
     }
-    bool get_watch() const {
-        return watch;
-    }
-    void set_watch(bool p_value) {
-        watch = p_value;
-    }
 };
 
 class PropertySet {

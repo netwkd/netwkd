@@ -61,11 +61,10 @@ struct Lane {
     int64_t hole = -1;
 
     int64_t fact(const char *p_name) const {
-        const Dictionary facts
-            = Internals::predict_declaration(
-                  rig->prediction_handle(StringName("P"))
-            )
-                  .facts.to_dictionary();
+        const Dictionary facts = Internals::predict_declaration(
+                                     rig->prediction_handle(StringName("P"))
+        )
+                                     .facts.to_dictionary();
         return int64_t(facts.get(StringName(p_name), int64_t(-1)));
     }
 

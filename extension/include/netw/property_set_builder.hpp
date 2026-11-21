@@ -31,10 +31,6 @@ bool compile_node(
     int64_t p_record
 );
 
-uint64_t from_node(
-    godot::Node *p_node,
-    int64_t p_record,
-    godot::Object *p_api
-);
+uint64_t from_node(godot::Node *p_node, int64_t p_record, godot::Object *p_api);
 
 } // namespace netw::property_set_builder

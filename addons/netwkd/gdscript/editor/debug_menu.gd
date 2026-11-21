@@ -1,4 +1,5 @@
 @tool
+## Adds the netwkd debug draw toggles to the editor's Debug menu.
 extends RefCounted
 
 const _HINTS: Array[Dictionary] = [
@@ -25,6 +26,8 @@ func _init(plugin: EditorPlugin) -> void:
 	_plugin = plugin
 
 
+## Adds the toggles to the Debug menu, or to a submenu of Project > Tools
+## when the Debug menu is missing.
 func attach() -> void:
 	# The Debug menu is found by node name because the editor publishes no
 	# API for it.
@@ -52,6 +55,7 @@ func attach() -> void:
 	_menu.id_pressed.connect(_on_id_pressed)
 
 
+## Removes the toggles.
 func detach() -> void:
 	if _menu == null:
 		return
@@ -67,6 +71,8 @@ func detach() -> void:
 	_menu = null
 
 
+## Returns [param args] with a [code]--netw-hints[/code] argument for the
+## checked toggles.
 func run_args(args: PackedStringArray) -> PackedStringArray:
 	var enabled := _enabled()
 	if not enabled.is_empty():

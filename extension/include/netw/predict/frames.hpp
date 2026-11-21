@@ -74,13 +74,6 @@ struct AckFrame {
     godot::LocalVector<AckEvidenceWire> records;
 };
 
-inline uint8_t ack_flags(int p_flags, int p_witness_class) {
-    return uint8_t(
-        (p_flags & ~int(ACK_WITNESS_MASK))
-        | ((p_witness_class << ACK_WITNESS_SHIFT) & int(ACK_WITNESS_MASK))
-    );
-}
-
 inline int ack_witness_class(uint8_t p_flags) {
     return int((p_flags & ACK_WITNESS_MASK) >> ACK_WITNESS_SHIFT);
 }

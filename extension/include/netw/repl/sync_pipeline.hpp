@@ -248,10 +248,7 @@ public:
         NetwPredictionEngine *p_prediction
     );
 #if defined(DEBUG_ENABLED)
-    void seat_profiler(
-        wire::NetworkProfiler *p_profiler,
-        uint32_t *p_outgoing
-    );
+    void seat_profiler(wire::NetworkProfiler *p_profiler, uint32_t *p_outgoing);
 #endif
 #if defined(NETW_TESTS)
     void seat_idle(session::IdleWork *p_idle);
@@ -278,14 +275,6 @@ public:
     }
     void unregister_derived(godot::Node *p_node);
     godot::LocalVector<repl::PropertyBindingPtr> derived_group(int64_t p_route);
-#if defined(NETW_TESTS)
-    void reconcile_state_timeline_for_test(godot::Node *p_node) {
-        reconcile_state_timeline(p_node);
-    }
-    void reconcile_dropped_state_timelines_for_test() {
-        reconcile_dropped_state_timelines();
-    }
-#endif
 
     void pump(int64_t p_tick);
     void open_carrier_batch(

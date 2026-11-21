@@ -7,7 +7,6 @@
 #include "godot/time.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;

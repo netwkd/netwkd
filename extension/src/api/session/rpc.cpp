@@ -231,11 +231,8 @@ NetwCarrierFrame NetwMultiplayer::receive_header(
         return header;
     }
     world.wire.count_received(p_packet.size() - header.payload_offset);
-    world.wire.attribution.note_datagram(
-        true,
-        p_peer,
-        int64_t(p_packet.size())
-    );
+    world.wire.attribution
+        .note_datagram(true, p_peer, int64_t(p_packet.size()));
 #if defined(DEBUG_ENABLED)
     const bool bare = header.payload_offset == p_packet.size();
     if (bare) {
@@ -719,9 +716,7 @@ Error NetwMultiplayer::rpc_declared(
     fault::raise(
         this,
         NETW_FAULT_UNKNOWN_NAME,
-        {String("The call"),
-         String(p_node->get_name()),
-         String(p_method)},
+        {String("The call"), String(p_node->get_name()), String(p_method)},
         gd::instance_id(p_node)
     );
     return ERR_METHOD_NOT_FOUND;
@@ -955,10 +950,7 @@ Dictionary NetwMultiplayer::lagcomp_metrics() const {
     return out;
 }
 
-double NetwMultiplayer::peer_get_traffic(
-    int64_t p_peer,
-    Traffic p_stat
-) const {
+double NetwMultiplayer::peer_get_traffic(int64_t p_peer, Traffic p_stat) const {
     return world.wire.traffic.read(p_peer, int(p_stat));
 }
 
@@ -1807,7 +1799,7 @@ bool NetwMultiplayer::rpc_sender_allowed(
                 return p_record != nullptr
                     && p_sender
                     == entity::Control::public_peer(
-                        p_record->get_control()->resolve()
+                           p_record->get_control()->resolve()
                     );
             case NetwMemberConfig::POLICY_ANY_PEER:
                 return true;
@@ -2027,12 +2019,8 @@ void NetwMultiplayer::rpc_handle_call(
         : StringName(token);
 
     NETW_NETWORK_PROFILE(
-        const uint32_t subject = profiler_member(
-            route,
-            wire::CHANNEL_CALL,
-            p_comp_node,
-            method
-        )
+        const uint32_t subject
+        = profiler_member(route, wire::CHANNEL_CALL, p_comp_node, method)
     );
     NETW_NETWORK_PROFILE(network_profiler.name_arrival(subject));
     NETW_NETWORK_PROFILE(
@@ -2361,9 +2349,11 @@ Error NetwMultiplayer::rpc_send(
             NETW_FAULT_BAD_VALUE,
             {String("{NetwMultiplayer.rpc_send}"),
              vformat("channel id %d", int(p_channel)),
-             vformat("an id from %d to %d",
-                     int(CHANNEL_USER_FIRST),
-                     int(CHANNEL_USER_LAST))}
+             vformat(
+                 "an id from %d to %d",
+                 int(CHANNEL_USER_FIRST),
+                 int(CHANNEL_USER_LAST)
+             )}
         );
         return ERR_INVALID_PARAMETER;
     }
@@ -2487,7 +2477,8 @@ Error NetwMultiplayer::send_frame(
     }
 #endif
 
-    const wire::Delivery delivery = link.channel_delivery(p_channel, p_delivery);
+    const wire::Delivery delivery
+        = link.channel_delivery(p_channel, p_delivery);
     const int64_t deadline = p_reliable ? 0 : wire::ride_deadline_ms(delivery);
     if (p_reliable && wire::ride_deadline_ms(delivery) > 0) {
         NETW_BUG_REPORT();
@@ -2539,7 +2530,7 @@ int64_t NetwMultiplayer::send_datagram(
         p_carrier,
         wire_stamp()
 #if defined(DEBUG_ENABLED)
-        ,
+            ,
         network_profiler.active()
 #endif
     );

@@ -188,8 +188,7 @@ void report(
 }
 
 void report_bug(const char *function, const char *file, int line) {
-    const FaultText text
-        = bug_text(vformat("%s:%d", String::utf8(file), line));
+    const FaultText text = bug_text(vformat("%s:%d", String::utf8(file), line));
     report(
         Level::ERROR,
         text.what + String(" ") + text.fix,

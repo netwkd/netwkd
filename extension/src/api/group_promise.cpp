@@ -1,8 +1,8 @@
 #include "netw/api/group_promise.hpp"
 
 #include "godot/class_db.hpp"
-#include "netw/game_call.hpp"
 #include "netw/fault_book.hpp"
+#include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/subsystems.hpp"
 

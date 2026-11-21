@@ -532,8 +532,8 @@ bool NetwPredictionEngine::admits_rollback_together(int64_t p_slot) {
     const NetwEntityRecord *owner = owner_record(p_slot);
     const bool requested = decl != nullptr
         && NetwMultiplayer::predict_rolls_back_together(
-            *owner_record(p_slot),
-            owner_node(p_slot)
+                               *owner_record(p_slot),
+                               owner_node(p_slot)
         );
     if (!requested || role_of(p_slot) == int(Role::REMOTE)) {
         return requested;
@@ -782,8 +782,7 @@ void NetwPredictionEngine::admit_simulated_rows(
     const PropertyBindingPtr binding = state_binding_of(p_slot);
     predict::Slot *row = mutable_row_of(p_slot);
     if (handle == nullptr || decl == nullptr || host == nullptr
-        || seated == nullptr
-        || binding == nullptr || row == nullptr) {
+        || seated == nullptr || binding == nullptr || row == nullptr) {
         return;
     }
     const RID entity = seated->get_handle();
@@ -968,11 +967,8 @@ void NetwPredictionEngine::refresh_selection(int64_t p_slot, bool p_joint) {
             admitted.push_back(member);
         }
     }
-    const LocalVector<RID> promoted = host->sim_select(
-        subject,
-        admitted,
-        drive_frontier(p_slot)
-    );
+    const LocalVector<RID> promoted
+        = host->sim_select(subject, admitted, drive_frontier(p_slot));
     if (p_joint) {
         const sim::Row *standing = sim_rows->row_of(subject);
         sim::Selection joint;

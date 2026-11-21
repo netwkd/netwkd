@@ -30,8 +30,7 @@ bool ReplicationSend::declare_channel(
     wire::ChannelDecl decl;
     decl.id = uint8_t(p_id);
     decl.name = p_name;
-    decl.delivery
-        = p_tick ? wire::Delivery::TICK : wire::Delivery::IMMEDIATE;
+    decl.delivery = p_tick ? wire::Delivery::TICK : wire::Delivery::IMMEDIATE;
     return registry.register_channel(decl);
 }
 

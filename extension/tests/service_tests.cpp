@@ -129,8 +129,8 @@ LawVerdict configuration_door(const Stand &) {
     Node *plain = memnew(Node);
     int accepted = 0;
     for (const Ref<RefCounted> &config : configs) {
-        accepted += api->object_configuration_add(plain, config)
-            != ERR_UNAVAILABLE;
+        accepted
+            += api->object_configuration_add(plain, config) != ERR_UNAVAILABLE;
         accepted += api->object_configuration_remove(plain, config)
             != ERR_UNAVAILABLE;
     }

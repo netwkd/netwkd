@@ -181,8 +181,8 @@ void SchemaBook::add_migration(
         return;
     }
     if (held == nullptr) {
-        held = &migrations.insert(schema, LocalVector<SchemaMigration>())
-                    ->value;
+        held
+            = &migrations.insert(schema, LocalVector<SchemaMigration>())->value;
     }
     SchemaMigration made;
     made.from_version = from_version;

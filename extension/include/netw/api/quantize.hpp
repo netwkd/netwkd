@@ -23,7 +23,8 @@ protected:
         godot::Ref<NetwQuantize> &r_part,
         const godot::Ref<NetwQuantize> &p_value
     );
-    virtual void hold_parts() {}
+    virtual void hold_parts() {
+    }
 
     GDVIRTUAL1RC(bool, _supports_type, godot::Variant::Type)
     GDVIRTUAL1RC(int, _bit_width, godot::Variant::Type)

@@ -89,8 +89,10 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
                 NETW_FAULT_UNSUPPORTED,
                 {String("'") + String(p_node->get_name()) + String("'"),
                  String("a scene outside the spawnable scenes"),
-                 String("the scene in the MultiplayerSpawner's spawnable "
-                        "scenes, or MultiplayerSpawner.spawn")},
+                 String(
+                     "the scene in the MultiplayerSpawner's spawnable "
+                     "scenes, or MultiplayerSpawner.spawn"
+                 )},
                 uint64_t(gd::instance_id(p_node))
             );
             return OK;

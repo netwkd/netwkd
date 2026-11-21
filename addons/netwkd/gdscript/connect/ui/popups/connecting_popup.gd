@@ -2,35 +2,40 @@
 class_name ConnectingPopup
 extends PopupPanel
 
+## Emitted when the player presses the cancel button.
 signal cancelled
 
-@onready var title_label: Label = %TitleLabel
-@onready var progress_bar: ProgressBar = %ProgressBar
-@onready var cancel_button: Button = %CancelButton
+@onready var _title_label: Label = %TitleLabel
+@onready var _progress_bar: ProgressBar = %ProgressBar
+@onready var _cancel_button: Button = %CancelButton
 
 
 func _ready() -> void:
 	hide()
-	cancel_button.pressed.connect(hide)
-	cancel_button.pressed.connect(cancelled.emit)
+	_cancel_button.pressed.connect(hide)
+	_cancel_button.pressed.connect(cancelled.emit)
 
 
+## Opens the popup for a new attempt.
 func open() -> void:
-	title_label.text = "Connecting..."
-	progress_bar.hide()
-	cancel_button.text = "Cancel"
+	_title_label.text = "Connecting..."
+	_progress_bar.hide()
+	_cancel_button.text = "Cancel"
 	popup_centered()
 
 
+## Shows [param message] and [param ratio]. A negative [param ratio] hides
+## the progress bar.
 func progressed(message: String, ratio: float) -> void:
 	if not message.is_empty():
-		title_label.text = message
-	progress_bar.visible = ratio >= 0.0
-	progress_bar.value = ratio
+		_title_label.text = message
+	_progress_bar.visible = ratio >= 0.0
+	_progress_bar.value = ratio
 
 
+## Shows [param reason] with a button to close the popup.
 func failed(reason: String) -> void:
-	title_label.text = reason
-	progress_bar.hide()
-	cancel_button.text = "Close"
+	_title_label.text = reason
+	_progress_bar.hide()
+	_cancel_button.text = "Close"
 	popup_centered()

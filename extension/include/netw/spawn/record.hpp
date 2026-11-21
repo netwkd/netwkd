@@ -162,9 +162,6 @@ public:
     void set_node_name(const godot::String &value) {
         node_name = value;
     }
-    godot::String get_node_name() const {
-        return node_name;
-    }
     void set_fn_method(const godot::StringName &value) {
         fn_method = value;
     }

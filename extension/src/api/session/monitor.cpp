@@ -42,8 +42,7 @@ void NetwMultiplayer::monitor_sample(monitor::Sample &r_sample) {
         monitor::Upload upload;
         upload.peer = peer;
         upload.sent_bytes = account->sent_bytes;
-        upload.budget_per_second
-            = send->fill_of(peer, budget_bits) * send_rate;
+        upload.budget_per_second = send->fill_of(peer, budget_bits) * send_rate;
         r_sample.uploads.push_back(upload);
     }
 
@@ -68,9 +67,8 @@ void NetwMultiplayer::monitor_sample(monitor::Sample &r_sample) {
     }
 
     const SyncCompat *compat = sync_adapter();
-    r_sample.memory_replication = store().row_bytes()
-        + store_pull.held_bytes() + store().peer_bytes()
-        + store().flight_bytes()
+    r_sample.memory_replication = store().row_bytes() + store_pull.held_bytes()
+        + store().peer_bytes() + store().flight_bytes()
         + binding_book.held_bytes() + set_book_bytes() + entity_bytes()
         + (compat != nullptr ? compat->held_bytes() : int64_t(0));
     int64_t transitions = 0;

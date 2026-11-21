@@ -22,15 +22,15 @@
 #include "netw/api/prediction.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/api/schema_model.hpp"
-#include "netw/repl/sync_pipeline.hpp"
-#include "netw/fault_book.hpp"
 #include "netw/colors.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/entity/stage.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
+#include "netw/repl/sync_pipeline.hpp"
 #include "netw/script/model.hpp"
 #include "netw/spawn/pipeline.hpp"
 #include "netw/stage.hpp"
@@ -119,8 +119,10 @@ Dictionary NetwMultiplayer::interest_leave_resolve(
             NETW_FAULT_BAD_CALLABLE,
             {vformat("The CUSTOM leave policy of layer '%s'", freed),
              String(),
-             String("a callback whose object stays alive while the layer "
-                    "uses it")}
+             String(
+                 "a callback whose object stays alive while the layer "
+                 "uses it"
+             )}
         );
     }
     return verdict;
@@ -132,12 +134,8 @@ void NetwMultiplayer::interest_leave_commit(
     const Dictionary &p_decision,
     bool p_forced
 ) {
-    interest_leave_engine.commit(
-        p_entity.get_id(),
-        p_peer_id,
-        p_decision,
-        p_forced
-    );
+    interest_leave_engine
+        .commit(p_entity.get_id(), p_peer_id, p_decision, p_forced);
 }
 
 void NetwMultiplayer::interest_leave_finish_sweep() {
@@ -222,8 +220,10 @@ void NetwMultiplayer::interest_refresh_perception(
             NETW_FAULT_BAD_CALLABLE,
             {vformat("The CUSTOM perception policy of layer '%s'", freed),
              String(),
-             String("a callback whose object stays alive while the layer "
-                    "uses it")}
+             String(
+                 "a callback whose object stays alive while the layer "
+                 "uses it"
+             )}
         );
     }
     if (bool(verdict[StringName("hide")])) {
@@ -726,7 +726,8 @@ TypedArray<NetwEntity> NetwMultiplayer::interest_shared_entities(
                 || candidate->get_owner() == nullptr || found.has(candidate)) {
                 continue;
             }
-            interest::Decl *decl = interest_decl_on(candidate->get_rid_handle());
+            interest::Decl *decl
+                = interest_decl_on(candidate->get_rid_handle());
             const Array labels = decl != nullptr ? decl->labels() : Array();
             for (int seat = 0; seat < labels.size(); ++seat) {
                 if (asked.has(labels[seat])) {
@@ -899,9 +900,8 @@ void NetwMultiplayer::interest_sync_scene_membership(const RID &p_entity) {
         = scene.is_valid() ? scene_layer_id(scene) : StringName();
     interest_engine.set_scene_root(
         slot,
-        entity_record(p_entity)->get_declares_scene()
-            ? scene_layer_id(p_entity)
-            : StringName()
+        entity_record(p_entity)->get_declares_scene() ? scene_layer_id(p_entity)
+                                                      : StringName()
     );
     if (!interest_engine.set_scene_membership(slot, current)) {
         return;
@@ -1942,11 +1942,7 @@ bool NetwMultiplayer::layer_add_viewer(const RID &p_layer, int64_t p_peer_id) {
             uint64_t(view->get_instance_id())
         );
     }
-    if (!interest_check_layer_name(
-            this,
-            name,
-            "{NetwInterestLayer.add_viewer}"
-        )
+    if (!interest_check_layer_name(this, name, "{NetwInterestLayer.add_viewer}")
         || !interest_engine.layer_add_viewer(name, p_peer_id)) {
         return false;
     }
@@ -1995,11 +1991,7 @@ bool NetwMultiplayer::layer_add_entity(id::Entity p_entity, id::Layer p_layer) {
     if (!is_host() || !layer_holds(p_entity.rid)) {
         return false;
     }
-    if (!interest_check_layer_name(
-            this,
-            name,
-            "{NetwInterestLayer.add_entity}"
-        )
+    if (!interest_check_layer_name(this, name, "{NetwInterestLayer.add_entity}")
         || !interest_engine.roster_add(name, p_entity.get_id())) {
         return false;
     }
@@ -2570,8 +2562,7 @@ Error NetwMultiplayer::interest_on_enter_label(
     if (facet == nullptr) {
         return ERR_DOES_NOT_EXIST;
     }
-    return facet->on_enter(p_layer_id, p_callback) ? OK
-                                                   : ERR_INVALID_PARAMETER;
+    return facet->on_enter(p_layer_id, p_callback) ? OK : ERR_INVALID_PARAMETER;
 }
 
 Error NetwMultiplayer::interest_on_leave_label(
@@ -2583,8 +2574,7 @@ Error NetwMultiplayer::interest_on_leave_label(
     if (facet == nullptr) {
         return ERR_DOES_NOT_EXIST;
     }
-    return facet->on_leave(p_layer_id, p_callback) ? OK
-                                                   : ERR_INVALID_PARAMETER;
+    return facet->on_leave(p_layer_id, p_callback) ? OK : ERR_INVALID_PARAMETER;
 }
 
 Error NetwMultiplayer::interest_leave_policy_label(

@@ -29,8 +29,8 @@ String key_of(
         owner = script.is_valid() ? script->get_path()
                                   : String(p_declarer->get_class());
     }
-    const String member = p_kind == NETW_SITE_CLOCK ? String()
-                                                    : String(p_member);
+    const String member
+        = p_kind == NETW_SITE_CLOCK ? String() : String(p_member);
     return itos(int64_t(p_kind)) + "|" + owner + "|" + member;
 }
 

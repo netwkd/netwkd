@@ -88,13 +88,6 @@ Only the server spawns, moves and despawns an entity by default. When :ref:`life
         entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_ACTIVE
         entity.prediction.mode = NetwPrediction.MODE_ROLLBACK
 
-.. rst-class:: classref-introduction-group
-
-Tutorials
----------
-
-- `Prediction guide <https://netwkd.readthedocs.io/en/latest/guides/prediction.html>`__
-
 .. rst-class:: classref-reftable-group
 
 Properties

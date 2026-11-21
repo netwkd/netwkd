@@ -5,21 +5,21 @@
 ## game that does not want it hides or removes the node.
 extends Control
 
-@onready var connection: NetwConnection = Netw.session(self).connection
-@onready var panel: Control = %Panel
-@onready var code_edit: LineEdit = %CodeEdit
+@onready var _connection: NetwConnection = Netw.session(self).connection
+@onready var _panel: Control = %Panel
+@onready var _code_edit: LineEdit = %CodeEdit
 
 
 func _ready() -> void:
-	connection.join_address_changed.connect(on_join_address_changed)
-	%CopyButton.pressed.connect(on_copy_pressed)
-	on_join_address_changed(connection.join_address)
+	_connection.join_address_changed.connect(_on_join_address_changed)
+	%CopyButton.pressed.connect(_on_copy_pressed)
+	_on_join_address_changed(_connection.join_address)
 
 
-func on_join_address_changed(address: String) -> void:
-	code_edit.text = address
-	panel.visible = not address.is_empty()
+func _on_join_address_changed(address: String) -> void:
+	_code_edit.text = address
+	_panel.visible = not address.is_empty()
 
 
-func on_copy_pressed() -> void:
-	DisplayServer.clipboard_set(code_edit.text)
+func _on_copy_pressed() -> void:
+	DisplayServer.clipboard_set(_code_edit.text)

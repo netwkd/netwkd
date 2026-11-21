@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 
+#include "godot/math.hpp"
 #include "godot/utility.hpp"
 #include "netw/log.hpp"
 #include "netw/predict/axes.hpp"
@@ -22,13 +23,6 @@ constexpr int CAUSAL_FAMILY_COUNT = 3;
 
 constexpr uint32_t FNV_OFFSET = 2166136261u;
 
-constexpr double TAU = 6.2831853071795864769252867666;
-
-static double angle_difference(double p_from, double p_to) {
-    double diff = std::fmod(p_to - p_from, TAU);
-    return std::fmod(2.0 * diff, TAU) - diff;
-}
-
 static Variant pose_delta(
     const Variant &target,
     const Variant &current,
@@ -36,8 +30,9 @@ static Variant pose_delta(
 ) {
     switch (target.get_type()) {
         case Variant::FLOAT:
-            return is_angle ? angle_difference(double(current), double(target))
-                            : double(target) - double(current);
+            return is_angle
+                ? gd::angle_difference(double(current), double(target))
+                : double(target) - double(current);
         case Variant::VECTOR2:
             return Vector2(target) - Vector2(current);
         case Variant::VECTOR3:

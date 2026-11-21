@@ -45,9 +45,7 @@ Method Descriptions
 
 :godot:`StringName` **peer_class**\ (\ ) :ref:`🔗<class_ConnectTransportConfig_method_peer_class>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the peer class name of the transport these settings are for.
 
 .. rst-class:: classref-item-separator
 
@@ -59,9 +57,7 @@ Method Descriptions
 
 :godot:`Dictionary` **settings**\ (\ ) :ref:`🔗<class_ConnectTransportConfig_method_settings>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Returns the settings passed to :ref:`NetwConnection.set_defaults()<class_NetwConnection_method_set_defaults>`.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

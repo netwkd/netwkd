@@ -347,9 +347,8 @@ bool PropertySet::declared_element_types(
         }
         const int hint = int(info.get("hint", int(PROPERTY_HINT_NONE)));
         const String text = info.get("hint_string", String());
-        const bool listed = p_dictionary
-            ? hint == PROPERTY_HINT_DICTIONARY_TYPE
-            : hint == PROPERTY_HINT_ARRAY_TYPE;
+        const bool listed = p_dictionary ? hint == PROPERTY_HINT_DICTIONARY_TYPE
+                                         : hint == PROPERTY_HINT_ARRAY_TYPE;
         if (!listed && hint != PROPERTY_HINT_TYPE_STRING) {
             return false;
         }

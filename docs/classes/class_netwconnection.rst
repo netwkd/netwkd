@@ -95,7 +95,7 @@ A WebRTC player behind a strict NAT reaches the others only through a TURN relay
 
 .. code:: text
 
-    project.godot   webrtc/turn_credentials_url="https://networked-turn.example.workers.dev"
+    project.godot   webrtc/turn_credentials_url="https://netwkd-turn.example.workers.dev"
     server          cp -r addons/netwkd/templates/turn_worker my-turn
                     cd my-turn
                     npx wrangler secret put TURN_KEY_ID

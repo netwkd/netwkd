@@ -1098,8 +1098,7 @@ inline ScenarioRun ScenarioRun::scenes(
         p_rig.pump();
     }
 
-    run.scene_rows
-        = read_scene_rows(p_rig, p_scenario, entity_names, p_plant);
+    run.scene_rows = read_scene_rows(p_rig, p_scenario, entity_names, p_plant);
 
     bool answered = !run.scene_rows.is_empty();
     for (int index = 0; index < run.scene_rows.size(); ++index) {

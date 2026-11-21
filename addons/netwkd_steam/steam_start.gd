@@ -5,6 +5,8 @@
 # a headless or minimized game would never hear from Steam. The SceneTree runs
 # them instead, and its connection is the one record that Steam is pumped.
 
+## Starts Steam and opens Steam lobbies through GodotSteam.
+
 static var _opening: bool
 
 ## Starts Steam once per process with [param app_id], or reads how it started.

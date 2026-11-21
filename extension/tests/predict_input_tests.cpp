@@ -172,11 +172,9 @@ struct Walk {
         bool p_steers,
         bool p_client_controls,
         const char *p_source = WALKER_SOURCE
-    ) :
-            rig(1) {
-        script = netw_test::minted_script(
-            p_steers ? STEERER_SOURCE : p_source
-        );
+    )
+        : rig(1) {
+        script = netw_test::minted_script(p_steers ? STEERER_SOURCE : p_source);
         inputs = netw_test::minted_script(INPUTS_SOURCE);
         const Callable build = p_steers
             ? callable_mp_static(&build_steerer).bind(script, inputs)

@@ -57,8 +57,7 @@ uint32_t &declaration_sweep_at() {
     return at;
 }
 
-template <typename T>
-void sweep_dead_nodes(HashMap<uint64_t, T> &r_book) {
+template <typename T> void sweep_dead_nodes(HashMap<uint64_t, T> &r_book) {
     LocalVector<uint64_t> dead;
     for (const KeyValue<uint64_t, T> &entry : r_book) {
         if (gd::object_of(ObjectID(entry.key)) == nullptr) {
@@ -201,8 +200,7 @@ void declare_node_property(
     }
     const uint64_t node = uint64_t(gd::instance_id(p_node));
     const Ref<Script> script = script_of(p_node);
-    HashMap<uint64_t, NodeDecl>::Iterator held
-        = declaration_book().find(node);
+    HashMap<uint64_t, NodeDecl>::Iterator held = declaration_book().find(node);
     if (held && held->value.configs.has(p_property)) {
         return;
     }
@@ -224,12 +222,11 @@ void declare_node_property(
         );
         advance_interpolation_epoch();
     }
-    const uint64_t before = held
-        ? held->value.shared_key
-        : folded(
-              14695981039346656037ULL,
-              uint64_t(gd::instance_id(script.ptr()))
-          );
+    const uint64_t before = held ? held->value.shared_key
+                                 : folded(
+                                       14695981039346656037ULL,
+                                       uint64_t(gd::instance_id(script.ptr()))
+                                   );
     const uint64_t key = folded(before, uint64_t(p_property.hash()));
     HashMap<uint64_t, Dictionary>::Iterator shared
         = shared_declarations().find(key);
@@ -791,7 +788,7 @@ bool write_call_body(
                p_quantizers,
                p_arg_types,
                p_session
-           );
+        );
 }
 
 PackedByteArray token_bytes(const Variant &p_token) {

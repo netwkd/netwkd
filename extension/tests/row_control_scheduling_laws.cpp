@@ -208,8 +208,8 @@ TEST_CASE(
     int64_t receipts = 0;
     uint64_t receipt_token = 0;
     for (const ControlRecord &record : out) {
-        closed = closed
-            || (record.tag == ControlTag::CLOSE && record.token == 7);
+        closed
+            = closed || (record.tag == ControlTag::CLOSE && record.token == 7);
         for (const auto &receipt : record.receipts) {
             receipts += 1;
             receipt_token = receipt.token;

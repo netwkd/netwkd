@@ -202,9 +202,8 @@ public:
         PackedByteArray payload;
         payload.push_back(1);
         const int64_t sender = plant_is(PLANT_A_SENDER_THE_DIRECTION_TRUSTS)
-            ? (declared.channel == netw::wire::CHANNEL_PREDICT_ACK
-                   ? 1
-                   : CONTROLLER)
+            ? (declared.channel == netw::wire::CHANNEL_PREDICT_ACK ? 1
+                                                                   : CONTROLLER)
             : declared.sender;
         session->receive_carrier(
             netw::NetwMultiplayer::frame_pack(

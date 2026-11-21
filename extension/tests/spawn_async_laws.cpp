@@ -444,10 +444,7 @@ TEST_CASE(
                 ->set_park_timeout_seconds(SHORT_PARK_DEADLINE);
         }
         netw_test::FaultWatch faults;
-        faults.expect_warning(
-            "*'make'*[NW0023]*",
-            1
-        );
+        faults.expect_warning("*'make'*[NW0023]*", 1);
         Node *runner = stand.client_host;
         Ref<NetwPromise> promise;
         if (on_client) {
@@ -478,10 +475,7 @@ TEST_CASE(
     spawner_script = spawner.ptr();
     Stand stand;
     netw_test::FaultWatch faults;
-    faults.expect_error(
-        "*'Made'*[NW0039]*",
-        1
-    );
+    faults.expect_error("*'Made'*[NW0039]*", 1);
 
     Node *made = spawn_made(stand);
     Ref<netw::NetwActionRequest> context;

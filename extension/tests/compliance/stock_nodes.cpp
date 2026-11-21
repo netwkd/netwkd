@@ -141,8 +141,7 @@ World slipway() {
         .at(3, call("Level", "launch", Array::make("blue")))
         .at(4, call("Level", "moor"))
         .at(6,
-            on(FIRST,
-               call("Level", "seize_and_launch", Array::make("green"))))
+            on(FIRST, call("Level", "seize_and_launch", Array::make("green"))))
         .at(8, call("Level", "launch", Array::make("gold")))
         .at(10, call("Level", "sink", Array::make("Blue")));
 }

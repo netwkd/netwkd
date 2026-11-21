@@ -210,15 +210,19 @@ TEST_CASE(
     const Seen &seen = grabs_frames.seen();
     for (int client : {SLOW, FAST}) {
         NETW_HOLDS(reads(
-            seen, client, "Crate", "mode",
-            netw::NetwSimulation::MODE_AUTHORITY, GRABBED
+            seen,
+            client,
+            "Crate",
+            "mode",
+            netw::NetwSimulation::MODE_AUTHORITY,
+            GRABBED
         ));
     }
     NETW_HOLDS(reads(seen, FAST, "Crate", "grab_code", OK));
     NETW_HOLDS(reads(seen, SLOW, "Crate", "grab_code", ERR_UNAUTHORIZED));
-    NETW_HOLDS(reads(
-        seen, SLOW, "Crate", "mode", netw::NetwSimulation::MODE_ACTIVE
-    ));
+    NETW_HOLDS(
+        reads(seen, SLOW, "Crate", "mode", netw::NetwSimulation::MODE_ACTIVE)
+    );
     for (int peer = SERVER; peer < PEERS - 1; ++peer) {
         NETW_HOLDS(reads(seen, peer, "Crate", "controller", "client 1"));
         NETW_HOLDS(near(seen, peer, "Crate", "velocity", GRAB_B, 1e-3));

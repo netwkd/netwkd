@@ -18,7 +18,7 @@ const TPComponent := preload("tp_component.gd")
 
 func _init() -> void:
 	unique_name_in_owner = true
-	body_entered.connect(on_body_entered)
+	body_entered.connect(_on_body_entered)
 
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -30,7 +30,7 @@ func _get_configuration_warnings() -> PackedStringArray:
 	return warnings
 
 
-func on_body_entered(body: Node2D) -> void:
+func _on_body_entered(body: Node2D) -> void:
 	if not is_inside_tree() or not body.is_inside_tree():
 		return
 	var tp: TPComponent = body.get_node_or_null("%TPComponent")

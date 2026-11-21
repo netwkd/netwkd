@@ -26,11 +26,11 @@ using netw::NetwMultiplayer;
 using netw::NetwPrediction;
 using netw::NetwSimulation;
 using netw_test::CallLog;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
 using netw_test::LawVerdict;
-using netw_test::Internals;
 
 enum Plant {
     PLANT_NONE,
@@ -108,11 +108,10 @@ public:
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         if (handle.is_valid()) {
             const Ref<NetwEntity> bound = handle->get_entity();
-            step_is_the_one_installed
-                = NetwMultiplayer::sim_step_of(
-                      *bound->get_record(),
-                      bound->get_owner()
-                  )
+            step_is_the_one_installed = NetwMultiplayer::sim_step_of(
+                                            *bound->get_record(),
+                                            bound->get_owner()
+                                        )
                 == step;
         }
         if (planted != PLANT_AN_UNDECLARE_THAT_NEVER_HAPPENED) {
@@ -148,7 +147,6 @@ public:
     bool step_kept() const {
         return step_is_the_one_installed;
     }
-
 };
 
 typedef LawRowFor<PredictRun> PredictLaw;
@@ -510,10 +508,12 @@ TEST_CASE(
 
     typed->set_rollback_together(true);
     typed->set_world_version(3);
-    CHECK(bool(session->predict_get_param(
-        entity,
-        NetwMultiplayer::PREDICT_PARAM_ROLLBACK_TOGETHER
-    )));
+    CHECK(
+        bool(session->predict_get_param(
+            entity,
+            NetwMultiplayer::PREDICT_PARAM_ROLLBACK_TOGETHER
+        ))
+    );
     NETW_CHECK_EQ(
         int(session->predict_get_param(
             entity,

@@ -1,3 +1,4 @@
+#include "netw/api/display.hpp"
 #include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "godot/display_server.hpp"
@@ -5,7 +6,6 @@
 #include "godot/object.hpp"
 #include "godot/os.hpp"
 #include "godot/project_settings.hpp"
-#include "netw/api/display.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_record.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -73,9 +73,8 @@ display::Decl NetwMultiplayer::display_config_for(
         return *standing;
     }
     display::Decl config;
-    const display::Decl *authored = p_record != nullptr
-        ? p_record->find_display_declaration()
-        : nullptr;
+    const display::Decl *authored
+        = p_record != nullptr ? p_record->find_display_declaration() : nullptr;
     if (authored != nullptr) {
         config = *authored;
     }

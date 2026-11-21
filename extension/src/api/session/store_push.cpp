@@ -277,9 +277,7 @@ void NetwMultiplayer::store_push_arrival(
 ) {
 #if defined(DEBUG_ENABLED)
     const store::Table &table = store().table(p_at.table);
-    const ObjectID node_id(
-        store_pull.residents.node_of(p_at.table, p_at.row)
-    );
+    const ObjectID node_id(store_pull.residents.node_of(p_at.table, p_at.row));
     Node *node = Object::cast_to<Node>(gd::object_of(node_id));
     LocalVector<StringName> changed;
     LocalVector<Variant> found;
@@ -318,9 +316,7 @@ void NetwMultiplayer::store_push_arrival(
         }
         const Variant held = port_get(node, key);
         if (held.get_type() != Variant::NIL && held.get_type() < Variant::RID
-            && held.hash_compare(
-                store::read_value(table, p_at.row, column)
-            )) {
+            && held.hash_compare(store::read_value(table, p_at.row, column))) {
             p_binding->landed_values.insert(key, held);
         }
     }
@@ -508,11 +504,11 @@ void NetwMultiplayer::store_retain(PropertyBinding *p_binding) {
             const StringName &key = table.schema.at(int(column))->key;
             read = gd::has_property(node, key)
                 && store::encode(
-                    table,
-                    column,
-                    port_get(node, key).duplicate(true),
-                    table.landing,
-                    this
+                       table,
+                       column,
+                       port_get(node, key).duplicate(true),
+                       table.landing,
+                       this
                 );
         }
         if (read) {

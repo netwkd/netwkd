@@ -42,12 +42,13 @@ Ref<NetwMultiplayer> NetwInterestLayer::host() const {
 
 NetwInterestLayer::LayerPolicy NetwInterestLayer::get_policy() const {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid()
-        ? LayerPolicy(int(owner->interest_layer_get_param(
-              layer,
-              NetwMultiplayer::LAYER_PARAM_POLICY
-          )))
-        : LAYER_POLICY_HIDE_FROM_OUTSIDERS;
+    return owner.is_valid() ? LayerPolicy(
+                                  int(owner->interest_layer_get_param(
+                                      layer,
+                                      NetwMultiplayer::LAYER_PARAM_POLICY
+                                  ))
+                              )
+                            : LAYER_POLICY_HIDE_FROM_OUTSIDERS;
 }
 
 bool NetwInterestLayer::set_policy(LayerPolicy p_policy) {
@@ -58,12 +59,13 @@ bool NetwInterestLayer::set_policy(LayerPolicy p_policy) {
 NetwInterestLayer::LeavePolicy NetwInterestLayer::
     get_default_leave_policy() const {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid()
-        ? LeavePolicy(int(owner->interest_layer_get_param(
-              layer,
-              NetwMultiplayer::LAYER_PARAM_LEAVE_POLICY
-          )))
-        : LEAVE_POLICY_HIDE;
+    return owner.is_valid() ? LeavePolicy(
+                                  int(owner->interest_layer_get_param(
+                                      layer,
+                                      NetwMultiplayer::LAYER_PARAM_LEAVE_POLICY
+                                  ))
+                              )
+                            : LEAVE_POLICY_HIDE;
 }
 
 void NetwInterestLayer::set_default_leave_policy(LeavePolicy p_policy) {
@@ -77,10 +79,12 @@ NetwInterestLayer::PerceptionPolicy NetwInterestLayer::
     get_default_perception_policy() const {
     const Ref<NetwMultiplayer> owner = host();
     return owner.is_valid()
-        ? PerceptionPolicy(int(owner->interest_layer_get_param(
-              layer,
-              NetwMultiplayer::LAYER_PARAM_PERCEPTION_POLICY
-          )))
+        ? PerceptionPolicy(
+              int(owner->interest_layer_get_param(
+                  layer,
+                  NetwMultiplayer::LAYER_PARAM_PERCEPTION_POLICY
+              ))
+          )
         : PERCEPTION_POLICY_HIDE;
 }
 
@@ -164,16 +168,14 @@ void NetwInterestLayer::set_driver(const Callable &p_driver) {
 
 Callable NetwInterestLayer::get_driver() {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() ? owner->layer_get_driver(layer, true)
-                            : Callable();
+    return owner.is_valid() ? owner->layer_get_driver(layer, true) : Callable();
 }
 
 int64_t NetwInterestLayer::stat(
     enums::NetwMultiplayer::LayerStat p_stat
 ) const {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() ? owner->interest_layer_get_stat(layer, p_stat)
-                            : 0;
+    return owner.is_valid() ? owner->interest_layer_get_stat(layer, p_stat) : 0;
 }
 
 void NetwInterestLayer::_bind_methods() {
@@ -311,10 +313,7 @@ void NetwInterestLayer::_bind_methods() {
         D_METHOD("is_visible_to", "entity", "peer_id"),
         &NetwInterestLayer::is_visible_to
     );
-    ClassDB::bind_method(
-        D_METHOD("stat", "stat"),
-        &NetwInterestLayer::stat
-    );
+    ClassDB::bind_method(D_METHOD("stat", "stat"), &NetwInterestLayer::stat);
     ClassDB::bind_method(
         D_METHOD("set_driver", "driver"),
         &NetwInterestLayer::set_driver

@@ -477,8 +477,8 @@ TypedArray<NetwEntity> NetwMultiplayer::player_entities_held(
 
 bool NetwMultiplayer::player_keep_entity(const RID &p_entity, int64_t p_peer) {
     const Ref<NetwEntity> view = slot_pinned_entity(p_entity);
-    if (session_settings.return_window <= 0.0 || view.is_null()
-        || !is_host() || p_peer == get_unique_id()) {
+    if (session_settings.return_window <= 0.0 || view.is_null() || !is_host()
+        || p_peer == get_unique_id()) {
         return false;
     }
     const PlayerRow *leaving = player_row(p_peer);
@@ -997,9 +997,8 @@ TypedArray<RID> NetwMultiplayer::player_get_entities(int64_t p_player) {
 }
 
 RID NetwMultiplayer::player_get_scene(int64_t p_player) {
-    return player_is_active(p_player)
-        ? scene_of_peer(player_get_peer(p_player))
-        : RID();
+    return player_is_active(p_player) ? scene_of_peer(player_get_peer(p_player))
+                                      : RID();
 }
 
 bool NetwMultiplayer::player_holds(const Ref<NetwPlayer> &p_who) const {
@@ -1030,8 +1029,10 @@ Error NetwMultiplayer::player_kick_from(
              p_door ? String("a player that is not in this session")
                     : vformat("player %d", p_player),
              p_door ? String("a player from {NetwSession.players}")
-                    : String("the id of a client's player, such as one from "
-                             "{NetwMultiplayer.player_list}")}
+                    : String(
+                          "the id of a client's player, such as one from "
+                          "{NetwMultiplayer.player_list}"
+                      )}
         );
         return ERR_INVALID_PARAMETER;
     }
@@ -1061,9 +1062,8 @@ void NetwMultiplayer::player_request_kick(
     const String &p_reason
 ) {
     const int64_t wire_player_limit = int64_t(1) << 35;
-    const uint64_t player = p_player > 0 && p_player < wire_player_limit
-        ? uint64_t(p_player)
-        : 0;
+    const uint64_t player
+        = p_player > 0 && p_player < wire_player_limit ? uint64_t(p_player) : 0;
     const PackedByteArray payload
         = session::frame_write(session::KickRequest{player, p_reason});
     if (is_server()) {
@@ -1655,11 +1655,8 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
             const Ref<NetwDatabase> database
                 = held != nullptr ? *held : Ref<NetwDatabase>();
             if (database.is_valid()) {
-                database->announce_failed(
-                    p_row.database,
-                    p_row.code,
-                    p_row.reason
-                );
+                database
+                    ->announce_failed(p_row.database, p_row.code, p_row.reason);
             }
         } break;
         case AnnouncementKind::SYNCHRONIZED: {
@@ -1702,8 +1699,9 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
             const bool heard = connection.is_valid() && view.is_valid();
             if (heard && p_row.kind == AnnouncementKind::ENDPOINT_ADDED) {
                 connection->announce_endpoint_added(view);
-            } else if (heard
-                       && p_row.kind == AnnouncementKind::ENDPOINT_REMOVED) {
+            } else if (
+                heard && p_row.kind == AnnouncementKind::ENDPOINT_REMOVED
+            ) {
                 connection->announce_endpoint_removed(view);
             } else if (heard && p_row.kind == AnnouncementKind::INVITED) {
                 connection->announce_invited(view);
@@ -2452,8 +2450,10 @@ PackedByteArray NetwMultiplayer::session_accept_payload(
                 NETW_FAULT_LIMIT_EXCEEDED,
                 {String("{NetwConnection.join_address}"),
                  String("the address in the join packet"),
-                 String("a shorter address in the transport or lobby "
-                        "directory"),
+                 String(
+                     "a shorter address in the transport or lobby "
+                     "directory"
+                 ),
                  p_destination,
                  length,
                  int64_t(wire::STRING_CAP)}
@@ -5193,9 +5193,7 @@ void NetwMultiplayer::clock_board_ping() {
         SERVER_PEER,
         0,
         wire::CHANNEL_CLOCK_PING,
-        session::frame_write(
-            world.clock.exchange.take_ping(clock_wall_usec())
-        ),
+        session::frame_write(world.clock.exchange.take_ping(clock_wall_usec())),
         false,
         0,
         String(),
@@ -5431,7 +5429,6 @@ bool NetwMultiplayer::session_is_local_client() const {
     const Role current = session_get_role();
     return current == ROLE_CLIENT || current == ROLE_LISTEN_SERVER;
 }
-
 
 void NetwMultiplayer::auth_relay_authenticating(int64_t p_peer) {
     if (p_peer == SERVER_PEER) {
@@ -5747,9 +5744,8 @@ void NetwMultiplayer::session_set_server_info(
 Ref<NetwServerInfo> NetwMultiplayer::session_get_server_info() const {
     Ref<NetwServerInfo> info;
     const Ref<NetwSessionConfig> config = session_get_config();
-    const Ref<NetwServerInfo> declared = config.is_valid()
-        ? config->get_server_info()
-        : Ref<NetwServerInfo>();
+    const Ref<NetwServerInfo> declared
+        = config.is_valid() ? config->get_server_info() : Ref<NetwServerInfo>();
     if (declared.is_valid()) {
         info = declared->duplicate();
     }
@@ -5834,11 +5830,8 @@ NetwMultiplayer::JoinPlan NetwMultiplayer::session_resolve_join() {
         return plan;
     }
     if (declared.state != session_decl::ABSENT) {
-        declaration_slots.report_unresolved(
-            this,
-            session_decl::KIND_JOIN,
-            declared.state
-        );
+        declaration_slots
+            .report_unresolved(this, session_decl::KIND_JOIN, declared.state);
         plan.available = false;
         return plan;
     }
@@ -5969,8 +5962,7 @@ bool NetwMultiplayer::session_decode_join_args(JoinRequest &r_request) {
         );
         return false;
     }
-    if (r_request.schema_hash
-        != join_schema_hash(plan.arg_types, quantizers)) {
+    if (r_request.schema_hash != join_schema_hash(plan.arg_types, quantizers)) {
         NETW_TRACE(
             sys::SESSION,
             "A join's arguments do not match this server's handler."
@@ -5979,12 +5971,7 @@ bool NetwMultiplayer::session_decode_join_args(JoinRequest &r_request) {
     }
     wire::ReadStream stream(r_request.arg_bytes);
     Array values;
-    if (!call_args::values_read(
-            stream,
-            quantizers,
-            plan.arg_types,
-            values
-        )
+    if (!call_args::values_read(stream, quantizers, plan.arg_types, values)
         || !stream.align_verify() || stream.bits_remaining() != 0) {
         NETW_TRACE(sys::SESSION, "A join's arguments did not decode fully.");
         return false;
@@ -6183,8 +6170,10 @@ void NetwMultiplayer::session_leave_drained(
             NETW_FAULT_STORAGE_FAILED,
             {String("Saving to the database"),
              String("the leave"),
-             String("its file or service before calling "
-                    "{NetwSession.leave} again")}
+             String(
+                 "its file or service before calling "
+                 "{NetwSession.leave} again"
+             )}
         );
         p_left->resolve(int(drained));
         return;

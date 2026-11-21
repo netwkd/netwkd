@@ -104,10 +104,6 @@ public:
     PropertyBinding(const PropertyBinding &) = delete;
     PropertyBinding &operator=(const PropertyBinding &) = delete;
 
-    bool is_retired() const {
-        return retired;
-    }
-
     godot::Node *node() const;
 
     void apply_state_feed(const predict::Feed &p_feed);
@@ -175,9 +171,6 @@ public:
     void set_route(int64_t p_value) {
         route = p_value;
     }
-    int64_t get_comp() const {
-        return comp;
-    }
     const godot::StringName &get_order_key() const {
         return order_key;
     }
@@ -190,27 +183,17 @@ public:
     void set_authored_tick(int64_t p_value) {
         authored_tick = p_value;
     }
-    int64_t get_reconcile_ack() const {
-        return reconcile_ack;
-    }
     void set_reconcile_ack(int64_t p_value) {
         reconcile_ack = p_value;
     }
 
     static uint64_t script_id_of(godot::Node *p_node);
 
-    const PropertyIndex *property_index() const {
-        return staged_index;
-    }
-
 #if defined(DEBUG_ENABLED)
     godot::HashMap<godot::StringName, godot::Variant> landed_values;
     uint32_t landed_at_write = 0;
 
-    bool holds_tree_blend(
-        godot::Node *p_node,
-        const godot::StringName &p_key
-    );
+    bool holds_tree_blend(godot::Node *p_node, const godot::StringName &p_key);
 #endif
 
 private:
@@ -288,9 +271,6 @@ public:
     void clear();
     uint32_t count() const;
     uint32_t retired_count() const;
-    uint32_t property_index_count() const {
-        return indexes.count();
-    }
 
     void index_node(uint64_t p_node, uint64_t p_binding);
     void reindex_node(uint64_t p_node, uint64_t p_from, uint64_t p_to);

@@ -10,103 +10,12 @@
 All classes
 ===========
 
-Nakama
-======
+Core
+----
 
 .. toctree::
     :maxdepth: 1
-    :name: toc-class-ref-nakama
-
-    class_addons--netwkd_nakama--nakama_relay_bridge.gd
-    class_nakamaaccount
-    class_nakamadatabase
-    class_nakamadatabase.connection
-    class_nakamaidtoken
-    class_nakamalobbydirectory
-    class_nakamalobbydirectory.lobbycard
-    class_nakamaparty
-    class_nakamarelaypeer
-    class_nakamarelaypeer.packet
-
-Steam
-=====
-
-.. toctree::
-    :maxdepth: 1
-    :name: toc-class-ref-steam
-
-    class_addons--netwkd_steam--steam_start.gd
-    class_steamlobbydirectory
-    class_steamparty
-    class_steamprofile
-    class_steamsocial
-    class_steamticket
-
-Testing
-=======
-
-.. toctree::
-    :maxdepth: 1
-    :name: toc-class-ref-testing
-
-    class_addons--netwkd_test--gdunit4--gdunit_awaiter.gd
-    class_addons--netwkd_test--gdunit4--gdunit_error_scrubber.gd
-    class_enettestsupport
-    class_framelockstepstepper
-    class_nakamatestsupport
-    class_netwgameharness
-    class_netwharnesssession
-    class_netwharnesssession.backendadapter
-    class_netwharnesssession.loopbackadapter
-    class_netwlink
-    class_netwlink.netwlinkmulti
-    class_networdinarysetup
-    class_networdinarysetup.outcome
-    class_netwprocessrig
-    class_netwregimepeer
-    class_netwregimethrottle
-    class_netwscenerunner
-    class_netwtestdiscordservice
-    class_netwtestsessionhook
-    class_netwtestsuite
-    class_netwtransfercontract
-    class_netwtransferdriver
-    class_netwwaiter
-    class_webrtctestsupport
-
-Gdscript
-========
-
-.. toctree::
-    :maxdepth: 1
-    :name: toc-class-ref-gdscript
-
-    class_addons--netwkd--gdscript--async.gd
-    class_addons--netwkd--gdscript--connect--ui--ice_servers_edit.gd
-    class_addons--netwkd--gdscript--connect--ui--room_bar.gd
-    class_addons--netwkd--gdscript--connect--ui--string_list_edit.gd
-    class_addons--netwkd--gdscript--editor--debug_menu.gd
-    class_addons--netwkd--gdscript--editor--traffic_debugger.gd
-    class_addons--netwkd--gdscript--editor--traffic_strip.gd
-    class_connectbrowser
-    class_connectbrowserrow
-    class_connectenetconfig
-    class_connectfieldlist
-    class_connecticeserverconfig
-    class_connectingpopup
-    class_connecttransportconfig
-    class_connectwebrtcconfig
-    class_hostpopup
-    class_joindirectpopup
-    class_joinpopup
-    class_statusdot
-
-Other classes
-=============
-
-.. toctree::
-    :maxdepth: 1
-    :name: toc-class-ref-other-classes
+    :name: toc-class-ref-core
 
     class_dictionaryrecord
     class_filesystemdatabase
@@ -180,4 +89,95 @@ Other classes
     class_serde
     class_stretchviewportcontainer
     class_webtorrentlobbydirectory
+
+GDScript
+--------
+
+.. toctree::
+    :maxdepth: 1
+    :name: toc-class-ref-gdscript
+
+    class_addons--netwkd--gdscript--async.gd
+    class_addons--netwkd--gdscript--connect--ui--ice_servers_edit.gd
+    class_addons--netwkd--gdscript--connect--ui--room_bar.gd
+    class_addons--netwkd--gdscript--connect--ui--string_list_edit.gd
+    class_addons--netwkd--gdscript--editor--debug_menu.gd
+    class_addons--netwkd--gdscript--editor--traffic_debugger.gd
+    class_addons--netwkd--gdscript--editor--traffic_strip.gd
+    class_connectbrowser
+    class_connectbrowserrow
+    class_connectenetconfig
+    class_connectfieldlist
+    class_connecticeserverconfig
+    class_connectingpopup
+    class_connecttransportconfig
+    class_connectwebrtcconfig
+    class_hostpopup
+    class_joindirectpopup
+    class_joinpopup
+    class_statusdot
+
+Nakama
+------
+
+.. toctree::
+    :maxdepth: 1
+    :name: toc-class-ref-nakama
+
+    class_addons--netwkd_nakama--nakama_relay_bridge.gd
+    class_nakamaaccount
+    class_nakamadatabase
+    class_nakamadatabase.connection
+    class_nakamaidtoken
+    class_nakamalobbydirectory
+    class_nakamalobbydirectory.lobbycard
+    class_nakamaparty
+    class_nakamarelaypeer
+    class_nakamarelaypeer.packet
+
+Steam
+-----
+
+.. toctree::
+    :maxdepth: 1
+    :name: toc-class-ref-steam
+
+    class_addons--netwkd_steam--steam_start.gd
+    class_steamlobbydirectory
+    class_steamparty
+    class_steamprofile
+    class_steamsocial
+    class_steamticket
+
+Testing
+-------
+
+.. toctree::
+    :maxdepth: 1
+    :name: toc-class-ref-testing
+
+    class_addons--netwkd_test--gdunit4--gdunit_awaiter.gd
+    class_addons--netwkd_test--gdunit4--gdunit_error_scrubber.gd
+    class_enettestsupport
+    class_framelockstepstepper
+    class_nakamatestsupport
+    class_netwgameharness
+    class_netwharnesssession
+    class_netwharnesssession.backendadapter
+    class_netwharnesssession.loopbackadapter
+    class_netwlink
+    class_netwlink.netwlinkmulti
+    class_networdinarysetup
+    class_networdinarysetup.outcome
+    class_netwprocessrig
+    class_netwregimepeer
+    class_netwregimethrottle
+    class_netwscenerunner
+    class_netwtestdiscordservice
+    class_netwtestsessionhook
+    class_netwtestsuite
+    class_netwtransfercontract
+    class_netwtransferdriver
+    class_netwwaiter
+    class_webrtctestsupport
 

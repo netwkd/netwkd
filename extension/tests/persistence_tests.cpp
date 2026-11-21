@@ -543,8 +543,7 @@ LawVerdict failed_load_retried(const World &) {
     const Ref<NetwPromise> retry = stand.saved()->load();
     stand.rig.step_ticks(4);
     Node *view = stand.view();
-    if (answer(retry) != 1 || view == nullptr
-        || view->get("where") != STORED) {
+    if (answer(retry) != 1 || view == nullptr || view->get("where") != STORED) {
         return law_broken("the retried load did not publish the entity");
     }
     return law_held();

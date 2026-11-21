@@ -54,15 +54,6 @@ public:
     double get_display_lag() const {
         return display_lag;
     }
-    void set_smoothed_floor(double value) {
-        smoothed_floor = value;
-    }
-    double get_smoothed_floor() const {
-        return smoothed_floor;
-    }
-    void set_starvation_ticks(int value) {
-        starvation_ticks = value;
-    }
     int get_starvation_ticks() const {
         return starvation_ticks;
     }
@@ -86,12 +77,6 @@ public:
     }
     double get_arrival_age() const {
         return arrival_age;
-    }
-    double get_arrival_age_mean() const {
-        return arrival_age_mean;
-    }
-    double get_arrival_age_deviation() const {
-        return arrival_age_deviation;
     }
 };
 

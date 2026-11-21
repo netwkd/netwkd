@@ -12,9 +12,7 @@ NakamaRelayPeer.Packet
 
 **Inherits:** :godot:`RefCounted`
 
-.. container:: contribute
-
-	There is currently no description for this class. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+A packet received from the match, waiting for Godot to poll it.
 
 .. rst-class:: classref-reftable-group
 
@@ -47,9 +45,7 @@ Property Descriptions
 
 :godot:`PackedByteArray` **data** :ref:`🔗<class_NakamaRelayPeer_Packet_property_data>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The packet bytes.
 
 **Note:** The returned array is copied and any changes to it will not update the original property value. See :godot:`PackedByteArray` for more details.
 
@@ -63,9 +59,7 @@ Property Descriptions
 
 :godot:`int` **from** :ref:`🔗<class_NakamaRelayPeer_Packet_property_from>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The peer id of the sender.
 
 .. rst-class:: classref-item-separator
 
@@ -77,9 +71,7 @@ Property Descriptions
 
 :godot:`int` **term** :ref:`🔗<class_NakamaRelayPeer_Packet_property_term>`
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+The server transfer the sender wrote the packet under.
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

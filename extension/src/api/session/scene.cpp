@@ -47,27 +47,6 @@ namespace {
 const char *SIG_PHYSICS_FRAME = "physics_frame";
 const char *SIG_TREE_SCENE_CHANGED = "scene_changed";
 
-bool running_under_gdunit() {
-    static const bool answer = []() -> bool {
-#if defined(NETW_MODULE)
-        const CoreBind::Engine *engine = CoreBind::Engine::get_singleton();
-#else
-        const Engine *engine = Engine::get_singleton();
-#endif
-        if (engine != nullptr && engine->has_meta(StringName("GdUnitRunner"))) {
-            return true;
-        }
-        const PackedStringArray args = gd::cmdline_args();
-        for (int at = 0; at < args.size(); ++at) {
-            if (String(args[at]).contains("GdUnit")) {
-                return true;
-            }
-        }
-        return false;
-    }();
-    return answer;
-}
-
 bool drawn(Node *p_node) {
     return p_node != nullptr
         && (p_node->is_class("CanvasItem") || p_node->is_class("Node3D"));
@@ -127,8 +106,7 @@ RID NetwMultiplayer::scene_report_entity_edge(
         NETW_ZONE_NC("scene edge scene of", colors::SCENE);
         scene = scene_of(p_subject);
     }
-    const RID *announced
-        = announced_scene_of_entity.getptr(p_subject.get_id());
+    const RID *announced = announced_scene_of_entity.getptr(p_subject.get_id());
     if (!p_present && announced != nullptr) {
         scene = *announced;
     }
@@ -1229,8 +1207,10 @@ Ref<NetwPromise> NetwMultiplayer::scene_move_entity(
             {mover_node != nullptr ? String(mover_node->get_name())
                                    : String("<null>"),
              structure_halted
-                 ? String("a scene while session authority moves to another "
-                          "peer")
+                 ? String(
+                       "a scene while session authority moves to another "
+                       "peer"
+                   )
                  : String("a scene by a peer that may not move it"),
              structure_halted
                  ? String("the move again once session authority has moved")
@@ -1392,8 +1372,7 @@ void NetwMultiplayer::scene_carry_begin(
     carry.guard = guard_hold(body);
     SubViewport *leaving = scene_world_of(p_source);
     if (leaving != nullptr && leaving != scene_world_of(p_target)) {
-        carry.hidden_between_worlds
-            = hide_while_carried(scene_outer_of(body));
+        carry.hidden_between_worlds = hide_while_carried(scene_outer_of(body));
     }
     const int64_t id = ++scene_carry_next;
     scene_carries.insert(id, carry);
@@ -1708,9 +1687,9 @@ void NetwMultiplayer::scene_carry_abandon(int64_t p_id) {
     guard_let_go(carry.guard);
     guard_hush_release(carry.hush);
     if (carry.hidden_between_worlds) {
-        show_after_carry(scene_outer_of(
-            Object::cast_to<Node>(gd::object_of(carry.body))
-        ));
+        show_after_carry(
+            scene_outer_of(Object::cast_to<Node>(gd::object_of(carry.body)))
+        );
     }
     NETW_TRACE(
         sys::SCENE,
@@ -1876,9 +1855,9 @@ void NetwMultiplayer::scene_on_player_joined(const Ref<NetwPlayer> &p_player) {
             continue;
         }
         const RID *admitting = scene_admission_layers.getptr(scene);
-        const Ref<NetwInterestLayer> layer
-            = admitting == nullptr ? Ref<NetwInterestLayer>()
-                                   : layer_view(*admitting);
+        const Ref<NetwInterestLayer> layer = admitting == nullptr
+            ? Ref<NetwInterestLayer>()
+            : layer_view(*admitting);
         if (layer.is_null() || p_player.ptr() != local.ptr()) {
             continue;
         }

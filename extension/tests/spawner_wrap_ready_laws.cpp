@@ -16,8 +16,8 @@
 namespace TestSpawnerWrapReadyLaws {
 
 using namespace godot;
-using netw_test::LoopbackRig;
 using netw_test::Internals;
+using netw_test::LoopbackRig;
 
 constexpr int TICKRATE = 30;
 
@@ -88,10 +88,7 @@ TEST_CASE(
     "only the session authority spawns"
 ) {
     netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error(
-        "*under a MultiplayerSpawner*[NW0012]*",
-        1
-    );
+    expected_faults.expect_error("*under a MultiplayerSpawner*[NW0012]*", 1);
 
     LoopbackRig rig(1);
     rig.mount();

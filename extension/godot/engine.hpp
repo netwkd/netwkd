@@ -30,13 +30,4 @@ inline godot::Object *named_singleton(const godot::StringName &p_name) {
 #endif
 }
 
-inline bool engine_has_meta(const godot::StringName &name) {
-#if defined(NETW_MODULE)
-    CoreBind::Engine *engine = CoreBind::Engine::get_singleton();
-#else
-    godot::Engine *engine = godot::Engine::get_singleton();
-#endif
-    return engine != nullptr && engine->has_meta(name);
-}
-
 } // namespace netw::gd

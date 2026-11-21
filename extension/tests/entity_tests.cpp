@@ -312,8 +312,7 @@ LawVerdict hidden_copy(const Stand &) {
     if (stand.layer_holds()) {
         return law_broken("the client's layer still holds the hidden copy");
     }
-    if (Internals::entity_at(stand.client(), stand.route)
-        != stand.standing) {
+    if (Internals::entity_at(stand.client(), stand.route) != stand.standing) {
         return law_broken("the route lost the hidden identity");
     }
     if (!stand.server_holds()) {
@@ -329,8 +328,7 @@ LawVerdict deleted_copy(const Stand &) {
     if (stand.state() != ABSENT) {
         return law_broken("the deleted copy is not absent");
     }
-    if (Internals::entity_at(stand.client(), stand.route)
-        != stand.standing) {
+    if (Internals::entity_at(stand.client(), stand.route) != stand.standing) {
         return law_broken("the route lost the deleted identity");
     }
     if (!stand.server_holds()) {
@@ -552,9 +550,11 @@ LawVerdict predicted_without_state(const Stand &) {
     faults.expect_error("*Ghost*[NW1013]*", 1);
     Node3D *root = memnew(Node3D);
     root->set_name("Ghost");
-    root->set_script(netw_test::minted_script(
-        "extends Node3D\nfunc _network_process(_delta):\n\tpass\n"
-    ));
+    root->set_script(
+        netw_test::minted_script(
+            "extends Node3D\nfunc _network_process(_delta):\n\tpass\n"
+        )
+    );
     const Ref<NetwEntity> entity = Netw::configure_entity(root);
     const Ref<netw::NetwPrediction> prediction = entity->get_prediction();
     const bool declared = prediction.is_valid();

@@ -6,6 +6,7 @@
 #include <initializer_list>
 
 #include "godot/label_3d.hpp"
+#include "godot/math.hpp"
 #include "godot/node.hpp"
 #include "godot/object.hpp"
 #include "godot/rendering_server.hpp"
@@ -18,7 +19,7 @@ namespace netw::diag {
 
 namespace {
 
-constexpr float FULL_TURN = 6.28318530717958647692f;
+constexpr float FULL_TURN = float(gd::TAU);
 constexpr int ANNULUS_SEGMENTS = 48;
 constexpr int DISC_SEGMENTS = 16;
 constexpr int SEGMENT_DASHES = 6;
