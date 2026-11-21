@@ -93,7 +93,14 @@ struct RowExplain {
     const char *row_class = "resting";
 };
 
+struct RowReservation {
+    wire::StreamLane lane;
+    uint64_t token = 0;
+    double credit = 0.0;
+};
+
 struct PeerAccount {
+    RowReservation reservation;
     double balance = 0.0;
     double rate = 0.0;
     double fill = 0.0;
@@ -220,7 +227,12 @@ class SessionSend {
         SessionResult &r_out
     );
 
-    PeerAccount &refill(int p_peer, int64_t p_max_bits, int64_t p_tick);
+    PeerAccount &refill(
+        int p_peer,
+        int64_t p_max_bits,
+        int64_t p_tick,
+        double &r_earned
+    );
 
 public:
     static constexpr uint32_t MISSES_PER_TICK = 4;

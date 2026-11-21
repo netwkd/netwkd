@@ -427,7 +427,7 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::peer_get_traffic
     );
     ClassDB::bind_method(
-        D_METHOD("peer_set_bandwidth", "peer", "kbps"),
+        D_METHOD("peer_set_bandwidth", "peer", "kilobytes_per_second"),
         &NetwMultiplayer::peer_set_bandwidth
     );
     ClassDB::bind_method(

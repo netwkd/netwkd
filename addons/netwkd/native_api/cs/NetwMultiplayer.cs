@@ -4070,20 +4070,20 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "peer_set_bandwidth",
-            3937882851UL);
+            1602489585UL);
 
     /// <summary>
-    /// Sets how many kilobits a second this peer may send to
-    /// <paramref name="peer"/>. <c>0</c> returns it to
-    /// <see cref="NetwSessionConfig.BandwidthKbps"/>. See
+    /// Sets the send budget for <paramref name="peer"/> in KB/s. <c>0</c>
+    /// returns it to
+    /// <see cref="NetwSessionConfig.BandwidthKilobytesPerSecond"/>. See
     /// <see cref="NetwSession.SetPeerBandwidth"/>.
     /// </summary>
-    public void PeerSetBandwidth(long peer, long kbps)
+    public void PeerSetBandwidth(long peer, double kilobytesPerSecond)
     {
         long slot0 = peer;
-        long slot1 = kbps;
+        double slot1 = kilobytesPerSecond;
         long discarded = default;
-        NetwThunks.Ptrcall2_Long_Long_Long(
+        NetwThunks.Ptrcall2_Long_Double_Long(
             _bindPeerSetBandwidth,
             Checked,
             in slot0,

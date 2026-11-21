@@ -18,6 +18,7 @@ class NetwSessionConfig : public godot::Resource {
 
 public:
     static constexpr int64_t DEFAULT_TRANSFER_DEADLINE_TICKS = 300;
+    static constexpr double BYTES_PER_KILOBYTE = 1000.0;
 
 private:
     struct Values {
@@ -25,8 +26,9 @@ private:
         enums::NetwSession::Role desired_role
             = enums::NetwSession::Role(DEFAULT_DESIRED_ROLE);
         godot::Ref<NetwLinkConditions> link_conditions;
+        godot::Ref<NetwLinkConditions> host_link_conditions;
         godot::Ref<NetwServerInfo> server_info;
-        int64_t bandwidth_kbps = 0;
+        double bandwidth_kilobytes_per_second = 0.0;
         enums::NetwSession::TransferMode transfer_mode
             = enums::NetwSession::TRANSFER_REJOIN;
         int64_t transfer_deadline_ticks = DEFAULT_TRANSFER_DEADLINE_TICKS;
@@ -65,6 +67,17 @@ public:
         return values.link_conditions;
     }
 
+    void set_host_link_conditions(
+        const godot::Ref<NetwLinkConditions> &p_conditions
+    ) {
+        if (guard.takes("host_link_conditions")) {
+            values.host_link_conditions = p_conditions;
+        }
+    }
+    godot::Ref<NetwLinkConditions> get_host_link_conditions() const {
+        return values.host_link_conditions;
+    }
+
     void set_server_info(const godot::Ref<NetwServerInfo> &p_info) {
         if (guard.takes("server_info")) {
             values.server_info = p_info;
@@ -74,9 +87,9 @@ public:
         return values.server_info;
     }
 
-    void set_bandwidth_kbps(int64_t p_kbps);
-    int64_t get_bandwidth_kbps() const {
-        return values.bandwidth_kbps;
+    void set_bandwidth_kilobytes_per_second(double p_kilobytes_per_second);
+    double get_bandwidth_kilobytes_per_second() const {
+        return values.bandwidth_kilobytes_per_second;
     }
 
     void set_transfer_mode(enums::NetwSession::TransferMode p_mode);
@@ -97,12 +110,13 @@ public:
     godot::Ref<NetwSessionConfig> app(const godot::StringName &p_app_id);
     godot::Ref<NetwSessionConfig> role(enums::NetwSession::Role p_role);
     godot::Ref<NetwSessionConfig> link(
-        const godot::Ref<NetwLinkConditions> &p_conditions
+        const godot::Ref<NetwLinkConditions> &p_client_conditions,
+        const godot::Ref<NetwLinkConditions> &p_host_conditions = {}
     );
     godot::Ref<NetwSessionConfig> server(
         const godot::Ref<NetwServerInfo> &p_info
     );
-    godot::Ref<NetwSessionConfig> bandwidth(int64_t p_kbps);
+    godot::Ref<NetwSessionConfig> bandwidth(double p_kilobytes_per_second);
     godot::Ref<NetwSessionConfig> transfer(
         enums::NetwSession::TransferMode p_mode
     );

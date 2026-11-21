@@ -2,6 +2,8 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/scene.hpp"
 
+#include <cmath>
+
 #include "netw/api/participant.hpp"
 #include "netw/display/decl_param.hpp"
 
@@ -713,22 +715,24 @@ void NetwMultiplayer::sync_pump_rows(
 
 void NetwMultiplayer::peer_set_bandwidth(
     int64_t p_peer,
-    int64_t p_kbps
+    double p_kilobytes_per_second
 ) {
-    if (p_kbps < 0) {
+    const double bytes_per_second
+        = p_kilobytes_per_second * NetwSessionConfig::BYTES_PER_KILOBYTE;
+    if (bytes_per_second < 0.0 || !std::isfinite(bytes_per_second)) {
         fault::raise(
             this,
             NETW_FAULT_BAD_VALUE,
             {"{NetwSession.set_peer_bandwidth}",
-             vformat("%d kbit/s", p_kbps),
-             "a rate in kbit/s, or 0 for the session's rate",
+             String::num(p_kilobytes_per_second) + " KB/s",
+             "a rate in KB/s, or 0 for the session's rate",
              p_peer}
         );
         return;
     }
     ReplicationSend *send = row_send_of(get_replication_plane());
     if (send != nullptr) {
-        send->set_peer_rate(p_peer, double(p_kbps) * KBPS_BYTES);
+        send->set_peer_rate(p_peer, bytes_per_second);
     }
 }
 
@@ -773,7 +777,10 @@ void NetwMultiplayer::sync_flush_rows(
     if (rate > 0) {
         p_send->set_tickrate(rate);
     }
-    p_send->set_rate(double(session_settings.bandwidth_kbps) * KBPS_BYTES);
+    p_send->set_rate(
+        session_settings.bandwidth_kilobytes_per_second
+        * NetwSessionConfig::BYTES_PER_KILOBYTE
+    );
     p_send->publish_tables(table_publishes());
     sync_note_backlog(p_send);
 #if defined(NETW_TESTS)

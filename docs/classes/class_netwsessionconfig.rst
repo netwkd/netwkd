@@ -32,7 +32,7 @@ Later changes warn and are ignored.
 
 \ **Bandwidth**\ 
 
-\ :ref:`bandwidth_kbps<class_NetwSessionConfig_property_bandwidth_kbps>` sets a bandwidth budget per peer. Updates that wait longer or have higher :ref:`NetwEntity.replication_priority<class_NetwEntity_property_replication_priority>` are sent first.
+\ :ref:`bandwidth_kilobytes_per_second<class_NetwSessionConfig_property_bandwidth_kilobytes_per_second>` sets a bandwidth budget per peer. Updates that wait longer or have higher :ref:`NetwEntity.replication_priority<class_NetwEntity_property_replication_priority>` are sent first.
 
 RPCs, spawns, authority changes and :ref:`NetwPropertyConfig.retained()<class_NetwPropertyConfig_method_retained>` properties can exceed the budget. Other property updates still receive at least a quarter of each tick's budget. Later ticks repay the excess, up to two ticks of budget at a time.
 
@@ -44,23 +44,25 @@ Properties
 .. table::
    :widths: auto
 
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :godot:`StringName`                                 | :ref:`app_id<class_NetwSessionConfig_property_app_id>`                                   |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :godot:`int`                                        | :ref:`bandwidth_kbps<class_NetwSessionConfig_property_bandwidth_kbps>`                   |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :ref:`Role<enum_NetwSession_Role>`                  | :ref:`desired_role<class_NetwSessionConfig_property_desired_role>`                       |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :ref:`NetwLinkConditions<class_NetwLinkConditions>` | :ref:`link_conditions<class_NetwSessionConfig_property_link_conditions>`                 |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :godot:`float`                                      | :ref:`return_window_seconds<class_NetwSessionConfig_property_return_window_seconds>`     |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :ref:`NetwServerInfo<class_NetwServerInfo>`         | :ref:`server_info<class_NetwSessionConfig_property_server_info>`                         |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :godot:`int`                                        | :ref:`transfer_deadline_ticks<class_NetwSessionConfig_property_transfer_deadline_ticks>` |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
-   | :ref:`TransferMode<enum_NetwSession_TransferMode>`  | :ref:`transfer_mode<class_NetwSessionConfig_property_transfer_mode>`                     |
-   +-----------------------------------------------------+------------------------------------------------------------------------------------------+
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :godot:`StringName`                                 | :ref:`app_id<class_NetwSessionConfig_property_app_id>`                                                 |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :godot:`float`                                      | :ref:`bandwidth_kilobytes_per_second<class_NetwSessionConfig_property_bandwidth_kilobytes_per_second>` |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`Role<enum_NetwSession_Role>`                  | :ref:`desired_role<class_NetwSessionConfig_property_desired_role>`                                     |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwLinkConditions<class_NetwLinkConditions>` | :ref:`host_link_conditions<class_NetwSessionConfig_property_host_link_conditions>`                     |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwLinkConditions<class_NetwLinkConditions>` | :ref:`link_conditions<class_NetwSessionConfig_property_link_conditions>`                               |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :godot:`float`                                      | :ref:`return_window_seconds<class_NetwSessionConfig_property_return_window_seconds>`                   |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwServerInfo<class_NetwServerInfo>`         | :ref:`server_info<class_NetwSessionConfig_property_server_info>`                                       |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :godot:`int`                                        | :ref:`transfer_deadline_ticks<class_NetwSessionConfig_property_transfer_deadline_ticks>`               |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
+   | :ref:`TransferMode<enum_NetwSession_TransferMode>`  | :ref:`transfer_mode<class_NetwSessionConfig_property_transfer_mode>`                                   |
+   +-----------------------------------------------------+--------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-reftable-group
 
@@ -70,23 +72,23 @@ Methods
 .. table::
    :widths: auto
 
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`app<class_NetwSessionConfig_method_app>`\ (\ app_id\: :godot:`StringName`\ )                                                 |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`bandwidth<class_NetwSessionConfig_method_bandwidth>`\ (\ kbps\: :godot:`int`\ )                                              |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`link<class_NetwSessionConfig_method_link>`\ (\ link_conditions\: :ref:`NetwLinkConditions<class_NetwLinkConditions>`\ )      |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`return_window<class_NetwSessionConfig_method_return_window>`\ (\ seconds\: :godot:`float`\ )                                 |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`role<class_NetwSessionConfig_method_role>`\ (\ desired_role\: :ref:`Role<enum_NetwSession_Role>`\ )                          |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`server<class_NetwSessionConfig_method_server>`\ (\ server_info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ )              |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`transfer<class_NetwSessionConfig_method_transfer>`\ (\ transfer_mode\: :ref:`TransferMode<enum_NetwSession_TransferMode>`\ ) |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`transfer_deadline<class_NetwSessionConfig_method_transfer_deadline>`\ (\ ticks\: :godot:`int`\ )                             |
-   +---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------+
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`app<class_NetwSessionConfig_method_app>`\ (\ app_id\: :godot:`StringName`\ )                                                                                                                            |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`bandwidth<class_NetwSessionConfig_method_bandwidth>`\ (\ kilobytes_per_second\: :godot:`float`\ )                                                                                                       |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`link<class_NetwSessionConfig_method_link>`\ (\ client_conditions\: :ref:`NetwLinkConditions<class_NetwLinkConditions>`, host_conditions\: :ref:`NetwLinkConditions<class_NetwLinkConditions>` = null\ ) |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`return_window<class_NetwSessionConfig_method_return_window>`\ (\ seconds\: :godot:`float`\ )                                                                                                            |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`role<class_NetwSessionConfig_method_role>`\ (\ desired_role\: :ref:`Role<enum_NetwSession_Role>`\ )                                                                                                     |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`server<class_NetwSessionConfig_method_server>`\ (\ server_info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ )                                                                                         |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`transfer<class_NetwSessionConfig_method_transfer>`\ (\ transfer_mode\: :ref:`TransferMode<enum_NetwSession_TransferMode>`\ )                                                                            |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwSessionConfig<class_NetwSessionConfig>` | :ref:`transfer_deadline<class_NetwSessionConfig_method_transfer_deadline>`\ (\ ticks\: :godot:`int`\ )                                                                                                        |
+   +---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -114,18 +116,18 @@ The game and build. Peers with a different :ref:`app_id<class_NetwSessionConfig_
 
 ----
 
-.. _class_NetwSessionConfig_property_bandwidth_kbps:
+.. _class_NetwSessionConfig_property_bandwidth_kilobytes_per_second:
 
 .. rst-class:: classref-property
 
-:godot:`int` **bandwidth_kbps** :ref:`🔗<class_NetwSessionConfig_property_bandwidth_kbps>`
+:godot:`float` **bandwidth_kilobytes_per_second** :ref:`🔗<class_NetwSessionConfig_property_bandwidth_kilobytes_per_second>`
 
 .. rst-class:: classref-property-setget
 
-- |void| **set_bandwidth_kbps**\ (\ value\: :godot:`int`\ )
-- :godot:`int` **get_bandwidth_kbps**\ (\ )
+- |void| **set_bandwidth_kilobytes_per_second**\ (\ value\: :godot:`float`\ )
+- :godot:`float` **get_bandwidth_kilobytes_per_second**\ (\ )
 
-The budget each peer is sent, in kbit/s. ``0`` allows each peer one datagram a tick of :godot:`SceneMultiplayer.max_sync_packet_size <SceneMultiplayer#class_SceneMultiplayer_property_max_sync_packet_size>`, less 150 bytes of headroom. A negative value is refused.
+The send budget per peer in KB/s. One kilobyte is 1000 bytes. ``0`` allows each peer one datagram a tick of :godot:`SceneMultiplayer.max_sync_packet_size <SceneMultiplayer#class_SceneMultiplayer_property_max_sync_packet_size>`, less 150 bytes of headroom. Negative or non-finite rates are refused.
 
 While a peer loses packets its budget halves, and each round trip without loss adds back an eighth of it, up to this value. :ref:`NetwSession.set_peer_bandwidth()<class_NetwSession_method_set_peer_bandwidth>` gives one peer its own budget.
 
@@ -150,6 +152,23 @@ The role this peer takes when it hosts, which becomes :ref:`NetwSession.role<cla
 
 ----
 
+.. _class_NetwSessionConfig_property_host_link_conditions:
+
+.. rst-class:: classref-property
+
+:ref:`NetwLinkConditions<class_NetwLinkConditions>` **host_link_conditions** :ref:`🔗<class_NetwSessionConfig_property_host_link_conditions>`
+
+.. rst-class:: classref-property-setget
+
+- |void| **set_host_link_conditions**\ (\ value\: :ref:`NetwLinkConditions<class_NetwLinkConditions>`\ )
+- :ref:`NetwLinkConditions<class_NetwLinkConditions>` **get_host_link_conditions**\ (\ )
+
+The server's profile, copied when the session starts.
+
+.. rst-class:: classref-item-separator
+
+----
+
 .. _class_NetwSessionConfig_property_link_conditions:
 
 .. rst-class:: classref-property
@@ -161,7 +180,7 @@ The role this peer takes when it hosts, which becomes :ref:`NetwSession.role<cla
 - |void| **set_link_conditions**\ (\ value\: :ref:`NetwLinkConditions<class_NetwLinkConditions>`\ )
 - :ref:`NetwLinkConditions<class_NetwLinkConditions>` **get_link_conditions**\ (\ )
 
-:ref:`NetwLinkConditions<class_NetwLinkConditions>` copied when the session starts.
+The client's profile, copied when the session starts.
 
 .. rst-class:: classref-item-separator
 
@@ -267,9 +286,9 @@ Sets :ref:`app_id<class_NetwSessionConfig_property_app_id>` to identify the game
 
 .. rst-class:: classref-method
 
-:ref:`NetwSessionConfig<class_NetwSessionConfig>` **bandwidth**\ (\ kbps\: :godot:`int`\ ) :ref:`🔗<class_NetwSessionConfig_method_bandwidth>`
+:ref:`NetwSessionConfig<class_NetwSessionConfig>` **bandwidth**\ (\ kilobytes_per_second\: :godot:`float`\ ) :ref:`🔗<class_NetwSessionConfig_method_bandwidth>`
 
-Sets :ref:`bandwidth_kbps<class_NetwSessionConfig_property_bandwidth_kbps>`, the bandwidth budget per peer in kbit/s.
+Sets :ref:`bandwidth_kilobytes_per_second<class_NetwSessionConfig_property_bandwidth_kilobytes_per_second>`, the bandwidth budget per peer in KB/s.
 
 .. rst-class:: classref-item-separator
 
@@ -279,11 +298,9 @@ Sets :ref:`bandwidth_kbps<class_NetwSessionConfig_property_bandwidth_kbps>`, the
 
 .. rst-class:: classref-method
 
-:ref:`NetwSessionConfig<class_NetwSessionConfig>` **link**\ (\ link_conditions\: :ref:`NetwLinkConditions<class_NetwLinkConditions>`\ ) :ref:`🔗<class_NetwSessionConfig_method_link>`
+:ref:`NetwSessionConfig<class_NetwSessionConfig>` **link**\ (\ client_conditions\: :ref:`NetwLinkConditions<class_NetwLinkConditions>`, host_conditions\: :ref:`NetwLinkConditions<class_NetwLinkConditions>` = null\ ) :ref:`🔗<class_NetwSessionConfig_method_link>`
 
-.. container:: contribute
-
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Sets :ref:`link_conditions<class_NetwSessionConfig_property_link_conditions>` for the client and :ref:`host_link_conditions<class_NetwSessionConfig_property_host_link_conditions>` for the host. Each profile applies in both directions.
 
 .. rst-class:: classref-item-separator
 

@@ -1,6 +1,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/link/shaped_peer.hpp"
 
+#include "godot/net_peers.hpp"
 #include "godot/transport_state.hpp"
 #include "netw/api/interest.hpp"
 #include "netw/api/join_config.hpp"
@@ -4182,10 +4183,14 @@ Ref<MultiplayerPeer> NetwMultiplayer::peer_shaped(
 #if defined(DEBUG_ENABLED)
     if (p_peer.is_null()
         || Object::cast_to<link::ShapedPeer>(*p_peer) != nullptr
-        || p_peer->is_class("OfflineMultiplayerPeer")) {
+        || p_peer->is_class("OfflineMultiplayerPeer")
+        || (session_settings.link_conditions.is_null()
+            && session_settings.host_link_conditions.is_null())) {
         return p_peer;
     }
-    const Ref<NetwLinkConditions> shaping = session_settings.link_conditions;
+    const Ref<NetwLinkConditions> &shaping = gd::peer_is_server(p_peer)
+        ? session_settings.host_link_conditions
+        : session_settings.link_conditions;
     if (shaping.is_null()) {
         return p_peer;
     }
@@ -5706,13 +5711,20 @@ Ref<NetwSessionConfig> NetwMultiplayer::session_get_config() const {
             = session_settings.link_conditions->duplicate();
         snapshot->set_link_conditions(link);
     }
+    if (session_settings.host_link_conditions.is_valid()) {
+        const Ref<NetwLinkConditions> link
+            = session_settings.host_link_conditions->duplicate();
+        snapshot->set_host_link_conditions(link);
+    }
     if (session_settings.server_info.is_valid()) {
         Ref<NetwServerInfo> info;
         info.instantiate();
         info->copy_values_from(**session_settings.server_info);
         snapshot->set_server_info(info);
     }
-    snapshot->set_bandwidth_kbps(session_settings.bandwidth_kbps);
+    snapshot->set_bandwidth_kilobytes_per_second(
+        session_settings.bandwidth_kilobytes_per_second
+    );
     snapshot->set_transfer_mode(session_settings.transfer_mode);
     snapshot->set_transfer_deadline_ticks(
         session_settings.transfer_deadline_ticks
@@ -5775,12 +5787,18 @@ Error NetwMultiplayer::session_initialize(
         if (link.is_valid()) {
             session_settings.link_conditions = link->duplicate();
         }
+        const Ref<NetwLinkConditions> host_link
+            = p_from->get_host_link_conditions();
+        if (host_link.is_valid()) {
+            session_settings.host_link_conditions = host_link->duplicate();
+        }
         const Ref<NetwServerInfo> info = p_from->get_server_info();
         if (info.is_valid()) {
             session_settings.server_info.instantiate();
             session_settings.server_info->copy_values_from(**info);
         }
-        session_settings.bandwidth_kbps = p_from->get_bandwidth_kbps();
+        session_settings.bandwidth_kilobytes_per_second
+            = p_from->get_bandwidth_kilobytes_per_second();
         session_settings.transfer_mode = p_from->get_transfer_mode();
         session_settings.transfer_deadline_ticks
             = p_from->get_transfer_deadline_ticks();

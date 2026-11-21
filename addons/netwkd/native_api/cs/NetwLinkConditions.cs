@@ -6,11 +6,12 @@ using Godot.NativeInterop;
 namespace Netwkd;
 
 /// <summary>
-/// Simulated latency and packet loss for testing.
+/// Simulated network conditions for testing.
 /// </summary>
 /// <remarks>
-/// Pass it to <see cref="NetwSessionConfig.Link"/>. Only debug builds apply it
-/// to a real connection.
+/// <see cref="NetwSessionConfig.Link"/> applies conditions to real connections
+/// only in debug builds. Default values add no delay or loss. RTT targets are
+/// for the client monitor on localhost at 60 ticks/s and 120 FPS.
 /// <code>
 /// Netw.configure_session(self).link(NetwLinkConditions.wifi())
 /// </code>
@@ -46,7 +47,7 @@ public sealed class NetwLinkConditions : NetwRefCounted
         NetwApi.MethodBind("NetwLinkConditions", "set_latency_ms", 373806689UL);
 
     /// <summary>
-    /// Applied to each direction.
+    /// One-way delay in milliseconds.
     /// </summary>
     public double LatencyMs
     {
@@ -77,6 +78,9 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindSetJitterMs =
         NetwApi.MethodBind("NetwLinkConditions", "set_jitter_ms", 373806689UL);
 
+    /// <summary>
+    /// Maximum random delay added to an unreliable packet, in milliseconds.
+    /// </summary>
     public double JitterMs
     {
         get
@@ -110,8 +114,7 @@ public sealed class NetwLinkConditions : NetwRefCounted
             373806689UL);
 
     /// <summary>
-    /// An unreliable packet is dropped. A reliable one arrives late, as if it
-    /// was sent again.
+    /// Chance to drop an unreliable packet or delay a reliable packet.
     /// </summary>
     public double LossChance
     {
@@ -148,6 +151,9 @@ public sealed class NetwLinkConditions : NetwRefCounted
             "set_reorder_chance",
             373806689UL);
 
+    /// <summary>
+    /// Chance to delay an unreliable packet by one physics tick.
+    /// </summary>
     public double ReorderChance
     {
         get
@@ -183,6 +189,9 @@ public sealed class NetwLinkConditions : NetwRefCounted
             "set_duplicate_chance",
             373806689UL);
 
+    /// <summary>
+    /// Chance to schedule a second copy of an unreliable packet.
+    /// </summary>
     public double DuplicateChance
     {
         get
@@ -219,8 +228,7 @@ public sealed class NetwLinkConditions : NetwRefCounted
             373806689UL);
 
     /// <summary>
-    /// The link holds every packet for
-    /// <see cref="NetwLinkConditions.StallMs"/>.
+    /// Chance for a packet to start a stall.
     /// </summary>
     public double StallChance
     {
@@ -251,6 +259,9 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindSetStallMs =
         NetwApi.MethodBind("NetwLinkConditions", "set_stall_ms", 373806689UL);
 
+    /// <summary>
+    /// Stall duration in milliseconds, with a minimum of one physics tick.
+    /// </summary>
     public double StallMs
     {
         get
@@ -278,8 +289,7 @@ public sealed class NetwLinkConditions : NetwRefCounted
         NetwApi.MethodBind("NetwLinkConditions", "set_seed", 1286410249UL);
 
     /// <summary>
-    /// The random seed for loss, duplication, reordering, jitter and stalls, so
-    /// the same seed drops and delays the same packets every run.
+    /// Seed for the random choices made by the simulation.
     /// </summary>
     public long Seed
     {
@@ -304,6 +314,16 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindWifi =
         NetwApi.MethodBind("NetwLinkConditions", "wifi", 109721920UL);
 
+    /// <summary>
+    /// <code>
+    /// Target RTT   40 ms
+    /// Jitter       0 to 8 ms
+    /// Loss         1%
+    /// Reordering   0.5%
+    /// Duplication  0.1%
+    /// Stalls       Off
+    /// </code>
+    /// </summary>
     public static NetwLinkConditions Wifi()
     {
         IntPtr answered = default;
@@ -314,6 +334,16 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindMobile4G =
         NetwApi.MethodBind("NetwLinkConditions", "mobile_4g", 109721920UL);
 
+    /// <summary>
+    /// <code>
+    /// Target RTT   85 ms
+    /// Jitter       0 to 25 ms
+    /// Loss         3%
+    /// Reordering   2%
+    /// Duplication  0.2%
+    /// Stalls       1% for 80 ms
+    /// </code>
+    /// </summary>
     public static NetwLinkConditions Mobile4G()
     {
         IntPtr answered = default;
@@ -324,6 +354,16 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindPoor3G =
         NetwApi.MethodBind("NetwLinkConditions", "poor_3g", 109721920UL);
 
+    /// <summary>
+    /// <code>
+    /// Target RTT   220 ms
+    /// Jitter       0 to 90 ms
+    /// Loss         8%
+    /// Reordering   5%
+    /// Duplication  0.5%
+    /// Stalls       4% for 250 ms
+    /// </code>
+    /// </summary>
     public static NetwLinkConditions Poor3G()
     {
         IntPtr answered = default;
@@ -334,6 +374,16 @@ public sealed class NetwLinkConditions : NetwRefCounted
     private static readonly IntPtr _bindSatellite =
         NetwApi.MethodBind("NetwLinkConditions", "satellite", 109721920UL);
 
+    /// <summary>
+    /// <code>
+    /// Target RTT   650 ms
+    /// Jitter       0 to 120 ms
+    /// Loss         4%
+    /// Reordering   3%
+    /// Duplication  0.3%
+    /// Stalls       2% for 400 ms
+    /// </code>
+    /// </summary>
     public static NetwLinkConditions Satellite()
     {
         IntPtr answered = default;

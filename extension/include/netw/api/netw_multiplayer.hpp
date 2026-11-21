@@ -663,7 +663,7 @@ public:
     double peer_get_link_stat(int64_t p_peer, LinkStat p_stat) const;
     int64_t peer_get_player(int64_t p_peer) const;
     double peer_get_traffic(int64_t p_peer, Traffic p_stat) const;
-    void peer_set_bandwidth(int64_t p_peer, int64_t p_kbps);
+    void peer_set_bandwidth(int64_t p_peer, double p_kilobytes_per_second);
 
     godot::Ref<NetwPromise> persist_flush_all();
     godot::RID persist_get_database(const godot::RID &p_entity) const;
@@ -1627,8 +1627,9 @@ private:
         godot::StringName app_id;
         int64_t desired_role = 3;
         godot::Ref<NetwLinkConditions> link_conditions;
+        godot::Ref<NetwLinkConditions> host_link_conditions;
         godot::Ref<NetwServerInfo> server_info;
-        int64_t bandwidth_kbps = 0;
+        double bandwidth_kilobytes_per_second = 0.0;
         enums::NetwSession::TransferMode transfer_mode
             = enums::NetwSession::TRANSFER_REJOIN;
         int64_t transfer_deadline_ticks
@@ -2401,7 +2402,6 @@ public:
         ReplicationSend *p_send,
         int64_t p_tick
     );
-    static constexpr double KBPS_BYTES = 125.0;
     void sync_note_backlog(ReplicationSend *p_send);
     void sync_flush_rows(
         ReplicationSend *p_send,

@@ -1,5 +1,7 @@
 #include "netw/api/session_config.hpp"
 
+#include <cmath>
+
 #include "godot/class_db.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/fault_book.hpp"
@@ -65,6 +67,25 @@ void NetwSessionConfig::_bind_methods() {
     );
 
     ClassDB::bind_method(
+        D_METHOD("set_host_link_conditions", "host_link_conditions"),
+        &NetwSessionConfig::set_host_link_conditions
+    );
+    ClassDB::bind_method(
+        D_METHOD("get_host_link_conditions"),
+        &NetwSessionConfig::get_host_link_conditions
+    );
+    ADD_PROPERTY(
+        PropertyInfo(
+            Variant::OBJECT,
+            "host_link_conditions",
+            PROPERTY_HINT_RESOURCE_TYPE,
+            "NetwLinkConditions"
+        ),
+        "set_host_link_conditions",
+        "get_host_link_conditions"
+    );
+
+    ClassDB::bind_method(
         D_METHOD("set_server_info", "server_info"),
         &NetwSessionConfig::set_server_info
     );
@@ -89,8 +110,9 @@ void NetwSessionConfig::_bind_methods() {
         &NetwSessionConfig::role
     );
     ClassDB::bind_method(
-        D_METHOD("link", "link_conditions"),
-        &NetwSessionConfig::link
+        D_METHOD("link", "client_conditions", "host_conditions"),
+        &NetwSessionConfig::link,
+        DEFVAL(Ref<NetwLinkConditions>())
     );
     ClassDB::bind_method(
         D_METHOD("server", "server_info"),
@@ -98,25 +120,28 @@ void NetwSessionConfig::_bind_methods() {
     );
 
     ClassDB::bind_method(
-        D_METHOD("set_bandwidth_kbps", "bandwidth_kbps"),
-        &NetwSessionConfig::set_bandwidth_kbps
+        D_METHOD(
+            "set_bandwidth_kilobytes_per_second",
+            "kilobytes_per_second"
+        ),
+        &NetwSessionConfig::set_bandwidth_kilobytes_per_second
     );
     ClassDB::bind_method(
-        D_METHOD("get_bandwidth_kbps"),
-        &NetwSessionConfig::get_bandwidth_kbps
+        D_METHOD("get_bandwidth_kilobytes_per_second"),
+        &NetwSessionConfig::get_bandwidth_kilobytes_per_second
     );
     ADD_PROPERTY(
         PropertyInfo(
-            Variant::INT,
-            "bandwidth_kbps",
+            Variant::FLOAT,
+            "bandwidth_kilobytes_per_second",
             PROPERTY_HINT_RANGE,
-            "0,100000,1,or_greater,suffix:kbit/s"
+            "0,12500,0.001,or_greater,suffix:KB/s"
         ),
-        "set_bandwidth_kbps",
-        "get_bandwidth_kbps"
+        "set_bandwidth_kilobytes_per_second",
+        "get_bandwidth_kilobytes_per_second"
     );
     ClassDB::bind_method(
-        D_METHOD("bandwidth", "kbps"),
+        D_METHOD("bandwidth", "kilobytes_per_second"),
         &NetwSessionConfig::bandwidth
     );
 
@@ -249,24 +274,31 @@ Ref<NetwSessionConfig> NetwSessionConfig::transfer(
     return Ref<NetwSessionConfig>(this);
 }
 
-void NetwSessionConfig::set_bandwidth_kbps(int64_t p_kbps) {
-    if (!guard.refused && p_kbps < 0) {
+void NetwSessionConfig::set_bandwidth_kilobytes_per_second(
+    double p_kilobytes_per_second
+) {
+    const double bytes_per_second
+        = p_kilobytes_per_second * BYTES_PER_KILOBYTE;
+    if (!guard.refused
+        && (bytes_per_second < 0.0 || !std::isfinite(bytes_per_second))) {
         fault::raise(
             nullptr,
             NETW_FAULT_BAD_VALUE,
-            {"{NetwSessionConfig.bandwidth_kbps}",
-             String::num_int64(p_kbps),
-             "kbit/s, or 0 for one packet a tick"}
+            {"{NetwSessionConfig.bandwidth_kilobytes_per_second}",
+             String::num(p_kilobytes_per_second),
+             "KB/s, or 0 for one packet a tick"}
         );
         return;
     }
-    if (guard.takes("bandwidth_kbps")) {
-        values.bandwidth_kbps = p_kbps;
+    if (guard.takes("bandwidth_kilobytes_per_second")) {
+        values.bandwidth_kilobytes_per_second = p_kilobytes_per_second;
     }
 }
 
-Ref<NetwSessionConfig> NetwSessionConfig::bandwidth(int64_t p_kbps) {
-    set_bandwidth_kbps(p_kbps);
+Ref<NetwSessionConfig> NetwSessionConfig::bandwidth(
+    double p_kilobytes_per_second
+) {
+    set_bandwidth_kilobytes_per_second(p_kilobytes_per_second);
     return Ref<NetwSessionConfig>(this);
 }
 
@@ -287,9 +319,13 @@ Ref<NetwSessionConfig> NetwSessionConfig::role(NetwMultiplayer::Role p_role) {
 }
 
 Ref<NetwSessionConfig> NetwSessionConfig::link(
-    const Ref<NetwLinkConditions> &p_conditions
+    const Ref<NetwLinkConditions> &p_client_conditions,
+    const Ref<NetwLinkConditions> &p_host_conditions
 ) {
-    set_link_conditions(p_conditions);
+    if (guard.takes("link_conditions")) {
+        values.link_conditions = p_client_conditions;
+        values.host_link_conditions = p_host_conditions;
+    }
     return Ref<NetwSessionConfig>(this);
 }
 
@@ -321,17 +357,23 @@ String NetwSessionConfig::non_default_fields() const {
         }
         named += "link_conditions";
     }
+    if (values.host_link_conditions.is_valid()) {
+        if (!named.is_empty()) {
+            named += ", ";
+        }
+        named += "host_link_conditions";
+    }
     if (values.server_info.is_valid()) {
         if (!named.is_empty()) {
             named += ", ";
         }
         named += "server_info";
     }
-    if (values.bandwidth_kbps != 0) {
+    if (values.bandwidth_kilobytes_per_second != 0.0) {
         if (!named.is_empty()) {
             named += ", ";
         }
-        named += "bandwidth_kbps";
+        named += "bandwidth_kilobytes_per_second";
     }
     if (values.transfer_mode != enums::NetwSession::TRANSFER_REJOIN) {
         if (!named.is_empty()) {

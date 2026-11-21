@@ -20,7 +20,7 @@ Ref<NetwLinkConditions> NetwLinkConditions::wifi() {
     Ref<NetwLinkConditions> conditions;
     conditions.instantiate();
     conditions->seed = 1;
-    conditions->latency_ms = 35.0;
+    conditions->latency_ms = 1.0;
     conditions->jitter_ms = 8.0;
     conditions->loss_chance = 0.01;
     conditions->reorder_chance = 0.005;
@@ -32,7 +32,7 @@ Ref<NetwLinkConditions> NetwLinkConditions::mobile_4g() {
     Ref<NetwLinkConditions> conditions;
     conditions.instantiate();
     conditions->seed = 2;
-    conditions->latency_ms = 85.0;
+    conditions->latency_ms = 12.5;
     conditions->jitter_ms = 25.0;
     conditions->loss_chance = 0.03;
     conditions->reorder_chance = 0.02;
@@ -46,7 +46,7 @@ Ref<NetwLinkConditions> NetwLinkConditions::poor_3g() {
     Ref<NetwLinkConditions> conditions;
     conditions.instantiate();
     conditions->seed = 3;
-    conditions->latency_ms = 220.0;
+    conditions->latency_ms = 42.5;
     conditions->jitter_ms = 90.0;
     conditions->loss_chance = 0.08;
     conditions->reorder_chance = 0.05;
@@ -60,7 +60,7 @@ Ref<NetwLinkConditions> NetwLinkConditions::satellite() {
     Ref<NetwLinkConditions> conditions;
     conditions.instantiate();
     conditions->seed = 4;
-    conditions->latency_ms = 650.0;
+    conditions->latency_ms = 245.0;
     conditions->jitter_ms = 120.0;
     conditions->loss_chance = 0.04;
     conditions->reorder_chance = 0.03;

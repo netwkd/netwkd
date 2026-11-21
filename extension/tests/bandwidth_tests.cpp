@@ -452,6 +452,137 @@ LocalVector<RowOffer> movers(int64_t p_tick, bool p_with_resting) {
     return out;
 }
 
+RowOffer wide_player(int64_t p_tick) {
+    constexpr int COLUMNS = 9;
+    static const SchemaRecord schema = [] {
+        SchemaRecord made;
+        made.name = StringName("BandwidthPlayer");
+        for (int at = 0; at < COLUMNS; ++at) {
+            SchemaCore::append_column(
+                &made,
+                StringName(String::num_int64(at)),
+                SchemaCore::I64,
+                1
+            );
+        }
+        SchemaCore::fix(&made);
+        return made;
+    }();
+    RowOffer row;
+    row.route = 1;
+    row.channel = CHANNEL;
+    row.schema = &schema;
+    row.recipients.push_back(PEER);
+    row.marks = netw::store::MARK_PLAYER;
+    row.tick = p_tick;
+    Array values;
+    for (int at = 0; at < COLUMNS; ++at) {
+        values.push_back(p_tick + at);
+    }
+    netw_test::offer_values(row, values);
+    return row;
+}
+
+LawVerdict wide_player_row() {
+    constexpr int64_t DATAGRAM = 128;
+    constexpr double BYTES_PER_SECOND = 2000.0;
+    constexpr int64_t TICKS_PER_SECOND = 60;
+    SessionSend session;
+    session.set_rate(BYTES_PER_SECOND);
+    session.set_tickrate(TICKS_PER_SECOND);
+    LocalVector<RowOffer> rows = movers(1, false);
+    rows.push_back(wide_player(1));
+    const int64_t size = frame_bytes(rows);
+    if (size < 75 || size > DATAGRAM) {
+        return law_broken("the full player row measures %d bytes", int(size));
+    }
+    netw_test::seat_streams(session, rows);
+    bool sent_player = false;
+    bool sent_small_after = false;
+    for (int64_t tick = 1; tick <= 80; ++tick) {
+        const RowOffer player = wide_player(tick);
+        rows = movers(tick, false);
+        rows.push_back(player);
+        const SessionResult result
+            = session.run(registry(), rows, DATAGRAM * 8, tick);
+        for (const netw::repl::RowSend &send : result.sends) {
+            if (send.route != player.route) {
+                sent_small_after = sent_small_after || sent_player;
+                continue;
+            }
+            if (!sent_player) {
+                const netw::wire::CodeRow image
+                    = netw_test::sent_row(session.world, send);
+                if (send.masked || image.is_empty()
+                    || image.read_bits(0, 64) != uint64_t(tick)) {
+                    return law_broken("the first player row is not current");
+                }
+                sent_player = true;
+            }
+        }
+        netw_test::accept_streams(session, rows, PEER);
+    }
+    if (!sent_player) {
+        return law_broken("the first player row never fit");
+    }
+    if (!sent_small_after) {
+        return law_broken("smaller rows stopped after the player row");
+    }
+    return law_held();
+}
+
+LawVerdict lost_final_player_row() {
+    constexpr int64_t PLAYER = 1;
+    constexpr int64_t MOVING = 2;
+    constexpr int64_t DATAGRAM = 128;
+    LocalVector<RowOffer> rows;
+    rows.push_back(offer(PLAYER, 1, 1.0f, netw::store::MARK_PLAYER));
+    rows.push_back(offer(MOVING, 1));
+    const int64_t fill = frame_bytes(rows);
+    SessionSend session;
+    session.set_tickrate(60);
+    session.set_rate(double(fill * 60));
+    netw_test::seat_streams(session, rows);
+    const SessionResult lost = session.run(registry(), rows, DATAGRAM * 8, 1);
+    if (lost.sends.size() != 1 || lost.sends[0].route != PLAYER
+        || lost.sends[0].framed != fill || lost.sends[0].masked) {
+        return law_broken("the lost player row was not one full refill");
+    }
+    int64_t moving_sends = 0;
+    bool player_recovered = false;
+    for (int64_t tick = 2; tick <= 60; ++tick) {
+        rows[0].tick = tick;
+        rows[1] = offer(MOVING, tick);
+        const SessionResult result
+            = session.run(registry(), rows, DATAGRAM * 8, tick, tick * 20);
+        for (const netw::repl::RowSend &send : result.sends) {
+            if (send.route == MOVING) {
+                if (send.framed != fill) {
+                    return law_broken(
+                        "the moving row spent %d bytes against a %d byte fill",
+                        int(send.framed),
+                        int(fill)
+                    );
+                }
+                ++moving_sends;
+            } else if (send.route == PLAYER && !send.masked) {
+                const netw::wire::CodeRow image
+                    = netw_test::sent_row(session.world, send);
+                if (image.is_empty() || image.read_bits(0, 32) != 1) {
+                    return law_broken("the repair does not hold the final row");
+                }
+                player_recovered = true;
+            }
+        }
+        if (player_recovered && moving_sends > 0) {
+            return law_held();
+        }
+    }
+    return moving_sends == 0
+        ? law_broken("the competing row never sent")
+        : law_broken("the final player row never recovered");
+}
+
 LawVerdict resting_row() {
     const int PER_TICK = 2;
     SessionSend session;
@@ -491,6 +622,10 @@ TEST_CASE(
         {"eight equal routes under a third of their budget take turns",
          &equal_routes},
         {"a player's own row beside thirty heartbeat rows", &player_row},
+        {"a full player row waits for its bytes beside smaller moving rows",
+         &wide_player_row},
+        {"a lost final player row recovers beside a moving row",
+         &lost_final_player_row},
         {"a resting row beside ten moving rows", &resting_row},
     };
     for (const Row &row : ROWS) {
@@ -514,7 +649,7 @@ using netw_test::LoopbackRig;
 using netw_test::WorldDecl;
 
 constexpr int TICKRATE = 60;
-constexpr int64_t SLOW_KBPS = 64;
+constexpr double SLOW_KILOBYTES_PER_SECOND = 8.0;
 constexpr int64_t FRAME_SLACK = 64;
 
 constexpr const char *SINK = R"(extends Node
@@ -525,10 +660,6 @@ var calls := 0
 func note_call(tag: int) -> void:
 	calls += 1
 )";
-
-int64_t per_tick(int64_t p_kbps) {
-    return p_kbps * 125 / TICKRATE;
-}
 
 struct Wake {
     LoopbackRig rig;
@@ -661,13 +792,15 @@ Spent watch(Wake &r_wake, int64_t p_peer, int p_ticks) {
 LawVerdict peer_rate(Wake &r_wake) {
     const int64_t slow = r_wake.rig.peer_id(0);
     const int64_t fast = r_wake.rig.peer_id(1);
-    Netw::session(r_wake.rig.branch(-1))->set_peer_bandwidth(slow, SLOW_KBPS);
+    Netw::session(r_wake.rig.branch(-1))
+        ->set_peer_bandwidth(slow, SLOW_KILOBYTES_PER_SECOND);
     r_wake.move(90);
     const LocalVector<double> before = r_wake.mirrored_heights(0);
     const Spent held = watch(r_wake, slow, 60);
     const LocalVector<double> after = r_wake.mirrored_heights(0);
     const Spent kept = watch(r_wake, fast, 60);
-    const int64_t fill = per_tick(SLOW_KBPS);
+    const int64_t fill
+        = int64_t(SLOW_KILOBYTES_PER_SECOND * 1000.0 / TICKRATE);
     for (uint32_t at = 0; at < before.size(); ++at) {
         if (after[at] <= before[at]) {
             return law_broken("body %d never updated on the held peer", at);
@@ -896,7 +1029,7 @@ TEST_CASE(
     "and a send rate sends on fewer ticks or is refused"
 ) {
     const WakeRow ROWS[] = {
-        {"240 moving bodies, one peer given 64 kbit/s", 240, &peer_rate},
+        {"240 moving bodies, one peer given 8 KB/s", 240, &peer_rate},
         {"eight moving bodies, one of priority 4 and one a player's own",
          8,
          &priority_reaches_scheduler},

@@ -140,7 +140,7 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Node`                                         | :ref:`service<class_NetwSession_method_service>`\ (\ type\: :godot:`Object`\ ) |const|                                                                                                |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                                                | :ref:`set_peer_bandwidth<class_NetwSession_method_set_peer_bandwidth>`\ (\ peer\: :godot:`int`, kbps\: :godot:`int`\ )                                                                |
+   | |void|                                                | :ref:`set_peer_bandwidth<class_NetwSession_method_set_peer_bandwidth>`\ (\ peer\: :godot:`int`, kilobytes_per_second\: :godot:`float`\ )                                              |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`set_server_info<class_NetwSession_method_set_server_info>`\ (\ info\: :ref:`NetwServerInfo<class_NetwServerInfo>`\ )                                                            |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -984,13 +984,13 @@ The service registered for ``type``, or ``null``.
 
 .. rst-class:: classref-method
 
-|void| **set_peer_bandwidth**\ (\ peer\: :godot:`int`, kbps\: :godot:`int`\ ) :ref:`🔗<class_NetwSession_method_set_peer_bandwidth>`
+|void| **set_peer_bandwidth**\ (\ peer\: :godot:`int`, kilobytes_per_second\: :godot:`float`\ ) :ref:`🔗<class_NetwSession_method_set_peer_bandwidth>`
 
-Gives ``peer`` its own budget in kbit/s, in place of :ref:`NetwSessionConfig.bandwidth_kbps<class_NetwSessionConfig_property_bandwidth_kbps>`, for what this peer sends it. ``0`` returns it to the session's budget, and a negative value is refused. The budget lasts until ``peer`` disconnects.
+Gives ``peer`` its own budget in KB/s, in place of :ref:`NetwSessionConfig.bandwidth_kilobytes_per_second<class_NetwSessionConfig_property_bandwidth_kilobytes_per_second>`, for what this peer sends it. ``0`` returns it to the session's budget, and negative or non-finite rates are refused. The budget lasts until ``peer`` disconnects.
 
 ::
 
-    Netw.session(self).set_peer_bandwidth(player.peer_id, 64)
+    Netw.session(self).set_peer_bandwidth(player.peer_id, 8.0)
 
 .. rst-class:: classref-item-separator
 

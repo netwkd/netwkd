@@ -187,11 +187,11 @@
 		<method name="set_peer_bandwidth">
 			<return type="void" />
 			<param index="0" name="peer" type="int" />
-			<param index="1" name="kbps" type="int" />
+			<param index="1" name="kilobytes_per_second" type="float" />
 			<description>
-				Gives [param peer] its own budget in kbit/s, in place of [member NetwSessionConfig.bandwidth_kbps], for what this peer sends it. [code]0[/code] returns it to the session's budget, and a negative value is refused. The budget lasts until [param peer] disconnects.
+				Gives [param peer] its own budget in KB/s, in place of [member NetwSessionConfig.bandwidth_kilobytes_per_second], for what this peer sends it. [code]0[/code] returns it to the session's budget, and negative or non-finite rates are refused. The budget lasts until [param peer] disconnects.
 				[codeblock]
-				Netw.session(self).set_peer_bandwidth(player.peer_id, 64)
+				Netw.session(self).set_peer_bandwidth(player.peer_id, 8.0)
 				[/codeblock]
 			</description>
 		</method>

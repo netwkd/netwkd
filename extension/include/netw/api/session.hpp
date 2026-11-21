@@ -83,7 +83,7 @@ public:
     godot::Ref<NetwSessionConfig> get_config() const;
     void set_server_info(const godot::Ref<NetwServerInfo> &p_info);
     int64_t stat(enums::NetwMultiplayer::Stat p_stat) const;
-    void set_peer_bandwidth(int64_t p_peer, int64_t p_kbps);
+    void set_peer_bandwidth(int64_t p_peer, double p_kilobytes_per_second);
     double link_stat(
         int64_t p_peer,
         enums::NetwMultiplayer::LinkStat p_stat

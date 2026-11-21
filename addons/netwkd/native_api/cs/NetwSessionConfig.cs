@@ -20,8 +20,8 @@ namespace Netwkd;
 ///         .role(NetwSession.ROLE_LISTEN_SERVER)
 /// </code>
 /// <para>
-/// <b>Bandwidth</b> <see cref="NetwSessionConfig.BandwidthKbps"/> sets a
-/// bandwidth budget per peer. Updates that wait longer or have higher
+/// <b>Bandwidth</b> <see cref="NetwSessionConfig.BandwidthKilobytesPerSecond"/>
+/// sets a bandwidth budget per peer. Updates that wait longer or have higher
 /// <see cref="NetwEntity.ReplicationPriority"/> are sent first. RPCs, spawns,
 /// authority changes and <see cref="NetwPropertyConfig.Retained"/> properties
 /// can exceed the budget. Other property updates still receive at least a
@@ -129,7 +129,7 @@ public sealed class NetwSessionConfig : NetwRefCounted
             1089193088UL);
 
     /// <summary>
-    /// <see cref="NetwLinkConditions"/> copied when the session starts.
+    /// The client's profile, copied when the session starts.
     /// </summary>
     public NetwLinkConditions LinkConditions
     {
@@ -148,6 +148,44 @@ public sealed class NetwSessionConfig : NetwRefCounted
             long discarded = default;
             NetwThunks.Ptrcall1_IntPtr_Long(
                 _bindSetLinkConditions,
+                Checked,
+                in slot0,
+                ref discarded);
+        }
+    }
+
+    private static readonly IntPtr _bindGetHostLinkConditions =
+        NetwApi.MethodBind(
+            "NetwSessionConfig",
+            "get_host_link_conditions",
+            2266514204UL);
+
+    private static readonly IntPtr _bindSetHostLinkConditions =
+        NetwApi.MethodBind(
+            "NetwSessionConfig",
+            "set_host_link_conditions",
+            1089193088UL);
+
+    /// <summary>
+    /// The server's profile, copied when the session starts.
+    /// </summary>
+    public NetwLinkConditions HostLinkConditions
+    {
+        get
+        {
+            IntPtr answered = default;
+            NetwThunks.Ptrcall0_IntPtr(
+                _bindGetHostLinkConditions,
+                Checked,
+                ref answered);
+            return NetwLinkConditions.Adopt(answered);
+        }
+        set
+        {
+            IntPtr slot0 = value?.Native ?? IntPtr.Zero;
+            long discarded = default;
+            NetwThunks.Ptrcall1_IntPtr_Long(
+                _bindSetHostLinkConditions,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -204,44 +242,45 @@ public sealed class NetwSessionConfig : NetwRefCounted
         }
     }
 
-    private static readonly IntPtr _bindGetBandwidthKbps =
+    private static readonly IntPtr _bindGetBandwidthKilobytesPerSecond =
         NetwApi.MethodBind(
             "NetwSessionConfig",
-            "get_bandwidth_kbps",
-            3905245786UL);
+            "get_bandwidth_kilobytes_per_second",
+            1740695150UL);
 
-    private static readonly IntPtr _bindSetBandwidthKbps =
+    private static readonly IntPtr _bindSetBandwidthKilobytesPerSecond =
         NetwApi.MethodBind(
             "NetwSessionConfig",
-            "set_bandwidth_kbps",
-            1286410249UL);
+            "set_bandwidth_kilobytes_per_second",
+            373806689UL);
 
     /// <summary>
-    /// The budget each peer is sent, in kbit/s. <c>0</c> allows each peer one
-    /// datagram a tick of <c>SceneMultiplayer.max_sync_packet_size</c>, less
-    /// 150 bytes of headroom. A negative value is refused. While a peer loses
+    /// The send budget per peer in KB/s. One kilobyte is 1000 bytes. <c>0</c>
+    /// allows each peer one datagram a tick of
+    /// <c>SceneMultiplayer.max_sync_packet_size</c>, less 150 bytes of
+    /// headroom. Negative or non-finite rates are refused. While a peer loses
     /// packets its budget halves, and each round trip without loss adds back an
     /// eighth of it, up to this value.
     /// <see cref="NetwSession.SetPeerBandwidth"/> gives one peer its own
     /// budget.
     /// </summary>
-    public long BandwidthKbps
+    public double BandwidthKilobytesPerSecond
     {
         get
         {
-            long answered = default;
-            NetwThunks.Ptrcall0_Long(
-                _bindGetBandwidthKbps,
+            double answered = default;
+            NetwThunks.Ptrcall0_Double(
+                _bindGetBandwidthKilobytesPerSecond,
                 Checked,
                 ref answered);
             return answered;
         }
         set
         {
-            long slot0 = value;
+            double slot0 = value;
             long discarded = default;
-            NetwThunks.Ptrcall1_Long_Long(
-                _bindSetBandwidthKbps,
+            NetwThunks.Ptrcall1_Double_Long(
+                _bindSetBandwidthKilobytesPerSecond,
                 Checked,
                 in slot0,
                 ref discarded);
@@ -416,16 +455,25 @@ public sealed class NetwSessionConfig : NetwRefCounted
     }
 
     private static readonly IntPtr _bindLink =
-        NetwApi.MethodBind("NetwSessionConfig", "link", 2618458252UL);
+        NetwApi.MethodBind("NetwSessionConfig", "link", 1075158704UL);
 
-    public NetwSessionConfig Link(NetwLinkConditions linkConditions)
+    /// <summary>
+    /// Sets <see cref="NetwSessionConfig.LinkConditions"/> for the client and
+    /// <see cref="NetwSessionConfig.HostLinkConditions"/> for the host. Each
+    /// profile applies in both directions.
+    /// </summary>
+    public NetwSessionConfig Link(
+        NetwLinkConditions clientConditions,
+        NetwLinkConditions hostConditions = null)
     {
-        IntPtr slot0 = linkConditions?.Native ?? IntPtr.Zero;
+        IntPtr slot0 = clientConditions?.Native ?? IntPtr.Zero;
+        IntPtr slot1 = hostConditions?.Native ?? IntPtr.Zero;
         IntPtr answered = default;
-        NetwThunks.Ptrcall1_IntPtr_IntPtr(
+        NetwThunks.Ptrcall2_IntPtr_IntPtr_IntPtr(
             _bindLink,
             Checked,
             in slot0,
+            in slot1,
             ref answered);
         return NetwSessionConfig.Adopt(answered);
     }
@@ -450,17 +498,17 @@ public sealed class NetwSessionConfig : NetwRefCounted
     }
 
     private static readonly IntPtr _bindBandwidth =
-        NetwApi.MethodBind("NetwSessionConfig", "bandwidth", 3031268209UL);
+        NetwApi.MethodBind("NetwSessionConfig", "bandwidth", 1487641699UL);
 
     /// <summary>
-    /// Sets <see cref="NetwSessionConfig.BandwidthKbps"/>, the bandwidth budget
-    /// per peer in kbit/s.
+    /// Sets <see cref="NetwSessionConfig.BandwidthKilobytesPerSecond"/>, the
+    /// bandwidth budget per peer in KB/s.
     /// </summary>
-    public NetwSessionConfig Bandwidth(long kbps)
+    public NetwSessionConfig Bandwidth(double kilobytesPerSecond)
     {
-        long slot0 = kbps;
+        double slot0 = kilobytesPerSecond;
         IntPtr answered = default;
-        NetwThunks.Ptrcall1_Long_IntPtr(
+        NetwThunks.Ptrcall1_Double_IntPtr(
             _bindBandwidth,
             Checked,
             in slot0,

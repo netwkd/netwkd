@@ -270,10 +270,13 @@ int64_t NetwSession::stat(enums::NetwMultiplayer::Stat p_stat) const {
     return api != nullptr ? api->stats_get(p_stat) : 0;
 }
 
-void NetwSession::set_peer_bandwidth(int64_t p_peer, int64_t p_kbps) {
+void NetwSession::set_peer_bandwidth(
+    int64_t p_peer,
+    double p_kilobytes_per_second
+) {
     NetwMultiplayer *api = session();
     if (api != nullptr) {
-        api->peer_set_bandwidth(p_peer, p_kbps);
+        api->peer_set_bandwidth(p_peer, p_kilobytes_per_second);
     }
 }
 
@@ -558,7 +561,7 @@ void NetwSession::_bind_methods() {
     ClassDB::bind_method(D_METHOD("stat", "stat"), &NetwSession::stat);
 
     ClassDB::bind_method(
-        D_METHOD("set_peer_bandwidth", "peer", "kbps"),
+        D_METHOD("set_peer_bandwidth", "peer", "kilobytes_per_second"),
         &NetwSession::set_peer_bandwidth
     );
     ClassDB::bind_method(

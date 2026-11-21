@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="NetwLinkConditions" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Simulated latency and packet loss for testing.
+		Simulated network conditions for testing.
 	</brief_description>
 	<description>
-		Pass it to [method NetwSessionConfig.link]. Only debug builds apply it to a real connection.
+		[method NetwSessionConfig.link] applies conditions to real connections only in debug builds.
+		Default values add no delay or loss. RTT targets are for the client monitor on localhost at 60 ticks/s and 120 FPS.
 		[codeblock]
-		Netw.configure_session(self).link(NetwLinkConditions.wifi())
+		    Netw.configure_session(self).link(NetwLinkConditions.wifi())
 		[/codeblock]
 	</description>
 	<tutorials>
@@ -15,44 +16,80 @@
 		<method name="mobile_4g" qualifiers="static">
 			<return type="NetwLinkConditions" />
 			<description>
+				[codeblock lang=text]
+				Target RTT   85 ms
+				Jitter       0 to 25 ms
+				Loss         3%
+				Reordering   2%
+				Duplication  0.2%
+				Stalls       1% for 80 ms
+				[/codeblock]
 			</description>
 		</method>
 		<method name="poor_3g" qualifiers="static">
 			<return type="NetwLinkConditions" />
 			<description>
+				[codeblock lang=text]
+				Target RTT   220 ms
+				Jitter       0 to 90 ms
+				Loss         8%
+				Reordering   5%
+				Duplication  0.5%
+				Stalls       4% for 250 ms
+				[/codeblock]
 			</description>
 		</method>
 		<method name="satellite" qualifiers="static">
 			<return type="NetwLinkConditions" />
 			<description>
+				[codeblock lang=text]
+				Target RTT   650 ms
+				Jitter       0 to 120 ms
+				Loss         4%
+				Reordering   3%
+				Duplication  0.3%
+				Stalls       2% for 400 ms
+				[/codeblock]
 			</description>
 		</method>
 		<method name="wifi" qualifiers="static">
 			<return type="NetwLinkConditions" />
 			<description>
+				[codeblock lang=text]
+				Target RTT   40 ms
+				Jitter       0 to 8 ms
+				Loss         1%
+				Reordering   0.5%
+				Duplication  0.1%
+				Stalls       Off
+				[/codeblock]
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="duplicate_chance" type="float" setter="set_duplicate_chance" getter="get_duplicate_chance" default="0.0">
+			Chance to schedule a second copy of an unreliable packet.
 		</member>
 		<member name="jitter_ms" type="float" setter="set_jitter_ms" getter="get_jitter_ms" default="0.0">
+			Maximum random delay added to an unreliable packet, in milliseconds.
 		</member>
 		<member name="latency_ms" type="float" setter="set_latency_ms" getter="get_latency_ms" default="0.0">
-			Applied to each direction.
+			One-way delay in milliseconds.
 		</member>
 		<member name="loss_chance" type="float" setter="set_loss_chance" getter="get_loss_chance" default="0.0">
-			An unreliable packet is dropped. A reliable one arrives late, as if it was sent again.
+			Chance to drop an unreliable packet or delay a reliable packet.
 		</member>
 		<member name="reorder_chance" type="float" setter="set_reorder_chance" getter="get_reorder_chance" default="0.0">
+			Chance to delay an unreliable packet by one physics tick.
 		</member>
 		<member name="seed" type="int" setter="set_seed" getter="get_seed" default="0">
-			The random seed for loss, duplication, reordering, jitter and stalls, so the same seed drops and delays the same packets every run.
+			Seed for the random choices made by the simulation.
 		</member>
 		<member name="stall_chance" type="float" setter="set_stall_chance" getter="get_stall_chance" default="0.0">
-			The link holds every packet for [member stall_ms].
+			Chance for a packet to start a stall.
 		</member>
 		<member name="stall_ms" type="float" setter="set_stall_ms" getter="get_stall_ms" default="0.0">
+			Stall duration in milliseconds, with a minimum of one physics tick.
 		</member>
 	</members>
 </class>

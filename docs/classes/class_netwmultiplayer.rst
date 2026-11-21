@@ -330,7 +330,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`float`                                         | :ref:`peer_get_traffic<class_NetwMultiplayer_method_peer_get_traffic>`\ (\ peer\: :godot:`int`, stat\: :ref:`Traffic<enum_NetwMultiplayer_Traffic>`\ ) |const|                                                                                                                   |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                                                 | :ref:`peer_set_bandwidth<class_NetwMultiplayer_method_peer_set_bandwidth>`\ (\ peer\: :godot:`int`, kbps\: :godot:`int`\ )                                                                                                                                                       |
+   | |void|                                                 | :ref:`peer_set_bandwidth<class_NetwMultiplayer_method_peer_set_bandwidth>`\ (\ peer\: :godot:`int`, kilobytes_per_second\: :godot:`float`\ )                                                                                                                                     |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                  | :ref:`persist_flush_all<class_NetwMultiplayer_method_persist_flush_all>`\ (\ )                                                                                                                                                                                                   |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -4924,9 +4924,9 @@ Returns the rate ``stat`` the session sent to ``peer`` or received from it over 
 
 .. rst-class:: classref-method
 
-|void| **peer_set_bandwidth**\ (\ peer\: :godot:`int`, kbps\: :godot:`int`\ ) :ref:`🔗<class_NetwMultiplayer_method_peer_set_bandwidth>`
+|void| **peer_set_bandwidth**\ (\ peer\: :godot:`int`, kilobytes_per_second\: :godot:`float`\ ) :ref:`🔗<class_NetwMultiplayer_method_peer_set_bandwidth>`
 
-Sets how many kilobits a second this peer may send to ``peer``. ``0`` returns it to :ref:`NetwSessionConfig.bandwidth_kbps<class_NetwSessionConfig_property_bandwidth_kbps>`. See :ref:`NetwSession.set_peer_bandwidth()<class_NetwSession_method_set_peer_bandwidth>`.
+Sets the send budget for ``peer`` in KB/s. ``0`` returns it to :ref:`NetwSessionConfig.bandwidth_kilobytes_per_second<class_NetwSessionConfig_property_bandwidth_kilobytes_per_second>`. See :ref:`NetwSession.set_peer_bandwidth()<class_NetwSession_method_set_peer_bandwidth>`.
 
 .. rst-class:: classref-item-separator
 

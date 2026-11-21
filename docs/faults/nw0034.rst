@@ -24,4 +24,4 @@ Declare it once, and keep what the first call returned.
 
     func _init() -> void:
         var config := Netw.configure_session(self)
-        config.bandwidth_kbps = 512
+        config.bandwidth_kilobytes_per_second = 64.0

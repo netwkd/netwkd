@@ -1118,9 +1118,9 @@
 		<method name="peer_set_bandwidth">
 			<return type="void" />
 			<param index="0" name="peer" type="int" />
-			<param index="1" name="kbps" type="int" />
+			<param index="1" name="kilobytes_per_second" type="float" />
 			<description>
-				Sets how many kilobits a second this peer may send to [param peer]. [code]0[/code] returns it to [member NetwSessionConfig.bandwidth_kbps]. See [method NetwSession.set_peer_bandwidth].
+				Sets the send budget for [param peer] in KB/s. [code]0[/code] returns it to [member NetwSessionConfig.bandwidth_kilobytes_per_second]. See [method NetwSession.set_peer_bandwidth].
 			</description>
 		</method>
 		<method name="persist_flush_all">

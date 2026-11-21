@@ -54,13 +54,6 @@ Node *child_named(Node *p_parent, const char *p_name) {
     return node;
 }
 
-Ref<MultiplayerPeer> a_server() {
-    Ref<netw::LocalMultiplayerPeer> made;
-    made.instantiate();
-    NETW_CHECK_EQ(int(made->create_server()), int(OK));
-    return made;
-}
-
 int64_t tag_of(const char *p_app) {
     return NetwMultiplayer::session_app_tag(StringName(p_app));
 }
@@ -84,24 +77,40 @@ TEST_CASE(
 #if defined(NETW_TIER_HOSTED)
 
 TEST_CASE(
-    "[Netw][Session][SceneTree] CS9 declared link conditions shape the "
-    "peer the same assignment installs"
+    "[Netw][Session][SceneTree] CS9 a shared link declaration shapes "
+    "clients and shapes the host only with its own profile"
 ) {
-    Mounted branch("CS9Tree");
-    Ref<netw::NetwLinkConditions> conditions;
-    conditions.instantiate();
+    const Ref<netw::NetwLinkConditions> client_conditions
+        = netw::NetwLinkConditions::poor_3g();
+    const Ref<netw::NetwLinkConditions> host_conditions
+        = netw::NetwLinkConditions::wifi();
+    for (const Ref<netw::NetwLinkConditions> &host_profile :
+         {Ref<netw::NetwLinkConditions>(), host_conditions}) {
+        Ref<netw::LocalLoopbackSession> loop;
+        loop.instantiate();
+        const Ref<MultiplayerPeer> host_peer = loop->get_server_peer();
+        const Ref<MultiplayerPeer> client_peer = loop->create_client_peer();
+        Mounted host("CS9Host");
+        Mounted client("CS9Client");
 
-    Netw::configure_session(child_named(branch.tree, "Session"))
-        ->link(conditions);
-    const Ref<MultiplayerPeer> offered = a_server();
+        Netw::configure_session(child_named(host.tree, "Session"))
+            ->link(client_conditions, host_profile);
+        Netw::configure_session(child_named(client.tree, "Session"))
+            ->link(client_conditions, host_profile);
+        host.assign(host_peer);
+        client.assign(client_peer);
 
-    branch.assign(offered);
-
-    CHECK(branch.peer() == offered);
-    const Ref<MultiplayerPeer> polled
-        = branch.api()->session_get_inner()->get_multiplayer_peer();
-    REQUIRE(polled.is_valid());
-    CHECK(polled != offered);
+        const Ref<MultiplayerPeer> host_effective
+            = host.api()->session_get_inner()->get_multiplayer_peer();
+        const Ref<MultiplayerPeer> client_effective
+            = client.api()->session_get_inner()->get_multiplayer_peer();
+        REQUIRE(host_effective.is_valid());
+        REQUIRE(client_effective.is_valid());
+        CHECK(host.peer() == host_peer);
+        CHECK(client.peer() == client_peer);
+        CHECK((host_effective != host_peer) == host_profile.is_valid());
+        CHECK(client_effective != client_peer);
+    }
 }
 
 #endif

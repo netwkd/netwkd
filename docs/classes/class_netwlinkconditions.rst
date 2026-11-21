@@ -12,18 +12,20 @@ NetwLinkConditions
 
 **Inherits:** :godot:`Resource`
 
-Simulated latency and packet loss for testing.
+Simulated network conditions for testing.
 
 .. rst-class:: classref-introduction-group
 
 Description
 -----------
 
-Pass it to :ref:`NetwSessionConfig.link()<class_NetwSessionConfig_method_link>`. Only debug builds apply it to a real connection.
+:ref:`NetwSessionConfig.link()<class_NetwSessionConfig_method_link>` applies conditions to real connections only in debug builds.
+
+Default values add no delay or loss. RTT targets are for the client monitor on localhost at 60 ticks/s and 120 FPS.
 
 ::
 
-    Netw.configure_session(self).link(NetwLinkConditions.wifi())
+        Netw.configure_session(self).link(NetwLinkConditions.wifi())
 
 .. rst-class:: classref-reftable-group
 
@@ -89,9 +91,7 @@ Property Descriptions
 - |void| **set_duplicate_chance**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_duplicate_chance**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Chance to schedule a second copy of an unreliable packet.
 
 .. rst-class:: classref-item-separator
 
@@ -108,9 +108,7 @@ Property Descriptions
 - |void| **set_jitter_ms**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_jitter_ms**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Maximum random delay added to an unreliable packet, in milliseconds.
 
 .. rst-class:: classref-item-separator
 
@@ -127,7 +125,7 @@ Property Descriptions
 - |void| **set_latency_ms**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_latency_ms**\ (\ )
 
-Applied to each direction.
+One-way delay in milliseconds.
 
 .. rst-class:: classref-item-separator
 
@@ -144,7 +142,7 @@ Applied to each direction.
 - |void| **set_loss_chance**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_loss_chance**\ (\ )
 
-An unreliable packet is dropped. A reliable one arrives late, as if it was sent again.
+Chance to drop an unreliable packet or delay a reliable packet.
 
 .. rst-class:: classref-item-separator
 
@@ -161,9 +159,7 @@ An unreliable packet is dropped. A reliable one arrives late, as if it was sent 
 - |void| **set_reorder_chance**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_reorder_chance**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Chance to delay an unreliable packet by one physics tick.
 
 .. rst-class:: classref-item-separator
 
@@ -180,7 +176,7 @@ An unreliable packet is dropped. A reliable one arrives late, as if it was sent 
 - |void| **set_seed**\ (\ value\: :godot:`int`\ )
 - :godot:`int` **get_seed**\ (\ )
 
-The random seed for loss, duplication, reordering, jitter and stalls, so the same seed drops and delays the same packets every run.
+Seed for the random choices made by the simulation.
 
 .. rst-class:: classref-item-separator
 
@@ -197,7 +193,7 @@ The random seed for loss, duplication, reordering, jitter and stalls, so the sam
 - |void| **set_stall_chance**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_stall_chance**\ (\ )
 
-The link holds every packet for :ref:`stall_ms<class_NetwLinkConditions_property_stall_ms>`.
+Chance for a packet to start a stall.
 
 .. rst-class:: classref-item-separator
 
@@ -214,9 +210,7 @@ The link holds every packet for :ref:`stall_ms<class_NetwLinkConditions_property
 - |void| **set_stall_ms**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_stall_ms**\ (\ )
 
-.. container:: contribute
-
-	There is currently no description for this property. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+Stall duration in milliseconds, with a minimum of one physics tick.
 
 .. rst-class:: classref-section-separator
 
@@ -233,9 +227,15 @@ Method Descriptions
 
 :ref:`NetwLinkConditions<class_NetwLinkConditions>` **mobile_4g**\ (\ ) |static| :ref:`🔗<class_NetwLinkConditions_method_mobile_4g>`
 
-.. container:: contribute
 
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+.. code:: text
+
+                    Target RTT   85 ms
+                    Jitter       0 to 25 ms
+                    Loss         3%
+                    Reordering   2%
+                    Duplication  0.2%
+                    Stalls       1% for 80 ms
 
 .. rst-class:: classref-item-separator
 
@@ -247,9 +247,15 @@ Method Descriptions
 
 :ref:`NetwLinkConditions<class_NetwLinkConditions>` **poor_3g**\ (\ ) |static| :ref:`🔗<class_NetwLinkConditions_method_poor_3g>`
 
-.. container:: contribute
 
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+.. code:: text
+
+                    Target RTT   220 ms
+                    Jitter       0 to 90 ms
+                    Loss         8%
+                    Reordering   5%
+                    Duplication  0.5%
+                    Stalls       4% for 250 ms
 
 .. rst-class:: classref-item-separator
 
@@ -261,9 +267,15 @@ Method Descriptions
 
 :ref:`NetwLinkConditions<class_NetwLinkConditions>` **satellite**\ (\ ) |static| :ref:`🔗<class_NetwLinkConditions_method_satellite>`
 
-.. container:: contribute
 
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+.. code:: text
+
+                    Target RTT   650 ms
+                    Jitter       0 to 120 ms
+                    Loss         4%
+                    Reordering   3%
+                    Duplication  0.3%
+                    Stalls       2% for 400 ms
 
 .. rst-class:: classref-item-separator
 
@@ -275,9 +287,15 @@ Method Descriptions
 
 :ref:`NetwLinkConditions<class_NetwLinkConditions>` **wifi**\ (\ ) |static| :ref:`🔗<class_NetwLinkConditions_method_wifi>`
 
-.. container:: contribute
 
-	There is currently no description for this method. Please help us by `contributing one <https://contributing.godotengine.org/en/latest/documentation/class_reference.html>`__!
+.. code:: text
+
+                    Target RTT   40 ms
+                    Jitter       0 to 8 ms
+                    Loss         1%
+                    Reordering   0.5%
+                    Duplication  0.1%
+                    Stalls       Off
 
 .. |virtual| replace:: :abbr:`virtual (This method should typically be overridden by the user to have any effect.)`
 .. |required| replace:: :abbr:`required (This method is required to be overridden when extending its base class.)`

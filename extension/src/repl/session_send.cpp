@@ -242,16 +242,17 @@ bool SessionSend::classify(
         r_form = RowForm::FRESH;
         return true;
     }
-    if (p_due
-        && (rest_flight(p_peer, table, p_row) != nullptr
-            || (rows.acked_rev[p_row] != 0 && !table.differs(p_row, p_peer)))) {
-        r_form = RowForm::REFRESH;
-        return true;
-    }
     const int64_t wait = wire::repair_interval_ms(
         int64_t(link.rtt_ms(world->peer_id(p_peer)))
     );
-    if (p_now_ms - rows.repair_at[p_row] < wait) {
+    const bool repair_due = p_now_ms - rows.repair_at[p_row] >= wait;
+    if (p_due
+        && ((!repair_due && rest_flight(p_peer, table, p_row) != nullptr)
+            || !table.differs(p_row, p_peer))) {
+        r_form = RowForm::REFRESH;
+        return true;
+    }
+    if (!repair_due) {
         r_out.caught_up += 1;
         return false;
     }
@@ -438,7 +439,10 @@ void SessionSend::commit_send(
         );
         world->mint(at, p_peer, image, p_send.form == RowForm::REPAIR);
     }
-    rows.repair_at[p_send.row] = p_now_ms;
+    if (p_send.form != RowForm::REFRESH || p_send.mask != 0
+        || !table.differs(p_send.row, p_peer)) {
+        rows.repair_at[p_send.row] = p_now_ms;
+    }
     rows.acc[p_send.row] = 0.0f;
     const bool restatable
         = p_send.form == RowForm::FRESH || p_send.form == RowForm::REPAIR;
@@ -485,7 +489,9 @@ void SessionSend::pass_peer(
     NETW_STAGE(SEND, "Send to peer", colors::WIRE);
     NETW_ZONE_TEXT_F("peer %d", id);
     candidates.clear();
-    PeerAccount &account = refill(id, p_max_bits, p_base_tick);
+    double earned = 0.0;
+    PeerAccount &account = refill(id, p_max_bits, p_base_tick, earned);
+    RowReservation &reservation = account.reservation;
     const int64_t bytes_before = account.sent_bytes;
     const uint32_t rows_before = r_out.sends.size();
     if (NETW_PROFILE_CONNECTED()) {
@@ -516,6 +522,8 @@ void SessionSend::pass_peer(
         );
     }
     uint32_t order = 0;
+    Candidate reserved;
+    bool has_reserved = false;
     {
         NETW_ZONE_NC("Send gather", colors::WIRE);
         world->come_due(p_peer, p_base_tick);
@@ -574,6 +582,16 @@ void SessionSend::pass_peer(
                 made.order = order++;
                 made.acc = rows.acc[p_row];
                 made.form = form;
+                if (reservation.token != 0
+                    && table.family == store::Family::VOLATILE
+                    && rows.token[p_row] == reservation.token
+                    && table.routes[p_row] == reservation.lane.route
+                    && table.ordinals[p_row] == reservation.lane.ordinal
+                    && rows.owed.get(p_row)) {
+                    reserved = made;
+                    has_reserved = true;
+                    return;
+                }
                 candidates.push_back(made);
             };
         for (uint32_t index = 0; index < world->table_count(); ++index) {
@@ -619,6 +637,60 @@ void SessionSend::pass_peer(
         }
         offer_nodeless(p_peer, id, p_base_tick, order);
     }
+    account.deferred = 0;
+    const int64_t datagram = p_max_bits / 8;
+    int64_t room = datagram;
+    const double least_floor
+        = std::min(account.fill, double(LinkGovernor::FLOOR_BITS) / 8.0);
+    const double row_floor
+        = std::max(account.fill * ROW_FLOOR_SHARE, least_floor);
+    const auto take = [&](const RowSend &p_send, double &r_credit) {
+        commit_send(p_peer, p_send, p_base_tick, p_now_ms);
+        room -= p_send.framed;
+        r_credit -= double(p_send.framed);
+        account.sent_bytes += p_send.framed;
+        r_out.sent_bits += p_send.bits;
+        r_out.sends.push_back(p_send);
+    };
+    const auto release_reservation = [&]() {
+        account.balance = std::min(
+            account.balance + reservation.credit,
+            account.fill * BANKED_TICKS
+        );
+        reservation = RowReservation();
+    };
+    double saved = 0.0;
+    if (reservation.token != 0) {
+        RowSend send;
+        const bool encoded = has_reserved && encode(
+            p_peer,
+            reserved.table,
+            reserved.row,
+            reserved.form,
+            p_base_tick,
+            send,
+            r_out
+        );
+        if (!encoded || send.framed > datagram) {
+            release_reservation();
+            if (encoded) {
+                candidates.push_back(reserved);
+            }
+        } else {
+            const double needed
+                = std::max(0.0, double(send.framed) - reservation.credit);
+            saved = std::min({earned, row_floor, needed});
+            account.balance -= saved;
+            reservation.credit += saved;
+            if (reservation.credit >= double(send.framed)) {
+                take(send, reservation.credit);
+                release_reservation();
+            } else {
+                r_out.deferred += 1;
+                account.deferred += 1;
+            }
+        }
+    }
     const auto later = [](const Candidate &p_left, const Candidate &p_right) {
         const bool left_refresh = p_left.form == RowForm::REFRESH;
         const bool right_refresh = p_right.form == RowForm::REFRESH;
@@ -636,18 +708,11 @@ void SessionSend::pass_peer(
         NETW_ZONE_NC("Send order", colors::WIRE);
         std::make_heap(first, last, later);
     }
-    const double least_floor
-        = std::min(account.fill, double(LinkGovernor::FLOOR_BITS) / 8.0);
-    const double row_floor
-        = std::max(account.fill * ROW_FLOOR_SHARE, least_floor);
-    const double lent
-        = account.balance < row_floor ? row_floor - account.balance : 0.0;
+    const double available_floor = row_floor - saved;
+    const double lent = std::max(0.0, available_floor - account.balance);
     account.balance += lent;
     {
         NETW_ZONE_NC("Send encode", colors::WIRE);
-        account.deferred = 0;
-        const int64_t datagram = p_max_bits / 8;
-        int64_t room = datagram;
         uint32_t misses = 0;
         while (last != first && account.balance > 0.0
                && misses < MISSES_PER_TICK) {
@@ -685,8 +750,20 @@ void SessionSend::pass_peer(
             }
             const bool opens = send.framed > room && room < datagram
                 && account.balance >= double(datagram);
-            if (double(send.framed) > account.balance
+            const bool credit_short = double(send.framed) > account.balance;
+            if (credit_short
                 || (send.framed > room && room < datagram && !opens)) {
+                if (credit_short && reservation.token == 0 && send.token != 0
+                    && double(send.framed) > row_floor
+                    && send.framed <= datagram
+                    && !send.windowed && !send.reliable
+                    && world->table(held.table)
+                        .peers[p_peer].owed.get(held.row)) {
+                    reservation.lane = {
+                        send.route, send.comp, wire::StreamFamily::VOLATILE
+                    };
+                    reservation.token = send.token;
+                }
                 misses += 1;
                 r_out.deferred += 1;
                 account.deferred += 1;
@@ -695,12 +772,7 @@ void SessionSend::pass_peer(
             if (opens) {
                 room = datagram;
             }
-            commit_send(p_peer, send, p_base_tick, p_now_ms);
-            room -= send.framed;
-            account.balance -= double(send.framed);
-            account.sent_bytes += send.framed;
-            r_out.sent_bits += send.bits;
-            r_out.sends.push_back(send);
+            take(send, account.balance);
         }
         const uint32_t waiting = uint32_t(last - first);
         r_out.deferred += waiting;
@@ -873,11 +945,13 @@ double SessionSend::configured_rate(int p_peer, int64_t p_max_bits) const {
 PeerAccount &SessionSend::refill(
     int p_peer,
     int64_t p_max_bits,
-    int64_t p_tick
+    int64_t p_tick,
+    double &r_earned
 ) {
     PeerAccount &held = accounts[p_peer];
     held.fill = fill_of(p_peer, p_max_bits);
     const int64_t elapsed = held.filled ? p_tick - held.filled_tick : 1;
+    r_earned = elapsed > 0 ? held.fill : 0.0;
     held.balance += held.fill * double(elapsed > 1 ? elapsed : 1);
     const double banked = held.fill * BANKED_TICKS;
     if (held.balance > banked) {
