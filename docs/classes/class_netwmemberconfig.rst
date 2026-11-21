@@ -425,7 +425,7 @@ Only the :ref:`NetwEntity.controller<class_NetwEntity_property_controller>` may 
 
 :ref:`NetwMemberConfig<class_NetwMemberConfig>` **defer_until**\ (\ sig\: :godot:`Signal`\ ) :ref:`🔗<class_NetwMemberConfig_method_defer_until>`
 
-Received calls wait for a signal with ``sig``'s name on the receiving :godot:`Node`. Only the signal name is stored.
+Received calls wait for a signal with ``sig``'s name on the receiving :godot:`Node`. Only the signal name is stored. A waiting call whose :ref:`NetwEntity<class_NetwEntity>` leaves the session is dropped and never runs.
 
 .. rst-class:: classref-item-separator
 

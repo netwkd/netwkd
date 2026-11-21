@@ -213,6 +213,6 @@ bool read_control_record(
     ControlRecord &r_record
 );
 
-godot::Dictionary control_spec_records();
+std::vector<SpecRecord> control_spec_rows();
 
 } // namespace netw::wire

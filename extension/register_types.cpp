@@ -3,6 +3,7 @@
 
 #include "godot/class_db.hpp"
 #include "godot/extension.hpp"
+#include "godot/os.hpp"
 #include "netw/decl_sites.hpp"
 
 #include "netw/api/action_request.hpp"
@@ -62,7 +63,7 @@
 #include "netw/carrier_buffers.hpp"
 #include "netw/carrier_frame.hpp"
 #include "netw/channel_book.hpp"
-#include "netw/clock_engine.hpp"
+#include "netw/clock.hpp"
 #include "netw/diag/hints.hpp"
 #include "netw/display/channel.hpp"
 #include "netw/display/history.hpp"
@@ -98,7 +99,6 @@
 #include "netw/session/event_plane.hpp"
 #include "netw/session_core.hpp"
 #include "netw/spawn/book.hpp"
-#include "netw/spawn/planner.hpp"
 #include "netw/spawn/record.hpp"
 #include "netw/sync_progress.hpp"
 
@@ -147,7 +147,9 @@ void initialize_netwkd_module(ModuleInitializationLevel level) {
     netw::profile::configure_plots();
     netw::log::configure();
     NETW_HINTS(netw::diag::configure_hints());
-    netw::store::configure();
+    netw::store::configure(
+        godot::OS::get_singleton()->get_environment("NETW_STORE_VALIDATE")
+    );
 #if defined(NETW_TESTS) && defined(NETW_GDEXTENSION)
     const PackedStringArray before_registration
         = ClassDBSingleton::get_singleton()->get_class_list();
@@ -258,23 +260,23 @@ void initialize_netwkd_module(ModuleInitializationLevel level) {
 #endif
     netw::profile::install_logger();
     netw::persist::install_record_formats();
-    netw::NetwEntityRecord::set_part_factory(
+    netw::NetwEntity::set_part_factory(
         netw::NetwEntityRecord::PART_DISPLAY,
         callable_mp_static(&netw::build_display_handle)
     );
-    netw::NetwEntityRecord::set_part_factory(
+    netw::NetwEntity::set_part_factory(
         netw::NetwEntityRecord::PART_INTEREST,
         callable_mp_static(&netw::build_interest_handle)
     );
-    netw::NetwEntityRecord::set_part_factory(
+    netw::NetwEntity::set_part_factory(
         netw::NetwEntityRecord::PART_PERSISTENCE,
         callable_mp_static(&netw::build_persistence_handle)
     );
-    netw::NetwEntityRecord::set_part_factory(
+    netw::NetwEntity::set_part_factory(
         netw::NetwEntityRecord::PART_PREDICTION,
         callable_mp_static(&netw::build_prediction_handle)
     );
-    netw::NetwEntityRecord::set_part_factory(
+    netw::NetwEntity::set_part_factory(
         netw::NetwEntityRecord::PART_SIMULATION,
         callable_mp_static(&netw::build_simulation_handle)
     );
@@ -295,7 +297,7 @@ void uninitialize_netwkd_module(ModuleInitializationLevel level) {
 #endif
     netw::NetwMultiplayer::restore_default_interface();
     netw::LocalLoopbackSession::set_shared_session(nullptr);
-    netw::NetwEntityRecord::clear_part_factories();
+    netw::NetwEntity::clear_part_factories();
     netw::NetwMultiplayer::clear_wrapper_factory();
     netw::connect::TransportBook::shared().clear();
     netw::SceneLoads::shared().clear();

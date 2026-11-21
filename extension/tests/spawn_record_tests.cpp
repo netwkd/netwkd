@@ -256,7 +256,7 @@ TEST_CASE(
     client->session_set_role(netw::NetwMultiplayer::ROLE_CLIENT);
     Node *arrived = memnew(Node);
     const Ref<netw::NetwEntity> stamped
-        = Record::stamp_header(arrived, header, client.ptr());
+        = netw::NetwEntity::stamp_header(arrived, header, client.ptr());
     REQUIRE(stamped.is_valid());
     NETW_CHECK_EQ(stamped->get_peer_id(), int64_t(9));
     NETW_CHECK_EQ(stamped->get_player_id(), int64_t(3));

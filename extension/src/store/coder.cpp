@@ -1,8 +1,9 @@
+#include "netw/sealed.hpp"
+
 #include "netw/store/coder.hpp"
 
 #include <cstring>
 
-#include "netw/api/quantize.hpp"
 #include "netw/schema_core.hpp"
 
 using namespace godot;
@@ -199,6 +200,15 @@ void raw_canonical(
     }
 }
 
+double axis_value(const ColumnCoder &p_coder, uint64_t p_code) {
+    return table::scalar_value(
+        p_coder.bits,
+        p_coder.low,
+        p_coder.high,
+        int64_t(p_code)
+    );
+}
+
 } // namespace
 
 ColumnCoder coder_of(
@@ -208,77 +218,39 @@ ColumnCoder coder_of(
     ColumnCoder out;
     out.type = p_column.type;
     out.slot = p_slot;
-    out.expected = Variant::Type(SchemaCore::element_type(p_column.type));
     const int components = components_of(p_column.type);
     if (p_slot.variable || p_column.stride != 1 || components == 0
         || p_slot.width <= 0 || p_slot.width > 64) {
         return out;
     }
-    if (p_column.quantizer.is_null()) {
+    const table::QuantSpec &spec = p_column.quant;
+    if (!spec.quantized()) {
         if (p_slot.stride == components) {
             out.kind = Coder::RAW;
         }
         return out;
     }
-    NetwQuantize *held = p_column.quantizer.ptr();
-    if (!held->supports_type(out.expected)) {
-        return out;
-    }
-    const NetwQuantizeScalar *scalar
-        = Object::cast_to<NetwQuantizeScalar>(held);
+    out.bits = spec.bits;
+    out.low = spec.low;
+    out.high = spec.high;
     const bool axes = floating(p_column.type)
         || p_column.type == SchemaCore::VECTOR2
         || p_column.type == SchemaCore::VECTOR3;
-    if (scalar != nullptr && axes && p_slot.stride == components) {
+    if (spec.kind == table::Quant::SCALAR && axes
+        && p_slot.stride == components) {
         out.kind = Coder::SCALAR;
-        out.scalar = scalar;
         return out;
     }
-    const NetwQuantizeQuaternion *turn
-        = Object::cast_to<NetwQuantizeQuaternion>(held);
-    if (turn != nullptr && p_column.type == SchemaCore::QUATERNION
+    if (spec.kind == table::Quant::ANGLE && floating(p_column.type)
         && p_slot.stride == 1) {
+        out.kind = Coder::ANGLE;
+        return out;
+    }
+    if (spec.kind == table::Quant::TURN
+        && p_column.type == SchemaCore::QUATERNION && p_slot.stride == 1) {
         out.kind = Coder::TURN;
-        out.turn = turn;
     }
     return out;
-}
-
-bool typed_from_variant(
-    const ColumnCoder &p_coder,
-    const Variant &p_value,
-    uint8_t *r_value
-) {
-    if (p_value.get_type() != p_coder.expected) {
-        return false;
-    }
-    switch (p_coder.type) {
-        case SchemaCore::BOOL:
-            *r_value = bool(p_value) ? 1 : 0;
-            return true;
-        case SchemaCore::F32:
-        case SchemaCore::F64:
-            put(r_value, double(p_value));
-            return true;
-        case SchemaCore::VECTOR2:
-            put(r_value, Vector2(p_value));
-            return true;
-        case SchemaCore::VECTOR3:
-            put(r_value, Vector3(p_value));
-            return true;
-        case SchemaCore::VECTOR4:
-            put(r_value, Vector4(p_value));
-            return true;
-        case SchemaCore::COLOR:
-            put(r_value, Color(p_value));
-            return true;
-        case SchemaCore::QUATERNION:
-            put(r_value, Quaternion(p_value));
-            return true;
-        default:
-            put(r_value, int64_t(p_value));
-            return true;
-    }
 }
 
 bool code_value(
@@ -294,13 +266,23 @@ bool code_value(
                 code = raw_code(p_coder, p_value, at);
                 break;
             case Coder::SCALAR:
-                code = uint64_t(p_coder.scalar->encode_axis(
-                    component(p_coder.type, p_value, at)
-                ));
+                code = uint64_t(
+                    table::scalar_code(
+                        p_coder.bits,
+                        p_coder.low,
+                        p_coder.high,
+                        component(p_coder.type, p_value, at)
+                    )
+                );
+                break;
+            case Coder::ANGLE:
+                code = uint64_t(
+                    table::angle_code(p_coder.bits, take<double>(p_value))
+                );
                 break;
             case Coder::TURN:
                 code = uint64_t(
-                    p_coder.turn->encode_turn(take<Quaternion>(p_value))
+                    table::turn_code(p_coder.bits, take<Quaternion>(p_value))
                 );
                 break;
             case Coder::VARIANT:
@@ -324,29 +306,36 @@ void canonical_value(
             raw_canonical(p_coder, p_codes, r_value);
             return;
         case Coder::SCALAR: {
-            const NetwQuantizeScalar *scalar = p_coder.scalar;
             if (p_coder.type == SchemaCore::VECTOR3) {
                 put(r_value,
                     Vector3(
-                        scalar->decode_axis(int64_t(p_codes[0])),
-                        scalar->decode_axis(int64_t(p_codes[1])),
-                        scalar->decode_axis(int64_t(p_codes[2]))
+                        axis_value(p_coder, p_codes[0]),
+                        axis_value(p_coder, p_codes[1]),
+                        axis_value(p_coder, p_codes[2])
                     ));
                 return;
             }
             if (p_coder.type == SchemaCore::VECTOR2) {
                 put(r_value,
                     Vector2(
-                        scalar->decode_axis(int64_t(p_codes[0])),
-                        scalar->decode_axis(int64_t(p_codes[1]))
+                        axis_value(p_coder, p_codes[0]),
+                        axis_value(p_coder, p_codes[1])
                     ));
                 return;
             }
-            put(r_value, scalar->decode_axis(int64_t(p_codes[0])));
+            put(r_value, axis_value(p_coder, p_codes[0]));
             return;
         }
+        case Coder::ANGLE:
+            put(r_value,
+                table::angle_value(
+                    p_coder.bits,
+                    p_coder.low < 0.0,
+                    int64_t(p_codes[0])
+                ));
+            return;
         case Coder::TURN:
-            put(r_value, p_coder.turn->decode_turn(int64_t(p_codes[0])));
+            put(r_value, table::turn_value(p_coder.bits, int64_t(p_codes[0])));
             return;
         case Coder::VARIANT:
             return;

@@ -66,25 +66,26 @@ void NetwMultiplayer::reset_interest() {
     interest_engine.clear();
 }
 
-void NetwMultiplayer::interest_sync_record(NetwEntity *p_wrapper) {
-    NetwEntity *current = p_wrapper;
+NetwEntityRecord *NetwMultiplayer::interest_record(const RID &p_entity) const {
+    return record_of(slot_pinned_entity(p_entity).ptr());
+}
+
+void NetwMultiplayer::interest_sync_record(const RID &p_entity) {
+    RID handle = p_entity;
     LocalVector<int64_t> keys;
     LocalVector<int64_t> routes;
     HashSet<int64_t> seen;
-    while (current != nullptr) {
-        const RID handle = liveness_adopt(current);
+    while (true) {
         const int64_t key = handle.get_id();
         if (!interest::Engine::is_key(key) || seen.has(key)) {
             break;
         }
         seen.insert(key);
         keys.push_back(key);
-        routes.push_back(current->get_route());
+        const NetwEntityRecord *record = interest_record(handle);
+        routes.push_back(record != nullptr ? record->get_route() : 0);
         Node *owner = wrapper_owner(handle);
-        current = owner == nullptr ? nullptr
-                                   : Object::cast_to<NetwEntity>(
-                                         wrapper_at(owner->get_parent()).ptr()
-                                     );
+        handle = owner == nullptr ? RID() : entity_of(owner->get_parent());
     }
     for (uint32_t index = keys.size(); index-- > 0;) {
         const int64_t key = keys[index];
@@ -101,16 +102,12 @@ void NetwMultiplayer::interest_sync_record(NetwEntity *p_wrapper) {
 }
 
 Dictionary NetwMultiplayer::interest_leave_resolve(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_peer_id
 ) {
-    if (p_entity.is_null()) {
-        return Dictionary();
-    }
-    const RID handle = p_entity->get_rid_handle();
     StringName freed;
     const Dictionary verdict = interest_leave_engine.resolve(
-        handle.get_id(),
+        p_entity.get_id(),
         p_peer_id,
         interest_decl_on(p_entity),
         interest_engine,
@@ -130,16 +127,13 @@ Dictionary NetwMultiplayer::interest_leave_resolve(
 }
 
 void NetwMultiplayer::interest_leave_commit(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_peer_id,
     const Dictionary &p_decision,
     bool p_forced
 ) {
-    if (p_entity.is_null()) {
-        return;
-    }
     interest_leave_engine.commit(
-        p_entity->get_rid_handle().get_id(),
+        p_entity.get_id(),
         p_peer_id,
         p_decision,
         p_forced
@@ -150,52 +144,50 @@ void NetwMultiplayer::interest_leave_finish_sweep() {
     interest_leave_engine.finish_sweep();
 }
 
-void NetwMultiplayer::interest_retire_entity(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
-        return;
-    }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+void NetwMultiplayer::interest_retire_entity(const RID &p_entity) {
+    const int64_t slot = p_entity.get_id();
     if (slot == 0 || !interest_engine.has_entity(slot)) {
         return;
     }
     interest_engine.remove_entity(slot);
 }
 
-void NetwMultiplayer::interest_release_body(const Ref<NetwEntity> &p_entity) {
+void NetwMultiplayer::interest_release_body(const RID &p_entity) {
     const Ref<NetwMultiplayer> keep(this);
-    if (p_entity.is_null()) {
+    if (!p_entity.is_valid()) {
         return;
     }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    const id::Entity entity(p_entity);
+    const int64_t slot = entity.get_id();
     const Array named = interest_engine.memberships(slot);
     for (int at = 0; at < named.size(); ++at) {
-        const RID exiting = interest_layer_find(named[at]);
+        const id::Layer exiting(interest_layer_find(named[at]));
         if (!exiting.is_valid()) {
             continue;
         }
         if (is_host()) {
-            layer_remove_entity(exiting, p_entity);
+            layer_remove_entity(entity, exiting);
         } else {
-            interest_client_untrack(exiting, p_entity);
+            interest_client_untrack(entity, exiting);
         }
     }
-    interest_retire_entity(p_entity);
+    interest_retire_entity(entity.rid);
     interest_leave_engine.forget_entity(slot);
     interest_engine.set_scene_membership(slot, StringName());
     interest_engine.set_scene_root(slot, StringName());
-    interest_clear_perception(p_entity, false);
+    interest_clear_perception(entity.rid, false);
 }
 
 void NetwMultiplayer::interest_refresh_perception(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const Array &p_layer_ids
 ) {
     const int64_t peer_id = interest_local_player();
-    if (peer_id == 0 || p_entity.is_null()
-        || p_entity->get_owner() == nullptr) {
+    if (peer_id == 0 || !p_entity.is_valid()
+        || wrapper_owner(p_entity) == nullptr) {
         return;
     }
-    const RID handle = p_entity->get_rid_handle();
+    const RID handle = p_entity;
     const int64_t slot = handle.get_id();
     if (is_host()) {
         if (!interest_engine.has_entity(slot)) {
@@ -235,7 +227,7 @@ void NetwMultiplayer::interest_refresh_perception(
         );
     }
     if (bool(verdict[StringName("hide")])) {
-        perception_hide(slot, p_entity->get_owner());
+        perception_hide(slot, wrapper_owner(p_entity));
     }
     const Array actions = verdict[StringName("custom")];
     interest_perception.arm(slot, actions);
@@ -266,31 +258,29 @@ void NetwMultiplayer::interest_refresh_all_perception() {
             Object::cast_to<NetwEntity>(wrapper_for_id(keys[at]).ptr())
         );
         if (member.is_valid()) {
-            interest_refresh_perception(member, Array());
+            interest_refresh_perception(member->get_rid_handle(), Array());
         }
     }
 }
 
-void NetwMultiplayer::interest_reapply_perception(
-    const Ref<NetwEntity> &p_entity
-) {
-    if (p_entity.is_null()) {
+void NetwMultiplayer::interest_reapply_perception(const RID &p_entity) {
+    if (!p_entity.is_valid()) {
         return;
     }
-    if (interest_perception.is_known(p_entity->get_rid_handle().get_id())) {
+    if (interest_perception.is_known(p_entity.get_id())) {
         interest_clear_perception(p_entity, true);
     }
     interest_refresh_perception(p_entity, Array());
 }
 
 void NetwMultiplayer::interest_clear_perception(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     bool p_restore
 ) {
-    if (p_entity.is_null()) {
+    if (!p_entity.is_valid()) {
         return;
     }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    const int64_t slot = p_entity.get_id();
     if (p_restore) {
         perception_restore(slot);
         perception_dispatch_custom(slot, true, interest_local_player());
@@ -348,7 +338,7 @@ void NetwMultiplayer::interest_receive_awareness(
         }
         const bool clocked = clock_engine().get_configured();
         const int64_t origin
-            = clocked ? clock_engine().get_ticks_run() : liveness_core->frame();
+            = clocked ? clock_engine().get_ticks_run() : liveness_core.frame();
         const int64_t timeout = clocked ? clock_engine().get_tickrate()
                                         : CLOCKLESS_AWARENESS_TICKRATE;
         liveness_schedule_when_live(
@@ -392,10 +382,11 @@ void NetwMultiplayer::interest_apply_awareness(
             int64_t(event_layer.get_id())
         );
     }
+    const id::Entity subject(entity->get_rid_handle());
     if (entered) {
-        interest_client_admit(event_layer, entity);
+        interest_client_admit(subject, id::Layer(event_layer));
     } else {
-        interest_client_revoke(event_layer, entity);
+        interest_client_revoke(subject, id::Layer(event_layer));
     }
 }
 
@@ -422,23 +413,24 @@ bool NetwMultiplayer::interest_can_send_to(int64_t p_peer_id) {
 
 void NetwMultiplayer::interest_queue_layer_awareness(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_observer_peer,
     int p_kind
 ) {
-    if (!is_host() || p_entity.is_null()) {
+    if (!is_host() || !p_entity.is_valid()) {
         return;
     }
-    Node *owner = p_entity->get_owner();
+    Node *owner = wrapper_owner(p_entity);
     if (owner == nullptr || !owner->is_inside_tree()) {
         return;
     }
     if (!interest_can_send_to(p_observer_peer)) {
         return;
     }
+    const Ref<NetwEntity> view = slot_pinned_entity(p_entity);
     interest_awareness_queue_layer(
         p_observer_peer,
-        liveness_allocate_route(p_entity.ptr()),
+        liveness_allocate_route(view.ptr()),
         p_layer_id,
         p_kind
     );
@@ -447,12 +439,12 @@ void NetwMultiplayer::interest_queue_layer_awareness(
 
 void NetwMultiplayer::interest_layer_transition(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_peer_id,
     bool p_visible
 ) {
     const Ref<NetwMultiplayer> keep(this);
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    const int64_t slot = p_entity.get_id();
     if (p_visible) {
         interest_leave_engine.release(slot, p_peer_id);
     } else {
@@ -484,11 +476,18 @@ void NetwMultiplayer::interest_apply_delta(const interest::Delta &p_delta) {
             if (!layer.is_valid() || entity.is_null() || peer_id == 0) {
                 continue;
             }
+            const id::Entity subject(entity->get_rid_handle());
             if (held) {
-                layer_report_edge(layer_id, layer, entity, peer_id, visible);
+                layer_report_edge(
+                    subject,
+                    layer_id,
+                    id::Layer(layer),
+                    peer_id,
+                    visible
+                );
                 continue;
             }
-            interest_layer_transition(layer_id, entity, peer_id, visible);
+            interest_layer_transition(layer_id, subject.rid, peer_id, visible);
         }
     }
     for (int pass = 0; pass < 2; ++pass) {
@@ -529,10 +528,10 @@ int64_t NetwMultiplayer::interest_local_player() {
 }
 
 Array NetwMultiplayer::perception_layers_for(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_peer_id
 ) {
-    const RID handle = p_entity->get_rid_handle();
+    const RID handle = p_entity;
     const Array pending
         = interest_leave_engine.pending_layers(handle.get_id(), p_peer_id);
     if (!pending.is_empty()) {
@@ -620,10 +619,8 @@ void NetwMultiplayer::perception_dispatch_custom(
     }
 }
 
-interest::Decl *NetwMultiplayer::interest_decl_on(
-    const Ref<NetwEntity> &p_entity
-) {
-    NetwEntityRecord *const record = record_of(p_entity.ptr());
+interest::Decl *NetwMultiplayer::interest_decl_on(const RID &p_entity) {
+    NetwEntityRecord *const record = interest_record(p_entity);
     if (record == nullptr) {
         return nullptr;
     }
@@ -633,12 +630,12 @@ interest::Decl *NetwMultiplayer::interest_decl_on(
 
 bool NetwMultiplayer::interest_player_sees(
     int64_t p_peer_id,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) {
-    if (p_peer_id == 0 || p_entity.is_null()) {
+    if (p_peer_id == 0 || !p_entity.is_valid()) {
         return false;
     }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    const int64_t slot = p_entity.get_id();
     if (!is_host()) {
         const interest::Decl *declared = interest_decl_on(p_entity);
         return declared == nullptr
@@ -672,13 +669,11 @@ Array sorted_names(const Array &p_names) {
 
 } // namespace
 
-Array NetwMultiplayer::interest_resolved_layer_ids(
-    const Ref<NetwEntity> &p_entity
-) {
-    if (p_entity.is_null()) {
+Array NetwMultiplayer::interest_resolved_layer_ids(const RID &p_entity) {
+    if (!p_entity.is_valid()) {
         return Array();
     }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    const int64_t slot = p_entity.get_id();
     Array named = interest_engine.memberships(slot);
     interest::Decl *decl = is_host() ? nullptr : interest_decl_on(p_entity);
     const Array declared = decl != nullptr ? decl->labels() : Array();
@@ -691,11 +686,11 @@ Array NetwMultiplayer::interest_resolved_layer_ids(
 }
 
 TypedArray<NetwEntity> NetwMultiplayer::interest_shared_entities(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const StringName &p_layer_id
 ) {
     TypedArray<NetwEntity> out;
-    if (p_entity.is_null()) {
+    if (!p_entity.is_valid()) {
         return out;
     }
     const Array resolved = interest_resolved_layer_ids(p_entity);
@@ -708,7 +703,7 @@ TypedArray<NetwEntity> NetwMultiplayer::interest_shared_entities(
         }
         wanted.push_back(p_layer_id);
     }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    const int64_t slot = p_entity.get_id();
     LocalVector<Ref<NetwEntity>> found;
     const PackedInt64Array co = interest_engine.co_members(slot, wanted);
     for (int at = 0; at < int(co.size()); ++at) {
@@ -727,11 +722,11 @@ TypedArray<NetwEntity> NetwMultiplayer::interest_shared_entities(
         const TypedArray<NetwEntity> live = liveness_get_entities();
         for (int at = 0; at < live.size(); ++at) {
             const Ref<NetwEntity> candidate = live[at];
-            if (candidate.is_null() || candidate == p_entity
+            if (candidate.is_null() || candidate->get_rid_handle() == p_entity
                 || candidate->get_owner() == nullptr || found.has(candidate)) {
                 continue;
             }
-            interest::Decl *decl = interest_decl_on(candidate);
+            interest::Decl *decl = interest_decl_on(candidate->get_rid_handle());
             const Array labels = decl != nullptr ? decl->labels() : Array();
             for (int seat = 0; seat < labels.size(); ++seat) {
                 if (asked.has(labels[seat])) {
@@ -765,62 +760,39 @@ TypedArray<NetwEntity> NetwMultiplayer::interest_shared_entities(
     return out;
 }
 
-Dictionary NetwMultiplayer::interest_monitor_snapshot() {
-    Dictionary out;
-    out[StringName("layers")] = interest_layers().size();
-    out[StringName("entities_filtered")]
-        = interest_engine.membership_keys().size();
-    out[StringName("visible_edges")] = interest_engine.stats_edges();
-    out[StringName("dirty_entities")] = interest_engine.dirty_count();
-    out[StringName("relay_backlog")] = liveness_pending_live_count();
-    out[StringName("transitions_total")] = interest_engine.transitions_total();
-    out[StringName("vanished_dirty_skips")]
-        = interest_engine.stats_vanished_dirty_skips();
-    return out;
-}
-
 bool NetwMultiplayer::interest_wire_admits(
     int64_t p_peer_id,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) {
+    const NetwEntityRecord *record = entity_record_any(p_entity);
     if (p_peer_id == SERVER_PEER
-        || (p_entity.is_valid() && p_entity->steering() == p_peer_id)) {
+        || (record != nullptr
+            && record->get_control()->resolve() == p_peer_id)) {
         return true;
     }
     return interest_player_sees(p_peer_id, p_entity);
 }
 
 bool NetwMultiplayer::interest_is_visible(const RID &p_entity, int64_t p_peer) {
-    const Ref<NetwEntity> entity = entity_get_view(p_entity);
-    if (entity.is_null() || p_peer == 0) {
+    if (entity_get_view(p_entity).is_null() || p_peer == 0) {
         return false;
     }
-    return !interest_entity_has_filter(entity)
-        || interest_wire_admits(p_peer, entity);
+    return !interest_entity_has_filter(p_entity)
+        || interest_wire_admits(p_peer, p_entity);
 }
 
-bool NetwMultiplayer::interest_has_committed_intent(
-    const Ref<NetwEntity> &p_entity
-) {
-    if (p_entity.is_null()) {
+bool NetwMultiplayer::interest_has_committed_intent(const RID &p_entity) {
+    if (!p_entity.is_valid()) {
         return false;
     }
-    return interest_engine.had_committed_intent(
-        p_entity->get_rid_handle().get_id()
-    );
+    return interest_engine.had_committed_intent(p_entity.get_id());
 }
 
-bool NetwMultiplayer::interest_bit_admits(
-    const Ref<NetwEntity> &p_entity,
-    int p_peer_bit
-) {
-    if (p_entity.is_null()) {
+bool NetwMultiplayer::interest_bit_admits(const RID &p_entity, int p_peer_bit) {
+    if (!p_entity.is_valid()) {
         return false;
     }
-    return interest_engine.test(
-        p_entity->get_rid_handle().get_id(),
-        p_peer_bit
-    );
+    return interest_engine.test(p_entity.get_id(), p_peer_bit);
 }
 
 bool NetwMultiplayer::interest_check_layer_name(
@@ -870,28 +842,24 @@ bool NetwMultiplayer::interest_has_layer(const StringName &p_layer_id) const {
     return interest_engine.has_layer(p_layer_id);
 }
 
-bool NetwMultiplayer::interest_entity_has_filter(
-    const Ref<NetwEntity> &p_entity
-) {
-    if (p_entity.is_null()) {
+bool NetwMultiplayer::interest_entity_has_filter(const RID &p_entity) {
+    if (!p_entity.is_valid()) {
         return false;
     }
     if (!is_host()) {
         interest::Decl *decl = interest_decl_on(p_entity);
         return decl != nullptr && !decl->labels().is_empty();
     }
-    return interest_engine.has_memberships(p_entity->get_rid_handle().get_id());
+    return interest_engine.has_memberships(p_entity.get_id());
 }
 
 void NetwMultiplayer::interest_peer_connected(int64_t p_peer_id) {
     interest_engine.peer_bit_for(p_peer_id);
     interest_sync_live_peers();
-    if (interest_compat_refresh.is_valid()) {
-        session_defer(
-            interest_compat_refresh,
-            StringName("interest_compat_intents")
-        );
-    }
+    session_defer(
+        callable_mp(this, &NetwMultiplayer::interest_refresh_compat_intents),
+        StringName("interest_compat_intents")
+    );
     interest_request_flush();
 }
 
@@ -918,35 +886,35 @@ void NetwMultiplayer::interest_clear_session() {
     interest_pending_live = false;
 }
 
-void NetwMultiplayer::interest_sync_scene_membership(
-    const Ref<NetwEntity> &p_entity
-) {
-    if (!is_host() || p_entity.is_null() || p_entity->get_owner() == nullptr) {
+void NetwMultiplayer::interest_sync_scene_membership(const RID &p_entity) {
+    Node *const owner = wrapper_owner(p_entity);
+    if (!is_host() || owner == nullptr) {
         return;
     }
-    liveness_adopt(p_entity.ptr());
-    const int64_t slot = p_entity->get_rid_handle().get_id();
+    liveness_adopt(p_entity);
+    const int64_t slot = p_entity.get_id();
     const StringName previous = interest_engine.scene_membership(slot);
-    const RID scene = scene_of(entity_of(p_entity->get_owner()));
+    const RID scene = scene_of(entity_of(owner));
     const StringName current
         = scene.is_valid() ? scene_layer_id(scene) : StringName();
     interest_engine.set_scene_root(
         slot,
-        p_entity->get_declares_scene()
-            ? scene_layer_id(p_entity->get_rid_handle())
+        entity_record(p_entity)->get_declares_scene()
+            ? scene_layer_id(p_entity)
             : StringName()
     );
     if (!interest_engine.set_scene_membership(slot, current)) {
         return;
     }
+    const id::Entity entity(p_entity);
     if (!previous.is_empty()) {
-        const RID before = interest_layer_find(previous);
+        const id::Layer before(interest_layer_find(previous));
         if (before.is_valid()) {
-            layer_remove_entity(before, p_entity);
+            layer_remove_entity(entity, before);
         }
     }
     if (!current.is_empty()) {
-        layer_add_entity(layer_open(current), p_entity);
+        layer_add_entity(entity, id::Layer(layer_open(current)));
     }
 }
 
@@ -955,18 +923,14 @@ PackedInt64Array NetwMultiplayer::interest_known_peers() const {
 }
 
 void NetwMultiplayer::interest_set_entity_intent(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedInt64Array &p_admitted
 ) {
-    if (p_entity.is_null()) {
+    if (!p_entity.is_valid()) {
         return;
     }
-    liveness_adopt(p_entity.ptr());
-    interest_sync_record(p_entity.ptr());
-    interest_engine.set_intent_for_peers(
-        p_entity->get_rid_handle().get_id(),
-        p_admitted
-    );
+    interest_sync_record(p_entity);
+    interest_engine.set_intent_for_peers(p_entity.get_id(), p_admitted);
     interest_request_flush();
 }
 
@@ -993,9 +957,8 @@ void NetwMultiplayer::interest_sync_live_peers() {
     for (const int64_t &peer_id : live) {
         ids.push_back(peer_id);
     }
-    if (interest_engine.set_live_peer_ids(ids)
-        && interest_compat_refresh.is_valid()) {
-        interest_compat_refresh.call();
+    if (interest_engine.set_live_peer_ids(ids)) {
+        interest_refresh_compat_intents();
     }
 }
 
@@ -1033,10 +996,10 @@ Error NetwMultiplayer::interest_recompute() {
         }
         if (!interest_engine.has_memberships(slot)
             && !interest_engine.has_intent(slot)) {
-            interest_retire_entity(member);
+            interest_retire_entity(member->get_rid_handle());
             continue;
         }
-        interest_sync_record(member.ptr());
+        interest_sync_record(member->adopt_in(this));
     }
     interest_pending = interest_engine.recompute();
     interest_pending_live = true;
@@ -1080,6 +1043,55 @@ void NetwMultiplayer::interest_refresh_compat_intents() {
     plane->get_sync_compat()->refresh_interest_intents();
 }
 
+namespace {
+
+bool awareness_from_array(const Variant &p_raw, interest::Awareness &r_edge) {
+    if (p_raw.get_type() != Variant::ARRAY) {
+        return false;
+    }
+    const Array row = p_raw;
+    if (row.size() != 3) {
+        return false;
+    }
+    if (row[0].get_type() != Variant::INT
+        || row[1].get_type() != Variant::STRING_NAME
+        || row[2].get_type() != Variant::INT) {
+        return false;
+    }
+    const int64_t row_route = row[0];
+    const StringName row_layer = row[1];
+    const int64_t row_kind = row[2];
+    if (!interest::Awareness::admits(row_route, row_layer, row_kind)) {
+        return false;
+    }
+    r_edge.route = row_route;
+    r_edge.layer_id = row_layer;
+    r_edge.kind = int32_t(row_kind);
+    return true;
+}
+
+Array awareness_to_array(const interest::Awareness &p_edge) {
+    Array out;
+    out.push_back(p_edge.route);
+    out.push_back(p_edge.layer_id);
+    out.push_back(int64_t(p_edge.kind));
+    return out;
+}
+
+PackedByteArray awareness_bytes(const Array &p_wire) {
+    LocalVector<interest::Awareness> edges;
+    for (int at = 0; at < p_wire.size(); ++at) {
+        interest::Awareness edge;
+        if (!awareness_from_array(p_wire[at], edge)) {
+            return PackedByteArray();
+        }
+        edges.push_back(edge);
+    }
+    return interest::awareness_encode(edges);
+}
+
+} // namespace
+
 void NetwMultiplayer::interest_send_awareness(
     int64_t p_peer,
     const Array &p_wire
@@ -1087,8 +1099,8 @@ void NetwMultiplayer::interest_send_awareness(
     send_to(
         p_peer,
         0,
-        wire::builtin_channel("INTEREST_AWARENESS"),
-        interest::awareness_encode(p_wire),
+        wire::CHANNEL_INTEREST_AWARENESS,
+        awareness_bytes(p_wire),
         true,
         0,
         String()
@@ -1097,8 +1109,8 @@ void NetwMultiplayer::interest_send_awareness(
 
 namespace {
 
-bool route_stays(NetwMultiplayer *p_plane, int64_t p_route) {
-    const Ref<NetwEntity> entity = p_plane->wrapper_for_route(p_route);
+bool route_stays(NetwMultiplayer *p_session, int64_t p_route) {
+    const Ref<NetwEntity> entity = p_session->wrapper_for_route(p_route);
     return entity.is_null()
         || entity->get_stage() < int64_t(entity::Stage::DESPAWNING);
 }
@@ -1107,7 +1119,7 @@ bool route_stays(NetwMultiplayer *p_plane, int64_t p_route) {
 
 void NetwMultiplayer::interest_relay_awareness() {
     const Array drained = interest_awareness_drain();
-    if (!is_host() || !interest_awareness_send.is_valid()) {
+    if (!is_host()) {
         return;
     }
     for (int at = 0; at < drained.size(); ++at) {
@@ -1120,7 +1132,7 @@ void NetwMultiplayer::interest_relay_awareness() {
         Array sent;
         for (int edge_at = 0; edge_at < wire.size(); ++edge_at) {
             interest::Awareness edge;
-            if (!interest::Awareness::from_array(wire[edge_at], edge)) {
+            if (!awareness_from_array(wire[edge_at], edge)) {
                 continue;
             }
             if (edge.kind != interest::Awareness::ENTER
@@ -1129,7 +1141,7 @@ void NetwMultiplayer::interest_relay_awareness() {
             }
         }
         if (!sent.is_empty()) {
-            interest_awareness_send.call(target, sent);
+            interest_send_awareness(target, sent);
         }
     }
 }
@@ -1142,10 +1154,7 @@ Error NetwMultiplayer::interest_flush_tail() {
             == MultiplayerPeer::CONNECTION_DISCONNECTED) {
         return OK;
     }
-    spawn::Pipeline *spawns = spawn_plane();
-    if (spawns != nullptr) {
-        spawns->schedule_visibility_sweep();
-    }
+    spawn_schedule_visibility_sweep();
     return OK;
 }
 
@@ -1191,9 +1200,14 @@ Array NetwMultiplayer::interest_awareness_drain() {
     Array out;
     const PackedInt64Array targets = interest_relay.targets();
     for (int at = 0; at < targets.size(); ++at) {
-        const Array wire = interest_relay.wire_for(targets[at]);
-        if (wire.is_empty()) {
+        const LocalVector<interest::Awareness> edges
+            = interest_relay.wire_for(targets[at]);
+        if (edges.is_empty()) {
             continue;
+        }
+        Array wire;
+        for (const interest::Awareness &edge : edges) {
+            wire.push_back(awareness_to_array(edge));
         }
         Array row;
         row.push_back(targets[at]);
@@ -1302,7 +1316,11 @@ void NetwMultiplayer::layer_free(const RID &p_layer) {
     const StringName name = row->name;
     const TypedArray<NetwEntity> members = layer_get_entities(p_layer);
     for (int at = 0; at < members.size(); at++) {
-        layer_remove_entity(p_layer, members[at]);
+        const Ref<NetwEntity> member = members[at];
+        layer_remove_entity(
+            id::Entity(member->get_rid_handle()),
+            id::Layer(p_layer)
+        );
     }
     const PackedInt64Array viewers = layer_viewer_ids(p_layer);
     for (int at = 0; at < int(viewers.size()); at++) {
@@ -1376,8 +1394,9 @@ Error NetwMultiplayer::interest_layer_add_entity(
         );
         return ERR_UNAUTHORIZED;
     }
-    const bool seated = layer_add_entity(p_layer, wrapper)
-        || layer_has_entity(p_layer, wrapper);
+    const id::Entity entity(p_entity);
+    const bool seated = layer_add_entity(entity, id::Layer(p_layer))
+        || layer_has_entity(entity, id::Layer(p_layer));
     return seated ? OK : ERR_UNAVAILABLE;
 }
 
@@ -1401,7 +1420,7 @@ Error NetwMultiplayer::interest_layer_remove_entity(
         );
         return ERR_UNAUTHORIZED;
     }
-    layer_remove_entity(p_layer, wrapper);
+    layer_remove_entity(id::Entity(p_entity), id::Layer(p_layer));
     return OK;
 }
 
@@ -1545,51 +1564,56 @@ TypedArray<RID> NetwMultiplayer::interest_layer_get_entities(
 }
 
 bool NetwMultiplayer::layer_has_entity(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity
+    id::Entity p_entity,
+    id::Layer p_layer
 ) const {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
-    return row != nullptr && layer_holds(p_entity)
-        && interest_engine.roster_has(
-            row->name,
-            p_entity->get_rid_handle().get_id()
-        );
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
+    return row != nullptr && layer_holds(p_entity.rid)
+        && interest_engine.roster_has(row->name, p_entity.get_id());
 }
 
 bool NetwMultiplayer::interest_layer_has_entity(
     const RID &p_layer,
     const RID &p_entity
 ) const {
-    return layer_has_entity(p_layer, entity_get_view(p_entity));
+    return entity_get_view(p_entity).is_valid()
+        && layer_has_entity(id::Entity(p_entity), id::Layer(p_layer));
 }
 
-Dictionary NetwMultiplayer::interest_layer_get_stats(
-    const RID &p_layer
+int64_t NetwMultiplayer::interest_layer_get_stat(
+    const RID &p_layer,
+    LayerStat p_stat
 ) const {
-    Dictionary out;
     const LayerRow *row = layer_rows.get_or_null(p_layer);
     if (row == nullptr) {
-        return out;
+        return 0;
     }
     const StringName name = row->name;
-    out[StringName("viewers")] = interest_engine.layer_viewers(name).size();
-    out[StringName("entities")] = interest_engine.roster(name).size();
-    out[StringName("visible_edges")] = interest_engine.layer_edge_count(name);
-    out[StringName("transitions_total")] = interest_engine.transitions(name);
-    return out;
+    switch (p_stat) {
+        case LAYER_STAT_VIEWERS:
+            return int64_t(interest_engine.layer_viewers(name).size());
+        case LAYER_STAT_ENTITIES:
+            return int64_t(interest_engine.roster(name).size());
+        case LAYER_STAT_VISIBLE_EDGES:
+            return int64_t(interest_engine.layer_edge_count(name));
+        case LAYER_STAT_TRANSITIONS_TOTAL:
+            return int64_t(interest_engine.transitions(name));
+        default:
+            return 0;
+    }
 }
 
 void NetwMultiplayer::interest_layer_report_edge(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity,
+    id::Entity p_entity,
+    id::Layer p_layer,
     int64_t p_peer_id,
     bool p_visible
 ) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr) {
         return;
     }
-    layer_report_edge(row->name, p_layer, p_entity, p_peer_id, p_visible);
+    layer_report_edge(p_entity, row->name, p_layer, p_peer_id, p_visible);
 }
 
 RID NetwMultiplayer::layer_for_delta(const StringName &p_name) const {
@@ -1615,13 +1639,13 @@ void NetwMultiplayer::layer_closing_drop(const StringName &p_name) {
 }
 
 void NetwMultiplayer::layer_report_edge(
+    id::Entity p_entity,
     const StringName &p_name,
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity,
+    id::Layer p_layer,
     int64_t p_peer_id,
     bool p_visible
 ) {
-    if (!layer_holds(p_entity)) {
+    if (!layer_holds(p_entity.rid)) {
         return;
     }
     const Ref<NetwMultiplayer> keep(this);
@@ -1629,28 +1653,28 @@ void NetwMultiplayer::layer_report_edge(
     if (interest_engine.has_layer(name)) {
         interest_engine.note_transition(name);
     }
-    const Ref<NetwInterestLayer> view = layer_view(p_layer);
+    const Ref<NetwInterestLayer> view = layer_view(p_layer.rid);
     const StringName edge
         = p_visible ? SIG_INTEREST_ENTERED : SIG_INTEREST_EXITED;
-    view->emit_signal(edge, p_entity, p_peer_id);
+    view->emit_signal(edge, slot_pinned_entity(p_entity.rid), p_peer_id);
     if (p_visible) {
-        layer_dispatch_enter(name, p_entity, p_peer_id);
+        layer_dispatch_enter(name, p_entity.rid, p_peer_id);
         return;
     }
-    layer_dispatch_leave(name, p_entity, p_peer_id);
+    layer_dispatch_leave(name, p_entity.rid, p_peer_id);
 }
 
 void NetwMultiplayer::interest_client_admit(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity
+    id::Entity p_entity,
+    id::Layer p_layer
 ) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr) {
         return;
     }
     const StringName name = row->name;
-    const Ref<NetwInterestLayer> view = layer_view(p_layer);
-    if (p_entity.is_null()) {
+    const Ref<NetwInterestLayer> view = layer_view(p_layer.rid);
+    if (!p_entity.is_valid()) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
@@ -1661,38 +1685,36 @@ void NetwMultiplayer::interest_client_admit(
         );
         return;
     }
-    if (!layer_holds(p_entity)
+    if (!layer_holds(p_entity.rid)
         || !interest_check_layer_name(
             this,
             name,
             "{NetwInterestLayer.add_entity}"
         )
-        || !interest_engine.roster_add(
-            name,
-            p_entity->get_rid_handle().get_id()
-        )) {
+        || !interest_engine.roster_add(name, p_entity.get_id())) {
         return;
     }
     const Ref<NetwMultiplayer> keep(this);
-    layer_track_membership(name, p_entity, true);
-    layer_join_label(name, p_entity);
-    interest_observer_edge(p_entity, name, layer_local_peer(), true);
-    layer_dispatch_enter(name, p_entity, layer_local_peer());
-    view->emit_signal(SIG_VISIBILITY_CHANGED, p_entity, true);
-    layer_refresh_perception(name, p_entity);
+    const Ref<NetwEntity> entity = slot_pinned_entity(p_entity.rid);
+    layer_track_membership(name, p_entity.rid, true);
+    layer_join_label(name, p_entity.rid);
+    interest_observer_edge(p_entity.rid, name, layer_local_peer(), true);
+    layer_dispatch_enter(name, p_entity.rid, layer_local_peer());
+    view->emit_signal(SIG_VISIBILITY_CHANGED, entity, true);
+    layer_refresh_perception(name, p_entity.rid);
 }
 
 void NetwMultiplayer::interest_client_revoke(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity
+    id::Entity p_entity,
+    id::Layer p_layer
 ) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr) {
         return;
     }
     const StringName name = row->name;
-    const Ref<NetwInterestLayer> view = layer_view(p_layer);
-    if (p_entity.is_null()) {
+    const Ref<NetwInterestLayer> view = layer_view(p_layer.rid);
+    if (!p_entity.is_valid()) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
@@ -1703,31 +1725,29 @@ void NetwMultiplayer::interest_client_revoke(
         );
         return;
     }
-    if (!layer_holds(p_entity)
-        || !interest_engine.roster_remove(
-            name,
-            p_entity->get_rid_handle().get_id()
-        )) {
+    if (!layer_holds(p_entity.rid)
+        || !interest_engine.roster_remove(name, p_entity.get_id())) {
         return;
     }
     const Ref<NetwMultiplayer> keep(this);
-    interest_observer_edge(p_entity, name, layer_local_peer(), false);
-    layer_dispatch_leave(name, p_entity, layer_local_peer());
-    view->emit_signal(SIG_VISIBILITY_CHANGED, p_entity, false);
-    layer_refresh_perception(name, p_entity);
+    const Ref<NetwEntity> entity = slot_pinned_entity(p_entity.rid);
+    interest_observer_edge(p_entity.rid, name, layer_local_peer(), false);
+    layer_dispatch_leave(name, p_entity.rid, layer_local_peer());
+    view->emit_signal(SIG_VISIBILITY_CHANGED, entity, false);
+    layer_refresh_perception(name, p_entity.rid);
 }
 
 void NetwMultiplayer::interest_client_untrack(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity
+    id::Entity p_entity,
+    id::Layer p_layer
 ) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr) {
         return;
     }
     const StringName name = row->name;
-    const Ref<NetwInterestLayer> view = layer_view(p_layer);
-    if (p_entity.is_null()) {
+    const Ref<NetwInterestLayer> view = layer_view(p_layer.rid);
+    if (!p_entity.is_valid()) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
@@ -1738,25 +1758,22 @@ void NetwMultiplayer::interest_client_untrack(
         );
         return;
     }
-    if (!layer_holds(p_entity)
-        || !interest_engine.roster_remove(
-            name,
-            p_entity->get_rid_handle().get_id()
-        )) {
+    if (!layer_holds(p_entity.rid)
+        || !interest_engine.roster_remove(name, p_entity.get_id())) {
         return;
     }
     const Ref<NetwMultiplayer> keep(this);
-    view->emit_signal(SIG_ENTITY_REMOVED, p_entity);
-    layer_track_membership(name, p_entity, false);
-    interest_observer_edge(p_entity, name, layer_local_peer(), false);
-    layer_dispatch_leave(name, p_entity, layer_local_peer());
-    view->emit_signal(SIG_VISIBILITY_CHANGED, p_entity, false);
-    layer_refresh_perception(name, p_entity);
+    const Ref<NetwEntity> entity = slot_pinned_entity(p_entity.rid);
+    view->emit_signal(SIG_ENTITY_REMOVED, entity);
+    layer_track_membership(name, p_entity.rid, false);
+    interest_observer_edge(p_entity.rid, name, layer_local_peer(), false);
+    layer_dispatch_leave(name, p_entity.rid, layer_local_peer());
+    view->emit_signal(SIG_VISIBILITY_CHANGED, entity, false);
+    layer_refresh_perception(name, p_entity.rid);
 }
 
-bool NetwMultiplayer::layer_holds(const Ref<NetwEntity> &p_entity) const {
-    return p_entity.is_valid()
-        && (p_entity->home == nullptr || p_entity->home == this);
+bool NetwMultiplayer::layer_holds(const RID &p_entity) const {
+    return slot_pinned_entity(p_entity).is_valid();
 }
 
 int64_t NetwMultiplayer::layer_local_peer() {
@@ -1765,10 +1782,10 @@ int64_t NetwMultiplayer::layer_local_peer() {
 
 void NetwMultiplayer::layer_dispatch_enter(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_peer_id
 ) {
-    NetwEntityRecord *const record = record_of(p_entity.ptr());
+    NetwEntityRecord *const record = interest_record(p_entity);
     interest::Facet *facet
         = record != nullptr ? record->find_interest_facet() : nullptr;
     if (facet != nullptr) {
@@ -1778,10 +1795,10 @@ void NetwMultiplayer::layer_dispatch_enter(
 
 void NetwMultiplayer::layer_dispatch_leave(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_peer_id
 ) {
-    NetwEntityRecord *const record = record_of(p_entity.ptr());
+    NetwEntityRecord *const record = interest_record(p_entity);
     interest::Facet *facet
         = record != nullptr ? record->find_interest_facet() : nullptr;
     if (facet != nullptr) {
@@ -1791,9 +1808,9 @@ void NetwMultiplayer::layer_dispatch_leave(
 
 void NetwMultiplayer::layer_join_label(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) {
-    NetwEntityRecord *const record = record_of(p_entity.ptr());
+    NetwEntityRecord *const record = interest_record(p_entity);
     if (record != nullptr) {
         record->get_interest_facet().join(p_layer_id);
     }
@@ -1801,37 +1818,31 @@ void NetwMultiplayer::layer_join_label(
 
 void NetwMultiplayer::layer_track_membership(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     bool p_joined
 ) {
+    const int64_t slot = p_entity.get_id();
     if (p_joined) {
-        liveness_adopt(p_entity.ptr());
-        interest_engine.membership_add(
-            p_entity->get_rid_handle().get_id(),
-            p_layer_id
-        );
-        liveness_adopt(p_entity.ptr());
+        liveness_adopt(p_entity);
+        interest_engine.membership_add(slot, p_layer_id);
+        liveness_adopt(p_entity);
     } else {
-        interest_engine.membership_remove(
-            p_entity->get_rid_handle().get_id(),
-            p_layer_id
-        );
+        interest_engine.membership_remove(slot, p_layer_id);
     }
-    const int64_t slot = p_entity->get_rid_handle().get_id();
     if (!interest_engine.has_memberships(slot)
         && !interest_engine.has_intent(slot)) {
         if (slot != 0 && interest_engine.has_entity(slot)) {
             interest_engine.remove_entity(slot);
         }
     } else {
-        interest_sync_record(p_entity.ptr());
+        interest_sync_record(p_entity);
     }
     interest_request_flush();
 }
 
 void NetwMultiplayer::layer_refresh_perception(
     const StringName &p_layer_id,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) {
     Array layers;
     layers.push_back(p_layer_id);
@@ -1906,7 +1917,7 @@ void NetwMultiplayer::layer_set_perception_policy(
             Object::cast_to<NetwEntity>(wrapper_for_id(slots[at]).ptr())
         );
         if (member.is_valid()) {
-            interest_reapply_perception(member);
+            interest_reapply_perception(member->get_rid_handle());
         }
     }
 }
@@ -1963,17 +1974,14 @@ bool NetwMultiplayer::layer_remove_viewer(
     return true;
 }
 
-bool NetwMultiplayer::layer_add_entity(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity
-) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+bool NetwMultiplayer::layer_add_entity(id::Entity p_entity, id::Layer p_layer) {
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr || row->freeing) {
         return false;
     }
     const StringName name = row->name;
-    const Ref<NetwInterestLayer> view = layer_view(p_layer);
-    if (p_entity.is_null()) {
+    const Ref<NetwInterestLayer> view = layer_view(p_layer.rid);
+    if (!p_entity.is_valid()) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
@@ -1984,7 +1992,7 @@ bool NetwMultiplayer::layer_add_entity(
         );
         return false;
     }
-    if (!is_host() || !layer_holds(p_entity)) {
+    if (!is_host() || !layer_holds(p_entity.rid)) {
         return false;
     }
     if (!interest_check_layer_name(
@@ -1992,31 +2000,28 @@ bool NetwMultiplayer::layer_add_entity(
             name,
             "{NetwInterestLayer.add_entity}"
         )
-        || !interest_engine.roster_add(
-            name,
-            p_entity->get_rid_handle().get_id()
-        )) {
+        || !interest_engine.roster_add(name, p_entity.get_id())) {
         return false;
     }
     const Ref<NetwMultiplayer> keep(this);
-    view->emit_signal(SIG_ENTITY_ADDED, p_entity);
-    if (layer_rows.get_or_null(p_layer) != nullptr) {
-        layer_track_membership(name, p_entity, true);
+    view->emit_signal(SIG_ENTITY_ADDED, slot_pinned_entity(p_entity.rid));
+    if (layer_rows.get_or_null(p_layer.rid) != nullptr) {
+        layer_track_membership(name, p_entity.rid, true);
     }
     return true;
 }
 
 bool NetwMultiplayer::layer_remove_entity(
-    const RID &p_layer,
-    const Ref<NetwEntity> &p_entity
+    id::Entity p_entity,
+    id::Layer p_layer
 ) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr) {
         return false;
     }
     const StringName name = row->name;
-    const Ref<NetwInterestLayer> view = layer_view(p_layer);
-    if (p_entity.is_null()) {
+    const Ref<NetwInterestLayer> view = layer_view(p_layer.rid);
+    if (!p_entity.is_valid()) {
         fault::raise(
             this,
             NETW_FAULT_EMPTY_ARGUMENT,
@@ -2027,18 +2032,15 @@ bool NetwMultiplayer::layer_remove_entity(
         );
         return false;
     }
-    if (!is_host() || !layer_holds(p_entity)) {
+    if (!is_host() || !layer_holds(p_entity.rid)) {
         return false;
     }
-    if (!interest_engine.roster_remove(
-            name,
-            p_entity->get_rid_handle().get_id()
-        )) {
+    if (!interest_engine.roster_remove(name, p_entity.get_id())) {
         return false;
     }
     const Ref<NetwMultiplayer> keep(this);
-    view->emit_signal(SIG_ENTITY_REMOVED, p_entity);
-    layer_track_membership(name, p_entity, false);
+    view->emit_signal(SIG_ENTITY_REMOVED, slot_pinned_entity(p_entity.rid));
+    layer_track_membership(name, p_entity.rid, false);
     return true;
 }
 
@@ -2158,11 +2160,17 @@ Error NetwMultiplayer::layer_drive(const RID &p_layer) {
         const Ref<NetwEntity> held = seated[at];
         if (held.is_valid()
             && !desired_ids.has(held->get_rid_handle().get_id())) {
-            layer_remove_entity(p_layer, held);
+            layer_remove_entity(
+                id::Entity(held->get_rid_handle()),
+                id::Layer(p_layer)
+            );
         }
     }
     for (const Ref<NetwEntity> &entity : desired) {
-        layer_add_entity(p_layer, entity);
+        layer_add_entity(
+            id::Entity(entity->get_rid_handle()),
+            id::Layer(p_layer)
+        );
     }
     return OK;
 }
@@ -2211,8 +2219,8 @@ bool NetwMultiplayer::interest_admits(const RID &p_entity, int64_t p_peer) {
     if (bit < 0) {
         return false;
     }
-    const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
-    return wrapper.is_valid() && interest_bit_admits(wrapper, bit);
+    return entity_get_view(p_entity).is_valid()
+        && interest_bit_admits(p_entity, bit);
 }
 
 TypedArray<RID> NetwMultiplayer::interest_get_layers(const RID &p_entity) {
@@ -2231,7 +2239,7 @@ bool NetwMultiplayer::scene_owns_layer(const StringName &p_layer) const {
     if (p_layer.is_empty()) {
         return false;
     }
-    const Array live = scene_core->live_scenes();
+    const Array live = scene_core.live_scenes();
     for (int at = 0; at < live.size(); ++at) {
         const RID scene = live[at];
         if (scene_layer_id(scene) == p_layer) {
@@ -2266,20 +2274,20 @@ void NetwMultiplayer::layer_close(const RID &p_layer) {
 }
 
 void NetwMultiplayer::layer_monitor_report(
-    const Ref<NetwEntity> &p_entity,
+    id::Entity p_entity,
     int64_t p_peer,
-    const RID &p_layer,
+    id::Layer p_layer,
     bool p_inside
 ) {
-    const LayerRow *row = layer_rows.get_or_null(p_layer);
+    const LayerRow *row = layer_rows.get_or_null(p_layer.rid);
     if (row == nullptr || !row->monitor.watch.is_valid()
-        || p_entity.is_null()) {
+        || !p_entity.is_valid()) {
         return;
     }
     const LayerMonitorRow monitor = row->monitor;
     Array args;
     args.push_back(p_inside);
-    args.push_back(entity_of(p_entity->get_owner()));
+    args.push_back(p_entity.rid);
     args.push_back(p_peer);
     game_call(monitor.watch, args, game_calls::LAYER_MONITOR_RID);
 }
@@ -2289,7 +2297,11 @@ void NetwMultiplayer::layer_monitor_enter(
     int64_t p_peer,
     RID p_layer
 ) {
-    layer_monitor_report(p_entity, p_peer, p_layer, true);
+    RID entity;
+    if (p_entity.is_valid()) {
+        entity = entity_of(p_entity->get_owner());
+    }
+    layer_monitor_report(id::Entity(entity), p_peer, id::Layer(p_layer), true);
 }
 
 void NetwMultiplayer::layer_monitor_exit(
@@ -2297,7 +2309,11 @@ void NetwMultiplayer::layer_monitor_exit(
     int64_t p_peer,
     RID p_layer
 ) {
-    layer_monitor_report(p_entity, p_peer, p_layer, false);
+    RID entity;
+    if (p_entity.is_valid()) {
+        entity = entity_of(p_entity->get_owner());
+    }
+    layer_monitor_report(id::Entity(entity), p_peer, id::Layer(p_layer), false);
 }
 
 void NetwMultiplayer::layer_monitor_visibility(
@@ -2305,7 +2321,16 @@ void NetwMultiplayer::layer_monitor_visibility(
     bool p_visible,
     RID p_layer
 ) {
-    layer_monitor_report(p_entity, get_unique_id(), p_layer, p_visible);
+    RID entity;
+    if (p_entity.is_valid()) {
+        entity = entity_of(p_entity->get_owner());
+    }
+    layer_monitor_report(
+        id::Entity(entity),
+        get_unique_id(),
+        id::Layer(p_layer),
+        p_visible
+    );
 }
 
 void NetwMultiplayer::layer_monitor_detach(const RID &p_layer) {
@@ -2399,19 +2424,19 @@ Array NetwMultiplayer::interest_layers() const {
     return out;
 }
 
-interest::Facet *NetwMultiplayer::interest_facet_on(
-    const Ref<NetwEntity> &p_entity
-) {
-    NetwEntityRecord *const record = record_of(p_entity.ptr());
+interest::Facet *NetwMultiplayer::interest_facet_on(const RID &p_entity) {
+    NetwEntityRecord *const record = interest_record(p_entity);
     return record != nullptr ? &record->get_interest_facet() : nullptr;
 }
 
 interest::Facet *NetwMultiplayer::interest_facet_of(const RID &p_entity) {
-    return interest_facet_on(entity_get_view(p_entity));
+    return entity_get_view(p_entity).is_valid() ? interest_facet_on(p_entity)
+                                                : nullptr;
 }
 
 interest::Decl *NetwMultiplayer::interest_decl_of(const RID &p_entity) {
-    return interest_decl_on(entity_get_view(p_entity));
+    return entity_get_view(p_entity).is_valid() ? interest_decl_on(p_entity)
+                                                : nullptr;
 }
 
 Error NetwMultiplayer::interest_join(const RID &p_entity, const RID &p_layer) {
@@ -2498,7 +2523,7 @@ Error NetwMultiplayer::interest_join_label(
     if (!facet->join(p_layer_id)) {
         return p_layer_id.is_empty() ? ERR_INVALID_PARAMETER : OK;
     }
-    store_stale_entity(entity);
+    store_stale_entity(entity->get_rid_handle());
     RID layer = interest_layer_find(p_layer_id);
     if (!layer.is_valid()) {
         layer = layer_open(p_layer_id);
@@ -2508,8 +2533,8 @@ Error NetwMultiplayer::interest_join_label(
         }
     }
     if (is_host() && layer.is_valid()) {
-        liveness_adopt(entity.ptr());
-        layer_add_entity(layer, entity);
+        entity->adopt_in(this);
+        layer_add_entity(id::Entity(p_entity), id::Layer(layer));
     }
     return OK;
 }
@@ -2526,9 +2551,12 @@ Error NetwMultiplayer::interest_leave_label(
     if (!facet->leave(p_layer_id)) {
         return OK;
     }
-    store_stale_entity(entity);
+    store_stale_entity(entity->get_rid_handle());
     if (is_host()) {
-        layer_remove_entity(interest_layer_find(p_layer_id), entity);
+        layer_remove_entity(
+            id::Entity(p_entity),
+            id::Layer(interest_layer_find(p_layer_id))
+        );
     }
     return OK;
 }
@@ -2587,15 +2615,15 @@ Error NetwMultiplayer::interest_perception_policy_label(
     if (!facet->set_perception_policy(p_layer_id, int(p_policy), p_custom)) {
         return ERR_INVALID_PARAMETER;
     }
-    interest_reapply_perception(entity_get_view(p_entity));
+    interest_reapply_perception(p_entity);
     return OK;
 }
 
-void NetwMultiplayer::interest_activate(const Ref<NetwEntity> &p_entity) {
-    interest::Facet *facet = interest_facet_on(p_entity);
-    if (facet == nullptr) {
-        return;
-    }
+void NetwMultiplayer::interest_activate(
+    const RID &p_entity,
+    NetwEntityRecord &p_record
+) {
+    interest::Facet *facet = &p_record.get_interest_facet();
     const Ref<NetwMultiplayer> keep(this);
     const Array labels = facet->declaration()->labels();
     for (int at = 0; at < labels.size(); at++) {
@@ -2611,47 +2639,55 @@ void NetwMultiplayer::interest_activate(const Ref<NetwEntity> &p_entity) {
         if (!is_host() || !layer.is_valid()) {
             continue;
         }
-        liveness_adopt(p_entity.ptr());
-        layer_add_entity(layer, p_entity);
+        const id::Entity entity(liveness_adopt(p_entity));
+        layer_add_entity(entity, id::Layer(layer));
     }
 }
 
-void NetwMultiplayer::interest_deactivate(const Ref<NetwEntity> &p_entity) {
-    interest::Facet *facet = interest_facet_on(p_entity);
-    if (facet == nullptr || !is_host()) {
+void NetwMultiplayer::interest_deactivate(
+    const RID &p_entity,
+    NetwEntityRecord &p_record
+) {
+    if (!is_host()) {
         return;
     }
+    interest::Facet *facet = &p_record.get_interest_facet();
     const Ref<NetwMultiplayer> keep(this);
+    const id::Entity entity(p_entity);
     const Array labels = facet->declaration()->labels();
     for (int at = 0; at < labels.size(); at++) {
-        layer_remove_entity(interest_layer_find(labels[at]), p_entity);
+        layer_remove_entity(entity, id::Layer(interest_layer_find(labels[at])));
     }
 }
 
 void NetwMultiplayer::interest_observer_edge(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const StringName &p_layer_id,
     int64_t p_peer,
     bool p_entered
 ) {
     const Ref<NetwMultiplayer> keep(this);
+    const Ref<NetwEntity> entity = slot_pinned_entity(p_entity);
+    if (entity.is_null()) {
+        return;
+    }
     const int64_t value
         = p_entered ? EventPlane::OBSERVER_ENTERED : EventPlane::OBSERVER_LEFT;
     if (event_records(value)) {
         event_record(
             value,
-            p_entity->get_rid_handle(),
-            p_entity->get_route(),
+            p_entity,
+            entity->get_route(),
             p_peer,
             OK,
             int64_t(layer_for_delta(p_layer_id).get_id())
         );
     }
-    const Ref<NetwInterest> handle = p_entity->held_interest();
+    const Ref<NetwInterest> handle = entity->held_interest();
     if (handle.is_null()) {
         return;
     }
-    NetwEntityRecord *const record = record_of(p_entity.ptr());
+    NetwEntityRecord *const record = interest_record(p_entity);
     interest::Facet *facet
         = record != nullptr ? record->find_interest_facet() : nullptr;
     if (facet != nullptr && facet->observes()) {

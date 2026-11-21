@@ -11,11 +11,8 @@
 
 namespace netw {
 class NetwMultiplayer;
+class SchemaBook;
 } // namespace netw
-
-namespace netw::session {
-struct Books;
-} // namespace netw::session
 
 namespace netw::persist {
 
@@ -58,17 +55,14 @@ class Bindings {
     godot::HashSet<uint64_t> refused;
     godot::LocalVector<godot::RID> order;
     NetwMultiplayer *session = nullptr;
-    const netw::session::Books *books = nullptr;
+    SchemaBook *schema_core = nullptr;
 
     void forget(const godot::RID &p_binding);
 
 public:
     ~Bindings();
 
-    void bind(
-        NetwMultiplayer *p_session,
-        const netw::session::Books *p_books
-    );
+    void bind(NetwMultiplayer *p_session, SchemaBook *p_schemas);
 
     godot::RID compile(godot::Node *p_root);
     godot::RID find(godot::Node *p_root) const;

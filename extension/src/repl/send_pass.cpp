@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/repl/send_pass.hpp"
 
 #include "netw/colors.hpp"

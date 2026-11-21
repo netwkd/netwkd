@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/traffic.hpp"
 
 #include <algorithm>
@@ -66,40 +68,31 @@ void TrafficMeter::forget_peer(int64_t p_peer) {
     rows.erase(p_peer);
 }
 
-Dictionary TrafficMeter::read(int64_t p_peer) const {
-    static const char *const CAUSES[CAUSE_COUNT + 1]
-        = {"state", "input", "calls", "spawns", "upkeep", "headers"};
+double TrafficMeter::read(int64_t p_peer, int p_index) const {
+    constexpr int CAUSES = CAUSE_COUNT + 1;
     const HashMap<int64_t, Row>::ConstIterator found = rows.find(p_peer);
-    const Rate rate = found != rows.end() ? found->value.rate : Rate();
-
-    Dictionary sent;
-    Dictionary received;
-    for (int cause = 0; cause <= CAUSE_COUNT; ++cause) {
-        const StringName key(CAUSES[cause]);
-        sent[key] = rate.sent[cause];
-        received[key] = rate.received[cause];
+    if (found == rows.end() || p_index < 0) {
+        return 0.0;
     }
-    Dictionary out;
-    out[StringName("sent")] = sent;
-    out[StringName("received")] = received;
-    out[StringName("sent_packets")] = rate.sent_packets;
-    out[StringName("received_packets")] = rate.received_packets;
-    return out;
+    const Rate &rate = found->value.rate;
+    if (p_index < CAUSES) {
+        return rate.sent[p_index];
+    }
+    if (p_index < CAUSES * 2) {
+        return rate.received[p_index - CAUSES];
+    }
+    if (p_index == CAUSES * 2) {
+        return rate.sent_packets;
+    }
+    if (p_index == CAUSES * 2 + 1) {
+        return rate.received_packets;
+    }
+    return 0.0;
 }
 
-#if defined(DEBUG_ENABLED)
-void TrafficMeter::read_flat(int64_t p_peer, Array &r_out) const {
+TrafficMeter::Rate TrafficMeter::rate_of(int64_t p_peer) const {
     const HashMap<int64_t, Row>::ConstIterator found = rows.find(p_peer);
-    const Rate rate = found != rows.end() ? found->value.rate : Rate();
-
-    r_out.resize(FLAT_SIZE);
-    for (int cause = 0; cause <= CAUSE_COUNT; ++cause) {
-        r_out[cause] = rate.sent[cause];
-        r_out[CAUSE_COUNT + 1 + cause] = rate.received[cause];
-    }
-    r_out[FLAT_SIZE - 2] = rate.sent_packets;
-    r_out[FLAT_SIZE - 1] = rate.received_packets;
+    return found != rows.end() ? found->value.rate : Rate();
 }
-#endif
 
 } // namespace netw::wire

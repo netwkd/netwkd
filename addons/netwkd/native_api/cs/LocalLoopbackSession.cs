@@ -236,11 +236,14 @@ public sealed class LocalLoopbackSession : NetwRefCounted
     /// that nothing but this session holds any more, leaves the list on the
     /// next poll.
     /// </summary>
-    public Godot.Collections.Array GetClientPeers()
+    public LocalMultiplayerPeer[] GetClientPeers()
     {
         godot_variant answered = default;
         NetwThunks.Call0(_bindGetClientPeers, Checked, ref answered);
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
+        LocalMultiplayerPeer[] result =
+            NetwApi.Elements(
+                VariantUtils.ConvertToArray(answered),
+                LocalMultiplayerPeer.From);
         answered.Dispose();
         return result;
     }

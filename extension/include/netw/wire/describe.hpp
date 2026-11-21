@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <tuple>
 #include <type_traits>
+#include <vector>
 
 #include "godot/variant.hpp"
 #include "netw/wire/stream.hpp"
@@ -124,7 +125,6 @@ bool apply_field(const Spec &spec, Stream &stream, Owner &value) {
 }
 
 const char *spec_kind_name(SpecKind kind);
-godot::Dictionary dump_field(const char *name, const Spec &spec);
 
 } // namespace detail
 
@@ -145,18 +145,29 @@ template <class... Fields> struct Description {
         );
         return healthy;
     }
-
-    godot::Array spec_dump() const {
-        godot::Array out;
-        std::apply(
-            [&](const Fields &...each) {
-                (out.push_back(detail::dump_field(each.name, each.spec)), ...);
-            },
-            fields
-        );
-        return out;
-    }
 };
+
+struct FieldSpec {
+    const char *name = "";
+    Spec spec;
+};
+
+struct SpecRecord {
+    const char *name = "";
+    std::vector<FieldSpec> fields;
+};
+
+template <class... Fields>
+std::vector<FieldSpec> field_specs(const Description<Fields...> &description) {
+    std::vector<FieldSpec> out;
+    std::apply(
+        [&](const Fields &...each) {
+            (out.push_back(FieldSpec{each.name, each.spec}), ...);
+        },
+        description.fields
+    );
+    return out;
+}
 
 template <class... Fields>
 constexpr Description<Fields...> describe(Fields... fields) {

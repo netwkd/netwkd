@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/attribution.hpp"
 
 namespace netw::wire {
@@ -303,66 +305,6 @@ int64_t AttributionBook::peer_channel_refused(
     const HashMap<uint64_t, int64_t>::ConstIterator found
         = refusals.find(refusal_key(p_peer, p_channel, p_refusal));
     return found != refusals.end() ? found->value : 0;
-}
-
-static Dictionary peer_channel_rows(const HashMap<uint64_t, int64_t> &p_table) {
-    Dictionary out;
-    for (const KeyValue<uint64_t, int64_t> &row : p_table) {
-        const int64_t peer = int64_t(int32_t(row.key >> 8));
-        const int64_t channel = int64_t(row.key & 0xff);
-        Dictionary channels = out.get(peer, Dictionary());
-        channels[channel] = row.value;
-        out[peer] = channels;
-    }
-    return out;
-}
-
-static Dictionary route_rows(const HashMap<int64_t, int64_t> &p_table) {
-    Dictionary out;
-    for (const KeyValue<int64_t, int64_t> &row : p_table) {
-        out[row.key] = row.value;
-    }
-    return out;
-}
-
-Dictionary AttributionBook::snapshot() const {
-    Dictionary out;
-    out[StringName("bytes_out")] = peer_channel_rows(bytes_out);
-    out[StringName("bytes_in")] = peer_channel_rows(bytes_in);
-    out[StringName("route_bytes_out")] = route_rows(route_out);
-    out[StringName("route_bytes_in")] = route_rows(route_in);
-    out[StringName("attributed_out")] = attributed_out;
-    out[StringName("attributed_in")] = attributed_in;
-    out[StringName("framing_out")] = framing_out;
-    out[StringName("frames_out")] = frames_out;
-    out[StringName("frames_in")] = frames_in;
-    out[StringName("staged_dropped_out")] = staged_dropped_out;
-    out[StringName("frames_in_by_channel")]
-        = peer_channel_rows(frames_by_peer_channel_in);
-    out[StringName("refused_in")] = refused_in;
-    Dictionary refused;
-    for (const KeyValue<uint64_t, int64_t> &row : refusals) {
-        const int64_t peer = int64_t(int32_t(row.key >> 16));
-        const int64_t channel = int64_t((row.key >> 8) & 0xff);
-        const Refusal verdict = Refusal(uint8_t(row.key & 0xff));
-        Dictionary channels = refused.get(peer, Dictionary());
-        Dictionary verdicts = channels.get(channel, Dictionary());
-        verdicts[String(refusal_name(verdict))] = row.value;
-        channels[channel] = verdicts;
-        refused[peer] = channels;
-    }
-    out[StringName("refusals")] = refused;
-    out[StringName("armed")] = armed;
-    Dictionary columns;
-    for (const KeyValue<uint64_t, int64_t> &row : column_bits) {
-        Dictionary cell;
-        cell[StringName("schema")] = int64_t(int32_t(row.key >> 16));
-        cell[StringName("column")] = int64_t(row.key & 0xffff);
-        cell[StringName("bits")] = row.value;
-        columns[int64_t(row.key)] = cell;
-    }
-    out[StringName("columns")] = columns;
-    return out;
 }
 
 void AttributionBook::retire_route(int64_t p_route) {

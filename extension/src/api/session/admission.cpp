@@ -9,6 +9,7 @@
 #include "netw/connect/directory_transport.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
+#include "netw/value_variant.hpp"
 
 using namespace godot;
 
@@ -404,8 +405,9 @@ void NetwMultiplayer::session_start_admission(const JoinRequest &p_request) {
             session_fail_join(peer, ERR_UNCONFIGURED, missing);
             return;
         }
-        const Variant decoded = gd::bytes_to_var(p_request.proof_bytes);
-        if (decoded.get_type() == Variant::ARRAY) {
+        Variant decoded;
+        if (value::decode_packed(p_request.proof_bytes, decoded)
+            && decoded.get_type() == Variant::ARRAY) {
             proofs = decoded;
         }
         if (proofs.size() != accepted) {

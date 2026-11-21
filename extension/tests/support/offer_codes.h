@@ -20,7 +20,7 @@ struct RowOffer {
     uint8_t channel = 0;
     const netw::table::SchemaRecord *schema = nullptr;
     const uint64_t *codes = nullptr;
-    const godot::Variant *carried = nullptr;
+    const netw::wire::TailRef *tails = nullptr;
     godot::LocalVector<int> recipients;
     float priority = 1.0f;
     bool masked = false;
@@ -72,14 +72,14 @@ inline const bool offer_codes_hooked = register_reset_hook(&clear_offer_codes);
 
 inline bool offer_values(RowOffer &r_offer, const godot::Array &p_values) {
     r_offer.codes = nullptr;
-    r_offer.carried = nullptr;
+    r_offer.tails = nullptr;
     netw::wire::CodeRow *held = new netw::wire::CodeRow();
     offer_code_pool().push_back(held);
     if (!netw::wire::encode_scalar_row(r_offer.declared(), p_values, *held)) {
         return false;
     }
     r_offer.codes = held->word_data();
-    r_offer.carried = held->value_data();
+    r_offer.tails = held->tail_data();
     return true;
 }
 
@@ -94,7 +94,7 @@ inline bool offer_row(RowOffer &r_offer, const netw::wire::CodeRow &p_row) {
     offer_code_pool().push_back(held);
     held->copy_from(p_row);
     r_offer.codes = held->word_data();
-    r_offer.carried = held->value_data();
+    r_offer.tails = held->tail_data();
     return true;
 }
 

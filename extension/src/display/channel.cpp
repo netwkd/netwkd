@@ -1,5 +1,6 @@
 #include "netw/display/channel.hpp"
 
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/subsystems.hpp"
@@ -23,11 +24,10 @@ void Channel::write(const Variant &p_value) {
 #if defined(NETW_TESTS)
     written += 1;
 #endif
-    if (door.is_valid()) {
-        const Variant verdict = door.call(entity, target_prop, p_value);
-        if (int64_t(verdict) != ERR_DOES_NOT_EXIST) {
-            return;
-        }
+    if (session != nullptr
+        && session->display_lane(entity, target_prop, p_value)
+            != ERR_DOES_NOT_EXIST) {
+        return;
     }
     if (output.is_valid()) {
         output.call(p_value);

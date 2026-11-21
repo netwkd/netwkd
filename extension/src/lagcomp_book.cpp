@@ -144,7 +144,7 @@ void LagBook::size_rings() {
     recorded_held = 0;
 }
 
-void LagBook::stage(const Dictionary &p_payload) {
+void LagBook::stage(const Dictionary &p_payload, NetwMultiplayer *p_session) {
     scratch.clear();
     staged_present = 0;
     staged_coded = 0;
@@ -162,7 +162,8 @@ void LagBook::stage(const Dictionary &p_payload) {
                 codec.plan.column(field),
                 field,
                 value,
-                scratch
+                scratch,
+                p_session
             )) {
             staged_coded |= bit_of(field);
         } else {
@@ -244,7 +245,11 @@ int LagBook::find_sample(int64_t p_tick) const {
     return -1;
 }
 
-bool LagBook::record(int64_t p_tick, const Dictionary &p_payload) {
+bool LagBook::record(
+    int64_t p_tick,
+    const Dictionary &p_payload,
+    NetwMultiplayer *p_session
+) {
     NETW_ZONE_LEAF(
         "Lagcomp book record",
         colors::PREDICTION,
@@ -254,7 +259,7 @@ bool LagBook::record(int64_t p_tick, const Dictionary &p_payload) {
         compile_keys(p_payload.keys());
     }
     note_recorded(p_tick);
-    stage(p_payload);
+    stage(p_payload, p_session);
     uint32_t place = held;
     while (place > 0 && ticks[slot_at(place - 1)] > p_tick) {
         place -= 1;

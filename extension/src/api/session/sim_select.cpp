@@ -124,7 +124,11 @@ bool NetwMultiplayer::sim_chooses(const RID &p_subject) {
     if (row == nullptr) {
         return false;
     }
-    if (sim_physics_driven(row->view)) {
+    if (row->viewed
+        && sim_physics_driven(
+            *entity_record(p_subject),
+            wrapper_owner(p_subject)
+        )) {
         return true;
     }
     sim_rows.joiners(sim_joining);
@@ -136,59 +140,58 @@ bool NetwMultiplayer::sim_chooses(const RID &p_subject) {
     return false;
 }
 
-bool NetwMultiplayer::sim_predicts(const Ref<NetwEntity> &p_subject) const {
-    return prediction_engine.slot_of(p_subject) >= 0;
+bool NetwMultiplayer::sim_predicts(const RID &p_subject) const {
+    const NetwEntityRecord *record = entity_record(p_subject);
+    return record != nullptr && prediction_engine.slot_of(record) >= 0;
 }
 
-bool NetwMultiplayer::sim_selects_unasked(
-    const Ref<NetwEntity> &p_subject
-) const {
-    return sim_predicts(p_subject) && sim_physics_driven(p_subject.ptr());
+bool NetwMultiplayer::sim_selects_unasked(const RID &p_subject) const {
+    return sim_predicts(p_subject)
+        && sim_physics_driven(
+            *entity_record(p_subject),
+            wrapper_owner(p_subject)
+        );
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::sim_joiners(
-    const Ref<NetwEntity> &p_subject
-) {
+LocalVector<RID> NetwMultiplayer::sim_joiners(const RID &p_subject) {
     return sim_gather(p_subject, false);
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::sim_candidates(
-    const Ref<NetwEntity> &p_subject
-) {
+LocalVector<RID> NetwMultiplayer::sim_candidates(const RID &p_subject) {
     return sim_gather(p_subject, sim_selects_unasked(p_subject));
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::sim_gather(
-    const Ref<NetwEntity> &p_subject,
+LocalVector<RID> NetwMultiplayer::sim_gather(
+    const RID &p_subject,
     bool p_shared
 ) {
-    TypedArray<NetwEntity> out;
-    if (p_subject.is_null()
-        || sim_rows.row_of(p_subject->get_rid_handle()) == nullptr) {
+    LocalVector<RID> out;
+    const Ref<NetwEntity> subject = slot_pinned_entity(p_subject);
+    if (subject.is_null() || sim_rows.row_of(p_subject) == nullptr) {
         return out;
     }
     LocalVector<Ref<NetwEntity>> found;
     sim_rows.joiners(sim_joining);
     for (const RID &joiner : sim_joining) {
-        take(*this, p_subject, entity_get_view(joiner), found);
+        take(*this, subject, entity_get_view(joiner), found);
     }
     if (p_shared) {
         const TypedArray<NetwEntity> shared
             = interest_shared_entities(p_subject, StringName());
         for (int at = 0; at < shared.size(); ++at) {
             const Ref<NetwEntity> member = shared[at];
-            take(*this, p_subject, member, found);
+            take(*this, subject, member, found);
         }
     }
     std::sort(found.ptr(), found.ptr() + found.size(), order_less);
     for (const Ref<NetwEntity> &member : found) {
-        out.push_back(member);
+        out.push_back(member->get_rid_handle());
     }
     return out;
 }
 
-bool NetwMultiplayer::sim_selectable(const Ref<NetwEntity> &p_member) {
-    const RID member = p_member->get_rid_handle();
+bool NetwMultiplayer::sim_selectable(const RID &p_member) {
+    const RID member = p_member;
     if (!member.is_valid()) {
         return false;
     }
@@ -196,28 +199,31 @@ bool NetwMultiplayer::sim_selectable(const Ref<NetwEntity> &p_member) {
     if (predict_engine_for(member) != nullptr) {
         return row != nullptr && row->facts.predicted && !sim::leads(row->mode);
     }
-    Node *owner = p_member->get_owner();
-    if (owner == nullptr || authoring::declares_prediction(owner)
-        || predict_implied(p_member.ptr())
-        || !sim_simulated(p_member.ptr())) {
+    NetwEntityRecord *record = entity_record(member);
+    Node *owner = wrapper_owner(member);
+    if (record == nullptr || owner == nullptr
+        || authoring::declares_prediction(owner)
+        || predict_implied(this, *record, owner)
+        || !sim_simulated(*record, owner)) {
         return false;
     }
     const sim::Mode mode = row != nullptr
         ? row->mode
-        : sim_rows.resolve(member, sim_body_facts(p_member));
+        : sim_rows.resolve(member, sim_body_facts(*record, owner));
     return !sim::leads(mode);
 }
 
-TypedArray<NetwEntity> NetwMultiplayer::sim_select(
-    const Ref<NetwEntity> &p_subject,
-    const TypedArray<NetwEntity> &p_candidates,
+LocalVector<RID> NetwMultiplayer::sim_select(
+    const RID &p_subject,
+    const LocalVector<RID> &p_candidates,
     int64_t p_frontier
 ) {
-    TypedArray<NetwEntity> promoted;
-    if (p_subject.is_null()) {
+    LocalVector<RID> promoted;
+    const Ref<NetwEntity> view = slot_pinned_entity(p_subject);
+    if (view.is_null()) {
         return promoted;
     }
-    const RID subject = p_subject->get_rid_handle();
+    const RID subject = p_subject;
     const sim::Row *standing = sim_rows.row_of(subject);
     if (standing == nullptr || !sim::leads(standing->mode)) {
         sim_drop_selections(subject);
@@ -225,14 +231,15 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_select(
     }
 
     LocalVector<Ref<NetwEntity>> ranked;
-    ranked.reserve(uint32_t(p_candidates.size()) + 1);
-    for (int at = 0; at < p_candidates.size(); ++at) {
-        const Ref<NetwEntity> member = p_candidates[at];
-        if (member.is_valid() && member != p_subject) {
+    ranked.reserve(p_candidates.size() + 1);
+    for (const RID &candidate : p_candidates) {
+        const Ref<NetwEntity> member
+            = wrapper_for_id(int64_t(candidate.get_id()));
+        if (member.is_valid() && member != view) {
             ranked.push_back(member);
         }
     }
-    ranked.push_back(p_subject);
+    ranked.push_back(view);
     std::sort(ranked.ptr(), ranked.ptr() + ranked.size(), order_less);
 
     HashMap<int64_t, Ref<NetwEntity>> by_key;
@@ -240,7 +247,7 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_select(
     int64_t subject_order = 0;
     for (uint32_t at = 0; at < ranked.size(); ++at) {
         const Ref<NetwEntity> &member = ranked[at];
-        if (member == p_subject) {
+        if (member == view) {
             subject_order = int64_t(at);
             continue;
         }
@@ -252,7 +259,7 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_select(
         sim::Candidate candidate;
         candidate.key = key;
         candidate.order_key = int64_t(at);
-        candidate.eligible = sim_selectable(member);
+        candidate.eligible = sim_selectable(entity);
         candidate.pick = pick_of(sim_rows.row_of(entity), candidate.eligible);
         candidates.push_back(candidate);
         by_key.insert(key, member);
@@ -260,7 +267,7 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_select(
 
     sim::Row &row = sim_rows.ensure(subject);
     row.selection.owner_order_key = subject_order;
-    row.selection.all = sim_selects_unasked(p_subject);
+    row.selection.all = sim_selects_unasked(subject);
     row.selection.commit(candidates, p_frontier);
 
     LocalVector<int64_t> promoted_keys;
@@ -283,7 +290,7 @@ TypedArray<NetwEntity> NetwMultiplayer::sim_select(
         if (sim_rows.note_selected(member, subject)) {
             moved.push_back(member);
         }
-        promoted.push_back(found->value);
+        promoted.push_back(member);
     }
     for (const int64_t key : demoted_keys) {
         const HashMap<int64_t, Ref<NetwEntity>>::ConstIterator found
@@ -329,15 +336,13 @@ void NetwMultiplayer::sim_release_lingering(
 }
 
 void NetwMultiplayer::sim_seed(sim::Row &r_row) {
-    const Ref<NetwEntity> entity = entity_get_view(r_row.entity);
-    if (entity.is_null()) {
+    const NetwEntityRecord *record = entity_record(r_row.entity);
+    if (record == nullptr || entity_get_view(r_row.entity).is_null()) {
         return;
     }
-    r_row.view = entity.ptr();
-    r_row.steering = sim_steering_of(*entity.ptr());
-    const NetwEntityRecord *record = record_of(entity.ptr());
-    const sim::Decl *found
-        = record != nullptr ? record->find_sim_declaration() : nullptr;
+    r_row.viewed = true;
+    r_row.steering = sim_steering_of(*record->get_control());
+    const sim::Decl *found = record->find_sim_declaration();
     const sim::Declaration undeclared;
     const sim::Declaration &held
         = found != nullptr ? found->declaration : undeclared;
@@ -354,16 +359,15 @@ void NetwMultiplayer::sim_seed(sim::Row &r_row) {
     r_row.facts.remote_mode = held.remote_mode;
 }
 
-void NetwMultiplayer::sim_declare(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
-        return;
-    }
-    const RID entity = p_entity->get_rid_handle();
-    if (!entity.is_valid() || entity_get_view(entity).is_null()) {
+void NetwMultiplayer::sim_declare(const RID &p_entity) {
+    const RID entity = p_entity;
+    const Ref<NetwEntity> view
+        = entity.is_valid() ? entity_get_view(entity) : Ref<NetwEntity>();
+    if (view.is_null()) {
         return;
     }
     sim::Row *standing = sim_rows.find(entity);
-    const NetwEntityRecord *record = record_of(p_entity.ptr());
+    const NetwEntityRecord *record = view->record_in(this);
     const sim::Decl *found
         = record != nullptr ? record->find_sim_declaration() : nullptr;
     if (standing == nullptr && (found == nullptr || !found->declared)) {
@@ -380,36 +384,40 @@ void NetwMultiplayer::sim_declare(const Ref<NetwEntity> &p_entity) {
 
 void NetwMultiplayer::sim_announce(const RID &p_entity) {
     const sim::Row *row = sim_rows.row_of(p_entity);
-    const EntitySlot *slot
-        = row != nullptr ? entity_slots.find(p_entity.get_id()) : nullptr;
-    if (slot == nullptr || slot->record == nullptr || slot->live.is_null()
+    const EntityRow *slot
+        = row != nullptr ? world.entities.find(p_entity.get_id()) : nullptr;
+    const session::EntityView *view
+        = slot != nullptr ? views.entities.find(p_entity.get_id()) : nullptr;
+    if (slot == nullptr || slot->record == nullptr || view == nullptr
+        || view->live.is_null()
         || slot->record->get_announced_mode() == row->mode) {
         return;
     }
 #if defined(NETW_TESTS)
     idle_work.announced += 1;
 #endif
-    sim_tell_mode(slot->record, slot->live, row->mode);
+    sim_tell_mode(*slot->record, p_entity, row->mode);
 }
 
 void NetwMultiplayer::sim_tell_mode(
-    NetwEntityRecord *p_record,
-    const Ref<NetwEntity> &p_entity,
+    NetwEntityRecord &p_record,
+    const RID &p_entity,
     sim::Mode p_mode
 ) {
-    const sim::Mode previous = p_record->get_announced_mode();
+    const sim::Mode previous = p_record.get_announced_mode();
     if (previous == p_mode) {
         return;
     }
-    p_record->set_announced_mode(p_mode);
-    if (p_entity->simulation_if_minted().is_null()) {
+    p_record.set_announced_mode(p_mode);
+    const Ref<NetwEntity> view = slot_pinned_entity(p_entity);
+    if (view.is_null() || view->simulation_if_minted().is_null()) {
         return;
     }
     Announcement row;
     row.kind = AnnouncementKind::MODE_CHANGED;
     row.from = int64_t(previous);
     row.to = int64_t(p_mode);
-    entity_announce(p_entity.ptr(), row);
+    entity_announce(view.ptr(), row);
 }
 
 void NetwMultiplayer::sim_refresh_members(const LocalVector<RID> &p_members) {
@@ -432,17 +440,20 @@ void NetwMultiplayer::sim_refresh_members(const LocalVector<RID> &p_members) {
             }
             continue;
         }
-        const Ref<NetwEntity> entity = entity_get_view(member);
-        if (entity.is_null()) {
+        NetwEntityRecord *record = entity_record(member);
+        if (record == nullptr || entity_get_view(member).is_null()) {
             continue;
         }
         {
             NETW_ZONE_NC("sim resolve body facts", colors::PREDICTION);
-            sim_rows.resolve(member, sim_body_facts(entity));
+            sim_rows.resolve(
+                member,
+                sim_body_facts(*record, wrapper_owner(member))
+            );
         }
         {
             NETW_ZONE_NC("sim settle body", colors::PREDICTION);
-            sim_settle_body(entity);
+            sim_settle_body(member);
         }
         {
             NETW_ZONE_NC("sim mark role dirty", colors::PREDICTION);

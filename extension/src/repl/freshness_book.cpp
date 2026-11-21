@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/repl/freshness_book.hpp"
 
 #include "netw/colors.hpp"

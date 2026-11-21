@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/rate_window.hpp"
 
 using namespace godot;

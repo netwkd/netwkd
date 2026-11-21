@@ -282,7 +282,7 @@ TEST_CASE(
     );
     stand->add_child(body);
     body->set_owner(stand);
-    const godot::RID space = server->entity_space_of(entity).space;
+    const godot::RID space = server->entity_space_of(body).space;
     REQUIRE(space.is_valid());
     Ref<InstallableStepper> stepper;
     stepper.instantiate();

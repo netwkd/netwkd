@@ -23,7 +23,8 @@ public:
     static bool decode(
         const SchemaRecord &p_schema,
         const godot::PackedByteArray &p_bytes,
-        CommandFrameRecord &r_record
+        CommandFrameRecord &r_record,
+        int *r_mistyped = nullptr
     );
 
     const CommandFrame &wire() const {
@@ -40,7 +41,10 @@ public:
     int64_t hold() const;
 
     bool append_transition(int64_t p_index, int64_t p_label, bool p_fresh);
-    bool append_values(const godot::LocalVector<godot::Variant> &p_values);
+    bool append_values(
+        const godot::LocalVector<godot::Variant> &p_values,
+        NetwMultiplayer *p_session
+    );
     bool append_codes(const uint64_t *p_words);
 
     const wire::WirePlan &row_plan() const {

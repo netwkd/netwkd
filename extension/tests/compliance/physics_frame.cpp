@@ -209,6 +209,100 @@ TEST_CASE(
     NETW_HOLDS(quiet(seen));
 }
 
+constexpr const char *PADDOCK = R"(
+var stepper := Stepper.new()
+var steps: int:
+	get:
+		return stepper.steps
+
+
+func _ready() -> void:
+	Netw.session(self).install_physics_stepper(get_world_3d(), stepper)
+
+
+class Stepper extends NetwPhysicsStepper:
+	var steps := 0
+
+	func _can_step() -> bool:
+		return true
+
+	func _step(_space: RID, _delta: float) -> void:
+		steps += 1
+
+
+class Rider extends Node3D:
+	var jump := false
+	var jumps := 0
+	var corrected := false
+
+	func _init() -> void:
+		Netw.configure_entity(self)
+		Netw.configure_property(self, &"position").state()
+		Netw.configure_property(self, &"jump").input()
+
+	func _network_process(_delta: float, _tick: int, is_fresh: bool) -> void:
+		corrected = corrected or not is_fresh
+		if jump and is_fresh:
+			jumps += 1
+			jump = false
+		position.x += 0.25
+
+	func press() -> void:
+		jump = true
+
+	func shove() -> void:
+		position.x += 4.0
+
+
+class Sled extends Rider:
+	func _init() -> void:
+		super()
+		Netw.configure_entity(self).simulation.schedule = (
+			NetwSimulation.SCHEDULE_FRAME
+		)
+)";
+
+constexpr int RIDER = 0;
+constexpr int SHOVES = 20;
+constexpr int RESTS = 60;
+
+World paddock() {
+    return World(PADDOCK, 1)
+        .paced(60)
+        .watch("Ada", "jumps")
+        .watch("Ada", "corrected")
+        .watch("Bo", "corrected")
+        .watch("Level", "steps")
+        .at(1, spawn("Rider", "Ada"))
+        .at(1, spawn("Sled", "Bo"))
+        .at(2, impair(RIDER, polls(3)))
+        .at(4, control("Ada", RIDER))
+        .at(4, control("Bo", RIDER))
+        .each(SHOVES, RESTS, call("Ada", "shove"))
+        .each(SHOVES, RESTS, call("Bo", "shove"))
+        .at(SHOVES + 10, on(RIDER, call("Ada", "press")))
+        .at(SHOVES + 21, on(RIDER, call("Ada", "press")))
+        .at(SHOVES + 30, on(RIDER, call("Ada", "press")));
+}
+
+NETW_FRAME_SCENARIO(WorldFrames, paddock_frames, &paddock, RESTS + 20);
+
+TEST_CASE(
+    "[Netw][Compliance][Frame] P4 a correction never presses a button the "
+    "game already used, and a corrected FRAME entity steps no space"
+) {
+    const Seen &seen = paddock_frames.seen();
+    for (const int peer : {SERVER, RIDER}) {
+        NETW_HOLDS(reads(seen, peer, "Ada", "jumps", 3));
+    }
+    NETW_HOLDS(reads(seen, RIDER, "Ada", "corrected", true));
+    NETW_HOLDS(reads(seen, RIDER, "Bo", "corrected", true));
+    for (const int peer : {SERVER, RIDER}) {
+        NETW_HOLDS(reads(seen, peer, "Level", "steps", 0));
+    }
+    NETW_HOLDS(quiet(seen));
+}
+
 constexpr const char *MOMENTS = R"(
 func spawn_all() -> void:
 	var players := {}

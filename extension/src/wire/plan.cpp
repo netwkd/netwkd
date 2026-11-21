@@ -1,6 +1,9 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/plan.hpp"
 
 #include "netw/colors.hpp"
+#include "netw/schema_core.hpp"
 #include "netw/profile.hpp"
 
 using namespace godot;
@@ -53,6 +56,29 @@ bool type_in_range(int column_type) {
 
 } // namespace
 
+bool ColumnPlan::mistypes(const TailRef &p_tail) const {
+    if (!variable || text || value_tag == value::TAG_COUNT
+        || p_tail.is_empty()) {
+        return false;
+    }
+    const uint8_t *held = p_tail.ptr();
+    if (value::kind_of(value::Tag(held[0])) != value_tag) {
+        return true;
+    }
+    if (element_tags[0] == value::TAG_COUNT) {
+        return false;
+    }
+    const bool list = value_tag == value::TAG_ARRAY;
+    const uint32_t parts = list ? 1 : 2;
+    const uint8_t typed
+        = list ? value::TAG_TYPED_ARRAY : value::TAG_TYPED_DICTIONARY;
+    if (held[0] != typed || p_tail.size() <= parts) {
+        return true;
+    }
+    return held[1] != element_tags[0]
+        || (!list && held[2] != element_tags[1]);
+}
+
 int WirePlan::element_width(int column_type) {
     return type_in_range(column_type) ? ELEMENT_WIDTHS[column_type] : 0;
 }
@@ -78,14 +104,15 @@ WirePlan WirePlan::compile(const SchemaRecord &record) {
         const int declared = column->stride > 0 ? column->stride : 1;
         ColumnPlan slot;
         slot.delta = column->delta;
-        if (column->quantizer.is_valid()) {
-            const Variant::Type element = static_cast<Variant::Type>(
-                SchemaCore::element_type(column->type)
-            );
-            slot.width = column->quantizer->bit_width(element);
-            slot.stride = declared * column->quantizer->stride(element);
+        if (column->quant.quantized()) {
+            slot.width = column->quant.width;
+            slot.stride = declared * column->quant.parts;
         } else if (sized_by_value(column->type) && declared == 1) {
             slot.variable = true;
+            slot.text = column->type == SchemaCore::STRING;
+            slot.value_tag = column->value_tag;
+            slot.element_tags[0] = column->element_tags[0];
+            slot.element_tags[1] = column->element_tags[1];
             slot.width = 0;
             slot.stride = 0;
             slot.offset = plan.total_bits;
@@ -105,6 +132,19 @@ WirePlan WirePlan::compile(const SchemaRecord &record) {
     }
     plan.plannable = true;
     return plan;
+}
+
+bool is_scalar_schema(const SchemaRecord &p_schema, const WirePlan &p_plan) {
+    if (!p_plan.valid()) {
+        return false;
+    }
+    for (int at = 0; at < p_schema.column_count(); ++at) {
+        const SchemaColumn *column = p_schema.at(at);
+        if (column->stride != 1) {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace netw::wire

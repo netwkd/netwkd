@@ -388,7 +388,8 @@ void NetwLagCompCore::timeline_record_coded(
     int64_t p_slot,
     int64_t p_tick,
     const Dictionary &p_payload,
-    const predict::FieldCodec &p_source
+    const predict::FieldCodec &p_source,
+    NetwMultiplayer *p_session
 ) {
     Row *row = mutable_row_of(p_slot);
     if (row == nullptr) {
@@ -398,7 +399,7 @@ void NetwLagCompCore::timeline_record_coded(
         row->book.compile(p_source, row->declared);
         row->declared_changed = false;
     }
-    row->book.record(p_tick, p_payload);
+    row->book.record(p_tick, p_payload, p_session);
 }
 
 int64_t NetwLagCompCore::timeline_sample_tick(

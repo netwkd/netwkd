@@ -5,7 +5,7 @@
 #include "godot/local_vector.hpp"
 #include "netw/repl/session_send.hpp"
 #include "netw/replication_send.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 #include "netw/wire/stream_book.hpp"
 
 namespace netw_test {
@@ -16,7 +16,7 @@ inline netw::wire::StreamFamily family_of(const RowOffer &p_offer) {
 
 template <typename Send>
 inline void seat_stream(Send &p_send, int p_peer, const RowOffer &p_offer) {
-    netw::store::World *world = p_send.store();
+    netw::store::Store *world = p_send.store();
     if (world == nullptr || world->token_of(p_peer, p_offer.lane()) != 0) {
         return;
     }
@@ -30,7 +30,7 @@ inline void seat_sent(
     Send &p_send,
     const godot::LocalVector<RowOffer> &p_offers
 ) {
-    netw::store::World *world = p_send.store();
+    netw::store::Store *world = p_send.store();
     if (world == nullptr) {
         return;
     }
@@ -65,7 +65,7 @@ inline void accept_sent(
     const godot::LocalVector<RowOffer> &p_offers,
     int p_peer
 ) {
-    netw::store::World *world = p_send.store();
+    netw::store::Store *world = p_send.store();
     if (world == nullptr) {
         return;
     }
@@ -96,7 +96,7 @@ inline void accept_streams(
 }
 
 template <typename Send> inline void seat_pending(Send &p_send, int p_peer) {
-    netw::store::World *world = p_send.store();
+    netw::store::Store *world = p_send.store();
     if (world == nullptr) {
         return;
     }

@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/gate_verdict_book.hpp"
 
 using namespace godot;

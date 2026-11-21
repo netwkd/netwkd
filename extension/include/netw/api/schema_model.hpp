@@ -43,7 +43,8 @@ public:
     static godot::Ref<NetwSchema> create(const godot::StringName &p_name);
     static godot::Ref<NetwSchema> declare(const godot::StringName &p_name);
     static godot::Ref<NetwSchema> from_record(
-        const table::SchemaRecord &p_record
+        const SchemaBook &p_schemas,
+        const godot::RID &p_schema
     );
 
     godot::StringName get_schema_name() const {

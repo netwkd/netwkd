@@ -141,11 +141,11 @@ public:
         return impl.control_scheduler();
     }
 
-    void watch_store(store::World *p_world) {
+    void watch_store(store::Store *p_world) {
         impl.watch_store(p_world);
     }
 
-    store::World *store() const {
+    store::Store *store() const {
         return impl.store();
     }
 

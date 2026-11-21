@@ -167,8 +167,9 @@ Ref<LocalMultiplayerPeer> LocalLoopbackSession::get_client_peer() {
     return create_client_peer();
 }
 
-Array LocalLoopbackSession::get_client_peers() const {
-    Array peers;
+TypedArray<LocalMultiplayerPeer> LocalLoopbackSession::get_client_peers()
+    const {
+    TypedArray<LocalMultiplayerPeer> peers;
     for (const Ref<LocalMultiplayerPeer> &client : client_peers) {
         peers.push_back(client);
     }

@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/sim/select.hpp"
 
 #include "netw/colors.hpp"

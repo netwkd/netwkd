@@ -9,23 +9,39 @@
 #include "netw/api/entity_options.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/participant.hpp"
+#include "netw/api/scene.hpp"
+#include "netw/entity/ids.hpp"
 #include "netw/scene_membership.hpp"
 #include "support/joined_peer.h"
 #include "support/netw_call_log.h"
+#include "support/netw_recorder.h"
 
 namespace TestSceneResidencyLaws {
 
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
-using netw_test::CallLog;
 using netw_test::Internals;
 using netw_test::LoopbackRig;
+using netw_test::Recorder;
+
+netw_test::CallLog *&avatar_listener() {
+    static netw_test::CallLog *held = nullptr;
+    return held;
+}
 
 Node *build_avatar(const Variant &p_marker) {
     Node2D *made = memnew(Node2D);
     made->set_name("Avatar");
     made->set_meta(StringName("marker"), p_marker);
+    if (avatar_listener() != nullptr) {
+        NetwEntity::ensure(made)->connect(
+            StringName("control_changed"),
+            avatar_listener()->callable("changed").bind(
+                int64_t(made->get_instance_id())
+            )
+        );
+    }
     return made;
 }
 
@@ -93,17 +109,6 @@ int spawn_into(
     );
 }
 
-int edges_for(const CallLog &p_seen, const RID &p_scene, bool p_subscribed) {
-    int total = 0;
-    for (int at = 0; at < p_seen.count(StringName("edge")); ++at) {
-        const Array row = p_seen.args(StringName("edge"), at);
-        if (RID(row[0]) == p_scene && bool(row[2]) == p_subscribed) {
-            total += 1;
-        }
-    }
-    return total;
-}
-
 TEST_CASE(
     "[Netw][Scene] JR2 two entities of one player in one scene are two "
     "reasons, so the first one leaving keeps the player subscribed and the "
@@ -144,6 +149,126 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "[Netw][Scene] JR11 a player entity moved into another scene reports "
+    "its controller on its client as it did when it first arrived"
+) {
+    LoopbackRig rig(1);
+    rig.mount();
+    const RID arena = open_scene(rig, StringName("Arena"), nullptr);
+    const RID annex = open_scene(rig, StringName("Annex"), nullptr);
+    const Ref<netw::NetwPlayer> ana = netw_test::seated_peer(
+        rig.server(),
+        rig.peer_id(0),
+        StringName("ana")
+    );
+    netw_test::CallLog log;
+    avatar_listener() = &log;
+    const int route = spawn_into(rig, level_of(rig, arena), ana, "steered");
+    const int64_t first = int64_t(rig.route_node(route, 0)->get_instance_id());
+    rig.route_node(route)->reparent(level_of(rig, annex));
+    rig.pump(8);
+    avatar_listener() = nullptr;
+    const int64_t moved = int64_t(rig.route_node(route, 0)->get_instance_id());
+    int on_first = 0;
+    int on_moved = 0;
+    for (int at = 0; at < log.count("changed"); at++) {
+        const int64_t heard = int64_t(log.args("changed", at)[2]);
+        on_first += heard == first ? 1 : 0;
+        on_moved += heard == moved ? 1 : 0;
+    }
+    REQUIRE(on_first > 0);
+    NETW_CHECK_EQ(on_moved, on_first);
+}
+
+TEST_CASE(
+    "[Netw][Scene] JR12 a player entity spawned under its controller "
+    "reports control_changed once on every peer"
+) {
+    LoopbackRig rig(1);
+    rig.mount();
+    const RID arena = open_scene(rig, StringName("Arena"), nullptr);
+    const Ref<netw::NetwPlayer> ana = netw_test::seated_peer(
+        rig.server(),
+        rig.peer_id(0),
+        StringName("ana")
+    );
+    netw_test::CallLog log;
+    avatar_listener() = &log;
+    const int route = spawn_into(rig, level_of(rig, arena), ana, "steered");
+    rig.pump(8);
+    avatar_listener() = nullptr;
+    for (const int peer : {-1, 0}) {
+        const int64_t node
+            = int64_t(rig.route_node(route, peer)->get_instance_id());
+        int heard = 0;
+        for (int at = 0; at < log.count("changed"); at++) {
+            heard += int64_t(log.args("changed", at)[2]) == node ? 1 : 0;
+        }
+        NETW_CHECK_EQ(heard, 1);
+    }
+}
+
+void rebuild_while_draining(
+    NetwMultiplayer *p_host,
+    NetwEntity *p_entity,
+    const RID &p_handle
+) {
+    p_entity->announce_reparented(p_host);
+    Internals::adopt_handle(Ref<NetwEntity>(p_entity), p_handle);
+    p_host->scene_on_entity_live(p_handle);
+}
+
+TEST_CASE(
+    "[Netw][Scene] JR13 an entity whose handle changes with a report "
+    "queued stays in its scene and does not enter it again"
+) {
+    LoopbackRig rig(0);
+    rig.mount();
+    NetwMultiplayer *host = rig.server();
+    const RID arena = open_scene(rig, StringName("Arena"), nullptr);
+    const int route = spawn_into(
+        rig,
+        level_of(rig, arena),
+        Ref<netw::NetwPlayer>(),
+        "crate"
+    );
+    const int other = spawn_into(
+        rig,
+        level_of(rig, arena),
+        Ref<netw::NetwPlayer>(),
+        "other"
+    );
+    const Ref<NetwEntity> entity = NetwEntity::ensure(rig.route_node(route));
+    const Ref<NetwEntity> neighbour
+        = NetwEntity::ensure(rig.route_node(other));
+    netw_test::CallLog log;
+    host->scene_handle_of(arena)->connect(
+        StringName("entity_entered"),
+        log.callable("entered")
+    );
+
+    const RID prior = entity->get_rid_handle();
+    netw::entity::retain(prior);
+    const RID handle = netw::entity::mint();
+    neighbour->connect(
+        StringName("reparented"),
+        callable_mp_static(&rebuild_while_draining)
+            .bind(host, entity.ptr(), handle),
+        Object::CONNECT_ONE_SHOT
+    );
+    neighbour->announce_reparented(host);
+    rig.pump(2);
+    const int entered = log.count("entered");
+    Internals::adopt_handle(entity, prior);
+    host->scene_on_entity_live(prior);
+    netw::entity::release(handle);
+    netw::entity::release(prior);
+    rig.pump(2);
+
+    NETW_CHECK_EQ(entered, 0);
+}
+
+TEST_CASE(
     "[Netw][Scene] JR3 an entity that leaves a scene and returns inside "
     "one settle never reports leaving it, because a move is classified from "
     "the tree the entity ended in rather than from the hops it took"
@@ -162,18 +287,34 @@ TEST_CASE(
     REQUIRE(avatar != nullptr);
     REQUIRE(host->scene_subscribes(arena, peer));
 
-    const CallLog seen;
-    host->set_scene_viewer_edge(seen.callable("edge"));
+    const Ref<netw::NetwScene> left = host->scene_handle_of(arena);
+    const Ref<netw::NetwScene> passed = host->scene_handle_of(annex);
+    REQUIRE(left.is_valid());
+    REQUIRE(passed.is_valid());
+    const Recorder exits(
+        left.ptr(),
+        Vector<StringName>{StringName("viewer_exited")}
+    );
+    const Recorder enters(
+        passed.ptr(),
+        Vector<StringName>{StringName("viewer_entered")}
+    );
 
     avatar->reparent(level_of(rig, annex));
     avatar->reparent(level_of(rig, arena));
     rig.pump(8);
 
-    NETW_CHECK_EQ(edges_for(seen, arena, false), 0);
-    NETW_CHECK_EQ(edges_for(seen, annex, true), 0);
+    NETW_CHECK_EQ(exits.count(StringName("viewer_exited")), 0);
+    NETW_CHECK_EQ(enters.count(StringName("viewer_entered")), 0);
     CHECK(host->scene_subscribes(arena, peer));
     CHECK_FALSE(host->scene_subscribes(annex, peer));
     NETW_CHECK_EQ(Internals::membership_book(host).entities_in(peer, arena), 1);
+
+    avatar->reparent(level_of(rig, annex));
+    rig.pump(8);
+
+    NETW_CHECK_EQ(exits.count(StringName("viewer_exited")), 1);
+    NETW_CHECK_EQ(enters.count(StringName("viewer_entered")), 1);
 }
 
 TEST_CASE(

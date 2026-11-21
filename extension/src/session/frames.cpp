@@ -1,6 +1,7 @@
 #include "netw/session/frames.hpp"
 
 #include "netw/api/join_request.hpp"
+#include "netw/wire/spec_dump.hpp"
 
 using namespace godot;
 
@@ -12,7 +13,20 @@ constexpr int ROSTER_COUNT_BYTES = 2;
 constexpr int64_t RESYNC_HEAD_BYTES = 16;
 constexpr int64_t RESYNC_LEASE_BYTES = 7;
 
+bool player_id_fits(uint64_t p_id) {
+    return p_id >= 1 && p_id <= PLAYER_ID_MAX;
+}
+
 } // namespace
+
+bool accept_read(const PackedByteArray &p_bytes, AcceptFrame &r_row) {
+    AcceptFrame row;
+    if (!frame_read(p_bytes, row) || !player_id_fits(row.player_id)) {
+        return false;
+    }
+    r_row = row;
+    return true;
+}
 
 AcceptFrame accept_seen_by(AcceptFrame p_row, int64_t p_destination) {
     if (p_destination != p_row.peer_id) {
@@ -54,7 +68,8 @@ bool roster_read(
     staged.reserve(uint32_t(count));
     for (uint64_t at = 0; at < count; ++at) {
         AcceptFrame row;
-        if (!AcceptFrame::wire.run(stream, row)) {
+        if (!AcceptFrame::wire.run(stream, row)
+            || !player_id_fits(row.player_id)) {
             return false;
         }
         staged.push_back(row);
@@ -210,7 +225,8 @@ bool viewers_read(
     staged.reserve(uint32_t(head.count));
     for (uint64_t at = 0; at < head.count; ++at) {
         SceneViewerRow row;
-        if (!SceneViewerRow::wire.run(stream, row)) {
+        if (!SceneViewerRow::wire.run(stream, row)
+            || !player_id_fits(row.player_id)) {
             return false;
         }
         staged.push_back(row.player_id);
@@ -225,27 +241,27 @@ bool viewers_read(
 
 Dictionary frame_spec_records() {
     Dictionary out;
-    out["ClockRate"] = ClockRate::wire.spec_dump();
-    out["ClockPing"] = ClockPing::wire.spec_dump();
-    out["ClockPong"] = ClockPong::wire.spec_dump();
-    out["ActionRequest"] = ActionRequest::wire.spec_dump();
-    out["SessionReason"] = SessionReason::wire.spec_dump();
-    out["KickRequest"] = KickRequest::wire.spec_dump();
-    out["SessionLeave"] = SessionLeave::wire.spec_dump();
-    out["PlayerLeft"] = PlayerLeft::wire.spec_dump();
-    out["SpawnFailed"] = SpawnFailed::wire.spec_dump();
-    out["SceneReleased"] = SceneReleased::wire.spec_dump();
-    out["SceneViewersHead"] = SceneViewersHead::wire.spec_dump();
-    out["SceneViewerRow"] = SceneViewerRow::wire.spec_dump();
-    out["AcceptFrame"] = AcceptFrame::wire.spec_dump();
-    out["JoinFrame"] = JoinFrame::wire.spec_dump();
-    out["ControlRequest"] = ControlRequest::wire.spec_dump();
-    out["ControlApply"] = ControlApply::wire.spec_dump();
-    out["DenyKey"] = DenyKey::wire.spec_dump();
-    out["ConfirmKey"] = ConfirmKey::wire.spec_dump();
-    out["RouteLease"] = RouteLease::wire.spec_dump();
-    out["ResyncHead"] = ResyncHead::wire.spec_dump();
-    out["ResyncRoute"] = ResyncRoute::wire.spec_dump();
+    out["ClockRate"] = wire::spec_dump(ClockRate::wire);
+    out["ClockPing"] = wire::spec_dump(ClockPing::wire);
+    out["ClockPong"] = wire::spec_dump(ClockPong::wire);
+    out["ActionRequest"] = wire::spec_dump(ActionRequest::wire);
+    out["SessionReason"] = wire::spec_dump(SessionReason::wire);
+    out["KickRequest"] = wire::spec_dump(KickRequest::wire);
+    out["SessionLeave"] = wire::spec_dump(SessionLeave::wire);
+    out["PlayerLeft"] = wire::spec_dump(PlayerLeft::wire);
+    out["SpawnFailed"] = wire::spec_dump(SpawnFailed::wire);
+    out["SceneReleased"] = wire::spec_dump(SceneReleased::wire);
+    out["SceneViewersHead"] = wire::spec_dump(SceneViewersHead::wire);
+    out["SceneViewerRow"] = wire::spec_dump(SceneViewerRow::wire);
+    out["AcceptFrame"] = wire::spec_dump(AcceptFrame::wire);
+    out["JoinFrame"] = wire::spec_dump(JoinFrame::wire);
+    out["ControlRequest"] = wire::spec_dump(ControlRequest::wire);
+    out["ControlApply"] = wire::spec_dump(ControlApply::wire);
+    out["DenyKey"] = wire::spec_dump(DenyKey::wire);
+    out["ConfirmKey"] = wire::spec_dump(ConfirmKey::wire);
+    out["RouteLease"] = wire::spec_dump(RouteLease::wire);
+    out["ResyncHead"] = wire::spec_dump(ResyncHead::wire);
+    out["ResyncRoute"] = wire::spec_dump(ResyncRoute::wire);
     return out;
 }
 

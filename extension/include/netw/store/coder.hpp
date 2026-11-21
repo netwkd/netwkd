@@ -2,37 +2,25 @@
 
 #include <cstdint>
 
-#include "godot/variant.hpp"
 #include "netw/table/schema_record.hpp"
 #include "netw/wire/plan.hpp"
 
-namespace netw {
-class NetwQuantizeScalar;
-class NetwQuantizeQuaternion;
-} // namespace netw
-
 namespace netw::store {
 
-enum class Coder : uint8_t { VARIANT, RAW, SCALAR, TURN };
+enum class Coder : uint8_t { VARIANT, RAW, SCALAR, ANGLE, TURN };
 
 struct ColumnCoder {
     Coder kind = Coder::VARIANT;
     int type = 0;
-    godot::Variant::Type expected = godot::Variant::NIL;
     wire::ColumnPlan slot;
-    const NetwQuantizeScalar *scalar = nullptr;
-    const NetwQuantizeQuaternion *turn = nullptr;
+    int bits = 0;
+    double low = 0.0;
+    double high = 0.0;
 };
 
 ColumnCoder coder_of(
     const netw::table::SchemaColumn &p_column,
     const wire::ColumnPlan &p_slot
-);
-
-bool typed_from_variant(
-    const ColumnCoder &p_coder,
-    const godot::Variant &p_value,
-    uint8_t *r_value
 );
 
 bool code_value(

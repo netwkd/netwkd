@@ -7,7 +7,7 @@
 #include "netw/tick_ring.hpp"
 
 namespace netw::store {
-class World;
+class Store;
 class Table;
 } // namespace netw::store
 
@@ -33,7 +33,7 @@ private:
     };
 
     TickRing ring;
-    const store::World *world = nullptr;
+    const store::Store *world = nullptr;
     uint64_t owner = 0;
     uint32_t lane = 0;
     uint32_t column = 0;
@@ -160,7 +160,7 @@ public:
     }
 
     void follow(
-        const store::World *p_world,
+        const store::Store *p_world,
         uint64_t p_owner,
         uint32_t p_lane,
         uint32_t p_column

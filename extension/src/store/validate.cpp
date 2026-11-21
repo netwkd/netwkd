@@ -1,9 +1,8 @@
+#include "netw/sealed.hpp"
+
 #include "netw/store/validate.hpp"
 
 #include <atomic>
-
-#include "godot/os.hpp"
-#include "netw/log.hpp"
 
 using namespace godot;
 
@@ -15,10 +14,8 @@ std::atomic<int64_t> interval{0};
 
 } // namespace
 
-void configure() {
-    const String held
-        = OS::get_singleton()->get_environment("NETW_STORE_VALIDATE");
-    const int64_t every = held.is_valid_int() ? held.to_int() : 0;
+void configure(const String &p_setting) {
+    const int64_t every = p_setting.is_valid_int() ? p_setting.to_int() : 0;
     interval.store(every > 0 ? every : 0, std::memory_order_relaxed);
 }
 

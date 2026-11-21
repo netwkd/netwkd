@@ -86,7 +86,7 @@ TypedArray<NetwPlayer> NetwScene::get_viewers() const {
     if (session == nullptr) {
         return out;
     }
-    const PackedInt64Array ids = session->scene_get_viewers(scene);
+    const PackedInt32Array ids = session->scene_get_viewers(scene);
     for (int at = 0; at < ids.size(); ++at) {
         out.push_back(session->player_view(ids[at]));
     }

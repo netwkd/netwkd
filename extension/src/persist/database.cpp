@@ -3,7 +3,7 @@
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/persist/envelope.hpp"
-#include "netw/schema_core.hpp"
+#include "netw/schema_book.hpp"
 
 using namespace godot;
 
@@ -36,7 +36,7 @@ Databases::~Databases() {
 }
 
 void Databases::bind(
-    SchemaCore *p_schemas,
+    SchemaBook *p_schemas,
     const Callable &p_settled,
     const Callable &p_connected
 ) {
@@ -958,7 +958,7 @@ Ref<NetwPromise> Databases::patch(
                 )
             );
         }
-        const Error checked = SchemaCore::validate_value(
+        const Error checked = SchemaBook::validate_value(
             schema->at(column)->type,
             schema->at(column)->stride,
             p_values[fields[at]]

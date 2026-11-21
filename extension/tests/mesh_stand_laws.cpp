@@ -242,6 +242,14 @@ TEST_CASE(
     mesh.session_of(9)->session_receive_accept(frame, 7);
     NETW_CHECK_EQ(int(mesh.session_of(9)->player_of(11).is_valid()), 0);
 
+    AcceptFrame oversized = forged;
+    oversized.player_id = uint64_t(1) << 31;
+    mesh.session_of(9)->session_receive_accept(
+        netw::session::frame_write(oversized),
+        1
+    );
+    NETW_CHECK_EQ(int(mesh.session_of(9)->player_of(11).is_valid()), 0);
+
     mesh.session_of(9)->session_receive_accept(frame, 1);
     NETW_CHECK_EQ(int(mesh.session_of(9)->player_of(11).is_valid()), 1);
 }

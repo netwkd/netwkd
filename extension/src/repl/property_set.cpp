@@ -1,7 +1,9 @@
 #include "netw/repl/property_set.hpp"
 
-#include "netw/api/schema_core.hpp"
+#include "godot/class_db.hpp"
+#include "netw/schema_book.hpp"
 #include "netw/script/model.hpp"
+#include "netw/value_variant.hpp"
 
 using namespace godot;
 
@@ -32,7 +34,8 @@ PropertyTypeLists lists_for(const Ref<Script> &p_script) {
 int64_t column_type_in(
     PropertyTypeLists &p_lists,
     Node *p_node,
-    const StringName &p_property
+    const StringName &p_property,
+    int *r_variant_type = nullptr
 ) {
     gd::PropertyResolution resolved
         = gd::listed_property(p_lists.declared, p_property);
@@ -44,8 +47,76 @@ int64_t column_type_in(
         resolved
             = script::model::resolve_property(p_node, p_property, p_lists.live);
     }
-    return resolved.type >= 0 ? SchemaCore::type_from_variant(resolved.type)
+    if (r_variant_type != nullptr) {
+        *r_variant_type = resolved.type;
+    }
+    return resolved.type >= 0 ? SchemaBook::type_from_variant(resolved.type)
                               : SchemaCore::VARIANT;
+}
+
+int hinted_element_type(const String &p_hint) {
+    const int colon = p_hint.find(":");
+    if (colon >= 0) {
+        const String head = p_hint.substr(0, colon).get_slice("/", 0);
+        if (head.is_valid_int()) {
+            return int(head.to_int());
+        }
+    }
+    if (p_hint.is_empty()) {
+        return -1;
+    }
+    if (p_hint == "Variant") {
+        return int(Variant::NIL);
+    }
+    for (int at = Variant::NIL + 1; at < Variant::VARIANT_MAX; ++at) {
+        if (Variant::get_type_name(Variant::Type(at)) == p_hint) {
+            return at;
+        }
+    }
+    return gd::names_a_class(StringName(p_hint)) ? int(Variant::OBJECT)
+                                                 : int(Variant::INT);
+}
+
+uint8_t element_tag_of(int p_type) {
+    if (p_type == int(Variant::NIL)) {
+        return value::TAG_NIL;
+    }
+    if (p_type < 0 || p_type == int(Variant::OBJECT)) {
+        return value::TAG_COUNT;
+    }
+    return uint8_t(value::kind_of_type(p_type));
+}
+
+void stamp_tags_in(
+    PropertyTypeLists &p_lists,
+    int p_variant_type,
+    table::SchemaColumn &r_column
+) {
+    r_column.value_tag = uint8_t(value::kind_of_type(p_variant_type));
+    r_column.element_tags[0] = value::TAG_COUNT;
+    r_column.element_tags[1] = value::TAG_COUNT;
+    const bool dictionary = r_column.value_tag == value::TAG_DICTIONARY;
+    if (r_column.value_tag != value::TAG_ARRAY && !dictionary) {
+        return;
+    }
+    int types[2] = {-1, -1};
+    if (!PropertySet::declared_element_types(
+            p_lists.live_fetched ? p_lists.live : p_lists.declared,
+            r_column.key,
+            dictionary,
+            types
+        )) {
+        return;
+    }
+    const uint8_t first = element_tag_of(types[0]);
+    const uint8_t second = dictionary ? element_tag_of(types[1]) : 0;
+    if (first == value::TAG_COUNT || second == value::TAG_COUNT) {
+        return;
+    }
+    r_column.element_tags[0] = first;
+    if (dictionary) {
+        r_column.element_tags[1] = second;
+    }
 }
 
 } // namespace
@@ -59,7 +130,8 @@ PropertyColumn PropertyColumn::create(
     PropertyColumn made;
     made.shape.key = p_key;
     made.shape.type = int(p_type);
-    made.shape.quantizer = p_quantizer;
+    made.shape.quant = SchemaBook::spec_of(p_quantizer, made.shape.type);
+    made.quantizer = p_quantizer;
     made.watch = p_watch;
     made.lane = p_watch ? PropertySet::RETAINED : PropertySet::VOLATILE;
     return made;
@@ -75,13 +147,13 @@ table::DeltaMode PropertySet::delta_of(const PropertyColumn &p_column) const {
     if (p_column.delta_mode == PropertyColumn::DELTA_FULL) {
         return table::DeltaMode::FULL;
     }
-    const Ref<NetwQuantize> grid = p_column.shape.quantizer;
+    const Ref<NetwQuantize> grid = p_column.quantizer;
     if (record != RECORD_STATE || grid.is_null()
         || grid->get_class() == StringName("NetwQuantizeAngle")) {
         return table::DeltaMode::FULL;
     }
     const Variant::Type element = static_cast<Variant::Type>(
-        SchemaCore::element_type(p_column.shape.type)
+        SchemaBook::element_type(p_column.shape.type)
     );
     return grid->bit_width(element) > 8 ? table::DeltaMode::LADDER
                                         : table::DeltaMode::FULL;
@@ -101,8 +173,8 @@ void PropertySet::project_lanes() {
         }
         codec.append(
             shape.key,
-            shape.quantizer,
-            SchemaCore::element_type(shape.type),
+            column.quantizer,
+            SchemaBook::element_type(shape.type),
             shape.type
         );
     }
@@ -249,17 +321,72 @@ enums::NetwSchema::ColumnType PropertySet::column_type_for(
     );
 }
 
+void PropertySet::stamp_value_tags(
+    const Ref<Script> &p_script,
+    Node *p_node,
+    table::SchemaColumn &r_column
+) {
+    PropertyTypeLists lists = lists_for(p_script);
+    int variant_type = -1;
+    column_type_in(lists, p_node, r_column.key, &variant_type);
+    stamp_tags_in(lists, variant_type, r_column);
+}
+
+bool PropertySet::declared_element_types(
+    const Array &p_infos,
+    const StringName &p_property,
+    bool p_dictionary,
+    int r_types[2]
+) {
+    r_types[0] = -1;
+    r_types[1] = -1;
+    for (int at = 0; at < p_infos.size(); ++at) {
+        const Dictionary info = p_infos[at];
+        if (StringName(info.get("name", StringName())) != p_property) {
+            continue;
+        }
+        const int hint = int(info.get("hint", int(PROPERTY_HINT_NONE)));
+        const String text = info.get("hint_string", String());
+        const bool listed = p_dictionary
+            ? hint == PROPERTY_HINT_DICTIONARY_TYPE
+            : hint == PROPERTY_HINT_ARRAY_TYPE;
+        if (!listed && hint != PROPERTY_HINT_TYPE_STRING) {
+            return false;
+        }
+        if (!p_dictionary) {
+            r_types[0] = hinted_element_type(text);
+            return r_types[0] >= 0;
+        }
+        if (text.get_slice_count(";") != 2) {
+            return false;
+        }
+        r_types[0] = hinted_element_type(text.get_slice(";", 0));
+        r_types[1] = hinted_element_type(text.get_slice(";", 1));
+        return r_types[0] >= 0 && r_types[1] >= 0;
+    }
+    return false;
+}
+
 void PropertySet::stamp_column_types(
     const Ref<Script> &p_script,
     Node *p_node
 ) {
     PropertyTypeLists lists = lists_for(p_script);
     for (PropertyColumn &column : columns) {
-        column.shape.type
-            = int(column_type_in(lists, p_node, column.get_key()));
+        int variant_type = -1;
+        column.shape.type = int(
+            column_type_in(lists, p_node, column.get_key(), &variant_type)
+        );
+        stamp_tags_in(lists, variant_type, column.shape);
+        column.shape.quant
+            = SchemaBook::spec_of(column.quantizer, column.shape.type);
         table::SchemaColumn *declared = schema.at(int(column.schema_column));
         if (declared != nullptr) {
             declared->type = column.shape.type;
+            declared->quant = column.shape.quant;
+            declared->value_tag = column.shape.value_tag;
+            declared->element_tags[0] = column.shape.element_tags[0];
+            declared->element_tags[1] = column.shape.element_tags[1];
         }
         reproject_lanes();
     }

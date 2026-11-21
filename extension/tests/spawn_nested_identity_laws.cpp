@@ -471,7 +471,7 @@ struct UnconnectedPair {
     void pump(int p_ticks) {
         for (int tick = 0; tick < p_ticks; ++tick) {
             for (int at = 0; at < count; ++at) {
-                Internals::clock_engine(apis[at]).force_step(1);
+                Internals::run_ticks(apis[at], 1);
             }
             link->advance_time(1000.0 / 30.0);
             for (int at = 0; at < count; ++at) {

@@ -20,8 +20,6 @@ constexpr const char *SIG_SERVER_DISCONNECTED = "server_disconnected";
 constexpr const char *SIG_CONNECTION_FAILED = "connection_failed";
 constexpr const char *SIG_CONNECTED_TO_SERVER = "connected_to_server";
 
-constexpr double AUTO_CONFIG_SECONDS = 5.0;
-
 bool authoring_in_editor() {
     Engine *engine = Engine::get_singleton();
     return engine != nullptr && engine->is_editor_hint();
@@ -62,7 +60,7 @@ Error NetwMultiplayer::clock_commit(const Ref<NetwClockConfig> &p_from) {
         Signal(this, SIG_CONNECTION_FAILED),
         callable_mp(this, &NetwMultiplayer::clock_drop_synchronization)
     );
-    clock_handshakes_on_enter = true;
+    clock_engine().set_handshakes_on_enter(true);
     connect_once(
         Signal(this, SIG_CONNECTED_TO_SERVER),
         callable_mp(this, &NetwMultiplayer::clock_start_handshake)
@@ -173,16 +171,15 @@ void NetwMultiplayer::clock_start_handshake() {
         return;
     }
     const uint64_t generation = uint64_t(gd::instance_id(peer.ptr()));
-    if (clock_handshake_generation == generation) {
+    if (!clock_engine().handshake_opens(generation)) {
         return;
     }
-    clock_handshake_generation = generation;
     clock_request_handshake();
 }
 
 void NetwMultiplayer::clock_drop_synchronization() {
     clock_set_synchronized(false);
-    clock_auto_config_left = 0.0;
+    clock_engine().auto_config_cancel();
 }
 
 void NetwMultiplayer::clock_auto_configure_offset() {
@@ -201,34 +198,24 @@ void NetwMultiplayer::clock_auto_configure_offset() {
         sys::CLOCK,
         "The clock started measuring its display offset for 5 seconds."
     );
-    clock_auto_config_left = AUTO_CONFIG_SECONDS;
-    clock_auto_config_best = 0;
+    clock_engine().auto_config_start();
 }
 
 void NetwMultiplayer::clock_step_auto_config(double p_delta) {
-    if (clock_auto_config_left <= 0.0) {
+    const int64_t measured = clock_engine().auto_config_step(p_delta);
+    if (measured == Clock::NO_MEASUREMENT) {
         return;
     }
-    const int64_t seen = clock_get_recommended_display_offset();
-    clock_auto_config_best
-        = seen > clock_auto_config_best ? seen : clock_auto_config_best;
-    clock_auto_config_left -= p_delta;
-    if (clock_auto_config_left > 0.0) {
-        return;
-    }
-    clock_auto_config_left = 0.0;
-    clock_set_param(CLOCK_PARAM_DISPLAY_OFFSET, clock_auto_config_best);
     NETW_INFO(
         sys::CLOCK,
         "The clock measured a display offset of %d.",
-        int(clock_auto_config_best)
+        int(measured)
     );
 }
 
 void NetwMultiplayer::clock_release() {
     clock_detach_pump();
-    clock_auto_config_left = 0.0;
-    clock_handshake_generation = 0;
+    clock_engine().release();
     clock_fallback = Ref<NetwClockConfig>();
 }
 

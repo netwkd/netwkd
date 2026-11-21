@@ -161,7 +161,8 @@ void canonicalize_row(
     const FieldCodec &p_codec,
     StateRow &r_row,
     wire::CodeRow &r_scratch,
-    PackedInt64Array &r_codes
+    PackedInt64Array &r_codes,
+    NetwMultiplayer *p_session
 ) {
     if (!r_scratch.valid_for(p_codec.plan)) {
         r_scratch = wire::CodeRow::for_plan(p_codec.plan);
@@ -183,7 +184,8 @@ void canonicalize_row(
                 slot,
                 uint32_t(at),
                 value,
-                r_scratch
+                r_scratch,
+                p_session
             )
             && wire::decode_scalar_column(
                 column,

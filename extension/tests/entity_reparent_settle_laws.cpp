@@ -6,6 +6,8 @@
 #include "godot/scene_tree.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/entity_options.hpp"
+#include "netw/display/book.hpp"
+#include "netw/entity/ids.hpp"
 #include "support/netw_call_log.h"
 
 namespace TestEntityReparentSettleLaws {
@@ -106,6 +108,36 @@ TEST_CASE(
     NETW_CHECK_EQ(stand.seen.count("reparented"), 1);
     const bool landed = stand.body->get_parent() == stand.home;
     CHECK(landed);
+}
+
+TEST_CASE(
+    "[Netw][Entity] a move settles once after the entity handle changes"
+) {
+    Stand stand;
+    NetwMultiplayer::entity_move(stand.body, stand.away);
+    NETW_CHECK_EQ(stand.seen.count("reparented"), 0);
+
+    const RID prior = stand.entity->get_rid_handle();
+    netw::entity::retain(prior);
+    const RID handle = netw::entity::mint();
+    Internals::adopt_handle(stand.entity, handle);
+    stand.rig.server()->entity_settle_captured(handle);
+    const int heard_on_settle = stand.seen.count("reparented");
+    const bool found_by_route
+        = stand.rig.server()->wrapper_for_route(stand.entity->get_route())
+        == stand.entity;
+    const bool displayed
+        = Internals::get_display_book(stand.rig.server())->decl_ptr(handle)
+        != nullptr;
+    Internals::adopt_handle(stand.entity, prior);
+    netw::entity::release(handle);
+    netw::entity::release(prior);
+
+    stand.settle();
+    NETW_CHECK_EQ(heard_on_settle, 1);
+    CHECK(found_by_route);
+    CHECK(displayed);
+    NETW_CHECK_EQ(stand.seen.count("reparented"), 1);
 }
 
 TEST_CASE(

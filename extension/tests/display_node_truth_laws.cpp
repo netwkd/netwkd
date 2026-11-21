@@ -76,7 +76,7 @@ public:
         return netw_test::flow_core(rig.server());
     }
 
-    netw::ClockEngine &clock() const {
+    netw::Clock &clock() const {
         return rig.clock_of(rig.server());
     }
 
@@ -109,7 +109,7 @@ public:
     }
 
     void display_at(int64_t p_tick, int p_offset, double p_factor) const {
-        netw::ClockEngine &handle = clock();
+        netw::Clock &handle = clock();
         handle.set_tick(int(p_tick));
         handle.set_display_offset(p_offset);
         handle.set_tick_factor_override(p_factor);
@@ -122,6 +122,7 @@ public:
             NetwNativeTests::display_runtime_of(core(), p_entity),
             netw::display::capture_timing(
                 &Internals::clock_engine(core()),
+                core()->clock_reading(),
                 p_delta
             )
         );
@@ -260,16 +261,18 @@ TEST_CASE(
     subject.entity->get_display()->set_display_role(
         NetwMultiplayer::DISPLAY_ROLE_REMOTE
     );
-    CHECK(
-        bool(runtime->track_stat(track->get_name(), StringName("offset_armed")))
-    );
+    CHECK(bool(runtime->track_stat(
+        track->get_name(),
+        netw::display::TRACK_OFFSET_ARMED
+    )));
     bench.display_at(2, 0, 0.0);
-    CHECK(!bool(
-        runtime->track_stat(track->get_name(), StringName("offset_armed"))
+    CHECK(!bool(runtime->track_stat(
+        track->get_name(),
+        netw::display::TRACK_OFFSET_ARMED
+    )));
+    CHECK(bool(
+        runtime->track_stat(track->get_name(), netw::display::TRACK_OFFSET_HELD)
     ));
-    CHECK(
-        bool(runtime->track_stat(track->get_name(), StringName("offset_held")))
-    );
     NETW_CHECK_LT(subject.visual->get_global_position().distance_to(p0()), 0.1);
 
     bench.render_many(subject.rid(), 90);

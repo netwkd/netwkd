@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/txn_book.hpp"
 
 using namespace godot;

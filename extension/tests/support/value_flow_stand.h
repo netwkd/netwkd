@@ -193,7 +193,7 @@ inline godot::Ref<netw::NetwLinkConditions> impairment(
 }
 
 struct FlowCapture {
-    netw::ClockEngine *receiver = nullptr;
+    netw::Clock *receiver = nullptr;
     bool measuring = true;
     int64_t applied = 0;
     int64_t first_tick = -1;
@@ -234,7 +234,11 @@ struct FlowCapture {
         godot::Vector2 held;
         for (int column = 0; column < p_table.schema.column_count(); ++column) {
             if (p_table.schema.at(column)->key == p_field) {
-                held = p_table.read_value(p_row, uint32_t(column));
+                held = netw::store::read_value(
+                    p_table,
+                    p_row,
+                    uint32_t(column)
+                );
             }
         }
         if (!held.is_equal_approx(authored_value(tick))) {

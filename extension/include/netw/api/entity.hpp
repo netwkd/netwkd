@@ -24,7 +24,15 @@ namespace netw_test {
 struct Internals;
 } // namespace netw_test
 
+namespace netw::session {
+struct Announcement;
+} // namespace netw::session
+
 namespace netw {
+
+namespace spawn {
+class Record;
+} // namespace spawn
 
 class NetwDisplay;
 class NetwInterest;
@@ -80,6 +88,7 @@ public:
 
 private:
     friend class NetwMultiplayer;
+    friend class spawn::Record;
 #if defined(NETW_TESTS)
     friend struct netw_test::Internals;
 #endif
@@ -98,9 +107,19 @@ private:
     bool owner_exiting_tree = false;
     bool despawning_watched = false;
     godot::RID scene_subject;
+    struct MintedPart {
+        int64_t part = 0;
+        godot::Variant value;
+    };
+    godot::LocalVector<MintedPart> parts;
+    godot::Ref<NetwDespawnOpts> despawning_opts;
+    godot::LocalVector<godot::ObjectID> comp_registered;
 
-    NetwEntityRecord *get_record() const;
+    NetwEntityRecord *vacate();
+    bool readmit();
     void readmitted_ready();
+    void tree_entered();
+    void tree_exiting();
     int64_t action_spawn_tick = -1;
     int64_t action_requester = 0;
     godot::Callable control_handler;
@@ -109,9 +128,61 @@ private:
     entity::Control *control() const;
     NetwMultiplayer *session_core() const;
     void unwrite_player();
+    void write_controller(int64_t p_peer);
+    void emit_control_change(int64_t p_was, int64_t p_peer);
+    void apply_control(bool p_announce = true);
+    void project_control(bool p_announce);
+    void adopt_controller(int64_t p_peer);
+    void seed_control(uint64_t p_revision, uint64_t p_tenure, int64_t p_hold);
+    void seed_controller(int64_t p_controller);
+    void refresh_control();
+    bool control_deciding_locally() const;
+    bool control_immediate_unavailable();
+    godot::Error control_local_refusal(int64_t p_local, int64_t p_hold);
+    int64_t control_admit_request(
+        int64_t p_requester,
+        int64_t p_hold,
+        godot::Error &r_code,
+        godot::String &r_reason
+    );
+    godot::Ref<NetwPromise> check_control_release(
+        int64_t p_successor,
+        int64_t p_local
+    ) const;
+    godot::Ref<NetwPromise> control_release_missing_copy(
+        int64_t p_successor
+    ) const;
+    void abandon_control_claims();
+    godot::Error give_control_here(int64_t p_peer);
+    void note_control_host_gift(int64_t p_peer, int64_t p_steering);
+    godot::Error transfer_control_to(int64_t p_peer);
+    godot::Error set_control_param(
+        int64_t p_param,
+        const godot::Variant &p_value
+    );
+    void decide_control_here(
+        int64_t p_peer,
+        int64_t p_hold,
+        int64_t p_issuer,
+        uint64_t p_op,
+        const godot::PackedByteArray &p_final_state = godot::PackedByteArray(),
+        bool p_sends_owner = false
+    );
+    void project_control_descendant(godot::Node *p_node);
     int64_t local_peer() const;
     void transition(int64_t p_stage);
     repl::PropertyBindingPtr derived_binding(int64_t p_record) const;
+    void emit_announcement(const session::Announcement &p_row);
+    bool publish_record_stage(NetwEntityRecord &p_record, int64_t p_from);
+    bool begin_despawn(
+        NetwEntityRecord &p_record,
+        const godot::Ref<NetwDespawnOpts> &p_opts
+    );
+    bool finish_teardown(NetwEntityRecord &p_record);
+    bool complete_departure(NetwEntityRecord &p_record);
+    void despawn_admitted(const godot::Ref<NetwDespawnOpts> &p_opts);
+    void despawn_here(const godot::Ref<NetwDespawnOpts> &p_opts);
+    void linger_then_free(const godot::Ref<NetwDespawnOpts> &p_opts);
 
 protected:
     static void _bind_methods();
@@ -125,6 +196,44 @@ public:
     static godot::Ref<NetwEntity> resolve(godot::Node *p_node);
     static godot::Ref<NetwEntity> declare(godot::Node *p_node);
     static void settle_parts(godot::Node *p_root, bool p_spawned);
+    static godot::Ref<NetwEntity> stamp_header(
+        godot::Node *p_node,
+        const godot::Dictionary &p_header,
+        NetwMultiplayer *p_session
+    );
+
+    static void set_part_factory(
+        int64_t p_part,
+        const godot::Callable &p_factory
+    );
+    static void clear_part_factories();
+
+    NetwEntityRecord *get_record() const;
+    NetwEntityRecord *record_in(const NetwMultiplayer *p_session) const;
+    NetwMultiplayer *home_session() const {
+        return home;
+    }
+    godot::RID attach(NetwMultiplayer *p_session);
+    bool rekey(NetwMultiplayer *p_session, const godot::RID &p_entity);
+    void detach(NetwMultiplayer *p_session);
+    void adopt_root(godot::Node *p_root);
+    void book_root(godot::Node *p_root, NetwMultiplayer *p_session);
+    void release_root(godot::Node *p_root);
+    godot::RID adopt_in(NetwMultiplayer *p_session);
+    bool bind_route(
+        NetwMultiplayer *p_session,
+        const godot::RID &p_entity,
+        int64_t p_route,
+        godot::Node *p_owner
+    );
+    void announce_reparented(NetwMultiplayer *p_session);
+
+    godot::Variant part(int64_t p_part);
+    godot::Variant minted_part(int64_t p_part) const;
+    void keep_part(int64_t p_part, const godot::Variant &p_value);
+    int64_t held_part_bytes() const {
+        return held::vector(parts) + held::vector(comp_registered);
+    }
 
     godot::Node *get_owner() const;
     void set_owner(godot::Node *p_owner);
@@ -224,7 +333,9 @@ public:
     bool get_is_player() const;
 
     Stage get_stage() const;
-    godot::Ref<NetwDespawnOpts> get_active_despawn_opts() const;
+    godot::Ref<NetwDespawnOpts> get_active_despawn_opts() const {
+        return despawning_opts;
+    }
 
     bool publish_stage(int64_t p_from, int64_t p_to);
 
@@ -239,6 +350,16 @@ public:
     ) const;
     int64_t comp_of(godot::Node *p_node) const;
     godot::String comp_path_of(godot::Node *p_node) const;
+    static int64_t comp_in(
+        const NetwEntityRecord &p_record,
+        godot::Node *p_owner,
+        godot::Node *p_node
+    );
+    static godot::String comp_path_in(
+        const NetwEntityRecord &p_record,
+        godot::Node *p_owner,
+        godot::Node *p_node
+    );
     godot::Node *comp_node_of(int64_t p_comp) const;
     bool has_comp_path(const godot::NodePath &p_path) const;
     bool get_comps_poisoned() const;

@@ -4,6 +4,7 @@
 
 #include "godot/engine.hpp"
 #include "netw/api/entity.hpp"
+#include "netw/api/entity_record.hpp"
 #include "netw/api/predict_slot_engine.hpp"
 #include "netw/colors.hpp"
 #include "netw/profile.hpp"
@@ -38,7 +39,12 @@ void NetwMultiplayer::diag_poll() {
     if (prediction_rings != nullptr) {
         NETW_ZONE_NC("Prediction rings sample", colors::PREDICTION);
         diag_gather(prediction_rings->sources);
-        prediction_rings->sample(books, *this);
+        prediction_rings->sample(
+            world.clock,
+            store(),
+            &prediction_engine,
+            *this
+        );
         NETW_ZONE_VALUE(prediction_rings->rows().size());
         diag::draw_ring_rows(prediction_rings->rows(), diag_drawing);
     }
@@ -46,7 +52,12 @@ void NetwMultiplayer::diag_poll() {
         {
             NETW_ZONE_NC("Interpolation view sample", colors::INTERP);
             diag_gather(interpolation_view->sources);
-            interpolation_view->sample(books);
+            interpolation_view->sample(
+                world.clock,
+                clock_reading(),
+                store(),
+                &prediction_engine
+            );
             NETW_ZONE_VALUE(interpolation_view->rows().size());
         }
         NETW_ZONE_NC("Interpolation view draw", colors::INTERP);
@@ -67,10 +78,7 @@ void NetwMultiplayer::diag_gather(
     LocalVector<diag::InterpSource> &r_sources
 ) const {
     r_sources.clear();
-    if (display_book.is_null()) {
-        return;
-    }
-    const LocalVector<display::Runtime *> &live = display_book->live_runtimes();
+    const LocalVector<display::Runtime *> &live = display_book.live_runtimes();
     r_sources.reserve(live.size());
     for (display::Runtime *runtime : live) {
         Node *owner = runtime != nullptr ? runtime->owner() : nullptr;
@@ -81,6 +89,11 @@ void NetwMultiplayer::diag_gather(
         source.route = runtime->get_route();
         source.runtime = runtime;
         source.owner = owner;
+        const Ref<NetwEntity> view = slot_pinned_entity(runtime->entity_rid());
+        if (view.is_valid()) {
+            source.record = view->get_record();
+            source.controlled_here = view->get_is_controlled_locally();
+        }
         r_sources.push_back(source);
     }
 }
@@ -93,15 +106,20 @@ void NetwMultiplayer::diag_gather(
     for (const KeyValue<int64_t, NetwPredictSlotEngine *> &row :
          predict_engines) {
         NetwPredictSlotEngine *engine = row.value;
-        NetwEntity *entity = engine != nullptr ? engine->entity.ptr() : nullptr;
-        Node *owner = entity != nullptr ? entity->get_owner() : nullptr;
+        Node *owner = engine != nullptr ? engine->seated_node() : nullptr;
         const int64_t slot = engine != nullptr ? engine->native_slot() : -1;
         if (owner == nullptr || slot < 0) {
             continue;
         }
+        const NetwEntityRecord *record = engine->held_record();
+        const RID entity = record->get_handle();
+        const display::Decl *authored = record->find_display_declaration();
         diag::RingSource source;
         source.key = row.key;
-        source.entity = entity;
+        source.visual_root = entity_get_view(entity).is_valid()
+            ? display_book.decl_of(entity).visual_root
+            : authored != nullptr ? authored->visual_root
+                                  : NodePath();
         source.slot = slot;
         source.owner = owner;
         r_sources.push_back(source);

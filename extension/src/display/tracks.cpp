@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/display/tracks.hpp"
 
 using namespace godot;

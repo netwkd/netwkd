@@ -34,10 +34,10 @@ private:
 
     godot::HashMap<int64_t, Row> rows;
     godot::HashMap<int64_t, Reparent> reparents;
-    godot::Ref<NetwLivenessCore> liveness;
+    NetwLivenessCore *liveness = nullptr;
 
 public:
-    void hold_routes_in(const godot::Ref<NetwLivenessCore> &p_liveness);
+    void hold_routes_in(NetwLivenessCore *p_liveness);
 
     bool park(
         int64_t route,

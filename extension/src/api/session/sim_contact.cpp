@@ -55,35 +55,36 @@ int64_t NetwMultiplayer::sim_local_peer() {
     return int64_t(NETW_API_VIRTUAL(get_unique_id)());
 }
 
-sim::Steering NetwMultiplayer::sim_steering_of(const NetwEntity &p_entity) {
+sim::Steering NetwMultiplayer::sim_steering_of(
+    const entity::Control &p_control
+) {
     sim::Steering steering;
-    steering.controller = p_entity.steering();
-    steering.hold = int64_t(p_entity.get_hold());
-    steering.pending = p_entity.get_is_control_pending();
-    steering.claiming = p_entity.is_claim_pending();
-    steering.immediate
-        = p_entity.get_transfer() == NetwEntity::TRANSFER_IMMEDIATE;
+    steering.controller = p_control.resolve();
+    steering.hold = p_control.hold;
+    steering.pending = p_control.has_pending();
+    steering.claiming = p_control.claims_pending();
+    steering.immediate = p_control.get_transfer()
+        == int64_t(entity::Control::Transfer::IMMEDIATE);
     return steering;
 }
 
-void NetwMultiplayer::sim_follow_steering(const NetwEntity *p_entity) {
-    if (p_entity == nullptr) {
-        return;
-    }
-    sim::Row *row = sim_rows.peek(p_entity->get_rid_handle());
-    if (row != nullptr) {
-        row->steering = sim_steering_of(*p_entity);
+void NetwMultiplayer::sim_follow_steering(const RID &p_entity) {
+    sim::Row *row = sim_rows.peek(p_entity);
+    const NetwEntityRecord *record = entity_record(p_entity);
+    if (row != nullptr && record != nullptr) {
+        row->steering = sim_steering_of(*record->get_control());
     }
 }
 
-void NetwMultiplayer::sim_follow_view(const RID &p_entity, NetwEntity *p_view) {
+void NetwMultiplayer::sim_follow_view(const RID &p_entity, bool p_viewed) {
     sim::Row *row = sim_rows.peek(p_entity);
     if (row == nullptr) {
         return;
     }
-    row->view = p_view;
-    if (p_view != nullptr) {
-        row->steering = sim_steering_of(*p_view);
+    row->viewed = p_viewed;
+    const NetwEntityRecord *record = entity_record(p_entity);
+    if (p_viewed && record != nullptr) {
+        row->steering = sim_steering_of(*record->get_control());
     }
 }
 
@@ -111,10 +112,10 @@ void NetwMultiplayer::sim_contact_arm(sim::Row &r_row) {
             this,
             NETW_FAULT_CONFLICTING_SETTINGS,
             {String("claim_on_contact or release_on_rest"),
-             String(r_row.view->get_name()),
+             String(entity_record(r_row.entity)->get_entity_id()),
              String("a NetwEntity.transfer other than TRANSFER_IMMEDIATE, or "
                     "an entity with prediction or state properties")},
-            uint64_t(gd::instance_id(r_row.view->get_owner()))
+            uint64_t(gd::instance_id(wrapper_owner(r_row.entity)))
         );
     }
     if (r_row.contact.eligible && r_row.declaration.claim_on_contact
@@ -185,7 +186,7 @@ void NetwMultiplayer::sim_rest_pass(
             rest = sim::Rest();
         } else if (!asleep && !steering.claiming) {
             rest = sim::Rest();
-            r_row.view->claim_control(entity::Control::HOLD_SOFT)
+            control_claim(r_row.entity, entity::Control::HOLD_SOFT, 0)
                 ->mark_failure_observed();
         }
         return;
@@ -202,14 +203,14 @@ void NetwMultiplayer::sim_rest_pass(
     }
     rest.asleep_since = -1;
     rest.releasing = true;
-    r_row.view->release_control(entity::Control::SERVER)
+    control_release(r_row.entity, entity::Control::SERVER)
         ->mark_failure_observed();
 }
 
 void NetwMultiplayer::sim_settle_walk(int64_t p_local_peer, int64_t p_tick) {
     for (uint32_t at = 0; at < sim_walk.size(); ++at) {
         sim::Row *row = sim_rows.at(sim_walk[at]);
-        if (row == nullptr || row->view == nullptr) {
+        if (row == nullptr || !row->viewed) {
             continue;
         }
         sim::settle_onsets(row->contact, p_tick);
@@ -231,7 +232,7 @@ void NetwMultiplayer::sim_settle_walk(int64_t p_local_peer, int64_t p_tick) {
     for (uint32_t at = 0; at < sim_noted.size(); ++at) {
         sim::Row *row = sim_rows.at(sim_noted[at]);
         if (row == nullptr || row->contact_tick == p_tick
-            || row->view == nullptr) {
+            || !row->viewed) {
             continue;
         }
         if (row->mode == sim::Mode::ACTIVE) {
@@ -247,7 +248,7 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
         NETW_ZONE_NC("Contact wake", colors::PREDICTION);
         sim_rouse_drowsy();
         sim_rows.settle();
-        const int64_t every = store_world.validate_every;
+        const int64_t every = store().validate_every;
         if (every > 0 && p_tick >= 0 && p_tick % every == 0) {
             sim_contact_validate(p_tick);
         }
@@ -265,7 +266,7 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
         sim_sources.clear();
         for (uint32_t at = 0; at < sim_walk.size(); ++at) {
             sim::Row *row = sim_rows.at(sim_walk[at]);
-            if (row->view == nullptr) {
+            if (!row->viewed) {
                 sim_rows.find(row->entity);
                 continue;
             }
@@ -279,7 +280,7 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
         NETW_ZONE_NC("Contact notes", colors::PREDICTION);
         for (uint32_t at = 0; at < sim_walk.size(); ++at) {
             sim::Row *row = sim_rows.at(sim_walk[at]);
-            if (row == nullptr || row->view == nullptr) {
+            if (row == nullptr || !row->viewed) {
                 continue;
             }
 #if defined(NETW_TESTS)
@@ -290,11 +291,7 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
                 colors::PREDICTION,
                 profile::SUBSYSTEM_ENTITY,
                 "entity %lld",
-                liveness_core.is_valid()
-                    ? static_cast<long long>(
-                          liveness_core->route_of(row->entity)
-                      )
-                    : 0LL
+                static_cast<long long>(liveness_core.route_of(row->entity))
             );
             sim_contact_arm(*row);
             sim_note_contacts(*row, p_tick);
@@ -310,7 +307,7 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
         for (uint32_t at = 0; at < sim_sources.size(); ++at) {
             const RID source = sim_sources[at];
             sim::Row *row = sim_rows.peek(source);
-            if (row == nullptr || row->view == nullptr) {
+            if (row == nullptr || !row->viewed) {
                 continue;
             }
             if (sim::asleep(row->bodies)) {
@@ -327,7 +324,7 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
             for (uint32_t which = 0; which < sim_colliders.size(); ++which) {
                 const RID target = sim_contact_owner(sim_colliders[which]);
                 const sim::Row *other = sim_rows.row_of(target);
-                if (other == nullptr || other->view == nullptr
+                if (other == nullptr || !other->viewed
                     || target == source || !other->contact.eligible
                     || !other->declaration.claim_on_contact
                     || (!sim_onsets[which] && !sim::moving(other->bodies))
@@ -335,10 +332,9 @@ void NetwMultiplayer::sim_contact_pass(int64_t p_tick) {
                     || other->steering.pending) {
                     continue;
                 }
-                const Ref<NetwEntity> touched(other->view);
                 control_claim_by_contact(
-                    touched.ptr(),
-                    Ref<NetwEntity>(row->view)
+                    id::Entity(target),
+                    id::Entity(source)
                 )
                     ->mark_failure_observed();
                 if (sim::steered_locally(other->steering, local)
@@ -360,9 +356,7 @@ void NetwMultiplayer::sim_contact_fault(
     int64_t p_tick
 ) {
     store::Miss missed;
-    missed.route = liveness_core.is_valid()
-        ? int64_t(liveness_core->route_of(p_row.entity))
-        : 0;
+    missed.route = int64_t(liveness_core.route_of(p_row.entity));
     missed.slot = p_row.index;
     missed.tick = p_tick;
     missed.column = StringName(p_bit);
@@ -389,12 +383,13 @@ void NetwMultiplayer::sim_contact_validate(int64_t p_tick) {
         if (sim_rows.is_joiner(at) != sim::joins(*row)) {
             sim_contact_fault(*row, "joiners", p_tick);
         }
-        const Ref<NetwEntity> view = entity_get_view(row->entity);
-        if (row->view != view.ptr()) {
+        const bool viewed = entity_get_view(row->entity).is_valid();
+        const NetwEntityRecord *record = entity_record(row->entity);
+        if (row->viewed != viewed) {
             sim_contact_fault(*row, "view", p_tick);
         }
-        if (view.is_valid()
-            && !(row->steering == sim_steering_of(*view.ptr()))) {
+        if (viewed
+            && !(row->steering == sim_steering_of(*record->get_control()))) {
             sim_contact_fault(*row, "steering", p_tick);
         }
         for (const sim::AuthoredBody &held : row->bodies.held) {
@@ -403,10 +398,11 @@ void NetwMultiplayer::sim_contact_validate(int64_t p_tick) {
                 sim_contact_fault(*row, "owner", p_tick);
             }
         }
-        if (!bodied || sim_rows.is_due(at) || view.is_null()) {
+        if (!bodied || sim_rows.is_due(at) || !viewed) {
             continue;
         }
-        const sim::Steering steering = sim_steering_of(*view.ptr());
+        const entity::Control &control = *record->get_control();
+        const sim::Steering steering = sim_steering_of(control);
         if (sim_contact_eligible(*row, steering) != row->contact.eligible) {
             sim_contact_fault(*row, "eligible", p_tick);
         }
@@ -425,10 +421,10 @@ void NetwMultiplayer::sim_contact_validate(int64_t p_tick) {
                 = found >= 0 ? sim_waking_since[uint32_t(found)] : p_tick;
             bool swept = false;
             for (const sim::AuthoredBody &held : row->bodies.held) {
-                swept = swept || store_world.dozing.has(uint64_t(held.node));
+                swept = swept || store().dozing.has(uint64_t(held.node));
             }
             const int64_t lag
-                = swept ? int64_t(store::World::SWEEP_TICKS) + 1 : 0;
+                = swept ? int64_t(store::Store::SWEEP_TICKS) + 1 : 0;
             if (found >= 0 && p_tick - since > lag) {
                 sim_contact_fault(*row, "awake", p_tick);
             }
@@ -441,7 +437,7 @@ void NetwMultiplayer::sim_contact_validate(int64_t p_tick) {
         const sim::Rest &rest = row->contact.rest;
         const bool rests = row->contact.eligible
             && row->declaration.release_on_rest > 0.0
-            && view->is_controller_here();
+            && control.controlled_by(sim_local_peer());
         if (rests || rest.releasing || rest.asleep_since >= 0) {
             sim_contact_fault(*row, "resting", p_tick);
         }
@@ -464,8 +460,8 @@ void NetwMultiplayer::sim_on_body_sleep(const RID &p_entity) {
         return;
     }
     sim_follow_sleep(*row);
-    if (!sim::asleep(row->bodies) && liveness_core.is_valid()) {
-        store_work_route(int64_t(liveness_core->route_of(p_entity)));
+    if (!sim::asleep(row->bodies)) {
+        store_work_route(int64_t(liveness_core.route_of(p_entity)));
     }
 }
 
@@ -479,13 +475,13 @@ void NetwMultiplayer::sim_follow_sleep(const sim::Row &p_row) {
     for (const sim::AuthoredBody &held : p_row.bodies.held) {
         const uint64_t body = uint64_t(held.node);
         if (!watched || awake) {
-            store_world.dozing.erase(body);
+            store().dozing.erase(body);
             sim_drowsy.erase(body);
-        } else if (store_world.probes(body)) {
-            store_world.dozing.insert(body);
+        } else if (store_pull.probes(body)) {
+            store().dozing.insert(body);
             sim_drowsy.erase(body);
         } else {
-            store_world.dozing.erase(body);
+            store().dozing.erase(body);
             sim_drowsy.insert(body, p_row.entity);
         }
     }
@@ -544,9 +540,9 @@ void NetwMultiplayer::sim_watch_sleep(sim::Row &r_row, bool p_watch) {
             body->disconnect(sleeping_changed_name(), r_row.sleep_hook);
         }
         if (p_watch) {
-            store_world.watched.insert(uint64_t(held.node));
+            store().watched.insert(uint64_t(held.node));
         } else {
-            store_world.watched.erase(uint64_t(held.node));
+            store().watched.erase(uint64_t(held.node));
         }
     }
     if (!p_watch) {

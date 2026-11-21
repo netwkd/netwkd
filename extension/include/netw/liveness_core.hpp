@@ -4,8 +4,8 @@
 
 #include "godot/callable.hpp"
 #include "godot/local_vector.hpp"
-#include "godot/ref_counted.hpp"
 #include "godot/rid.hpp"
+#include "godot/templates.hpp"
 #include "godot/variant.hpp"
 #include "netw/slot_rows.hpp"
 
@@ -13,7 +13,7 @@ namespace netw {
 
 struct PeerRename;
 
-class NetwLivenessCore : public godot::RefCounted {
+class NetwLivenessCore {
 public:
     enum State {
         STATE_UNKNOWN = 0,
@@ -71,6 +71,8 @@ private:
 
 public:
     NetwLivenessCore();
+    NetwLivenessCore(const NetwLivenessCore &) = delete;
+    NetwLivenessCore &operator=(const NetwLivenessCore &) = delete;
     ~NetwLivenessCore();
 
     godot::RID entity_create();
@@ -100,6 +102,7 @@ public:
 
     bool bind_route(const godot::RID &entity, int route);
     bool unbind_route(const godot::RID &entity);
+    bool rekey(const godot::RID &from, const godot::RID &to);
     int route_of(const godot::RID &entity) const;
     godot::RID rid_from_route(int route) const;
 

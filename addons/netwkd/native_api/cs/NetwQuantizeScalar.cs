@@ -14,7 +14,8 @@ namespace Netwkd;
 /// <see cref="NetwQuantizeScalar.MaxLimit"/> are rounded to
 /// <see cref="NetwQuantizeScalar.ResolutionStep"/>. Set the precision with
 /// <see cref="NetwQuantizeScalar.Bits"/> or with
-/// <see cref="NetwQuantizeScalar.Step"/>.
+/// <see cref="NetwQuantizeScalar.Step"/>. A property reads these settings when
+/// it is declared, so set them before.
 /// <code>
 /// var q := NetwQuantizeScalar.new().limits(-2048.0, 2048.0).bits(19)
 /// # the same

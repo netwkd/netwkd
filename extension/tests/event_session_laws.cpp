@@ -175,7 +175,7 @@ class SessionRun {
             );
             core->receive_header(INTAKE_PEER, truncated);
         }
-        r_evidence.received_bytes = core->get_received_bytes();
+        r_evidence.received_bytes = core->wire().received_bytes;
 
         for (int index = 0; index < declared.acks; index++) {
             r_evidence.acks_advanced

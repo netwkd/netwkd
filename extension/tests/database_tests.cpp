@@ -717,6 +717,47 @@ LawVerdict edited_text(const Stand &) {
     return law_held();
 }
 
+Dictionary richer(const Dictionary &p_row) {
+    Dictionary out = p_row.duplicate();
+    out["gold"] = int64_t(p_row.get("gold", 0)) + 100;
+    return out;
+}
+
+LawVerdict older_version(const Stand &) {
+    const String root = scratch("older");
+    World world("OlderVersion", files(root, FileSystemDatabase::FORMAT_TEXT));
+    const Ref<NetwSchema> schema
+        = NetwSchema::create("database_tests_versioned");
+    schema->replicated(false);
+    schema->i64("gold", 1);
+    schema->storage_version(2);
+    schema->migrate(1, callable_mp_static(&richer));
+    world.db->delete_slot("slot1");
+    if (!world.opened()
+        || World::answer(world.db->write(schema, "hero", row(1))) != OK) {
+        return law_broken("the write did not answer OK");
+    }
+    const String path = the_one_file(root);
+    const String saved = FileAccess::get_file_as_string(path);
+    const String older = saved.replace(
+        "\"schema_version\": 2",
+        "\"schema_version\": 1"
+    );
+    if (older == saved) {
+        return law_broken("the save names no storage version 2");
+    }
+    const Ref<FileAccess> file = FileAccess::open(path, FileAccess::WRITE);
+    if (file.is_null()) {
+        return law_broken("the save file could not be edited");
+    }
+    file->store_string(older);
+    file->close();
+    if (!holds(read(world, schema, "hero"), 101)) {
+        return law_broken("the older record did not read through its step");
+    }
+    return law_held();
+}
+
 const Row ROWS[] = {
     {"work sent before the database has opened",
      "it is refused, and work after the open settles runs",
@@ -773,6 +814,9 @@ const Row ROWS[] = {
     {"a text save edited to build an object or load a resource",
      "the read is refused, and a string that only looks like one loads",
      &edited_text},
+    {"a record saved at an older storage version",
+     "the read runs the schema's migration and answers the migrated values",
+     &older_version},
 };
 
 TEST_CASE("[Netw][Table][SceneTree] a save holds what a game wrote") {

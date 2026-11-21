@@ -152,7 +152,8 @@ void LANLobbyDirectory::answer_queries() {
                 their_nonce,
                 instance,
                 gameplay_port(),
-                listed
+                listed,
+                session
             )
         );
     }

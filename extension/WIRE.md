@@ -1,7 +1,7 @@
-# WIRE v23, the carrier format
+# WIRE v24, the carrier format
 
 The byte layout of every datagram, frame and payload netwkd writes.
-`FORMAT_VERSION` is 23. `src/wire/registry.cpp` is the one declaration of the
+`FORMAT_VERSION` is 24. `src/wire/registry.cpp` is the one declaration of the
 channel table and `tools/wire_decode.py` reads a capture against this page.
 
 ---
@@ -188,16 +188,17 @@ Every axis of the table folds into the identity hash two peers exchange at
 admission, so a build disagreeing about any cell cannot pair.
 
 A channel also carries a `payload_revision`, folded into identity when
-non-zero. ACTION declares 1 for the request of section 18 that carries
-neither a timing nor a key. LAGCOMP_DENY declares 1 for the code and the
-reason of section 13. SYNC_ROW, SYNC_ROW_DELTA and SYNC_ROW_WINDOW declare 1
-for the v11
-row contract, SESSION_JOIN declares 1 for its proof, SESSION_ACCEPT and
+non-zero. Every channel that carries a value of section 23 declares one more
+than it did before that format, so ACTION declares 2, CALL, REPLY, SIGNAL,
+PROPERTY_SYNC, SYNC and SYNC_DELTA declare 1, SYNC_ROW, SYNC_ROW_DELTA and
+SYNC_ROW_WINDOW declare 2, SESSION_JOIN declares 4, SPAWN declares 6, and
+PREDICT_COMMAND, PREDICT_RELAY and PREDICT_ACK declare 4. ACTION's request
+of section 18 carries neither a timing nor a key. LAGCOMP_DENY declares 1
+for the code and the reason of section 13. SESSION_ACCEPT and
 SESSION_ROSTER declare 3 for the membership row, its account and the join
-address of section 16,
-SPAWN declares 5 for the player id, the decision, the anchor revision and
-its author the header of section 11 carries and the origin its ADOPT body
-carries, DESPAWN declares 1 for the base a controller's DESPAWN carries,
+address of section 16. SPAWN's header of section 11 carries the player id,
+the decision, the anchor revision and its author, and its ADOPT body the
+origin. DESPAWN declares 1 for the base a controller's DESPAWN carries,
 REPARENT declares 2 for its anchor revision and its author,
 CONTROL_REQUEST declares 1 for the layout of section 14 and CONTROL_APPLY
 declares 2 for that layout and the code and the reason of a refusal,
@@ -205,10 +206,10 @@ ROW_CONTROL declares 5 for the frame of records, the stepped ids, the omitted
 OPEN fields and the RESET that names only a token of section 10, and for the
 parked lanes and binding floors of section 7, LIFECYCLE_DECISION declares 2
 for the author of the revision it names and the denial string a refusal
-carries, PREDICT_COMMAND and PREDICT_RELAY declare 3 for the repeated row bit,
-the `asks_detail` bit and the `hold` of section 20, PREDICT_ACK declares 3 for
-the compact record, the held bit and the run of section 20,
-INTEREST_AWARENESS declares 1 for the edge of section 15,
+carries. PREDICT_COMMAND and PREDICT_RELAY carry the repeated row bit, the
+`asks_detail` bit and the `hold` of section 20, and PREDICT_ACK the compact
+record, the held bit and the run of section 20. INTEREST_AWARENESS
+declares 1 for the edge of section 15,
 SESSION_KICK_REQUEST declares 1 for the player id of section 16, and every
 other revision is 0.
 
@@ -351,12 +352,25 @@ On SYNC_ROW and SYNC_ROW_DELTA.
 [ack_delta svarint 5]      iff has_ack. ack = T + ack_delta
 [tick_delta svarint 3]     iff has_tick. row tick = T + tick_delta
 per column in mask order, per element of stride:
+  sized                            [cell bytes_capped 65535]
   laddered, and distance nonzero   [sel bits 2] then section 6's body
   otherwise                        [code bits width]
 [align_verify]
 ```
 
 `T` is the datagram's `base_tick - 1`.
+
+A sized column is a STRING or VARIANT column of stride 1 with no quantizer,
+and it spends one cell however many elements it holds.
+
+```text
+STRING   the UTF-8 with no tag. Text holding a NUL, opening with a byte order
+         mark or not exact UTF-8 is refused
+VARIANT  one value of section 23 that fills the cell exactly
+```
+
+The window row and the prediction rows of section 20 carry a sized column
+the same way.
 
 `distance` names `revision - distance` in this exact stream. A distance of 0 is
 a full row, which carries every column and writes no mask. There is no partial
@@ -705,8 +719,9 @@ move, installing `anchor_revision` when the carry places it.
 
 `[token]`, `[values]`, `[custom]`, `[args]`, `[value]`, `[consumed]` and
 `[derived]` are opaque runs. The verb delimits them and never reads inside, so
-an unparseable run costs one field. The consumed and derived runs carry the
-descriptor rows of section 19.
+an unparseable run costs one field. `[custom]` and each native `[value]` hold
+one value of section 23, and `[args]` and `[values]` hold a section 18 slot
+list. The consumed and derived runs carry the descriptor rows of section 19.
 
 `waits` is set when the server spawned through `Netw.spawn_async`. A receiver
 whose spawn function awaits then holds the route until the function returns,
@@ -938,8 +953,7 @@ each entity's `derived` descriptors from SPAWN with its own sets and leaves
 on a mismatch. `[args]` is an opaque run. `[arg_types]`
 holds one `Variant.Type` byte per argument the client passed, so a server
 whose handler refuses them names the argument and both types. `[proof]` holds
-a serialized Godot Variant without objects. It is empty when no proof
-was requested.
+one ARRAY value of section 23. It is empty when no proof was requested.
 
 Only the server that decoded `[args]` sees those values. The accept goes to
 every peer and the roster is handed to a late joiner, so the accept names the
@@ -1132,17 +1146,11 @@ same ordinal. A name is the fallback for a member the ordering does not reach.
 ```text
 value
 quantized  [code bits width] x stride         no type byte at all
-raw        [type int_range 0..5]
-  0 FALLBACK  [bytes bytes_capped 65535]      var_to_bytes
-  1 BOOL      [bool1]
-  2 INT       [bits 64]
-  3 VECTOR2   [x bits 32][y bits 32]
-  4 FLOAT     [bits 32]
-  5 VECTOR3   [x bits 32][y bits 32][z bits 32]
+raw        [align_verify][one value of section 23, at most 65535 bytes]
 ```
 
-A raw float is 32 bits, so a value a game read as a double arrives as its
-`f32` rounding.
+A raw float arrives exact, and an int spends two to eleven bytes with its
+tag.
 
 ```text
 slot list
@@ -1155,7 +1163,8 @@ per slot  [kind int_range 0..2]
 ```
 
 An `Object` has no value encoding, so a call that passes a node passes its
-address.
+address. A null or freed `Object` is NIL. A value section 23 refuses is sent
+as NIL.
 
 ```text
 CALL           [flags bits 8]              bit0 bit1 target, bit2 awaits reply
@@ -1169,7 +1178,7 @@ REPLY          [txn varuint 5][failed bool]
 SIGNAL         [signal token][args slots][align_verify]
 PROPERTY_SYNC  [property token][values slots][align_verify]
 ACTION         [method string][view_tick svarint 5]
-               [data bytes_capped 4095][align_verify]
+               [data bytes_capped 4095][align_verify]   data is one ARRAY value
 ```
 
 `flags` bits 0 and 1 name who the call is addressed to, `0` everyone the
@@ -1196,7 +1205,7 @@ SYNC_DELTA  [ordinal varuint 5][mask varuint 10][values slots][align_verify]
 ```
 
 `values slots` is the section 18 slot list with no quantizer and no declared
-type, so every value spends its raw type selector. A stock synchronizer names
+type, so every value spends its tag. A stock synchronizer names
 properties by `NodePath` and says nothing about their types, so there is no
 declared width to pack into.
 
@@ -1488,5 +1497,105 @@ An ACCEPT of two entries, the head then the pairs.
 `tools/wire_decode.py --self-test` holds every byte string above against a
 field list transcribed from this page and from nothing else, and `--spec`
 holds the same strings against the build's own `describe()` dump.
+
+---
+
+## 23. The value format
+
+A value is byte aligned, a tag byte and then its payload. Integers are little
+endian, and `varuint` and `svarint` are section 1's at up to ten groups.
+`src/value.cpp` writes and reads it.
+
+```text
+0   NIL                 1   FALSE               2   TRUE
+3   INT        svarint
+4   FLOAT      8 bytes, only when a FLOAT32 cannot hold the value exactly
+5   FLOAT32    4 bytes
+6   STRING        varuint length, then UTF-8
+7   STRING_NAME   as STRING
+8   NODE_PATH     as STRING
+9   VECTOR2     2 x f32       10  VECTOR2I    2 x svarint
+11  VECTOR3     3 x f32       12  VECTOR3I    3 x svarint
+13  VECTOR4     4 x f32       14  VECTOR4I    4 x svarint
+15  QUATERNION  4 x f32       16  COLOR       4 x f32
+17  RECT2       4 x f32       18  RECT2I      4 x svarint
+19  PLANE       4 x f32       20  AABB        6 x f32
+21  BASIS       9 x f32, row by row
+22  TRANSFORM2D 6 x f32, column by column
+23  TRANSFORM3D 12 x f32, the basis row by row, then the origin
+24  PROJECTION  16 x f32, column by column
+25  ARRAY             varuint count, then that many values
+26  TYPED_ARRAY       an element tag, varuint count, then the values
+27  DICTIONARY        varuint count, then key and value pairs in the order
+                      the game inserted them
+28  TYPED_DICTIONARY  a key tag, a value tag, then as DICTIONARY
+29  BYTES             varuint length, then the bytes
+30  PACKED_INT32      varuint count, 4 bytes each
+31  PACKED_INT64      varuint count, 8 bytes each
+32  PACKED_FLOAT32    varuint count, 4 bytes each
+33  PACKED_FLOAT64    varuint count, 8 bytes each
+34  PACKED_STRING     varuint count, then varuint length and UTF-8 each
+35  PACKED_VECTOR2    varuint count, 8 bytes each
+36  PACKED_VECTOR3    varuint count, 12 bytes each
+37  PACKED_COLOR      varuint count, 16 bytes each
+38  PACKED_VECTOR4    varuint count, 16 bytes each
+```
+
+A vector's components are 32 bits on every build, so a build with double
+precision narrows them. A typed container's tag names its element kind, FALSE
+for bool, FLOAT for float, ARRAY and DICTIONARY for either form, and NIL in a
+dictionary for an untyped key or value. Tags are only ever appended.
+
+One value has one encoding, so a reader refuses every other spelling.
+
+```text
+refused
+  a tag past 38, a read past the end
+  a varuint in more groups than it needs, or past 64 bits
+  a FLOAT a FLOAT32 holds exactly
+  text that is not exact UTF-8, holds a NUL or opens with a byte order mark
+  a NODE_PATH whose text Godot would read as another path, so an empty name
+    or subname, a doubled or trailing slash, or a trailing colon
+  a VECTOR2I, VECTOR3I, VECTOR4I or RECT2I component past 32 bits
+  a TYPED_ARRAY of NIL, or a typed element of another kind
+  a TYPED_DICTIONARY of NIL and NIL
+  a typed header naming a tag that is not a kind, TRUE, FLOAT32,
+    TYPED_ARRAY or TYPED_DICTIONARY
+  a count larger than the bytes behind it
+  nesting past depth 16, or more than 65,536 values in one value
+  a DICTIONARY that holds one key twice, as Godot compares keys, so 0.0 and
+    -0.0, two NaN, or a String and a StringName of one text
+  an Object, an RID, a Callable or a Signal, which have no tag
+```
+
+A packed array counts as one value toward the 65,536. The field that carries
+a value caps its bytes, and a field that holds one value refuses bytes after
+it. The writer refuses what the reader refuses, so text, a NodePath or a
+container it cannot carry is sent as NIL with NW1019, and a null or freed
+Object is written as NIL.
+
+```text
+Vector2(1.5, -2)      09 00 00 C0 3F 00 00 00 C0
+[7, "ok"]             19 02 03 0E 06 02 6F 6B
+```
+
+---
+
+## 24. The probe reply
+
+A server answers a browser's probe before any session exists, so the reply
+carries its own version and no channel.
+
+```text
+[version byte]              1
+[motd text][players svarint][max_players svarint]
+[game_mode text][version text][app_id text]
+[is_local_listener byte]    0 or 1
+[visibility svarint]
+[metadata value]            one DICTIONARY value of section 23, to the end
+```
+
+`text` is a varuint length and exact UTF-8. A reader refuses another version
+byte, a short reply and residue, so a browser on another build reads no row.
 
 ---

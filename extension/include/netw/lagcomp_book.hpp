@@ -47,7 +47,7 @@ class LagBook {
     void size_rings();
     void copy_entry(uint32_t p_to, uint32_t p_from);
     int64_t oldest_recorded() const;
-    void stage(const godot::Dictionary &p_payload);
+    void stage(const godot::Dictionary &p_payload, NetwMultiplayer *p_session);
     bool staged_equals(uint32_t p_at) const;
     void write_staged(uint32_t p_at, int64_t p_tick);
     void note_recorded(int64_t p_tick);
@@ -76,7 +76,11 @@ public:
         return compiled;
     }
 
-    bool record(int64_t p_tick, const godot::Dictionary &p_payload);
+    bool record(
+        int64_t p_tick,
+        const godot::Dictionary &p_payload,
+        NetwMultiplayer *p_session = nullptr
+    );
 
     int64_t sample_tick(int64_t p_tick) const;
     godot::Dictionary sample(int64_t p_tick) const;

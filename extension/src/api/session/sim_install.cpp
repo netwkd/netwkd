@@ -86,7 +86,7 @@ Array NetwMultiplayer::sim_install_target(
     int64_t p_max_restore_ticks,
     int64_t &r_age
 ) const {
-    const ClockEngine &clock = clock_engine();
+    const Clock &clock = clock_engine();
     const int64_t now = clock.get_configured() ? clock.get_tick() : -1;
     r_age = now >= 0 && p_sample.tick >= 0
         ? std::max(int64_t(0), now - p_sample.tick)
@@ -114,7 +114,7 @@ void NetwMultiplayer::sim_install_target_row(
     LocalVector<Variant> &r_target,
     int64_t &r_age
 ) const {
-    const ClockEngine &clock = clock_engine();
+    const Clock &clock = clock_engine();
     const int64_t now = clock.get_configured() ? clock.get_tick() : -1;
     r_age = now >= 0 && p_tick >= 0 ? std::max(int64_t(0), now - p_tick) : -1;
     const uint32_t count = p_values.size();
@@ -185,7 +185,7 @@ bool NetwMultiplayer::sim_write_install_row(
     }
     if (!r_moved_keys.is_empty()) {
         display_absorb_moved(
-            display_book->runtime_of(p_entity),
+            display_book.runtime_of(p_entity),
             r_moved_keys,
             r_moved
         );
@@ -213,7 +213,7 @@ uint64_t NetwMultiplayer::sim_author_tenure(const RID &p_entity) const {
 }
 
 int64_t NetwMultiplayer::sim_display_tick() const {
-    const ClockEngine &clock = clock_engine();
+    const Clock &clock = clock_engine();
     return clock.get_configured() ? int64_t(clock.display_tick()) : -1;
 }
 

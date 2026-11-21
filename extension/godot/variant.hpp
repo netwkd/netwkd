@@ -141,6 +141,13 @@ template <class Packed> Packed zeroed(int64_t p_size) {
     return out;
 }
 
+inline godot::String utf8_span(const uint8_t *p_bytes, int64_t p_size) {
+    if (p_size <= 0) {
+        return godot::String();
+    }
+    return godot::String::utf8(reinterpret_cast<const char *>(p_bytes), p_size);
+}
+
 inline godot::String utf8_string(const godot::PackedByteArray &p_bytes) {
     if (p_bytes.is_empty()) {
         return godot::String();

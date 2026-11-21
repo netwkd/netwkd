@@ -4,7 +4,6 @@
 
 #include "godot/hash_map.hpp"
 #include "godot/local_vector.hpp"
-#include "godot/variant.hpp"
 #include "netw/wire/attribution.hpp"
 #include "netw/wire/registry.hpp"
 
@@ -15,7 +14,6 @@ public:
     static constexpr double WINDOW_SECONDS = 1.0;
     static constexpr int HEADERS = CAUSE_COUNT;
 
-private:
     struct Rate {
         double sent[CAUSE_COUNT + 1] = {};
         double received[CAUSE_COUNT + 1] = {};
@@ -23,6 +21,7 @@ private:
         double received_packets = 0.0;
     };
 
+private:
     struct Row {
         TrafficTotals seen;
         Rate rate;
@@ -51,10 +50,10 @@ public:
         window = p_seconds;
     }
     void forget_peer(int64_t p_peer);
-    godot::Dictionary read(int64_t p_peer) const;
+    double read(int64_t p_peer, int p_index) const;
+    Rate rate_of(int64_t p_peer) const;
 #if defined(DEBUG_ENABLED)
     static constexpr int FLAT_SIZE = (CAUSE_COUNT + 1) * 2 + 2;
-    void read_flat(int64_t p_peer, godot::Array &r_out) const;
 #endif
 };
 

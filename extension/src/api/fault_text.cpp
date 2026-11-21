@@ -1092,6 +1092,36 @@ FaultText fault_text(netw_fault_code p_code, const FaultValues &v) {
                 "Call {NetwRequest.deny} before the first await, or do not "
                 "await in this handler."
             };
+        case NETW_FAULT_VALUE_TYPE:
+            return {
+                vformat(
+                    "Peer %d sent %s a value of another type, so the row was "
+                    "refused.",
+                    v.peer,
+                    v.name
+                ),
+                "Give the property the same type on every peer."
+            };
+        case NETW_FAULT_QUANTIZER_CHANGED:
+            return {
+                vformat(
+                    "%s was changed after a property was declared with it, "
+                    "so peers can read that property wrong.",
+                    v.name
+                ),
+                "Set the quantizer's settings before you declare the "
+                "property."
+            };
+        case NETW_FAULT_VALUE_UNREADABLE:
+            return {
+                vformat(
+                    "Peer %d sent %s a value this peer could not read, so "
+                    "null was used.",
+                    v.peer,
+                    v.name
+                ),
+                "Run the same netwkd version on every peer."
+            };
     }
     return {};
 }

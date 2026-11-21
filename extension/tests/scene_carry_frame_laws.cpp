@@ -49,10 +49,10 @@ struct CarryRun {
         const Ref<netw::NetwEntity> entity
             = netw::NetwEntity::ensure(p_container);
         const RID handle = Internals::get_liveness_core(core)->entity_create();
-        core->liveness_bind(
+        entity->bind_route(
+            core.ptr(),
             handle,
             Internals::get_liveness_core(core)->reserve_route(),
-            entity,
             p_container
         );
         p_container->set_meta(

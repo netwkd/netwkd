@@ -26,7 +26,8 @@ godot::PackedByteArray encode_reply(
     uint64_t p_nonce,
     uint64_t p_instance,
     int64_t p_gameplay_port,
-    const godot::Ref<NetwServerInfo> &p_info
+    const godot::Ref<NetwServerInfo> &p_info,
+    NetwMultiplayer *p_session
 );
 bool decode_reply(
     const godot::PackedByteArray &p_data,

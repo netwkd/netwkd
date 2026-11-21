@@ -4,12 +4,15 @@
 
 #include "godot/multiplayer_synchronizer.hpp"
 #include "godot/node.hpp"
+#include "godot/object.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
 #include "netw/repl/sync_compat.hpp"
+#include "netw/repl/sync_pipeline.hpp"
+#include "netw/script/model.hpp"
 #include "netw/sync_kernel.hpp"
 
 namespace TestSyncCompat {
@@ -32,6 +35,7 @@ struct Stand {
     MultiplayerSynchronizer *sync = nullptr;
     Ref<SceneReplicationConfig> config;
     Ref<NetwEntity> entity;
+    RID handle;
 
     Stand() {
         core.instantiate();
@@ -74,6 +78,7 @@ struct Stand {
         sync->set_replication_config(config);
         entity = NetwEntity::ensure(root);
         core->liveness_bind_route(ROUTE, entity.ptr());
+        handle = entity->get_rid_handle();
         compat->consume(root, sync);
     }
 
@@ -95,7 +100,13 @@ struct Stand {
             types.push_back(int(p_values[at].get_type()));
         }
         if (!sync_kernel::VolatileHead::wire.run(stream, head)
-            || !netw::call_args::values_write(stream, p_values, Array(), types)
+            || !netw::call_args::values_write(
+                stream,
+                p_values,
+                Array(),
+                types,
+                nullptr
+            )
             || !stream.align_verify()) {
             return PackedByteArray();
         }
@@ -142,7 +153,7 @@ TEST_CASE(
 
     Array one;
     one.push_back(String("applied"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, one), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, one), 1);
 
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(1));
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(0));
@@ -150,11 +161,11 @@ TEST_CASE(
     Array two;
     two.push_back(String("a"));
     two.push_back(String("b"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, two), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, two), 1);
 
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(1));
 
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, one), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, one), 1);
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(2));
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(1));
 }
@@ -169,7 +180,7 @@ TEST_CASE(
 
     Array one;
     one.push_back(String("applied"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(5, 0, one), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(5, 0, one), 1);
 
     NETW_CHECK_EQ(stand.counter("drops_sync_no_set"), int64_t(1));
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(0));
@@ -185,7 +196,7 @@ TEST_CASE(
 
     Array one;
     one.push_back(String("applied"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, one), 2);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, one), 2);
 
     NETW_CHECK_EQ(stand.counter("drops_sync_bad_sender"), int64_t(1));
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(0));
@@ -205,7 +216,7 @@ TEST_CASE(
     Array one;
     one.push_back(String("applied"));
     stand.compat->handle_sync(
-        stand.entity,
+        stand.handle,
         stand.sync_payload(0, sync_kernel::RESERVED + 1, one),
         1
     );
@@ -224,7 +235,7 @@ TEST_CASE(
 
     Array one;
     one.push_back(String("a"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, one), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, one), 1);
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(1));
 
     Ref<SceneReplicationConfig> wider;
@@ -244,7 +255,7 @@ TEST_CASE(
     Array two;
     two.push_back(String("a"));
     two.push_back(String("b"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, two), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, two), 1);
 
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(2));
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(0));
@@ -266,7 +277,7 @@ TEST_CASE(
     two.push_back(String("b"));
 
     stand.declare("second", SceneReplicationConfig::REPLICATION_MODE_ALWAYS);
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, two), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, two), 1);
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(0));
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(1));
 
@@ -280,7 +291,7 @@ TEST_CASE(
     announced.config->emit_changed();
 
     announced.compat
-        ->handle_sync(announced.entity, announced.sync_payload(0, 0, two), 1);
+        ->handle_sync(announced.handle,announced.sync_payload(0, 0, two), 1);
     NETW_CHECK_EQ(announced.counter("sync_frames_in"), int64_t(1));
     NETW_CHECK_EQ(announced.counter("drops_sync_poisoned"), int64_t(0));
 }
@@ -304,7 +315,7 @@ TEST_CASE(
 
     Array one;
     one.push_back(String("applied"));
-    fits.compat->handle_sync(fits.entity, fits.sync_payload(0, 0, one), 1);
+    fits.compat->handle_sync(fits.handle,fits.sync_payload(0, 0, one), 1);
 
     NETW_CHECK_EQ(fits.counter("sync_frames_in"), int64_t(1));
     NETW_CHECK_EQ(fits.counter("drops_sync_poisoned"), int64_t(0));
@@ -319,7 +330,7 @@ TEST_CASE(
     }
     over.arm();
 
-    over.compat->handle_sync(over.entity, over.sync_payload(0, 0, one), 1);
+    over.compat->handle_sync(over.handle,over.sync_payload(0, 0, one), 1);
 
     NETW_CHECK_EQ(over.counter("drops_sync_poisoned"), int64_t(1));
     NETW_CHECK_EQ(over.counter("sync_frames_in"), int64_t(0));
@@ -350,7 +361,7 @@ TEST_CASE(
     Array two;
     two.push_back(String("a"));
     two.push_back(String("b"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, two), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, two), 1);
 
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(1));
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(0));
@@ -368,22 +379,19 @@ TEST_CASE(
     disagreeing[int64_t(0)] = int64_t(0x1234);
     const netw_test::FaultWatch faults;
     stand.compat->note_schema(ROUTE, disagreeing);
-    stand.core->sync_compat_entity_live(ROUTE, stand.entity);
+    stand.core->sync_compat_entity_live(ROUTE, stand.entity->get_rid_handle());
     NETW_CHECK_EQ(faults.errors_containing("differs from the server"), 1);
 
     Array one;
     one.push_back(String("a"));
-    stand.compat->handle_sync(stand.entity, stand.sync_payload(0, 0, one), 1);
+    stand.compat->handle_sync(stand.handle,stand.sync_payload(0, 0, one), 1);
 
     NETW_CHECK_EQ(stand.counter("drops_sync_poisoned"), int64_t(1));
     NETW_CHECK_EQ(stand.counter("sync_frames_in"), int64_t(0));
 }
 
 bool minted(const Ref<NetwEntity> &p_entity, int64_t p_part) {
-    return Ref<RefCounted>(
-               netw_test::Internals::record(p_entity.ptr())->minted_part(p_part)
-    )
-        .is_valid();
+    return Ref<RefCounted>(p_entity->minted_part(p_part)).is_valid();
 }
 
 TEST_CASE(
@@ -405,6 +413,36 @@ TEST_CASE(
     keyed.arm();
     CHECK(minted(keyed.entity, NetwEntityRecord::PART_PREDICTION));
     CHECK(minted(keyed.entity, NetwEntityRecord::PART_DISPLAY));
+}
+
+TEST_CASE(
+    "[Netw][Sync][Hosted] a server signal reaches an entity the session "
+    "adopted before it was attached"
+) {
+    Stand stand;
+    netw::gd::add_user_signal(stand.root, StringName("ping"), Array());
+    stand.root->connect(
+        "ping",
+        Callable(stand.root, "set_meta").bind(StringName("heard"), true)
+    );
+    stand.entity = NetwEntity::ensure(stand.root);
+    const RID adopted = stand.entity->adopt_in(stand.core.ptr());
+    REQUIRE(stand.core->entity_record(adopted) == nullptr);
+
+    netw::wire::WriteStream stream;
+    REQUIRE(netw::script::model::write_token(stream, String("ping")));
+    REQUIRE(netw::call_args::values_write(
+        stream,
+        Array(),
+        Array(),
+        Array(),
+        nullptr
+    ));
+    REQUIRE(stream.align_verify());
+    netw_test::Internals::sync_pipeline(stand.core)
+        ->handle_signal(adopted, stand.root, stream.to_bytes(), 1);
+
+    CHECK(stand.root->has_meta("heard"));
 }
 
 } // namespace TestSyncCompat

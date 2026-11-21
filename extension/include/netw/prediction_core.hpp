@@ -114,13 +114,6 @@ struct Fold {
     DriveKind kind = DriveKind::NONE;
 };
 
-struct RecoveryPlan {
-    godot::Dictionary restore;
-    godot::Dictionary write;
-    bool teleport = false;
-    bool skip = true;
-};
-
 struct Judgement {
     double divergence = 0.0;
     bool corrected = false;

@@ -3,9 +3,9 @@
 #include "godot/class_db.hpp"
 #include "godot/node.hpp"
 #include "godot/vararg.hpp"
+#include "netw/api/control_script.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/api/quantize.hpp"
-#include "netw/entity/control.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/member_packing.hpp"
@@ -124,7 +124,7 @@ void NetwMemberConfig::publish_policy() {
     if (declaring.is_null() || context_type == 0) {
         return;
     }
-    entity::Control::declare_policy(
+    entity::declare_policy(
         declaring.ptr(),
         context_name,
         int64_t(write_policy),

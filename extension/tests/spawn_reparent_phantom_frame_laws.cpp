@@ -233,10 +233,10 @@ class AreaHushScenario final : public netw_test::FrameScenario {
     RID seat(Node *p_node) {
         const Ref<netw::NetwEntity> entity = netw::NetwEntity::ensure(p_node);
         const RID handle = Internals::get_liveness_core(core)->entity_create();
-        core->liveness_bind(
+        entity->bind_route(
+            core.ptr(),
             handle,
             Internals::get_liveness_core(core)->reserve_route(),
-            entity,
             p_node
         );
         p_node->set_meta(NetwMultiplayer::wrapper_meta(), Variant(entity));

@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/stream_book.hpp"
 
 #include "netw/colors.hpp"

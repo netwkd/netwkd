@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/carrier_buffers.hpp"
 
 #include <algorithm>

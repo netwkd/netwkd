@@ -510,6 +510,60 @@ TEST_CASE(
     NETW_HOLDS(quiet(followed));
 }
 
+constexpr const char *DOCK = R"(
+class Crate extends Node3D:
+	var held = Array([], TYPE_INT, &"", null)
+
+	func _init() -> void:
+		Netw.configure_entity(self)
+		Netw.configure_property(self, &"cargo").broadcast()
+
+	func _get_property_list() -> Array[Dictionary]:
+		if is_inside_tree() and not multiplayer.is_server():
+			return [{"name": "cargo", "type": TYPE_NIL,
+				"usage": PROPERTY_USAGE_DEFAULT}]
+		return [{"name": "cargo", "type": TYPE_ARRAY,
+			"hint": PROPERTY_HINT_ARRAY_TYPE, "hint_string": "int",
+			"usage": PROPERTY_USAGE_DEFAULT}]
+
+	func _get(property: StringName) -> Variant:
+		return held if property == &"cargo" else null
+
+	func _set(property: StringName, value: Variant) -> bool:
+		if property != &"cargo":
+			return false
+		held = value
+		return true
+)";
+
+TEST_CASE(
+    "[Netw][Compliance] A11 a peer that sends a value of the wrong type, "
+    "or an array of the wrong element type, into a typed property is "
+    "refused"
+) {
+    Array words;
+    words.set_typed(Variant::STRING, StringName(), Variant());
+    words.push_back("tea");
+    const Variant cargoes[] = {Dictionary(), words};
+    for (const Variant &cargo : cargoes) {
+        const Seen seen
+            = World(DOCK, 1)
+                  .watch("Crate", "cargo")
+                  .at(1, spawn("Crate", "Crate"))
+                  .at(3, control("Crate", 0))
+                  .each(8, 12, on(0, set("Crate", "cargo", cargo)))
+                  .run(20);
+        NETW_HOLDS(reads(seen, SERVER, "Crate", "cargo", Array()));
+        int refused = 0;
+        for (const String &fault : seen.faults) {
+            refused
+                += fault.contains("'cargo'") && fault.contains("[NW1044]");
+        }
+        CHECK(refused == 1);
+        CHECK(seen.faults.size() == refused);
+    }
+}
+
 } // namespace ComplianceControl
 
 #endif

@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/datagram_seq_book.hpp"
 
 #include "netw/wire/registry.hpp"

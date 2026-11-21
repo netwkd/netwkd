@@ -4,7 +4,7 @@
 #include "godot/rid.hpp"
 #include "godot/variant.hpp"
 #include "netw/persist/envelope.hpp"
-#include "netw/schema_core.hpp"
+#include "netw/schema_book.hpp"
 
 namespace netw::persist {
 
@@ -16,7 +16,7 @@ godot::Dictionary seal_snapshot(
 );
 
 godot::Error open_snapshot(
-    const SchemaCore &p_core,
+    const SchemaBook &p_core,
     const godot::RID &p_schema,
     const godot::Dictionary &p_envelope,
     godot::PackedStringArray &r_ids,

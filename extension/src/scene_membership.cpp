@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/scene_membership.hpp"
 
 #include "netw/peer_rename.hpp"

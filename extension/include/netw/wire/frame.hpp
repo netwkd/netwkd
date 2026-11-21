@@ -4,6 +4,7 @@
 
 #include "godot/local_vector.hpp"
 #include "godot/variant.hpp"
+#include "netw/wire/describe.hpp"
 #include "netw/wire/stream.hpp"
 
 namespace netw::wire {
@@ -49,6 +50,6 @@ FrameWalk frame_unpack_all(
     int64_t p_from
 );
 
-godot::Dictionary frame_spec_records();
+std::vector<SpecRecord> frame_spec_rows();
 
 } // namespace netw::wire

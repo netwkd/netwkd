@@ -159,8 +159,8 @@ class IndependentScenario final : public netw_test::FrameScenario {
     }
 
     void tick_in_physics() {
-        Internals::clock_engine(stand->session(SERVER)).force_step(1);
-        Internals::clock_engine(stand->session(A)).force_step(1);
+        Internals::run_ticks(stand->session(SERVER), 1);
+        Internals::run_ticks(stand->session(A), 1);
         stand->loopback()->advance_time(1000.0 / double(TICKRATE));
         stand->session(SERVER)->poll();
     }

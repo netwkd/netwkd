@@ -48,24 +48,44 @@ struct JointRestore {
     int64_t entry = -1;
 };
 
-struct JointStep {
+enum ReplayStepFlag : uint8_t {
+    STEP_READS_INPUT = 1 << 0,
+    STEP_SEALS = 1 << 1,
+    STEP_CLOSES_ENTRY = 1 << 2,
+};
+
+enum ReplayPlanFlag : uint8_t {
+    REPLAY_REBASES = 1 << 0,
+    REPLAY_SETTLES = 1 << 1,
+    REPLAY_SAMPLES_EACH_CLOSE = 1 << 2,
+    REPLAY_RUNS_THROUGH_SEAT = 1 << 3,
+    REPLAY_DEMOTES = 1 << 4,
+};
+
+struct ReplayStep {
     StateRow command;
     int64_t slot = 0;
-    int64_t transition = -1;
+    int64_t tick = -1;
+    int64_t entry = -1;
+    int64_t input_key = -1;
+    uint8_t flags = 0;
     CellProvenance provenance = CellProvenance::COAST;
 };
 
-struct JointPassPlan {
+struct ReplayPlan {
     godot::LocalVector<JointRestore> restores;
-    godot::LocalVector<JointStep> steps;
+    godot::LocalVector<ReplayStep> steps;
+    godot::Dictionary sample;
+    godot::PackedStringArray participants;
     int64_t floor = -1;
     int64_t present = -1;
+    uint8_t flags = 0;
     bool heal = false;
     bool valid = false;
 
-    JointPassPlan() = default;
-    JointPassPlan(const JointPassPlan &p_other);
-    JointPassPlan &operator=(const JointPassPlan &p_other);
+    ReplayPlan() = default;
+    ReplayPlan(const ReplayPlan &p_other);
+    ReplayPlan &operator=(const ReplayPlan &p_other);
 };
 
 struct JointStats {

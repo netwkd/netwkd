@@ -1,0 +1,34 @@
+:github_url: hide
+
+.. _fault_nw1044:
+
+NW1044. A peer sent a value of another type
+===========================================
+
+Checked in every build, on the peer that receives the row. The first
+refusal for each peer is reported once per session.
+
+A typed property that is not a number, a vector or text, such as an
+``Array`` or a ``Dictionary``, travels as one value. The receiving peer
+checks that the value is the property's type before it lands. A typed
+``Array`` or ``Dictionary`` property takes only a value typed the same
+way, so an ``Array[int]`` refuses an ``Array[String]``. When it is
+not, the whole row is dropped and the property keeps its last value. A
+null value is always taken.
+
+The server declares ``targets`` as an ``Array``.
+
+.. code-block:: gdscript
+
+    var targets: Array = []
+
+    func _init() -> void:
+        Netw.configure_property(self, "targets").state()
+
+A client running another build declares it as a ``Dictionary`` and sends it.
+
+.. code-block:: gdscript
+
+    var targets: Dictionary = {}
+
+Give the property the same type on every peer.

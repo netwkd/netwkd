@@ -4,15 +4,13 @@
 
 #include "godot/hash_map.hpp"
 #include "godot/local_vector.hpp"
-#include "godot/object.hpp"
 #include "godot/rid.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/schema_core.hpp"
 #include "netw/repl/window_ring.hpp"
+#include "netw/schema_core.hpp"
 #include "netw/store/coder.hpp"
 #include "netw/store/column.hpp"
 #include "netw/store/peers.hpp"
-#include "netw/store/resident.hpp"
 #include "netw/wire/code_row.hpp"
 #include "netw/wire/plan.hpp"
 
@@ -27,7 +25,7 @@ struct Received {
     uint32_t held = 0;
     godot::LocalVector<uint64_t> revisions;
     godot::LocalVector<uint64_t> images;
-    godot::LocalVector<godot::Variant> carried;
+    godot::LocalVector<wire::TailRef> tails;
     godot::PackedByteArray early_edge;
     uint64_t early_token = 0;
     uint64_t early_revision = 0;
@@ -64,12 +62,12 @@ public:
     Family family = Family::VOLATILE;
     uint64_t set_id = 0;
     godot::RID rid;
-    bool ports_resolved = false;
+    uint32_t index = NO_SLOT;
     bool scalar = false;
     uint32_t body_columns = 0;
     uint32_t indexed_columns = 0;
     uint32_t words = 0;
-    uint32_t carried = 0;
+    uint32_t tail_columns = 0;
     int64_t pulled_tick = -1;
     int64_t heartbeat = 0;
     uint32_t window = 1;
@@ -78,9 +76,6 @@ public:
     godot::LocalVector<uint32_t> slots;
     godot::LocalVector<int64_t> routes;
     godot::LocalVector<uint64_t> owners;
-    godot::LocalVector<uint64_t> nodes;
-    godot::LocalVector<NodeCell> cells;
-    godot::LocalVector<uint64_t> scripts;
     godot::LocalVector<int32_t> authorities;
     godot::LocalVector<uint8_t> comps;
     godot::LocalVector<uint8_t> lanes;
@@ -94,7 +89,7 @@ public:
     godot::LocalVector<wire::StreamTenure> tenures;
     godot::LocalVector<uint64_t> admit_stamps;
     godot::LocalVector<godot::LocalVector<uint8_t>> values;
-    godot::LocalVector<godot::Variant> carried_values;
+    godot::LocalVector<wire::TailRef> cell_tails;
     godot::LocalVector<uint64_t> codes;
     godot::LocalVector<PeerRows> peers;
     godot::LocalVector<Sender> senders;
@@ -103,7 +98,7 @@ public:
     godot::LocalVector<uint32_t> value_offsets;
     godot::LocalVector<int64_t> history_ticks;
     godot::LocalVector<uint8_t> history_values;
-    godot::LocalVector<godot::Variant> history_carried;
+    godot::LocalVector<wire::TailRef> history_tails;
     godot::LocalVector<uint8_t> history_next;
     godot::LocalVector<uint8_t> history_held;
     godot::LocalVector<uint32_t> history_appends;
@@ -137,7 +132,6 @@ public:
     godot::LocalVector<repl::WindowSample> arrived_window;
 
     godot::LocalVector<ColumnCoder> coders;
-    bool typed = false;
     godot::LocalVector<uint8_t> exact;
     godot::LocalVector<uint64_t> pulled_codes;
     godot::LocalVector<uint32_t> code_offsets;
@@ -149,8 +143,6 @@ public:
     godot::LocalVector<godot::PackedInt64Array> decode_codes;
 
     void compile(const SchemaRecord &p_schema, Family p_family);
-
-    void resolve_ports(godot::Object *p_node);
 
     uint32_t row_count() const {
         return slots.size();
@@ -166,24 +158,11 @@ public:
         return codes.ptr() + uint64_t(p_row) * words;
     }
 
-    const godot::Variant *carried_of(uint32_t p_row) const {
-        return carried == 0 ? nullptr
-                            : carried_values.ptr() + uint64_t(p_row) * carried;
+    const wire::TailRef *tails_of(uint32_t p_row) const {
+        return tail_columns == 0
+            ? nullptr
+            : cell_tails.ptr() + uint64_t(p_row) * tail_columns;
     }
-
-    void write_value(
-        uint32_t p_row,
-        uint32_t p_column,
-        const godot::Variant &p_value
-    );
-
-    godot::Variant read_value(uint32_t p_row, uint32_t p_column) const;
-
-    bool encode(
-        uint32_t p_column,
-        const godot::Variant &p_value,
-        wire::CodeRow &r_row
-    ) const;
 
     bool settle(uint32_t p_row, const wire::CodeRow &p_codes, int64_t p_tick);
 
@@ -235,7 +214,7 @@ public:
     const uint64_t *received_image(
         const Received &p_received,
         uint64_t p_revision,
-        const godot::Variant *&r_carried
+        const wire::TailRef *&r_tails
     ) const;
 
     void keep_received(
@@ -244,7 +223,9 @@ public:
         const wire::CodeRow &p_codes
     );
 
-    bool decode_row(const wire::CodeRow &p_codes);
+    bool stage_codes(const wire::CodeRow &p_codes);
+
+    int mistyped(const wire::CodeRow &p_codes) const;
 
     bool land(uint32_t p_row, const wire::CodeRow &p_codes, int64_t p_tick);
 
@@ -258,10 +239,6 @@ public:
         int64_t p_tick
     );
 
-    int settle_exact(uint32_t p_row, bool p_body_columns, int64_t p_tick);
-
-    void record_held(uint32_t p_row, int64_t p_tick);
-
     void record_rest(uint32_t p_row, int64_t p_tick);
 
     uint32_t history_count(uint32_t p_row) const {
@@ -272,11 +249,7 @@ public:
 
     int history_at(uint32_t p_row, int64_t p_tick) const;
 
-    godot::Variant history_value(
-        uint32_t p_row,
-        uint32_t p_age,
-        uint32_t p_column
-    ) const;
+    uint32_t history_slot(uint32_t p_row, uint32_t p_age) const;
 
     uint32_t owe_push(
         uint32_t p_row,
@@ -295,17 +268,17 @@ public:
 
 private:
     void compile_coders();
-    uint32_t history_slot(uint32_t p_row, uint32_t p_age) const;
-    godot::Variant read_bytes(const uint8_t *p_at, uint32_t p_column) const;
-    void write_bytes(
-        uint8_t *p_at,
-        uint32_t p_column,
-        const godot::Variant &p_value
-    ) const;
     void fresh_peer_row(PeerRows &r_peer, uint32_t p_row);
     void push_peer_rows();
     void move_peer_rows(uint32_t p_to, uint32_t p_from);
     void shrink_peer_rows(uint32_t p_count);
 };
+
+bool decode_coded(
+    Table &r_table,
+    uint32_t p_column,
+    const wire::CodeRow &p_codes,
+    uint8_t *r_value
+);
 
 } // namespace netw::store

@@ -792,14 +792,14 @@ void NetwNativeTests::fault_book_clear() {
 Dictionary NetwNativeTests::prediction_stats(Object *p_handle) {
     const NetwPrediction *handle = Object::cast_to<NetwPrediction>(p_handle);
     const predict::Decl *decl = handle != nullptr
-        ? NetwMultiplayer::predict_find_declaration(handle->get_entity().ptr())
+        ? handle->get_entity()->get_record()->find_predict_declaration()
         : nullptr;
     return decl != nullptr ? decl->facts.to_dictionary() : Dictionary();
 }
 
 void NetwNativeTests::attribution_arm(NetwMultiplayer *p_session) {
     if (p_session != nullptr) {
-        p_session->attribution_set_armed(true);
+        p_session->wire().attribution.set_armed(true);
     }
 }
 
@@ -840,11 +840,12 @@ bool NetwNativeTests::rpc_sender_admits(
         return false;
     }
     const Ref<Script> script = p_node->get_script();
+    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
     return p_session->rpc_sender_allowed(
         netw::script::model::get_rpc_options(script, p_method),
         script,
         p_method,
-        NetwEntity::of(p_node),
+        entity.is_valid() ? entity->get_record() : nullptr,
         p_node,
         p_sender
     );

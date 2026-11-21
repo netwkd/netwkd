@@ -568,7 +568,9 @@ public class NetwMemberConfig : NetwRefCounted
 
     /// <summary>
     /// Received calls wait for a signal with <paramref name="sig"/>'s name on
-    /// the receiving <see cref="Node"/>. Only the signal name is stored.
+    /// the receiving <see cref="Node"/>. Only the signal name is stored. A
+    /// waiting call whose <see cref="NetwEntity"/> leaves the session is
+    /// dropped and never runs.
     /// </summary>
     public NetwMemberConfig DeferUntil(Signal sig)
     {

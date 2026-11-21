@@ -10,8 +10,20 @@ namespace netw {
 class NetwQuantize : public godot::Resource {
     GDCLASS(NetwQuantize, godot::Resource)
 
+    bool held = false;
+    bool reported = false;
+    int part_holds = 0;
+
 protected:
     static void _bind_methods();
+
+    void note_change(bool p_changes);
+    void hold_part(const godot::Ref<NetwQuantize> &p_part) const;
+    void swap_part(
+        godot::Ref<NetwQuantize> &r_part,
+        const godot::Ref<NetwQuantize> &p_value
+    );
+    virtual void hold_parts() {}
 
     GDVIRTUAL1RC(bool, _supports_type, godot::Variant::Type)
     GDVIRTUAL1RC(int, _bit_width, godot::Variant::Type)
@@ -26,6 +38,14 @@ protected:
     GDVIRTUAL1RC(double, _max_error, godot::Variant::Type)
 
 public:
+    void hold() {
+        if (held) {
+            return;
+        }
+        held = true;
+        hold_parts();
+    }
+
     virtual bool supports_type(godot::Variant::Type type) const;
     virtual int bit_width(godot::Variant::Type type) const;
     virtual int stride(godot::Variant::Type type) const;
@@ -120,9 +140,6 @@ class NetwQuantizeQuaternion : public NetwQuantize {
 
     int bit_count = 10;
 
-    int64_t encode_component(double value) const;
-    double decode_component(int64_t code) const;
-
 protected:
     static void _bind_methods();
 
@@ -157,6 +174,8 @@ class NetwQuantizeTransform2D : public NetwQuantize {
 
 protected:
     static void _bind_methods();
+
+    void hold_parts() override;
 
 public:
     void set_origin_quantizer(const godot::Ref<NetwQuantize> &value);
@@ -194,6 +213,8 @@ class NetwQuantizeTransform3D : public NetwQuantize {
 
 protected:
     static void _bind_methods();
+
+    void hold_parts() override;
 
 public:
     void set_origin_quantizer(const godot::Ref<NetwQuantize> &value);

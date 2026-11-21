@@ -172,7 +172,7 @@ TEST_CASE(
     const int64_t refused
         = int64_t(before[StringName("drops_spawn_bad_sender")]);
 
-    pipeline->handle_spawn_frame(frame, 2);
+    rig.client(0)->spawn_handle_spawn_frame(frame, 2);
 
     const Dictionary after = Dictionary(rig.spawn_plane(0)->counters());
     NETW_CHECK_EQ(

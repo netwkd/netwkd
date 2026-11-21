@@ -11,7 +11,6 @@
 #include "netw/log.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/profile.hpp"
-#include "netw/session/books.hpp"
 #include "netw/subsystems.hpp"
 
 using namespace godot;
@@ -28,16 +27,11 @@ struct OrderRow {
 } // namespace
 
 void NetwPredictRunner::seat_core(
-    NetwMultiplayer *p_core,
-    const session::Books *p_books
+    NetwMultiplayer *p_session,
+    NetwPredictionEngine *p_prediction
 ) {
-    NETW_BUG_COND(p_core != nullptr && p_books == nullptr);
-    core_id = gd::instance_id(p_core);
-    books = p_core != nullptr ? p_books : nullptr;
-}
-
-NetwMultiplayer *NetwPredictRunner::core() const {
-    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
+    session = p_session;
+    prediction_engine = p_prediction;
 }
 
 int64_t NetwPredictRunner::index_of(NetwPredictSlotEngine *p_engine) const {
@@ -71,11 +65,11 @@ void NetwPredictRunner::unregister_engine(NetwPredictSlotEngine *p_engine) {
 }
 
 bool NetwPredictRunner::resolve_pool_order() {
-    NetwMultiplayer *service = core();
+    NetwMultiplayer *service = session;
     if (service == nullptr) {
         return false;
     }
-    NetwPredictionEngine *const pool = books->prediction;
+    NetwPredictionEngine *const pool = prediction_engine;
     if (pool == nullptr) {
         return false;
     }
@@ -83,7 +77,7 @@ bool NetwPredictRunner::resolve_pool_order() {
         NetwPredictSlotEngine *engine = engines[at];
         const int64_t slot = engine == nullptr
             ? -1
-            : service->native_prediction_slot(engine->seated_entity());
+            : service->native_prediction_slot(engine->seated_rid());
         if (slot < 0) {
             NETW_TRACE(
                 sys::PREDICTION,
@@ -142,7 +136,7 @@ const LocalVector<NetwPredictSlotEngine *> &NetwPredictRunner::phase(
     if (sort_dirty) {
         rebuild_sorted();
     }
-    NetwMultiplayer *service = core();
+    NetwMultiplayer *service = session;
     if (service == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,
@@ -163,7 +157,7 @@ const LocalVector<NetwPredictSlotEngine *> &NetwPredictRunner::phase(
         );
         return sorted;
     }
-    NetwPredictionEngine *const pool = books->prediction;
+    NetwPredictionEngine *const pool = prediction_engine;
     if (pool == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,
@@ -263,7 +257,7 @@ void NetwPredictRunner::tick_step(const NetwPredictTiming &p_timing) {
 
 void NetwPredictRunner::step_stepped_spaces(const NetwPredictTiming &p_timing) {
     NETW_ZONE_NC("Predict step spaces", colors::PREDICTION);
-    NetwMultiplayer *service = core();
+    NetwMultiplayer *service = session;
     if (service == nullptr) {
         return;
     }
@@ -275,7 +269,7 @@ void NetwPredictRunner::step_stepped_spaces(const NetwPredictTiming &p_timing) {
             continue;
         }
         const NetwMultiplayer::EntitySpace held
-            = service->entity_space_of(engine->seated_entity());
+            = service->entity_space_of(engine->seated_node());
         if (!service->predict_space_can_step(held.space, held.dimension)
             || driven.has(held.space.get_id())) {
             continue;

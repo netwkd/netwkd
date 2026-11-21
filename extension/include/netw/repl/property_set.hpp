@@ -25,6 +25,7 @@ struct PropertyColumn {
 
     int64_t schema_column = -1;
     table::SchemaColumn shape;
+    godot::Ref<NetwQuantize> quantizer;
     Delta delta_mode = DELTA_AUTO;
     bool watch = false;
     int64_t lane = 0;
@@ -49,10 +50,7 @@ struct PropertyColumn {
         return enums::NetwSchema::ColumnType(shape.type);
     }
     godot::Ref<NetwQuantize> get_quantizer() const {
-        return shape.quantizer;
-    }
-    void set_quantizer(const godot::Ref<NetwQuantize> &p_quantizer) {
-        shape.quantizer = p_quantizer;
+        return quantizer;
     }
     int64_t get_lane() const {
         return lane;
@@ -147,6 +145,17 @@ public:
         const godot::Ref<godot::Script> &p_script,
         godot::Node *p_node,
         const godot::StringName &p_property
+    );
+    static void stamp_value_tags(
+        const godot::Ref<godot::Script> &p_script,
+        godot::Node *p_node,
+        table::SchemaColumn &r_column
+    );
+    static bool declared_element_types(
+        const godot::Array &p_infos,
+        const godot::StringName &p_property,
+        bool p_dictionary,
+        int r_types[2]
     );
 
     int64_t get_cadence() const {

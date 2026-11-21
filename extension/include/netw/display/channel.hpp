@@ -9,6 +9,10 @@
 #include "netw/display/port.hpp"
 #include "netw/object_port.hpp"
 
+namespace netw {
+class NetwMultiplayer;
+} // namespace netw
+
 namespace netw::display {
 
 class Channel {
@@ -19,7 +23,7 @@ private:
     History history;
     Offset offset;
     godot::RID entity;
-    godot::Callable door;
+    NetwMultiplayer *session = nullptr;
     godot::Callable output;
     Port port;
     bool refused_global = false;
@@ -82,11 +86,8 @@ public:
         return entity;
     }
 
-    void set_door(const godot::Callable &p_door) {
-        door = p_door;
-    }
-    godot::Callable get_door() const {
-        return door;
+    void set_session(NetwMultiplayer *p_session) {
+        session = p_session;
     }
 
     void set_output(const godot::Callable &p_output) {

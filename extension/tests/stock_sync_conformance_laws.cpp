@@ -186,6 +186,7 @@ struct CarryEvidence {
     String enter_tree_value;
     int64_t synced = -1;
     int64_t watched = -1;
+    int64_t watched_again = -1;
     Color modulate;
 };
 
@@ -269,6 +270,17 @@ public:
                     mirror,
                     StringName("watched_value"),
                     42
+                )
+            );
+        }
+        if (p_scenario.carries_watch && p_scenario.shape == SHAPE_ONE_SYNC) {
+            node->set(StringName("watched_value"), 43);
+            seen.watched_again = int64_t(
+                netw_test::pump_until_value(
+                    rig,
+                    mirror,
+                    StringName("watched_value"),
+                    43
                 )
             );
         }
@@ -361,6 +373,13 @@ LawVerdict law_carries(const CarryRun &p_run) {
     if ((scenario.carries_watch || scenario.shape == SHAPE_TWO_SYNCS)
         && seen.watched != 42) {
         return law_broken("the second field reads %d", int(seen.watched));
+    }
+    if (scenario.carries_watch && scenario.shape == SHAPE_ONE_SYNC
+        && seen.watched_again != 43) {
+        return law_broken(
+            "the watched field reads %d after its second change",
+            int(seen.watched_again)
+        );
     }
     if (scenario.carries_sub_node
         && !seen.modulate.is_equal_approx(Color(0.25, 0.5, 0.75, 1.0))) {

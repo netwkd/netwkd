@@ -3,6 +3,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 #include "support/netw_call_log.h"
@@ -36,6 +37,7 @@ using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw_test::CallLog;
 using netw_test::FaultWatch;
+using netw_test::Internals;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawVerdict;
@@ -144,6 +146,38 @@ func everyone(tag: int) -> int:
 @rpc("authority", "call_remote", "reliable")
 func others(tag: int) -> int:
 	return tag * 2
+)";
+
+constexpr const char *GATED_SINK = R"(extends Node
+
+signal opened
+
+var calls := 0
+var tags := 0
+
+func _init() -> void:
+	Netw.configure_rpc(note_call).defer_until(opened)
+
+@rpc("any_peer", "call_remote", "reliable")
+func note_call(tag: int) -> void:
+	calls += 1
+	tags = tags * 10 + tag
+)";
+
+constexpr const char *GATED_ARG_SINK = R"(extends Node
+
+signal opened(level: int)
+
+var calls := 0
+var tags := 0
+
+func _init() -> void:
+	Netw.configure_rpc(note_call).defer_until(opened)
+
+@rpc("any_peer", "call_remote", "reliable")
+func note_call(tag: int) -> void:
+	calls += 1
+	tags = tags * 10 + tag
 )";
 
 constexpr const char *SIGNAL_SINK = R"(extends Node
@@ -364,6 +398,40 @@ LawVerdict node_argument(const World &) {
     const Object *at_client = star.at(1)->get(StringName("pointed"));
     if (at_client != targets[2]) {
         return law_broken("client 1's handler read another node");
+    }
+    return law_held();
+}
+
+LawVerdict node_argument_before_its_entity(const World &) {
+    Star star(SINK);
+    NetwMultiplayer *server = star.rig.server();
+    Node *nodes[2] = {sink_of(SINK, "Late"), sink_of(SINK, "Late")};
+    for (int side = 0; side < 2; ++side) {
+        star.owned.push_back(nodes[side]);
+        star.rig.branch(side == 0 ? -1 : 1)->add_child(nodes[side]);
+    }
+    const RID late = server->entity_create();
+    const int64_t route = server->entity_admit(late);
+    REQUIRE(server->entity_bind_node(late, nodes[0]) == OK);
+
+    Array args;
+    args.push_back(nodes[0]);
+    Netw::rpc_id(star.rig.peer_id(1), star.method(-1, "point_at"), args);
+    star.rig.pump(6);
+    const Object *early = star.at(1)->get(StringName("pointed"));
+
+    NetwMultiplayer *client = star.rig.client(1);
+    const RID here = client->entity_create();
+    REQUIRE(client->entity_bind_route(here, route) == OK);
+    REQUIRE(client->entity_bind_node(here, nodes[1]) == OK);
+    star.rig.pump(2);
+    const Object *pointed = star.at(1)->get(StringName("pointed"));
+    if (early != nullptr || pointed != nodes[1]) {
+        return law_broken(
+            "client 1's handler ran early %d, and read its own node %d",
+            int(early != nullptr),
+            int(pointed == nodes[1])
+        );
     }
     return law_held();
 }
@@ -641,6 +709,139 @@ LawVerdict unsteered_controller(const World &) {
     if (star.read(0, "calls") != 0) {
         return law_broken("a call to the controller ran on a client");
     }
+
+    star.rig.server()->entity_set_controller(star.at_hub, star.rig.peer_id(0));
+    star.rig.pump(4);
+    Netw::rpc_controller(star.method(-1, "note_call"), tagged(5));
+    const Ref<NetwPromise> steered
+        = Netw::request_controller(star.method(-1, "double_tag"), tagged(5));
+    star.rig.pump(6);
+    if (star.read(0, "calls") != 2 || star.read(0, "last_tag") != 5) {
+        return law_broken(
+            "client 0 ran %d of the server's two calls",
+            star.read(0, "calls")
+        );
+    }
+    if (steered.is_null() || int(steered->get_result()) != 10) {
+        return law_broken("client 0 did not answer the server's request");
+    }
+    return law_held();
+}
+
+void hand_route_to_another(Star &p_star) {
+    NetwMultiplayer *server = p_star.rig.server();
+    const int64_t route = server->entity_get_route(p_star.at_hub);
+    server->NETW_API_VIRTUAL(set_multiplayer_peer)(Ref<MultiplayerPeer>());
+    p_star.rig.pump(2);
+    Node *taker = memnew(Node);
+    taker->set_name("Taker");
+    p_star.owned.push_back(taker);
+    p_star.rig.branch(-1)->add_child(taker);
+    const RID other = server->entity_create();
+    REQUIRE(server->entity_bind_route(other, route) == OK);
+    REQUIRE(server->entity_bind_node(other, taker) == OK);
+}
+
+void end_session_and_rebind(Star &p_star) {
+    NetwMultiplayer *server = p_star.rig.server();
+    const int64_t route = server->entity_get_route(p_star.at_hub);
+    server->NETW_API_VIRTUAL(set_multiplayer_peer)(Ref<MultiplayerPeer>());
+    p_star.rig.pump(2);
+    const RID again = server->entity_create();
+    REQUIRE(server->entity_bind_route(again, route) == OK);
+    REQUIRE(server->entity_bind_node(again, p_star.at(-1)) == OK);
+}
+
+LawVerdict deferred_call(const World &) {
+    for (int at = 0; at < 4; ++at) {
+        const bool leaves = at == 1;
+        const bool reused = at == 2;
+        const bool ended = at == 3;
+        Star star(GATED_SINK);
+        Netw::rpc_id(1, star.method(0, "note_call"), tagged(3));
+        star.rig.pump(6);
+        if (star.read(-1, "calls") != 0) {
+            return law_broken("the call ran before its signal");
+        }
+        if (leaves) {
+            star.at(-1)->get_parent()->remove_child(star.at(-1));
+            star.rig.pump(2);
+        }
+        if (reused) {
+            hand_route_to_another(star);
+        }
+        if (ended) {
+            end_session_and_rebind(star);
+        }
+        star.at(-1)->emit_signal(StringName("opened"));
+        star.rig.pump(2);
+        if (star.read(-1, "calls") != (at == 0 ? 1 : 0)) {
+            return law_broken(
+                "the server ran it %d times, its entity gone %d, its route "
+                "taken %d, its session ended %d",
+                star.read(-1, "calls"),
+                leaves,
+                reused,
+                ended
+            );
+        }
+    }
+    return law_held();
+}
+
+LawVerdict deferred_calls_share_a_signal(const World &) {
+    Star star(GATED_SINK);
+    Netw::rpc_id(1, star.method(0, "note_call"), tagged(3));
+    Netw::rpc_id(1, star.method(0, "note_call"), tagged(4));
+    star.rig.pump(6);
+    star.at(-1)->emit_signal(StringName("opened"));
+    star.rig.pump(2);
+    if (star.read(-1, "tags") != 34) {
+        return law_broken(
+            "the server ran %d of the two parked calls, tagged %d",
+            star.read(-1, "calls"),
+            star.read(-1, "tags")
+        );
+    }
+    return law_held();
+}
+
+LawVerdict deferred_call_on_a_signal_with_an_argument(const World &) {
+    Star star(GATED_ARG_SINK);
+    Netw::rpc_id(1, star.method(0, "note_call"), tagged(3));
+    star.rig.pump(6);
+    star.at(-1)->emit_signal(StringName("opened"), 7);
+    star.rig.pump(2);
+    Netw::rpc_id(1, star.method(0, "note_call"), tagged(4));
+    star.rig.pump(6);
+    if (star.read(-1, "tags") != 34) {
+        return law_broken(
+            "the server ran %d of the two calls, tagged %d",
+            star.read(-1, "calls"),
+            star.read(-1, "tags")
+        );
+    }
+    return law_held();
+}
+
+LawVerdict deferred_call_of_a_freed_node(const World &) {
+    Star star(GATED_SINK);
+    Netw::rpc_id(1, star.method(0, "note_call"), tagged(3));
+    star.rig.pump(6);
+    const int parked = Internals::parked_call_count(star.rig.server());
+    Node *gated = star.at(-1);
+    star.owned.erase(gated);
+    gated->get_parent()->remove_child(gated);
+    memdelete(gated);
+    star.rig.pump(2);
+    const int left = Internals::parked_call_count(star.rig.server());
+    if (parked != 1 || left != 0) {
+        return law_broken(
+            "%d calls parked and %d still held after the node was freed",
+            parked,
+            left
+        );
+    }
     return law_held();
 }
 
@@ -782,7 +983,54 @@ LawVerdict channel_delivers(const World &) {
     return law_held();
 }
 
+LawVerdict child_call(const World &) {
+    LoopbackRig rig(1);
+    rig.mount();
+    Node *roots[2] = {nullptr, nullptr};
+    Node *sinks[2] = {nullptr, nullptr};
+    for (int side = -1; side < 1; ++side) {
+        roots[side + 1] = memnew(Node);
+        roots[side + 1]->set_name("Car");
+        sinks[side + 1] = sink_of(CALL_SINK);
+        roots[side + 1]->add_child(sinks[side + 1]);
+        rig.branch(side)->add_child(roots[side + 1]);
+    }
+    NetwMultiplayer *server = rig.server();
+    const RID made = server->entity_create();
+    const int64_t route = server->entity_admit(made);
+    REQUIRE(route > 0);
+    REQUIRE(server->entity_bind_node(made, roots[0]) == OK);
+    NetwMultiplayer *client = rig.client(0);
+    const RID here = client->entity_create();
+    REQUIRE(client->entity_bind_route(here, route) == OK);
+    REQUIRE(client->entity_bind_node(here, roots[1]) == OK);
+    rig.pump(4);
+
+    Netw::rpc(Callable(sinks[0], "note_call"), tagged(4));
+    const Ref<NetwPromise> asked
+        = Netw::request(Callable(sinks[1], "double_tag"), tagged(4));
+    rig.pump(6);
+    const int client_calls = int(sinks[1]->get(StringName("calls")));
+    const int server_calls = int(sinks[0]->get(StringName("calls")));
+    const bool answered = asked.is_valid() && !asked->get_is_failed()
+        && asked->get_code() == OK;
+    for (Node *root : roots) {
+        root->get_parent()->remove_child(root);
+        memdelete(root);
+    }
+    if (client_calls != 1) {
+        return law_broken("the client's child ran it %d times", client_calls);
+    }
+    if (server_calls != 1 || !answered) {
+        return law_broken("the server's child ran it %d times", server_calls);
+    }
+    return law_held();
+}
+
 const Row ROWS[] = {
+    {"a call and a request on a child node of an entity",
+     "each runs once on that child on the receiving peer",
+     &child_call},
     {"a payload a client sends on a NetwChannel the server registered",
      "the server's handler runs once with the client's id and the payload",
      &channel_delivers},
@@ -800,6 +1048,10 @@ const Row ROWS[] = {
     {"a call whose argument is a node of an entity",
      "each receiver's handler reads its own copy of that node",
      &node_argument},
+    {"a call whose argument is a node of an entity the receiver has not "
+     "spawned yet",
+     "the handler runs once that entity is live there, and reads its node",
+     &node_argument_before_its_entity},
     {"a request to a method whose sender rule refuses the caller",
      "it fails with ERR_UNAUTHORIZED and the receiver warns",
      &refused_by_sender_rule},
@@ -830,8 +1082,9 @@ const Row ROWS[] = {
     {"request_all of a call_local method and of a call_remote one",
      "the caller answers too only for call_local, under peer 1",
      &request_all_asks_caller},
-    {"rpc_controller and request_controller on an entity no peer steers",
-     "they reach the server from a client and run at once on the server",
+    {"rpc_controller and request_controller on an entity no peer steers, "
+     "then on one client 0 steers",
+     "they run on the server, at once when it calls, then on client 0",
      &unsteered_controller},
     {"configure_rpc, configure_spawn and configure_signal naming nothing, "
      "configure_rpc on a lambda and on an engine method, and a handler "
@@ -842,6 +1095,23 @@ const Row ROWS[] = {
      "and configure_persistence on a node already in the tree",
      "each is reported and declares nothing",
      &mounted_declaration},
+    {"a call declared with defer_until, one whose node leaves the tree "
+     "before the signal, one whose route the next session gives to "
+     "another entity, and one whose entity the next session binds again",
+     "the first runs when the signal fires and the others never run",
+     &deferred_call},
+    {"two calls declared with defer_until that reach one node before its "
+     "signal",
+     "both run, in the order they arrived, when the signal fires",
+     &deferred_calls_share_a_signal},
+    {"a call declared with defer_until on a signal that carries an "
+     "argument, and a second call after the signal fires",
+     "the first runs when the signal fires and the second at once",
+     &deferred_call_on_a_signal_with_an_argument},
+    {"a call declared with defer_until whose node is freed before its "
+     "signal",
+     "the session holds nothing of it after the next poll",
+     &deferred_call_of_a_freed_node},
 };
 
 TEST_CASE(

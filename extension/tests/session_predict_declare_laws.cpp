@@ -107,8 +107,12 @@ public:
 
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         if (handle.is_valid()) {
+            const Ref<NetwEntity> bound = handle->get_entity();
             step_is_the_one_installed
-                = NetwMultiplayer::sim_step_of(handle->get_entity().ptr())
+                = NetwMultiplayer::sim_step_of(
+                      *bound->get_record(),
+                      bound->get_owner()
+                  )
                 == step;
         }
         if (planted != PLANT_AN_UNDECLARE_THAT_NEVER_HAPPENED) {
@@ -340,13 +344,15 @@ public:
 
         const Ref<NetwPrediction> handle = session->prediction_handle(entity);
         REQUIRE(handle.is_valid());
+        const Ref<NetwEntity> bound = handle->get_entity();
         policy = NetwMultiplayer::predict_resolve_mode(
-            handle->get_entity().ptr()
+            *bound->get_record(),
+            bound->get_owner()
         );
         netw::NetwPredictionEngine *pool
             = Internals::get_prediction_engine(session);
         REQUIRE(pool != nullptr);
-        const int64_t slot = pool->slot_register(wrapper);
+        const int64_t slot = Internals::seat(pool, wrapper);
         REQUIRE(slot >= 0);
         const int declared = netw::NetwPredictionEngine::correction_for_mode(
             handle->get_mode()
@@ -448,14 +454,17 @@ void check_auto_resolution(bool p_rigid) {
         = netw::NetwPredictionEngine::correction_for_mode(expected);
     NETW_CHECK_EQ(int(handle->get_mode()), int(NetwPrediction::MODE_AUTO));
     const auto resolved = [&wrapper]() {
-        return int(NetwMultiplayer::predict_resolve_mode(wrapper.ptr()));
+        return int(NetwMultiplayer::predict_resolve_mode(
+            *wrapper->get_record(),
+            wrapper->get_owner()
+        ));
     };
     NETW_CHECK_EQ(resolved(), expected);
 
     netw::NetwPredictionEngine *pool
         = Internals::get_prediction_engine(session);
     REQUIRE(pool != nullptr);
-    const int64_t slot = pool->slot_register(wrapper);
+    const int64_t slot = Internals::seat(pool, wrapper);
     REQUIRE(slot >= 0);
     const int automatic = int(netw::CorrectionMode::AUTO);
     NETW_CHECK_EQ(resolved(), expected);

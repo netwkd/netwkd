@@ -7,6 +7,8 @@
 
 #include "godot/class_db.hpp"
 #include "godot/object.hpp"
+#include "netw/fault_book.hpp"
+#include "netw/table/quant_spec.hpp"
 
 using namespace godot;
 
@@ -80,6 +82,39 @@ void NetwQuantize::_bind_methods() {
     GDVIRTUAL_BIND(_encode, "value", "element");
     GDVIRTUAL_BIND(_decode, "codes", "type");
     GDVIRTUAL_BIND(_max_error, "type");
+}
+
+void NetwQuantize::note_change(bool p_changes) {
+    if (!p_changes || (!held && part_holds == 0) || reported) {
+        return;
+    }
+    reported = true;
+    fault::raise(
+        nullptr,
+        NETW_FAULT_QUANTIZER_CHANGED,
+        {vformat("A %s", get_class())}
+    );
+}
+
+void NetwQuantize::hold_part(const Ref<NetwQuantize> &p_part) const {
+    if (held && p_part.is_valid()) {
+        p_part->part_holds += 1;
+    }
+}
+
+void NetwQuantize::swap_part(
+    Ref<NetwQuantize> &r_part,
+    const Ref<NetwQuantize> &p_value
+) {
+    if (p_value == r_part) {
+        return;
+    }
+    note_change(true);
+    if (held && r_part.is_valid()) {
+        r_part->part_holds -= 1;
+    }
+    r_part = p_value;
+    hold_part(p_value);
 }
 
 int NetwQuantize::stride(Variant::Type type) const {
@@ -268,7 +303,9 @@ void NetwQuantizeScalar::_bind_methods() {
 }
 
 void NetwQuantizeScalar::set_bit_count(int value) {
-    bit_count = std::clamp(value, 1, 32);
+    const int clamped = std::clamp(value, 1, 32);
+    note_change(clamped != bit_count);
+    bit_count = clamped;
 }
 
 int NetwQuantizeScalar::get_bit_count() const {
@@ -276,6 +313,7 @@ int NetwQuantizeScalar::get_bit_count() const {
 }
 
 void NetwQuantizeScalar::set_min_limit(double value) {
+    note_change(value != min_limit);
     min_limit = value;
 }
 
@@ -284,6 +322,7 @@ double NetwQuantizeScalar::get_min_limit() const {
 }
 
 void NetwQuantizeScalar::set_max_limit(double value) {
+    note_change(value != max_limit);
     max_limit = value;
 }
 
@@ -322,27 +361,21 @@ Ref<NetwQuantizeScalar> NetwQuantizeScalar::limits(
     double minimum,
     double maximum
 ) {
-    min_limit = minimum;
-    max_limit = maximum;
+    set_min_limit(minimum);
+    set_max_limit(maximum);
     return Ref<NetwQuantizeScalar>(this);
 }
 
 int64_t NetwQuantizeScalar::top_code() const {
-    return std::max<int64_t>(2, (int64_t(1) << bit_count) - 1) - 1;
+    return table::scalar_top(bit_count);
 }
 
 int64_t NetwQuantizeScalar::encode_axis(double value) const {
-    const double span = max_limit - min_limit;
-    const int64_t top = top_code();
-    const double unit
-        = span == 0.0 ? 0.0 : std::clamp((value - min_limit) / span, 0.0, 1.0);
-    return std::clamp<int64_t>(int64_t(std::round(unit * double(top))), 0, top);
+    return table::scalar_code(bit_count, min_limit, max_limit, value);
 }
 
 double NetwQuantizeScalar::decode_axis(int64_t code) const {
-    const int64_t top = top_code();
-    const int64_t held = std::clamp<int64_t>(code, 0, top);
-    return min_limit + double(held) / double(top) * (max_limit - min_limit);
+    return table::scalar_value(bit_count, min_limit, max_limit, code);
 }
 
 int64_t NetwQuantizeScalar::encode(const Variant &value, int element) const {
@@ -425,7 +458,9 @@ void NetwQuantizeAngle::_bind_methods() {
 }
 
 void NetwQuantizeAngle::set_bit_count(int value) {
-    bit_count = std::clamp(value, 1, 32);
+    const int clamped = std::clamp(value, 1, 32);
+    note_change(clamped != bit_count);
+    bit_count = clamped;
 }
 
 int NetwQuantizeAngle::get_bit_count() const {
@@ -433,6 +468,7 @@ int NetwQuantizeAngle::get_bit_count() const {
 }
 
 void NetwQuantizeAngle::set_centered_on_zero(bool value) {
+    note_change(value != centered_on_zero);
     centered_on_zero = value;
 }
 
@@ -446,32 +482,21 @@ Ref<NetwQuantizeAngle> NetwQuantizeAngle::bits(int value) {
 }
 
 Ref<NetwQuantizeAngle> NetwQuantizeAngle::centered() {
-    centered_on_zero = true;
+    set_centered_on_zero(true);
     return Ref<NetwQuantizeAngle>(this);
 }
 
 int64_t NetwQuantizeAngle::encode(const Variant &value, int element) const {
     (void)element;
-    const uint64_t level_count = uint64_t(1) << bit_count;
-    double wrapped = std::fmod(double(value), TAU_VALUE);
-    if (wrapped < 0.0) {
-        wrapped += TAU_VALUE;
-    }
-    return int64_t(
-        uint64_t(std::llround(wrapped / TAU_VALUE * double(level_count)))
-        % level_count
-    );
+    return table::angle_code(bit_count, double(value));
 }
 
 Variant NetwQuantizeAngle::decode(
     const PackedInt64Array &codes,
     Variant::Type type
 ) const {
-    const uint64_t level_count = uint64_t(1) << bit_count;
-    double angle = double(codes[0]) / double(level_count) * TAU_VALUE;
-    if (centered_on_zero && angle > PI_VALUE) {
-        angle -= TAU_VALUE;
-    }
+    const double angle
+        = table::angle_value(bit_count, centered_on_zero, codes[0]);
     return type == Variant::INT ? Variant(int64_t(std::round(angle)))
                                 : Variant(angle);
 }
@@ -516,7 +541,9 @@ void NetwQuantizeQuaternion::_bind_methods() {
 }
 
 void NetwQuantizeQuaternion::set_bit_count(int value) {
-    bit_count = std::clamp(value, 1, 20);
+    const int clamped = std::clamp(value, 1, 20);
+    note_change(clamped != bit_count);
+    bit_count = clamped;
 }
 
 int NetwQuantizeQuaternion::get_bit_count() const {
@@ -528,20 +555,6 @@ Ref<NetwQuantizeQuaternion> NetwQuantizeQuaternion::bits(int value) {
     return Ref<NetwQuantizeQuaternion>(this);
 }
 
-int64_t NetwQuantizeQuaternion::encode_component(double value) const {
-    const int64_t top = (int64_t(1) << bit_count) - 1;
-    const double span = QUATERNION_COMPONENT_LIMIT * 2.0;
-    const double unit
-        = std::clamp((value + QUATERNION_COMPONENT_LIMIT) / span, 0.0, 1.0);
-    return int64_t(std::round(unit * double(top)));
-}
-
-double NetwQuantizeQuaternion::decode_component(int64_t code) const {
-    const int64_t top = (int64_t(1) << bit_count) - 1;
-    const double unit = double(code) / double(top);
-    return unit * QUATERNION_COMPONENT_LIMIT * 2.0 - QUATERNION_COMPONENT_LIMIT;
-}
-
 int64_t NetwQuantizeQuaternion::encode(
     const Variant &value,
     int element
@@ -551,34 +564,7 @@ int64_t NetwQuantizeQuaternion::encode(
 }
 
 int64_t NetwQuantizeQuaternion::encode_turn(const Quaternion &value) const {
-    Quaternion quaternion = value.normalized();
-    std::array<double, 4> components = {
-        quaternion.x,
-        quaternion.y,
-        quaternion.z,
-        quaternion.w,
-    };
-    int largest = 0;
-    for (int index = 1; index < 4; ++index) {
-        if (std::abs(components[index]) > std::abs(components[largest])) {
-            largest = index;
-        }
-    }
-    if (components[largest] < 0.0) {
-        for (double &component : components) {
-            component = -component;
-        }
-    }
-    int64_t packed = int64_t(largest);
-    int at = 2;
-    for (int index = 0; index < 4; ++index) {
-        if (index == largest) {
-            continue;
-        }
-        packed |= encode_component(components[index]) << at;
-        at += bit_count;
-    }
-    return packed;
+    return table::turn_code(bit_count, value);
 }
 
 Variant NetwQuantizeQuaternion::decode(
@@ -590,27 +576,7 @@ Variant NetwQuantizeQuaternion::decode(
 }
 
 Quaternion NetwQuantizeQuaternion::decode_turn(int64_t packed) const {
-    const int largest = int(packed & 0x3);
-    const int64_t mask = (int64_t(1) << bit_count) - 1;
-    std::array<double, 4> components = {0.0, 0.0, 0.0, 0.0};
-    double length_squared = 0.0;
-    int at = 2;
-    for (int index = 0; index < 4; ++index) {
-        if (index == largest) {
-            continue;
-        }
-        components[index] = decode_component((packed >> at) & mask);
-        length_squared += components[index] * components[index];
-        at += bit_count;
-    }
-    components[largest] = std::sqrt(std::max(0.0, 1.0 - length_squared));
-    return Quaternion(
-               components[0],
-               components[1],
-               components[2],
-               components[3]
-    )
-        .normalized();
+    return table::turn_value(bit_count, packed);
 }
 
 bool NetwQuantizeQuaternion::supports_type(Variant::Type type) const {
@@ -619,7 +585,7 @@ bool NetwQuantizeQuaternion::supports_type(Variant::Type type) const {
 
 int NetwQuantizeQuaternion::bit_width(Variant::Type type) const {
     (void)type;
-    return 2 + bit_count * 3;
+    return table::turn_width(bit_count);
 }
 
 int NetwQuantizeQuaternion::stride(Variant::Type type) const {
@@ -717,10 +683,16 @@ const Ref<NetwQuantize> &NetwQuantizeTransform2D::rotation_or_stock() const {
     return stock_rotation;
 }
 
+void NetwQuantizeTransform2D::hold_parts() {
+    hold_part(origin_quantizer);
+    hold_part(rotation_quantizer);
+    hold_part(scale_quantizer);
+}
+
 void NetwQuantizeTransform2D::set_origin_quantizer(
     const Ref<NetwQuantize> &value
 ) {
-    origin_quantizer = value;
+    swap_part(origin_quantizer, value);
 }
 
 Ref<NetwQuantize> NetwQuantizeTransform2D::get_origin_quantizer() const {
@@ -730,7 +702,7 @@ Ref<NetwQuantize> NetwQuantizeTransform2D::get_origin_quantizer() const {
 void NetwQuantizeTransform2D::set_rotation_quantizer(
     const Ref<NetwQuantize> &value
 ) {
-    rotation_quantizer = value;
+    swap_part(rotation_quantizer, value);
 }
 
 Ref<NetwQuantize> NetwQuantizeTransform2D::get_rotation_quantizer() const {
@@ -740,7 +712,7 @@ Ref<NetwQuantize> NetwQuantizeTransform2D::get_rotation_quantizer() const {
 void NetwQuantizeTransform2D::set_scale_quantizer(
     const Ref<NetwQuantize> &value
 ) {
-    scale_quantizer = value;
+    swap_part(scale_quantizer, value);
 }
 
 Ref<NetwQuantize> NetwQuantizeTransform2D::get_scale_quantizer() const {
@@ -895,10 +867,16 @@ const Ref<NetwQuantize> &NetwQuantizeTransform3D::rotation_or_stock() const {
     return stock_rotation;
 }
 
+void NetwQuantizeTransform3D::hold_parts() {
+    hold_part(origin_quantizer);
+    hold_part(rotation_quantizer);
+    hold_part(scale_quantizer);
+}
+
 void NetwQuantizeTransform3D::set_origin_quantizer(
     const Ref<NetwQuantize> &value
 ) {
-    origin_quantizer = value;
+    swap_part(origin_quantizer, value);
 }
 
 Ref<NetwQuantize> NetwQuantizeTransform3D::get_origin_quantizer() const {
@@ -908,7 +886,7 @@ Ref<NetwQuantize> NetwQuantizeTransform3D::get_origin_quantizer() const {
 void NetwQuantizeTransform3D::set_rotation_quantizer(
     const Ref<NetwQuantize> &value
 ) {
-    rotation_quantizer = value;
+    swap_part(rotation_quantizer, value);
 }
 
 Ref<NetwQuantize> NetwQuantizeTransform3D::get_rotation_quantizer() const {
@@ -918,7 +896,7 @@ Ref<NetwQuantize> NetwQuantizeTransform3D::get_rotation_quantizer() const {
 void NetwQuantizeTransform3D::set_scale_quantizer(
     const Ref<NetwQuantize> &value
 ) {
-    scale_quantizer = value;
+    swap_part(scale_quantizer, value);
 }
 
 Ref<NetwQuantize> NetwQuantizeTransform3D::get_scale_quantizer() const {

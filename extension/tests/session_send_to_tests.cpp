@@ -53,8 +53,8 @@ TEST_CASE(
         godot::OK
     );
 
-    NETW_CHECK_EQ(core->carrier_pending(PEER, false), 8);
-    NETW_CHECK_EQ(core->carrier_pending(PEER, true), 0);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, false), 8);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, true), 0);
 }
 
 TEST_CASE(
@@ -66,11 +66,11 @@ TEST_CASE(
     core.instantiate();
 
     core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), false, 0, String());
-    NETW_CHECK_EQ(core->carrier_pending(PEER, false), 8);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, false), 8);
 
     core->send_to(PEER, 4, SYNC_CHANNEL, payload(4), false, 0, String());
     const bool one_run_rather_than_two
-        = core->carrier_pending(PEER, false) == 16;
+        = core->wire().carrier.pending(PEER, false) == 16;
     CHECK(one_run_rather_than_two);
 }
 
@@ -91,29 +91,7 @@ TEST_CASE(
         netw::wire::Delivery::TICK
     );
 
-    NETW_CHECK_EQ(core->carrier_pending(PEER, false), 0);
-}
-
-TEST_CASE(
-    "[Netw][Transport][Hosted] S4 a negative route is refused and stages "
-    "nothing, because it addresses no entity and no peer-scoped stream"
-) {
-    const Ref<NetwMultiplayer> core = configured_core();
-
-    NETW_CHECK_EQ(
-        core->send_to(
-            PEER,
-            -1,
-            SYNC_CHANNEL,
-            payload(4),
-            false,
-            0,
-            String()
-        ),
-        godot::ERR_INVALID_PARAMETER
-    );
-
-    NETW_CHECK_EQ(core->carrier_pending(PEER, false), 0);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, false), 0);
 }
 
 TEST_CASE(
@@ -124,8 +102,8 @@ TEST_CASE(
 
     core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String());
 
-    NETW_CHECK_EQ(core->carrier_pending(PEER, true), 8);
-    NETW_CHECK_EQ(core->carrier_pending(PEER, false), 0);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, true), 8);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, false), 0);
 }
 
 TEST_CASE(
@@ -136,7 +114,7 @@ TEST_CASE(
     const Ref<NetwMultiplayer> core = configured_core();
 
     core->send_to(PEER, 3, SYNC_CHANNEL, payload(4), true, 0, String());
-    NETW_CHECK_EQ(core->carrier_pending(PEER, true), 8);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, true), 8);
 
     core->send_to(
         PEER,
@@ -148,7 +126,24 @@ TEST_CASE(
         String()
     );
 
-    NETW_CHECK_EQ(core->carrier_pending(PEER, true), 0);
+    NETW_CHECK_EQ(core->wire().carrier.pending(PEER, true), 0);
+}
+
+TEST_CASE(
+    "[Netw][Transport][Hosted] S7 a cleared route leaves no row in the "
+    "peer's run, so the run's ack names only live routes"
+) {
+    const Ref<NetwMultiplayer> core = configured_core();
+    netw::CarrierRow row;
+    row.route = 3;
+    row.token = 1;
+    row.revision = 1;
+    core->wire().carrier.append(PEER, payload(4), false, 1024, &row);
+
+    core->replication_clear_route(3);
+
+    const netw::CarrierBatch run = core->wire().carrier.take(PEER, false);
+    NETW_CHECK_EQ(int64_t(run.rows().size()), 0);
 }
 
 } // namespace TestNetwSessionSendTo

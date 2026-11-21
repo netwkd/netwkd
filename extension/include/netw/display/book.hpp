@@ -1,16 +1,20 @@
 #pragma once
 
 #include "godot/local_vector.hpp"
-#include "godot/ref_counted.hpp"
 #include "godot/rid.hpp"
+#include "godot/templates.hpp"
 #include "godot/variant.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/display/pump_stats.hpp"
 #include "netw/display/runtime.hpp"
 
+namespace netw {
+class NetwMultiplayer;
+} // namespace netw
+
 namespace netw::display {
 
-class Book : public godot::RefCounted {
+class Book {
 private:
     struct Row {
         int64_t route = 0;
@@ -26,16 +30,19 @@ private:
     godot::LocalVector<Runtime *> pumping;
     godot::LocalVector<Runtime *> recording;
     PumpStats stats;
-    godot::Callable went_dirty;
+    NetwMultiplayer *session = nullptr;
 
     Row &row_for(const godot::RID &p_entity);
     void forget(const godot::RID &p_entity);
     void release(Runtime *p_runtime);
 
 public:
+    Book() = default;
+    Book(const Book &) = delete;
+    Book &operator=(const Book &) = delete;
     ~Book();
 
-    void set_went_dirty(const godot::Callable &callback);
+    void seat(NetwMultiplayer *p_session);
 
     void enroll(const godot::RID &p_entity, int64_t p_route);
 
@@ -78,6 +85,7 @@ public:
     bool is_dirty(const godot::RID &p_entity) const;
     godot::TypedArray<godot::RID> take_dirty();
 
+    void rekey(const godot::RID &p_from, const godot::RID &p_to);
     void drop(const godot::RID &p_entity);
     void drop_route(int64_t p_route);
     void clear();

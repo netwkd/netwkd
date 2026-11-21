@@ -48,8 +48,8 @@ public:
     enums::NetwInterestLayer::PerceptionPolicy
     get_default_perception_policy() const;
 
-    godot::Dictionary get_viewers() const;
-    godot::Dictionary get_entities();
+    godot::PackedInt32Array get_viewers() const;
+    godot::TypedArray<NetwEntity> get_entities();
 
     bool add_viewer(int64_t p_peer_id);
     bool remove_viewer(int64_t p_peer_id);
@@ -64,8 +64,7 @@ public:
         int64_t p_peer_id
     );
 
-    godot::Array viewer_ids() const;
-    godot::Dictionary monitor_snapshot() const;
+    int64_t stat(enums::NetwMultiplayer::LayerStat p_stat) const;
     void set_driver(const godot::Callable &p_driver);
     godot::Callable get_driver();
 };

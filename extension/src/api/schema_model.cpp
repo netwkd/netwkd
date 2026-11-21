@@ -5,7 +5,7 @@
 #include "godot/templates.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
-#include "netw/schema_core.hpp"
+#include "netw/schema_book.hpp"
 #include "netw/schema_model.hpp"
 
 using namespace godot;
@@ -19,21 +19,33 @@ Ref<NetwSchema> NetwSchema::create(const StringName &p_name) {
     return made;
 }
 
-Ref<NetwSchema> NetwSchema::from_record(const table::SchemaRecord &p_record) {
-    const Ref<NetwSchema> made = create(p_record.name);
-    made->columns.reserve(p_record.columns.size());
-    for (const table::SchemaColumn &property : p_record.columns) {
+Ref<NetwSchema> NetwSchema::from_record(
+    const SchemaBook &p_schemas,
+    const RID &p_schema
+) {
+    const table::SchemaRecord *record = p_schemas.record_of(p_schema);
+    if (record == nullptr) {
+        return Ref<NetwSchema>();
+    }
+    const Ref<NetwSchema> made = create(record->name);
+    made->columns.reserve(record->columns.size());
+    for (const table::SchemaColumn &property : record->columns) {
         Column declared;
         declared.key = property.key;
         declared.type = NetwMultiplayer::ColumnType(property.type);
         declared.stride = property.stride;
-        declared.quantizer = property.quantizer;
+        declared.quantizer
+            = Ref<NetwQuantize>(SchemaBook::quantizer_of(property.quant));
         made->columns.push_back(declared);
     }
-    for (const table::SchemaMigration &migration : p_record.migrations) {
-        made->migrations[migration.from_version] = migration.step;
+    const LocalVector<SchemaMigration> *steps
+        = p_schemas.migrations_of(p_schema);
+    if (steps != nullptr) {
+        for (const SchemaMigration &migration : *steps) {
+            made->migrations[migration.from_version] = migration.step;
+        }
     }
-    made->version = p_record.storage_version;
+    made->version = record->storage_version;
     made->replicated_lane = false;
     made->read_only = true;
     return made;

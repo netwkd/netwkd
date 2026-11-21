@@ -588,7 +588,8 @@ struct Stealthed {
     }
 
     bool host_sees() const {
-        return server->interest_player_sees(HOST_PEER, entity);
+        const RID seen = entity->get_rid_handle();
+        return server->interest_player_sees(HOST_PEER, seen);
     }
 
     void hide() {
@@ -741,9 +742,10 @@ struct Cars {
     }
 
     Array shared_on_owner() const {
-        return named_ids(
-            owner->interest_shared_entities(local_mine, StringName("arena"))
-        );
+        return named_ids(owner->interest_shared_entities(
+            local_mine->get_rid_handle(),
+            StringName("arena")
+        ));
     }
 };
 
@@ -754,7 +756,7 @@ LawVerdict owner_shares(const Stand &) {
     stand.mirror("Spectator", 75, "lobby");
 
     const Array committed = named_ids(stand.server->interest_shared_entities(
-        stand.mine,
+        stand.mine->get_rid_handle(),
         StringName("arena")
     ));
     const Array derived = stand.shared_on_owner();
@@ -781,12 +783,14 @@ LawVerdict owner_shares(const Stand &) {
 
 LawVerdict owner_in_scene(const Stand &) {
     Cars stand(76);
+    const RID mine = stand.local_mine->get_rid_handle();
+    const RID arena
+        = stand.owner->interest_layer_create(StringName("scene:Arena"));
     stand.owner->interest_client_admit(
-        stand.owner->interest_layer_create(StringName("scene:Arena")),
-        stand.local_mine
+        netw::id::Entity(mine),
+        netw::id::Layer(arena)
     );
-    const Array resolved
-        = stand.owner->interest_resolved_layer_ids(stand.local_mine);
+    const Array resolved = stand.owner->interest_resolved_layer_ids(mine);
     if (!resolved.has(StringName("scene:Arena"))) {
         return law_broken("the owner's scene layer did not admit its car");
     }
@@ -854,14 +858,17 @@ LawVerdict driver_answers(const Stand &) {
     if (server->interest_flush_now() != OK || !layer->has_entity(own)) {
         return law_broken("the driver's own entity did not join the layer");
     }
+    if (layer->get_entities() != own_only) {
+        return law_broken("the layer's entities are not the driver's");
+    }
     layer->set_driver(Callable());
     if (layer->add_entity(foreign) || layer->has_entity(foreign)) {
         return law_broken("the layer took another session's entity");
     }
     layer->connect("interest_entered", driver.callable("entered"));
     server->interest_layer_report_edge(
-        server->interest_layer_find(StringName("sight")),
-        foreign,
+        netw::id::Entity(foreign->get_rid_handle()),
+        netw::id::Layer(server->interest_layer_find(StringName("sight"))),
         rig.peer_id(0),
         true
     );
@@ -1285,8 +1292,9 @@ LawVerdict nested_flush(const Stand &) {
     if (held.heard != 1 || heard_host(heard, "far") != 1) {
         return law_broken("a layer heard its enter for peer 1 more than once");
     }
-    if (!held.server->interest_player_sees(HOST_PEER, entity)
-        || !held.server->interest_player_sees(held.guest, entity)) {
+    const RID seen = entity->get_rid_handle();
+    if (!held.server->interest_player_sees(HOST_PEER, seen)
+        || !held.server->interest_player_sees(held.guest, seen)) {
         return law_broken("the flush after the handler left a peer blind");
     }
     return law_held();

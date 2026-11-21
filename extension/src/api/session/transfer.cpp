@@ -116,7 +116,7 @@ void NetwMultiplayer::session_reset_inner(
 
 void NetwMultiplayer::session_rename_peers(
     const PeerRename &p_rename,
-    LocalVector<Ref<NetwEntity>> &r_renamed
+    LocalVector<RID> &r_renamed
 ) {
     for (KeyValue<int64_t, PlayerRow> &row : players) {
         const int64_t renamed = p_rename.of(row.value.peer);
@@ -133,24 +133,22 @@ void NetwMultiplayer::session_rename_peers(
     join_roster.rename(p_rename);
     scene_membership.rename_members(p_rename);
     interest_engine.rename_peers(p_rename);
-    liveness_core->rename_authors(p_rename);
-    LocalVector<Ref<NetwEntity>> live;
+    liveness_core.rename_authors(p_rename);
+    LocalVector<RID> live;
     transfer_live_entities(live);
-    for (const Ref<NetwEntity> &entity : live) {
-        if (control_rename_peers(entity.ptr(), p_rename)) {
+    for (const RID &entity : live) {
+        if (control_rename_peers(*entity_record(entity), p_rename)) {
             r_renamed.push_back(entity);
         }
     }
     interest_sync_live_peers();
 }
 
-void NetwMultiplayer::transfer_live_entities(
-    LocalVector<Ref<NetwEntity>> &r_live
-) {
-    r_live.reserve(entity_slots.size());
-    entity_slots.each([&r_live](uint64_t, const EntitySlot &p_slot) {
-        if (p_slot.live.is_valid()) {
-            r_live.push_back(p_slot.live);
+void NetwMultiplayer::transfer_live_entities(LocalVector<RID> &r_live) {
+    r_live.reserve(views.entities.size());
+    views.entities.each([&r_live](uint64_t, const session::EntityView &p_view) {
+        if (p_view.live.is_valid()) {
+            r_live.push_back(p_view.live->get_rid_handle());
         }
     });
 }
@@ -227,7 +225,7 @@ void NetwMultiplayer::session_follow_relabel(
     spawn::Pipeline *spawns
         = replication != nullptr ? replication->get_spawn_pipeline() : nullptr;
     if (spawns != nullptr) {
-        spawns->clear_parks();
+        replication->clear_spawn_parks();
     }
     if (succeeds) {
         for (int at = 0; at < links.size(); ++at) {
@@ -238,7 +236,7 @@ void NetwMultiplayer::session_follow_relabel(
 
     const PeerRename rename
         = PeerRename::of_transfer(p_successor_was, p_former_now);
-    LocalVector<Ref<NetwEntity>> renamed;
+    LocalVector<RID> renamed;
     session_rename_peers(rename, renamed);
     transfer_label = rename.of(transfer_label);
 
@@ -251,7 +249,7 @@ void NetwMultiplayer::session_follow_relabel(
         if (spawns != nullptr) {
             promoted = spawns->promote_received();
         }
-        liveness_core->leave_lease();
+        liveness_core.leave_lease();
         const PackedInt32Array linked = gd::api_peer_ids(inner);
         transfer_await_resync(linked);
         for (int at = 0; at < linked.size(); ++at) {
@@ -261,13 +259,19 @@ void NetwMultiplayer::session_follow_relabel(
         session_set_role(ROLE_CLIENT);
         transfer_note_dying();
         if (spawns != nullptr) {
+            const PackedInt64Array armed = spawns->begin_demotion();
+            for (int at = 0; at < armed.size(); ++at) {
+                spawn::Ops ops;
+                spawns->discard_armed_spawn(armed[at], ops);
+                spawn_act(ops);
+            }
             spawns->demote_spawned();
         }
     }
 
-    for (const Ref<NetwEntity> &entity : renamed) {
-        control_follow_rename(entity.ptr());
-        sim_follow_steering(entity.ptr());
+    for (const RID &entity : renamed) {
+        control_follow_rename(entity);
+        sim_follow_steering(entity);
     }
     interest_refresh_compat_intents();
 
@@ -277,11 +281,13 @@ void NetwMultiplayer::session_follow_relabel(
         if (clock_engine().get_configured()) {
             clock_request_handshake();
         }
-        entity_slots.each([](uint64_t, const EntitySlot &p_slot) {
-            if (p_slot.live.is_valid()) {
-                control_forget_server_claims(p_slot.live.ptr());
+        views.entities.each(
+            [this](uint64_t, const session::EntityView &p_view) {
+                if (p_view.live.is_valid()) {
+                    control_forget_server_claims(p_view.live->get_rid_handle());
+                }
             }
-        });
+        );
         scene_viewers_server_generation = 0;
         scene_viewers_parked.clear();
         if (rejoins) {
@@ -324,12 +330,12 @@ void NetwMultiplayer::transfer_follow_scenes(bool p_succeeds) {
             scene_viewers_revision[applied.key] = applied.value;
         }
     }
-    LocalVector<Ref<NetwEntity>> live;
+    LocalVector<RID> live;
     transfer_live_entities(live);
 #if defined(NETW_TESTS)
     membership_audit_held += 1;
 #endif
-    for (const Ref<NetwEntity> &entity : live) {
+    for (const RID &entity : live) {
         membership_place_entity(entity);
     }
 #if defined(NETW_TESTS)
@@ -355,9 +361,9 @@ void NetwMultiplayer::transfer_follow_interest(bool p_succeeds) {
     if (!p_succeeds) {
         return;
     }
-    LocalVector<Ref<NetwEntity>> live;
+    LocalVector<RID> live;
     transfer_live_entities(live);
-    for (const Ref<NetwEntity> &entity : live) {
+    for (const RID &entity : live) {
         interest_sync_scene_membership(entity);
     }
     const TypedArray<RID> scenes = scene_list();
@@ -387,11 +393,14 @@ void NetwMultiplayer::transfer_follow_persistence(bool p_succeeds) {
         return;
     }
     bool persisted = false;
-    entity_slots.each([&persisted](uint64_t, const EntitySlot &p_slot) {
-        if (persisted || p_slot.live.is_null()) {
+    views.entities.each([&persisted](
+                            uint64_t,
+                            const session::EntityView &p_view
+                        ) {
+        if (persisted || p_view.live.is_null()) {
             return;
         }
-        Node *owner = p_slot.live->get_owner();
+        Node *owner = p_view.live->get_owner();
         persisted = owner != nullptr
             && script::model::get_persistence_config(owner).is_valid();
     });
@@ -490,14 +499,19 @@ void NetwMultiplayer::transfer_release_world() {
         return;
     }
     transfer_authored = spawns->get_spawn_book()->authored_routes();
-    spawns->release_received();
+    const PackedInt64Array received = spawns->get_spawn_book()->recv_routes();
+    for (int at = 0; at < received.size(); ++at) {
+        spawn::Ops ops;
+        spawns->release_received(received[at], ops);
+        spawn_act(ops);
+    }
     LocalVector<uint64_t> departing;
     departing.reserve(entity_departures.size());
     for (const KeyValue<uint64_t, EntityDeparture> &row : entity_departures) {
         departing.push_back(row.key);
     }
-    for (const uint64_t instance : departing) {
-        entity_settle_departure(int64_t(instance));
+    for (const uint64_t entity : departing) {
+        entity_settle_departure(int64_t(entity));
     }
 }
 
@@ -559,7 +573,7 @@ void NetwMultiplayer::transfer_readmit(int64_t p_survivor) {
     send_to(
         p_survivor,
         0,
-        session_roster_channel,
+        wire::CHANNEL_SESSION_ROSTER,
         join_roster.roster_frame(p_survivor),
         true,
         0,
@@ -572,7 +586,7 @@ void NetwMultiplayer::transfer_readmitted() {
     if (transfer_awaits_roster && spawns != nullptr) {
         const PackedInt64Array held = spawns->get_spawn_book()->recv_routes();
         for (int at = 0; at < held.size(); ++at) {
-            liveness_core->follow_wire_epoch(int(held[at]));
+            liveness_core.follow_wire_epoch(int(held[at]));
         }
     }
     transfer_awaits_roster = false;
@@ -653,12 +667,12 @@ void NetwMultiplayer::transfer_despawn_gone(int64_t p_route) {
 
 void NetwMultiplayer::transfer_queue_resync(bool p_former) {
     session::ResyncHead head;
-    head.route_floor = uint64_t(MAX(liveness_core->route_floor(), 0));
+    head.route_floor = uint64_t(MAX(liveness_core.route_floor(), 0));
     for (const KeyValue<int64_t, PlayerRow> &row : players) {
         head.player_high = MAX(head.player_high, uint64_t(MAX(row.key, 0)));
     }
     LocalVector<session::RouteLease> leases;
-    const PackedInt32Array spans = liveness_core->lease_spans();
+    const PackedInt32Array spans = liveness_core.lease_spans();
     for (int at = 0; at + 1 < spans.size()
          && uint64_t(leases.size()) < session::RESYNC_LEASES_MAX;
          at += 2) {
@@ -717,7 +731,7 @@ void NetwMultiplayer::transfer_send_resync() {
         send_to(
             SERVER_PEER,
             0,
-            session_resync_channel,
+            wire::CHANNEL_SESSION_RESYNC,
             resync_outbox[resync_sent],
             true,
             0,
@@ -776,7 +790,7 @@ void NetwMultiplayer::session_receive_resync(
         return;
     }
     for (const session::RouteLease &lease : chunk.leases) {
-        liveness_core->restore_grant(
+        liveness_core.restore_grant(
             int(p_sender),
             int(MIN(lease.base, 0x7fffffffULL)),
             int(lease.count)
@@ -805,7 +819,7 @@ void NetwMultiplayer::session_receive_resync(
                 if (spawn::VerbHead::wire.run(stream, head)
                     && wire::string_field(stream, unspoken)
                     && stream.align_verify()) {
-                    attribution_note_subject(int64_t(route));
+                    world.wire.note_subject(int64_t(route));
                     send_to(
                         p_sender,
                         0,
@@ -819,9 +833,9 @@ void NetwMultiplayer::session_receive_resync(
                 continue;
             }
             record->add_recipient(int(p_sender));
-            store_world.stale_route(int64_t(route));
-            if (liveness_core->adopt_epoch(int(route), int(row.epoch))) {
-                liveness_core->raise_epoch_to_wire(int(route));
+            store().stale_route(int64_t(route));
+            if (liveness_core.adopt_epoch(int(route), int(row.epoch))) {
+                liveness_core.raise_epoch_to_wire(int(route));
             }
             const AnchorRevision standing = anchor_installed(int64_t(route));
             const bool moved = row.anchor > standing.revision
@@ -839,13 +853,13 @@ void NetwMultiplayer::session_receive_resync(
                     : raise.revision;
             }
         }
-        spawns->schedule_carrier_flush();
+        spawn_defer_carrier_flush();
     }
     if (!chunk.head.last) {
         return;
     }
     const uint64_t floor = MAX(intake.route_floor, intake.lease_high);
-    liveness_core->mint_above(int(MIN(floor, 0x7fffffffULL)));
+    liveness_core.mint_above(int(MIN(floor, 0x7fffffffULL)));
     player_incarnation_next
         = MAX(player_incarnation_next, int64_t(intake.player_high) + 1);
     resync_intake.erase(p_sender);
@@ -882,7 +896,7 @@ const char *NetwMultiplayer::transfer_check_report(
         route += row.route_delta;
     }
     r_intake.route_high = MAX(r_intake.route_high, route);
-    const uint64_t floor = uint64_t(MAX(liveness_core->route_floor(), 0));
+    const uint64_t floor = uint64_t(MAX(liveness_core.route_floor(), 0));
     const uint64_t route_bound
         = MAX(floor, r_intake.route_high) + RESYNC_RAISE_REACH;
     for (const session::RouteLease &lease : p_chunk.leases) {
@@ -912,7 +926,7 @@ const char *NetwMultiplayer::transfer_check_report(
 
 void NetwMultiplayer::transfer_drop_reporter(int64_t p_sender) {
     resync_intake.erase(p_sender);
-    liveness_core->abandon_lease(int(p_sender));
+    liveness_core.abandon_lease(int(p_sender));
     disconnect_peer(p_sender);
     halt_forget_peer(p_sender);
 }
@@ -976,7 +990,6 @@ void NetwMultiplayer::transfer_raise_reported() {
                 uint64_t(get_unique_id())
             );
             spawn_send_reparent(
-                book,
                 record,
                 node,
                 peers,
@@ -986,11 +999,11 @@ void NetwMultiplayer::transfer_raise_reported() {
         }
         const Ref<NetwEntity> entity = NetwEntity::of(node);
         if (noted.value.revision > 0 && entity.is_valid()) {
-            control_raise(entity.ptr(), noted.value.revision);
+            control_raise(entity->get_rid_handle(), noted.value.revision);
         }
     }
     resync_raises.clear();
-    spawns->schedule_carrier_flush();
+    spawn_defer_carrier_flush();
 }
 
 Error NetwMultiplayer::session_transfer_server(int64_t p_player) {

@@ -28,6 +28,10 @@ PropertyInfo entity_param() {
     );
 }
 
+id::Entity entity_id(const Ref<NetwEntity> &p_entity) {
+    return id::Entity(p_entity.is_valid() ? p_entity->get_rid_handle() : RID());
+}
+
 } // namespace
 
 Ref<NetwMultiplayer> NetwInterestLayer::host() const {
@@ -89,30 +93,16 @@ void NetwInterestLayer::set_default_perception_policy(
     }
 }
 
-Dictionary NetwInterestLayer::get_viewers() const {
-    Dictionary out;
+PackedInt32Array NetwInterestLayer::get_viewers() const {
     const Ref<NetwMultiplayer> owner = host();
-    if (owner.is_null()) {
-        return out;
-    }
-    const PackedInt64Array peers = owner->layer_viewer_ids(layer);
-    for (int at = 0; at < int(peers.size()); ++at) {
-        out[peers[at]] = true;
-    }
-    return out;
+    return owner.is_valid() ? owner->interest_layer_get_viewers(layer)
+                            : PackedInt32Array();
 }
 
-Dictionary NetwInterestLayer::get_entities() {
-    Dictionary out;
+TypedArray<NetwEntity> NetwInterestLayer::get_entities() {
     const Ref<NetwMultiplayer> owner = host();
-    if (owner.is_null()) {
-        return out;
-    }
-    const TypedArray<NetwEntity> members = owner->layer_get_entities(layer);
-    for (int at = 0; at < members.size(); ++at) {
-        out[members[at]] = true;
-    }
-    return out;
+    return owner.is_valid() ? owner->layer_get_entities(layer)
+                            : TypedArray<NetwEntity>();
 }
 
 bool NetwInterestLayer::add_viewer(int64_t p_peer_id) {
@@ -133,17 +123,20 @@ bool NetwInterestLayer::has_viewer(int64_t p_peer_id) const {
 
 bool NetwInterestLayer::add_entity(const Ref<NetwEntity> &p_entity) {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() && owner->layer_add_entity(layer, p_entity);
+    return owner.is_valid()
+        && owner->layer_add_entity(entity_id(p_entity), id::Layer(layer));
 }
 
 bool NetwInterestLayer::remove_entity(const Ref<NetwEntity> &p_entity) {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() && owner->layer_remove_entity(layer, p_entity);
+    return owner.is_valid()
+        && owner->layer_remove_entity(entity_id(p_entity), id::Layer(layer));
 }
 
 bool NetwInterestLayer::has_entity(const Ref<NetwEntity> &p_entity) const {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() && owner->layer_has_entity(layer, p_entity);
+    return owner.is_valid()
+        && owner->layer_has_entity(entity_id(p_entity), id::Layer(layer));
 }
 
 bool NetwInterestLayer::is_visible_to(
@@ -153,19 +146,6 @@ bool NetwInterestLayer::is_visible_to(
     const Ref<NetwMultiplayer> owner = host();
     return owner.is_valid() && p_entity.is_valid()
         && owner->interest_is_visible(p_entity->get_rid_handle(), p_peer_id);
-}
-
-Array NetwInterestLayer::viewer_ids() const {
-    Array out;
-    const Ref<NetwMultiplayer> owner = host();
-    if (owner.is_null()) {
-        return out;
-    }
-    const PackedInt64Array peers = owner->layer_viewer_ids(layer);
-    for (int at = 0; at < int(peers.size()); ++at) {
-        out.push_back(peers[at]);
-    }
-    return out;
 }
 
 void NetwInterestLayer::set_driver(const Callable &p_driver) {
@@ -188,10 +168,12 @@ Callable NetwInterestLayer::get_driver() {
                             : Callable();
 }
 
-Dictionary NetwInterestLayer::monitor_snapshot() const {
+int64_t NetwInterestLayer::stat(
+    enums::NetwMultiplayer::LayerStat p_stat
+) const {
     const Ref<NetwMultiplayer> owner = host();
-    return owner.is_valid() ? owner->interest_layer_get_stats(layer)
-                            : Dictionary();
+    return owner.is_valid() ? owner->interest_layer_get_stat(layer, p_stat)
+                            : 0;
 }
 
 void NetwInterestLayer::_bind_methods() {
@@ -281,7 +263,7 @@ void NetwInterestLayer::_bind_methods() {
         &NetwInterestLayer::get_viewers
     );
     ADD_PROPERTY(
-        PropertyInfo(Variant::DICTIONARY, "viewers"),
+        PropertyInfo(Variant::PACKED_INT32_ARRAY, "viewers"),
         "",
         "get_viewers"
     );
@@ -291,7 +273,12 @@ void NetwInterestLayer::_bind_methods() {
         &NetwInterestLayer::get_entities
     );
     ADD_PROPERTY(
-        PropertyInfo(Variant::DICTIONARY, "entities"),
+        PropertyInfo(
+            Variant::ARRAY,
+            "entities",
+            PROPERTY_HINT_ARRAY_TYPE,
+            "NetwEntity"
+        ),
         "",
         "get_entities"
     );
@@ -325,12 +312,8 @@ void NetwInterestLayer::_bind_methods() {
         &NetwInterestLayer::is_visible_to
     );
     ClassDB::bind_method(
-        D_METHOD("viewer_ids"),
-        &NetwInterestLayer::viewer_ids
-    );
-    ClassDB::bind_method(
-        D_METHOD("monitor_snapshot"),
-        &NetwInterestLayer::monitor_snapshot
+        D_METHOD("stat", "stat"),
+        &NetwInterestLayer::stat
     );
     ClassDB::bind_method(
         D_METHOD("set_driver", "driver"),

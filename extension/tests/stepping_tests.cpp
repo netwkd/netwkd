@@ -97,9 +97,11 @@ constexpr int RELEASED = 42;
 constexpr int GONE = 60;
 
 Variant policy(Node *p_ball) {
+    const Ref<netw::NetwEntity> ball = netw::NetwEntity::of(p_ball);
     return int(
         netw::NetwMultiplayer::predict_resolve_mode(
-            netw::NetwEntity::of(p_ball).ptr()
+            *ball->get_record(),
+            ball->get_owner()
         )
     );
 }

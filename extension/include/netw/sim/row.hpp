@@ -15,10 +15,6 @@
 #include "netw/sim/select.hpp"
 #include "netw/store/peers.hpp"
 
-namespace netw {
-class NetwEntity;
-} // namespace netw
-
 namespace netw::sim {
 
 struct Steering {
@@ -67,7 +63,7 @@ struct Decl {
 
 struct Row {
     godot::RID entity;
-    NetwEntity *view = nullptr;
+    bool viewed = false;
     Steering steering;
     Declaration declaration;
     Facts facts;

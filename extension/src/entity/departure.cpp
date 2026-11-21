@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/entity/departure.hpp"
 
 namespace netw::entity {

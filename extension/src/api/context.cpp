@@ -1,5 +1,6 @@
 #include "netw/api/context.hpp"
 
+#include "godot/callable.hpp"
 #include "godot/class_db.hpp"
 #include "godot/engine.hpp"
 #include "godot/object.hpp"
@@ -17,6 +18,7 @@
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
+#include "netw/repl/property_set.hpp"
 #include "netw/scene_core.hpp"
 #include "netw/scene_decl.hpp"
 #include "netw/script/model.hpp"
@@ -68,6 +70,42 @@ bool is_animation_request(Node *p_node, const StringName &p_property) {
     return p_node->is_class("AnimationTree")
         && (path.ends_with("/request")
             || path.ends_with("/transition_request"));
+}
+
+String unsendable_holding(
+    const Array &p_infos,
+    const StringName &p_property,
+    int p_type,
+    bool p_indexed
+) {
+    switch (p_type) {
+        case Variant::OBJECT:
+            return "an Object";
+        case Variant::RID:
+            return "an RID";
+        case Variant::CALLABLE:
+            return "a Callable";
+        case Variant::SIGNAL:
+            return "a Signal";
+        default:
+            break;
+    }
+    const bool dictionary = p_type == Variant::DICTIONARY;
+    if (p_indexed || (p_type != Variant::ARRAY && !dictionary)) {
+        return String();
+    }
+    int types[2] = {-1, -1};
+    if (!repl::PropertySet::declared_element_types(
+            p_infos,
+            p_property,
+            dictionary,
+            types
+        )
+        || (types[0] != Variant::OBJECT && types[1] != Variant::OBJECT)) {
+        return String();
+    }
+    return dictionary ? "a Dictionary typed to a class"
+                      : "an Array typed to a class";
 }
 
 netw_unknown_name unknown_member_reason(
@@ -299,8 +337,12 @@ void setup_defer_latches(Node *p_node) {
         p_node->set_meta(StringName(meta_key), false);
         p_node->connect(
             latched,
-            callable_mp_static(&mark_signal_fired)
-                .bind(Variant(p_node), meta_key),
+            gd::dropping_signal_arguments(
+                callable_mp_static(&mark_signal_fired)
+                    .bind(Variant(p_node), meta_key),
+                p_node,
+                latched
+            ),
             Object::CONNECT_ONE_SHOT
         );
     }
@@ -627,8 +669,9 @@ Ref<NetwPropertyConfig> Netw::configure_property(
         return refused<NetwPropertyConfig>();
     }
     const bool indexed = gd::declare_indexed_path(p_property) != nullptr;
+    const Array infos = gd::property_list(p_node);
     const gd::PropertyResolution resolved
-        = gd::resolve_property(p_node, p_property, gd::property_list(p_node));
+        = gd::resolve_property(p_node, p_property, infos);
     if (!resolved.present) {
         const String child = child_a_path_starts_at(p_node, p_property);
         fault::raise(
@@ -684,12 +727,14 @@ Ref<NetwPropertyConfig> Netw::configure_property(
         );
         return refused<NetwPropertyConfig>();
     }
-    if (declared_type == int(Variant::OBJECT)) {
+    const String holding
+        = unsendable_holding(infos, p_property, declared_type, indexed);
+    if (!holding.is_empty()) {
         fault::raise(
             nullptr,
             NETW_FAULT_UNSUPPORTED,
             {String("{Netw.configure_property}"),
-             vformat("'%s', which holds an Object", String(p_property)),
+             vformat("'%s', which holds %s", String(p_property), holding),
              String("a property that holds a plain value, such as the "
                     "object's data or its node path")},
             node_id

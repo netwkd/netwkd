@@ -39,9 +39,10 @@ for path in sources.source_paths():
         path.relative_to(sources.ROOT).as_posix(),
     )
 
-env_fault_text = env_netwkd.Clone()
-env_fault_text.Append(CCFLAGS=sources.SWITCH_ERROR_FLAGS[sources.dialect(env)])
-env_fault_text.add_source_files(
-    env.modules_sources,
-    sources.FAULT_TEXT.relative_to(sources.ROOT).as_posix(),
-)
+env_switch = env_netwkd.Clone()
+env_switch.Append(CCFLAGS=sources.SWITCH_ERROR_FLAGS[sources.dialect(env)])
+for path in sources.SWITCH_SOURCES:
+    env_switch.add_source_files(
+        env.modules_sources,
+        path.relative_to(sources.ROOT).as_posix(),
+    )

@@ -5,14 +5,14 @@
 #include "godot/callable.hpp"
 #include "godot/local_vector.hpp"
 #include "godot/node.hpp"
-#include "godot/ref_counted.hpp"
 #include "godot/rid.hpp"
+#include "godot/templates.hpp"
 #include "godot/utility.hpp"
 #include "godot/variant.hpp"
 
 namespace netw {
 
-class NetwSceneCore : public godot::RefCounted {
+class NetwSceneCore {
 public:
     enum Move {
         MOVE_REFUSED,
@@ -39,6 +39,10 @@ private:
     void promote_survivors();
 
 public:
+    NetwSceneCore() = default;
+    NetwSceneCore(const NetwSceneCore &) = delete;
+    NetwSceneCore &operator=(const NetwSceneCore &) = delete;
+
     void scene_enter(
         const godot::RID &scene,
         const godot::StringName &stem,

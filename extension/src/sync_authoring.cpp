@@ -331,7 +331,7 @@ void apply(Node *p_root, Object *p_sync) {
     apply_interpolators(p_sync, owner);
     const Ref<NetwMultiplayer> core = NetwMultiplayer::session_holding(owner);
     if (core.is_valid() && predicts) {
-        core->predict_declare(core->liveness_adopt(entity.ptr()));
+        core->predict_declare(entity->adopt_in(core.ptr()));
     }
     if (core.is_valid()) {
         core->display_mark_dirty(

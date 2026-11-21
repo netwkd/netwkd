@@ -100,10 +100,7 @@ Ref<NetwSchema> NetwPersistence::get_schema() {
         return Ref<NetwSchema>();
     }
     if (schema_id != found) {
-        const table::SchemaRecord *record
-            = api->get_schema_core()->record_of(found);
-        schema = record != nullptr ? NetwSchema::from_record(*record)
-                                   : Ref<NetwSchema>();
+        schema = NetwSchema::from_record(*api->get_schema_core(), found);
         schema_id = found;
     }
     return schema;

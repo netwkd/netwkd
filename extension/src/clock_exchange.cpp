@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/clock_exchange.hpp"
 
 #include "netw/wire/registry.hpp"
@@ -99,17 +101,6 @@ session::ClockPong ClockExchange::take_pong(
     pong.wait = waited < WAIT_LIMIT ? waited : WAIT_LIMIT;
     asked.erase(p_peer);
     return pong;
-}
-
-double ClockExchange::round_trip_seconds(
-    const session::ClockPong &p_pong,
-    uint64_t p_now_usec
-) {
-    const uint32_t elapsed
-        = uint32_t(p_now_usec & 0xFFFFFFFF) - uint32_t(p_pong.origin);
-    const uint64_t waited = p_pong.wait * WAIT_UNIT_USEC;
-    const uint64_t travelled = elapsed > waited ? elapsed - waited : 0;
-    return double(travelled) / 1'000'000.0;
 }
 
 void ClockExchange::forget_peer(int64_t p_peer) {

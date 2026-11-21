@@ -89,6 +89,9 @@ Fault index
 - :doc:`nw1041`, MISUSE
 - :doc:`nw1042`, MISUSE
 - :doc:`nw1043`, MISUSE
+- :doc:`nw1044`, REMOTE
+- :doc:`nw1045`, MISUSE
+- :doc:`nw1046`, REMOTE
 
 .. toctree::
    :hidden:
@@ -181,3 +184,6 @@ Fault index
    nw1041
    nw1042
    nw1043
+   nw1044
+   nw1045
+   nw1046

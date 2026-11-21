@@ -8,14 +8,17 @@
 #include "godot/ref_counted.hpp"
 #include "godot/rid.hpp"
 #include "godot/string_name.hpp"
+#include "netw/slot_rows.hpp"
 
 namespace netw {
 class NetwClock;
 class NetwConnection;
 class NetwDatabase;
 class NetwEndpoint;
+class NetwEntity;
 class NetwInterestLayer;
 class NetwPlayer;
+class NetwScene;
 class NetwSession;
 class NetwTable;
 } // namespace netw
@@ -34,6 +37,19 @@ struct ServiceRow {
     godot::StringName class_key;
 };
 
+struct EntityView {
+    godot::Ref<NetwEntity> live;
+    godot::Ref<NetwEntity> retired;
+    NetwEntity *holder = nullptr;
+    godot::ObjectID indexed;
+    godot::Ref<NetwScene> pinned_scene;
+
+    bool empty() const {
+        return live.is_null() && retired.is_null() && holder == nullptr
+            && indexed.is_null() && pinned_scene.is_null();
+    }
+};
+
 struct Views {
     godot::Ref<NetwConnection> connection_handle;
     godot::Ref<NetwSession> session_handle;
@@ -45,6 +61,13 @@ struct Views {
     godot::LocalVector<ServiceRow> services;
     mutable godot::HashMap<uint64_t, godot::StringName> native_class_names;
     mutable godot::HashMap<int64_t, godot::Ref<NetwPlayer>> player_views;
+    SlotRows<EntityView> entities;
+    godot::HashMap<uint64_t, godot::Ref<NetwEntity>> node_entities;
+    godot::HashMap<uint64_t, godot::Ref<NetwEntity>> departing;
+
+    NetwEntity *holder_of(uint64_t p_id) const;
+    godot::Ref<NetwEntity> departing_of(uint64_t p_id) const;
+    godot::Ref<NetwScene> pinned_scene_of(uint64_t p_id) const;
 };
 
 } // namespace netw::session

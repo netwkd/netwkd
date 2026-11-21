@@ -40,26 +40,12 @@ Variant duplicate_arg(const Variant &p_data) {
 
 } // namespace
 
-NetwMultiplayer *SpawnerCompat::core() const {
-    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
-}
-
 Node *SpawnerCompat::session_root() const {
-    NetwMultiplayer *plane = core();
-    return plane != nullptr ? plane->session_get_root() : nullptr;
+    return session != nullptr ? session->session_get_root() : nullptr;
 }
 
-void SpawnerCompat::set_core(Object *p_core) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_core);
-    core_id = gd::instance_id(plane);
-}
-
-void SpawnerCompat::set_spawn_seams(
-    const Callable &p_booked_reader,
-    const Callable &p_arm_consumed
-) {
-    booked_reader = p_booked_reader;
-    arm_consumed = p_arm_consumed;
+void SpawnerCompat::seat(NetwMultiplayer *p_session) {
+    session = p_session;
 }
 
 Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
@@ -68,17 +54,16 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
     if (p_node == nullptr || spawner == nullptr) {
         return ERR_INVALID_PARAMETER;
     }
-    if (!booked_reader.is_valid() || !arm_consumed.is_valid()) {
+    if (session == nullptr) {
         return ERR_UNCONFIGURED;
     }
     register_spawner(spawner);
-    if (bool(booked_reader.call(p_node))) {
+    if (session->spawn_books_node(p_node)) {
         return OK;
     }
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr && !plane->is_host()) {
+    if (!session->is_host()) {
         fault::raise(
-            plane,
+            session,
             NETW_FAULT_SERVER_ONLY,
             {String("Adding '") + String(p_node->get_name())
              + String("' under a MultiplayerSpawner")},
@@ -100,7 +85,7 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
         if (scene_index < 0) {
             drops_uncaptured_custom += 1;
             fault::raise(
-                plane,
+                session,
                 NETW_FAULT_UNSUPPORTED,
                 {String("'") + String(p_node->get_name()) + String("'"),
                  String("a scene outside the spawnable scenes"),
@@ -112,7 +97,7 @@ Error SpawnerCompat::consume(Node *p_node, Object *p_spawner) {
         }
     }
 
-    arm_consumed.call(p_node, spawner, scene_index, data);
+    session->spawn_arm_consumed(p_node, spawner, scene_index, data);
     authoring::apply_spawner(p_node, spawner);
     return OK;
 }
@@ -133,7 +118,7 @@ void SpawnerCompat::register_spawner(Object *p_spawner) {
 
 void SpawnerCompat::wrap_when_ready(
     MultiplayerSpawner *p_spawner,
-    NetwMultiplayer *p_plane
+    NetwMultiplayer *p_session
 ) {
     if (!p_spawner->is_inside_tree() || gd::node_ready(p_spawner)) {
         return;
@@ -142,7 +127,7 @@ void SpawnerCompat::wrap_when_ready(
     Node *waiter
         = scene != nullptr && !gd::node_ready(scene) ? scene : p_spawner;
     const Callable armed
-        = callable_mp(p_plane, &NetwMultiplayer::spawner_wrap_when_ready)
+        = callable_mp(p_session, &NetwMultiplayer::spawner_wrap_when_ready)
               .bind(p_spawner);
     if (waiter->is_connected(SIG_READY, armed)) {
         return;
@@ -163,22 +148,21 @@ void SpawnerCompat::wrap_spawner(Object *p_spawner) {
     if (spawner == nullptr) {
         return;
     }
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
     const Callable current = spawner->get_spawn_function();
     if (!current.is_valid()) {
-        wrap_when_ready(spawner, plane);
+        wrap_when_ready(spawner, session);
         return;
     }
-    if (current.get_object() == plane) {
+    if (current.get_object() == session) {
         return;
     }
     game_call_declared(current, game_calls::SPAWNER_FUNCTION);
     originals[int64_t(gd::instance_id(spawner))] = current;
     spawner->set_spawn_function(
-        callable_mp(plane, &NetwMultiplayer::spawner_wrapped_spawn)
+        callable_mp(session, &NetwMultiplayer::spawner_wrapped_spawn)
             .bind(current)
     );
 }
@@ -287,12 +271,11 @@ void SpawnerCompat::on_session_entered() {
     if (tree == nullptr) {
         return;
     }
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
     const Callable watcher
-        = callable_mp(plane, &NetwMultiplayer::spawner_node_added);
+        = callable_mp(session, &NetwMultiplayer::spawner_node_added);
     if (!tree->is_connected(SIG_NODE_ADDED, watcher)) {
         tree->connect(SIG_NODE_ADDED, watcher);
     }
@@ -309,18 +292,17 @@ void SpawnerCompat::on_node_added(Node *p_node) {
 }
 
 void SpawnerCompat::on_session_ended() {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
     SceneTree *tree = gd::scene_tree();
     const Callable watcher
-        = callable_mp(plane, &NetwMultiplayer::spawner_node_added);
+        = callable_mp(session, &NetwMultiplayer::spawner_node_added);
     if (tree != nullptr && tree->is_connected(SIG_NODE_ADDED, watcher)) {
         tree->disconnect(SIG_NODE_ADDED, watcher);
     }
-    plane->session_defer(
-        callable_mp(plane, &NetwMultiplayer::spawner_clear_session_state),
+    session->session_defer(
+        callable_mp(session, &NetwMultiplayer::spawner_clear_session_state),
         StringName(KEY_CLEAR_SESSION)
     );
 }

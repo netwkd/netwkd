@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/handle_ledger.hpp"
 
 #include <vector>

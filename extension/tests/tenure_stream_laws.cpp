@@ -235,7 +235,7 @@ TEST_CASE(
     }
     const netw::wire::StreamLane lane
         = broadcast_lane(rig.client(0), pair.mirror(0));
-    netw::store::World &writers = *row_send_of(rig.client(0))->store();
+    netw::store::Store &writers = *row_send_of(rig.client(0))->store();
     const uint64_t to_server = writers.token_of(1, lane);
     const uint64_t to_b = writers.token_of(b, lane);
     const uint64_t asked = writers.request_of(1, lane);

@@ -1,6 +1,8 @@
+#include "netw/sealed.hpp"
+
 #include "netw/store/schedule.hpp"
 
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 
 namespace netw::store {
 
@@ -33,7 +35,7 @@ const char *class_name(RowClass p_class) {
 }
 
 RowClass row_class(
-    const World &p_world,
+    const Store &p_world,
     const Table &p_table,
     uint32_t p_row,
     int64_t p_tick,
@@ -57,7 +59,7 @@ RowClass row_class(
 }
 
 float importance(
-    const World &p_world,
+    const Store &p_world,
     const Table &p_table,
     uint32_t p_row,
     int64_t p_tick,

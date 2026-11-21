@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/session/event_plane.hpp"
 
 #include <cstring>

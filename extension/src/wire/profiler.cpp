@@ -171,7 +171,7 @@ uint32_t NetworkProfiler::synchronizer(
         return found;
     }
     if (detailed >= SUBJECT_LIMIT) {
-        return aggregate(uint8_t(builtin_channel("SYNC")));
+        return aggregate(CHANNEL_SYNC);
     }
     Row made;
     made.sync = p_sync;
@@ -321,19 +321,19 @@ uint32_t NetworkProfiler::take_reply(
     const ReplyKey key{p_peer, p_transaction, p_sending};
     const uint32_t at = reply_slot(key);
     if (!rpc_enabled || at == NONE) {
-        return aggregate(uint8_t(builtin_channel("REPLY")));
+        return aggregate(CHANNEL_REPLY);
     }
     const uint32_t parent = replies[at].subject;
     erase_reply(at);
     if (parent < 258) {
-        return aggregate(uint8_t(builtin_channel("REPLY")));
+        return aggregate(CHANNEL_REPLY);
     }
     const uint32_t *existing = reply_rows.getptr(parent);
     if (existing != nullptr) {
         return *existing;
     }
     if (detailed >= SUBJECT_LIMIT) {
-        return aggregate(uint8_t(builtin_channel("REPLY")));
+        return aggregate(CHANNEL_REPLY);
     }
     const uint32_t result = append(rows[parent].label + String(" reply"));
     reply_rows.insert(parent, result);

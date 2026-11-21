@@ -19,7 +19,7 @@
 #include "netw/wire/stream_book.hpp"
 
 namespace netw::store {
-class World;
+class Store;
 class Table;
 struct Flight;
 } // namespace netw::store
@@ -124,7 +124,7 @@ class SessionSend {
     int64_t row_budget_bits = 0;
     int64_t pass_tick = -1;
     bool tables_published = true;
-    store::World *world = nullptr;
+    store::Store *world = nullptr;
     godot::LocalVector<Candidate> candidates;
     godot::LocalVector<godot::LocalVector<uint32_t>> table_picks;
     godot::LocalVector<uint32_t> refreshed;
@@ -265,11 +265,11 @@ public:
         tables_published = p_publishes;
     }
 
-    void watch_store(store::World *p_world) {
+    void watch_store(store::Store *p_world) {
         world = p_world;
     }
 
-    store::World *store() const {
+    store::Store *store() const {
         return world;
     }
 

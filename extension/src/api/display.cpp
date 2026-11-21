@@ -3,6 +3,7 @@
 #include "godot/class_db.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/display/decl_param.hpp"
 
 using namespace godot;
 
@@ -35,7 +36,7 @@ RID NetwDisplay::entity_rid() const {
 display::Decl *NetwDisplay::declaration() const {
     const Ref<NetwEntity> bound = entity();
     NetwEntityRecord *const record
-        = NetwMultiplayer::record_of_wrapper(bound.ptr());
+        = bound.is_valid() ? bound->get_record() : nullptr;
     return record != nullptr ? &record->display_declaration() : nullptr;
 }
 
@@ -53,7 +54,7 @@ void NetwDisplay::write(int p_param, const Variant &p_value) {
     }
     display::Decl *held = declaration();
     if (held != nullptr) {
-        held->set_param(p_param, p_value);
+        display::set_param(*held, p_param, p_value);
     }
 }
 
@@ -68,8 +69,8 @@ Variant NetwDisplay::read(int p_param) const {
         );
     }
     const display::Decl *held = declaration();
-    return held != nullptr ? held->get_param(p_param)
-                           : display::Decl().get_param(p_param);
+    const display::Decl fallback;
+    return display::get_param(held != nullptr ? *held : fallback, p_param);
 }
 
 NodePath NetwDisplay::get_visual_root() const {
@@ -174,13 +175,14 @@ double NetwDisplay::get_display_lag() const {
     const Variant answered = session->display_get_track_stat(
         entity_rid(),
         StringName(),
-        StringName("display_lag")
+        NetwMultiplayer::TRACK_STAT_DISPLAY_LAG
     );
     return answered.get_type() != Variant::NIL ? double(answered) : 0.0;
 }
 
 NetwDisplay::DisplayPump NetwDisplay::get_pump_mode() const {
-    const Variant answered = get_track_stat(StringName(), "pump_mode");
+    const Variant answered
+        = get_track_stat(StringName(), NetwMultiplayer::TRACK_STAT_PUMP_MODE);
     return answered.get_type() != Variant::NIL
         ? NetwDisplay::DisplayPump(int64_t(answered))
         : NetwDisplay::DISPLAY_PUMP_UNRESOLVED;
@@ -188,7 +190,7 @@ NetwDisplay::DisplayPump NetwDisplay::get_pump_mode() const {
 
 Variant NetwDisplay::get_track_stat(
     const StringName &p_property,
-    const StringName &p_stat
+    NetwMultiplayer::TrackStat p_stat
 ) const {
     NetwMultiplayer *session = core();
     if (session == nullptr) {

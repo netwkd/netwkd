@@ -123,7 +123,8 @@ void canonicalize_row(
     const FieldCodec &p_codec,
     StateRow &r_row,
     wire::CodeRow &r_scratch,
-    godot::PackedInt64Array &r_codes
+    godot::PackedInt64Array &r_codes,
+    NetwMultiplayer *p_session = nullptr
 );
 
 int measure(

@@ -28,7 +28,8 @@ int32_t fingerprint_row(
     const StateRow &p_row,
     uint64_t p_scope,
     wire::CodeRow &r_scratch,
-    bool &r_any
+    bool &r_any,
+    NetwMultiplayer *p_session = nullptr
 );
 
 class TransitionBook {
@@ -65,7 +66,8 @@ class TransitionBook {
     bool code_field(
         const FieldCodec &p_codec,
         int p_field,
-        const godot::Variant &p_value
+        const godot::Variant &p_value,
+        NetwMultiplayer *p_session
     );
     void seal_entry(uint32_t p_at);
     bool field_value(
@@ -97,7 +99,8 @@ public:
         int64_t p_label,
         bool p_fresh,
         const StateRow &p_row,
-        uint8_t p_origin = 0
+        uint8_t p_origin = 0,
+        NetwMultiplayer *p_session = nullptr
     );
 
     bool holds(int64_t p_key) const;

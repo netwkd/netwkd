@@ -111,4 +111,38 @@ inline godot::Object *instance_from_id(const godot::ObjectID &id) {
 #endif
 }
 
+inline int signal_argument_count(
+    const godot::Object *p_object,
+    const godot::StringName &p_signal
+) {
+#if defined(NETW_MODULE)
+    List<MethodInfo> signals;
+    p_object->get_signal_list(&signals);
+    for (const MethodInfo &declared : signals) {
+        if (godot::StringName(declared.name) == p_signal) {
+            return int(declared.arguments.size());
+        }
+    }
+#else
+    const godot::TypedArray<godot::Dictionary> signals
+        = p_object->get_signal_list();
+    for (int at = 0; at < signals.size(); ++at) {
+        const godot::Dictionary declared = signals[at];
+        if (godot::StringName(declared["name"]) == p_signal) {
+            return int(godot::Array(declared["args"]).size());
+        }
+    }
+#endif
+    return 0;
+}
+
+inline godot::Callable dropping_signal_arguments(
+    const godot::Callable &p_callable,
+    const godot::Object *p_object,
+    const godot::StringName &p_signal
+) {
+    const int count = signal_argument_count(p_object, p_signal);
+    return count > 0 ? p_callable.unbind(count) : p_callable;
+}
+
 } // namespace netw::gd

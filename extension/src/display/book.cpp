@@ -1,5 +1,8 @@
 #include "netw/display/book.hpp"
 
+#include "netw/api/netw_multiplayer.hpp"
+#include "netw/display/decl_param.hpp"
+
 using namespace godot;
 
 namespace netw::display {
@@ -22,8 +25,8 @@ Book::~Book() {
     }
 }
 
-void Book::set_went_dirty(const Callable &callback) {
-    went_dirty = callback;
+void Book::seat(NetwMultiplayer *p_session) {
+    session = p_session;
 }
 
 PumpStats &Book::get_stats() {
@@ -189,8 +192,8 @@ void Book::mark_dirty(const RID &p_entity, int p_dirt) {
         return;
     }
     if (p_dirt == netw::display::DIRT_ROLE) {
-        if (went_dirty.is_valid()) {
-            went_dirty.call(p_entity, p_dirt);
+        if (session != nullptr) {
+            session->display_on_book_dirty(p_entity, Dirt(p_dirt));
         }
         return;
     }
@@ -202,8 +205,8 @@ void Book::mark_dirty(const RID &p_entity, int p_dirt) {
         runtime->set_rebuild_queued(true);
     }
     dirty.push_back(p_entity);
-    if (went_dirty.is_valid()) {
-        went_dirty.call(p_entity, p_dirt);
+    if (session != nullptr) {
+        session->display_on_book_dirty(p_entity, Dirt(p_dirt));
     }
 }
 
@@ -222,7 +225,7 @@ Error Book::write_param(
             decl = &p_fallback;
         }
     }
-    const Error verdict = decl->set_param(p_param, p_value);
+    const Error verdict = set_param(*decl, p_param, p_value);
     if (verdict != OK) {
         return verdict;
     }
@@ -251,6 +254,29 @@ TypedArray<RID> Book::take_dirty() {
     }
     dirty.clear();
     return out;
+}
+
+void Book::rekey(const RID &p_from, const RID &p_to) {
+    HashMap<RID, Row>::Iterator found = rows.find(p_from);
+    if (found == rows.end()) {
+        return;
+    }
+    NETW_BUG_COND(rows.has(p_to));
+    const Row row = found->value;
+    rows.remove(found);
+    rows.insert(p_to, row);
+    if (row.route != 0 && entity_at(row.route) == p_from) {
+        by_route[row.route] = p_to;
+    }
+    for (RID &held : order) {
+        held = held == p_from ? p_to : held;
+    }
+    for (RID &held : dirty) {
+        held = held == p_from ? p_to : held;
+    }
+    if (row.runtime != nullptr) {
+        row.runtime->rekey(p_to);
+    }
 }
 
 void Book::drop(const RID &p_entity) {

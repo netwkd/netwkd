@@ -6,6 +6,12 @@
 #include "netw/wire/describe.hpp"
 #include "netw/wire/stream.hpp"
 
+namespace netw {
+
+class NetwMultiplayer;
+
+}
+
 namespace netw::sync_kernel {
 
 struct DecodedRow {
@@ -49,7 +55,8 @@ struct RetainedHead {
 
 godot::PackedByteArray encode_volatile(
     int64_t p_ordinal,
-    const godot::Array &p_values
+    const godot::Array &p_values,
+    NetwMultiplayer *p_session
 );
 
 bool decode_volatile(
@@ -61,7 +68,8 @@ bool decode_volatile(
 godot::PackedByteArray encode_retained(
     int64_t p_ordinal,
     int64_t p_mask,
-    const godot::Array &p_values
+    const godot::Array &p_values,
+    NetwMultiplayer *p_session
 );
 
 bool decode_retained(

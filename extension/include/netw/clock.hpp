@@ -3,19 +3,108 @@
 #include <cstdint>
 
 #include "godot/local_vector.hpp"
-#include "godot/variant.hpp"
-#include "netw/object_port.hpp"
+#include "netw/clock_exchange.hpp"
 
 namespace netw {
 
-class ClockEngine {
+struct TickTime {
+    double delta = 0.0;
+    int64_t tick = 0;
+};
+
+class Clock {
 public:
     enum SyncMode {
         SYNC_SNAP = 0,
         SYNC_STRETCH = 1,
     };
 
+    enum Param {
+        PARAM_TICKRATE = 0,
+        PARAM_SYNC_MODE = 1,
+        PARAM_MAX_TICKS_PER_FRAME = 3,
+        PARAM_STALL_THRESHOLD = 4,
+        PARAM_PANIC_SNAP_THRESHOLD = 5,
+        PARAM_STRETCH_NUDGE_FACTOR = 6,
+        PARAM_DISPLAY_OFFSET = 7,
+        PARAM_LEAD_TICKS = 8,
+        PARAM_JITTER_MULTIPLIER = 9,
+        PARAM_JITTER_WINDOW = 10,
+        PARAM_JITTER_STABILITY_THRESHOLD = 11,
+        PARAM_USE_PHYSICS_INTERPOLATION = 12,
+        PARAM_MANUAL_TICK = 14,
+        PARAM_TICK_FACTOR_OVERRIDE = 15,
+    };
+
+    enum Monitor {
+        MONITOR_RTT = 0,
+        MONITOR_RTT_AVG = 1,
+        MONITOR_RTT_JITTER = 2,
+        MONITOR_ONE_WAY_LATENCY = 3,
+        MONITOR_TICKTIME = 4,
+        MONITOR_TICK_ACCUMULATOR = 5,
+        MONITOR_PHYSICS_FRAMES = 6,
+        MONITOR_POLLS = 7,
+        MONITOR_WALL_SECONDS = 8,
+        MONITOR_PHYSICS_HZ = 9,
+        MONITOR_POLL_HZ = 10,
+    };
+
+    enum Mismatch {
+        MISMATCH_WARN = 0,
+        MISMATCH_DISCONNECT = 1,
+        MISMATCH_SIGNAL = 2,
+    };
+
+    enum RateVerdict {
+        RATE_AGREES,
+        RATE_WARNS,
+        RATE_DISCONNECTS,
+        RATE_SIGNALS,
+    };
+
+    static constexpr int64_t NO_MEASUREMENT = -1;
+    static constexpr double AUTO_CONFIG_SECONDS = 5.0;
+
+    struct Reading {
+        uint64_t wall_usec = 0;
+        int physics_hz = 60;
+        double interpolation_fraction = 0.0;
+        bool editor_hint = false;
+    };
+
+    struct Frame {
+        bool runs = true;
+        bool stalled = false;
+    };
+
+    struct Pong {
+        double rtt_raw = 0.0;
+        double rtt_avg = 0.0;
+        double rtt_jitter = 0.0;
+        int diff = 0;
+        int tick = 0;
+        int display_offset = 0;
+        int recommended_display_offset = 0;
+        bool is_stable = true;
+        bool is_synchronized = false;
+    };
+
+    struct Cadence {
+        int64_t physics_frames = 0;
+        int64_t polls = 0;
+        double wall_seconds = 0.0;
+        double physics_hz = 0.0;
+        double poll_hz = 0.0;
+    };
+
     static int64_t pumps_for(double seconds, double rate);
+
+    struct OpenFrame {
+        int32_t ticks = 0;
+        int32_t closing_tick = 0;
+        bool metered = false;
+    };
 
 private:
     static constexpr int64_t NEVER_STAMPED = INT64_MIN;
@@ -71,6 +160,11 @@ private:
     int32_t simulation_gates = 0;
     int32_t simulation_credit = 0;
 
+    int32_t frame_ticks = 0;
+    int32_t frame_ceiling = 0;
+    double frame_ticktime = 0.0;
+    bool frame_metered = false;
+
     int64_t physics_frames = 0;
     int64_t polls = 0;
     int64_t ticks_run = 0;
@@ -78,43 +172,32 @@ private:
 
     Stats stats;
 
-public:
-    enum Event {
-        EVENT_BEFORE_TICK,
-        EVENT_ON_TICK,
-        EVENT_AFTER_TICK,
-        EVENT_BEFORE_TICK_LOOP,
-        EVENT_AFTER_TICK_LOOP,
-        EVENT_SYNCHRONIZED,
-        EVENT_STABILITY_CHANGED,
-    };
-    typedef void (*Hook)(
-        void *p_context,
-        Event p_event,
-        const godot::Variant &p_a,
-        const godot::Variant &p_b
-    );
+    Mismatch mismatch_action = MISMATCH_WARN;
+    double auto_config_left = 0.0;
+    int64_t auto_config_best = 0;
+    uint64_t handshake_generation = 0;
+    bool sweeps_effects = false;
+    bool handshakes_on_enter = false;
 
-private:
-    Hook hook = nullptr;
-    void *hook_context = nullptr;
-
-    double seconds_into_frame() const;
-    void announce(
-        Event p_event,
-        int p_argc = 0,
-        const godot::Variant &p_a = godot::Variant(),
-        const godot::Variant &p_b = godot::Variant()
-    );
-    void emit_tick();
+    double seconds_into_frame(const Reading &p_now) const;
     void calibrate(double target);
     void nudge_toward_estimate();
-    void resolve_simulation_gate(int ticks_this_frame);
 
 public:
-    ObjectPort sink;
+    ClockExchange exchange;
 
-    void hook_with(Hook p_hook, void *p_context);
+    void set_mismatch_action(Mismatch value);
+    Mismatch get_mismatch_action() const;
+    RateVerdict tickrate_verdict(int p_server_tickrate) const;
+    void set_sweeps_effects(bool value);
+    bool get_sweeps_effects() const;
+    void set_handshakes_on_enter(bool value);
+    bool get_handshakes_on_enter() const;
+    bool handshake_opens(uint64_t p_generation);
+    void auto_config_start();
+    void auto_config_cancel();
+    int64_t auto_config_step(double p_delta);
+    void release();
 
     void set_tickrate(int value);
     int get_tickrate() const;
@@ -168,11 +251,11 @@ public:
 
     double ticktime() const;
     int display_tick() const;
-    double physics_factor() const;
-    int physics_steps_per_tick() const;
+    double physics_factor(const Reading &p_now) const;
+    int physics_steps_per_tick(const Reading &p_now) const;
     double tick_phase() const;
     double tick_accumulator() const;
-    double tick_factor() const;
+    double tick_factor(const Reading &p_now) const;
     double rtt() const;
     double rtt_avg() const;
     double rtt_jitter() const;
@@ -180,17 +263,21 @@ public:
     int recommended_display_offset() const;
     bool is_stable() const;
 
-    void physics_step(double delta);
-    void force_step(int count);
+    Frame frame_open(double delta, const Reading &p_now);
+    void accumulate(double delta);
+    bool tick_due() const;
+    TickTime tick_open();
+    void tick_close();
+    void resolve_simulation_gate(const Reading &p_now);
+    void frame_close();
+    OpenFrame frame_set_aside();
+    void frame_resume(const OpenFrame &p_frame);
 
-    void begin_tick_loop();
-    void end_tick_loop();
+    void count_poll(const Reading &p_now);
+    Cadence cadence(const Reading &p_now) const;
 
-    void count_poll();
-    godot::Dictionary cadence() const;
-
-    double seconds_since_step() const;
-    void mark_step(double seconds_ago = 0.0);
+    double seconds_since_step(const Reading &p_now) const;
+    void mark_step(const Reading &p_now, double seconds_ago = 0.0);
 
     bool is_simulating() const;
     int get_simulation_behind_count() const;
@@ -202,12 +289,15 @@ public:
     void set_held(bool p_held);
     bool is_held() const;
 
-    godot::Dictionary handle_pong(
-        double sample,
-        int server_tick_at_pong,
-        double server_tick_phase,
-        bool apply_lead
+    Pong pong_received(
+        const session::ClockPong &p_pong,
+        uint64_t p_now_usec,
+        bool p_apply_lead
     );
+
+    double param(Param p_param) const;
+    bool set_param(Param p_param, double p_value);
+    double monitor(Monitor p_monitor, const Reading &p_now) const;
 
     bool is_settled() const;
     bool consume_ping_due(double delta);

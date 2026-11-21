@@ -7,18 +7,22 @@
 #include "godot/rid.hpp"
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/schema_core.hpp"
-#include "netw/store/array.hpp"
+#include "netw/schema_core.hpp"
 #include "netw/store/column.hpp"
 #include "netw/store/entity_ref.hpp"
 #include "netw/store/peers.hpp"
-#include "netw/store/port.hpp"
-#include "netw/store/resident.hpp"
 #include "netw/store/table.hpp"
 #include "netw/store/validate.hpp"
 #include "netw/wire/stream_book.hpp"
 
+namespace netw {
+class NetwMultiplayer;
+} // namespace netw
+
 namespace netw::store {
+
+class Arrays;
+class Pull;
 
 static_assert(EntityRef::NONE == Table::NO_SLOT);
 
@@ -39,7 +43,9 @@ struct RowAddress {
     }
 };
 
-class World {
+class Store {
+    friend class Pull;
+
     struct TableName {
         uint32_t index = 0;
     };
@@ -68,7 +74,6 @@ class World {
     godot::LocalVector<Table *> tables;
     godot::HashMap<uint64_t, SetTables> tables_by_set;
     godot::HashMap<uint64_t, OwnerRows> owner_rows;
-    godot::HashMap<uint64_t, uint32_t> body_rows;
     mutable godot::RID_Owner<TableName> table_names;
 
     godot::LocalVector<PeerSide> sides;
@@ -84,7 +89,6 @@ class World {
 
     static constexpr uint32_t MISSES_KEPT = 64;
 
-    wire::CodeRow probe;
     godot::LocalVector<wire::CodeRow> spare_images;
 
     using Stamp = void (*)(void *p_context, uint32_t p_table, uint32_t p_row);
@@ -104,7 +108,6 @@ class World {
     void forget_side(PeerSide &r_side);
     void trim_departed();
     void owe_changed(Table &p_table, uint32_t p_row);
-    void count_probe(const Table &p_table, uint32_t p_row, bool p_reads);
     void close_row(const RowAddress &p_at, uint32_t p_peer, Stream p_stream);
     void evict_dormant(
         uint32_t p_peer,
@@ -123,63 +126,18 @@ class World {
         const wire::StreamTenure &p_bar
     );
 
-    const NodeCell &resident(Table &p_table, uint32_t p_row);
-    bool readable(Table &p_table, uint32_t p_row, godot::Object *p_node);
-    void note_rest(Table &p_table, uint32_t p_row, const NodeCell &p_cell);
-    void follow_authority(
-        Table &p_table,
-        uint32_t p_row,
-        godot::Object *p_node
-    );
-    void follow_rest(Table &p_table, uint32_t p_row, const BodyState &p_body);
-    bool read_row(
-        Table &p_table,
-        uint32_t p_row,
-        godot::Object *p_node,
-        BodyState &p_body,
-        bool p_body_columns,
-        wire::CodeRow &r_codes,
-        bool p_keep
-    );
-    bool read_exact(
-        Table &p_table,
-        godot::Object *p_node,
-        BodyState &p_body,
-        bool p_body_columns
-    );
-    bool pull_exact(
-        Table &p_table,
-        uint32_t p_row,
-        godot::Object *p_node,
-        BodyState &p_body,
-        bool p_body_columns,
-        int64_t p_tick
-    );
-    void pull_rows(Table &p_table, int64_t p_tick, bool p_validating);
-    void pull_row(
-        Table &p_table,
-        uint32_t p_row,
-        int64_t p_tick,
-        bool p_validating,
-        bool p_gated,
-        bool p_swept
-    );
     uint32_t sweep(Table &p_table, bool p_wake);
-    void audit_quiet(Table &p_table, int64_t p_tick);
-    void check_codes(
-        Table &p_table,
-        uint32_t p_row,
-        godot::Object *p_node,
-        BodyState &p_body,
-        int64_t p_tick,
-        const char *p_gate
-    );
     void note_miss(
         const Table &p_table,
         uint32_t p_row,
         int p_column,
         const char *p_gate,
         int64_t p_tick
+    );
+    bool refuses_type(
+        const Table &p_table,
+        const wire::CodeRow &p_codes,
+        int p_sender
     );
     Landing land_frame(
         const RowAddress &p_at,
@@ -189,19 +147,20 @@ class World {
         bool p_windowed
     );
 
-    godot::LocalVector<uint32_t> visiting;
-
 public:
     static constexpr uint32_t SWEEP_TICKS = 30;
 
-    Arrays arrays;
-    Residents residents;
+    static uint32_t sweep_share(uint32_t p_count) {
+        return (p_count + SWEEP_TICKS - 1) / SWEEP_TICKS;
+    }
+
+    Arrays *arrays = nullptr;
+    Pull *pull = nullptr;
     int64_t validate_every = validation_interval();
     godot::LocalVector<Miss> misses;
     int64_t miss_count = 0;
     godot::HashSet<uint64_t> dozing;
     godot::LocalVector<uint64_t> woken;
-    godot::LocalVector<uint64_t> reprobed;
     godot::HashSet<uint64_t> watched;
 
     void mark_working(const RowAddress &p_at) {
@@ -280,19 +239,12 @@ public:
 
     void forget_sender(int p_id);
 
-    void pull(uint32_t p_table, int64_t p_tick);
+    NetwMultiplayer *session = nullptr;
 
-    bool read_live(
-        const RowAddress &p_at,
-        godot::LocalVector<godot::Variant> &r_values
-    );
-
-    World() {
-        arrays.seat(this);
-    }
-    World(const World &) = delete;
-    World &operator=(const World &) = delete;
-    ~World();
+    Store() = default;
+    Store(const Store &) = delete;
+    Store &operator=(const Store &) = delete;
+    ~Store();
 
     void clear();
 
@@ -439,19 +391,14 @@ public:
         uint32_t p_table,
         uint64_t p_owner,
         uint32_t p_lane,
-        uint64_t p_node,
         uint8_t p_comp
     );
 
     RowAddress row_of(uint64_t p_owner, uint32_t p_lane) const;
 
-    bool probes(uint64_t p_node) const;
-
     void place(const RowAddress &p_at, int64_t p_route, int64_t p_epoch);
 
     void remove_row(const RowAddress &p_at);
-
-    void remove_owner(uint64_t p_owner);
 
     ReceiptCounts receipts;
 

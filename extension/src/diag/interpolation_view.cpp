@@ -13,7 +13,6 @@
 #include "godot/sprite.hpp"
 #include "godot/viewport.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/clock_engine.hpp"
 #include "netw/diag/hints.hpp"
 #include "netw/display/channel.hpp"
 #include "netw/display/decl.hpp"
@@ -21,9 +20,8 @@
 #include "netw/display/playhead.hpp"
 #include "netw/display/runtime.hpp"
 #include "netw/predict/engine.hpp"
-#include "netw/session/books.hpp"
+#include "netw/store/store.hpp"
 #include "netw/store/table.hpp"
-#include "netw/store/world.hpp"
 
 using namespace godot;
 
@@ -514,7 +512,12 @@ InterpolationView::InterpolationView() {
     held_values.resize(SAMPLE_CAP);
 }
 
-void InterpolationView::sample(const session::Books &p_books) {
+void InterpolationView::sample(
+    const Clock &p_clock,
+    const Clock::Reading &p_now,
+    const store::Store &p_store,
+    NetwPredictionEngine *p_prediction
+) {
     ++generation;
     sampled.clear();
     held.clear();
@@ -522,7 +525,7 @@ void InterpolationView::sample(const session::Books &p_books) {
     candidates.clear();
     texted.clear();
     cameras.clear();
-    const ClockEngine &clock = *p_books.clock;
+    const Clock &clock = p_clock;
     if (!clock.get_configured()) {
         forget_departed();
         return;
@@ -530,7 +533,7 @@ void InterpolationView::sample(const session::Books &p_books) {
     Now now;
     now.tick = clock.get_tick();
     now.display_tick = clock.display_tick();
-    now.tick_factor = clock.tick_factor();
+    now.tick_factor = clock.tick_factor(p_now);
     now.snap_ticks = MAX(
         int64_t(1),
         int64_t(std::ceil(SNAP_SECONDS * double(clock.get_tickrate())))
@@ -563,9 +566,7 @@ void InterpolationView::sample(const session::Books &p_books) {
                 entry.snap_until = now.tick + now.snap_ticks;
             }
         } else {
-            const Ref<NetwEntity> entity = runtime.entity();
-            made.forecast
-                = entity.is_valid() && !entity->get_is_controlled_locally();
+            made.forecast = source.record != nullptr && !source.controlled_here;
             made.glide = glide_of(pose);
             const double floor = Object::cast_to<Node2D>(owner) != nullptr
                 ? GLIDE_FLOOR_PIXELS
@@ -589,7 +590,7 @@ void InterpolationView::sample(const session::Books &p_books) {
     }
     keep_nearest_per_world(candidates, ENTITY_CAP);
     for (const Candidate &each : candidates) {
-        read(p_books, each, now);
+        read(p_store, p_prediction, each, now);
     }
     forget_departed();
 }
@@ -627,7 +628,7 @@ bool InterpolationView::resolve_pose(
 void InterpolationView::resolve_heading(
     Seen &r_entry,
     const display::Channel &p_pose,
-    const session::Books &p_books
+    const store::Store &p_store
 ) {
     if (r_entry.heading_from != HEADING_UNRESOLVED) {
         return;
@@ -643,18 +644,18 @@ void InterpolationView::resolve_heading(
         r_entry.heading_from = HEADING_NONE;
         return;
     }
-    const store::RowAddress at = p_books.store->row_of(owner, lane);
+    const store::RowAddress at = p_store.row_of(owner, lane);
     if (!at.valid()) {
         return;
     }
-    const store::Table &table = p_books.store->table(at.table);
+    const store::Table &table = p_store.table(at.table);
     if (!table.holds_values(at.row)) {
         return;
     }
     r_entry.heading_from = HEADING_NONE;
     for (uint32_t each = 0; each < table.columns.size(); ++each) {
         if (each != column
-            && turns(table.read_value(at.row, each).get_type())) {
+            && turns(store::read_value(table, at.row, each).get_type())) {
             r_entry.heading_from = HEADING_COLUMN;
             r_entry.heading_owner = owner;
             r_entry.heading_lane = lane;
@@ -665,7 +666,8 @@ void InterpolationView::resolve_heading(
 }
 
 void InterpolationView::read(
-    const session::Books &p_books,
+    const store::Store &p_store,
+    NetwPredictionEngine *p_prediction,
     const Candidate &p_candidate,
     const Now &p_now
 ) {
@@ -704,16 +706,25 @@ void InterpolationView::read(
         sampled.push_back(row);
         return;
     }
-    resolve_heading(entry, pose, p_books);
+    resolve_heading(entry, pose, p_store);
     if (row.pump == display::PUMP_CHASE) {
-        read_forecast(p_books, entry, runtime, frame, row, p_now);
+        read_forecast(
+            p_store,
+            p_prediction,
+            entry,
+            runtime,
+            source.record,
+            frame,
+            row,
+            p_now
+        );
         return;
     }
-    read_remote(p_books, entry, runtime, frame, row, p_now);
+    read_remote(p_store, entry, runtime, frame, row, p_now);
 }
 
 void InterpolationView::read_remote(
-    const session::Books &p_books,
+    const store::Store &p_store,
     Seen &r_entry,
     display::Runtime &p_runtime,
     Node *p_frame,
@@ -739,7 +750,7 @@ void InterpolationView::read_remote(
         ? r_row.finished && playhead_tick >= newest_held
         : every_channel_sleeping(p_runtime);
     hold_marks(
-        p_books,
+        p_store,
         r_entry,
         p_frame,
         count,
@@ -797,9 +808,11 @@ void InterpolationView::read_remote(
 }
 
 void InterpolationView::read_forecast(
-    const session::Books &p_books,
+    const store::Store &p_store,
+    NetwPredictionEngine *p_prediction,
     Seen &r_entry,
     display::Runtime &p_runtime,
+    const NetwEntityRecord *p_record,
     Node *p_frame,
     TimelineRow &r_row,
     const Now &p_now
@@ -813,10 +826,10 @@ void InterpolationView::read_forecast(
     if (count == 0) {
         return;
     }
-    hold_marks(p_books, r_entry, p_frame, count, INFINITY, r_row);
-    NetwPredictionEngine *engine = p_books.prediction;
+    hold_marks(p_store, r_entry, p_frame, count, INFINITY, r_row);
+    NetwPredictionEngine *engine = p_prediction;
     const int64_t offset = engine != nullptr
-        ? engine->joint_world_offset_of(engine->slot_of(p_runtime.entity()))
+        ? engine->joint_world_offset_of(engine->slot_of(p_record))
         : 0;
     r_row.phase = PHASE_FORECAST;
     r_row.horizon = p_now.tick + offset - held_ticks[0];
@@ -839,7 +852,7 @@ void InterpolationView::read_forecast(
 }
 
 void InterpolationView::hold_marks(
-    const session::Books &p_books,
+    const store::Store &p_store,
     const Seen &p_entry,
     Node *p_frame,
     uint32_t p_count,
@@ -849,12 +862,12 @@ void InterpolationView::hold_marks(
     const store::Table *heading_table = nullptr;
     uint32_t heading_row = 0;
     if (p_entry.heading_from == HEADING_COLUMN) {
-        const store::RowAddress at = p_books.store->row_of(
+        const store::RowAddress at = p_store.row_of(
             p_entry.heading_owner,
             p_entry.heading_lane
         );
         if (at.valid()) {
-            heading_table = &p_books.store->table(at.table);
+            heading_table = &p_store.table(at.table);
             heading_row = at.row;
         }
     }
@@ -874,8 +887,12 @@ void InterpolationView::hold_marks(
             mark.turned = heading_of(value, mark.heading);
         } else if (heading_table != nullptr) {
             mark.turned = heading_of(
-                heading_table
-                    ->history_value(heading_row, age, p_entry.heading_column),
+                store::history_value(
+                    *heading_table,
+                    heading_row,
+                    age,
+                    p_entry.heading_column
+                ),
                 mark.heading
             );
         }

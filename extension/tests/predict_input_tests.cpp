@@ -6,8 +6,11 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/prediction.hpp"
 #include "netw/predict/drive.hpp"
+#include "netw/predict/engine.hpp"
+#include "support/fault_log.h"
 #include "support/internals.h"
 #include "support/minted_script.h"
+#include "support/netw_call_log.h"
 #include "support/netw_cells.h"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -30,6 +33,26 @@ constexpr int HELD_TICKS = 3;
 constexpr int SETTLE_TICKS = 24;
 constexpr int SERVER = -1;
 
+TEST_CASE("[Netw][Predict][Input] a predictor receives its configured entity") {
+    netw_test::CallLog seen;
+    Ref<netw::NetwEntity> entity;
+    entity.instantiate();
+    entity->get_prediction()->set_predict_input(
+        seen.answering("input", Dictionary())
+    );
+    netw::NetwPredictionEngine pool;
+    const int64_t slot = Internals::seat(&pool, entity);
+    REQUIRE(slot >= 0);
+
+    REQUIRE(pool.predict_command(slot, 12));
+
+    const Array args = seen.args("input");
+    REQUIRE(args.size() == 2);
+    const Ref<netw::NetwEntity> subject = args[0];
+    CHECK(subject.ptr() == entity.ptr());
+    CHECK(int64_t(args[1]) == 12);
+}
+
 const char *WALKER_SOURCE = R"(extends Node2D
 
 var beat := 0
@@ -44,6 +67,42 @@ func _init() -> void:
 
 func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
 	beat += motion
+)";
+
+const char *AIMER_SOURCE = R"(extends Node2D
+
+var beat := 0
+var strays := 0
+var held = []
+
+
+func _init() -> void:
+	Netw.configure_entity(self)
+	Netw.configure_property(self, &"beat").state()
+	Netw.configure_property(self, &"aim").input()
+
+
+func _get_property_list() -> Array[Dictionary]:
+	var client := is_inside_tree() and not multiplayer.is_server()
+	var kind := TYPE_NIL if client else TYPE_ARRAY
+	return [{"name": "aim", "type": kind, "usage": PROPERTY_USAGE_DEFAULT}]
+
+
+func _get(property: StringName) -> Variant:
+	return held if property == &"aim" else null
+
+
+func _set(property: StringName, value: Variant) -> bool:
+	if property != &"aim":
+		return false
+	held = value
+	return true
+
+
+func _network_process(_delta: float, _tick: int, _is_fresh: bool) -> void:
+	if typeof(held) != TYPE_ARRAY:
+		strays += 1
+	beat += 1
 )";
 
 const char *INPUTS_SOURCE = R"(extends Resource
@@ -108,9 +167,15 @@ struct Walk {
     Ref<Script> inputs;
     int route = 0;
 
-    Walk(int p_lobby_ticks, bool p_steers, bool p_client_controls) : rig(1) {
+    Walk(
+        int p_lobby_ticks,
+        bool p_steers,
+        bool p_client_controls,
+        const char *p_source = WALKER_SOURCE
+    ) :
+            rig(1) {
         script = netw_test::minted_script(
-            p_steers ? STEERER_SOURCE : WALKER_SOURCE
+            p_steers ? STEERER_SOURCE : p_source
         );
         inputs = netw_test::minted_script(INPUTS_SOURCE);
         const Callable build = p_steers
@@ -292,6 +357,34 @@ LawVerdict resource_input_lands(const World &) {
     return law_held();
 }
 
+LawVerdict mistyped_input_is_refused(const World &) {
+    netw_test::FaultWatch faults;
+    faults.expect_warning("*'aim'*[NW1044]*", 1);
+    Walk walk(0, false, true, AIMER_SOURCE);
+    for (int tick = 0; tick < WARM_TICKS; ++tick) {
+        walk.walker(0)->set(StringName("aim"), Array());
+        walk.rig.step_ticks(1);
+    }
+    if (walk.beat(SERVER) <= 0) {
+        return law_broken("the server never stepped on a typed input");
+    }
+    for (int tick = 0; tick < SETTLE_TICKS; ++tick) {
+        walk.walker(0)->set(StringName("aim"), Dictionary());
+        walk.rig.step_ticks(1);
+    }
+    const int64_t strays = walk.walker(SERVER)->get(StringName("strays"));
+    if (strays != 0) {
+        return law_broken(
+            "the server ran %d tick(s) on a Dictionary",
+            int(strays)
+        );
+    }
+    const int64_t told = faults.warnings_containing("[NW1044]");
+    return told == 1
+        ? law_held()
+        : law_broken("the server reported the refusal %d times", int(told));
+}
+
 LawVerdict server_body_moves(const World &) {
     Walk walk(0, false, false);
     for (int tick = 0; tick < SETTLE_TICKS; ++tick) {
@@ -320,6 +413,9 @@ const Row ROWS[] = {
      "replay restores it into the same resource, and the resource is never "
      "assigned again",
      &resource_input_lands},
+    {"a client sends an input property a value of the wrong type",
+     "the server refuses it, keeps its own typed value and reports it once",
+     &mistyped_input_is_refused},
     {"a predicted body nobody controls, driven by the server",
      "it moves on the server and on the client",
      &server_body_moves},

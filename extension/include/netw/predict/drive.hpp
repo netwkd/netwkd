@@ -258,16 +258,13 @@ struct PendingProvenance {
 };
 
 struct EntityRoster {
-    godot::LocalVector<godot::ObjectID> members;
+    godot::LocalVector<godot::RID> members;
+    godot::LocalVector<godot::ObjectID> wrappers;
 
-    int index_of(const godot::ObjectID &p_id) const;
-    bool add(const godot::ObjectID &p_id);
-    bool erase(const godot::ObjectID &p_id);
+    int index_of(const godot::RID &p_id) const;
+    bool add(const godot::RID &p_id, godot::ObjectID p_wrapper);
+    bool erase(const godot::RID &p_id);
     void clear();
-
-    int count() const {
-        return int(members.size());
-    }
 };
 
 struct DeclaredAxes {
@@ -360,6 +357,7 @@ struct StatePart {
 };
 
 struct Slot {
+    NetwMultiplayer *session = nullptr;
     Config config;
     Wiring wiring;
     FieldCodec input_codec;

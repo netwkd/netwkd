@@ -16,7 +16,7 @@
 #include "godot/physics_body.hpp"
 #include "godot/physics_server.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 
 using namespace godot;
 using netw_test::Internals;
@@ -26,7 +26,7 @@ namespace TestNetwStorePull {
 using netw::NetwMultiplayer;
 using netw::store::RowAddress;
 using netw::store::Table;
-using netw::store::World;
+using netw::store::Store;
 
 constexpr const char *CUBE_ID = "store_pull_cube";
 
@@ -75,7 +75,8 @@ constexpr int WINDOW_FRAMES = 30;
 constexpr int WINDOW_AT = SETTLE_FRAMES + WINDOW_FRAMES;
 constexpr int WAKE_AT = WINDOW_AT + 2;
 constexpr int MISS_AT = WAKE_AT + 3;
-constexpr int PULL_END = MISS_AT + 2;
+constexpr int MISS_READ_AT = MISS_AT + 2;
+constexpr int PULL_END = MISS_AT + int(Store::SWEEP_TICKS) + 2;
 const Vector3 NUDGE(1.0, 0.0, 0.0);
 const Vector3 SHIFT(4.0, 0.0, 0.0);
 
@@ -92,13 +93,13 @@ Node *build_cube(const Variant &p_name) {
     return made;
 }
 
-RowAddress row_of_node(const World &p_world, Node *p_node) {
+RowAddress row_of_node(const Store &p_world, Node *p_node) {
     RowAddress found;
     const uint64_t id = uint64_t(p_node->get_instance_id());
     for (uint32_t table = 0; table < p_world.table_count(); ++table) {
         const Table &held = p_world.table(table);
         for (uint32_t row = 0; row < held.row_count(); ++row) {
-            if (held.nodes[row] == id) {
+            if (p_world.pull->residents.node_of(table, row) == id) {
                 found.table = table;
                 found.row = row;
             }
@@ -122,6 +123,9 @@ struct PullEvidence {
     bool miss_named = false;
     bool miss_restored = false;
     std::string miss_gate;
+    int64_t moved_at = -1;
+    int64_t moved_changed = -1;
+    bool moved_quiet = false;
 };
 
 PullEvidence &pull_evidence() {
@@ -197,13 +201,15 @@ protected:
 class PullScenario final : public netw_test::FrameScenario, PullStand {
     int frame = 0;
     bool done = false;
-    World::PullWork opened;
+    Store::PullWork opened;
     int64_t faults_before = 0;
     std::string first_before;
+    int64_t count_before = 0;
+    int64_t count_last = 0;
 
     void read_window() {
         PullEvidence &seen = pull_evidence();
-        const World::PullWork &now = Internals::store(server()).work;
+        const Store::PullWork &now = Internals::store(server()).work;
         seen.window_ticks = WINDOW_FRAMES;
         seen.window_rows = now.rows - opened.rows;
         seen.window_rested = now.rested - opened.rested;
@@ -225,8 +231,10 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
             = netw::store::validation_audit::ledger();
         faults_before = book.faults;
         first_before = book.first;
+        count_before = Internals::store(server()).miss_count;
         Internals::store(server()).validate_every = 1;
         Internals::store(server()).misses.clear();
+        pull_evidence().moved_at = table_of(4).pulled_tick;
         RigidBody3D *held = cube(4);
         PhysicsServer3D *physics = PhysicsServer3D::get_singleton();
         Transform3D moved = held->get_global_transform();
@@ -245,7 +253,7 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
 
     void read_misses() {
         PullEvidence &seen = pull_evidence();
-        World &world = Internals::store(server());
+        Store &world = Internals::store(server());
         const int64_t route = table_of(4).routes[row_at(4)];
         seen.misses = int(world.misses.size());
         seen.miss_named = !world.misses.is_empty();
@@ -255,9 +263,17 @@ class PullScenario final : public netw_test::FrameScenario, PullStand {
                 && missed.column == StringName("position");
             seen.miss_gate = missed.gate;
         }
+    }
+
+    void read_caught() {
+        PullEvidence &seen = pull_evidence();
+        Store &world = Internals::store(server());
+        seen.moved_changed = table_of(4).changed_ticks[row_at(4)];
+        seen.moved_quiet = world.miss_count == count_last;
         netw::store::validation_audit::Ledger &book
             = netw::store::validation_audit::ledger();
-        seen.miss_restored = book.faults - faults_before == seen.misses;
+        seen.miss_restored
+            = book.faults - faults_before == world.miss_count - count_before;
         book.planted += book.faults - faults_before;
         book.faults = faults_before;
         book.first = first_before;
@@ -289,13 +305,17 @@ public:
         if (frame == MISS_AT) {
             plant_miss();
         }
-        if (frame == PULL_END) {
+        if (frame == MISS_READ_AT) {
             read_misses();
+        }
+        if (frame == PULL_END) {
+            read_caught();
             close_stand();
             seen.driven = true;
             done = true;
             return false;
         }
+        count_last = Internals::store(server()).miss_count;
         stand->step_ticks(1);
         if (frame == WAKE_AT) {
             seen.woken_body
@@ -332,12 +352,12 @@ class AllocScenario final : public netw_test::FrameScenario, PullStand {
     int frame = 0;
     bool done = false;
     netw_test::AllocProbe probe;
-    World::PullWork opened;
+    Store::PullWork opened;
     int64_t seen_opened = 0;
 
     void read() {
         AllocEvidence &seen = alloc_evidence();
-        const World::PullWork &now = Internals::store(server()).work;
+        const Store::PullWork &now = Internals::store(server()).work;
         seen.pulls = now.pulls - opened.pulls;
         seen.rested = now.rested - opened.rested;
         seen.read = now.rows - opened.rows;
@@ -530,7 +550,7 @@ TEST_CASE(
 ) {
     const PullEvidence &seen = pull_evidence();
     REQUIRE(seen.driven);
-    const int64_t sweep = int64_t(World::SWEEP_TICKS);
+    const int64_t sweep = int64_t(Store::SWEEP_TICKS);
     const int64_t share = (CUBES + sweep - 1) / sweep;
     NETW_CHECK_EQ(seen.asleep, CUBES);
     NETW_CHECK_EQ(seen.window_body, seen.window_ticks * share);
@@ -552,14 +572,16 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Netw][Store][Frame] P5 the validation mode names the entity, the "
-    "column and the gate of a change the rest gate hid"
+    "[Netw][Store][Frame] P5 a sleeping body moved through the physics "
+    "server is named by the validation mode, then sent by its sweep"
 ) {
     const PullEvidence &seen = pull_evidence();
     REQUIRE(seen.driven);
     NETW_CHECK_GE(seen.misses, 1);
     CHECK(seen.miss_named);
     CHECK(bool(seen.miss_gate == "rested"));
+    NETW_CHECK_GT(seen.moved_changed, seen.moved_at);
+    CHECK(seen.moved_quiet);
     CHECK(seen.miss_restored);
 }
 
@@ -572,7 +594,7 @@ TEST_CASE(
     REQUIRE(seen.driven);
     NETW_CHECK_EQ(seen.asleep, PILE);
     NETW_CHECK_EQ(seen.pulls, int64_t(ALLOC_WINDOW));
-    const int64_t sweep = int64_t(World::SWEEP_TICKS);
+    const int64_t sweep = int64_t(Store::SWEEP_TICKS);
     NETW_CHECK_EQ(seen.rested, int64_t(0));
     NETW_CHECK_EQ(
         seen.read,

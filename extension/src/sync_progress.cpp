@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/sync_progress.hpp"
 
 namespace netw {

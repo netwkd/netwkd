@@ -3,13 +3,13 @@
 #include <cstdint>
 
 #include "godot/variant.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 #include "netw/wire/code_row.hpp"
 
 namespace netw_test {
 
 struct StoreReader {
-    netw::store::World world;
+    netw::store::Store world;
     uint32_t table = 0;
     netw::store::RowAddress at;
     int64_t base_tick = 0;
@@ -20,7 +20,7 @@ struct StoreReader {
         int64_t p_base_tick
     ) {
         table = world.table_for(1, netw::store::Family::VOLATILE, p_schema);
-        at = world.add_row(table, uint64_t(p_route), 0, uint64_t(p_route), 0);
+        at = world.add_row(table, uint64_t(p_route), 0, 0);
         base_tick = p_base_tick;
     }
 
@@ -54,7 +54,7 @@ struct StoreReader {
 
     bool keeps(int p_sender, uint64_t p_revision) {
         const netw::store::Received *rows = received(p_sender);
-        const godot::Variant *carried = nullptr;
+        const netw::wire::TailRef *carried = nullptr;
         return rows != nullptr
             && held().received_image(*rows, p_revision, carried) != nullptr;
     }
@@ -62,7 +62,7 @@ struct StoreReader {
     netw::wire::CodeRow image_at(int p_sender, uint64_t p_revision) {
         netw::wire::CodeRow out = netw::wire::CodeRow::for_plan(held().plan);
         const netw::store::Received *rows = received(p_sender);
-        const godot::Variant *carried = nullptr;
+        const netw::wire::TailRef *carried = nullptr;
         const uint64_t *image = rows == nullptr
             ? nullptr
             : held().received_image(*rows, p_revision, carried);
@@ -77,7 +77,7 @@ struct StoreReader {
         out.assign(
             held().plan,
             held().codes_of(at.row),
-            held().carried_of(at.row)
+            held().tails_of(at.row)
         );
         return out;
     }

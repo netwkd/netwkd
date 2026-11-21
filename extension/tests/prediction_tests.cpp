@@ -247,12 +247,17 @@ LawVerdict refused_joint_spawned(const World &) {
     return refused_joint_once(true);
 }
 
+constexpr NetwMultiplayer::Traffic SENT_INPUT
+    = NetwMultiplayer::TRAFFIC_SENT_INPUT;
+constexpr NetwMultiplayer::Traffic SENT_UPKEEP
+    = NetwMultiplayer::TRAFFIC_SENT_UPKEEP;
+
 template <typename Tick>
 double sent_from(
     LoopbackRig &p_rig,
     NetwMultiplayer *p_sender,
     int64_t p_to,
-    const char *p_cause,
+    NetwMultiplayer::Traffic p_cause,
     int p_ticks,
     Tick p_before_each
 ) {
@@ -264,17 +269,14 @@ double sent_from(
         p_rig.step_ticks(1);
     }
     Internals::traffic_advance(p_sender, WINDOW);
-    const Dictionary left = p_sender->session_get_traffic(p_to);
-    const Dictionary sent = left[StringName("sent")];
-    const double rate = sent[StringName(p_cause)];
-    return rate * WINDOW;
+    return p_sender->peer_get_traffic(p_to, p_cause) * WINDOW;
 }
 
 template <typename Tick>
 double sent_bytes(
     LoopbackRig &p_rig,
     int p_client,
-    const char *p_cause,
+    NetwMultiplayer::Traffic p_cause,
     int p_ticks,
     Tick p_before_each
 ) {
@@ -289,7 +291,7 @@ double sent_bytes(
 }
 
 double acked_bytes(LoopbackRig &p_rig, bool p_shoved) {
-    return sent_bytes(p_rig, 0, "upkeep", 64, [&](int p_tick) {
+    return sent_bytes(p_rig, 0, SENT_UPKEEP, 64, [&](int p_tick) {
         if (p_shoved && p_tick % 8 == 0) {
             shove(p_rig, "P");
         }
@@ -410,15 +412,16 @@ LawVerdict relays_a_change(const World &) {
     };
     const auto hold = [](int) {};
     const double turning
-        = sent_bytes(rig, WATCHER, "input", WINDOW_TICKS, turn);
+        = sent_bytes(rig, WATCHER, SENT_INPUT, WINDOW_TICKS, turn);
     rig.step_ticks(REPEATED_TICKS);
-    if (sent_bytes(rig, WATCHER, "input", BACKOFF_TICKS, hold) <= 0.0) {
+    if (sent_bytes(rig, WATCHER, SENT_INPUT, BACKOFF_TICKS, hold) <= 0.0) {
         return law_broken(
             "a changed input was not sent again between its first repeats "
             "and its refresh"
         );
     }
-    const double held = sent_bytes(rig, WATCHER, "input", WINDOW_TICKS, hold);
+    const double held
+        = sent_bytes(rig, WATCHER, SENT_INPUT, WINDOW_TICKS, hold);
     if (held <= 0.0) {
         return law_broken("an input held for two seconds was never refreshed");
     }
@@ -453,7 +456,7 @@ LawVerdict relays_in_four_sends(const World &) {
     }
     const auto hold = [](int) {};
     for (int copy = 1; copy < COPIES; ++copy) {
-        if (sent_bytes(rig, WATCHER, "input", INTERVAL, hold) <= 0.0) {
+        if (sent_bytes(rig, WATCHER, SENT_INPUT, INTERVAL, hold) <= 0.0) {
             return law_broken(
                 "send %d after the change carried no copy of it",
                 copy + 1
@@ -476,7 +479,7 @@ LawVerdict idles_in_step(const World &) {
     NetwMultiplayer *server = rig.server();
     const auto hold = [](int) {};
     for (int tick = 0; tick < 2 * IDLE_RATE; ++tick) {
-        if (sent_from(rig, client, 1, "input", 1, hold) > 0.0) {
+        if (sent_from(rig, client, 1, SENT_INPUT, 1, hold) > 0.0) {
             break;
         }
     }
@@ -494,11 +497,11 @@ LawVerdict idles_in_step(const World &) {
     for (NetwMultiplayer *side : {client, server}) {
         Internals::traffic_advance(side, WINDOW);
     }
-    const StringName packets("sent_packets");
-    const double up = double(client->session_get_traffic(1)[packets]) * WINDOW;
+    constexpr NetwMultiplayer::Traffic PACKETS
+        = NetwMultiplayer::TRAFFIC_SENT_PACKETS;
+    const double up = client->peer_get_traffic(1, PACKETS) * WINDOW;
     const double down
-        = double(server->session_get_traffic(rig.peer_id(WATCHER))[packets])
-        * WINDOW;
+        = server->peer_get_traffic(rig.peer_id(WATCHER), PACKETS) * WINDOW;
     if (up > 2 * SECONDS + 1) {
         return law_broken(
             "a standing client sent %d packets in %d seconds",
@@ -571,7 +574,7 @@ LawVerdict rests_at_a_wide_interval(const World &) {
         rig,
         rig.client(0),
         1,
-        "input",
+        SENT_INPUT,
         WINDOW_TICKS,
         [&](int) {
             halted = halted || predicted->get_position().x == last;
@@ -585,7 +588,7 @@ LawVerdict rests_at_a_wide_interval(const World &) {
     rig.step_ticks(WINDOW_TICKS);
     const auto hold = [](int) {};
     const double resting
-        = sent_from(rig, rig.client(0), 1, "input", WINDOW_TICKS, hold);
+        = sent_from(rig, rig.client(0), 1, SENT_INPUT, WINDOW_TICKS, hold);
     if (resting * 3.0 > running) {
         return law_broken(
             "a standing client sent %d input bytes and a running one %d",
@@ -641,7 +644,7 @@ LawVerdict answers_a_roster_change(const World &) {
         LoopbackRig rig(2);
         two_runners(rig);
         answered[joins]
-            = sent_bytes(rig, WATCHER, "upkeep", 32, [&](int p_tick) {
+            = sent_bytes(rig, WATCHER, SENT_UPKEEP, 32, [&](int p_tick) {
                   if (joins == 1 && p_tick == JOINED) {
                       NetwEntity::of(body(rig, "P", SERVER))
                           ->get_simulation()
@@ -758,7 +761,7 @@ LawVerdict holds_a_standing_input(const World &) {
         ran = effects(rig, SERVER);
     };
     const double held
-        = sent_from(rig, rig.client(0), 1, "input", WINDOW_TICKS, count);
+        = sent_from(rig, rig.client(0), 1, SENT_INPUT, WINDOW_TICKS, count);
     if (idle > 2) {
         return law_broken(
             "the server did not run a held button on %d of %d ticks",
@@ -766,11 +769,11 @@ LawVerdict holds_a_standing_input(const World &) {
             WINDOW_TICKS
         );
     }
-    const double answered = sent_bytes(rig, 0, "upkeep", WINDOW_TICKS, hold);
+    const double answered = sent_bytes(rig, 0, SENT_UPKEEP, WINDOW_TICKS, hold);
     const double tapped
-        = sent_from(rig, rig.client(0), 1, "input", WINDOW_TICKS, tap);
+        = sent_from(rig, rig.client(0), 1, SENT_INPUT, WINDOW_TICKS, tap);
     const double answered_taps
-        = sent_bytes(rig, 0, "upkeep", WINDOW_TICKS, tap);
+        = sent_bytes(rig, 0, SENT_UPKEEP, WINDOW_TICKS, tap);
     if (held * 4.0 > tapped) {
         return law_broken(
             "a held button cost the client %d bytes and a tapped one %d",
@@ -816,13 +819,13 @@ LawVerdict rests_inside_its_threshold(const World &) {
     LoopbackRig rig(1);
     stand(rig, false);
     const double agreed
-        = sent_from(rig, rig.client(0), 1, "input", WINDOW_TICKS, hold);
+        = sent_from(rig, rig.client(0), 1, SENT_INPUT, WINDOW_TICKS, hold);
 
     Node2D *served = body(rig, "P", SERVER);
     served->set_position(served->get_position() + Vector2(DRIFT, 0.0));
     rig.step_ticks(SETTLE_TICKS);
     const double drifted
-        = sent_from(rig, rig.client(0), 1, "input", WINDOW_TICKS, hold);
+        = sent_from(rig, rig.client(0), 1, SENT_INPUT, WINDOW_TICKS, hold);
     if (body(rig, "P", 0)->get_position() == served->get_position()) {
         return law_broken(
             "a client %g from the server's copy was corrected under a "

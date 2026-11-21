@@ -17,12 +17,14 @@
 #include "netw/repl/watch_book.hpp"
 #include "netw/spawn/book.hpp"
 
-namespace netw::session {
-struct Books;
-} // namespace netw::session
+namespace netw::wire {
+class NetworkProfiler;
+} // namespace netw::wire
 
 namespace netw {
 
+class Clock;
+class NetwLivenessCore;
 class NetwMultiplayer;
 
 class SyncCompat {
@@ -88,7 +90,7 @@ private:
         bool feed_any = false;
         godot::MultiplayerSynchronizer *sync_at = nullptr;
         godot::Node *root_at = nullptr;
-        godot::Ref<NetwEntity> entity_at;
+        godot::RID entity_at;
         bool resident = false;
         int64_t ordinal = -1;
         uint64_t ordinal_revision = UINT64_MAX;
@@ -97,12 +99,15 @@ private:
         godot::Node *root_node() const;
     };
 
-    godot::ObjectID core_id;
-    const session::Books *books = nullptr;
+    NetwMultiplayer *session = nullptr;
+    Clock *clock_engine = nullptr;
+    NetwLivenessCore *liveness_core = nullptr;
+#if defined(DEBUG_ENABLED)
+    wire::NetworkProfiler *network_profiler = nullptr;
+    uint32_t *profiler_outgoing = nullptr;
+#endif
     NetwSyncModel *sync_model = nullptr;
     spawn::Book *spawn_book;
-    godot::Callable adopt_seam;
-    godot::Callable sweep_seam;
     int64_t channel_sync = 0;
     int64_t channel_sync_delta = 0;
 
@@ -126,6 +131,8 @@ private:
     int64_t fields_resolved = 0;
     godot::Array gathered;
     godot::Array gathered_readable;
+    godot::LocalVector<wire::TailRef> watched;
+    godot::LocalVector<uint8_t> watched_readable;
 
     int64_t sync_frames_out = 0;
     int64_t sync_frames_in = 0;
@@ -136,7 +143,6 @@ private:
     int64_t drops_sync_poisoned = 0;
     int64_t drops_sync_unknown_flag = 0;
 
-    NetwMultiplayer *core() const;
     Consumed *row_of(godot::Object *p_sync);
     Consumed *row_by_ordinal(int64_t p_route, int64_t p_ordinal);
     void index_row(Consumed *p_row);
@@ -149,7 +155,7 @@ private:
     void watch_tree();
     void forget_nodes(Consumed *p_row);
     bool locate(Consumed *p_row);
-    godot::Ref<NetwEntity> entity_of(Consumed *p_row);
+    godot::RID entity_of(Consumed *p_row);
 
     void refresh_row(Consumed *p_row);
     void disconnect_config(Consumed *p_row);
@@ -173,7 +179,7 @@ private:
 
     godot::PackedInt32Array recipients_for(
         Consumed *p_row,
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         int64_t p_route,
         godot::Node *p_root
     );
@@ -217,21 +223,25 @@ private:
     void on_config_changed();
     void on_node_removed(godot::Node *p_node);
     void on_sync_visibility_changed(int64_t p_peer, godot::Node *p_root);
-    void on_entity_live(
-        int64_t p_route,
-        const godot::Ref<NetwEntity> &p_entity
-    );
+    void on_entity_live(int64_t p_route, const godot::RID &p_entity);
 
 public:
     ~SyncCompat();
 
-    void set_core(godot::Object *p_core, const session::Books *p_books);
+    void seat(
+        NetwMultiplayer *p_session,
+        Clock *p_clock,
+        NetwLivenessCore *p_liveness
+    );
+#if defined(DEBUG_ENABLED)
+    void seat_profiler(
+        wire::NetworkProfiler *p_profiler,
+        uint32_t *p_outgoing
+    );
+#endif
+    void unseat();
     void set_sync_model(NetwSyncModel *p_model);
     void set_spawn_book(spawn::Book *p_book);
-    void set_spawn_seams(
-        const godot::Callable &p_adopt,
-        const godot::Callable &p_sweep
-    );
     void set_channels(int64_t p_sync, int64_t p_sync_delta);
 
     godot::Error consume(godot::Node *p_root, godot::Object *p_sync);
@@ -244,12 +254,12 @@ public:
     void pump();
 
     void handle_sync(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender
     );
     void handle_sync_delta(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender
     );

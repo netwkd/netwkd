@@ -1216,8 +1216,8 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// </summary>
         AttributionDroppedOut = 96,
         /// <summary>
-        /// Counter. Property updates delayed because the bandwidth limit in
-        /// <see cref="NetwMultiplayer.PeerGetLinkStats"/> was reached.
+        /// Counter. Property updates delayed because the bandwidth limit
+        /// <see cref="NetwMultiplayer.LinkStat.BudgetBytes"/> was reached.
         /// </summary>
         RowFramesDeferred = 97,
         /// <summary>
@@ -1225,6 +1225,213 @@ public sealed class NetwMultiplayer : NetwRefCounted
         /// does not control.
         /// </summary>
         PredictInstalls = 98,
+    }
+
+    public enum TrackStat : long
+    {
+        /// <summary>
+        /// A [bool]. Whether the track reached its newest snapshot and holds
+        /// that value.
+        /// </summary>
+        Sleeping = 0,
+        /// <summary>
+        /// A [bool]. Whether the track smooths out the jump to the next value
+        /// it draws.
+        /// </summary>
+        OffsetArmed = 1,
+        /// <summary>
+        /// A [bool]. Whether the track is still smoothing out a jump.
+        /// </summary>
+        OffsetHeld = 2,
+        /// <summary>
+        /// An [int]. The tick of the track's newest snapshot, or <c>-1</c> when
+        /// it holds none.
+        /// </summary>
+        NewestTick = 3,
+        /// <summary>
+        /// An [int]. How many snapshots the track holds.
+        /// </summary>
+        BufferSize = 4,
+        /// <summary>
+        /// An [int]. How many properties of the entity are displayed.
+        /// </summary>
+        Channels = 5,
+        /// <summary>
+        /// An [int]. How many property names more than one node of the entity
+        /// declares.
+        /// </summary>
+        Ambiguous = 6,
+        /// <summary>
+        /// An [int] counter. Frames the entity was displayed.
+        /// </summary>
+        PumpedFrames = 7,
+        /// <summary>
+        /// A <see cref="NetwDisplay.DisplayPump"/> value. The same as
+        /// <see cref="NetwDisplay.PumpMode"/>.
+        /// </summary>
+        PumpMode = 8,
+        /// <summary>
+        /// An [int]. How many frames in a row playback has run past the newest
+        /// snapshot.
+        /// </summary>
+        StarvationTicks = 9,
+        /// <summary>
+        /// A [float]. The same as <see cref="NetwDisplay.DisplayLag"/>.
+        /// </summary>
+        DisplayLag = 10,
+        /// <summary>
+        /// A <see cref="NetwDisplay.DisplayRoleEnum"/> value. How the entity is
+        /// displayed on this peer, with
+        /// <see cref="NetwDisplay.DisplayRoleEnum.Auto"/> resolved.
+        /// </summary>
+        Role = 11,
+    }
+
+    public enum LinkStat : long
+    {
+        /// <summary>
+        /// Round trip time, in seconds.
+        /// </summary>
+        Rtt = 0,
+        /// <summary>
+        /// Round trip variation, in seconds.
+        /// </summary>
+        Jitter = 1,
+        /// <summary>
+        /// Packets that arrived out of order.
+        /// </summary>
+        Reorders = 2,
+        /// <summary>
+        /// Packets that arrived twice.
+        /// </summary>
+        Duplicates = 3,
+        /// <summary>
+        /// The share of the last 32 packets lost, from <c>0.0</c> to
+        /// <c>1.0</c>.
+        /// </summary>
+        Loss = 4,
+        /// <summary>
+        /// A <see cref="NetwMultiplayer.LinkMode"/> value.
+        /// <see cref="NetwMultiplayer.LinkMode.Bad"/> while the peer's budget
+        /// is cut.
+        /// </summary>
+        Mode = 5,
+        /// <summary>
+        /// The most bits one packet to the peer may use.
+        /// </summary>
+        BudgetBits = 6,
+        /// <summary>
+        /// The bytes the peer may be sent each tick.
+        /// </summary>
+        BudgetBytes = 7,
+        /// <summary>
+        /// Bytes charged to the peer since it joined.
+        /// </summary>
+        SentBytes = 8,
+        /// <summary>
+        /// Bytes the peer was sent past its budget.
+        /// </summary>
+        DebtBytes = 9,
+        /// <summary>
+        /// Rows left waiting by the last tick.
+        /// </summary>
+        DeferredRows = 10,
+    }
+
+    public enum LinkMode : long
+    {
+        /// <summary>
+        /// The link sends its whole budget.
+        /// </summary>
+        Good = 0,
+        /// <summary>
+        /// The link lost packets and its budget is cut.
+        /// </summary>
+        Bad = 1,
+    }
+
+    public enum Traffic : long
+    {
+        /// <summary>
+        /// Bytes a second sent for state and broadcast properties.
+        /// </summary>
+        SentState = 0,
+        /// <summary>
+        /// Bytes a second sent for input properties.
+        /// </summary>
+        SentInput = 1,
+        /// <summary>
+        /// Bytes a second sent for RPCs, signals and actions.
+        /// </summary>
+        SentCalls = 2,
+        /// <summary>
+        /// Bytes a second sent for spawns, despawns, control, scenes and joins.
+        /// </summary>
+        SentSpawns = 3,
+        /// <summary>
+        /// Bytes a second sent for prediction acknowledgements and the clock.
+        /// </summary>
+        SentUpkeep = 4,
+        /// <summary>
+        /// Bytes a second sent for packet headers, an estimate for the
+        /// transport.
+        /// </summary>
+        SentHeaders = 5,
+        /// <summary>
+        /// Bytes a second received for state and broadcast properties.
+        /// </summary>
+        ReceivedState = 6,
+        /// <summary>
+        /// Bytes a second received for input properties.
+        /// </summary>
+        ReceivedInput = 7,
+        /// <summary>
+        /// Bytes a second received for RPCs, signals and actions.
+        /// </summary>
+        ReceivedCalls = 8,
+        /// <summary>
+        /// Bytes a second received for spawns, despawns, control, scenes and
+        /// joins.
+        /// </summary>
+        ReceivedSpawns = 9,
+        /// <summary>
+        /// Bytes a second received for prediction acknowledgements and the
+        /// clock.
+        /// </summary>
+        ReceivedUpkeep = 10,
+        /// <summary>
+        /// Bytes a second received for packet headers, an estimate for the
+        /// transport.
+        /// </summary>
+        ReceivedHeaders = 11,
+        /// <summary>
+        /// Packets a second sent.
+        /// </summary>
+        SentPackets = 12,
+        /// <summary>
+        /// Packets a second received.
+        /// </summary>
+        ReceivedPackets = 13,
+    }
+
+    public enum LayerStat : long
+    {
+        /// <summary>
+        /// The number of peers viewing the layer.
+        /// </summary>
+        Viewers = 0,
+        /// <summary>
+        /// The number of entities in the layer.
+        /// </summary>
+        Entities = 1,
+        /// <summary>
+        /// The number of entity and peer pairs that can see each other.
+        /// </summary>
+        VisibleEdges = 2,
+        /// <summary>
+        /// Shows plus hides since the layer was created.
+        /// </summary>
+        TransitionsTotal = 3,
     }
 
     /// <summary>
@@ -1710,26 +1917,6 @@ public sealed class NetwMultiplayer : NetwRefCounted
             NetwGroupPromise.Adopt(
                 NetwApi.Retained(
                     VariantUtils.ConvertToGodotObjectPtr(answered)));
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindSessionGetStats =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_get_stats",
-            2382534195UL);
-
-    /// <summary>
-    /// Returns every <see cref="NetwMultiplayer.Stat"/> value, keyed by the
-    /// lowercase constant name, such as <c>sent_bytes</c>.
-    /// </summary>
-    public Godot.Collections.Dictionary SessionGetStats()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindSessionGetStats, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
         answered.Dispose();
         return result;
     }
@@ -3831,78 +4018,52 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return result;
     }
 
-    private static readonly IntPtr _bindPeerGetLinkStats =
+    private static readonly IntPtr _bindPeerGetLinkStat =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "peer_get_link_stats",
-            3485342025UL);
+            "peer_get_link_stat",
+            1863659248UL);
 
     /// <summary>
-    /// Returns measured connection quality to <paramref name="peer"/>, and what
-    /// this peer's byte budget sends it.
-    /// <code>
-    /// Dictionary
-    /// ┠╴loss           float   share of the last 32 packets lost
-    /// ┠╴rtt            float   round trip time, in seconds
-    /// ┠╴jitter         float   round trip variation, in seconds
-    /// ┠╴reorders       int     packets that arrived out of order
-    /// ┠╴duplicates     int     packets that arrived twice
-    /// ┠╴mode           String  "good", or "bad" while its budget is cut
-    /// ┠╴budget_bits    int     most bits one packet to this peer may use
-    /// ┠╴budget_bytes   int     bytes it may be sent each tick
-    /// ┠╴sent_bytes     int     bytes charged to it since it joined
-    /// ┠╴debt_bytes     int     bytes it was sent past its budget
-    /// ┖╴deferred_rows  int     rows left waiting by the last tick
-    /// </code>
-    /// <para>
-    /// Losing packets halves <c>budget_bytes</c> and <c>budget_bits</c>. Each
-    /// round trip without loss adds back an eighth of the configured budget,
-    /// stopping an eighth short of the rate that lost packets for the next
-    /// minute. While <c>debt_bytes</c> is above zero, volatile properties wait,
-    /// and retained properties and RPCs still go.
-    /// </para>
+    /// Returns the measured connection quality <paramref name="stat"/> of
+    /// <paramref name="peer"/>, or what this peer's byte budget sends it.
+    /// <see cref="NetwSession.LinkStat"/> says how the budget moves.
     /// </summary>
-    public Godot.Collections.Dictionary PeerGetLinkStats(long peer)
+    public double PeerGetLinkStat(long peer, NetwMultiplayer.LinkStat stat)
     {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindPeerGetLinkStats,
+        long slot0 = peer;
+        long slot1 = (long)stat;
+        double answered = default;
+        NetwThunks.Ptrcall2_Long_Long_Double(
+            _bindPeerGetLinkStat,
             Checked,
             in slot0,
+            in slot1,
             ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
+        return answered;
     }
 
-    private static readonly IntPtr _bindSessionGetTraffic =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "session_get_traffic",
-            3485342025UL);
+    private static readonly IntPtr _bindPeerGetTraffic =
+        NetwApi.MethodBind("NetwMultiplayer", "peer_get_traffic", 3316222599UL);
 
     /// <summary>
-    /// Returns what the session sent to <paramref name="peer"/> and received
-    /// from it over the last second. <see cref="NetwSession.Traffic"/> lists
-    /// the keys.
+    /// Returns the rate <paramref name="stat"/> the session sent to
+    /// <paramref name="peer"/> or received from it over the last second. A
+    /// <paramref name="peer"/> of <c>0</c> counts every peer.
+    /// <see cref="NetwSession.Traffic"/> says what headers cost.
     /// </summary>
-    public Godot.Collections.Dictionary SessionGetTraffic(long peer)
+    public double PeerGetTraffic(long peer, NetwMultiplayer.Traffic stat)
     {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindSessionGetTraffic,
+        long slot0 = peer;
+        long slot1 = (long)stat;
+        double answered = default;
+        NetwThunks.Ptrcall2_Long_Long_Double(
+            _bindPeerGetTraffic,
             Checked,
             in slot0,
+            in slot1,
             ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
+        return answered;
     }
 
     private static readonly IntPtr _bindPeerSetBandwidth =
@@ -4981,18 +5142,18 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindPlayerList =
-        NetwApi.MethodBind("NetwMultiplayer", "player_list", 235988956UL);
+        NetwApi.MethodBind("NetwMultiplayer", "player_list", 1930428628UL);
 
     /// <summary>
-    /// Returns the id of every player whose join was accepted. A connected peer
-    /// that has not joined is not here.
+    /// Returns the <see cref="NetwPlayer.Id"/> of every player whose join was
+    /// accepted. A connected peer that has not joined is not here.
     /// </summary>
-    public long[] PlayerList()
+    public int[] PlayerList()
     {
         godot_variant answered = default;
         NetwThunks.Call0(_bindPlayerList, Checked, ref answered);
-        long[] result =
-            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
+        int[] result =
+            VariantUtils.ConvertAsPackedInt32ArrayToSystemArray(answered);
         answered.Dispose();
         return result;
     }
@@ -5879,36 +6040,28 @@ public sealed class NetwMultiplayer : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindInterestLayerGetStats =
+    private static readonly IntPtr _bindInterestLayerGetStat =
         NetwApi.MethodBind(
             "NetwMultiplayer",
-            "interest_layer_get_stats",
-            1882737106UL);
+            "interest_layer_get_stat",
+            4234224608UL);
 
     /// <summary>
-    /// Returns the visibility counters of <paramref name="layer"/>.
-    /// <code>
-    /// Dictionary
-    /// ┠╴viewers            int   number of viewers
-    /// ┠╴entities           int   number of entities
-    /// ┠╴visible_edges      int   (entity, peer) pairs that can see each other
-    /// ┖╴transitions_total  int   shows plus hides since the layer was created
-    /// </code>
+    /// Returns the visibility counter <paramref name="stat"/> of
+    /// <paramref name="layer"/>, or <c>0</c> for an unknown layer.
     /// </summary>
-    public Godot.Collections.Dictionary InterestLayerGetStats(Rid layer)
+    public long InterestLayerGetStat(Rid layer, NetwMultiplayer.LayerStat stat)
     {
-        godot_variant slot0 = VariantUtils.CreateFromRid(layer);
-        godot_variant answered = default;
-        NetwThunks.Call1(
-            _bindInterestLayerGetStats,
+        Rid slot0 = layer;
+        long slot1 = (long)stat;
+        long answered = default;
+        NetwThunks.Ptrcall2_Rid_Long_Long(
+            _bindInterestLayerGetStat,
             Checked,
             in slot0,
+            in slot1,
             ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
+        return answered;
     }
 
     private static readonly IntPtr _bindInterestJoin =
@@ -7514,21 +7667,21 @@ public sealed class NetwMultiplayer : NetwRefCounted
         NetwApi.MethodBind(
             "NetwMultiplayer",
             "display_get_track_stat",
-            2832353505UL);
+            2621838135UL);
 
     /// <summary>
     /// Returns the display diagnostic <paramref name="stat"/> of
-    /// <paramref name="entity"/>, or <c>null</c> when unknown. Some stats
-    /// describe one <paramref name="track"/>, and the rest ignore it.
+    /// <paramref name="entity"/>, or <c>null</c> when it is not displayed. Some
+    /// stats describe one <paramref name="track"/>, and the rest ignore it.
     /// </summary>
     public Variant DisplayGetTrackStat(
         Rid entity,
         StringName track,
-        StringName stat)
+        NetwMultiplayer.TrackStat stat)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(entity);
         godot_variant slot1 = VariantUtils.CreateFromStringName(track);
-        godot_variant slot2 = VariantUtils.CreateFromStringName(stat);
+        godot_variant slot2 = VariantUtils.CreateFromInt((long)stat);
         godot_variant answered = default;
         NetwThunks.Call3(
             _bindDisplayGetTrackStat,
@@ -7765,23 +7918,20 @@ public sealed class NetwMultiplayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindSceneGetViewers =
-        NetwApi.MethodBind(
-            "NetwMultiplayer",
-            "scene_get_viewers",
-            1637577313UL);
+        NetwApi.MethodBind("NetwMultiplayer", "scene_get_viewers", 426342219UL);
 
     /// <summary>
     /// Returns the <see cref="NetwPlayer.Id"/> of every player who sees
     /// <paramref name="scene"/>.
     /// </summary>
-    public long[] SceneGetViewers(Rid scene)
+    public int[] SceneGetViewers(Rid scene)
     {
         godot_variant slot0 = VariantUtils.CreateFromRid(scene);
         godot_variant answered = default;
         NetwThunks.Call1(_bindSceneGetViewers, Checked, in slot0, ref answered);
         slot0.Dispose();
-        long[] result =
-            VariantUtils.ConvertAsPackedInt64ArrayToSystemArray(answered);
+        int[] result =
+            VariantUtils.ConvertAsPackedInt32ArrayToSystemArray(answered);
         answered.Dispose();
         return result;
     }

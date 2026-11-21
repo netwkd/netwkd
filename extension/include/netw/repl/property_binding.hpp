@@ -19,7 +19,6 @@ class Table;
 } // namespace netw::store
 
 namespace netw {
-class NetwEntity;
 class NetwMultiplayer;
 class ReplicationSend;
 } // namespace netw
@@ -130,7 +129,7 @@ public:
     void settle_arrival();
     bool stream_is_reset() const;
     bool writes_node(bool p_retained) const;
-    bool writes_node(bool p_retained, const NetwEntity *p_entity) const;
+    bool writes_node(bool p_retained, bool p_claim_running_ahead) const;
     void notify_landed(const store::Table &p_table, uint32_t p_row) const;
 
     godot::Error write_entity_column(int64_t p_column, int64_t p_route);
@@ -161,7 +160,6 @@ public:
     void clear_peer(int64_t p_peer);
 
     bool retains_arrivals() const;
-    bool retains_arrivals(const NetwEntity *p_entity) const;
     bool follows_tenure() const;
     godot::PackedByteArray write_image(const godot::Array &p_values);
     bool read_image(

@@ -107,7 +107,7 @@ godot::PackedByteArray clock_reply(SessionSide &p_receiver) {
     return netw::wire::frame_pack(
         0,
         0,
-        netw::wire::builtin_channel("CLOCK_HANDSHAKE_REPLY"),
+        netw::wire::CHANNEL_CLOCK_HANDSHAKE_REPLY,
         netw::session::frame_write(rate),
         godot::String()
     );
@@ -196,8 +196,9 @@ TEST_CASE(
     NativeSessionPair pair = make_native_pair();
     settle_pair(pair);
     arm_inbound_sink(pair.client);
-    const int64_t packets_before = pair.client.core->get_received_packets();
-    const int64_t bytes_before = pair.client.core->get_received_bytes();
+    const netw::wire::Wire &counts = pair.client.core->wire();
+    const int64_t packets_before = counts.received_packets;
+    const int64_t bytes_before = counts.received_bytes;
 
     const godot::PackedByteArray payload = clock_reply(pair.client);
     pair.server.core->send_datagram(pair.client_id, payload, true);
@@ -207,10 +208,8 @@ TEST_CASE(
     NETW_CHECK_EQ(inbound_sink.count, 1);
     NETW_CHECK_EQ(inbound_sink.sender, 1);
 
-    const int64_t counted_packets
-        = pair.client.core->get_received_packets() - packets_before;
-    const int64_t counted_bytes
-        = pair.client.core->get_received_bytes() - bytes_before;
+    const int64_t counted_packets = counts.received_packets - packets_before;
+    const int64_t counted_bytes = counts.received_bytes - bytes_before;
 
     const NetwCarrierFrame header = pair.client.core->receive_header(
         inbound_sink.sender,

@@ -4,7 +4,7 @@
 #include "netw/held_bytes.hpp"
 #include "netw/liveness_core.hpp"
 #include "netw/log.hpp"
-#include "netw/spawn/planner.hpp"
+#include "netw/repl/spawn_plan.hpp"
 
 using namespace godot;
 
@@ -137,13 +137,17 @@ void Book::forget_peer(int64_t peer) {
 }
 
 PackedInt64Array Book::ancestry_order() const {
-    PackedInt64Array routes;
-    Dictionary parents;
+    LocalVector<int64_t> routes;
+    HashMap<int64_t, int64_t> parents;
     for (const KeyValue<int64_t, Record> &row : spawned) {
         routes.push_back(row.key);
-        parents[row.key] = row.value.get_parent_route();
+        parents.insert(row.key, row.value.get_parent_route());
     }
-    return Planner::ancestry_order(routes, parents);
+    PackedInt64Array out;
+    for (int64_t route : repl::ancestry_order(routes, parents)) {
+        out.push_back(route);
+    }
+    return out;
 }
 
 PackedInt64Array Book::despawn_order(int64_t route) const {

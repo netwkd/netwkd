@@ -5,6 +5,7 @@
 #include "godot/node.hpp"
 #include "godot/scene_tree.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/api/replication_core.hpp"
 #include "netw/spawn/pipeline.hpp"
 
 namespace TestNetwPipeline {
@@ -36,19 +37,19 @@ TEST_CASE(
     PackedByteArray payload;
     payload.push_back(1);
 
-    pipeline->handle_spawn_frame(payload, 2);
+    core->spawn_handle_spawn_frame(payload, 2);
     NETW_CHECK_EQ(
         int64_t(pipeline->counters()[StringName("drops_spawn_bad_sender")]),
         int64_t(1)
     );
 
-    pipeline->handle_despawn_frame(payload, 5);
+    core->spawn_handle_despawn_frame(payload, 5);
     NETW_CHECK_EQ(
         int64_t(pipeline->counters()[StringName("drops_spawn_bad_sender")]),
         int64_t(2)
     );
 
-    pipeline->handle_spawn_frame(payload, 1);
+    core->spawn_handle_spawn_frame(payload, 1);
     NETW_CHECK_EQ(
         int64_t(pipeline->counters()[StringName("drops_spawn_bad_sender")]),
         int64_t(2)
@@ -70,7 +71,7 @@ TEST_CASE(
     PackedByteArray payload;
     payload.push_back(1);
 
-    pipeline->handle_spawn_frame(payload, 1);
+    core->spawn_handle_spawn_frame(payload, 1);
     NETW_CHECK_EQ(
         int64_t(pipeline->counters()[StringName("drops_spawn_unresolved")]),
         int64_t(0)
@@ -99,7 +100,7 @@ TEST_CASE(
     );
 
     pipeline->get_park().cancel(9001);
-    pipeline->retry_scene_parked_spawns(0, Ref<netw::NetwEntity>());
+    core->spawn_retry_scene_parked_spawns();
 
     CHECK_FALSE(pipeline->retries_scene_parks());
 }
@@ -117,7 +118,7 @@ TEST_CASE(
     pipeline->park_spawn_for_scene(payload, 9002, 1);
     CHECK(pipeline->retries_scene_parks());
 
-    pipeline->clear_session();
+    Internals::replication_plane(core)->clear_session();
 
     CHECK_FALSE(pipeline->retries_scene_parks());
     NETW_CHECK_EQ(pipeline->get_park().size(), 0);
@@ -138,7 +139,7 @@ TEST_CASE(
     PackedByteArray payload;
     payload.push_back(7);
     pipeline->park_spawn_for_scene(payload, 9003, 1);
-    pipeline->retry_scene_parked_spawns(0, Ref<netw::NetwEntity>());
+    core->spawn_retry_scene_parked_spawns();
 
     NETW_CHECK_EQ(
         int64_t(pipeline->counters()[StringName("spawn_park_expired")]),
@@ -179,10 +180,10 @@ TEST_CASE(
     PackedByteArray payload;
     payload.push_back(7);
 
-    world.pipeline->handle_spawn_frame(payload, 7);
+    world.core->spawn_handle_spawn_frame(payload, 7);
     NETW_CHECK_EQ(world.counted("drops_spawn_bad_sender"), int64_t(1));
 
-    world.pipeline->handle_spawn_frame(PackedByteArray(), 1);
+    world.core->spawn_handle_spawn_frame(PackedByteArray(), 1);
     NETW_CHECK_EQ(world.counted("drops_spawn_bad_sender"), int64_t(1));
 }
 
@@ -197,7 +198,7 @@ TEST_CASE(
 
     ParkedRelease stale;
     stale.pipeline->park_spawn_for_scene(stale.frame(), 9101, 7);
-    stale.pipeline->retry_scene_parked_spawns(0, Ref<netw::NetwEntity>());
+    stale.core->spawn_retry_scene_parked_spawns();
 
     NETW_CHECK_EQ(stale.counted("spawn_park_refused"), int64_t(1));
     NETW_CHECK_EQ(stale.counted("drops_spawn_truncated"), int64_t(0));
@@ -205,7 +206,7 @@ TEST_CASE(
     const netw_test::FaultWatch faults;
     ParkedRelease current;
     current.pipeline->park_spawn_for_scene(current.frame(), 9101, 1);
-    current.pipeline->retry_scene_parked_spawns(0, Ref<netw::NetwEntity>());
+    current.core->spawn_retry_scene_parked_spawns();
 
     NETW_CHECK_EQ(current.counted("spawn_park_refused"), int64_t(0));
     NETW_CHECK_EQ(current.counted("drops_spawn_truncated"), int64_t(1));
@@ -223,7 +224,7 @@ TEST_CASE(
 
     ParkedRelease stale;
     stale.pipeline->park_spawn_for_adopt(stale.frame(), 9102, 7);
-    stale.pipeline->retry_adopt_parked();
+    stale.core->spawn_retry_adopt();
 
     NETW_CHECK_EQ(stale.counted("spawn_park_refused"), int64_t(1));
     NETW_CHECK_EQ(stale.counted("drops_spawn_truncated"), int64_t(0));
@@ -231,7 +232,7 @@ TEST_CASE(
     const netw_test::FaultWatch faults;
     ParkedRelease current;
     current.pipeline->park_spawn_for_adopt(current.frame(), 9102, 1);
-    current.pipeline->retry_adopt_parked();
+    current.core->spawn_retry_adopt();
 
     NETW_CHECK_EQ(current.counted("spawn_park_refused"), int64_t(0));
     NETW_CHECK_EQ(current.counted("drops_spawn_truncated"), int64_t(1));
@@ -287,7 +288,9 @@ TEST_CASE(
         int64_t(1)
     );
 
-    pipeline->clear_route(31);
+    netw::spawn::Ops ops;
+    pipeline->clear_route(31, ops);
+    core->spawn_act(ops);
     CHECK_FALSE(pipeline->owns_spawned_route(31));
 
     memdelete(node);

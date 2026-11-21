@@ -7,7 +7,8 @@
 #include "godot/local_vector.hpp"
 #include "netw/repl/session_send.hpp"
 #include "netw/replication_send.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/array.hpp"
+#include "netw/store/store.hpp"
 #include "netw/wire/registry.hpp"
 
 namespace netw_test {
@@ -17,7 +18,7 @@ inline netw::store::Family store_family(netw::wire::StreamFamily p_family) {
 }
 
 inline netw::store::RowAddress stage_offer(
-    netw::store::World &r_world,
+    netw::store::Store &r_world,
     const RowOffer &p_offer,
     int64_t p_tick
 ) {
@@ -30,7 +31,7 @@ inline netw::store::RowAddress stage_offer(
             store_family(lane.family),
             p_offer.declared()
         );
-        at = r_world.add_row(table, owner, 0, 0, p_offer.comp);
+        at = r_world.add_row(table, owner, 0, p_offer.comp);
     }
     netw::store::Table &table = r_world.table(at.table);
     r_world.place(at, p_offer.route, p_offer.life);
@@ -46,7 +47,7 @@ inline netw::store::RowAddress stage_offer(
         table.flags[at.row] |= netw::store::Table::UNENCODED;
     } else {
         netw::wire::CodeRow held;
-        held.assign(table.plan, p_offer.codes, p_offer.carried);
+        held.assign(table.plan, p_offer.codes, p_offer.tails);
         const bool fresh
             = (table.flags[at.row] & netw::store::Table::PULLED) == 0;
         if (table.settle(at.row, held, p_tick) || fresh) {
@@ -72,7 +73,7 @@ inline netw::store::RowAddress stage_offer(
 }
 
 inline void stage_offers(
-    netw::store::World &r_world,
+    netw::store::Store &r_world,
     const godot::LocalVector<RowOffer> &p_offers,
     int64_t p_tick
 ) {
@@ -88,7 +89,7 @@ inline void stage_offers(
 }
 
 inline bool row_owed(
-    const netw::store::World &p_world,
+    const netw::store::Store &p_world,
     const netw::wire::StreamLane &p_lane,
     int p_peer
 ) {
@@ -101,7 +102,7 @@ inline bool row_owed(
 }
 
 inline uint64_t row_acked(
-    const netw::store::World &p_world,
+    const netw::store::Store &p_world,
     const netw::wire::StreamLane &p_lane,
     int p_peer
 ) {
@@ -114,7 +115,7 @@ inline uint64_t row_acked(
 }
 
 inline uint64_t row_exposed(
-    const netw::store::World &p_world,
+    const netw::store::Store &p_world,
     const netw::wire::StreamLane &p_lane,
     int p_peer
 ) {
@@ -127,7 +128,7 @@ inline uint64_t row_exposed(
 }
 
 inline bool row_baseline(
-    const netw::store::World &p_world,
+    const netw::store::Store &p_world,
     const netw::wire::StreamLane &p_lane,
     int p_peer,
     netw::wire::CodeRow &r_row
@@ -145,14 +146,14 @@ inline bool row_baseline(
     return r_row.assign(
         table.plan,
         rows.baseline.ptr() + uint64_t(at.row) * table.words,
-        table.carried != 0
-            ? rows.baseline_carried.ptr() + uint64_t(at.row) * table.carried
+        table.tail_columns != 0
+            ? rows.baseline_tails.ptr() + uint64_t(at.row) * table.tail_columns
             : nullptr
     );
 }
 
 inline netw::wire::CodeRow sent_row(
-    const netw::store::World &p_world,
+    const netw::store::Store &p_world,
     const netw::repl::RowSend &p_send
 ) {
     netw::wire::CodeRow out;
@@ -170,9 +171,12 @@ inline netw::wire::CodeRow sent_row(
 
 class SessionSend : public netw::repl::SessionSend {
 public:
-    netw::store::World world;
+    netw::store::Store world;
+    netw::store::Arrays arrays;
 
     SessionSend() {
+        world.arrays = &arrays;
+        arrays.seat(&world);
         watch_store(&world);
     }
 
@@ -200,9 +204,12 @@ public:
 
 class ReplicationSend : public netw::ReplicationSend {
 public:
-    netw::store::World world;
+    netw::store::Store world;
+    netw::store::Arrays arrays;
 
     ReplicationSend() {
+        world.arrays = &arrays;
+        arrays.seat(&world);
         watch_store(&world);
     }
 

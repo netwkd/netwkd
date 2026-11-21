@@ -30,13 +30,13 @@ HashMap<uint64_t, NodeOverlay> &overlay_book() {
     return book;
 }
 
-struct NodeDeclaration {
+struct NodeDecl {
     uint64_t shared_key = 0;
     Dictionary configs;
 };
 
-HashMap<uint64_t, NodeDeclaration> &declaration_book() {
-    static HashMap<uint64_t, NodeDeclaration> book;
+HashMap<uint64_t, NodeDecl> &declaration_book() {
+    static HashMap<uint64_t, NodeDecl> book;
     return book;
 }
 
@@ -201,7 +201,7 @@ void declare_node_property(
     }
     const uint64_t node = uint64_t(gd::instance_id(p_node));
     const Ref<Script> script = script_of(p_node);
-    HashMap<uint64_t, NodeDeclaration>::Iterator held
+    HashMap<uint64_t, NodeDecl>::Iterator held
         = declaration_book().find(node);
     if (held && held->value.configs.has(p_property)) {
         return;
@@ -209,7 +209,7 @@ void declare_node_property(
     if (script.is_null()) {
         if (!held) {
             sweep_when_full(declaration_book(), declaration_sweep_at());
-            held = declaration_book().insert(node, NodeDeclaration());
+            held = declaration_book().insert(node, NodeDecl());
         }
         held->value.configs[p_property] = p_config;
         advance_interpolation_epoch();
@@ -239,7 +239,7 @@ void declare_node_property(
         grown[p_property] = get_property_config(script, p_property);
         shared = shared_declarations().insert(key, grown);
     }
-    const NodeDeclaration after{key, shared->value};
+    const NodeDecl after{key, shared->value};
     if (!held) {
         sweep_when_full(declaration_book(), declaration_sweep_at());
     }
@@ -327,7 +327,7 @@ Dictionary get_declared_property_configs(Node *p_node) {
     if (p_node == nullptr) {
         return Dictionary();
     }
-    HashMap<uint64_t, NodeDeclaration>::ConstIterator held
+    HashMap<uint64_t, NodeDecl>::ConstIterator held
         = declaration_book().find(uint64_t(gd::instance_id(p_node)));
     return held ? held->value.configs : Dictionary();
 }
@@ -339,7 +339,7 @@ Ref<NetwPropertyConfig> get_declared_property_config(
     if (p_node == nullptr) {
         return Ref<NetwPropertyConfig>();
     }
-    HashMap<uint64_t, NodeDeclaration>::ConstIterator held
+    HashMap<uint64_t, NodeDecl>::ConstIterator held
         = declaration_book().find(uint64_t(gd::instance_id(p_node)));
     if (!held) {
         return Ref<NetwPropertyConfig>();
@@ -351,7 +351,7 @@ uint64_t shared_declaration_key(Node *p_node) {
     if (p_node == nullptr) {
         return 0;
     }
-    HashMap<uint64_t, NodeDeclaration>::ConstIterator held
+    HashMap<uint64_t, NodeDecl>::ConstIterator held
         = declaration_book().find(uint64_t(gd::instance_id(p_node)));
     return held ? held->value.shared_key : 0;
 }
@@ -781,10 +781,17 @@ bool write_call_body(
     const Variant &p_method,
     const LocalVector<call_args::Slot> &p_slots,
     const Array &p_quantizers,
-    const Array &p_arg_types
+    const Array &p_arg_types,
+    NetwMultiplayer *p_session
 ) {
     return write_token(p_stream, p_method)
-        && call_args::write(p_stream, p_slots, p_quantizers, p_arg_types);
+        && call_args::write(
+               p_stream,
+               p_slots,
+               p_quantizers,
+               p_arg_types,
+               p_session
+           );
 }
 
 PackedByteArray token_bytes(const Variant &p_token) {

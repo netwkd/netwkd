@@ -22,14 +22,6 @@ using repl::PropertySet;
 
 namespace {
 
-uint8_t declared_channel(const char *p_name) {
-    static const wire::WireRegistry declared
-        = wire::WireRegistry::create_default();
-    const wire::ChannelDecl *found
-        = declared.find_channel_by_name(StringName(p_name));
-    return found != nullptr ? found->id : 0;
-}
-
 String record_kind_name(int64_t p_record) {
     if (p_record == PropertySet::RECORD_INPUT) {
         return String("input");
@@ -121,7 +113,7 @@ void for_record(PropertySet &r_set, int64_t p_record) {
         ? PropertySet::STAMP_TICK_ACK
         : PropertySet::STAMP_TICK;
     set->cadence = PropertySet::TICK;
-    set->channel = declared_channel("SYNC");
+    set->channel = wire::CHANNEL_SYNC;
     set->policy = p_record == PropertySet::RECORD_STATE
         ? NetwMemberConfig::POLICY_AUTHORITY
         : NetwMemberConfig::POLICY_CONTROLLER;
@@ -139,7 +131,7 @@ void from_property_config(
     PropertySet *set = &r_set;
     set->cadence = PropertySet::ON_DEMAND;
     set->profile = PropertySet::PLAIN;
-    set->channel = declared_channel("PROPERTY_SYNC");
+    set->channel = wire::CHANNEL_PROPERTY_SYNC;
     Ref<NetwQuantize> quantizer;
     if (p_config.is_valid()) {
         set->policy = p_config->get_write_policy();

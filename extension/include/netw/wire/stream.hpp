@@ -79,6 +79,8 @@ public:
     bool bytes_capped(godot::PackedByteArray &value, int cap);
     bool raw_bytes(godot::PackedByteArray &value, int64_t count);
     bool raw_span(uint8_t *value, int64_t count);
+    bool aligned_rest(const uint8_t *&r_bytes, int64_t &r_size);
+    bool skip_bytes(int64_t count);
     bool align_verify();
 
     bool ok() const {

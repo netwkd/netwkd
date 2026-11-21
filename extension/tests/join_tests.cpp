@@ -150,7 +150,7 @@ LawVerdict nameless_join(const Stand &) {
             || int64_t(mine->get(StringName("id"))) != own) {
             return law_broken("peer %d reads another id as its own", at);
         }
-        const PackedInt64Array listed = api->player_list();
+        const PackedInt32Array listed = api->player_list();
         if (listed.size() != 3 || !listed.has(own)) {
             return law_broken("peer %d does not list three players", at);
         }

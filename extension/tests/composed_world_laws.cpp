@@ -193,7 +193,7 @@ int64_t display_role_of(NetwMultiplayer *p_core, Node *p_node) {
     return int64_t(p_core->display_get_track_stat(
         NetwEntity::of(p_node)->get_rid_handle(),
         StringName(),
-        StringName("role")
+        NetwMultiplayer::TRACK_STAT_ROLE
     ));
 }
 
@@ -235,10 +235,10 @@ struct ComposedWorld {
         stand.mount(SERVER, held);
         stand.mount(OTHER, at_seven);
         stand.mount(MEMBER, at_nine);
-        NETW_CHECK_EQ(int(seven->embed_settle()), int(OK));
-        NETW_CHECK_EQ(int(nine->embed_settle()), int(OK));
+        seven->embed_settle();
+        nine->embed_settle();
 
-        NETW_CHECK_EQ(int(host->embed_settle()), int(OK));
+        host->embed_settle();
         netw_test::register_level(host);
         netw_test::register_level(seven);
         netw_test::register_level(nine);
@@ -310,7 +310,7 @@ struct ComposedWorld {
         arm_clock(late);
         at_late = mount_under_root("CWLate");
         stand.mount(LATECOMER, at_late);
-        NETW_CHECK_EQ(int(late->embed_settle()), int(OK));
+        late->embed_settle();
         netw_test::register_level(late);
         teach_player(late);
         REQUIRE(stand.seated(LATECOMER).is_valid());
@@ -468,18 +468,14 @@ TEST_CASE(
     REQUIRE(seven_route > 0);
     REQUIRE(nine_route > 0);
 
-    const Ref<NetwEntity> only_seven
-        = NetwEntity::of(cw.host->entity_get_node(for_seven));
-    const Ref<NetwEntity> only_nine
-        = NetwEntity::of(cw.host->entity_get_node(for_nine));
     NETW_CHECK_EQ(int(cw.host->interest_membership_ids(for_seven).size()), 1);
     NETW_CHECK_EQ(int(cw.host->interest_membership_ids(for_nine).size()), 1);
 
-    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(OTHER, only_seven)), 1);
-    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(MEMBER, only_seven)), 0);
-    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(OTHER, only_nine)), 0);
-    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(MEMBER, only_nine)), 1);
-    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(SERVER, only_nine)), 1);
+    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(OTHER, for_seven)), 1);
+    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(MEMBER, for_seven)), 0);
+    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(OTHER, for_nine)), 0);
+    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(MEMBER, for_nine)), 1);
+    NETW_CHECK_EQ(int(cw.host->interest_wire_admits(SERVER, for_nine)), 1);
 
     NETW_CHECK_EQ(int(route_node_at(cw.seven, seven_route) != nullptr), 1);
     NETW_CHECK_EQ(int(route_node_at(cw.nine, seven_route) != nullptr), 0);
@@ -708,13 +704,14 @@ struct ForgedCall {
             netw::script::model::write_call_body(
                 writer,
                 p_world.host->rpc_method_token(
-                    wrapper,
+                    *wrapper->get_record(),
                     sink,
                     StringName("receive_node")
                 ),
                 encoded,
                 options.is_valid() ? options->get_quantizers() : Array(),
-                arg_types
+                arg_types,
+                nullptr
             )
         );
         REQUIRE(writer.align_verify());
@@ -724,7 +721,7 @@ struct ForgedCall {
                 NetwMultiplayer::frame_pack(
                     sink_route,
                     0,
-                    netw::wire::builtin_channel("CALL"),
+                    netw::wire::CHANNEL_CALL,
                     writer.to_bytes(),
                     String()
                 ),
@@ -788,7 +785,7 @@ Error deliver_control_apply(
         NetwMultiplayer::frame_pack(
             p_route,
             0,
-            netw::wire::builtin_channel("CONTROL_APPLY"),
+            netw::wire::CHANNEL_CONTROL_APPLY,
             netw::session::frame_write(applied),
             String()
         ),

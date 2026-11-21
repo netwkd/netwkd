@@ -38,24 +38,13 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Book book;
+    Book &book = *core->spawn_held_book();
     Node *node = memnew(Node);
     tracked(&book, 1, 0, node);
 
-    CHECK_FALSE(core->spawn_despawn_route(
-        &book,
-        9,
-        PackedInt32Array(),
-        DESPAWN_CHANNEL
-    ));
-    CHECK(book.has_spawned(1));
-
-    CHECK_FALSE(core->spawn_despawn_route(
-        nullptr,
-        1,
-        PackedInt32Array(),
-        DESPAWN_CHANNEL
-    ));
+    CHECK_FALSE(
+        core->spawn_despawn_route(9, PackedInt32Array(), DESPAWN_CHANNEL)
+    );
     CHECK(book.has_spawned(1));
 
     memdelete(node);
@@ -67,7 +56,7 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Book book;
+    Book &book = *core->spawn_held_book();
     Node *parent = memnew(Node);
     Node *child = memnew(Node);
     Node *grandchild = memnew(Node);
@@ -78,12 +67,7 @@ TEST_CASE(
     tracked(&book, 2, 1, child);
     tracked(&book, 3, 2, grandchild);
 
-    CHECK(core->spawn_despawn_route(
-        &book,
-        1,
-        PackedInt32Array(),
-        DESPAWN_CHANNEL
-    ));
+    CHECK(core->spawn_despawn_route(1, PackedInt32Array(), DESPAWN_CHANNEL));
 
     CHECK_FALSE(book.has_spawned(1));
     CHECK_FALSE(book.has_spawned(2));
@@ -101,19 +85,14 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Book book;
+    Book &book = *core->spawn_held_book();
     Node *bare = memnew(Node);
     Node *carrying = memnew(Node);
     NetwEntity::ensure(carrying);
     tracked(&book, 1, 0, bare);
     tracked(&book, 2, 1, carrying);
 
-    CHECK(core->spawn_despawn_route(
-        &book,
-        1,
-        PackedInt32Array(),
-        DESPAWN_CHANNEL
-    ));
+    CHECK(core->spawn_despawn_route(1, PackedInt32Array(), DESPAWN_CHANNEL));
 
     NETW_CHECK_EQ(book.spawned_count(), 0);
 

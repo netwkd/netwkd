@@ -229,7 +229,8 @@ bool Slot::record_authored_row(
         p_label,
         p_fresh,
         p_input,
-        uint8_t(CellProvenance::AUTHORED)
+        uint8_t(CellProvenance::AUTHORED),
+        session
     );
 }
 
@@ -303,7 +304,8 @@ bool Slot::admit_command(
             p_label,
             p_fresh,
             p_command,
-            uint8_t(CellProvenance::AUTHORED)
+            uint8_t(CellProvenance::AUTHORED),
+            session
         );
 }
 
@@ -321,7 +323,8 @@ bool Slot::record_joint_command(
         p_key,
         true,
         p_command,
-        uint8_t(p_provenance)
+        uint8_t(p_provenance),
+        session
     );
 }
 
@@ -399,7 +402,9 @@ bool Slot::record_state_row(int64_t p_key, const StateRow &p_state) {
         p_key,
         label_for(p_key),
         !framed || tape.is_fresh(p_key - 1),
-        p_state
+        p_state,
+        0,
+        session
     );
 }
 
@@ -588,7 +593,7 @@ void RecoveryLedger::bump_contracted(int p_field) {
     }
 }
 
-int EntityRoster::index_of(const godot::ObjectID &p_id) const {
+int EntityRoster::index_of(const godot::RID &p_id) const {
     for (uint32_t at = 0; at < members.size(); ++at) {
         if (members[at] == p_id) {
             return int(at);
@@ -597,25 +602,28 @@ int EntityRoster::index_of(const godot::ObjectID &p_id) const {
     return -1;
 }
 
-bool EntityRoster::add(const godot::ObjectID &p_id) {
+bool EntityRoster::add(const godot::RID &p_id, godot::ObjectID p_wrapper) {
     if (index_of(p_id) >= 0) {
         return false;
     }
     members.push_back(p_id);
+    wrappers.push_back(p_wrapper);
     return true;
 }
 
-bool EntityRoster::erase(const godot::ObjectID &p_id) {
+bool EntityRoster::erase(const godot::RID &p_id) {
     const int at = index_of(p_id);
     if (at < 0) {
         return false;
     }
     members.remove_at(uint32_t(at));
+    wrappers.remove_at(uint32_t(at));
     return true;
 }
 
 void EntityRoster::clear() {
     members.clear();
+    wrappers.clear();
 }
 
 void FieldReadings::resize(int p_count) {

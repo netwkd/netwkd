@@ -2,13 +2,8 @@
 
 #include <cstdint>
 
-#include "godot/callable.hpp"
-#include "godot/node.hpp"
-#include "godot/object.hpp"
 #include "godot/ref_counted.hpp"
 #include "godot/rid.hpp"
-#include "godot/variant.hpp"
-#include "netw/api/entity_options.hpp"
 #include "netw/api/promise.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/display/decl.hpp"
@@ -89,39 +84,18 @@ private:
     entity::Control control;
     double replication_priority = 1.0;
     sim::Mode announced_mode = sim::Mode::NONE;
-    struct MintedPart {
-        int64_t part = 0;
-        godot::Variant value;
-    };
-    godot::LocalVector<MintedPart> parts;
-    godot::Ref<NetwDespawnOpts> despawning_opts;
     godot::StringName despawn_reason;
     interest::Facet *interest_facet = nullptr;
     NetwCompTable comp_table;
-    godot::LocalVector<godot::ObjectID> comp_registered;
     display::Decl *display_decl = nullptr;
     predict::Decl *predict_decl = nullptr;
     sim::Decl *sim_decl = nullptr;
     godot::StringName scene_label;
     int64_t scene_isolation = -1;
     int64_t projected_follower = 0;
-    int64_t projected_steerer = 0;
+    int64_t announced_steerer = 0;
     spawn::Record *readmission = nullptr;
     bool predicted_at_departure = false;
-
-    struct Projection {
-        int64_t follower = SERVER_PEER;
-        int64_t prior_follower = SERVER_PEER;
-    };
-
-    Projection projection_to(int64_t p_follower) const;
-    void project_node(
-        godot::Node *p_owner,
-        godot::Node *p_node,
-        const Projection &p_projection,
-        uint64_t p_watch
-    );
-    void write_authority(godot::Node *p_node, int64_t p_to, int64_t p_prior);
 
 public:
     NetwEntityRecord();
@@ -129,6 +103,10 @@ public:
 
     NetwEntityRecord(const NetwEntityRecord &) = delete;
     NetwEntityRecord &operator=(const NetwEntityRecord &) = delete;
+
+#if defined(NETW_TESTS)
+    static bool is_live(const NetwEntityRecord *p_record);
+#endif
 
     godot::RID get_handle() const {
         return handle;
@@ -164,8 +142,6 @@ public:
         route = p_route;
     }
 
-    godot::StringName scene_label_of(godot::Node *p_owner);
-    int64_t scene_isolation_of(godot::Node *p_owner);
     godot::StringName get_scene_label() const {
         return scene_label;
     }
@@ -222,21 +198,18 @@ public:
 
     bool transition(int64_t p_stage);
 
-    void deactivate(godot::Node *p_owner);
-
-    bool publish_stage(godot::Object *p_wrapper, int64_t p_from);
-
-    void apply_control(
-        godot::Object *p_wrapper,
-        godot::Node *p_owner,
-        uint64_t p_watch = 0
-    );
-
-    void project_entered(
-        godot::Node *p_owner,
-        godot::Node *p_node,
-        uint64_t p_watch
-    );
+    int64_t get_projected_follower() const {
+        return projected_follower;
+    }
+    void set_projected_follower(int64_t p_follower) {
+        projected_follower = p_follower;
+    }
+    int64_t get_announced_steerer() const {
+        return announced_steerer;
+    }
+    void set_announced_steerer(int64_t p_steerer) {
+        announced_steerer = p_steerer;
+    }
 
     bool projects_to_server() const {
         return projected_follower == SERVER_PEER;
@@ -244,26 +217,8 @@ public:
 
     static godot::StringName entity_meta();
 
-    void hydrate_identity(godot::Node *p_owner);
-
-    bool set_controller(godot::Object *p_wrapper, int64_t p_peer);
-
-    int64_t admit_control_request(
-        godot::Object *p_wrapper,
-        int64_t p_requester,
-        int64_t p_hold,
-        godot::Error &r_code,
-        godot::String &r_reason
-    );
-
-    bool begin_despawn(
-        godot::Object *p_wrapper,
-        godot::Node *p_owner,
-        const godot::Ref<NetwDespawnOpts> &p_opts
-    );
-
-    godot::Ref<NetwDespawnOpts> get_active_despawn_opts() const {
-        return despawning_opts;
+    bool set_controller(int64_t p_peer) {
+        return control.set_controller(p_peer);
     }
 
     const godot::StringName &get_despawn_reason() const {
@@ -274,8 +229,6 @@ public:
         despawn_reason = p_reason;
     }
 
-    bool finish_teardown(godot::Object *p_wrapper);
-    bool complete_departure(godot::Object *p_wrapper);
     void readmit();
 
     void keep_readmission(const spawn::Record &p_recipe);
@@ -286,13 +239,6 @@ public:
     }
     void set_predicted_at_departure(bool p_predicted) {
         predicted_at_departure = p_predicted;
-    }
-
-    godot::Variant part(int64_t p_part, godot::Object *p_wrapper);
-    godot::Variant minted_part(int64_t p_part) const;
-    void keep_part(int64_t p_part, const godot::Variant &p_value);
-    uint32_t minted_part_count() const {
-        return parts.size();
     }
 
     interest::Facet &get_interest_facet();
@@ -310,21 +256,13 @@ public:
         return comp_table;
     }
 
-    godot::LocalVector<godot::ObjectID> &get_comp_registered() {
-        return comp_registered;
-    }
-    const godot::LocalVector<godot::ObjectID> &get_comp_registered() const {
-        return comp_registered;
-    }
-
     godot::LocalVector<HeldBinding> &get_held_bindings() {
         return held_bindings;
     }
 
     int64_t held_bytes() const {
         return int64_t(sizeof(NetwEntityRecord)) + held::vector(held_bindings)
-            + held::vector(parts) + comp_table.held_bytes()
-            + held::vector(comp_registered)
+            + comp_table.held_bytes()
             + (interest_facet != nullptr ? int64_t(sizeof(interest::Facet)) : 0)
             + (display_decl != nullptr ? int64_t(sizeof(display::Decl)) : 0)
             + predict_declaration_bytes() + sim_declaration_bytes();
@@ -365,14 +303,6 @@ public:
     const sim::Decl *find_sim_declaration() const {
         return sim_decl;
     }
-
-    static void set_part_factory(
-        int64_t p_part,
-        const godot::Callable &p_factory
-    );
-    static bool has_part_factory(int64_t p_part);
-    static godot::Callable part_factory(int64_t p_part);
-    static void clear_part_factories();
 };
 
 } // namespace netw

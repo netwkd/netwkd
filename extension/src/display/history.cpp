@@ -9,8 +9,9 @@
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/project.hpp"
+#include "netw/store/store.hpp"
+#include "netw/store/table_value.hpp"
 #include "netw/store/validate.hpp"
-#include "netw/store/world.hpp"
 
 namespace netw::display {
 
@@ -138,7 +139,12 @@ Variant History::value_in(const Rows &p_rows, int64_t p_age) const {
         return Variant();
     }
     return p_rows.table != nullptr
-        ? p_rows.table->history_value(p_rows.row, uint32_t(p_age), column)
+        ? store::history_value(
+              *p_rows.table,
+              p_rows.row,
+              uint32_t(p_age),
+              column
+          )
         : ring.value_of_age(p_age);
 }
 
@@ -201,7 +207,7 @@ int History::pass_verdict(
 }
 
 void History::follow(
-    const store::World *p_world,
+    const store::Store *p_world,
     uint64_t p_owner,
     uint32_t p_lane,
     uint32_t p_column

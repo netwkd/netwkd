@@ -6,6 +6,7 @@
 #include "godot/scene_tree.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/api/interpolate.hpp"
+#include "netw/display/decl_param.hpp"
 #include "netw/display/history.hpp"
 #include "netw/display/playhead.hpp"
 #include "netw/display/port.hpp"
@@ -394,8 +395,9 @@ LawVerdict jittered_arrivals(const Stand &) {
 LawVerdict starved_frames(const Stand &) {
     Playhead head = playhead();
     Decl settings;
-    settings.set_param(netw::display::PARAM_LAG_ADAPT_RATE, 0.0);
-    settings.set_param(netw::display::PARAM_FLOOR_SMOOTHING, 0.0);
+    using netw::display::set_param;
+    set_param(settings, netw::display::PARAM_LAG_ADAPT_RATE, 0.0);
+    set_param(settings, netw::display::PARAM_FLOOR_SMOOTHING, 0.0);
 
     head.dilate(settings, 0, 0, true);
     head.dilate(settings, 0, 0, true);

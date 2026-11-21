@@ -50,20 +50,18 @@ void Runtime::clear_channels() {
     states.clear();
 }
 
-void Runtime::bind(NetwEntity *p_entity, Node *p_owner) {
-    entity_port.bind(p_entity);
+void Runtime::bind(const RID &p_entity, Node *p_owner) {
+    bound_entity = p_entity;
     owner_port.bind(p_owner);
 }
 
-Ref<NetwEntity> Runtime::entity() {
-    return Ref<NetwEntity>(
-        Object::cast_to<NetwEntity>(entity_port.resolve(sys::INTERPOLATION))
-    );
-}
-
-RID Runtime::entity_rid() {
-    const Ref<NetwEntity> held = entity();
-    return held.is_valid() ? held->get_rid_handle() : RID();
+void Runtime::rekey(const RID &p_entity) {
+    for (Channel *channel : states) {
+        if (channel->get_entity() == bound_entity) {
+            channel->set_entity(p_entity);
+        }
+    }
+    bound_entity = p_entity;
 }
 
 Node *Runtime::owner() {
@@ -148,51 +146,42 @@ const History *Runtime::history_of(const StringName &p_track) const {
     return channel != nullptr ? &channel->display_history() : nullptr;
 }
 
-Variant Runtime::track_stat(
-    const StringName &p_track,
-    const StringName &p_stat
-) const {
+Variant Runtime::track_stat(const StringName &p_track, int p_stat) const {
     const Channel *channel
         = p_track.is_empty() ? nullptr : channel_named(p_track);
-    if (p_stat == StringName("sleeping")) {
-        return channel != nullptr && channel->display_history().is_sleeping();
+    switch (p_stat) {
+        case TRACK_SLEEPING:
+            return channel != nullptr
+                && channel->display_history().is_sleeping();
+        case TRACK_OFFSET_ARMED:
+            return channel != nullptr && channel->render_offset().armed;
+        case TRACK_OFFSET_HELD:
+            return channel != nullptr && channel->render_offset().is_held();
+        case TRACK_NEWEST_TICK: {
+            const History *history = history_of(p_track);
+            return history != nullptr ? history->newest_tick() : int64_t(-1);
+        }
+        case TRACK_BUFFER_SIZE: {
+            const History *history = history_of(p_track);
+            return history != nullptr ? history->size() : int64_t(0);
+        }
+        case TRACK_CHANNELS:
+            return int64_t(states.size());
+        case TRACK_AMBIGUOUS:
+            return tracks.ambiguous_count();
+        case TRACK_PUMPED_FRAMES:
+            return pumped;
+        case TRACK_PUMP_MODE:
+            return pump_mode;
+        case TRACK_STARVATION_TICKS:
+            return playhead.get_starvation_ticks();
+        case TRACK_DISPLAY_LAG:
+            return playhead.get_display_lag();
+        case TRACK_ROLE:
+            return role;
+        default:
+            return Variant();
     }
-    if (p_stat == StringName("offset_armed")) {
-        return channel != nullptr && channel->render_offset().armed;
-    }
-    if (p_stat == StringName("offset_held")) {
-        return channel != nullptr && channel->render_offset().is_held();
-    }
-    if (p_stat == StringName("newest_tick")) {
-        const History *history = history_of(p_track);
-        return history != nullptr ? history->newest_tick() : int64_t(-1);
-    }
-    if (p_stat == StringName("buffer_size")) {
-        const History *history = history_of(p_track);
-        return history != nullptr ? history->size() : int64_t(0);
-    }
-    if (p_stat == StringName("channels")) {
-        return int64_t(states.size());
-    }
-    if (p_stat == StringName("ambiguous")) {
-        return tracks.ambiguous_count();
-    }
-    if (p_stat == StringName("pumped_frames")) {
-        return pumped;
-    }
-    if (p_stat == StringName("pump_mode")) {
-        return pump_mode;
-    }
-    if (p_stat == StringName("starvation_ticks")) {
-        return playhead.get_starvation_ticks();
-    }
-    if (p_stat == StringName("display_lag")) {
-        return playhead.get_display_lag();
-    }
-    if (p_stat == StringName("role")) {
-        return role;
-    }
-    return Variant();
 }
 
 } // namespace netw::display

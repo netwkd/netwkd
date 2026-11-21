@@ -314,8 +314,8 @@ Array TransportBook::peer_classes() const {
     return classes;
 }
 
-Array TransportBook::slots() const {
-    Array held;
+TypedArray<RID> TransportBook::slots() const {
+    TypedArray<RID> held;
     for (uint32_t at = 0; at < rows.size(); at++) {
         held.push_back(rows[at].slot);
     }
@@ -449,8 +449,8 @@ RID TransportRegistry::slot_of_script(const Ref<Script> &p_script) const {
     return RID();
 }
 
-Array TransportRegistry::slots() const {
-    Array held;
+TypedArray<RID> TransportRegistry::slots() const {
+    TypedArray<RID> held;
     for (uint32_t at = 0; at < rows.size(); at++) {
         held.push_back(rows[at].slot);
     }

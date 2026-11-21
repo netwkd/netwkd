@@ -586,17 +586,19 @@ public sealed class NetwDisplay : NetwRefCounted
     }
 
     private static readonly IntPtr _bindGetTrackStat =
-        NetwApi.MethodBind("NetwDisplay", "get_track_stat", 2718203076UL);
+        NetwApi.MethodBind("NetwDisplay", "get_track_stat", 4245683612UL);
 
     /// <summary>
     /// Returns the display diagnostic <paramref name="stat"/> of
-    /// <paramref name="property"/>, or <c>null</c> for an unknown stat. An
-    /// empty <paramref name="property"/> reads the whole entity.
+    /// <paramref name="property"/>, or <c>null</c> while the entity is not
+    /// displayed. An empty <paramref name="property"/> reads the whole entity.
     /// </summary>
-    public Variant GetTrackStat(StringName property, StringName stat)
+    public Variant GetTrackStat(
+        StringName property,
+        NetwMultiplayer.TrackStat stat)
     {
         godot_variant slot0 = VariantUtils.CreateFromStringName(property);
-        godot_variant slot1 = VariantUtils.CreateFromStringName(stat);
+        godot_variant slot1 = VariantUtils.CreateFromInt((long)stat);
         godot_variant answered = default;
         NetwThunks.Call2(
             _bindGetTrackStat,

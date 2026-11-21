@@ -1,9 +1,10 @@
 #pragma once
 
-#include "godot/callable.hpp"
 #include "godot/local_vector.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/quantize.hpp"
+#include "netw/table/delta_mode.hpp"
+#include "netw/table/quant_spec.hpp"
+#include "netw/value.hpp"
 
 namespace netw {
 class SchemaCore;
@@ -11,22 +12,14 @@ class SchemaCore;
 
 namespace netw::table {
 
-enum class DeltaMode {
-    FULL,
-    LADDER,
-};
-
 struct SchemaColumn {
     godot::StringName key;
     int type = 15;
     int stride = 1;
     DeltaMode delta = DeltaMode::FULL;
-    godot::Ref<NetwQuantize> quantizer;
-};
-
-struct SchemaMigration {
-    int from_version = 0;
-    godot::Callable step;
+    QuantSpec quant;
+    uint8_t value_tag = value::TAG_COUNT;
+    uint8_t element_tags[2] = {value::TAG_COUNT, value::TAG_COUNT};
 };
 
 class SchemaRecord {
@@ -39,7 +32,6 @@ class SchemaRecord {
 public:
     godot::StringName name;
     godot::LocalVector<SchemaColumn> columns;
-    godot::LocalVector<SchemaMigration> migrations;
     int storage_version = 1;
     bool sealed = false;
     int shape_hash = 0;

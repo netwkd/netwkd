@@ -41,11 +41,6 @@ public:
     bool pong_boards(int64_t p_peer, int64_t p_now_ms, bool p_datagram_leaves);
     session::ClockPong take_pong(int64_t p_peer, uint64_t p_now_usec);
 
-    static double round_trip_seconds(
-        const session::ClockPong &p_pong,
-        uint64_t p_now_usec
-    );
-
     void forget_peer(int64_t p_peer);
     void clear();
 };

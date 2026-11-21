@@ -844,82 +844,67 @@ public sealed class NetwSession : NetwRefCounted
             ref discarded);
     }
 
-    private static readonly IntPtr _bindLinkStats =
-        NetwApi.MethodBind("NetwSession", "link_stats", 3485342025UL);
+    private static readonly IntPtr _bindLinkStat =
+        NetwApi.MethodBind("NetwSession", "link_stat", 1863659248UL);
 
     /// <summary>
-    /// Measured connection quality to <paramref name="peer"/>, and what this
-    /// peer's byte budget sends it.
+    /// The measured connection quality <paramref name="stat"/> of
+    /// <paramref name="peer"/>, or what this peer's byte budget sends it.
     /// <code>
-    /// Dictionary
-    /// ┠╴loss           float   share of the last 32 packets lost
-    /// ┠╴rtt            float   round trip time, in seconds
-    /// ┠╴jitter         float   round trip variation, in seconds
-    /// ┠╴reorders       int     packets that arrived out of order
-    /// ┠╴duplicates     int     packets that arrived twice
-    /// ┠╴mode           String  "good", or "bad" while its budget is cut
-    /// ┠╴budget_bits    int     most bits one packet to this peer may use
-    /// ┠╴budget_bytes   int     bytes it may be sent each tick
-    /// ┠╴sent_bytes     int     bytes charged to it since it joined
-    /// ┠╴debt_bytes     int     bytes it was sent past its budget
-    /// ┖╴deferred_rows  int     rows left waiting by the last tick
+    /// var rtt := session.link_stat(peer, NetwMultiplayer.LINK_STAT_RTT)
     /// </code>
     /// <para>
-    /// Losing packets halves <c>budget_bytes</c> and <c>budget_bits</c>. Each
-    /// round trip without loss adds back an eighth of the configured budget,
-    /// stopping an eighth short of the rate that lost packets for the next
-    /// minute. While <c>debt_bytes</c> is above zero, volatile properties wait,
-    /// and retained properties and RPCs still go.
+    /// Losing packets halves <see cref="NetwMultiplayer.LinkStat.BudgetBytes"/>
+    /// and <see cref="NetwMultiplayer.LinkStat.BudgetBits"/>. Each round trip
+    /// without loss adds back an eighth of the configured budget, stopping an
+    /// eighth short of the rate that lost packets for the next minute. While
+    /// <see cref="NetwMultiplayer.LinkStat.DebtBytes"/> is above zero, volatile
+    /// properties wait, and retained properties and RPCs still go.
     /// </para>
     /// </summary>
-    public Godot.Collections.Dictionary LinkStats(long peer)
+    public double LinkStat(long peer, NetwMultiplayer.LinkStat stat)
     {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindLinkStats, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
+        long slot0 = peer;
+        long slot1 = (long)stat;
+        double answered = default;
+        NetwThunks.Ptrcall2_Long_Long_Double(
+            _bindLinkStat,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return answered;
     }
 
     private static readonly IntPtr _bindTraffic =
-        NetwApi.MethodBind("NetwSession", "traffic", 1012633761UL);
+        NetwApi.MethodBind("NetwSession", "traffic", 3316222599UL);
 
     /// <summary>
-    /// What the session sent to <paramref name="peer"/> and received from it
-    /// over the last second, in bytes a second. <c>0</c> counts every peer.
+    /// The rate <paramref name="stat"/> the session sent to
+    /// <paramref name="peer"/> or received from it over the last second. A
+    /// <paramref name="peer"/> of <c>0</c> counts every peer.
     /// <code>
-    /// Dictionary
-    /// ┠╴sent                Dictionary  bytes a second sent, by cause
-    /// ┃ ┠╴state             float       state and broadcast properties
-    /// ┃ ┠╴input             float       input properties
-    /// ┃ ┠╴calls             float       RPCs, signals and actions
-    /// ┃ ┠╴spawns            float       spawns, despawns, control, scenes and joins
-    /// ┃ ┠╴upkeep            float       prediction acknowledgements and the clock
-    /// ┃ ┖╴headers           float       packet headers, an estimate for the transport
-    /// ┠╴received            Dictionary  the same causes, received
-    /// ┠╴sent_packets        float       packets a second sent
-    /// ┖╴received_packets    float       packets a second received
+    /// var calls := session.traffic(peer, NetwMultiplayer.TRAFFIC_SENT_CALLS)
     /// </code>
     /// <para>
-    /// Every packet costs <c>headers</c> before it carries anything, so sending
-    /// fewer packets saves the most. A local session has no transport, so its
-    /// <c>headers</c> count only the session's own packet header. The
-    /// transport's own keepalive is not counted.
+    /// Every packet costs <see cref="NetwMultiplayer.Traffic.SentHeaders"/>
+    /// before it carries anything, so sending fewer packets saves the most. A
+    /// local session has no transport, so its headers count only the session's
+    /// own packet header. The transport's own keepalive is not counted.
     /// </para>
     /// </summary>
-    public Godot.Collections.Dictionary Traffic(long peer = 0)
+    public double Traffic(long peer, NetwMultiplayer.Traffic stat)
     {
-        godot_variant slot0 = VariantUtils.CreateFromInt((long)peer);
-        godot_variant answered = default;
-        NetwThunks.Call1(_bindTraffic, Checked, in slot0, ref answered);
-        slot0.Dispose();
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
+        long slot0 = peer;
+        long slot1 = (long)stat;
+        double answered = default;
+        NetwThunks.Ptrcall2_Long_Long_Double(
+            _bindTraffic,
+            Checked,
+            in slot0,
+            in slot1,
+            ref answered);
+        return answered;
     }
 
     private static readonly IntPtr _bindTransferServer =

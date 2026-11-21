@@ -29,6 +29,7 @@
 #include "spawn_record_tests.cpp"
 #include "spawner_compat_tests.cpp"
 #include "sync_compat_tests.cpp"
+#include "value_tests.cpp"
 #include "wire_composed_transport_laws.cpp"
 
 NETW_INSTALL_RESET_LISTENER();

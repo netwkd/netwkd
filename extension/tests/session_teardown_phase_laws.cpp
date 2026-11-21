@@ -11,6 +11,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/predict_slot_engine.hpp"
 #include "netw/api/session.hpp"
+#include "netw/api/simulation.hpp"
 #include "netw/display/book.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/session_core.hpp"
@@ -95,10 +96,10 @@ TEST_CASE(
     REQUIRE(Internals::display_runtime_for(core, 17, entity) != nullptr);
     const RID handle = entity->get_rid_handle();
     auto *pool = Internals::get_prediction_engine(core);
-    const int64_t slot = pool->slot_register(entity);
+    const int64_t slot = Internals::seat(pool, entity);
     REQUIRE(pool->bind_owner(slot, body));
     auto *prediction = memnew(netw::NetwPredictSlotEngine);
-    prediction->attach(core.ptr(), entity, &Internals::books(core));
+    Internals::attach_slot_engine(*prediction, core, entity);
     core->predict_engine_install(handle, prediction);
     const ObjectID wrapper = netw::gd::instance_id(entity.ptr());
     entity.unref();
@@ -113,7 +114,7 @@ TEST_CASE(
     const bool wrapper_freed = netw::gd::object_of(wrapper) == nullptr;
     CHECK(wrapper_freed);
     if (core->predict_is_declared(handle)) {
-        core->unregister_prediction(prediction->seated_entity());
+        core->unregister_prediction(handle);
     }
     Internals::get_display_book(core)->clear();
 
@@ -126,7 +127,7 @@ TEST_CASE(
     REQUIRE(core->liveness_adopt_route(17, entity, body) == OK);
     auto *runtime = Internals::display_runtime_for(core, 17, entity);
     REQUIRE(runtime != nullptr);
-    CHECK(runtime->entity() == entity);
+    CHECK(runtime->entity_rid() == entity->get_rid_handle());
     core->liveness_clear_session();
     CHECK(Internals::get_display_book(core)->runtimes().is_empty());
     core->display_clear_runtimes();
@@ -144,12 +145,15 @@ TEST_CASE(
     entity.instantiate();
     entity->set_owner(body);
     auto *pool = Internals::get_prediction_engine(core);
-    const int64_t slot = pool->slot_register(entity);
+    const int64_t slot = Internals::seat(pool, entity);
     REQUIRE(pool->bind_owner(slot, body));
     netw::NetwPredictSlotEngine engine;
-    engine.attach(core.ptr(), entity, &Internals::books(core));
+    Internals::attach_slot_engine(engine, core, entity);
     REQUIRE(engine.seated_pool() == pool);
     REQUIRE(engine.native_slot() == slot);
+    entity->get_simulation()->set_schedule(
+        netw::NetwSimulation::SCHEDULE_FRAME
+    );
 
     SUBCASE("the owner remains alive") {
     }
@@ -166,7 +170,9 @@ TEST_CASE(
         0
     );
     engine.release();
-    pool->slot_unregister(entity);
+    Internals::unseat(pool, entity);
+    CHECK(engine.runs_in_pass(netw::NetwSimulation::SCHEDULE_FRAME));
+    CHECK_FALSE(engine.runs_in_pass(netw::NetwSimulation::SCHEDULE_TICK));
     if (body != nullptr) {
         memdelete(body);
     }

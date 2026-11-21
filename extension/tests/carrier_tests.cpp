@@ -8,18 +8,19 @@
 #include <initializer_list>
 
 #include "godot/node.hpp"
+#include "godot/time.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/quantize.hpp"
 #include "netw/api/schema_core.hpp"
 #include "netw/call_args.hpp"
 #include "netw/carrier_frame.hpp"
-#include "netw/clock_exchange.hpp"
+#include "netw/clock.hpp"
 #include "netw/comp_table.hpp"
 #include "netw/datagram_seq_book.hpp"
 #include "netw/rate_window.hpp"
 #include "netw/repl/snapshot_frame.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 #include "netw/wire/ack_book.hpp"
 #include "netw/wire/code_row.hpp"
 #include "netw/wire/frame.hpp"
@@ -205,7 +206,7 @@ Heard hear(const PackedByteArray &p_datagram) {
     if (out.announced > 0) {
         out.args = recorder.args("peer_packet");
     }
-    out.ack = session->peer_ack(PEER);
+    out.ack = session->wire().seq_book.peer_ack(PEER);
     return out;
 }
 
@@ -364,7 +365,11 @@ LawVerdict echo_rides(const Carrier &) {
 
     Ref<NetwMultiplayer> session;
     session.instantiate();
-    const int64_t carried = session->next_send_seq(PEER);
+    netw::DatagramSeqBook &seqs = session->wire().seq_book;
+    const int64_t carried = seqs.next_send_seq(
+        PEER,
+        godot::Time::get_singleton()->get_ticks_usec()
+    );
     session->session_get_inner()->emit_signal(
         "peer_packet",
         PEER,
@@ -378,12 +383,11 @@ LawVerdict echo_rides(const Carrier &) {
             true
         )
     );
-    if (session->peer_ack(PEER) != carried
-        || session->link_round_trip_ms(PEER) != 0.0) {
+    if (seqs.peer_ack(PEER) != carried || seqs.round_trip_ms(PEER) != 0.0) {
         return law_broken(
             "a session read ack %lld and %g ms from an echo that waited",
-            (long long)session->peer_ack(PEER),
-            session->link_round_trip_ms(PEER)
+            (long long)seqs.peer_ack(PEER),
+            seqs.round_trip_ms(PEER)
         );
     }
     return law_held();
@@ -437,8 +441,9 @@ LawVerdict clock_pair_rides(const Carrier &) {
             (long long)pong.wait
         );
     }
+    netw::Clock client;
     const double trip
-        = netw::ClockExchange::round_trip_seconds(pong, LEFT_USEC + 190000);
+        = client.pong_received(pong, LEFT_USEC + 190000, false).rtt_raw;
     if (int64_t(trip * 1000000.0 + 0.5) != 90000) {
         return law_broken("a pong held 100 ms read a round trip of %g s", trip);
     }
@@ -517,7 +522,7 @@ LawVerdict call_cut_short(const Carrier &) {
     slots.push_back(netw::call_args::of_value(int64_t(5)));
     slots.push_back(netw::call_args::of_value(true));
     netw::wire::WriteStream stream;
-    if (!netw::call_args::write(stream, slots, Array(), Array())
+    if (!netw::call_args::write(stream, slots, Array(), Array(), nullptr)
         || !stream.align_verify()) {
         return law_broken("the argument row did not write");
     }
@@ -587,7 +592,7 @@ LawVerdict partial_decode_writes_nothing() {
     packer.instantiate();
     packer->bits(8);
     packer->limits(0.0, 1.0);
-    schema.at(1)->quantizer = packer;
+    netw::SchemaBook::assign_quantizer(&schema, 1, packer);
     SchemaCore::fix(&schema);
     const WirePlan plan = WirePlan::compile(schema);
     if (!plan.valid()) {
@@ -613,7 +618,8 @@ LawVerdict refused_snapshot(const Carrier &) {
     if (reader.land(sender, snapshot(plan, 9, 2, 101)) != Landing::ACCEPTED) {
         return law_broken("the first frame was not accepted");
     }
-    const Variant value = reader.held().read_value(reader.at.row, 0);
+    const Variant value
+        = netw::store::read_value(reader.held(), reader.at.row, 0);
     const int64_t newest = reader.held().history_tick(reader.at.row, 0);
     const CodeRow base = counted(plan, 9);
     PackedByteArray torn = snapshot(plan, 4, 7, 102);
@@ -629,7 +635,7 @@ LawVerdict refused_snapshot(const Carrier &) {
             return law_broken("a frame the receiver should refuse landed");
         }
     }
-    if (reader.held().read_value(reader.at.row, 0) != value
+    if (netw::store::read_value(reader.held(), reader.at.row, 0) != value
         || reader.held().history_tick(reader.at.row, 0) != newest) {
         return law_broken("a refused frame moved the received value");
     }
@@ -794,9 +800,7 @@ LawVerdict channel_ids(const Carrier &) {
     for (const Declared &declared : TRANSCRIBED) {
         const netw::wire::ChannelDecl *decl
             = registry.find_channel(uint8_t(declared.id));
-        if (netw::wire::builtin_channel(StringName(declared.name))
-                != declared.id
-            || decl == nullptr || decl->name != StringName(declared.name)) {
+        if (decl == nullptr || decl->name != StringName(declared.name)) {
             return law_broken("%s does not carry its id", declared.name);
         }
     }

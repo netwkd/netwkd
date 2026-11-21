@@ -21,64 +21,53 @@ const StringName &network_process_name() {
     return name;
 }
 
-String entity_name(const NetwEntity *p_entity) {
-    const String named = String(p_entity->get_name());
+String entity_name(const NetwEntityRecord &p_record, const Node *p_owner) {
+    const String named = String(p_record.get_entity_id());
     if (!named.is_empty()) {
         return named;
     }
-    Node *owner = p_entity->get_owner();
-    return owner != nullptr ? String(owner->get_name()) : String("<unnamed>");
+    return p_owner != nullptr ? String(p_owner->get_name())
+                              : String("<unnamed>");
 }
 
 } // namespace
 
-const sim::Decl *NetwMultiplayer::sim_find_declaration(
-    const NetwEntity *p_wrapper
+void NetwMultiplayer::sim_restate(
+    NetwMultiplayer *p_home,
+    NetwEntityRecord &p_record,
+    bool p_declares
 ) {
-    const NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    return record != nullptr ? record->find_sim_declaration() : nullptr;
-}
-
-void NetwMultiplayer::sim_restate(NetwEntity *p_wrapper, bool p_declares) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
-    }
     if (p_declares) {
-        record->sim_declaration().declared = true;
+        p_record.sim_declaration().declared = true;
     }
-    NetwMultiplayer *home = entity_home(p_wrapper);
-    if (home != nullptr) {
-        home->sim_declare(Ref<NetwEntity>(p_wrapper));
+    if (p_home != nullptr) {
+        p_home->sim_declare(p_record.get_handle());
     }
-    predict_restate(p_wrapper);
+    predict_restate(p_home, p_record);
 }
 
 Error NetwMultiplayer::sim_write_param(
-    NetwEntity *p_wrapper,
+    NetwMultiplayer *p_home,
+    NetwEntityRecord &p_record,
+    Node *p_owner,
     SimulationParam p_param,
     const Variant &p_value
 ) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return ERR_DOES_NOT_EXIST;
-    }
-    sim::Declaration &declared = record->sim_declaration().declaration;
+    sim::Declaration &declared = p_record.sim_declaration().declaration;
     Error verdict = OK;
     switch (p_param) {
         case SIMULATION_PARAM_BODIES: {
-            NetwMultiplayer *home = entity_home(p_wrapper);
-            const sim::Row *row = home != nullptr
-                ? home->sim_rows.row_of(p_wrapper->get_rid_handle())
+            const sim::Row *row = p_home != nullptr
+                ? p_home->sim_rows.row_of(p_record.get_handle())
                 : nullptr;
             if (row != nullptr && row->bodies.recorded) {
                 fault::raise(
-                    home,
+                    p_home,
                     NETW_FAULT_TOO_LATE,
                     {String("NetwSimulation.bodies"),
-                     String("'") + entity_name(p_wrapper) + String("'"),
+                     String("'") + entity_name(p_record, p_owner) + String("'"),
                      String("the entity enters the tree")},
-                    uint64_t(gd::instance_id(p_wrapper->get_owner()))
+                    uint64_t(gd::instance_id(p_owner))
                 );
                 verdict = ERR_LOCKED;
                 break;
@@ -116,18 +105,19 @@ Error NetwMultiplayer::sim_write_param(
         default:
             return ERR_INVALID_PARAMETER;
     }
-    if (predict_engine_of(p_wrapper) != nullptr) {
-        predict_settle_kind(p_wrapper);
+    if (predict_engine_of(p_home, p_record) != nullptr) {
+        predict_settle_kind(p_record, p_owner);
     }
-    sim_restate(p_wrapper, true);
+    sim_restate(p_home, p_record, true);
     return verdict;
 }
 
 Variant NetwMultiplayer::sim_read_param(
-    const NetwEntity *p_wrapper,
+    const NetwEntityRecord &p_record,
+    Node *p_owner,
     SimulationParam p_param
 ) {
-    const sim::Decl *found = sim_find_declaration(p_wrapper);
+    const sim::Decl *found = p_record.find_sim_declaration();
     const sim::Declaration undeclared;
     const sim::Declaration &declared
         = found != nullptr ? found->declaration : undeclared;
@@ -152,90 +142,95 @@ Variant NetwMultiplayer::sim_read_param(
         case SIMULATION_PARAM_RELEASE_ON_REST:
             return declared.release_on_rest;
         case SIMULATION_PARAM_PHYSICS_DRIVEN:
-            return sim_physics_driven(p_wrapper);
+            return sim_physics_driven(p_record, p_owner);
         default:
             return Variant();
     }
 }
 
 void NetwMultiplayer::sim_write_step(
-    NetwEntity *p_wrapper,
+    NetwMultiplayer *p_home,
+    NetwEntityRecord &p_record,
     const Callable &p_step
 ) {
-    game_call_declared(p_step, game_calls::SIMULATION_STEP);
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
-    }
-    record->sim_declaration().declaration.step = p_step;
-    sim_restate(p_wrapper, true);
-    sim_adopt_step(p_wrapper, p_step);
+    p_record.sim_declaration().declaration.step = p_step;
+    sim_restate(p_home, p_record, true);
+    sim_adopt_step(p_home, p_record, p_step);
 }
 
 void NetwMultiplayer::sim_adopt_step(
-    NetwEntity *p_wrapper,
+    NetwMultiplayer *p_home,
+    NetwEntityRecord &p_record,
     const Callable &p_step
 ) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
+    p_record.sim_declaration().declaration.step = p_step;
+    NetwPredictSlotEngine *engine = predict_engine_of(p_home, p_record);
+    if (engine != nullptr) {
+        engine->push_simulate();
     }
-    record->sim_declaration().declaration.step = p_step;
-    predict_step_changed(p_wrapper);
 }
 
-Callable NetwMultiplayer::sim_step_of(const NetwEntity *p_wrapper) {
-    const sim::Decl *found = sim_find_declaration(p_wrapper);
+Callable NetwMultiplayer::sim_step_of(
+    const NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    const sim::Decl *found = p_record.find_sim_declaration();
     if (found != nullptr && found->declaration.step.is_valid()) {
         return found->declaration.step;
     }
-    Node *owner = p_wrapper != nullptr ? p_wrapper->get_owner() : nullptr;
-    if (owner != nullptr && owner->has_method(network_process_name())) {
-        return Callable(owner, network_process_name());
+    if (p_owner != nullptr && p_owner->has_method(network_process_name())) {
+        return Callable(p_owner, network_process_name());
     }
     return Callable();
 }
 
-bool NetwMultiplayer::sim_physics_driven(const NetwEntity *p_wrapper) {
-    Node *owner = p_wrapper != nullptr ? p_wrapper->get_owner() : nullptr;
-    const sim::Decl *found = sim_find_declaration(p_wrapper);
+bool NetwMultiplayer::sim_physics_driven(
+    const NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    const sim::Decl *found = p_record.find_sim_declaration();
     if (found != nullptr && found->declaration.wrote_physics_driven) {
         return found->declaration.physics_driven;
     }
-    if (owner == nullptr) {
+    if (p_owner == nullptr) {
         return false;
     }
-    if (sim::is_solver_body(owner)) {
+    if (sim::is_solver_body(p_owner)) {
         return true;
     }
     if (found == nullptr) {
         return false;
     }
     for (const NodePath &path : found->declaration.bodies) {
-        if (sim::is_solver_body(owner->get_node_or_null(path))) {
+        if (sim::is_solver_body(p_owner->get_node_or_null(path))) {
             return true;
         }
     }
     return false;
 }
 
-bool NetwMultiplayer::sim_simulated(const NetwEntity *p_wrapper) {
-    return p_wrapper != nullptr
-        && (sim_step_of(p_wrapper).is_valid() || sim_physics_driven(p_wrapper));
+bool NetwMultiplayer::sim_simulated(
+    const NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    return sim_step_of(p_record, p_owner).is_valid()
+        || sim_physics_driven(p_record, p_owner);
 }
 
 NetwSimulation::Restore NetwMultiplayer::sim_snap_restore_of(
-    const NetwEntity *p_wrapper
+    const NetwEntityRecord &p_record
 ) {
-    const sim::Decl *found = sim_find_declaration(p_wrapper);
+    const sim::Decl *found = p_record.find_sim_declaration();
     return found != nullptr
             && found->declaration.restore == sim::Restore::EXTRAPOLATED
         ? NetwSimulation::RESTORE_EXTRAPOLATED
         : NetwSimulation::RESTORE_EXACT;
 }
 
-int NetwMultiplayer::sim_max_restore_ticks_of(const NetwEntity *p_wrapper) {
-    const sim::Decl *found = sim_find_declaration(p_wrapper);
+int NetwMultiplayer::sim_max_restore_ticks_of(
+    const NetwEntityRecord &p_record
+) {
+    const sim::Decl *found = p_record.find_sim_declaration();
     return found != nullptr ? found->declaration.max_restore_ticks
                             : sim::Declaration().max_restore_ticks;
 }
@@ -268,7 +263,13 @@ Error NetwMultiplayer::simulation_set_param(
         );
         return ERR_INVALID_PARAMETER;
     }
-    return sim_write_param(wrapper.ptr(), p_param, p_value);
+    return sim_write_param(
+        wrapper->home_session(),
+        *wrapper->get_record(),
+        wrapper->get_owner(),
+        p_param,
+        p_value
+    );
 }
 
 Variant NetwMultiplayer::simulation_get_param(
@@ -276,8 +277,14 @@ Variant NetwMultiplayer::simulation_get_param(
     SimulationParam p_param
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
-    return wrapper.is_valid() ? sim_read_param(wrapper.ptr(), p_param)
-                              : Variant();
+    if (wrapper.is_null()) {
+        return Variant();
+    }
+    return sim_read_param(
+        *wrapper->get_record(),
+        wrapper->get_owner(),
+        p_param
+    );
 }
 
 void NetwMultiplayer::simulation_set_network_process_callback(
@@ -286,7 +293,12 @@ void NetwMultiplayer::simulation_set_network_process_callback(
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_valid()) {
-        sim_write_step(wrapper.ptr(), p_callback);
+        game_call_declared(p_callback, game_calls::SIMULATION_STEP);
+        sim_write_step(
+            wrapper->home_session(),
+            *wrapper->get_record(),
+            p_callback
+        );
     }
 }
 

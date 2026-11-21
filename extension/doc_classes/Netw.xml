@@ -576,7 +576,7 @@
 				Moves every entity in [param entities] back to [param tick], calls [param callback], moves them back, and returns what [param callback] returned. Apply what the query found after it returns.
 				[codeblock]
 				func fire(request: NetwActionRequest, origin: Vector3, aim: Vector3) -&gt; void:
-				    var targets := players.entities.keys()
+				    var targets := players.entities
 				    targets.erase(entity)
 				    var hit: Dictionary = Netw.rewind(targets, request.view_tick, func() -&gt; Dictionary:
 				        var ray := PhysicsRayQueryParameters3D.create(

@@ -354,42 +354,44 @@ public sealed class NetwInterestLayer : NetwRefCounted
     }
 
     private static readonly IntPtr _bindGetViewers =
-        NetwApi.MethodBind("NetwInterestLayer", "get_viewers", 3102165223UL);
+        NetwApi.MethodBind("NetwInterestLayer", "get_viewers", 1930428628UL);
 
     /// <summary>
-    /// The viewer peer ids, as keys. Returns a copy, so use
+    /// The viewer peer ids. Returns a copy, so use
     /// <see cref="NetwInterestLayer.AddViewer"/> and
     /// <see cref="NetwInterestLayer.RemoveViewer"/> to change it.
     /// </summary>
-    public Godot.Collections.Dictionary Viewers
+    public int[] Viewers
     {
         get
         {
             godot_variant answered = default;
             NetwThunks.Call0(_bindGetViewers, Checked, ref answered);
-            Godot.Collections.Dictionary result =
-                VariantUtils.ConvertToDictionary(answered);
+            int[] result =
+                VariantUtils.ConvertAsPackedInt32ArrayToSystemArray(answered);
             answered.Dispose();
             return result;
         }
     }
 
     private static readonly IntPtr _bindGetEntities =
-        NetwApi.MethodBind("NetwInterestLayer", "get_entities", 2382534195UL);
+        NetwApi.MethodBind("NetwInterestLayer", "get_entities", 2915620761UL);
 
     /// <summary>
-    /// The entities in the layer, as keys. On a client, only the ones it sees.
-    /// Returns a copy, so use <see cref="NetwInterestLayer.AddEntity"/> and
+    /// The entities in the layer. On a client, only the ones it sees. Returns a
+    /// copy, so use <see cref="NetwInterestLayer.AddEntity"/> and
     /// <see cref="NetwInterestLayer.RemoveEntity"/> to change it.
     /// </summary>
-    public Godot.Collections.Dictionary Entities
+    public NetwEntity[] Entities
     {
         get
         {
             godot_variant answered = default;
             NetwThunks.Call0(_bindGetEntities, Checked, ref answered);
-            Godot.Collections.Dictionary result =
-                VariantUtils.ConvertToDictionary(answered);
+            NetwEntity[] result =
+                NetwApi.Elements(
+                    VariantUtils.ConvertToArray(answered),
+                    NetwEntity.From);
             answered.Dispose();
             return result;
         }
@@ -535,45 +537,25 @@ public sealed class NetwInterestLayer : NetwRefCounted
         return answered != 0;
     }
 
-    private static readonly IntPtr _bindViewerIds =
-        NetwApi.MethodBind("NetwInterestLayer", "viewer_ids", 3995934104UL);
+    private static readonly IntPtr _bindStat =
+        NetwApi.MethodBind("NetwInterestLayer", "stat", 148831686UL);
 
     /// <summary>
-    /// Returns the viewer peer ids.
-    /// </summary>
-    public Godot.Collections.Array ViewerIds()
-    {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindViewerIds, Checked, ref answered);
-        Godot.Collections.Array result = VariantUtils.ConvertToArray(answered);
-        answered.Dispose();
-        return result;
-    }
-
-    private static readonly IntPtr _bindMonitorSnapshot =
-        NetwApi.MethodBind(
-            "NetwInterestLayer",
-            "monitor_snapshot",
-            3102165223UL);
-
-    /// <summary>
-    /// Returns counts for this layer.
+    /// Returns the visibility counter <paramref name="stat"/> of this layer.
     /// <code>
-    /// Dictionary
-    /// ┠╴viewers            int   number of viewers
-    /// ┠╴entities           int   number of entities
-    /// ┠╴visible_edges      int   (entity, peer) pairs that can see each other
-    /// ┖╴transitions_total  int   shows plus hides since the layer was created
+    /// var edges := layer.stat(NetwMultiplayer.LAYER_STAT_VISIBLE_EDGES)
     /// </code>
     /// </summary>
-    public Godot.Collections.Dictionary MonitorSnapshot()
+    public long Stat(NetwMultiplayer.LayerStat stat)
     {
-        godot_variant answered = default;
-        NetwThunks.Call0(_bindMonitorSnapshot, Checked, ref answered);
-        Godot.Collections.Dictionary result =
-            VariantUtils.ConvertToDictionary(answered);
-        answered.Dispose();
-        return result;
+        long slot0 = (long)stat;
+        long answered = default;
+        NetwThunks.Ptrcall1_Long_Long(
+            _bindStat,
+            Checked,
+            in slot0,
+            ref answered);
+        return answered;
     }
 
     private static readonly IntPtr _bindSetDriver =

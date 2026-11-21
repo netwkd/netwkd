@@ -206,10 +206,15 @@ TEST_CASE(
     REQUIRE(
         script_model::write_call_body(
             writer,
-            core->rpc_method_token(host, target, StringName("receive_node")),
+            core->rpc_method_token(
+                *host->get_record(),
+                target,
+                StringName("receive_node")
+            ),
             encoded,
             Array(),
-            Array()
+            Array(),
+            nullptr
         )
     );
     REQUIRE(writer.align_verify());
@@ -218,7 +223,7 @@ TEST_CASE(
         netw::NetwMultiplayer::frame_pack(
             open_route,
             0,
-            netw::wire::builtin_channel("CALL"),
+            netw::wire::CHANNEL_CALL,
             writer.to_bytes(),
             String()
         ),

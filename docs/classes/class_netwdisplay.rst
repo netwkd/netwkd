@@ -97,15 +97,15 @@ Methods
 .. table::
    :widths: auto
 
-   +-------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`int`                        | :ref:`displayed_authoring_tick<class_NetwDisplay_method_displayed_authoring_tick>`\ (\ ) |const|                                         |
-   +-------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | :ref:`NetwEntity<class_NetwEntity>` | :ref:`entity<class_NetwDisplay_method_entity>`\ (\ ) |const|                                                                             |
-   +-------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Variant`                    | :ref:`get_track_stat<class_NetwDisplay_method_get_track_stat>`\ (\ property\: :godot:`StringName`, stat\: :godot:`StringName`\ ) |const| |
-   +-------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
-   | |void|                              | :ref:`reset<class_NetwDisplay_method_reset>`\ (\ )                                                                                       |
-   +-------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+
+   +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`int`                        | :ref:`displayed_authoring_tick<class_NetwDisplay_method_displayed_authoring_tick>`\ (\ ) |const|                                                                      |
+   +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :ref:`NetwEntity<class_NetwEntity>` | :ref:`entity<class_NetwDisplay_method_entity>`\ (\ ) |const|                                                                                                          |
+   +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`Variant`                    | :ref:`get_track_stat<class_NetwDisplay_method_get_track_stat>`\ (\ property\: :godot:`StringName`, stat\: :ref:`TrackStat<enum_NetwMultiplayer_TrackStat>`\ ) |const| |
+   +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | |void|                              | :ref:`reset<class_NetwDisplay_method_reset>`\ (\ )                                                                                                                    |
+   +-------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 .. rst-class:: classref-section-separator
 
@@ -531,9 +531,9 @@ The :ref:`NetwEntity<class_NetwEntity>` this handle belongs to, or ``null`` once
 
 .. rst-class:: classref-method
 
-:godot:`Variant` **get_track_stat**\ (\ property\: :godot:`StringName`, stat\: :godot:`StringName`\ ) |const| :ref:`🔗<class_NetwDisplay_method_get_track_stat>`
+:godot:`Variant` **get_track_stat**\ (\ property\: :godot:`StringName`, stat\: :ref:`TrackStat<enum_NetwMultiplayer_TrackStat>`\ ) |const| :ref:`🔗<class_NetwDisplay_method_get_track_stat>`
 
-Returns the display diagnostic ``stat`` of ``property``, or ``null`` for an unknown stat. An empty ``property`` reads the whole entity.
+Returns the display diagnostic ``stat`` of ``property``, or ``null`` while the entity is not displayed. An empty ``property`` reads the whole entity.
 
 .. rst-class:: classref-item-separator
 

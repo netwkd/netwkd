@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/entity/ids.hpp"
 
 #include <vector>

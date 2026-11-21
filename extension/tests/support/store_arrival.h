@@ -7,7 +7,7 @@
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/predict/arrival.hpp"
 #include "netw/repl/property_binding.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 
 namespace netw_test {
 
@@ -31,7 +31,9 @@ struct LandedLog {
         log->values.clear();
         for (int column = 0; column < p_table.schema.column_count(); ++column) {
             log->keys.push_back(p_table.schema.at(column)->key);
-            log->values.push_back(p_table.read_value(p_row, uint32_t(column)));
+            log->values.push_back(
+                netw::store::read_value(p_table, p_row, uint32_t(column))
+            );
         }
     }
 
@@ -62,7 +64,7 @@ struct StoreArrival {
         session->store_admit(binding);
     }
 
-    netw::store::World &world() {
+    netw::store::Store &world() {
         return Internals::store(session);
     }
 
@@ -117,7 +119,11 @@ struct StoreArrival {
         const netw::store::Table &table = world().table(row.table);
         for (int column = 0; column < table.schema.column_count(); ++column) {
             if (table.schema.at(column)->key == p_key) {
-                return table.read_value(row.row, uint32_t(column));
+                return netw::store::read_value(
+                    table,
+                    row.row,
+                    uint32_t(column)
+                );
             }
         }
         return godot::Variant();

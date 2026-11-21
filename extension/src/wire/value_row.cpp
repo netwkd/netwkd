@@ -3,10 +3,13 @@
 #include <cstring>
 
 #include "netw/api/quantize.hpp"
+#include "netw/call_args.hpp"
 #include "netw/colors.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
+#include "netw/schema_book.hpp"
+#include "netw/value_variant.hpp"
 #include "netw/wire/plan.hpp"
 
 namespace netw::wire {
@@ -182,23 +185,130 @@ bool raw_value(
     }
 }
 
-bool scalar_schema(const SchemaRecord &p_schema, const WirePlan &p_plan) {
-    if (!p_plan.valid()) {
+} // namespace
+
+bool cell_bytes(
+    const ColumnPlan &p_slot,
+    const Variant &p_value,
+    PackedByteArray &r_bytes
+) {
+    if (p_slot.text) {
+        r_bytes = String(p_value).to_utf8_buffer();
+        return true;
+    }
+    value::Bytes bytes;
+    if (value::encode(p_value, bytes) != OK) {
         return false;
     }
-    for (int at = 0; at < p_schema.column_count(); ++at) {
-        const SchemaColumn *column = p_schema.at(at);
-        if (column->stride != 1) {
-            return false;
-        }
-    }
+    r_bytes.resize(int64_t(bytes.size()));
+    memcpy(r_bytes.ptrw(), bytes.ptr(), bytes.size());
     return true;
 }
 
-} // namespace
+bool cell_value(
+    const ColumnPlan &p_slot,
+    const PackedByteArray &p_bytes,
+    Variant &r_value
+) {
+    if (p_slot.text) {
+        if (!value::is_exact_text(p_bytes.ptr(), p_bytes.size())) {
+            return false;
+        }
+        r_value = gd::utf8_string(p_bytes);
+        return true;
+    }
+    return value::decode(p_bytes.ptr(), p_bytes.size(), r_value)
+        == p_bytes.size();
+}
 
-bool is_scalar_schema(const SchemaRecord &p_schema, const WirePlan &p_plan) {
-    return scalar_schema(p_schema, p_plan);
+bool cell_tail(bool p_text, const Variant &p_value, TailRef &r_tail) {
+    if (p_text) {
+        const CharString utf8 = String(p_value).utf8();
+        if (!value::is_exact_text(
+                reinterpret_cast<const uint8_t *>(utf8.get_data()),
+                utf8.length()
+            )) {
+            return false;
+        }
+        r_tail = TailRef::of(
+            reinterpret_cast<const uint8_t *>(utf8.get_data()),
+            uint32_t(utf8.length())
+        );
+        return true;
+    }
+    return value_tail(p_value, r_tail) == OK;
+}
+
+Error value_tail(const Variant &p_value, TailRef &r_tail) {
+    r_tail = TailRef();
+    if (p_value.get_type() == Variant::NIL) {
+        return OK;
+    }
+    value::Bytes bytes;
+    const Error refusal = value::encode(p_value, bytes);
+    if (refusal != OK) {
+        return refusal;
+    }
+    if (bytes.size() == 1 && bytes[0] == uint8_t(value::TAG_NIL)) {
+        return OK;
+    }
+    r_tail = TailRef::of(bytes.ptr(), bytes.size());
+    return OK;
+}
+
+Variant tail_value(bool p_text, const TailRef &p_tail) {
+    if (p_text) {
+        return gd::utf8_span(p_tail.ptr(), p_tail.size());
+    }
+    if (p_tail.is_empty()) {
+        return Variant();
+    }
+    Variant value;
+    if (value::decode(p_tail.ptr(), p_tail.size(), value)
+        != int64_t(p_tail.size())) {
+        return Variant();
+    }
+    return value;
+}
+
+void tail_bytes(
+    const ColumnPlan &p_slot,
+    const TailRef &p_tail,
+    PackedByteArray &r_bytes
+) {
+    if (!p_slot.text && p_tail.is_empty()) {
+        r_bytes.resize(1);
+        r_bytes.set(0, uint8_t(value::TAG_NIL));
+        return;
+    }
+    r_bytes.resize(int64_t(p_tail.size()));
+    if (p_tail.size() > 0) {
+        memcpy(r_bytes.ptrw(), p_tail.ptr(), p_tail.size());
+    }
+}
+
+bool bytes_tail(
+    const ColumnPlan &p_slot,
+    const PackedByteArray &p_bytes,
+    TailRef &r_tail
+) {
+    if (p_slot.text) {
+        if (!value::is_exact_text(p_bytes.ptr(), p_bytes.size())) {
+            return false;
+        }
+    } else {
+        Variant checked;
+        if (value::decode(p_bytes.ptr(), p_bytes.size(), checked)
+            != p_bytes.size()) {
+            return false;
+        }
+        if (p_bytes.size() == 1 && p_bytes[0] == uint8_t(value::TAG_NIL)) {
+            r_tail = TailRef();
+            return true;
+        }
+    }
+    r_tail = TailRef::of(p_bytes.ptr(), uint32_t(p_bytes.size()));
+    return true;
 }
 
 bool encode_scalar_column(
@@ -206,31 +316,47 @@ bool encode_scalar_column(
     const ColumnPlan &p_slot,
     uint32_t p_index,
     const Variant &p_value,
-    CodeRow &r_row
+    CodeRow &r_row,
+    NetwMultiplayer *p_session
 ) {
     const int at = int(p_index);
     const Variant::Type expected
-        = Variant::Type(SchemaCore::element_type(p_column.type));
+        = Variant::Type(SchemaBook::element_type(p_column.type));
     if (p_slot.variable) {
         const bool textual = p_column.type != SchemaCore::STRING
             || Variant::can_convert_strict(p_value.get_type(), Variant::STRING);
-        if (!textual || SchemaCore::validate_storable(p_value) != OK) {
-            fault::raise(
-                nullptr,
-                NETW_FAULT_UNSENDABLE_VALUE,
-                {vformat("Column %d", at),
-                 String("an Object"),
-                 String("a plain value, such as the object's data or its node "
-                        "path")}
+        const String name = vformat("Property '%s'", String(p_column.key));
+        TailRef tail;
+        if (!p_slot.text) {
+            const Error refusal = value_tail(p_value, tail);
+            if (refusal != OK) {
+                call_args::report_unsendable(p_session, name, p_value, refusal);
+            }
+        } else if (!textual) {
+            call_args::report_unsendable(
+                p_session,
+                name,
+                p_value,
+                ERR_INVALID_DATA
             );
-            return false;
+        } else if (!cell_tail(true, p_value, tail)) {
+            fault::raise(
+                p_session,
+                NETW_FAULT_UNSENDABLE_VALUE,
+                {name,
+                 String(
+                     "text that opens with a byte order mark or holds a "
+                     "NUL"
+                 ),
+                 String("text without them")}
+            );
         }
-        r_row.write_value(p_index, p_value);
+        r_row.write_tail(p_index, tail);
         return true;
     }
     if (!Variant::can_convert_strict(p_value.get_type(), expected)) {
         fault::raise(
-            nullptr,
+            p_session,
             NETW_FAULT_UNSENDABLE_VALUE,
             {vformat("Column %d", at),
              String("a value of the wrong type"),
@@ -238,10 +364,12 @@ bool encode_scalar_column(
         );
         return false;
     }
-    if (p_column.quantizer.is_valid()) {
-        if (!p_column.quantizer->supports_type(expected)) {
+    if (p_column.quant.quantized()) {
+        const NetwQuantize *quantizer
+            = SchemaBook::quantizer_of(p_column.quant);
+        if (quantizer == nullptr || !quantizer->supports_type(expected)) {
             fault::raise(
-                nullptr,
+                p_session,
                 NETW_FAULT_UNSENDABLE_VALUE,
                 {vformat("Column %d", at),
                  String("a quantizer that does not support its type"),
@@ -250,11 +378,10 @@ bool encode_scalar_column(
             return false;
         }
         for (int element = 0; element < p_slot.stride; ++element) {
-            const uint64_t code
-                = uint64_t(p_column.quantizer->encode(p_value, element));
+            const uint64_t code = uint64_t(quantizer->encode(p_value, element));
             if (!r_row.write(p_slot, element, code)) {
                 fault::raise(
-                    nullptr,
+                    p_session,
                     NETW_FAULT_UNSENDABLE_VALUE,
                     {vformat("Column %d", at),
                      String("a quantizer code with more bits than it declares"),
@@ -284,7 +411,7 @@ bool encode_scalar_row(
     NETW_ZONE_NC("Wire value row encode", colors::WIRE);
     const WirePlan plan = WirePlan::compile(p_schema);
     NETW_BUG_COND_V(
-        !scalar_schema(p_schema, plan)
+        !is_scalar_schema(p_schema, plan)
             || p_values.size() != p_schema.column_count(),
         false
     );
@@ -319,7 +446,7 @@ bool decode_scalar_column(
     Variant &r_value
 ) {
     if (p_slot.variable) {
-        r_value = p_row.read_value(p_index);
+        r_value = tail_value(p_row.is_text(p_index), p_row.tail(p_index));
         return true;
     }
     constexpr int WIDEST = 16;
@@ -330,12 +457,13 @@ bool decode_scalar_column(
     for (int element = 0; element < p_slot.stride; ++element) {
         codes[element] = p_row.read(p_slot, element);
     }
-    if (p_column.quantizer.is_null()) {
+    if (!p_column.quant.quantized()) {
         return raw_value(p_column.type, p_slot.width, codes, r_value);
     }
     const Variant::Type expected
-        = Variant::Type(SchemaCore::element_type(p_column.type));
-    if (!p_column.quantizer->supports_type(expected)) {
+        = Variant::Type(SchemaBook::element_type(p_column.type));
+    const NetwQuantize *quantizer = SchemaBook::quantizer_of(p_column.quant);
+    if (quantizer == nullptr || !quantizer->supports_type(expected)) {
         return false;
     }
     if (r_codes.size() != int64_t(p_slot.stride)) {
@@ -344,7 +472,7 @@ bool decode_scalar_column(
     for (int element = 0; element < p_slot.stride; ++element) {
         r_codes.set(int64_t(element), int64_t(codes[element]));
     }
-    r_value = p_column.quantizer->decode(r_codes, expected);
+    r_value = quantizer->decode(r_codes, expected);
     return true;
 }
 
@@ -355,7 +483,7 @@ bool decode_scalar_row(
 ) {
     NETW_ZONE_NC("Wire value row decode", colors::WIRE);
     const WirePlan plan = WirePlan::compile(p_schema);
-    if (!scalar_schema(p_schema, plan) || !p_row.valid_for(plan)) {
+    if (!is_scalar_schema(p_schema, plan) || !p_row.valid_for(plan)) {
         return false;
     }
     Array staged;

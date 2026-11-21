@@ -1,11 +1,12 @@
+#include "netw/sealed.hpp"
+
 #include <cstring>
 #include <utility>
 
 #include "netw/colors.hpp"
 #include "netw/profile.hpp"
 #include "netw/repl/snapshot_frame.hpp"
-#include "netw/store/world.hpp"
-#include "netw/wire/value_row.hpp"
+#include "netw/store/store.hpp"
 
 using namespace godot;
 
@@ -47,17 +48,17 @@ void Table::forget_sender(int p_id) {
 const uint64_t *Table::received_image(
     const Received &p_received,
     uint64_t p_revision,
-    const Variant *&r_carried
+    const wire::TailRef *&r_tails
 ) const {
-    r_carried = nullptr;
+    r_tails = nullptr;
     for (uint32_t age = 0; age < p_received.held; ++age) {
         const uint32_t at
             = (p_received.next + RECEIVED_DEPTH - 1 - age) % RECEIVED_DEPTH;
         if (p_received.revisions[at] != p_revision) {
             continue;
         }
-        if (carried != 0) {
-            r_carried = p_received.carried.ptr() + uint64_t(at) * carried;
+        if (tail_columns != 0) {
+            r_tails = p_received.tails.ptr() + uint64_t(at) * tail_columns;
         }
         return p_received.images.ptr() + uint64_t(at) * words;
     }
@@ -72,7 +73,7 @@ void Table::keep_received(
     if (r_received.revisions.size() != RECEIVED_DEPTH) {
         r_received.revisions.resize(RECEIVED_DEPTH);
         r_received.images.resize(RECEIVED_DEPTH * words);
-        r_received.carried.resize(RECEIVED_DEPTH * carried);
+        r_received.tails.resize(RECEIVED_DEPTH * tail_columns);
     }
     const uint32_t at = r_received.next;
     r_received.revisions[at] = p_revision;
@@ -80,9 +81,9 @@ void Table::keep_received(
     for (uint32_t word = 0; word < words; ++word) {
         r_received.images[at * words + word] = given[word];
     }
-    const Variant *kept = p_codes.value_data();
-    for (uint32_t column = 0; column < carried; ++column) {
-        r_received.carried[at * carried + column] = kept[column];
+    const wire::TailRef *kept = p_codes.tail_data();
+    for (uint32_t column = 0; column < tail_columns; ++column) {
+        r_received.tails[at * tail_columns + column] = kept[column];
     }
     r_received.next = (at + 1) % RECEIVED_DEPTH;
     if (r_received.held < RECEIVED_DEPTH) {
@@ -91,30 +92,18 @@ void Table::keep_received(
     r_received.accepted = p_revision;
 }
 
-bool Table::decode_row(const wire::CodeRow &p_codes) {
-    uint8_t *staged = landed.ptr();
-    for (uint32_t at = 0; at < columns.size(); ++at) {
-        if (columns[at].value_bytes == 0) {
-            continue;
+int Table::mistyped(const wire::CodeRow &p_codes) const {
+    for (uint32_t at = 0; at < plan.column_count(); ++at) {
+        const wire::ColumnPlan &slot = plan.column(at);
+        if (slot.variable && slot.mistypes(p_codes.tail(at))) {
+            return int(at);
         }
-        Variant value;
-        if (!wire::decode_scalar_column(
-                *schema.at(int(at)),
-                plan.column(at),
-                at,
-                p_codes,
-                decode_codes[at],
-                value
-            )) {
-            return false;
-        }
-        write_bytes(staged + value_offsets[at], at, value);
     }
-    return true;
+    return -1;
 }
 
 bool Table::land(uint32_t p_row, const wire::CodeRow &p_codes, int64_t p_tick) {
-    if (!decode_row(p_codes)) {
+    if (!stage_codes(p_codes)) {
         return false;
     }
     uint64_t *held = codes.ptr() + uint64_t(p_row) * words;
@@ -124,9 +113,9 @@ bool Table::land(uint32_t p_row, const wire::CodeRow &p_codes, int64_t p_tick) {
         changed = changed || held[at] != fresh[at];
         held[at] = fresh[at];
     }
-    const Variant *given = p_codes.value_data();
-    for (uint32_t at = 0; at < carried; ++at) {
-        Variant &kept = carried_values[p_row * carried + at];
+    const wire::TailRef *given = p_codes.tail_data();
+    for (uint32_t at = 0; at < tail_columns; ++at) {
+        wire::TailRef &kept = cell_tails[p_row * tail_columns + at];
         changed = changed || kept != given[at];
         kept = given[at];
     }
@@ -159,25 +148,34 @@ bool Table::record_codes(
     const wire::CodeRow &p_codes,
     int64_t p_tick
 ) {
-    if (!decode_row(p_codes)) {
+    if (!stage_codes(p_codes)) {
         return false;
     }
     record(p_row, p_tick, landed.ptr());
     return true;
 }
 
-void Table::record_held(uint32_t p_row, int64_t p_tick) {
-    const uint64_t *held = codes_of(p_row);
+bool Table::stage_codes(const wire::CodeRow &p_codes) {
+    const uint64_t *given = p_codes.word_data();
     uint8_t *staged = landed.ptr();
     uint64_t element_codes[4] = {0, 0, 0, 0};
     for (uint32_t at = 0; at < columns.size(); ++at) {
-        const ColumnCoder &coder = coders[at];
-        for (int element = 0; element < coder.slot.stride; ++element) {
-            element_codes[element] = read_code(held, coder.slot, element);
+        if (columns[at].value_bytes == 0) {
+            continue;
         }
-        canonical_value(coder, element_codes, staged + value_offsets[at]);
+        if (columns[at].kind == Kind::FIXED) {
+            const ColumnCoder &coder = coders[at];
+            for (int element = 0; element < coder.slot.stride; ++element) {
+                element_codes[element] = read_code(given, coder.slot, element);
+            }
+            canonical_value(coder, element_codes, staged + value_offsets[at]);
+            continue;
+        }
+        if (!decode_coded(*this, at, p_codes, staged + value_offsets[at])) {
+            return false;
+        }
     }
-    record(p_row, p_tick, staged);
+    return true;
 }
 
 void Table::record(uint32_t p_row, int64_t p_tick, const uint8_t *p_image) {
@@ -185,9 +183,9 @@ void Table::record(uint32_t p_row, int64_t p_tick, const uint8_t *p_image) {
     const uint64_t sample = uint64_t(p_row) * HISTORY_DEPTH + at;
     history_ticks[sample] = p_tick;
     memcpy(history_values.ptr() + sample * row_bytes, p_image, row_bytes);
-    for (uint32_t column = 0; column < carried; ++column) {
-        history_carried[sample * carried + column]
-            = carried_values[p_row * carried + column];
+    for (uint32_t column = 0; column < tail_columns; ++column) {
+        history_tails[sample * tail_columns + column]
+            = cell_tails[p_row * tail_columns + column];
     }
     history_next[p_row] = uint8_t((at + 1) % HISTORY_DEPTH);
     if (history_held[p_row] < HISTORY_DEPTH) {
@@ -213,9 +211,9 @@ void Table::record_rest(uint32_t p_row, int64_t p_tick) {
         history_values.ptr() + uint64_t(newest) * row_bytes,
         row_bytes
     );
-    for (uint32_t column = 0; column < carried; ++column) {
-        history_carried[sample * carried + column]
-            = history_carried[uint64_t(newest) * carried + column];
+    for (uint32_t column = 0; column < tail_columns; ++column) {
+        history_tails[sample * tail_columns + column]
+            = history_tails[uint64_t(newest) * tail_columns + column];
     }
     history_next[p_row] = uint8_t((at + 1) % HISTORY_DEPTH);
     if (history_held[p_row] < HISTORY_DEPTH) {
@@ -255,26 +253,6 @@ int Table::history_at(uint32_t p_row, int64_t p_tick) const {
         }
     }
     return best;
-}
-
-Variant Table::history_value(
-    uint32_t p_row,
-    uint32_t p_age,
-    uint32_t p_column
-) const {
-    if (p_age >= history_count(p_row) || p_column >= columns.size()) {
-        return Variant();
-    }
-    const uint32_t sample = history_slot(p_row, p_age);
-    if (columns[p_column].value_bytes == 0) {
-        return carried == 0 ? Variant()
-                            : history_carried[sample * carried + p_column];
-    }
-    return read_bytes(
-        history_values.ptr() + uint64_t(sample) * row_bytes
-            + value_offsets[p_column],
-        p_column
-    );
 }
 
 uint32_t Table::owe_push(
@@ -327,7 +305,7 @@ void Table::drop_due(uint32_t p_row) {
     due.set(p_row, false);
 }
 
-Landing World::receive(
+Landing Store::receive(
     const RowAddress &p_at,
     int p_sender,
     const PackedByteArray &p_frame,
@@ -352,7 +330,7 @@ Landing World::receive(
     return verdict;
 }
 
-Landing World::admits(
+Landing Store::admits(
     const RowAddress &p_at,
     int p_sender,
     const PackedByteArray &p_frame,
@@ -389,19 +367,35 @@ Landing World::admits(
     if (p_windowed || named.absolute()) {
         return Landing::ACCEPTED;
     }
-    const Variant *carried = nullptr;
+    const wire::TailRef *tails = nullptr;
     const uint64_t *image = fresh
         ? nullptr
-        : table.received_image(*held, named.baseline_revision(), carried);
+        : table.received_image(*held, named.baseline_revision(), tails);
     if (image == nullptr) {
         return Landing::BASELINE_UNKNOWN;
     }
-    table.base.assign(table.plan, image, carried);
+    table.base.assign(table.plan, image, tails);
     r_baseline = &table.base;
     return Landing::ACCEPTED;
 }
 
-Landing World::land_frame(
+bool Store::refuses_type(
+    const Table &p_table,
+    const wire::CodeRow &p_codes,
+    int p_sender
+) {
+    const int column = p_table.mistyped(p_codes);
+    if (column < 0) {
+        return false;
+    }
+    FaultValues values;
+    values.name = vformat("'%s'", String(p_table.schema.at(column)->key));
+    values.peer = p_sender;
+    fault::raise(session, NETW_FAULT_VALUE_TYPE, values);
+    return true;
+}
+
+Landing Store::land_frame(
     const RowAddress &p_at,
     int p_sender,
     const PackedByteArray &p_frame,
@@ -431,6 +425,11 @@ Landing World::land_frame(
             return Landing::MALFORMED;
         }
         for (uint32_t at = 0; at < samples.size(); ++at) {
+            if (refuses_type(table, samples[at].row, p_sender)) {
+                return Landing::MALFORMED;
+            }
+        }
+        for (uint32_t at = 0; at < samples.size(); ++at) {
             if (!table.land(row, samples[at].row, samples[at].tick)) {
                 return Landing::MALFORMED;
             }
@@ -458,7 +457,8 @@ Landing World::land_frame(
             : Landing::MALFORMED;
     }
     const int64_t tick = header.tick >= 0 ? header.tick : p_base_tick;
-    if (!table.land(row, table.landing, tick)) {
+    if (refuses_type(table, table.landing, p_sender)
+        || !table.land(row, table.landing, tick)) {
         return Landing::MALFORMED;
     }
     table.arrived_tick = header.tick;
@@ -476,7 +476,7 @@ Landing World::land_frame(
     return Landing::ACCEPTED;
 }
 
-void World::hold_early_edge(
+void Store::hold_early_edge(
     const RowAddress &p_at,
     int p_sender,
     const PackedByteArray &p_frame,
@@ -504,7 +504,7 @@ void World::hold_early_edge(
     held.early_tick = p_base_tick;
 }
 
-bool World::take_early_edge(
+bool Store::take_early_edge(
     const RowAddress &p_at,
     int p_sender,
     PackedByteArray &r_frame,
@@ -535,7 +535,7 @@ bool World::take_early_edge(
     return due;
 }
 
-void World::forget_sender(int p_id) {
+void Store::forget_sender(int p_id) {
     for (uint32_t at = 0; at < tables.size(); ++at) {
         tables[at]->forget_sender(p_id);
     }

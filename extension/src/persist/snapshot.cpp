@@ -70,7 +70,7 @@ Error pack_column(int p_type, const Array &p_values, Variant &r_out) {
         r_out = out;
         return OK;
     }
-    switch (SchemaCore::storage_type(p_type)) {
+    switch (SchemaBook::storage_type(p_type)) {
         case Variant::PACKED_FLOAT32_ARRAY:
             r_out = packed_of<PackedFloat32Array, float>(p_values);
             return OK;
@@ -110,7 +110,7 @@ Error pack_column(int p_type, const Array &p_values, Variant &r_out) {
 }
 
 Error migrate_rows(
-    const SchemaCore &p_core,
+    const SchemaBook &p_core,
     const RID &p_schema,
     const SchemaRecord &p_record,
     int p_from,
@@ -191,7 +191,7 @@ Error migrate_rows(
                 return ERR_INVALID_DATA;
             }
             const Variant value = rows[row][column->key];
-            const Error checked = SchemaCore::validate_value(
+            const Error checked = SchemaBook::validate_value(
                 column->type,
                 column->stride,
                 value
@@ -289,7 +289,7 @@ Dictionary seal_snapshot(
 }
 
 Error open_snapshot(
-    const SchemaCore &p_core,
+    const SchemaBook &p_core,
     const RID &p_schema,
     const Dictionary &p_envelope,
     PackedStringArray &r_ids,
@@ -393,14 +393,14 @@ Error open_snapshot(
             return ERR_INVALID_DATA;
         }
         const Variant held = stored[key];
-        if (int(held.get_type()) != SchemaCore::storage_type(column->type)) {
+        if (int(held.get_type()) != SchemaBook::storage_type(column->type)) {
             r_detail = vformat(
                 "column '%s' is stored as type %d and schema '%s' declares "
                 "%d",
                 key,
                 int(held.get_type()),
                 String(schema->name),
-                SchemaCore::storage_type(column->type)
+                SchemaBook::storage_type(column->type)
             );
             return ERR_INVALID_DATA;
         }

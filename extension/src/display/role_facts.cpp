@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/display/role_facts.hpp"
 
 #include "netw/display/decl.hpp"

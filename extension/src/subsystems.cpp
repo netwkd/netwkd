@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/subsystems.hpp"
 
 namespace netw {

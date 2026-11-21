@@ -2,16 +2,16 @@
 
 #include <cstdint>
 
+#include "godot/hash_map.hpp"
 #include "godot/local_vector.hpp"
-#include "godot/rid.hpp"
-#include "godot/variant.hpp"
+#include "netw/wire/tail.hpp"
 
 namespace netw::repl {
 
 class WatchBook {
     struct Stream {
         bool inited = false;
-        godot::Array values;
+        godot::LocalVector<wire::TailRef> values;
         godot::LocalVector<int64_t> stamps;
         int64_t change_counter = 0;
         godot::HashMap<int64_t, int64_t> baselines;
@@ -27,15 +27,15 @@ public:
 
     void poll(
         int64_t p_key,
-        const godot::Array &p_values,
-        const godot::Array &p_readable
+        const godot::LocalVector<wire::TailRef> &p_values,
+        const godot::LocalVector<uint8_t> &p_readable
     );
 
     void mask_for(
         int64_t p_key,
         int64_t p_peer,
         uint64_t &r_mask,
-        godot::Array &r_values
+        godot::LocalVector<wire::TailRef> &r_values
     ) const;
 
     void commit(int64_t p_key, int64_t p_peer);
@@ -48,7 +48,8 @@ public:
 
     void retain_baselines(
         int64_t p_key,
-        const godot::PackedInt32Array &p_recipients
+        const int32_t *p_recipients,
+        int64_t p_count
     );
 
     bool is_inited(int64_t p_key) const;

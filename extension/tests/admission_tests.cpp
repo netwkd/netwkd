@@ -345,7 +345,7 @@ void join_proving(
     claim.username = StringName("ana");
     claim.app_tag = p_api->auth_app_tag_of();
     claim.wire_identity = netw::SessionCore::compute_wire_identity();
-    claim.proof_bytes = netw::gd::var_to_bytes(p_proofs);
+    claim.proof_bytes = netw_test::Internals::value_packed(p_proofs);
     p_api->session_receive_join(claim.serialize(), p_peer);
 }
 

@@ -11,7 +11,9 @@
 #include "netw/api/entity_record.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/schema_core.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/pull.hpp"
+#include "netw/store/store.hpp"
+#include "netw/store/table_value.hpp"
 
 #if defined(NETW_TIER_HOSTED)
 
@@ -22,9 +24,10 @@ namespace TestNetwStoreResidentLaws {
 
 using netw::NetwMultiplayer;
 using netw::SchemaCore;
+using netw::store::Pull;
 using netw::store::RowAddress;
 using netw::store::Source;
-using netw::store::World;
+using netw::store::Store;
 using netw::table::SchemaColumn;
 using netw::table::SchemaRecord;
 
@@ -57,32 +60,40 @@ struct Bench {
             StringName("node_removed"),
             callable_mp(session.ptr(), &NetwMultiplayer::sync_note_node_removed)
         );
-        World &world = Internals::store(session);
-        world.residents.watch(true);
+        Store &world = Internals::store(session);
+        Pull &pull = *world.pull;
+        pull.residents.watch(true);
         table
             = world.table_for(1, netw::store::Family::VOLATILE, pose_schema());
-        world.table(table).resolve_ports(p_body);
-        at = world
-                 .add_row(table, 10, 0, uint64_t(p_body->get_instance_id()), 0);
+        netw::store::resolve_ports(
+            world.table(table),
+            pull.residents.rows(table),
+            p_body
+        );
+        at = pull.add_row(table, 10, 0, uint64_t(p_body->get_instance_id()), 0);
         world.place(at, 5, 1);
-        world.set_source(at, Source::LOCAL);
+        pull.set_source(at, Source::LOCAL);
     }
 
-    World &world() const {
+    Store &world() const {
         return Internals::store(session);
     }
 
+    Pull &pull() const {
+        return *world().pull;
+    }
+
     const netw::store::NodeCell &cell() const {
-        return world().table(table).cells[at.row];
+        return pull().residents.rows(table).cells[at.row];
     }
 
     bool read() const {
         LocalVector<Variant> values;
-        return world().read_live(at, values);
+        return pull().read_live(at, values);
     }
 
     bool cached() const {
-        return cell().epoch == world().residents.current()
+        return cell().epoch == pull().residents.current()
             && cell().object != nullptr;
     }
 };
@@ -95,7 +106,7 @@ TEST_CASE(
     netw::gd::scene_root()->add_child(parent);
     RigidBody3D *body = rooted_body(parent);
     Bench bench(body);
-    REQUIRE(bench.world().residents.is_watching());
+    REQUIRE(bench.pull().residents.is_watching());
     REQUIRE(bench.world().table(bench.table).body_columns == 1);
 
     REQUIRE(bench.read());
@@ -140,6 +151,35 @@ TEST_CASE(
     memdelete(body);
     memdelete(second);
     memdelete(first);
+}
+
+TEST_CASE(
+    "[Netw][Store] removing a row leaves the row moved into its place "
+    "reading its own body"
+) {
+    Node3D *parent = memnew(Node3D);
+    netw::gd::scene_root()->add_child(parent);
+    RigidBody3D *first = rooted_body(parent);
+    RigidBody3D *second = rooted_body(parent);
+    Bench bench(first);
+    Pull &pull = bench.pull();
+    const RowAddress later = pull.add_row(
+        bench.table,
+        11,
+        0,
+        uint64_t(second->get_instance_id()),
+        0
+    );
+    bench.world().place(later, 6, 1);
+    pull.set_source(later, Source::LOCAL);
+
+    pull.remove_row(bench.at);
+    bench.at = bench.world().row_of(11, 0);
+    REQUIRE(bench.at.row == 0);
+    REQUIRE(bench.read());
+    const bool own_body = bench.cell().solid == second;
+    CHECK(own_body);
+    memdelete(parent);
 }
 
 } // namespace TestNetwStoreResidentLaws

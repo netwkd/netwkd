@@ -6,6 +6,7 @@
 #include "netw/api/schema_core.hpp"
 #include "netw/colors.hpp"
 #include "netw/profile.hpp"
+#include "netw/value_variant.hpp"
 #include "netw/wire/value_row.hpp"
 
 using namespace godot;
@@ -57,11 +58,7 @@ void mix_word(uint32_t &r_hash, uint64_t p_word) {
 }
 
 void mix_value(uint32_t &r_hash, const Variant &p_value) {
-    const PackedByteArray bytes = gd::var_to_bytes(p_value);
-    const uint8_t *data = bytes.ptr();
-    for (int64_t at = 0; at < bytes.size(); ++at) {
-        mix(r_hash, data[at]);
-    }
+    r_hash = value::hash_variant(r_hash, p_value);
 }
 
 } // namespace
@@ -135,7 +132,8 @@ int32_t fingerprint_row(
     const StateRow &p_row,
     uint64_t p_scope,
     wire::CodeRow &r_scratch,
-    bool &r_any
+    bool &r_any,
+    NetwMultiplayer *p_session
 ) {
     if (!r_scratch.valid_for(p_codec.plan)) {
         r_scratch = wire::CodeRow::for_plan(p_codec.plan);
@@ -160,7 +158,8 @@ int32_t fingerprint_row(
                 p_codec.plan.column(field),
                 field,
                 value,
-                r_scratch
+                r_scratch,
+                p_session
             )) {
             coded |= bit;
         }
@@ -353,7 +352,8 @@ void TransitionBook::seal_entry(uint32_t p_at) {
 bool TransitionBook::code_field(
     const FieldCodec &p_codec,
     int p_field,
-    const Variant &p_value
+    const Variant &p_value,
+    NetwMultiplayer *p_session
 ) {
     return p_codec.holds(p_field, p_value)
         && wire::encode_scalar_column(
@@ -361,7 +361,8 @@ bool TransitionBook::code_field(
                p_codec.plan.column(uint32_t(p_field)),
                uint32_t(p_field),
                p_value,
-               scratch
+               scratch,
+               p_session
         );
 }
 
@@ -371,7 +372,8 @@ bool TransitionBook::record_row(
     int64_t p_label,
     bool p_fresh,
     const StateRow &p_row,
-    uint8_t p_origin
+    uint8_t p_origin,
+    NetwMultiplayer *p_session
 ) {
     NETW_ZONE_LEAF(
         "Predict book record row",
@@ -390,7 +392,7 @@ bool TransitionBook::record_row(
         }
         const Variant &value = p_row.values[field];
         present[at] |= bit_of(int(field));
-        if (code_field(p_codec, int(field), value)) {
+        if (code_field(p_codec, int(field), value, p_session)) {
             coded[at] |= bit_of(int(field));
         } else {
             carry(at, int(field), value);

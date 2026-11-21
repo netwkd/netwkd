@@ -19,7 +19,7 @@ NetwQuantizeQuaternion
 Description
 -----------
 
-Sends three of the four components, and rebuilds the largest one. Any rotation takes ``2 + bit_count * 3`` bits.
+Sends three of the four components, and rebuilds the largest one. Any rotation takes ``2 + bit_count * 3`` bits. A property reads :ref:`bit_count<class_NetwQuantizeQuaternion_property_bit_count>` when it is declared, so set it before.
 
 ::
 

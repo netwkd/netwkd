@@ -4,6 +4,7 @@
 #if defined(NETW_TIER_HOSTED)
 
 #include "support/fault_log.h"
+#include "support/internals.h"
 #include "support/loopback_rig.h"
 #include "support/minted_script.h"
 #include "support/netw_call_log.h"
@@ -786,12 +787,13 @@ LawVerdict undeclared_method_denied(const World &) {
         log.callable(StringName("confirmed")),
         log.callable(StringName("denied"))
     );
-    forged.data
-        = netw::gd::var_to_bytes(netw::gd::array_of(Vector2(3.0, -4.0), 7));
+    forged.data = netw_test::Internals::value_packed(
+        netw::gd::array_of(Vector2(3.0, -4.0), 7)
+    );
     client->send_to(
         MultiplayerPeer::TARGET_PEER_SERVER,
         netw::NetwEntity::of(shot.owner)->get_route(),
-        netw::wire::builtin_channel("ACTION"),
+        netw::wire::CHANNEL_ACTION,
         netw::session::frame_write(forged),
         true,
         0,

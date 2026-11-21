@@ -12,18 +12,16 @@
 #include "netw/predict/slot_verdicts.hpp"
 #include "netw/repl/property_binding.hpp"
 
-namespace netw::session {
-struct Books;
-} // namespace netw::session
-
 namespace netw::predict {
 struct Decl;
 } // namespace netw::predict
 
 namespace netw {
 
+class NetwEntityRecord;
 class NetwMultiplayer;
 class NetwPrediction;
+class NetwPredictRunner;
 
 class NetwPredictSlotEngine {
     friend class NetwMultiplayer;
@@ -36,11 +34,16 @@ class NetwPredictSlotEngine {
         bool controlled_locally = false;
     };
 
-    godot::ObjectID core_id;
-    const session::Books *books = nullptr;
+    NetwMultiplayer *session = nullptr;
+    NetwLivenessCore *liveness_core = nullptr;
+    NetwPredictRunner *predict_runner = nullptr;
+    const sim::Rows *sim_rows = nullptr;
+    const godot::HashMap<int64_t, NetwPredictSlotEngine *> *predict_engines
+        = nullptr;
     NetwPredictionEngine *pool = nullptr;
     int64_t seat = -1;
-    godot::Ref<NetwEntity> entity;
+    NetwEntityRecord *record = nullptr;
+    godot::ObjectID node;
     godot::Ref<NetwPrediction> handle;
     predict::Decl *decl = nullptr;
     Declaration declaration;
@@ -65,11 +68,9 @@ class NetwPredictSlotEngine {
     HeldRecovery held_recovery;
 
     NetwMultiplayer *core_seated() const;
-    NetwPredictSlotEngine *sibling(
-        const godot::Ref<NetwEntity> &p_member
-    ) const;
+    NetwPredictSlotEngine *sibling(const godot::RID &p_member) const;
     Declaration resolved_declaration() const;
-    Declaration declaration_of(const godot::Ref<NetwEntity> &p_entity) const;
+    bool is_seated() const;
 
     int role() const;
     void set_role_column(int p_role);
@@ -153,15 +154,15 @@ class NetwPredictSlotEngine {
         int p_operator,
         int64_t p_basis,
         NetwPredictSlotEngine *p_provenance_owner,
-        int64_t p_entry
+        int64_t p_entry,
+        bool p_evidence_free = false,
+        bool p_pool_planned = false
     );
-    RecoveryPlan plan_of(const predict::WritePlan &p_plan) const;
-    void close_replayed_entry(int64_t p_index);
     bool is_steppable() const;
     godot::LocalVector<NetwPredictSlotEngine *> joint_group();
     void append_joint_member(
         godot::LocalVector<NetwPredictSlotEngine *> &r_out,
-        const godot::Ref<NetwEntity> &p_member
+        const godot::RID &p_member
     );
     struct SteppedIsland {
         godot::RID space;
@@ -171,16 +172,19 @@ class NetwPredictSlotEngine {
     };
     SteppedIsland stepped_island() const;
     void step_island(const SteppedIsland &p_island, int64_t p_transition);
-    void run_joint_pass(
-        const predict::JointPassPlan &p_plan,
-        const godot::LocalVector<NetwPredictSlotEngine *> &p_members,
-        int64_t p_floor_transition
+    void close_replay_step(
+        const predict::ReplayPlan &p_plan,
+        const predict::ReplayStep &p_step
+    );
+    void run_replay(
+        const predict::ReplayPlan &p_plan,
+        const godot::LocalVector<NetwPredictSlotEngine *> &p_members
     );
     void release_lingering(int64_t p_floor_transition);
     void joint_heal();
     void note_joint_writes(const predict::StateRow &p_before);
     int64_t ledger_drive_frontier() const;
-    predict::JointPassPlan pool_joint_pass(int64_t p_present);
+    predict::ReplayPlan pool_joint_pass(int64_t p_present);
 
     void host_local_author_tick(int64_t p_tick);
     void host_local_frame_step(const NetwPredictTiming &p_timing);
@@ -213,15 +217,6 @@ class NetwPredictSlotEngine {
     void close_journal_row(int64_t p_transition);
     godot::Dictionary witness_sample() const;
     godot::PackedStringArray island_participant_ids() const;
-    void restore(
-        const godot::Dictionary &p_payload,
-        int p_operator,
-        int64_t p_basis,
-        NetwPredictSlotEngine *p_provenance_owner = nullptr,
-        bool p_evidence_free = false,
-        bool p_pool_planned = false,
-        int64_t p_entry = -1
-    );
     void register_with_loop();
     void unregister_from_loop();
 
@@ -251,20 +246,36 @@ class NetwPredictSlotEngine {
 public:
     void attach(
         godot::Object *p_iface,
-        const godot::Ref<NetwEntity> &p_entity,
-        const session::Books *p_books
+        NetwEntityRecord *p_record,
+        godot::Node *p_node,
+        const godot::Ref<NetwPrediction> &p_handle,
+        predict::Decl *p_decl,
+        NetwLivenessCore *p_liveness,
+        NetwPredictionEngine *p_prediction,
+        NetwPredictRunner *p_runner,
+        const sim::Rows *p_sims,
+        const godot::HashMap<int64_t, NetwPredictSlotEngine *> *p_engines
     );
     void release();
+    void unseat();
 
-    void receive_command_frame(const godot::PackedByteArray &p_payload);
-    void receive_relayed_command_frame(const godot::PackedByteArray &p_payload);
+    void receive_command_frame(
+        const godot::PackedByteArray &p_payload,
+        int64_t p_sender
+    );
+    void receive_relayed_command_frame(
+        const godot::PackedByteArray &p_payload,
+        int64_t p_sender
+    );
     void receive_ack_frame(const godot::PackedByteArray &p_payload);
     void notify_collision();
 
     int64_t native_slot() const;
     NetwPredictionEngine *seated_pool() const;
-    godot::Ref<NetwEntity> seated_entity() const;
-    NetwMultiplayer *core() const;
+    godot::RID seated_rid() const;
+    NetwEntityRecord *held_record() const;
+    godot::Node *seated_node() const;
+    const NetwEntityRecord &seated_record() const;
 
     void rewire();
     void reconfigure();

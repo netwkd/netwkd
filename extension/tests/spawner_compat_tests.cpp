@@ -1,6 +1,5 @@
 #include "support/fault_log.h"
 #include "support/internals.h"
-#include "support/netw_call_log.h"
 #include "support/netw_test.h"
 
 #include "godot/callable.hpp"
@@ -9,13 +8,15 @@
 #include "godot/variant.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/spawn/book.hpp"
+#include "netw/spawn/pipeline.hpp"
+#include "netw/spawn/record.hpp"
 #include "netw/spawn/spawner_compat.hpp"
 
 namespace TestNetwSpawnerCompat {
 
 using namespace godot;
 using netw::spawn::SpawnerCompat;
-using netw_test::CallLog;
 
 Node *build_probe(const Variant &) {
     return memnew(Node);
@@ -24,26 +25,21 @@ Node *build_probe(const Variant &) {
 struct Stand {
     Ref<netw::NetwMultiplayer> core;
     SpawnerCompat *compat = nullptr;
+    netw::spawn::Book *book = nullptr;
     MultiplayerSpawner *spawner = nullptr;
-    CallLog log;
 
     Stand() {
         core.instantiate();
-        compat = netw_test::Internals::replication_plane(core)
-                     ->get_spawner_compat();
+        netw::ReplicationCore *plane
+            = netw_test::Internals::replication_plane(core);
+        compat = plane->get_spawner_compat();
+        book = plane->get_spawn_pipeline()->get_spawn_book();
         spawner = memnew(MultiplayerSpawner);
         spawner->set_spawn_function(callable_mp_static(&build_probe));
     }
 
     ~Stand() {
         memdelete(spawner);
-    }
-
-    void arm_seams(bool p_booked) {
-        compat->set_spawn_seams(
-            log.answering("booked", p_booked),
-            log.callable("arm")
-        );
     }
 
     Node *spawn_through_wrap(const Variant &p_data) {
@@ -59,25 +55,47 @@ struct Stand {
 };
 
 TEST_CASE(
-    "[Netw][Spawn][Hosted] a captured argument is consumed by the one "
-    "registration it belongs to, and a second registration has none"
+    "[Netw][Spawn][Hosted] a captured argument arms the node it was "
+    "spawned with, once"
 ) {
     netw_test::FaultWatch expected_faults;
     expected_faults.expect_error("*[NW1020]*", 1);
 
     Stand stand;
-    stand.arm_seams(false);
     stand.compat->wrap_spawner(stand.spawner);
 
     Node *made = stand.spawn_through_wrap(Variant("carried"));
     REQUIRE(made != nullptr);
 
-    stand.compat->consume(made, stand.spawner);
+    NETW_CHECK_EQ(int(stand.compat->consume(made, stand.spawner)), int(OK));
+    CHECK(stand.core->spawn_books_node(made));
+    NETW_CHECK_EQ(stand.book->armed_count(), 1);
     NETW_CHECK_EQ(stand.drops(), int64_t(0));
 
+    netw::spawn::Record record;
+    REQUIRE(stand.book->take_armed(stand.book->armed_routes()[0], record));
+    REQUIRE_FALSE(stand.core->spawn_books_node(made));
     NETW_CHECK_EQ(int(stand.compat->consume(made, stand.spawner)), int(OK));
-    NETW_CHECK_EQ(stand.log.count("arm"), 1);
+    NETW_CHECK_EQ(stand.book->armed_count(), 0);
     NETW_CHECK_EQ(stand.drops(), int64_t(1));
+
+    memdelete(made);
+}
+
+TEST_CASE(
+    "[Netw][Spawn][Hosted] a node this peer already books is ignored "
+    "rather than given a second identity"
+) {
+    Stand stand;
+    stand.compat->wrap_spawner(stand.spawner);
+
+    Node *made = stand.spawn_through_wrap(Variant("carried"));
+    REQUIRE(made != nullptr);
+    stand.compat->consume(made, stand.spawner);
+
+    NETW_CHECK_EQ(int(stand.compat->consume(made, stand.spawner)), int(OK));
+    NETW_CHECK_EQ(stand.book->armed_count(), 1);
+    NETW_CHECK_EQ(stand.drops(), int64_t(0));
 
     memdelete(made);
 }
@@ -87,7 +105,6 @@ TEST_CASE(
     "record carries what was spawned rather than what the caller kept"
 ) {
     Stand stand;
-    stand.arm_seams(false);
     stand.compat->wrap_spawner(stand.spawner);
 
     Array carried;
@@ -98,9 +115,11 @@ TEST_CASE(
 
     stand.compat->consume(made, stand.spawner);
 
-    const Array armed = stand.log.args("arm");
-    REQUIRE(armed.size() == 4);
-    const Array recorded = armed[3];
+    const PackedInt64Array armed = stand.book->armed_routes();
+    REQUIRE(armed.size() == 1);
+    netw::spawn::Record record;
+    REQUIRE(stand.book->take_armed(armed[0], record));
+    const Array recorded = record.get_custom_data();
     NETW_CHECK_EQ(recorded.size(), 1);
 
     memdelete(made);
@@ -114,7 +133,6 @@ TEST_CASE(
     expected_faults.expect_error("*[NW1020]*", 1);
 
     Stand stand;
-    stand.arm_seams(false);
     stand.compat->wrap_spawner(stand.spawner);
     stand.compat->wrap_spawner(stand.spawner);
 
@@ -123,56 +141,32 @@ TEST_CASE(
     REQUIRE(made != nullptr);
 
     NETW_CHECK_EQ(int(stand.compat->consume(made, stand.spawner)), int(OK));
-    NETW_CHECK_EQ(stand.log.count("arm"), 0);
+    CHECK_FALSE(stand.core->spawn_books_node(made));
     NETW_CHECK_EQ(stand.drops(), int64_t(1));
 
     memdelete(made);
 }
 
 TEST_CASE(
-    "[Netw][Spawn][Hosted] a node this peer already books is ignored "
-    "rather than given a second identity"
-) {
-    Stand stand;
-    stand.arm_seams(true);
-    stand.compat->wrap_spawner(stand.spawner);
-
-    Node *made = stand.spawn_through_wrap(Variant("carried"));
-    REQUIRE(made != nullptr);
-
-    NETW_CHECK_EQ(int(stand.compat->consume(made, stand.spawner)), int(OK));
-    NETW_CHECK_EQ(stand.log.count("arm"), 0);
-    NETW_CHECK_EQ(stand.drops(), int64_t(0));
-
-    memdelete(made);
-}
-
-TEST_CASE(
-    "[Netw][Spawn][Hosted] a registration with no seams to arm through "
+    "[Netw][Spawn][Hosted] a registration with no session to arm through "
     "is refused rather than silently lost"
 ) {
     Stand stand;
-    SpawnerCompat unseamed;
+    SpawnerCompat unseated;
     Node *made = memnew(Node);
 
     NETW_CHECK_EQ(
-        int(unseamed.consume(made, stand.spawner)),
+        int(unseated.consume(made, stand.spawner)),
         int(ERR_UNCONFIGURED)
     );
-
-    unseamed.set_spawn_seams(
-        stand.log.answering("booked", false),
-        stand.log.callable("arm")
-    );
     NETW_CHECK_EQ(
-        int(unseamed.consume(nullptr, stand.spawner)),
+        int(unseated.consume(nullptr, stand.spawner)),
         int(ERR_INVALID_PARAMETER)
     );
     NETW_CHECK_EQ(
-        int(unseamed.consume(made, nullptr)),
+        int(unseated.consume(made, nullptr)),
         int(ERR_INVALID_PARAMETER)
     );
-    NETW_CHECK_EQ(stand.log.count("arm"), 0);
 
     memdelete(made);
 }
@@ -255,7 +249,6 @@ TEST_CASE(
 ) {
     Stand stand;
     const Callable own = stand.spawner->get_spawn_function();
-    stand.arm_seams(false);
     stand.compat->register_spawner(stand.spawner);
 
     NETW_CHECK_EQ(stand.compat->get_roster().size(), 1);

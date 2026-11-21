@@ -10,7 +10,9 @@ namespace Netwkd;
 /// </summary>
 /// <remarks>
 /// Sends three of the four components, and rebuilds the largest one. Any
-/// rotation takes <c>2 + bit_count * 3</c> bits.
+/// rotation takes <c>2 + bit_count * 3</c> bits. A property reads
+/// <see cref="NetwQuantizeQuaternion.BitCount"/> when it is declared, so set it
+/// before.
 /// <code>
 /// var q := NetwQuantizeQuaternion.new().bits(10)
 /// </code>

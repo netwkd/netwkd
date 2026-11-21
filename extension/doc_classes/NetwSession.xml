@@ -113,26 +113,16 @@
 				Leaves the session. The server saves its entity rows first, and stays online if the database refuses a row. The promise resolves with an [enum @GlobalScope.Error] once the peer is down or the save failed. Closing the game window leaves the same way. On a server whose [MultiplayerPeer] can move the server, closing the window tells no client, so the peer promotes one when it can. A server that saves entities loses unsaved changes when its window closes, so it sets [member SceneTree.auto_accept_quit] to [code]false[/code] and quits after [method leave] resolves.
 			</description>
 		</method>
-		<method name="link_stats" qualifiers="const">
-			<return type="Dictionary" />
+		<method name="link_stat" qualifiers="const">
+			<return type="float" />
 			<param index="0" name="peer" type="int" />
+			<param index="1" name="stat" type="int" enum="NetwMultiplayer.LinkStat" />
 			<description>
-				Measured connection quality to [param peer], and what this peer's byte budget sends it.
-				[codeblock lang=text]
-				Dictionary
-				┠╴loss           float   share of the last 32 packets lost
-				┠╴rtt            float   round trip time, in seconds
-				┠╴jitter         float   round trip variation, in seconds
-				┠╴reorders       int     packets that arrived out of order
-				┠╴duplicates     int     packets that arrived twice
-				┠╴mode           String  "good", or "bad" while its budget is cut
-				┠╴budget_bits    int     most bits one packet to this peer may use
-				┠╴budget_bytes   int     bytes it may be sent each tick
-				┠╴sent_bytes     int     bytes charged to it since it joined
-				┠╴debt_bytes     int     bytes it was sent past its budget
-				┖╴deferred_rows  int     rows left waiting by the last tick
+				The measured connection quality [param stat] of [param peer], or what this peer's byte budget sends it.
+				[codeblock]
+				var rtt := session.link_stat(peer, NetwMultiplayer.LINK_STAT_RTT)
 				[/codeblock]
-				Losing packets halves [code]budget_bytes[/code] and [code]budget_bits[/code]. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While [code]debt_bytes[/code] is above zero, volatile properties wait, and retained properties and RPCs still go.
+				Losing packets halves [constant NetwMultiplayer.LINK_STAT_BUDGET_BYTES] and [constant NetwMultiplayer.LINK_STAT_BUDGET_BITS]. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While [constant NetwMultiplayer.LINK_STAT_DEBT_BYTES] is above zero, volatile properties wait, and retained properties and RPCs still go.
 			</description>
 		</method>
 		<method name="pause">
@@ -237,24 +227,15 @@
 			</description>
 		</method>
 		<method name="traffic" qualifiers="const">
-			<return type="Dictionary" />
-			<param index="0" name="peer" type="int" default="0" />
+			<return type="float" />
+			<param index="0" name="peer" type="int" />
+			<param index="1" name="stat" type="int" enum="NetwMultiplayer.Traffic" />
 			<description>
-				What the session sent to [param peer] and received from it over the last second, in bytes a second. [code]0[/code] counts every peer.
-				[codeblock lang=text]
-				Dictionary
-				┠╴sent                Dictionary  bytes a second sent, by cause
-				┃ ┠╴state             float       state and broadcast properties
-				┃ ┠╴input             float       input properties
-				┃ ┠╴calls             float       RPCs, signals and actions
-				┃ ┠╴spawns            float       spawns, despawns, control, scenes and joins
-				┃ ┠╴upkeep            float       prediction acknowledgements and the clock
-				┃ ┖╴headers           float       packet headers, an estimate for the transport
-				┠╴received            Dictionary  the same causes, received
-				┠╴sent_packets        float       packets a second sent
-				┖╴received_packets    float       packets a second received
+				The rate [param stat] the session sent to [param peer] or received from it over the last second. A [param peer] of [code]0[/code] counts every peer.
+				[codeblock]
+				var calls := session.traffic(peer, NetwMultiplayer.TRAFFIC_SENT_CALLS)
 				[/codeblock]
-				Every packet costs [code]headers[/code] before it carries anything, so sending fewer packets saves the most. A local session has no transport, so its [code]headers[/code] count only the session's own packet header. The transport's own keepalive is not counted.
+				Every packet costs [constant NetwMultiplayer.TRAFFIC_SENT_HEADERS] before it carries anything, so sending fewer packets saves the most. A local session has no transport, so its headers count only the session's own packet header. The transport's own keepalive is not counted.
 			</description>
 		</method>
 		<method name="transfer_server">

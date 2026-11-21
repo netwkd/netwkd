@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/repl/set_model.hpp"
 
 #include <algorithm>

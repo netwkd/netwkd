@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/control_record.hpp"
 
 #include "netw/colors.hpp"
@@ -424,15 +426,15 @@ bool read_control_record(
     return true;
 }
 
-Dictionary control_spec_records() {
-    Dictionary out;
-    out["RowControlOpenHead"] = ControlOpenHead::wire.spec_dump();
-    out["RowControlReady"] = ControlReady::wire.spec_dump();
-    out["RowControlReset"] = ControlReset::wire.spec_dump();
-    out["RowControlClose"] = ControlClose::wire.spec_dump();
-    out["RowControlAcceptHead"] = ControlAcceptHead::wire.spec_dump();
-    out["RowControlAcceptStep"] = ControlAcceptStep::wire.spec_dump();
-    return out;
+std::vector<SpecRecord> control_spec_rows() {
+    return {
+        {"RowControlOpenHead", field_specs(ControlOpenHead::wire)},
+        {"RowControlReady", field_specs(ControlReady::wire)},
+        {"RowControlReset", field_specs(ControlReset::wire)},
+        {"RowControlClose", field_specs(ControlClose::wire)},
+        {"RowControlAcceptHead", field_specs(ControlAcceptHead::wire)},
+        {"RowControlAcceptStep", field_specs(ControlAcceptStep::wire)},
+    };
 }
 
 } // namespace netw::wire

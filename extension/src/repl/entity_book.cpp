@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/repl/entity_book.hpp"
 
 namespace netw::repl {

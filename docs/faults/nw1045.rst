@@ -1,0 +1,40 @@
+:github_url: hide
+
+.. _fault_nw1045:
+
+NW1045. A quantizer was changed after a property was declared with it
+=====================================================================
+
+Checked in every build. Reported once for each quantizer.
+
+A declared property fixes the size of its values from its quantizer's
+settings once, when it is declared. Some sends still read the quantizer
+itself. So a later change to the bits, the limits or the centering of
+:ref:`NetwQuantizeScalar <class_NetwQuantizeScalar>`,
+:ref:`NetwQuantizeAngle <class_NetwQuantizeAngle>` or
+:ref:`NetwQuantizeQuaternion <class_NetwQuantizeQuaternion>` can make peers
+read the property wrong. A part of
+:ref:`NetwQuantizeTransform2D <class_NetwQuantizeTransform2D>` or
+:ref:`NetwQuantizeTransform3D <class_NetwQuantizeTransform3D>` is read on
+every send, so changing a part, or setting a part to another quantizer,
+writes values that no longer fit the size the property fixed.
+
+The quantizer is declared, then changed.
+
+.. code-block:: gdscript
+
+    var grid := NetwQuantizeScalar.new().bits(12)
+
+    func _init() -> void:
+        Netw.configure_property(self, "speed").state().quantize(grid)
+        grid.limits(0.0, 64.0)
+
+Set the quantizer's settings before you declare the property.
+
+.. code-block:: gdscript
+
+    func _init() -> void:
+        var grid := NetwQuantizeScalar.new().bits(12).limits(0.0, 64.0)
+        Netw.configure_property(self, "speed").state().quantize(grid)
+
+A call that sets a value the quantizer already has is not a change.

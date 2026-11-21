@@ -9,6 +9,7 @@
 #include "netw/api/predict_slot_engine.hpp"
 #include "netw/api/refusal.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/call_args.hpp"
 #include "netw/colors.hpp"
 #include "netw/decl_sites.hpp"
 #include "netw/game_call.hpp"
@@ -435,13 +436,17 @@ void NetwMultiplayer::action_send_request(
     session::ActionRequest body;
     body.method = p_method;
     body.view_tick = p_view_tick;
-    body.data = gd::var_to_bytes(p_args);
+    body.data = call_args::value_bytes(
+        p_args,
+        String("The action's arguments"),
+        this
+    );
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
             profiler_outgoing,
             profiler_member(
                 route,
-                wire::builtin_channel("ACTION"),
+                wire::CHANNEL_ACTION,
                 node_from_tree_path(p_target_path),
                 p_method
             )
@@ -450,7 +455,7 @@ void NetwMultiplayer::action_send_request(
     plane->send_to(
         destination,
         route,
-        wire::builtin_channel("ACTION"),
+        wire::CHANNEL_ACTION,
         session::frame_write(body),
         true,
         0,

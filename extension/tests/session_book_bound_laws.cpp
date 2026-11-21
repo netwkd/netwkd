@@ -106,7 +106,7 @@ TEST_CASE(
 ) {
     BookStage stage;
     for (int side = -1; side < 1; ++side) {
-        stage.side(side)->attribution_set_armed(true);
+        stage.side(side)->wire().attribution.set_armed(true);
     }
     stage.spawn_and_despawn(1);
     const NetwMultiplayer::BookSizes server_before

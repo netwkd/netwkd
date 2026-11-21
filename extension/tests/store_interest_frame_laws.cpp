@@ -10,7 +10,7 @@
 #include "godot/node.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/liveness_core.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 
 using namespace godot;
 using netw_test::Internals;
@@ -20,7 +20,7 @@ namespace TestNetwStoreInterest {
 using netw::NetwMultiplayer;
 using netw::store::RowAddress;
 using netw::store::Table;
-using netw::store::World;
+using netw::store::Store;
 
 constexpr const char *MARK_ID = "store_interest_mark";
 
@@ -51,13 +51,13 @@ Node *build_mark(const Variant &p_name) {
     return made;
 }
 
-RowAddress row_of_node(const World &p_world, Node *p_node) {
+RowAddress row_of_node(const Store &p_world, Node *p_node) {
     RowAddress found;
     const uint64_t id = uint64_t(p_node->get_instance_id());
     for (uint32_t table = 0; table < p_world.table_count(); ++table) {
         const Table &held = p_world.table(table);
         for (uint32_t row = 0; row < held.row_count(); ++row) {
-            if (held.nodes[row] == id) {
+            if (p_world.pull->residents.node_of(table, row) == id) {
                 found.table = table;
                 found.row = row;
             }
@@ -102,7 +102,7 @@ protected:
 
     Seen seen_by_client(int p_index) const {
         Seen out;
-        const World &world = Internals::store(server());
+        const Store &world = Internals::store(server());
         const RowAddress at = row_of_node(world, mark(p_index));
         const uint32_t peer = world.peer_of(client_id());
         if (!at.valid() || peer == Table::NO_SLOT) {
@@ -118,7 +118,7 @@ protected:
     }
 
     int admitted_to_client() const {
-        const World &world = Internals::store(server());
+        const Store &world = Internals::store(server());
         const uint32_t peer = world.peer_of(client_id());
         if (peer == Table::NO_SLOT) {
             return 0;
@@ -257,7 +257,7 @@ CrowdEvidence &crowd_evidence() {
 class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
     int frame = 0;
     bool done = false;
-    World::InterestWork opened;
+    Store::InterestWork opened;
     int64_t marks_opened = 0;
 
     bool open() {
@@ -286,7 +286,7 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
 
     void joined() {
         CrowdEvidence &seen = crowd_evidence();
-        const World::InterestWork &now
+        const Store::InterestWork &now
             = Internals::store(server()).interest_work;
         seen.join_evaluations = now.evaluations - opened.evaluations;
         seen.join_writes = now.writes - opened.writes;
@@ -298,7 +298,7 @@ class CrowdScenario final : public netw_test::FrameScenario, MarkStand {
 
     void settled() {
         CrowdEvidence &seen = crowd_evidence();
-        const World::InterestWork &now
+        const Store::InterestWork &now
             = Internals::store(server()).interest_work;
         seen.steady_evaluations = now.evaluations - opened.evaluations;
         seen.steady_writes = now.writes - opened.writes;

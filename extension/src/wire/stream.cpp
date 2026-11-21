@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/stream.hpp"
 
 #include <cstring>
@@ -503,6 +505,27 @@ bool ReadStream::raw_span(uint8_t *value, int64_t count) {
     }
     if (count > 0) {
         memcpy(value, input + (bits_read / 8), size_t(count));
+    }
+    bits_read += count * 8;
+    return true;
+}
+
+bool ReadStream::aligned_rest(const uint8_t *&r_bytes, int64_t &r_size) {
+    if (!align_verify()) {
+        return false;
+    }
+    r_bytes = input + (bits_read / 8);
+    r_size = bits_remaining() / 8;
+    return true;
+}
+
+bool ReadStream::skip_bytes(int64_t count) {
+    if (!healthy) {
+        return false;
+    }
+    if (count < 0 || count * 8 > bits_remaining()) {
+        healthy = false;
+        return false;
     }
     bits_read += count * 8;
     return true;

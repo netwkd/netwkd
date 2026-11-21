@@ -1,8 +1,12 @@
 #include "netw/api/server_info.hpp"
 
+#include <cstring>
+
 #include "godot/class_db.hpp"
-#include "godot/utility.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/call_args.hpp"
+#include "netw/fault_book.hpp"
+#include "netw/value_variant.hpp"
 
 using namespace godot;
 
@@ -10,62 +14,126 @@ namespace netw {
 
 namespace {
 
-const char *KEY_MOTD = "motd";
-const char *KEY_VISIBILITY = "visibility";
-const char *KEY_PLAYERS = "players";
-const char *KEY_MAX_PLAYERS = "max_players";
-const char *KEY_GAME_MODE = "game_mode";
-const char *KEY_VERSION = "version";
-const char *KEY_APP_ID = "app_id";
-const char *KEY_IS_LOCAL_LISTENER = "is_local_listener";
-const char *KEY_METADATA = "metadata";
+constexpr uint8_t INFO_VERSION = 1;
+
+void put_text(
+    value::Bytes &r_out,
+    const String &p_text,
+    const char *p_name,
+    NetwMultiplayer *p_session
+) {
+    const CharString utf8 = p_text.utf8();
+    const uint8_t *bytes = reinterpret_cast<const uint8_t *>(utf8.get_data());
+    if (!value::is_exact_text(bytes, utf8.length())) {
+        fault::raise(
+            p_session,
+            NETW_FAULT_UNSENDABLE_VALUE,
+            {String(p_name),
+             String(
+                 "text with a NUL, a byte order mark at its start or a "
+                 "character UTF-8 cannot hold"
+             ),
+             String("text without them")}
+        );
+        value::write_varuint(r_out, 0);
+        return;
+    }
+    value::write_varuint(r_out, uint64_t(utf8.length()));
+    value::write_span(r_out, bytes, utf8.length());
+}
+
+bool take_text(value::Reader &r_reader, String &r_text) {
+    const uint64_t size = r_reader.varuint();
+    const uint8_t *utf8 = r_reader.span(int64_t(size));
+    if (!r_reader.ok || !value::is_exact_text(utf8, int64_t(size))) {
+        return false;
+    }
+    r_text = String::utf8(reinterpret_cast<const char *>(utf8), int(size));
+    return true;
+}
 
 } // namespace
 
 PackedByteArray NetwServerInfo::to_payload(const Ref<NetwServerInfo> &p_info) {
+    return payload_for(p_info, nullptr);
+}
+
+PackedByteArray NetwServerInfo::payload_for(
+    const Ref<NetwServerInfo> &p_info,
+    NetwMultiplayer *p_session
+) {
     if (p_info.is_null()) {
         return PackedByteArray();
     }
-    Dictionary out;
-    out[KEY_MOTD] = p_info->get_motd();
-    out[KEY_PLAYERS] = p_info->get_players();
-    out[KEY_MAX_PLAYERS] = p_info->get_max_players();
-    out[KEY_GAME_MODE] = p_info->get_game_mode();
-    out[KEY_VERSION] = p_info->get_version();
-    out[KEY_APP_ID] = p_info->get_app_id();
-    out[KEY_IS_LOCAL_LISTENER] = p_info->get_is_local_listener();
-    out[KEY_VISIBILITY] = p_info->get_visibility();
-    out[KEY_METADATA] = p_info->get_metadata();
-    return gd::var_to_bytes(out);
+    value::Bytes out;
+    out.push_back(INFO_VERSION);
+    put_text(out, p_info->get_motd(), "The server info's motd", p_session);
+    value::write_svarint(out, p_info->get_players());
+    value::write_svarint(out, p_info->get_max_players());
+    put_text(
+        out,
+        p_info->get_game_mode(),
+        "The server info's game_mode",
+        p_session
+    );
+    put_text(
+        out,
+        p_info->get_version(),
+        "The server info's version",
+        p_session
+    );
+    put_text(out, p_info->get_app_id(), "The server info's app_id", p_session);
+    out.push_back(p_info->get_is_local_listener() ? 1 : 0);
+    value::write_svarint(out, int64_t(p_info->get_visibility()));
+    const PackedByteArray metadata = call_args::value_bytes(
+        p_info->get_metadata(),
+        String("The server info's metadata"),
+        p_session
+    );
+    value::write_span(out, metadata.ptr(), metadata.size());
+    PackedByteArray bytes;
+    bytes.resize(int64_t(out.size()));
+    std::memcpy(bytes.ptrw(), out.ptr(), out.size());
+    return bytes;
 }
 
 Ref<NetwServerInfo> NetwServerInfo::from_payload(
     const PackedByteArray &p_bytes
 ) {
-    if (p_bytes.is_empty()) {
+    value::Reader reader(p_bytes.ptr(), p_bytes.size());
+    const uint8_t *version = reader.span(1);
+    if (!reader.ok || *version != INFO_VERSION) {
         return Ref<NetwServerInfo>();
     }
-    const Variant decoded = gd::bytes_to_var(p_bytes);
-    if (decoded.get_type() != Variant::DICTIONARY) {
+    String motd;
+    String game_mode;
+    String game_version;
+    String app_id;
+    const bool texts = take_text(reader, motd);
+    const int64_t players = reader.svarint();
+    const int64_t max_players = reader.svarint();
+    const bool named = texts && take_text(reader, game_mode)
+        && take_text(reader, game_version) && take_text(reader, app_id);
+    const uint8_t *local = reader.span(1);
+    const int64_t visibility = reader.svarint();
+    Variant metadata;
+    if (!named || !reader.ok || *local > 1
+        || value::decode(reader.at, reader.left(), metadata) != reader.left()) {
         return Ref<NetwServerInfo>();
     }
-    const Dictionary row = decoded;
     Ref<NetwServerInfo> info;
     info.instantiate();
-    info->set_motd(row.get(KEY_MOTD, String()));
-    info->set_visibility(
-        NetwServerInfo::Visibility(int64_t(row.get(KEY_VISIBILITY, int64_t(0))))
-    );
-    info->set_players(int64_t(row.get(KEY_PLAYERS, 0)));
-    info->set_max_players(int64_t(row.get(KEY_MAX_PLAYERS, 0)));
-    info->set_game_mode(StringName(row.get(KEY_GAME_MODE, String())));
-    info->set_version(row.get(KEY_VERSION, String()));
-    info->set_app_id(StringName(row.get(KEY_APP_ID, String())));
-    info->set_is_local_listener(bool(row.get(KEY_IS_LOCAL_LISTENER, false)));
-    const Variant carried = row.get(KEY_METADATA, Dictionary());
+    info->set_motd(motd);
+    info->set_visibility(NetwServerInfo::Visibility(visibility));
+    info->set_players(players);
+    info->set_max_players(max_players);
+    info->set_game_mode(StringName(game_mode));
+    info->set_version(game_version);
+    info->set_app_id(StringName(app_id));
+    info->set_is_local_listener(*local == 1);
     info->set_metadata(
-        carried.get_type() == Variant::DICTIONARY ? Dictionary(carried)
-                                                  : Dictionary()
+        metadata.get_type() == Variant::DICTIONARY ? Dictionary(metadata)
+                                                   : Dictionary()
     );
     return info;
 }

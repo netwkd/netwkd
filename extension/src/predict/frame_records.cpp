@@ -38,11 +38,12 @@ bool CommandFrameRecord::open(
 bool CommandFrameRecord::decode(
     const SchemaRecord &p_schema,
     const PackedByteArray &p_bytes,
-    CommandFrameRecord &r_record
+    CommandFrameRecord &r_record,
+    int *r_mistyped
 ) {
     CommandFrameRecord staged;
     if (!open(p_schema, staged)
-        || !decode_command(p_bytes, staged.plan, staged.frame)) {
+        || !decode_command(p_bytes, staged.plan, staged.frame, r_mistyped)) {
         return false;
     }
     r_record = staged;
@@ -103,7 +104,10 @@ bool CommandFrameRecord::append_transition(
     return true;
 }
 
-bool CommandFrameRecord::append_values(const LocalVector<Variant> &p_values) {
+bool CommandFrameRecord::append_values(
+    const LocalVector<Variant> &p_values,
+    NetwMultiplayer *p_session
+) {
     if (!wire::is_scalar_schema(schema, plan)
         || int(p_values.size()) != schema.column_count()) {
         return false;
@@ -115,7 +119,8 @@ bool CommandFrameRecord::append_values(const LocalVector<Variant> &p_values) {
                 plan.column(uint32_t(at)),
                 uint32_t(at),
                 p_values[uint32_t(at)],
-                row
+                row,
+                p_session
             )) {
             return false;
         }

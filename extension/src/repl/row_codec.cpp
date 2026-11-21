@@ -185,8 +185,8 @@ bool write_row_columns(
         }
         const wire::ColumnPlan &slot = p_plan.column(index);
         if (slot.variable) {
-            godot::Variant value = p_row.read_value(index);
-            if (!wire::carry_value(p_stream, value)) {
+            wire::TailRef tail = p_row.tail(index);
+            if (!wire::carry_tail(p_stream, slot, tail)) {
                 return false;
             }
             continue;
@@ -224,9 +224,9 @@ bool read_row_columns(
         }
         const wire::ColumnPlan &slot = p_plan.column(index);
         if (slot.variable) {
-            godot::Variant value;
-            if (!wire::carry_value(p_stream, value)
-                || !r_row.write_value(index, value)) {
+            wire::TailRef tail;
+            if (!wire::carry_tail(p_stream, slot, tail)
+                || !r_row.write_tail(index, tail)) {
                 return false;
             }
             continue;

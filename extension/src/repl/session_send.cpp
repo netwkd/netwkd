@@ -6,8 +6,9 @@
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
 #include "netw/stage.hpp"
+#include "netw/store/array.hpp"
 #include "netw/store/schedule.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 #include "netw/wire/frame.hpp"
 
 namespace netw::repl {
@@ -303,11 +304,8 @@ void SessionSend::record_windows(int64_t p_base_tick) {
             if (ring == nullptr || !ring->valid()) {
                 continue;
             }
-            image.assign(
-                ring->plan(),
-                table.codes_of(row),
-                table.carried_of(row)
-            );
+            image
+                .assign(ring->plan(), table.codes_of(row), table.tails_of(row));
             const int64_t tick = table.frame_ticks[row] >= 0
                 ? table.frame_ticks[row]
                 : p_base_tick;
@@ -329,7 +327,7 @@ bool SessionSend::encode(
     store::Table &table = world->table(p_table);
     const store::PeerRows &rows = table.peers[p_peer];
     const wire::WirePlan &plan = table.plan;
-    image.assign(plan, table.codes_of(p_row), table.carried_of(p_row));
+    image.assign(plan, table.codes_of(p_row), table.tails_of(p_row));
     r_send = RowSend();
     r_send.route = table.routes[p_row];
     r_send.comp = table.ordinals[p_row];
@@ -393,9 +391,9 @@ bool SessionSend::encode(
             baseline.assign(
                 plan,
                 rows.baseline.ptr() + uint64_t(p_row) * table.words,
-                table.carried != 0 ? rows.baseline_carried.ptr()
-                        + uint64_t(p_row) * table.carried
-                                   : nullptr
+                table.tail_columns != 0 ? rows.baseline_tails.ptr()
+                        + uint64_t(p_row) * table.tail_columns
+                                        : nullptr
             );
         }
         header.mask = header.absolute()
@@ -436,7 +434,7 @@ void SessionSend::commit_send(
         image.assign(
             table.plan,
             table.codes_of(p_send.row),
-            table.carried_of(p_send.row)
+            table.tails_of(p_send.row)
         );
         world->mint(at, p_peer, image, p_send.form == RowForm::REPAIR);
     }
@@ -740,7 +738,7 @@ void SessionSend::offer_nodeless(
     int64_t p_tick,
     uint32_t &r_order
 ) {
-    store::Arrays &arrays = world->arrays;
+    store::Arrays &arrays = *world->arrays;
     if (table_picks.size() < arrays.table_count()) {
         table_picks.resize(arrays.table_count());
     }
@@ -801,7 +799,7 @@ bool SessionSend::take_nodeless(
     PeerAccount &r_account
 ) {
     (void)p_peer;
-    store::Arrays &arrays = world->arrays;
+    store::Arrays &arrays = *world->arrays;
     const store::ArrayTable &held = arrays.table_at(p_held.table);
     LocalVector<uint32_t> &picks = table_picks[p_held.table];
     const int64_t price = (held.row_bits + 7) / 8
@@ -821,7 +819,7 @@ void SessionSend::emit_nodeless(
     PeerAccount &r_account,
     SessionResult &r_out
 ) {
-    store::Arrays &arrays = world->arrays;
+    store::Arrays &arrays = *world->arrays;
     if (!tables_published) {
         return;
     }

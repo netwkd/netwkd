@@ -15,22 +15,13 @@ class NetwMultiplayer;
 
 namespace netw::call_args {
 
-enum RawType {
-    RAW_FALLBACK = 0,
-    RAW_BOOL = 1,
-    RAW_INT = 2,
-    RAW_VECTOR2 = 3,
-    RAW_FLOAT = 4,
-    RAW_VECTOR3 = 5,
-};
-
 enum SlotKind {
     KIND_RAW = 0,
     KIND_QUANTIZED = 1,
     KIND_NODE_REF = 2,
 };
 
-constexpr int FALLBACK_CAP = 65535;
+constexpr int VALUE_CAP = 65535;
 constexpr int COUNT_BYTES = 2;
 
 struct NodeRef {
@@ -49,24 +40,25 @@ Slot of_value(const godot::Variant &value);
 
 Slot of_node(int64_t route, int64_t comp, const godot::String &path);
 
-bool value_write(
-    wire::WriteStream &stream,
+godot::PackedByteArray value_bytes(
     const godot::Variant &value,
-    const godot::Ref<NetwQuantize> &quantizer
+    const godot::String &name,
+    NetwMultiplayer *session
 );
 
-bool value_read(
-    wire::ReadStream &stream,
-    godot::Variant::Type type,
-    const godot::Ref<NetwQuantize> &quantizer,
-    godot::Variant &r_value
+void report_unsendable(
+    NetwMultiplayer *session,
+    const godot::String &name,
+    const godot::Variant &value,
+    godot::Error refusal
 );
 
 bool write(
     wire::WriteStream &stream,
     const godot::LocalVector<Slot> &slots,
     const godot::Array &quantizers,
-    const godot::Array &types
+    const godot::Array &types,
+    NetwMultiplayer *session
 );
 
 bool read(
@@ -81,7 +73,7 @@ bool values_write(
     const godot::Array &values,
     const godot::Array &quantizers,
     const godot::Array &types,
-    NetwMultiplayer *session = nullptr
+    NetwMultiplayer *session
 );
 
 bool values_read(

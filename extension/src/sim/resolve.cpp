@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/sim/resolve.hpp"
 
 namespace netw::sim {

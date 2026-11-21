@@ -4,7 +4,7 @@
 		[NetwQuantize] for a normalized [Quaternion].
 	</brief_description>
 	<description>
-		Sends three of the four components, and rebuilds the largest one. Any rotation takes [code]2 + bit_count * 3[/code] bits.
+		Sends three of the four components, and rebuilds the largest one. Any rotation takes [code]2 + bit_count * 3[/code] bits. A property reads [member bit_count] when it is declared, so set it before.
 		[codeblock]
 		var q := NetwQuantizeQuaternion.new().bits(10)
 		[/codeblock]

@@ -17,6 +17,7 @@
 #include "netw/api/interpolate.hpp"
 #include "netw/display/channel.hpp"
 #include "netw/display/decl.hpp"
+#include "netw/display/decl_param.hpp"
 #include "netw/display/history.hpp"
 #include "netw/display/playhead.hpp"
 #include "netw/display/pump.hpp"
@@ -307,7 +308,11 @@ struct InterpHarness {
         const godot::Vector2 &p_initial
     ) {
         build_runtime(netw::display::PUMP_CHASE);
-        config.set_param(netw::display::PARAM_LIVE_SMOOTH_TIME, p_smooth_time);
+        netw::display::set_param(
+            config,
+            netw::display::PARAM_LIVE_SMOOTH_TIME,
+            p_smooth_time
+        );
         runtime->set_config(config);
         body = memnew(godot::Node2D);
         body->set_position(p_initial);

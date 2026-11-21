@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/repl/watch_book.hpp"
 
 #include "netw/colors.hpp"
@@ -9,22 +11,8 @@ using namespace godot;
 
 namespace {
 
-// A container the game keeps mutating would alias the stored copy, so the poll
-// would compare it against itself and never see it change again. The packed
-// families are values and need no copy.
-Variant stable_copy(const Variant &p_value) {
-    switch (p_value.get_type()) {
-        case Variant::ARRAY:
-            return Array(p_value).duplicate(true);
-        case Variant::DICTIONARY:
-            return Dictionary(p_value).duplicate(true);
-        default:
-            return p_value;
-    }
-}
-
-bool readable_at(const Array &p_readable, int64_t p_index) {
-    return p_index >= p_readable.size() || bool(p_readable[p_index]);
+bool readable_at(const LocalVector<uint8_t> &p_readable, uint32_t p_index) {
+    return p_index >= p_readable.size() || p_readable[p_index] != 0;
 }
 
 } // namespace
@@ -41,32 +29,27 @@ const WatchBook::Stream *WatchBook::stream_for(int64_t p_key) const {
 
 void WatchBook::poll(
     int64_t p_key,
-    const Array &p_values,
-    const Array &p_readable
+    const LocalVector<wire::TailRef> &p_values,
+    const LocalVector<uint8_t> &p_readable
 ) {
     NETW_ZONE_LEAF("Watch poll", colors::WIRE, profile::SUBSYSTEM_WIRE);
     Stream &stream = streams[p_key];
     if (!stream.inited) {
         stream.change_counter = 1;
-        for (int64_t i = 0; i < p_values.size(); ++i) {
+        for (uint32_t i = 0; i < p_values.size(); ++i) {
             const bool ok = readable_at(p_readable, i);
-            stream.values.push_back(ok ? stable_copy(p_values[i]) : Variant());
+            stream.values.push_back(ok ? p_values[i] : wire::TailRef());
             stream.stamps.push_back(ok ? 1 : 0);
         }
         stream.inited = true;
         return;
     }
-    for (int64_t i = 0; i < p_values.size() && i < stream.values.size(); ++i) {
-        if (!readable_at(p_readable, i)) {
-            continue;
-        }
-        const Variant current = p_values[i];
-        const Variant previous = stream.values[i];
-        if (current.get_type() == previous.get_type() && current == previous) {
+    for (uint32_t i = 0; i < p_values.size() && i < stream.values.size(); ++i) {
+        if (!readable_at(p_readable, i) || p_values[i] == stream.values[i]) {
             continue;
         }
         stream.change_counter += 1;
-        stream.values[i] = stable_copy(current);
+        stream.values[i] = p_values[i];
         stream.stamps[i] = stream.change_counter;
     }
 }
@@ -75,7 +58,7 @@ void WatchBook::mask_for(
     int64_t p_key,
     int64_t p_peer,
     uint64_t &r_mask,
-    Array &r_values
+    LocalVector<wire::TailRef> &r_values
 ) const {
     r_mask = 0;
     r_values.clear();
@@ -90,7 +73,7 @@ void WatchBook::mask_for(
     for (uint32_t i = 0; i < stream->stamps.size(); ++i) {
         if (stream->stamps[i] > baseline) {
             r_mask |= uint64_t(1) << i;
-            r_values.push_back(stream->values[int64_t(i)]);
+            r_values.push_back(stream->values[i]);
         }
     }
 }
@@ -121,7 +104,8 @@ void WatchBook::clear_peer(int64_t p_peer) {
 
 void WatchBook::retain_baselines(
     int64_t p_key,
-    const PackedInt32Array &p_recipients
+    const int32_t *p_recipients,
+    int64_t p_count
 ) {
     Stream *stream = stream_for(p_key);
     if (stream == nullptr) {
@@ -130,7 +114,7 @@ void WatchBook::retain_baselines(
     LocalVector<int64_t> doomed;
     for (const KeyValue<int64_t, int64_t> &entry : stream->baselines) {
         bool kept = false;
-        for (int64_t i = 0; i < p_recipients.size(); ++i) {
+        for (int64_t i = 0; i < p_count; ++i) {
             if (int64_t(p_recipients[i]) == entry.key) {
                 kept = true;
                 break;

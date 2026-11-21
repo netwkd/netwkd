@@ -19,7 +19,7 @@ NetwQuantizeScalar
 Description
 -----------
 
-Values between :ref:`min_limit<class_NetwQuantizeScalar_property_min_limit>` and :ref:`max_limit<class_NetwQuantizeScalar_property_max_limit>` are rounded to :ref:`resolution_step<class_NetwQuantizeScalar_property_resolution_step>`. Set the precision with :ref:`bits()<class_NetwQuantizeScalar_method_bits>` or with :ref:`step()<class_NetwQuantizeScalar_method_step>`.
+Values between :ref:`min_limit<class_NetwQuantizeScalar_property_min_limit>` and :ref:`max_limit<class_NetwQuantizeScalar_property_max_limit>` are rounded to :ref:`resolution_step<class_NetwQuantizeScalar_property_resolution_step>`. Set the precision with :ref:`bits()<class_NetwQuantizeScalar_method_bits>` or with :ref:`step()<class_NetwQuantizeScalar_method_step>`. A property reads these settings when it is declared, so set them before.
 
 ::
 

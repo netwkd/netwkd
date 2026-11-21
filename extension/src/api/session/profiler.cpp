@@ -22,6 +22,23 @@ const StringName &bandwidth_profiler() {
     return name;
 }
 
+void traffic_flat(
+    const wire::TrafficMeter &p_meter,
+    int64_t p_peer,
+    Array &r_out
+) {
+    constexpr int FLAT_SIZE = wire::TrafficMeter::FLAT_SIZE;
+    const wire::TrafficMeter::Rate rate = p_meter.rate_of(p_peer);
+
+    r_out.resize(FLAT_SIZE);
+    for (int cause = 0; cause <= wire::CAUSE_COUNT; ++cause) {
+        r_out[cause] = rate.sent[cause];
+        r_out[wire::CAUSE_COUNT + 1 + cause] = rate.received[cause];
+    }
+    r_out[FLAT_SIZE - 2] = rate.sent_packets;
+    r_out[FLAT_SIZE - 1] = rate.received_packets;
+}
+
 String set_label(const repl::PropertyBinding *p_binding, int64_t p_record) {
     const String role = p_record == repl::PropertySet::RECORD_INPUT
         ? String(" input")
@@ -51,16 +68,15 @@ String member_label(
     const wire::ChannelDecl *p_channel,
     const StringName &p_member
 ) {
-    const StringName name
-        = p_channel != nullptr ? p_channel->name : StringName();
+    const int id = p_channel != nullptr ? p_channel->id : -1;
     const String member = String(p_member);
-    if (name == StringName("CALL")) {
+    if (id == wire::CHANNEL_CALL) {
         return p_path + String(".") + member + String("()");
     }
-    if (name == StringName("SIGNAL")) {
+    if (id == wire::CHANNEL_SIGNAL) {
         return p_path + String(".") + member + String(" signal");
     }
-    if (name == StringName("ACTION")) {
+    if (id == wire::CHANNEL_ACTION) {
         return p_path + String(".") + member + String(" action");
     }
     return p_path + String(":") + member;
@@ -91,7 +107,7 @@ void NetwMultiplayer::profiler_poll() {
         gd::debugger_profiling(sync)
     );
     if (network_profiler.active() && network_profiler.row_count() == 0) {
-        network_profiler.prepare(channels);
+        network_profiler.prepare(world.wire.channels);
     }
     profiler_bandwidth = gd::debugger_profiling(bandwidth_profiler());
     if (profiler_bandwidth && profiler_bandwidth_in.is_empty()) {
@@ -134,7 +150,7 @@ void NetwMultiplayer::profiler_publish() {
     const uint64_t now = Time::get_singleton()->get_ticks_msec();
     if (now - profiler_last_traffic >= TRAFFIC_INTERVAL_MSEC) {
         profiler_last_traffic = now;
-        traffic.read_flat(0, profiler_traffic_payload);
+        traffic_flat(world.wire.traffic, 0, profiler_traffic_payload);
         gd::debugger_send("netw:traffic", profiler_traffic_payload);
     }
     if (now - profiler_last_publish < 100) {
@@ -198,7 +214,7 @@ uint32_t NetwMultiplayer::profiler_member(
     }
     profiler_watch_node(p_node);
     const wire::ChannelDecl *channel
-        = channels.find_channel(uint8_t(p_channel));
+        = world.wire.channels.find_channel(uint8_t(p_channel));
     return network_profiler.admit(
         key,
         member_label(profiler_path(p_node), channel, p_member)
@@ -257,7 +273,7 @@ uint32_t NetwMultiplayer::profiler_frame_subject(
         return network_profiler.aggregate(uint8_t(p_channel));
     }
     const wire::ChannelDecl *channel
-        = channels.find_channel(uint8_t(p_channel));
+        = world.wire.channels.find_channel(uint8_t(p_channel));
     const String words
         = wire::NetworkProfiler::channel_words(channel, p_channel);
     String label;
@@ -287,12 +303,7 @@ uint32_t NetwMultiplayer::profiler_synchronizer(
         || !network_profiler.records_sync()) {
         return subject;
     }
-    return profiler_frame_subject(
-        p_route,
-        0,
-        wire::builtin_channel("SYNC"),
-        String()
-    );
+    return profiler_frame_subject(p_route, 0, wire::CHANNEL_SYNC, String());
 }
 
 } // namespace netw

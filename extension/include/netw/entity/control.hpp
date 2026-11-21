@@ -138,21 +138,6 @@ public:
     static godot::StringName write_book_key();
     static godot::StringName emit_book_key();
 
-    static void declare_policy(
-        godot::Object *p_script,
-        const godot::StringName &p_name,
-        int64_t p_policy,
-        bool p_is_signal
-    );
-
-    static bool script_admits(
-        godot::Object *p_node,
-        const godot::StringName &p_name,
-        bool p_is_signal,
-        int64_t p_sender,
-        int64_t p_controller
-    );
-
     static int64_t public_peer(int64_t p_controller) {
         return p_controller == SERVER ? SERVER_PEER : p_controller;
     }

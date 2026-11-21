@@ -8,14 +8,18 @@
 #include "godot/local_vector.hpp"
 #include "godot/node.hpp"
 #include "godot/variant.hpp"
+#include "netw/clock.hpp"
 #include "netw/diag/sketch.hpp"
 #include "netw/diag/space.hpp"
 
 namespace netw {
 
-namespace session {
-struct Books;
-} // namespace session
+class NetwEntityRecord;
+class NetwPredictionEngine;
+
+namespace store {
+class Store;
+} // namespace store
 
 namespace display {
 class Channel;
@@ -28,6 +32,8 @@ struct InterpSource {
     int64_t route = 0;
     display::Runtime *runtime = nullptr;
     godot::Node *owner = nullptr;
+    const NetwEntityRecord *record = nullptr;
+    bool controlled_here = false;
 };
 
 enum TimelinePhase : int {
@@ -156,7 +162,12 @@ public:
     uint64_t part_walks = 0;
 #endif
 
-    void sample(const session::Books &p_books);
+    void sample(
+        const Clock &p_clock,
+        const Clock::Reading &p_now,
+        const store::Store &p_store,
+        NetwPredictionEngine *p_prediction
+    );
     const godot::LocalVector<TimelineRow> &rows() const {
         return sampled;
     }
@@ -236,15 +247,16 @@ private:
     void resolve_heading(
         Seen &r_entry,
         const display::Channel &p_pose,
-        const session::Books &p_books
+        const store::Store &p_store
     );
     void read(
-        const session::Books &p_books,
+        const store::Store &p_store,
+        NetwPredictionEngine *p_prediction,
         const Candidate &p_candidate,
         const Now &p_now
     );
     void read_remote(
-        const session::Books &p_books,
+        const store::Store &p_store,
         Seen &r_entry,
         display::Runtime &p_runtime,
         godot::Node *p_frame,
@@ -252,15 +264,17 @@ private:
         const Now &p_now
     );
     void read_forecast(
-        const session::Books &p_books,
+        const store::Store &p_store,
+        NetwPredictionEngine *p_prediction,
         Seen &r_entry,
         display::Runtime &p_runtime,
+        const NetwEntityRecord *p_record,
         godot::Node *p_frame,
         TimelineRow &r_row,
         const Now &p_now
     );
     void hold_marks(
-        const session::Books &p_books,
+        const store::Store &p_store,
         const Seen &p_entry,
         godot::Node *p_frame,
         uint32_t p_count,

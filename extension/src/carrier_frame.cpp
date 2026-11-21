@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/carrier_frame.hpp"
 
 #include "netw/log.hpp"
@@ -161,15 +163,6 @@ NetwCarrierFrame NetwCarrierFrame::read(const PackedByteArray &p_packet) {
     }
     out.tick = head.base_tick == 0 ? int64_t(-1) : int64_t(head.base_tick) - 1;
     out.payload_offset = stream.bit_length() / 8;
-    return out;
-}
-
-Dictionary NetwCarrierFrame::spec_records() {
-    Dictionary out;
-    out["DatagramReliable"] = DatagramHead::reliable_wire.spec_dump();
-    out["DatagramUnreliable"] = DatagramHead::unreliable_wire.spec_dump();
-    out["DatagramAcked"] = DatagramHead::acked_wire.spec_dump();
-    out["DatagramAckedHeld"] = DatagramHead::acked_wire.spec_dump();
     return out;
 }
 

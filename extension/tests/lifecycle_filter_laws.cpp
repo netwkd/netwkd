@@ -100,14 +100,15 @@ Node3D *plain_node(Node *p_parent, const char *p_name) {
     return made;
 }
 
-int64_t frames_in(NetwMultiplayer *p_api, int64_t p_from, const char *p_name) {
+int64_t frames_in(
+    NetwMultiplayer *p_api,
+    int64_t p_from,
+    netw::wire::Channel p_channel
+) {
     const Dictionary rows
         = p_api->attribution_snapshot()["frames_in_by_channel"];
     const Dictionary channels = rows.get(p_from, Dictionary());
-    return int64_t(channels.get(
-        int64_t(netw::wire::builtin_channel(StringName(p_name))),
-        0
-    ));
+    return int64_t(channels.get(int64_t(p_channel), 0));
 }
 
 int64_t counter_of(NetwMultiplayer *p_api, const char *p_name) {
@@ -241,7 +242,8 @@ TEST_CASE(
     const int64_t session_peer = stage.rig.peer_id(-1);
     Node *seen = stage.rig.route_node(stage.crate, 1);
     REQUIRE(seen != nullptr);
-    const int64_t observed = frames_in(observer, session_peer, "DESPAWN");
+    const int64_t observed
+        = frames_in(observer, session_peer, netw::wire::CHANNEL_DESPAWN);
     stage.deny(NetwLifecycleRequest::KIND_DESPAWN, "not yours");
 
     stage.author_despawns();
@@ -257,7 +259,11 @@ TEST_CASE(
     }
     const bool untouched = stage.rig.route_node(stage.crate, 1) == seen;
     CHECK(untouched);
-    NETW_CHECK_EQ(frames_in(observer, session_peer, "DESPAWN") - observed, 0);
+    NETW_CHECK_EQ(
+        frames_in(observer, session_peer, netw::wire::CHANNEL_DESPAWN)
+            - observed,
+        0
+    );
 }
 
 TEST_CASE(

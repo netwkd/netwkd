@@ -7,7 +7,6 @@
 #include "godot/node.hpp"
 #include "godot/ref_counted.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/entity.hpp"
 #include "netw/display/channel.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/display/playhead.hpp"
@@ -19,7 +18,7 @@ namespace netw::display {
 
 class Runtime {
 private:
-    ObjectPort entity_port;
+    godot::RID bound_entity;
     ObjectPort owner_port;
 
     int64_t route = 0;
@@ -57,9 +56,11 @@ public:
         return bytes;
     }
 
-    void bind(NetwEntity *p_entity, godot::Node *p_owner);
-    godot::Ref<NetwEntity> entity();
-    godot::RID entity_rid();
+    void bind(const godot::RID &p_entity, godot::Node *p_owner);
+    void rekey(const godot::RID &p_entity);
+    godot::RID entity_rid() const {
+        return bound_entity;
+    }
     godot::Node *owner();
 
     const godot::LocalVector<Channel *> &channels() const {
@@ -87,7 +88,7 @@ public:
     const History *history_of(const godot::StringName &p_track) const;
     godot::Variant track_stat(
         const godot::StringName &p_track,
-        const godot::StringName &p_stat
+        int p_stat
     ) const;
 
     void set_route(int64_t p_route) {

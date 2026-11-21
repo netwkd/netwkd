@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/auth_protocol.hpp"
 
 using namespace godot;

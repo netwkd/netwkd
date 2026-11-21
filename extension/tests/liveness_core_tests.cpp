@@ -1,6 +1,8 @@
 
 #include "support/netw_test.h"
 
+#include <memory>
+
 #include "netw/entity/ids.hpp"
 #include "netw/liveness_core.hpp"
 #include "support/netw_call_log.h"
@@ -10,14 +12,13 @@ namespace TestNetwLivenessCore {
 using namespace godot;
 using netw::NetwLivenessCore;
 using netw_test::CallLog;
+using Core = std::unique_ptr<NetwLivenessCore>;
 
-Ref<NetwLivenessCore> make_core() {
-    Ref<NetwLivenessCore> core;
-    core.instantiate();
-    return core;
+Core make_core() {
+    return std::make_unique<NetwLivenessCore>();
 }
 
-RID spawn(const Ref<NetwLivenessCore> &core, int *out_route) {
+RID spawn(const Core &core, int *out_route) {
     const RID entity = core->entity_create();
     const int route = core->reserve_route();
     core->bind_route(entity, route);
@@ -28,7 +29,7 @@ RID spawn(const Ref<NetwLivenessCore> &core, int *out_route) {
 }
 
 TEST_CASE("[Netw][Liveness][Hosted] L1 routes are monotonic and never repeat") {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     int previous = 0;
     for (int i = 0; i < 256; i++) {
@@ -44,7 +45,7 @@ TEST_CASE("[Netw][Liveness][Hosted] L1 routes are monotonic and never repeat") {
 }
 
 TEST_CASE("[Netw][Liveness][Hosted] L2 set_state moves forward only") {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     const RID entity = spawn(core, nullptr);
 
     CHECK(core->state_of(entity) == NetwLivenessCore::STATE_LIVE);
@@ -92,7 +93,7 @@ TEST_CASE("[Netw][Liveness][Hosted] L2 set_state moves forward only") {
 TEST_CASE(
     "[Netw][Liveness][Hosted] L3 a dead route stays dead for the session"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
 
@@ -122,7 +123,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L4 the route bridge agrees in both "
     "directions"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     RID entities[16];
     int routes[16];
@@ -158,7 +159,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L5 a revival is a new epoch on the same "
     "record"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
     NETW_CHECK_EQ(core->epoch_of(entity), 0);
@@ -200,7 +201,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L15 an entity bound to a second route "
     "leaves its first one, so one entity answers to one route"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int first = 0;
     const RID entity = spawn(core, &first);
     const int second = core->reserve_route();
@@ -230,7 +231,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L11 a route never renames, alive or "
     "tombstoned"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID holder = spawn(core, &route);
     const RID stranger = core->entity_create();
@@ -269,7 +270,7 @@ TEST_CASE(
 TEST_CASE(
     "[Netw][Liveness][Hosted] L12 the epoch moves on one edge and by one"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
 
@@ -319,7 +320,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L13 hide_route is the only door into "
     "absence and live is the only door in"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
 
@@ -369,7 +370,7 @@ TEST_CASE(
 TEST_CASE(
     "[Netw][Liveness][Hosted] L14 a return from absence is the same life"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
     CHECK(core->hide_route(route));
@@ -378,6 +379,13 @@ TEST_CASE(
         CHECK(core->bind_route(entity, route));
         CHECK(core->route_state(route) == NetwLivenessCore::STATE_LIVE);
         NETW_CHECK_EQ(core->epoch_of(entity), 0);
+        CHECK(core->rid_from_route(route) == entity);
+    }
+
+    SUBCASE("a rebuilt handle rekeyed onto the record leaves none behind") {
+        const RID rebuilt = core->entity_create();
+        CHECK(core->rekey(rebuilt, entity));
+        CHECK_FALSE(core->entity_is_valid(rebuilt));
         CHECK(core->rid_from_route(route) == entity);
     }
 
@@ -416,7 +424,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] live_routes is sorted and holds only live "
     "routes"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     RID entities[8];
     int routes[8];
@@ -440,7 +448,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L6 the bulk door mints an identity per "
     "route and lands on one already standing"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     PackedInt64Array routes;
     for (int i = 0; i < 3; i++) {
@@ -498,7 +506,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L7 a wait is answered once, by the binding "
     "that made its route live"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     CallLog log;
     const int route = core->reserve_route() + 1;
 
@@ -550,7 +558,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L8 a wait expires against the counter it "
     "was armed on"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     CallLog log;
     const int route = core->reserve_route() + 1;
 
@@ -589,7 +597,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L9 one expiry does not take its route's "
     "other waits with it"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     CallLog log;
     const int route = core->reserve_route() + 1;
 
@@ -635,7 +643,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] L10 a wait armed on a clock ignores the "
     "frame counter"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     CallLog log;
     const int route = core->reserve_route() + 1;
 
@@ -670,7 +678,7 @@ TEST_CASE(
 }
 
 TEST_CASE("[Netw][Liveness][Hosted] clear releases the session") {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
     int route = 0;
     const RID entity = spawn(core, &route);
 
@@ -699,7 +707,7 @@ TEST_CASE(
     "different questions"
 ) {
     const RID loose = netw::entity::mint();
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     CHECK(netw::entity::minted(loose));
     CHECK_FALSE(core->entity_is_valid(loose));
@@ -723,7 +731,7 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] M2 a handle the mint never issued cannot "
     "open a record"
 ) {
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     CHECK_FALSE(core->adopt(RID()));
     CHECK_FALSE(core->entity_is_valid(RID()));
@@ -739,8 +747,8 @@ TEST_CASE(
     "[Netw][Liveness][Hosted] M3 two planes never see each other's "
     "entities, and a released handle is never issued again"
 ) {
-    Ref<NetwLivenessCore> a = make_core();
-    Ref<NetwLivenessCore> b = make_core();
+    Core a = make_core();
+    Core b = make_core();
 
     const RID from_a = a->entity_create();
     const RID from_b = b->entity_create();
@@ -763,7 +771,7 @@ TEST_CASE(
     "adopted, routed or not"
 ) {
     const int before = netw::entity::outstanding();
-    Ref<NetwLivenessCore> core = make_core();
+    Core core = make_core();
 
     const RID routed = core->entity_create();
     core->entity_create();
@@ -783,8 +791,8 @@ TEST_CASE(
     const RID carried = netw::entity::mint();
     NETW_CHECK_EQ(netw::entity::holders(carried), 1);
 
-    Ref<NetwLivenessCore> a = make_core();
-    Ref<NetwLivenessCore> b = make_core();
+    Core a = make_core();
+    Core b = make_core();
     CHECK(a->adopt(carried));
     CHECK(b->adopt(carried));
     NETW_CHECK_EQ(netw::entity::holders(carried), 3);
@@ -805,7 +813,7 @@ TEST_CASE(
 
     SUBCASE("a second adoption by one plane claims no second hold") {
         const RID once = netw::entity::mint();
-        Ref<NetwLivenessCore> plane = make_core();
+        Core plane = make_core();
         CHECK(plane->adopt(once));
         CHECK(plane->adopt(once));
         NETW_CHECK_EQ(netw::entity::holders(once), 2);
@@ -817,7 +825,7 @@ TEST_CASE(
     SUBCASE("a handle the mint never issued is retained by nobody") {
         CHECK_FALSE(netw::entity::retain(RID()));
         NETW_CHECK_EQ(netw::entity::holders(RID()), 0);
-        Ref<NetwLivenessCore> plane = make_core();
+        Core plane = make_core();
         CHECK_FALSE(plane->adopt(RID()));
     }
 

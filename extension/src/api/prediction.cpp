@@ -11,8 +11,12 @@ namespace netw {
 
 void NetwPrediction::write(int p_param, const Variant &p_value) {
     const Ref<NetwEntity> bound = get_entity();
+    if (bound.is_null()) {
+        return;
+    }
     NetwMultiplayer::predict_write_param(
-        bound.ptr(),
+        bound->home_session(),
+        *bound->get_record(),
         NetwMultiplayer::PredictParam(p_param),
         p_value
     );
@@ -20,9 +24,18 @@ void NetwPrediction::write(int p_param, const Variant &p_value) {
 
 Variant NetwPrediction::read(int p_param) const {
     const Ref<NetwEntity> bound = get_entity();
+    const auto param = NetwMultiplayer::PredictParam(p_param);
+    if (bound.is_null()) {
+        return NetwMultiplayer::predict_read_param(
+            NetwEntityRecord(),
+            nullptr,
+            param
+        );
+    }
     return NetwMultiplayer::predict_read_param(
-        bound.ptr(),
-        NetwMultiplayer::PredictParam(p_param)
+        *bound->get_record(),
+        bound->get_owner(),
+        param
     );
 }
 
@@ -42,7 +55,8 @@ Ref<NetwEntity> NetwPrediction::get_entity() const {
 
 bool NetwPrediction::is_registered() const {
     const Ref<NetwEntity> bound = get_entity();
-    NetwMultiplayer *home = NetwMultiplayer::entity_home(bound.ptr());
+    NetwMultiplayer *home
+        = bound.is_valid() ? bound->home_session() : nullptr;
     return home != nullptr
         && home->predict_is_declared(bound->get_rid_handle());
 }
@@ -61,7 +75,14 @@ void NetwPrediction::set_world_version(int64_t p_value) {
 
 void NetwPrediction::set_correction_path_clear(const Callable &p_value) {
     const Ref<NetwEntity> bound = get_entity();
-    NetwMultiplayer::predict_write_correction_path(bound.ptr(), p_value);
+    if (bound.is_null()) {
+        return;
+    }
+    NetwMultiplayer::predict_write_correction_path(
+        *bound->get_record(),
+        bound->get_owner(),
+        p_value
+    );
 }
 
 void NetwPrediction::set_teleport_threshold(double p_value) {
@@ -112,8 +133,9 @@ int64_t NetwPrediction::get_world_version() const {
 
 Callable NetwPrediction::get_correction_path_clear() const {
     const Ref<NetwEntity> bound = get_entity();
-    const predict::Decl *decl
-        = NetwMultiplayer::predict_find_declaration(bound.ptr());
+    const predict::Decl *decl = bound.is_valid()
+        ? bound->get_record()->find_predict_declaration()
+        : nullptr;
     return decl != nullptr ? decl->correction_path : Callable();
 }
 
@@ -151,7 +173,8 @@ bool NetwPrediction::get_rollback_together() const {
 
 void NetwPrediction::notify_collision() {
     const Ref<NetwEntity> bound = get_entity();
-    NetwMultiplayer *home = NetwMultiplayer::entity_home(bound.ptr());
+    NetwMultiplayer *home
+        = bound.is_valid() ? bound->home_session() : nullptr;
     if (home != nullptr && home->predict_is_declared(bound->get_rid_handle())) {
         home->predict_notify_collision(bound->get_rid_handle());
     }
@@ -159,13 +182,21 @@ void NetwPrediction::notify_collision() {
 
 void NetwPrediction::set_predict_input(const Callable &p_predictor) {
     const Ref<NetwEntity> bound = get_entity();
-    NetwMultiplayer::predict_write_input(bound.ptr(), p_predictor);
+    if (bound.is_null()) {
+        return;
+    }
+    NetwMultiplayer::predict_write_input(
+        *bound->get_record(),
+        bound->get_owner(),
+        p_predictor
+    );
 }
 
 Callable NetwPrediction::get_predict_input() const {
     const Ref<NetwEntity> bound = get_entity();
-    const predict::Decl *decl
-        = NetwMultiplayer::predict_find_declaration(bound.ptr());
+    const predict::Decl *decl = bound.is_valid()
+        ? bound->get_record()->find_predict_declaration()
+        : nullptr;
     return decl != nullptr ? decl->input : Callable();
 }
 

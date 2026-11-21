@@ -1,4 +1,6 @@
-#include "netw/store/world.hpp"
+#include "netw/sealed.hpp"
+
+#include "netw/store/store.hpp"
 
 #include "netw/wire/snapshot_stream.hpp"
 
@@ -12,7 +14,7 @@ void size_rows(
     PeerRows &r_peer,
     uint32_t p_count,
     uint32_t p_words,
-    uint32_t p_carried
+    uint32_t p_tails
 ) {
     r_peer.admitted.resize(p_count);
     r_peer.sendable.resize(p_count);
@@ -29,7 +31,7 @@ void size_rows(
     r_peer.exposed_rev.resize(p_count);
     r_peer.rest_rev.resize(p_count);
     r_peer.baseline.resize(p_count * p_words);
-    r_peer.baseline_carried.resize(p_count * p_carried);
+    r_peer.baseline_tails.resize(p_count * p_tails);
     r_peer.acc.resize(p_count);
     r_peer.last_sent.resize(p_count);
     r_peer.refresh_at.resize(p_count);
@@ -211,8 +213,8 @@ void Table::fresh_peer_row(PeerRows &r_peer, uint32_t p_row) {
     for (uint32_t at = 0; at < words; ++at) {
         r_peer.baseline[p_row * words + at] = 0;
     }
-    for (uint32_t at = 0; at < carried; ++at) {
-        r_peer.baseline_carried[p_row * carried + at] = Variant();
+    for (uint32_t at = 0; at < tail_columns; ++at) {
+        r_peer.baseline_tails[p_row * tail_columns + at] = wire::TailRef();
     }
     r_peer.acc[p_row] = 0.0f;
     r_peer.last_sent[p_row] = -1;
@@ -223,7 +225,7 @@ void Table::fresh_peer_row(PeerRows &r_peer, uint32_t p_row) {
 void Table::push_peer_rows() {
     const uint32_t count = slots.size();
     for (uint32_t peer = 0; peer < peers.size(); ++peer) {
-        size_rows(peers[peer], count, words, carried);
+        size_rows(peers[peer], count, words, tail_columns);
         fresh_peer_row(peers[peer], count - 1);
     }
 }
@@ -249,9 +251,9 @@ void Table::move_peer_rows(uint32_t p_to, uint32_t p_from) {
             held.baseline[p_to * words + at]
                 = held.baseline[p_from * words + at];
         }
-        for (uint32_t at = 0; at < carried; ++at) {
-            held.baseline_carried[p_to * carried + at]
-                = held.baseline_carried[p_from * carried + at];
+        for (uint32_t at = 0; at < tail_columns; ++at) {
+            held.baseline_tails[p_to * tail_columns + at]
+                = held.baseline_tails[p_from * tail_columns + at];
         }
         held.acc[p_to] = held.acc[p_from];
         held.last_sent[p_to] = held.last_sent[p_from];
@@ -262,7 +264,7 @@ void Table::move_peer_rows(uint32_t p_to, uint32_t p_from) {
 
 void Table::shrink_peer_rows(uint32_t p_count) {
     for (uint32_t peer = 0; peer < peers.size(); ++peer) {
-        size_rows(peers[peer], p_count, words, carried);
+        size_rows(peers[peer], p_count, words, tail_columns);
     }
 }
 
@@ -273,7 +275,7 @@ void Table::size_peers(uint32_t p_count) {
     }
     peers.resize(p_count);
     for (uint32_t peer = had; peer < p_count; ++peer) {
-        size_rows(peers[peer], slots.size(), words, carried);
+        size_rows(peers[peer], slots.size(), words, tail_columns);
         for (uint32_t row = 0; row < slots.size(); ++row) {
             fresh_peer_row(peers[peer], row);
         }
@@ -301,8 +303,8 @@ void Table::reset_stream(uint32_t p_row, uint32_t p_peer, Stream p_stream) {
     for (uint32_t at = 0; at < words; ++at) {
         held.baseline[p_row * words + at] = 0;
     }
-    for (uint32_t at = 0; at < carried; ++at) {
-        held.baseline_carried[p_row * carried + at] = Variant();
+    for (uint32_t at = 0; at < tail_columns; ++at) {
+        held.baseline_tails[p_row * tail_columns + at] = wire::TailRef();
     }
     held.last_sent[p_row] = -1;
     held.refresh_at[p_row] = -1;
@@ -322,9 +324,9 @@ bool Table::differs(uint32_t p_row, uint32_t p_peer) const {
             return true;
         }
     }
-    for (uint32_t at = 0; at < carried; ++at) {
-        if (carried_values[p_row * carried + at]
-            != held.baseline_carried[p_row * carried + at]) {
+    for (uint32_t at = 0; at < tail_columns; ++at) {
+        if (cell_tails[p_row * tail_columns + at]
+            != held.baseline_tails[p_row * tail_columns + at]) {
             return true;
         }
     }
@@ -362,10 +364,10 @@ void Table::promote(
     for (uint32_t at = 0; at < words; ++at) {
         held.baseline[p_row * words + at] = at < given ? image[at] : 0;
     }
-    const Variant *values = p_image.value_data();
-    for (uint32_t at = 0; at < carried; ++at) {
-        held.baseline_carried[p_row * carried + at]
-            = values != nullptr ? values[at] : Variant();
+    const wire::TailRef *values = p_image.tail_data();
+    for (uint32_t at = 0; at < tail_columns; ++at) {
+        held.baseline_tails[p_row * tail_columns + at]
+            = values != nullptr ? values[at] : wire::TailRef();
     }
     held.acked_rev[p_row] = p_revision;
     refresh_owed(p_row, p_peer);
@@ -381,21 +383,21 @@ bool Table::holds_image(uint32_t p_row, const wire::CodeRow &p_image) const {
             return false;
         }
     }
-    const Variant *values = p_image.value_data();
-    for (uint32_t at = 0; at < carried; ++at) {
-        if (carried_values[p_row * carried + at]
-            != (values != nullptr ? values[at] : Variant())) {
+    const wire::TailRef *values = p_image.tail_data();
+    for (uint32_t at = 0; at < tail_columns; ++at) {
+        if (cell_tails[p_row * tail_columns + at]
+            != (values != nullptr ? values[at] : wire::TailRef())) {
             return false;
         }
     }
     return true;
 }
 
-uint64_t World::lane_key(const Table &p_table, uint32_t p_row) const {
+uint64_t Store::lane_key(const Table &p_table, uint32_t p_row) const {
     return lane_of(p_table, p_row).address();
 }
 
-void World::forget_lane(const RowAddress &p_at) {
+void Store::forget_lane(const RowAddress &p_at) {
     Table &held = *tables[p_at.table];
     if ((held.flags[p_at.row] & Table::DECLARED) == 0) {
         return;
@@ -413,7 +415,7 @@ void World::forget_lane(const RowAddress &p_at) {
     held.flags[p_at.row] &= ~uint8_t(Table::DECLARED);
 }
 
-void World::name_lane(const RowAddress &p_at, uint8_t p_ordinal) {
+void Store::name_lane(const RowAddress &p_at, uint8_t p_ordinal) {
     Table &held = *tables[p_at.table];
     const bool named = (held.flags[p_at.row] & Table::DECLARED) != 0;
     if (named && held.ordinals[p_at.row] == p_ordinal) {
@@ -428,16 +430,16 @@ void World::name_lane(const RowAddress &p_at, uint8_t p_ordinal) {
     lane_rows[lane_key(held, p_at.row)] = p_at;
 }
 
-RowAddress World::lane_row(const wire::StreamLane &p_lane) const {
+RowAddress Store::lane_row(const wire::StreamLane &p_lane) const {
     return lane_row(p_lane.address());
 }
 
-RowAddress World::lane_row(uint64_t p_address) const {
+RowAddress Store::lane_row(uint64_t p_address) const {
     const RowAddress *named = lane_rows.getptr(p_address);
     return named != nullptr ? *named : RowAddress();
 }
 
-uint32_t World::peer_join(int p_id) {
+uint32_t Store::peer_join(int p_id) {
     const uint32_t *held = peer_index.getptr(p_id);
     if (held != nullptr) {
         return *held;
@@ -466,7 +468,7 @@ uint32_t World::peer_join(int p_id) {
     return index;
 }
 
-void World::forget_side(PeerSide &r_side) {
+void Store::forget_side(PeerSide &r_side) {
     r_side.flights.clear();
     r_side.requests.clear();
     r_side.tokens.clear();
@@ -475,7 +477,7 @@ void World::forget_side(PeerSide &r_side) {
     r_side.dormant.clear();
 }
 
-void World::peer_leave(int p_id) {
+void Store::peer_leave(int p_id) {
     const uint32_t *held = peer_index.getptr(p_id);
     if (held == nullptr) {
         return;
@@ -501,7 +503,7 @@ void World::peer_leave(int p_id) {
     trim_departed();
 }
 
-void World::trim_departed() {
+void Store::trim_departed() {
     while (!sides.is_empty() && !sides[sides.size() - 1].joined) {
         const uint32_t last = sides.size() - 1;
         for (uint32_t at = 0; at < tables.size(); ++at) {
@@ -517,7 +519,7 @@ void World::trim_departed() {
     }
 }
 
-void World::clear_peers() {
+void Store::clear_peers() {
     for (uint32_t index = 0; index < sides.size(); ++index) {
         if (sides[index].joined) {
             peer_leave(sides[index].id);
@@ -525,12 +527,12 @@ void World::clear_peers() {
     }
 }
 
-uint32_t World::peer_of(int p_id) const {
+uint32_t Store::peer_of(int p_id) const {
     const uint32_t *held = peer_index.getptr(p_id);
     return held != nullptr ? *held : Table::NO_SLOT;
 }
 
-uint32_t World::flight_count(uint32_t p_peer) const {
+uint32_t Store::flight_count(uint32_t p_peer) const {
     uint32_t total = 0;
     if (p_peer >= sides.size()) {
         return total;
@@ -542,7 +544,7 @@ uint32_t World::flight_count(uint32_t p_peer) const {
     return total;
 }
 
-void World::admit(const RowAddress &p_at, uint32_t p_peer, bool p_admitted) {
+void Store::admit(const RowAddress &p_at, uint32_t p_peer, bool p_admitted) {
     Table &held = *tables[p_at.table];
     PeerRows &peer = held.peers[p_peer];
     if (peer.admitted.get(p_at.row) == p_admitted) {
@@ -553,34 +555,30 @@ void World::admit(const RowAddress &p_at, uint32_t p_peer, bool p_admitted) {
     held.refresh_owed(p_at.row, p_peer);
 }
 
-void World::hide(const RowAddress &p_at, uint32_t p_peer) {
+void Store::hide(const RowAddress &p_at, uint32_t p_peer) {
     Table &held = *tables[p_at.table];
     held.peers[p_peer].admitted.set(p_at.row, false);
     held.refresh_sendable(p_at.row, p_peer);
     close_row(p_at, p_peer, Stream::NONE);
 }
 
-void World::set_source(const RowAddress &p_at, Source p_source) {
+void Store::set_source(const RowAddress &p_at, Source p_source) {
     Table &held = *tables[p_at.table];
     const uint8_t was = held.sources[p_at.row];
     if (was == uint8_t(p_source)) {
         return;
     }
     held.sources[p_at.row] = uint8_t(p_source);
-    const bool reads = p_source != Source::NONE;
-    if (reads != (was != uint8_t(Source::NONE))) {
-        count_probe(held, p_at.row, reads);
-    }
     for (uint32_t peer = 0; peer < held.peers.size(); ++peer) {
         held.refresh_sendable(p_at.row, peer);
     }
 }
 
-void World::note_changed(const RowAddress &p_at) {
+void Store::note_changed(const RowAddress &p_at) {
     owe_changed(*tables[p_at.table], p_at.row);
 }
 
-void World::owe_changed(Table &p_table, uint32_t p_row) {
+void Store::owe_changed(Table &p_table, uint32_t p_row) {
     Table &held = p_table;
     for (uint32_t peer = 0; peer < held.peers.size(); ++peer) {
         if (!peer_joined(peer)) {
@@ -604,7 +602,7 @@ void World::owe_changed(Table &p_table, uint32_t p_row) {
     }
 }
 
-void World::close_row(
+void Store::close_row(
     const RowAddress &p_at,
     uint32_t p_peer,
     Stream p_stream
@@ -626,7 +624,7 @@ void World::close_row(
     held.reset_stream(p_at.row, p_peer, p_stream);
 }
 
-bool World::stream_row(
+bool Store::stream_row(
     int p_peer,
     const wire::StreamLane &p_lane,
     uint32_t &r_peer,
@@ -637,7 +635,7 @@ bool World::stream_row(
     return r_at.valid() && r_peer != Table::NO_SLOT;
 }
 
-uint64_t World::stream_open(
+uint64_t Store::stream_open(
     int p_peer,
     const wire::StreamLane &p_lane,
     const wire::StreamTenure &p_tenure
@@ -664,7 +662,7 @@ uint64_t World::stream_open(
     return request;
 }
 
-wire::ReadyVerdict World::stream_ready(
+wire::ReadyVerdict Store::stream_ready(
     int p_peer,
     uint64_t p_request,
     uint64_t p_token
@@ -704,7 +702,7 @@ wire::ReadyVerdict World::stream_ready(
     return wire::ReadyVerdict::SEATED;
 }
 
-bool World::stream_reset(int p_peer, uint64_t p_request, uint64_t p_token) {
+bool Store::stream_reset(int p_peer, uint64_t p_request, uint64_t p_token) {
     const uint32_t peer = peer_of(p_peer);
     if (peer == Table::NO_SLOT) {
         return false;
@@ -738,7 +736,7 @@ bool World::stream_reset(int p_peer, uint64_t p_request, uint64_t p_token) {
     return true;
 }
 
-bool World::stream_close(
+bool Store::stream_close(
     int p_peer,
     const wire::StreamLane &p_lane,
     uint64_t &r_token
@@ -758,7 +756,7 @@ bool World::stream_close(
     return true;
 }
 
-bool World::stream_hide(int p_peer, const wire::StreamLane &p_lane) {
+bool Store::stream_hide(int p_peer, const wire::StreamLane &p_lane) {
     uint32_t peer = 0;
     RowAddress at;
     if (!stream_row(p_peer, p_lane, peer, at)) {
@@ -770,7 +768,7 @@ bool World::stream_hide(int p_peer, const wire::StreamLane &p_lane) {
     return held;
 }
 
-uint64_t World::token_of(int p_peer, const wire::StreamLane &p_lane) const {
+uint64_t Store::token_of(int p_peer, const wire::StreamLane &p_lane) const {
     uint32_t peer = 0;
     RowAddress at;
     if (!stream_row(p_peer, p_lane, peer, at)) {
@@ -781,7 +779,7 @@ uint64_t World::token_of(int p_peer, const wire::StreamLane &p_lane) const {
                                                          : 0;
 }
 
-uint64_t World::request_of(int p_peer, const wire::StreamLane &p_lane) const {
+uint64_t Store::request_of(int p_peer, const wire::StreamLane &p_lane) const {
     uint32_t peer = 0;
     RowAddress at;
     if (!stream_row(p_peer, p_lane, peer, at)) {
@@ -790,7 +788,7 @@ uint64_t World::request_of(int p_peer, const wire::StreamLane &p_lane) const {
     return tables[at.table]->peers[peer].request[at.row];
 }
 
-bool World::names_request(
+bool Store::names_request(
     int p_peer,
     uint64_t p_request,
     wire::StreamLane &r_lane
@@ -809,7 +807,7 @@ bool World::names_request(
     return true;
 }
 
-LocalVector<uint64_t> World::opening_requests(int p_peer) const {
+LocalVector<uint64_t> Store::opening_requests(int p_peer) const {
     LocalVector<uint64_t> out;
     const uint32_t peer = peer_of(p_peer);
     if (peer == Table::NO_SLOT) {
@@ -826,7 +824,7 @@ LocalVector<uint64_t> World::opening_requests(int p_peer) const {
     return out;
 }
 
-LocalVector<wire::ClosedLane> World::close_where(
+LocalVector<wire::ClosedLane> Store::close_where(
     int64_t p_route,
     bool (*p_dooms)(const wire::StreamTenure &, const wire::StreamTenure &),
     const wire::StreamTenure &p_bar
@@ -857,7 +855,7 @@ LocalVector<wire::ClosedLane> World::close_where(
     return out;
 }
 
-LocalVector<wire::ClosedLane> World::park_tenures_other_than(
+LocalVector<wire::ClosedLane> Store::park_tenures_other_than(
     int64_t p_route,
     uint64_t p_tenure
 ) {
@@ -894,7 +892,7 @@ LocalVector<wire::ClosedLane> World::park_tenures_other_than(
     return out;
 }
 
-void World::evict_dormant(
+void Store::evict_dormant(
     uint32_t p_peer,
     LocalVector<wire::ClosedLane> &r_closed
 ) {
@@ -911,7 +909,7 @@ void World::evict_dormant(
     close_row(at, p_peer, Stream::NONE);
 }
 
-bool World::stream_resume(
+bool Store::stream_resume(
     uint32_t p_peer,
     const RowAddress &p_at,
     const wire::StreamTenure &p_bound
@@ -950,12 +948,12 @@ bool World::stream_resume(
     return true;
 }
 
-uint32_t World::dormant_count(int p_peer) const {
+uint32_t Store::dormant_count(int p_peer) const {
     const uint32_t peer = peer_of(p_peer);
     return peer != Table::NO_SLOT ? sides[peer].dormant.size() : 0;
 }
 
-LocalVector<wire::ClosedLane> World::close_anchors_other_than(
+LocalVector<wire::ClosedLane> Store::close_anchors_other_than(
     int64_t p_route,
     uint64_t p_anchor,
     uint64_t p_author
@@ -966,7 +964,7 @@ LocalVector<wire::ClosedLane> World::close_anchors_other_than(
     return close_where(p_route, &anchor_other_than, bar);
 }
 
-void World::route_closed(int64_t p_route) {
+void Store::route_closed(int64_t p_route) {
     for (uint32_t table = 0; table < tables.size(); ++table) {
         Table &held = *tables[table];
         for (uint32_t row = 0; row < held.row_count(); ++row) {
@@ -982,7 +980,7 @@ void World::route_closed(int64_t p_route) {
     }
 }
 
-void World::close_life(const RowAddress &p_at) {
+void Store::close_life(const RowAddress &p_at) {
     Table &held = *tables[p_at.table];
     for (uint32_t peer = 0; peer < held.peers.size(); ++peer) {
         if (peer_joined(peer)
@@ -992,7 +990,7 @@ void World::close_life(const RowAddress &p_at) {
     }
 }
 
-uint64_t World::mint(
+uint64_t Store::mint(
     const RowAddress &p_at,
     uint32_t p_peer,
     const wire::CodeRow &p_image,
@@ -1035,7 +1033,7 @@ uint64_t World::mint(
     return revision;
 }
 
-const Flight *World::flight_of(
+const Flight *Store::flight_of(
     uint32_t p_peer,
     uint64_t p_token,
     uint64_t p_revision
@@ -1049,7 +1047,7 @@ const Flight *World::flight_of(
     return found >= 0 ? &(*flights)[uint32_t(found)] : nullptr;
 }
 
-const Flight *World::pinned_of(uint32_t p_peer, uint64_t p_token) const {
+const Flight *Store::pinned_of(uint32_t p_peer, uint64_t p_token) const {
     const LocalVector<Flight> *flights
         = p_token != 0 ? sides[p_peer].flights.getptr(p_token) : nullptr;
     if (flights == nullptr) {
@@ -1063,7 +1061,7 @@ const Flight *World::pinned_of(uint32_t p_peer, uint64_t p_token) const {
     return nullptr;
 }
 
-void World::arm_refresh(
+void Store::arm_refresh(
     const RowAddress &p_at,
     uint32_t p_peer,
     int64_t p_tick
@@ -1086,7 +1084,7 @@ void World::arm_refresh(
     sift_up(heap, heap.size() - 1);
 }
 
-void World::come_due(uint32_t p_peer, int64_t p_tick) {
+void Store::come_due(uint32_t p_peer, int64_t p_tick) {
     PeerSide &side = sides[p_peer];
     LocalVector<Refresh> &heap = side.refreshes;
     while (!heap.is_empty() && heap[0].at <= p_tick) {
@@ -1117,7 +1115,7 @@ void World::come_due(uint32_t p_peer, int64_t p_tick) {
     }
 }
 
-void World::settle_due(uint32_t p_peer) {
+void Store::settle_due(uint32_t p_peer) {
     PeerSide &side = sides[p_peer];
     uint32_t kept = 0;
     for (uint32_t at = 0; at < side.due.size(); ++at) {
@@ -1132,7 +1130,7 @@ void World::settle_due(uint32_t p_peer) {
     side.due.resize(kept);
 }
 
-void World::stream_withdrawn(
+void Store::stream_withdrawn(
     int p_peer,
     uint64_t p_token,
     uint64_t p_revision
@@ -1149,7 +1147,7 @@ void World::stream_withdrawn(
     }
 }
 
-wire::ReceiptVerdict World::stream_receipt(
+wire::ReceiptVerdict Store::stream_receipt(
     int p_peer,
     uint64_t p_token,
     uint64_t p_revision

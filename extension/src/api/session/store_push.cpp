@@ -44,8 +44,9 @@ Variant pushed_value(
     int p_age,
     uint32_t p_column
 ) {
-    return p_age < 0 ? p_table.read_value(p_row, p_column)
-                     : p_table.history_value(p_row, uint32_t(p_age), p_column);
+    return p_age < 0
+        ? store::read_value(p_table, p_row, p_column)
+        : store::history_value(p_table, p_row, uint32_t(p_age), p_column);
 }
 
 bool codes_within_step(
@@ -72,7 +73,7 @@ bool NetwMultiplayer::store_push(
     display::Runtime *p_absorb,
     const Array *p_values
 ) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
     const uint32_t row = p_at.row;
     NETW_ZONE_LEAF_F(
         "Store push entity",
@@ -81,13 +82,15 @@ bool NetwMultiplayer::store_push(
         "entity %lld",
         static_cast<long long>(table.routes[row])
     );
-    Object *node = gd::object_of(ObjectID(table.nodes[row]));
+    Object *node = gd::object_of(
+        ObjectID(store_pull.residents.node_of(p_at.table, row))
+    );
     if (node == nullptr) {
         return false;
     }
     table.working.set(row, true);
 #if defined(NETW_TESTS)
-    store_world.push_work.pushes += 1;
+    store().push_work.pushes += 1;
     const int64_t allocated = store::allocations_seen();
 #endif
     const bool absorbing = p_absorb != nullptr
@@ -125,7 +128,7 @@ bool NetwMultiplayer::store_push(
         display_absorb_recovery(p_absorb, deltas, false);
     }
 #if defined(NETW_TESTS)
-    store_world.push_work.allocations += store::allocations_seen() - allocated;
+    store().push_work.allocations += store::allocations_seen() - allocated;
 #endif
     sim_note_push(node);
     return true;
@@ -137,7 +140,7 @@ bool NetwMultiplayer::store_rests(
     Node *p_node,
     const PropertyBinding *p_binding
 ) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
     for (uint32_t column = 0; column < table.columns.size(); ++column) {
         const table::SchemaColumn *declared = table.schema.at(int(column));
         const Variant live = port_get(p_node, declared->key);
@@ -146,12 +149,12 @@ bool NetwMultiplayer::store_rests(
             ? p_binding->correction_threshold_of(declared->key)
             : -1.0;
         const wire::ColumnPlan &slot = table.plan.column(column);
-        if (declared_epsilon < 0.0 && declared->quantizer.is_valid()
+        if (declared_epsilon < 0.0 && declared->quant.quantized()
             && !slot.variable) {
             table.landing.clear();
             table.base.clear();
-            if (!table.encode(column, live, table.landing)
-                || !table.encode(column, pushed, table.base)
+            if (!store::encode(table, column, live, table.landing, this)
+                || !store::encode(table, column, pushed, table.base, this)
                 || !codes_within_step(slot, table.landing, table.base)) {
                 return false;
             }
@@ -178,9 +181,10 @@ bool NetwMultiplayer::sim_push(
     if (row == nullptr) {
         return false;
     }
-    store::Table &table = store_world.table(p_at.table);
-    Node *node
-        = Object::cast_to<Node>(gd::object_of(ObjectID(table.nodes[p_at.row])));
+    store::Table &table = store().table(p_at.table);
+    Node *node = Object::cast_to<Node>(gd::object_of(
+        ObjectID(store_pull.residents.node_of(p_at.table, p_at.row))
+    ));
     if (node == nullptr || row->mode != sim::Mode::ACTIVE
         || p_sender != sim_author_peer(p_entity)
         || p_tenure != sim_author_tenure(p_entity)) {
@@ -197,11 +201,11 @@ bool NetwMultiplayer::sim_push(
     }
     const sim::Restore restore = row->declaration.restore;
     const int64_t reach = int64_t(row->declaration.max_restore_ticks);
-    const ClockEngine &clock = clock_engine();
+    const Clock &clock = clock_engine();
     const int64_t now = clock.get_configured() ? clock.get_tick() : -1;
     const int64_t age
         = now >= 0 && p_stamp >= 0 ? (now > p_stamp ? now - p_stamp : 0) : -1;
-    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    display::Runtime *runtime = display_book.runtime_of(p_entity);
     if (restore == sim::Restore::EXTRAPOLATED && age > 0
         && binding != nullptr) {
         sim::Sample sample;
@@ -238,9 +242,11 @@ void NetwMultiplayer::store_received(
     bool p_volatile,
     int64_t p_sender
 ) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
     const Ref<NetwEntity> entity = wrapper_for_route(p_binding->route);
-    if (!p_binding->writes_node(p_retained, entity.ptr())) {
+    const bool claim_running_ahead
+        = entity.is_valid() && entity->is_claim_running_ahead();
+    if (!p_binding->writes_node(p_retained, claim_running_ahead)) {
         return;
     }
     const RID rid = entity.is_valid() ? entity->get_rid_handle() : RID();
@@ -270,8 +276,10 @@ void NetwMultiplayer::store_push_arrival(
     int64_t p_sender
 ) {
 #if defined(DEBUG_ENABLED)
-    const store::Table &table = store_world.table(p_at.table);
-    const ObjectID node_id(table.nodes[p_at.row]);
+    const store::Table &table = store().table(p_at.table);
+    const ObjectID node_id(
+        store_pull.residents.node_of(p_at.table, p_at.row)
+    );
     Node *node = Object::cast_to<Node>(gd::object_of(node_id));
     LocalVector<StringName> changed;
     LocalVector<Variant> found;
@@ -310,7 +318,9 @@ void NetwMultiplayer::store_push_arrival(
         }
         const Variant held = port_get(node, key);
         if (held.get_type() != Variant::NIL && held.get_type() < Variant::RID
-            && held.hash_compare(table.read_value(p_at.row, column))) {
+            && held.hash_compare(
+                store::read_value(table, p_at.row, column)
+            )) {
             p_binding->landed_values.insert(key, held);
         }
     }
@@ -328,8 +338,8 @@ void NetwMultiplayer::sim_drain_installs() {
         return;
     }
     NETW_STAGE(APPLY, "Store drain", colors::TABLE);
-    for (uint32_t index = 0; index < store_world.table_count(); ++index) {
-        store::Table &table = store_world.table(index);
+    for (uint32_t index = 0; index < store().table_count(); ++index) {
+        store::Table &table = store().table(index);
         for (uint32_t word = 0; word < table.due.words.size(); ++word) {
             uint64_t bits = table.due.words[word];
             while (bits != 0) {
@@ -377,14 +387,14 @@ PackedByteArray NetwMultiplayer::store_take_image(PropertyBinding *p_binding) {
     uint32_t found = 0;
     LocalVector<Variant> live;
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        const store::RowAddress at = store_world.row_of(p_binding->id, lane);
+        const store::RowAddress at = store().row_of(p_binding->id, lane);
         if (!at.valid()) {
             continue;
         }
-        if (!store_world.read_live(at, live)) {
+        if (!store_pull.read_live(at, live)) {
             return PackedByteArray();
         }
-        const store::Table &table = store_world.table(at.table);
+        const store::Table &table = store().table(at.table);
         for (uint32_t column = 0; column < live.size(); ++column) {
             const StringName &key = table.schema.at(int(column))->key;
             for (uint32_t field = 0; field < fields.size(); ++field) {
@@ -414,19 +424,25 @@ void NetwMultiplayer::store_install_image(
     const uint64_t owner = p_binding->id;
     store::RowAddress lanes[2];
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        lanes[lane] = store_world.row_of(owner, lane);
+        lanes[lane] = store().row_of(owner, lane);
         if (!lanes[lane].valid()) {
             continue;
         }
-        store::Table &table = store_world.table(lanes[lane].table);
+        store::Table &table = store().table(lanes[lane].table);
         const uint32_t row = lanes[lane].row;
         table.landing
-            .assign(table.plan, table.codes_of(row), table.carried_of(row));
+            .assign(table.plan, table.codes_of(row), table.tails_of(row));
         for (uint32_t column = 0; column < table.columns.size(); ++column) {
             const StringName &key = table.schema.at(int(column))->key;
             for (int at = 0; at < p_keys.size(); ++at) {
                 if (StringName(p_keys[at]) == key) {
-                    table.encode(column, p_values[at], table.landing);
+                    store::encode(
+                        table,
+                        column,
+                        p_values[at],
+                        table.landing,
+                        this
+                    );
                     break;
                 }
             }
@@ -444,7 +460,7 @@ void NetwMultiplayer::store_install_image(
     const bool simulated = row != nullptr && !row->facts.predicted
         && !row->facts.state_rows && broadcast;
     if (simulated && row->mode == sim::Mode::ACTIVE && lanes[0].valid()) {
-        store::Table &table = store_world.table(lanes[0].table);
+        store::Table &table = store().table(lanes[0].table);
         const int64_t author = sim_author_peer(rid);
         const uint64_t tenure = sim_author_tenure(rid);
         if (sim::installs_on_arrival(
@@ -462,7 +478,7 @@ void NetwMultiplayer::store_install_image(
         return;
     }
     display::Runtime *runtime = simulated && row->mode == sim::Mode::AUTHORITY
-        ? display_book->runtime_of(rid)
+        ? display_book.runtime_of(rid)
         : nullptr;
     for (uint32_t lane = 0; lane < 2; ++lane) {
         if (lanes[lane].valid()) {
@@ -476,25 +492,27 @@ void NetwMultiplayer::store_retain(PropertyBinding *p_binding) {
     if (node == nullptr) {
         return;
     }
-    const ClockEngine &clock = clock_engine();
+    const Clock &clock = clock_engine();
     const int64_t tick = clock.get_configured() ? clock.get_tick() : 0;
     const uint64_t owner = p_binding->id;
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        const store::RowAddress at = store_world.row_of(owner, lane);
-        if (!at.valid() || store_world.table(at.table).holds_values(at.row)) {
+        const store::RowAddress at = store().row_of(owner, lane);
+        if (!at.valid() || store().table(at.table).holds_values(at.row)) {
             continue;
         }
-        store::Table &table = store_world.table(at.table);
+        store::Table &table = store().table(at.table);
         table.landing.clear();
         bool read = true;
         for (uint32_t column = 0; read && column < table.columns.size();
              ++column) {
             const StringName &key = table.schema.at(int(column))->key;
             read = gd::has_property(node, key)
-                && table.encode(
+                && store::encode(
+                    table,
                     column,
                     port_get(node, key).duplicate(true),
-                    table.landing
+                    table.landing,
+                    this
                 );
         }
         if (read) {
@@ -512,11 +530,11 @@ void NetwMultiplayer::store_reinstall(
     }
     const uint64_t owner = p_binding->id;
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        const store::RowAddress at = store_world.row_of(owner, lane);
+        const store::RowAddress at = store().row_of(owner, lane);
         if (!at.valid()) {
             continue;
         }
-        const store::Table &table = store_world.table(at.table);
+        const store::Table &table = store().table(at.table);
         if (!table.holds_values(at.row)) {
             continue;
         }
@@ -533,17 +551,17 @@ Error NetwMultiplayer::store_write_entity(
 ) {
     const uint64_t owner = p_binding->id;
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        const store::RowAddress at = store_world.row_of(owner, lane);
+        const store::RowAddress at = store().row_of(owner, lane);
         if (!at.valid()) {
             continue;
         }
-        store::Table &table = store_world.table(at.table);
+        store::Table &table = store().table(at.table);
         for (uint32_t column = 0; column < table.columns.size() && column < 64;
              ++column) {
             if (table.schema.at(int(column))->key != p_key) {
                 continue;
             }
-            table.write_value(at.row, column, p_route);
+            store::write_value(table, at.row, column, p_route);
             store_push(at, -1, uint64_t(1) << column, nullptr);
             return OK;
         }

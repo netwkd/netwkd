@@ -7,7 +7,8 @@
 #include "godot/rid.hpp"
 #include "godot/templates.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/schema_core.hpp"
+#include "netw/api/quantize.hpp"
+#include "netw/schema_core.hpp"
 #include "netw/store/column.hpp"
 #include "netw/store/peers.hpp"
 #include "netw/wire/describe.hpp"
@@ -15,7 +16,7 @@
 
 namespace netw::store {
 
-class World;
+class Store;
 
 struct ArrayFrameHead {
     uint64_t table_id = 0;
@@ -135,7 +136,7 @@ public:
     static uint32_t element_bytes(int p_type);
 
 private:
-    World *world = nullptr;
+    Store *world = nullptr;
     godot::LocalVector<ArrayTable *> tables;
     godot::HashMap<godot::RID, uint32_t> by_rid;
     godot::LocalVector<uint32_t> wire_order;
@@ -221,7 +222,7 @@ public:
     Arrays &operator=(const Arrays &) = delete;
     ~Arrays();
 
-    void seat(World *p_world) {
+    void seat(Store *p_world) {
         world = p_world;
     }
 

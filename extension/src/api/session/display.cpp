@@ -65,74 +65,61 @@ void report_type_change(NetwMultiplayer *p_session, display::Channel *p_state) {
 } // namespace
 
 display::Decl NetwMultiplayer::display_config_for(
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity,
+    const NetwEntityRecord *p_record
 ) {
-    if (p_entity.is_null()) {
-        return display::Decl();
-    }
-    const RID rid = p_entity->get_rid_handle();
-    const display::Decl *standing = display_book->decl_ptr(rid);
+    const display::Decl *standing = display_book.decl_ptr(p_entity);
     if (standing != nullptr) {
         return *standing;
     }
     display::Decl config;
-    const NetwEntityRecord *record = record_of(p_entity.ptr());
-    const display::Decl *authored
-        = record != nullptr ? record->find_display_declaration() : nullptr;
+    const display::Decl *authored = p_record != nullptr
+        ? p_record->find_display_declaration()
+        : nullptr;
     if (authored != nullptr) {
         config = *authored;
     }
-    if (rid.is_valid()) {
-        display_book->set_decl(rid, config);
+    if (p_entity.is_valid()) {
+        display_book.set_decl(p_entity, config);
     }
     return config;
 }
 
-int64_t NetwMultiplayer::display_route_of(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
-        return 0;
-    }
-    const int64_t route = liveness_route_of(p_entity.ptr());
-    return route > 0 ? route : p_entity->get_route();
-}
-
 display::Runtime *NetwMultiplayer::display_runtime_for(
     int64_t p_route,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) {
-    if (p_route <= 0 || p_entity.is_null()) {
+    if (p_route <= 0) {
         return nullptr;
     }
-    display::Runtime *standing = display_book->runtime_at(p_route);
+    display::Runtime *standing = display_book.runtime_at(p_route);
     if (standing != nullptr) {
         return standing;
     }
-    display_book->enroll(p_entity->get_rid_handle(), p_route);
-    display::Runtime *runtime
-        = display_book->open_runtime(p_entity->get_rid_handle());
+    display_book.enroll(p_entity, p_route);
+    display::Runtime *runtime = display_book.open_runtime(p_entity);
     runtime->set_route(p_route);
-    runtime->bind(p_entity.ptr(), p_entity->get_owner());
-    runtime->set_config(display_config_for(p_entity));
+    runtime->bind(p_entity, wrapper_owner(p_entity));
+    runtime->set_config(display_config_for(p_entity, entity_record(p_entity)));
     runtime->set_follows_control(true);
     return runtime;
 }
 
 void NetwMultiplayer::display_on_entity_live(
     int64_t p_route,
-    Object *p_entity
+    const RID &p_entity
 ) {
     NETW_ZONE_NC("display on entity live", colors::INTERP);
-    const Ref<NetwEntity> entity
-        = Ref<NetwEntity>(Object::cast_to<NetwEntity>(p_entity));
-    if (entity.is_null()) {
+    const NetwEntityRecord *record = entity_record(p_entity);
+    if (record == nullptr) {
         return;
     }
     bool wanted = false;
     {
         NETW_ZONE_NC("display config and wants", colors::INTERP);
-        const display::Decl config = display_config_for(entity);
+        const display::Decl config = display_config_for(p_entity, record);
         wanted = config.display_role != netw::display::ROLE_AUTO
-            || display_wants_runtime(entity->get_owner());
+            || display_wants_runtime(wrapper_owner(p_entity));
     }
     if (!wanted) {
         return;
@@ -140,7 +127,7 @@ void NetwMultiplayer::display_on_entity_live(
     display::Runtime *runtime = nullptr;
     {
         NETW_ZONE_NC("display runtime for", colors::INTERP);
-        runtime = display_runtime_for(p_route, entity);
+        runtime = display_runtime_for(p_route, p_entity);
     }
     if (runtime == nullptr) {
         return;
@@ -169,52 +156,52 @@ void NetwMultiplayer::display_detach_runtime(display::Runtime *p_runtime) {
 }
 
 void NetwMultiplayer::display_release_route(int64_t p_route) {
-    display::Runtime *runtime = display_book->runtime_at(p_route);
+    display::Runtime *runtime = display_book.runtime_at(p_route);
     if (runtime != nullptr) {
         display_detach_runtime(runtime);
         sim_release_body(runtime->entity_rid(), true);
     }
-    display_book->drop_route(p_route);
-    display_book->drop(liveness_core->rid_from_route(int(p_route)));
+    display_book.drop_route(p_route);
+    display_book.drop(liveness_core.rid_from_route(int(p_route)));
 }
 
 void NetwMultiplayer::display_retire_route(int64_t p_route) {
-    display::Runtime *runtime = display_book->runtime_at(p_route);
+    display::Runtime *runtime = display_book.runtime_at(p_route);
     if (runtime != nullptr) {
         display_detach_runtime(runtime);
         sim_release_body(runtime->entity_rid(), false);
     }
-    display_book->drop_route(p_route);
-    display_book->drop(liveness_core->rid_from_route(int(p_route)));
+    display_book.drop_route(p_route);
+    display_book.drop(liveness_core.rid_from_route(int(p_route)));
 }
 
 void NetwMultiplayer::display_clear_runtimes() {
-    const LocalVector<display::Runtime *> runtimes = display_book->runtimes();
+    const LocalVector<display::Runtime *> runtimes = display_book.runtimes();
     for (int at = 0; at < runtimes.size(); ++at) {
         display::Runtime *runtime = runtimes[at];
         display_detach_runtime(runtime);
         sim_release_body(runtime->entity_rid(), true);
     }
-    display_book->clear();
+    display_book.clear();
 }
 
 void NetwMultiplayer::display_follow_control(const RID &p_entity) {
-    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    display::Runtime *runtime = display_book.runtime_of(p_entity);
     if (runtime != nullptr && runtime->get_follows_control()) {
         display_resolve_role(runtime);
     }
 }
 
 void NetwMultiplayer::display_refresh_moved(int64_t p_route) {
-    display::Runtime *runtime = display_book->runtime_at(p_route);
+    display::Runtime *runtime = display_book.runtime_at(p_route);
     if (runtime == nullptr) {
         return;
     }
-    const Ref<NetwEntity> entity = runtime->entity();
-    if (entity.is_null()) {
+    const RID entity = runtime->entity_rid();
+    if (entity_record(entity) == nullptr) {
         return;
     }
-    runtime->bind(entity.ptr(), entity->get_owner());
+    runtime->bind(entity, wrapper_owner(entity));
     display_rebuild_runtime(runtime);
     display_resolve_role(runtime);
     runtime->reset(
@@ -224,18 +211,18 @@ void NetwMultiplayer::display_refresh_moved(int64_t p_route) {
 }
 
 void NetwMultiplayer::display_mark_role_dirty(const RID &p_entity) {
-    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    display::Runtime *runtime = display_book.runtime_of(p_entity);
     if (runtime == nullptr) {
-        display_book->mark_dirty(p_entity, netw::display::DIRT_RUNTIME);
+        display_book.mark_dirty(p_entity, netw::display::DIRT_RUNTIME);
         return;
     }
     display_resolve_role(runtime);
 }
 
 void NetwMultiplayer::display_drain_dirty() {
-    const TypedArray<RID> stale = display_book->take_dirty();
+    const TypedArray<RID> stale = display_book.take_dirty();
     for (int at = 0; at < stale.size(); ++at) {
-        display::Runtime *runtime = display_book->runtime_of(stale[at]);
+        display::Runtime *runtime = display_book.runtime_of(stale[at]);
         if (runtime != nullptr) {
             display_rebuild_runtime(runtime);
             display_resolve_role(runtime);
@@ -251,14 +238,11 @@ void NetwMultiplayer::display_on_book_dirty(
     const RID &p_entity,
     netw::display::Dirt p_dirt
 ) {
-    display::Runtime *runtime = display_book->runtime_of(p_entity);
+    display::Runtime *runtime = display_book.runtime_of(p_entity);
     if (runtime == nullptr) {
-        display_book->clear_dirty(p_entity);
-        const Ref<NetwEntity> wrapper = Ref<NetwEntity>(
-            Object::cast_to<NetwEntity>(wrapper_for_id(p_entity.get_id()).ptr())
-        );
-        if (wrapper.is_valid()) {
-            display_on_entity_live(display_route_of(wrapper), wrapper.ptr());
+        display_book.clear_dirty(p_entity);
+        if (wrapper_for_id(p_entity.get_id()).is_valid()) {
+            display_on_entity_live(liveness_core.route_of(p_entity), p_entity);
         }
         return;
     }
@@ -286,11 +270,12 @@ void NetwMultiplayer::display_record(
     if (p_node == nullptr || p_spec.is_null() || p_target_property.is_empty()) {
         return;
     }
-    const Ref<NetwEntity> entity = NetwEntity::of(p_node);
-    if (entity.is_null()) {
+    const Ref<NetwEntity> view = NetwEntity::of(p_node);
+    if (view.is_null()) {
         return;
     }
-    const int64_t route = display_route_of(entity);
+    const RID entity = view->get_rid_handle();
+    const int64_t route = liveness_core.route_of(entity);
     if (route <= 0) {
         return;
     }
@@ -353,7 +338,7 @@ bool NetwMultiplayer::display_record_followed(
     uint32_t p_lane,
     uint32_t p_column
 ) {
-    display::Runtime *runtime = display_book->runtime_at(p_route);
+    display::Runtime *runtime = display_book.runtime_at(p_route);
     if (runtime == nullptr
         || runtime->get_pump_mode() == netw::display::PUMP_UNRESOLVED) {
         return false;
@@ -396,12 +381,12 @@ void NetwMultiplayer::display_land(
     }
     display::History &history = p_state->display_history();
     if (p_owner != 0) {
-        history.follow(&store_world, p_owner, p_lane, p_column);
+        history.follow(&store(), p_owner, p_lane, p_column);
     }
     if (!history.record(p_tick, p_value, p_authoring_tick)) {
         report_type_change(this, p_state);
     }
-    display_book->wake(p_runtime);
+    display_book.wake(p_runtime);
 
     event_record(EventPlane::DISPLAY_RECORD, RID(), p_route, 0, OK, p_tick);
 }
@@ -428,11 +413,11 @@ bool NetwMultiplayer::display_table_of(
         }
         const uint64_t owner = binding->id;
         for (uint32_t lane = 0; lane < 2; ++lane) {
-            const store::RowAddress at = store_world.row_of(owner, lane);
+            const store::RowAddress at = store().row_of(owner, lane);
             if (!at.valid()) {
                 continue;
             }
-            const store::Table &table = store_world.table(at.table);
+            const store::Table &table = store().table(at.table);
             for (int column = 0; column < table.schema.column_count();
                  ++column) {
                 if (table.schema.at(column)->key == p_property) {
@@ -458,18 +443,18 @@ void NetwMultiplayer::display_follow_binding(
     }
     const Ref<NetwEntity> entity = NetwEntity::of(node);
     display::Runtime *runtime = entity.is_valid()
-        ? display_book->runtime_of(entity->get_rid_handle())
+        ? display_book.runtime_of(entity->get_rid_handle())
         : nullptr;
     if (runtime == nullptr) {
         return;
     }
     const uint64_t owner = p_binding->id;
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        const store::RowAddress at = store_world.row_of(owner, lane);
+        const store::RowAddress at = store().row_of(owner, lane);
         if (!at.valid()) {
             continue;
         }
-        const store::Table &table = store_world.table(at.table);
+        const store::Table &table = store().table(at.table);
         for (display::Channel *state : runtime->channels()) {
             const StringName prop = state->get_source_prop();
             if (prop.is_empty()
@@ -480,12 +465,12 @@ void NetwMultiplayer::display_follow_binding(
                  ++column) {
                 if (table.schema.at(column)->key == prop) {
                     state->display_history()
-                        .follow(&store_world, owner, lane, uint32_t(column));
+                        .follow(&store(), owner, lane, uint32_t(column));
                 }
             }
         }
     }
-    display_book->wake(runtime);
+    display_book.wake(runtime);
 }
 
 void NetwMultiplayer::display_follow_tables(display::Runtime *p_runtime) {
@@ -503,25 +488,25 @@ void NetwMultiplayer::display_follow_tables(display::Runtime *p_runtime) {
         uint32_t column = 0;
         if (node != nullptr
             && display_table_of(node, prop, owner, lane, column)) {
-            state->display_history().follow(&store_world, owner, lane, column);
+            state->display_history().follow(&store(), owner, lane, column);
         }
     }
-    display_book->wake(p_runtime);
+    display_book.wake(p_runtime);
 }
 
 void NetwMultiplayer::display_wake_entity(const RID &p_entity) {
-    display_book->wake(display_book->runtime_of(p_entity));
+    display_book.wake(display_book.runtime_of(p_entity));
 }
 
 void NetwMultiplayer::display_drain_touched() {
-    for (uint32_t at = 0; at < store_world.table_count(); ++at) {
-        store::Table &table = store_world.table(at);
+    for (uint32_t at = 0; at < store().table_count(); ++at) {
+        store::Table &table = store().table(at);
         if (table.touched_overflow) {
             table.touched_overflow = false;
-            display_book->wake_all();
+            display_book.wake_all();
         }
         for (const int64_t route : table.touched_routes) {
-            display_book->wake_route(route);
+            display_book.wake_route(route);
         }
         table.touched_routes.clear();
     }
@@ -561,7 +546,7 @@ bool NetwMultiplayer::display_record_runtime(
             report_type_change(this, state);
         }
         history.set_source_rested(rests);
-        display_book->wake(p_runtime);
+        display_book.wake(p_runtime);
         busy = busy || !rests;
     }
     return busy;
@@ -572,7 +557,7 @@ void NetwMultiplayer::display_on_clock_tick(double p_delta, int64_t p_tick) {
 #if defined(NETW_TESTS)
     store::AllocationTally recording(idle_work.display_allocations);
 #endif
-    LocalVector<display::Runtime *> &listed = display_book->record_set();
+    LocalVector<display::Runtime *> &listed = display_book.record_set();
     if (!display_renders_here()) {
         for (display::Runtime *runtime : listed) {
             if (runtime != nullptr) {
@@ -642,15 +627,14 @@ bool NetwMultiplayer::display_pump_listed(
     if (!display_renders) {
         return false;
     }
-    const Ref<NetwEntity> entity = p_runtime->entity();
-    if (entity.is_null()) {
+    if (p_runtime->owner() == nullptr) {
         return false;
     }
     const bool busy
         = display::pump_runtime(p_runtime, p_timing, p_stats, display_hooks);
     event_record(
         EventPlane::DISPLAY_PUMP,
-        entity->get_rid_handle(),
+        p_runtime->entity_rid(),
         p_runtime->get_route(),
         0,
         OK,
@@ -685,13 +669,17 @@ Error NetwMultiplayer::display_pump(double p_delta) {
         timing.frame_delta = 0.0;
         timing.frame_ticks = 0.0;
     } else {
-        timing = display::capture_timing(&clock_engine(), p_delta);
+        timing = display::capture_timing(
+            &clock_engine(),
+            clock_reading(),
+            p_delta
+        );
         display_last_timing = timing;
     }
-    display::PumpStats &stats = display_book->get_stats();
+    display::PumpStats &stats = display_book.get_stats();
     stats.reset();
 
-    LocalVector<display::Runtime *> &listed = display_book->pump_set();
+    LocalVector<display::Runtime *> &listed = display_book.pump_set();
     const uint32_t count = listed.size();
     NETW_ZONE_VALUE(count);
     uint32_t kept = 0;
@@ -732,16 +720,14 @@ void NetwMultiplayer::display_bind_session() {
         return;
     }
     display_session_bound = true;
-    display_book->set_went_dirty(
-        callable_mp(this, &NetwMultiplayer::display_on_book_dirty)
-    );
+    display_book.seat(this);
 }
 
 void NetwMultiplayer::display_mark_dirty(
     const RID &p_entity,
     netw::display::Dirt p_dirt
 ) {
-    display_book->mark_dirty(p_entity, p_dirt);
+    display_book.mark_dirty(p_entity, p_dirt);
 }
 
 } // namespace netw

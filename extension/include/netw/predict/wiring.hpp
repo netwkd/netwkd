@@ -10,6 +10,10 @@
 #include "netw/table/schema_record.hpp"
 #include "netw/wire/plan.hpp"
 
+namespace netw {
+class NetwMultiplayer;
+} // namespace netw
+
 namespace netw::predict {
 
 enum class StateFamily : int {
@@ -64,14 +68,10 @@ struct FieldCodec {
     void clear();
 };
 
-godot::PackedByteArray canonical_bytes(
-    const FieldCodec &p_codec,
-    const godot::Dictionary &p_payload
-);
-
 godot::Dictionary canonicalize(
     const FieldCodec &p_codec,
-    const godot::Dictionary &p_payload
+    const godot::Dictionary &p_payload,
+    NetwMultiplayer *p_session = nullptr
 );
 
 bool codes_agree(

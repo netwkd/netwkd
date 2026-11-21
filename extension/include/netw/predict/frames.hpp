@@ -1,18 +1,5 @@
 #pragma once
 
-/* Prediction's four declared wire lanes.
- *
- * COMMAND carries a contiguous transition window and one schema-planned code
- * row for every fresh transition. ACK carries authority's oldest evidence
- * prefix. RELAY is the admitted COMMAND byte sequence unchanged, and the
- * subscription request is one boolean bit.
- *
- * Protocol identity is established before any of these frames are admitted,
- * so no payload repeats a version byte. Every variable section is bounded by
- * the count in its typed header and a decoder accepts only a complete frame
- * with no unread residue.
- */
-
 #include <cstdint>
 
 #include "godot/local_vector.hpp"
@@ -23,16 +10,6 @@
 #include "netw/wire/registry.hpp"
 
 namespace netw::predict {
-
-/* The ids are spelled here as well as in the registry, because the registry
- * composes every family's channels and cannot depend on one of them. Nothing
- * else is restated: `admit_frame` reads each lane's direction off the
- * registry, and a law pins these ids to the declarations they name.
- */
-constexpr uint8_t CHANNEL_COMMAND = 35;
-constexpr uint8_t CHANNEL_ACK = 36;
-constexpr uint8_t CHANNEL_RELAY = 37;
-constexpr uint8_t CHANNEL_RELAY_REQUEST = 38;
 
 bool is_lane(uint8_t p_channel);
 
@@ -116,7 +93,8 @@ godot::PackedByteArray encode_command(
 bool decode_command(
     const godot::PackedByteArray &p_bytes,
     const wire::WirePlan &p_input_plan,
-    CommandFrame &r_frame
+    CommandFrame &r_frame,
+    int *r_mistyped = nullptr
 );
 
 int ack_transitions_carried(const AckFrame &p_frame);
@@ -136,13 +114,6 @@ struct FrameOrigin {
     bool receiver_is_authority = false;
 };
 
-/* Whether one inbound prediction frame may be admitted.
- *
- * A refused route outranks the frame's own verdict, so a drop is attributed to
- * the route rather than to the sender. The authorship rule comes from the
- * registry's declared direction, so a lane cannot be gated one way and
- * declared another.
- */
 godot::Error admit_frame(
     const wire::WireRegistry &p_registry,
     uint8_t p_channel,

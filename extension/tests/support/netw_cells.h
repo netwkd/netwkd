@@ -1,5 +1,6 @@
 #pragma once
 
+#include "godot/variant.hpp"
 #include "netw_test.h"
 
 #include <cstdarg>
@@ -7,6 +8,7 @@
 #include <cstdlib>
 #include <set>
 #include <string>
+#include <type_traits>
 
 namespace netw_test {
 
@@ -31,7 +33,7 @@ inline LawVerdict law_held() {
     return LawVerdict();
 }
 
-inline LawVerdict law_broken(const char *p_format, ...) {
+inline LawVerdict law_broken_printf(const char *p_format, ...) {
     LawVerdict verdict;
     verdict.held = false;
     va_list arguments;
@@ -39,6 +41,42 @@ inline LawVerdict law_broken(const char *p_format, ...) {
     std::vsnprintf(verdict.detail, sizeof(verdict.detail), p_format, arguments);
     va_end(arguments);
     return verdict;
+}
+
+typedef decltype(godot::String().utf8()) LawBytes;
+
+template <typename T> constexpr bool law_is_text() {
+    typedef std::decay_t<T> Plain;
+    if constexpr (
+        std::is_arithmetic_v<Plain> || std::is_pointer_v<Plain>
+        || std::is_enum_v<Plain>
+    ) {
+        return false;
+    } else {
+        return std::is_convertible_v<T, godot::String>;
+    }
+}
+
+template <typename T> decltype(auto) law_hold(const T &p_value) {
+    if constexpr (law_is_text<T>()) {
+        return godot::String(p_value).utf8();
+    } else {
+        return p_value;
+    }
+}
+
+template <typename T> decltype(auto) law_pass(const T &p_value) {
+    if constexpr (std::is_same_v<T, LawBytes>) {
+        return p_value.get_data();
+    } else {
+        static_assert(std::is_trivially_copyable_v<T>);
+        return p_value;
+    }
+}
+
+template <typename... Args>
+LawVerdict law_broken(const char *p_format, const Args &...p_args) {
+    return law_broken_printf(p_format, law_pass(law_hold(p_args))...);
 }
 
 class Cells {

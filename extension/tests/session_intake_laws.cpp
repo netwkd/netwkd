@@ -12,7 +12,7 @@
 #include "godot/variant.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
-#include "netw/api/replication_core.hpp"
+#include "netw/channel_book.hpp"
 #include "netw/wire/registry.hpp"
 
 namespace TestNetwSessionIntakeLaws {
@@ -20,7 +20,6 @@ namespace TestNetwSessionIntakeLaws {
 using namespace godot;
 using netw::NetwEntity;
 using netw::NetwMultiplayer;
-using netw::ReplicationCore;
 using netw_test::law_broken;
 using netw_test::law_held;
 using netw_test::LawRowFor;
@@ -100,23 +99,26 @@ struct IntakeScenario {
     bool reaches_the_handler = false;
     bool counts_an_unknown_route = false;
     bool counts_a_missing_route_verdict = false;
+    bool refuses_the_author = false;
 };
 
 IntakeScenario a_command_from_a_stranger() {
     IntakeScenario scenario;
     scenario.label = "a-command-from-a-stranger";
-    scenario.channel = netw::wire::builtin_channel("PREDICT_COMMAND");
+    scenario.channel = netw::wire::CHANNEL_PREDICT_COMMAND;
     scenario.sender = 3;
     scenario.binds_the_route_first = true;
+    scenario.refuses_the_author = true;
     return scenario;
 }
 
 IntakeScenario an_ack_from_a_client() {
     IntakeScenario scenario;
     scenario.label = "an-ack-from-a-client";
-    scenario.channel = netw::wire::builtin_channel("PREDICT_ACK");
+    scenario.channel = netw::wire::CHANNEL_PREDICT_ACK;
     scenario.sender = 2;
     scenario.binds_the_route_first = true;
+    scenario.refuses_the_author = true;
     return scenario;
 }
 
@@ -139,7 +141,7 @@ IntakeScenario a_plain_channel_ahead_of_its_route() {
 IntakeScenario a_sync_frame_for_a_route_nobody_bound() {
     IntakeScenario scenario;
     scenario.label = "a-sync-frame-for-a-route-nobody-bound";
-    scenario.channel = netw::wire::builtin_channel("SYNC");
+    scenario.channel = netw::wire::CHANNEL_SYNC;
     scenario.sender = 2;
     scenario.counts_an_unknown_route = true;
     scenario.counts_a_missing_route_verdict = true;
@@ -160,6 +162,7 @@ class IntakeRun {
     PackedInt64Array handled;
     int64_t unknown_route_drops = 0;
     int64_t missing_route_verdicts = 0;
+    int64_t author_refusals = 0;
 
     bool plant_is(Plant p_plant) const {
         return planted == p_plant;
@@ -170,9 +173,6 @@ public:
         : declared(p_scenario), planted(p_plant) {
         Ref<NetwMultiplayer> session;
         session.instantiate();
-        ReplicationCore *plane
-            = netw_test::Internals::replication_plane(session);
-
         Node3D *body = memnew(Node3D);
         netw::gd::scene_root()->add_child(body);
         const Ref<NetwEntity> wrapper = NetwEntity::ensure(body);
@@ -187,11 +187,13 @@ public:
         if (plant_is(PLANT_A_CHANNEL_THAT_ASKED_TO_DEFER)) {
             defers = true;
         }
-        plane->register_channel(
-            declared.channel,
-            Callable(memnew(SenderSink(seen, session.ptr()))),
-            defers
-        );
+        if (declared.channel >= netw::wire::USER_CHANNEL_FIRST) {
+            netw_test::Internals::get_channel_book(session)->register_channel(
+                declared.channel,
+                Callable(memnew(SenderSink(seen, session.ptr()))),
+                defers
+            );
+        }
 
         if (declared.binds_the_route_first) {
             session->liveness_bind_route(ROUTE, wrapper.ptr());
@@ -200,7 +202,7 @@ public:
         PackedByteArray payload;
         payload.push_back(1);
         const int64_t sender = plant_is(PLANT_A_SENDER_THE_DIRECTION_TRUSTS)
-            ? (declared.channel == netw::wire::builtin_channel("PREDICT_ACK")
+            ? (declared.channel == netw::wire::CHANNEL_PREDICT_ACK
                    ? 1
                    : CONTROLLER)
             : declared.sender;
@@ -225,11 +227,12 @@ public:
         }
 
         handled = *seen;
-        const Dictionary snapshot = session->session_get_stats();
         unknown_route_drops
-            = int64_t(snapshot.get(StringName("drops_unknown_route"), -1));
+            = session->stats_get(NetwMultiplayer::STAT_DROPS_UNKNOWN_ROUTE);
         missing_route_verdicts
-            = int64_t(snapshot.get(StringName("verdict_does_not_exist"), -1));
+            = session->stats_get(NetwMultiplayer::STAT_VERDICT_DOES_NOT_EXIST);
+        author_refusals
+            = session->stats_get(NetwMultiplayer::STAT_VERDICT_UNAUTHORIZED);
 
         session->clear_session_state();
         body->queue_free();
@@ -249,6 +252,10 @@ public:
 
     int64_t missing_route_verdict() const {
         return missing_route_verdicts;
+    }
+
+    int64_t refused_authors() const {
+        return author_refusals;
     }
 
     int64_t sender_sent() const {
@@ -309,6 +316,18 @@ LawVerdict law_both_books(const IntakeRun &p_run) {
     return law_held();
 }
 
+LawVerdict law_author(const IntakeRun &p_run) {
+    const int64_t expected = p_run.scenario().refuses_the_author ? 1 : 0;
+    if (p_run.refused_authors() != expected) {
+        return law_broken(
+            "%d frames refused for their author against %d",
+            int(p_run.refused_authors()),
+            int(expected)
+        );
+    }
+    return law_held();
+}
+
 const IntakeLaw L_ADMITS = {
     "admits",
     "a frame reaches a handler only where its route and its author both hold",
@@ -333,7 +352,14 @@ const IntakeLaw L_BOTH_BOOKS = {
     &law_both_books,
 };
 
-const IntakeLaw LAWS[] = {L_ADMITS, L_SENDER, L_COUNTED, L_BOTH_BOOKS};
+const IntakeLaw L_AUTHOR = {
+    "author",
+    "a frame from a peer its channel does not trust is refused",
+    &law_author,
+};
+
+const IntakeLaw LAWS[]
+    = {L_ADMITS, L_SENDER, L_COUNTED, L_BOTH_BOOKS, L_AUTHOR};
 
 TEST_CASE("[Netw][Session][SceneTree] the carrier intake laws hold") {
     netw_test::FaultWatch expected_faults;
@@ -358,22 +384,22 @@ TEST_CASE("[Netw][Session][SceneTree] the carrier intake laws hold") {
 
 TEST_CASE(
     "[Netw][Session][SceneTree] a command the controller did send "
-    "reds admits"
+    "reds author"
 ) {
     const IntakeScenario scenario = a_command_from_a_stranger();
     const IntakeRun run(scenario, PLANT_A_SENDER_THE_DIRECTION_TRUSTS);
-    NETW_CELL(L_ADMITS, scenario);
-    NETW_LAW_BREAKS(L_ADMITS, run);
+    NETW_CELL(L_AUTHOR, scenario);
+    NETW_LAW_BREAKS(L_AUTHOR, run);
 }
 
 TEST_CASE(
     "[Netw][Session][SceneTree] an ack the server did send reds "
-    "admits"
+    "author"
 ) {
     const IntakeScenario scenario = an_ack_from_a_client();
     const IntakeRun run(scenario, PLANT_A_SENDER_THE_DIRECTION_TRUSTS);
-    NETW_CELL(L_ADMITS, scenario);
-    NETW_LAW_BREAKS(L_ADMITS, run);
+    NETW_CELL(L_AUTHOR, scenario);
+    NETW_LAW_BREAKS(L_AUTHOR, run);
 }
 
 TEST_CASE(

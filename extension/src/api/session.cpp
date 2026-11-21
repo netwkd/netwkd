@@ -277,14 +277,20 @@ void NetwSession::set_peer_bandwidth(int64_t p_peer, int64_t p_kbps) {
     }
 }
 
-Dictionary NetwSession::link_stats(int64_t p_peer) const {
+double NetwSession::link_stat(
+    int64_t p_peer,
+    enums::NetwMultiplayer::LinkStat p_stat
+) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->peer_get_link_stats(p_peer) : Dictionary();
+    return api != nullptr ? api->peer_get_link_stat(p_peer, p_stat) : 0.0;
 }
 
-Dictionary NetwSession::traffic(int64_t p_peer) const {
+double NetwSession::traffic(
+    int64_t p_peer,
+    enums::NetwMultiplayer::Traffic p_stat
+) const {
     NetwMultiplayer *api = session();
-    return api != nullptr ? api->session_get_traffic(p_peer) : Dictionary();
+    return api != nullptr ? api->peer_get_traffic(p_peer, p_stat) : 0.0;
 }
 
 Ref<NetwPromise> NetwSession::leave() {
@@ -556,13 +562,12 @@ void NetwSession::_bind_methods() {
         &NetwSession::set_peer_bandwidth
     );
     ClassDB::bind_method(
-        D_METHOD("link_stats", "peer"),
-        &NetwSession::link_stats
+        D_METHOD("link_stat", "peer", "stat"),
+        &NetwSession::link_stat
     );
     ClassDB::bind_method(
-        D_METHOD("traffic", "peer"),
-        &NetwSession::traffic,
-        DEFVAL(0)
+        D_METHOD("traffic", "peer", "stat"),
+        &NetwSession::traffic
     );
     ClassDB::bind_method(
         D_METHOD("transfer_server", "player"),

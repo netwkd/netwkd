@@ -22,7 +22,7 @@
 #include "netw/repl/property_binding.hpp"
 #include "netw/sim/install.hpp"
 #include "netw/sim/row.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 
 namespace TestNetwSimInstallLaws {
 
@@ -124,7 +124,7 @@ struct Stand {
         row.declaration.bodies.push_back(NodePath("Body"));
         row.declaration.remote_mode = netw::sim::RemoteMode::ACTIVE;
         row.declaration.restore = p_restore;
-        session->sim_settle_body(NetwEntity::of(copy(p_client)));
+        session->sim_settle_body(rid(p_client));
     }
 
     void pump_display(int p_client, int p_frames) {
@@ -134,6 +134,7 @@ struct Stand {
                 rid(p_client),
                 netw::display::capture_timing(
                     &Internals::clock_engine(session),
+                    session->clock_reading(),
                     FRAME_DELTA
                 )
             );
@@ -155,7 +156,7 @@ struct Stand {
             session,
             NetwEntity::of(copy(p_client)).ptr()
         );
-        netw::store::World &world = Internals::store(session);
+        netw::store::Store &world = Internals::store(session);
         int held = 0;
         for (uint32_t at = 0; at < world.table_count(); ++at) {
             const netw::store::Table &table = world.table(at);
@@ -264,13 +265,18 @@ netw::predict::Arrival simulated_arrival(
     int64_t p_tick,
     bool p_whole
 ) {
-    netw::store::World &world = Internals::store(p_core);
+    netw::store::Store &world = Internals::store(p_core);
     const netw::store::RowAddress at = world.row_of(p_binding->id, 0);
     REQUIRE(at.valid());
     netw::store::Table &table = world.table(at.table);
     for (int column = 0; column < table.schema.column_count(); ++column) {
         if (table.schema.at(column)->key == StringName(FIELD)) {
-            table.write_value(at.row, uint32_t(column), Vector2(2.0, 0.0));
+            netw::store::write_value(
+                table,
+                at.row,
+                uint32_t(column),
+                Vector2(2.0, 0.0)
+            );
         }
     }
     netw::predict::Arrival arrival = netw::predict::Arrival::of(table, at.row);
@@ -289,11 +295,11 @@ TEST_CASE(
     REQUIRE(seated.is_valid());
     netw::NetwPredictionEngine *const pool
         = Internals::get_prediction_engine(stand.core(0));
-    const int64_t slot = pool->slot_register(seated);
+    const int64_t slot = Internals::seat(pool, seated);
     REQUIRE(slot >= 0);
     Internals::record(seated.ptr())->predict_declaration();
     pool->adopt_declaration(
-        seated,
+        slot,
         seated->get_state_binding(),
         PropertyBindingPtr(),
         int(netw::Schedule::TICK),
@@ -346,6 +352,34 @@ TEST_CASE(
         int64_t(pool->verdict_reason_of(slot)),
         int64_t(netw::predict::VERDICT_REASON_NONE)
     );
+}
+
+TEST_CASE(
+    "[Netw][Sim][SceneTree] retiring a subject keeps its island available "
+    "until the selection is settled"
+) {
+    Stand stand(1, STATE_SOURCE);
+    const FlowPair pair
+        = stand_flow_pair(stand.rig, STATE_SOURCE.c_str(), "IslandMember");
+    NetwMultiplayer *const core = stand.core(0);
+    const RID subject = stand.rid(0);
+    const Ref<NetwEntity> member = NetwEntity::of(pair.mirror(0));
+    REQUIRE(member.is_valid());
+    const RID neighbor = member->get_rid_handle();
+
+    core->sim_note_selected_by(neighbor, subject, true);
+    NETW_REQUIRE_EQ(core->sim_selection_count(neighbor), 1);
+    Internals::sim_row(core, subject).mode = netw::sim::Mode::NONE;
+    netw::sim::Row &joiner = Internals::sim_row(core, neighbor);
+    joiner.facts.predicted = true;
+    joiner.declaration.remote_mode = netw::sim::RemoteMode::ACTIVE;
+    Internals::retire_entity_view(core, subject);
+
+    CHECK(core->sim_chooses(subject));
+    CHECK(core->sim_joiners(subject).has(neighbor));
+    CHECK(core->sim_candidates(subject).has(neighbor));
+    core->sim_select(subject, LocalVector<RID>(), 0);
+    NETW_CHECK_EQ(core->sim_selection_count(neighbor), 0);
 }
 
 TEST_CASE(

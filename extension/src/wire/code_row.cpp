@@ -1,6 +1,6 @@
-#include "netw/wire/code_row.hpp"
+#include "netw/sealed.hpp"
 
-#include "godot/utility.hpp"
+#include "netw/wire/code_row.hpp"
 
 using namespace godot;
 
@@ -74,10 +74,6 @@ bool runs_differ(
     return false;
 }
 
-int64_t fixed_byte_count(int64_t p_bits) {
-    return (p_bits + 7) / 8;
-}
-
 uint32_t value_slots(const WirePlan &plan) {
     return plan.has_variable() ? plan.column_count() : 0;
 }
@@ -95,38 +91,10 @@ CodeRow CodeRow::for_plan(const WirePlan &plan) {
     for (uint32_t index = 0; index < row.words.size(); ++index) {
         row.words[index] = 0;
     }
-    row.values.resize(value_slots(plan));
-    return row;
-}
-
-CodeRow CodeRow::from_bytes(
-    const WirePlan &plan,
-    const PackedByteArray &bytes
-) {
-    CodeRow row = for_plan(plan);
-    const int64_t expected = fixed_byte_count(plan.row_bits());
-    if (row.is_empty() || bytes.size() < expected
-        || (!plan.has_variable() && bytes.size() != expected)) {
-        return CodeRow();
-    }
-    const int tail = int(plan.row_bits() & 7);
-    if (tail != 0 && expected > 0
-        && (bytes[expected - 1] & uint8_t(0xffU << tail)) != 0) {
-        return CodeRow();
-    }
-    for (int64_t at = 0; at < expected; ++at) {
-        row.words[uint32_t(at >> 3)] |= uint64_t(bytes[at])
-            << int((at & 7) * 8);
-    }
-    if (!plan.has_variable()) {
-        return row;
-    }
-    const Array carried = gd::bytes_to_var(bytes.slice(expected));
-    if (carried.size() != int64_t(row.values.size())) {
-        return CodeRow();
-    }
-    for (uint32_t at = 0; at < row.values.size(); ++at) {
-        row.values[at] = carried[at];
+    row.tails.resize(value_slots(plan));
+    row.texts.resize(value_slots(plan));
+    for (uint32_t index = 0; index < row.texts.size(); ++index) {
+        row.texts[index] = plan.column(index).text ? 1 : 0;
     }
     return row;
 }
@@ -134,7 +102,7 @@ CodeRow CodeRow::from_bytes(
 bool CodeRow::assign(
     const WirePlan &plan,
     const uint64_t *p_words,
-    const Variant *p_values
+    const TailRef *p_tails
 ) {
     if (p_words == nullptr || !plan.valid()) {
         return false;
@@ -145,40 +113,24 @@ bool CodeRow::assign(
     for (uint32_t index = 0; index < words.size(); ++index) {
         words[index] = p_words[index];
     }
-    for (uint32_t index = 0; index < values.size(); ++index) {
-        values[index] = p_values != nullptr ? p_values[index] : Variant();
+    for (uint32_t index = 0; index < tails.size(); ++index) {
+        tails[index] = p_tails != nullptr ? p_tails[index] : TailRef();
     }
     return true;
 }
 
 bool CodeRow::valid_for(const WirePlan &plan) const {
-    return plan.valid() && used_bits == plan.row_bits()
-        && words.size() == uint32_t((used_bits + 63) / 64 + 1)
-        && values.size() == value_slots(plan);
-}
-
-PackedByteArray CodeRow::to_bytes() const {
-    PackedByteArray out;
-    if (words.is_empty()) {
-        return out;
+    if (!plan.valid() || used_bits != plan.row_bits()
+        || words.size() != uint32_t((used_bits + 63) / 64 + 1)
+        || tails.size() != value_slots(plan)) {
+        return false;
     }
-    const int64_t count = fixed_byte_count(used_bits);
-    out.resize(count);
-    for (int64_t at = 0; at < count; ++at) {
-        out.set(
-            at,
-            uint8_t((words[uint32_t(at >> 3)] >> int((at & 7) * 8)) & 0xff)
-        );
+    for (uint32_t index = 0; index < texts.size(); ++index) {
+        if ((texts[index] != 0) != plan.column(index).text) {
+            return false;
+        }
     }
-    if (values.is_empty()) {
-        return out;
-    }
-    Array carried;
-    for (uint32_t at = 0; at < values.size(); ++at) {
-        carried.push_back(values[at]);
-    }
-    out.append_array(gd::var_to_bytes(carried));
-    return out;
+    return true;
 }
 
 void CodeRow::clear() {
@@ -189,8 +141,8 @@ void CodeRow::clear() {
 }
 
 void CodeRow::clear_values() {
-    for (uint32_t index = 0; index < values.size(); ++index) {
-        values[index] = Variant();
+    for (uint32_t index = 0; index < tails.size(); ++index) {
+        tails[index] = TailRef();
     }
 }
 
@@ -201,12 +153,13 @@ void CodeRow::copy_from(const CodeRow &other) {
     for (uint32_t index = 0; index < words.size(); ++index) {
         words[index] = other.words[index];
     }
-    if (values.size() != other.values.size()) {
-        values.resize(other.values.size());
+    if (tails.size() != other.tails.size()) {
+        tails.resize(other.tails.size());
     }
-    for (uint32_t index = 0; index < values.size(); ++index) {
-        values[index] = other.values[index];
+    for (uint32_t index = 0; index < tails.size(); ++index) {
+        tails[index] = other.tails[index];
     }
+    texts = other.texts;
     used_bits = other.used_bits;
 }
 
@@ -247,16 +200,21 @@ uint64_t CodeRow::read_bits(int64_t offset, int width) const {
     return read_run(words, offset, width);
 }
 
-bool CodeRow::write_value(uint32_t column, const Variant &value) {
-    if (column >= values.size()) {
+bool CodeRow::write_tail(uint32_t column, const TailRef &tail) {
+    if (column >= tails.size()) {
         return false;
     }
-    values[column] = value.duplicate(true);
+    tails[column] = tail;
     return true;
 }
 
-Variant CodeRow::read_value(uint32_t column) const {
-    return column < values.size() ? values[column] : Variant();
+const TailRef &CodeRow::tail(uint32_t column) const {
+    static const TailRef empty;
+    return column < tails.size() ? tails[column] : empty;
+}
+
+bool CodeRow::is_text(uint32_t column) const {
+    return column < texts.size() && texts[column] != 0;
 }
 
 uint64_t CodeRow::changed_mask(
@@ -271,7 +229,7 @@ uint64_t CodeRow::changed_mask(
     for (uint32_t index = 0; index < plan.column_count(); ++index) {
         const ColumnPlan &slot = plan.column(index);
         if (slot.variable) {
-            if (before.values[index] != after.values[index]) {
+            if (before.tails[index] != after.tails[index]) {
                 mask |= uint64_t(1) << index;
             }
             continue;
@@ -289,7 +247,7 @@ uint64_t CodeRow::changed_mask(
 
 bool CodeRow::equals(const CodeRow &other) const {
     if (used_bits != other.used_bits || words.size() != other.words.size()
-        || values.size() != other.values.size()) {
+        || tails.size() != other.tails.size()) {
         return false;
     }
     for (uint32_t index = 0; index < words.size(); ++index) {
@@ -297,8 +255,8 @@ bool CodeRow::equals(const CodeRow &other) const {
             return false;
         }
     }
-    for (uint32_t index = 0; index < values.size(); ++index) {
-        if (values[index] != other.values[index]) {
+    for (uint32_t index = 0; index < tails.size(); ++index) {
+        if (tails[index] != other.tails[index]) {
             return false;
         }
     }

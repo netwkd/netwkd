@@ -1314,7 +1314,6 @@ struct Kinds {
 
     void spawn(Table &p_table) {
         NetwMultiplayer *server = p_table.rig.server();
-        netw::spawn::Pipeline *pipeline = p_table.rig.spawn_plane(-1);
         Node *arena = p_table.arena;
 
         const RID nest_entity
@@ -1326,7 +1325,7 @@ struct Kinds {
         Node *host
             = p_table.rig.branch(-1)->get_node_or_null(NodePath("Maker"));
         NETW_REQUIRE_EQ(int(host != nullptr), 1);
-        Node *made = pipeline->spawn(
+        Node *made = server->spawn_verb(
             Callable(host, StringName("make")),
             named("Made"),
             Ref<NetwPlayer>()
@@ -1427,8 +1426,7 @@ TEST_CASE(
     table.arena->add_child(served);
     table.rig.pump(SETTLE_PUMPS);
     const int route = int(server->entity_get_route(entity));
-    const Ref<netw::NetwLivenessCore> lives
-        = Internals::get_liveness_core(server);
+    netw::NetwLivenessCore *lives = Internals::get_liveness_core(server);
     const RID life = lives->rid_from_route(route);
     lives->set_state(life, netw::NetwLivenessCore::STATE_DEAD);
     NETW_REQUIRE_EQ(int(lives->bind_route(life, route)), 1);
@@ -1525,14 +1523,13 @@ bool left_tree(ObjectID p_node) {
     return node == nullptr || !node->is_inside_tree();
 }
 
-int64_t spawn_frames_in(NetwMultiplayer *p_api, const char *p_channel) {
+int64_t spawn_frames_in(
+    NetwMultiplayer *p_api, netw::wire::Channel p_channel
+) {
     const Dictionary rows
         = p_api->attribution_snapshot()["frames_in_by_channel"];
     const Dictionary channels = rows.get(int64_t(1), Dictionary());
-    return int64_t(channels.get(
-        int64_t(netw::wire::builtin_channel(StringName(p_channel))),
-        0
-    ));
+    return int64_t(channels.get(int64_t(p_channel), 0));
 }
 
 int64_t recv_count(Table &p_table, int p_at) {
@@ -1769,9 +1766,9 @@ TEST_CASE(
 
     NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));
     table.rig.pump(SETTLE_PUMPS);
-    const netw::ClockEngine &held
+    const netw::Clock &held
         = Internals::clock_engine(table.seat(survivor));
-    const netw::ClockEngine &serving
+    const netw::Clock &serving
         = Internals::clock_engine(table.seat(successor));
     const int stopped = held.get_tick();
     const int serving_from = serving.get_tick();
@@ -1839,9 +1836,10 @@ TEST_CASE(
     int64_t others[CLIENTS];
     for (int at = 0; at < CLIENTS; ++at) {
         NetwMultiplayer *seat = table.seat(at);
-        spawns[at] = spawn_frames_in(seat, "SPAWN");
-        others[at] = spawn_frames_in(seat, "DESPAWN")
-            + spawn_frames_in(seat, "HIDE") + spawn_frames_in(seat, "REPARENT");
+        spawns[at] = spawn_frames_in(seat, netw::wire::CHANNEL_SPAWN);
+        others[at] = spawn_frames_in(seat, netw::wire::CHANNEL_DESPAWN)
+            + spawn_frames_in(seat, netw::wire::CHANNEL_HIDE)
+            + spawn_frames_in(seat, netw::wire::CHANNEL_REPARENT);
     }
 
     NETW_REQUIRE_EQ(int(table.rig.session()->lose_server()), int(OK));
@@ -1857,10 +1855,15 @@ TEST_CASE(
         NETW_FORMAT_INT(seat_text, at);
         CAPTURE(seat_text);
         NetwMultiplayer *seat = table.seat(at);
-        NETW_CHECK_EQ(spawn_frames_in(seat, "SPAWN") - spawns[at], served);
         NETW_CHECK_EQ(
-            spawn_frames_in(seat, "DESPAWN") + spawn_frames_in(seat, "HIDE")
-                + spawn_frames_in(seat, "REPARENT") - others[at],
+            spawn_frames_in(seat, netw::wire::CHANNEL_SPAWN) - spawns[at],
+            served
+        );
+        NETW_CHECK_EQ(
+            spawn_frames_in(seat, netw::wire::CHANNEL_DESPAWN)
+                + spawn_frames_in(seat, netw::wire::CHANNEL_HIDE)
+                + spawn_frames_in(seat, netw::wire::CHANNEL_REPARENT)
+                - others[at],
             int64_t(0)
         );
     }
@@ -1875,19 +1878,17 @@ int64_t channel_in(
     NetwMultiplayer *p_api,
     const char *p_key,
     int64_t p_peer,
-    const char *p_channel
+    netw::wire::Channel p_channel
 ) {
     const Dictionary rows = p_api->attribution_snapshot()[StringName(p_key)];
     const Dictionary channels = rows.get(p_peer, Dictionary());
-    return int64_t(channels.get(
-        int64_t(netw::wire::builtin_channel(StringName(p_channel))),
-        0
-    ));
+    return int64_t(channels.get(int64_t(p_channel), 0));
 }
 
 int64_t verbs_in(NetwMultiplayer *p_api) {
-    return spawn_frames_in(p_api, "SPAWN") + spawn_frames_in(p_api, "DESPAWN")
-        + spawn_frames_in(p_api, "CONTROL_APPLY");
+    return spawn_frames_in(p_api, netw::wire::CHANNEL_SPAWN)
+        + spawn_frames_in(p_api, netw::wire::CHANNEL_DESPAWN)
+        + spawn_frames_in(p_api, netw::wire::CHANNEL_CONTROL_APPLY);
 }
 
 int spawn_bodies(Table &p_table, int p_count) {
@@ -2169,7 +2170,12 @@ TEST_CASE(
         CAPTURE(seat_text);
         NETW_CHECK_EQ(verbs_in(table.seat(at)) - verbs[at], int64_t(0));
         NETW_CHECK_GT(
-            channel_in(host, "bytes_in", table.was(at), "SESSION_RESYNC"),
+            channel_in(
+                host,
+                "bytes_in",
+                table.was(at),
+                netw::wire::CHANNEL_SESSION_RESYNC
+            ),
             int64_t(0)
         );
         NETW_CHECK_EQ(held_by(table, successor, table.was(at)), MANY_ENTITIES);
@@ -2198,10 +2204,18 @@ TEST_CASE(
         NETW_FORMAT_INT(seat_text, at);
         CAPTURE(seat_text);
         const int64_t peer = table.was(at);
-        const int64_t bytes
-            = channel_in(host, "bytes_in", peer, "SESSION_RESYNC");
-        const int64_t frames
-            = channel_in(host, "frames_in_by_channel", peer, "SESSION_RESYNC");
+        const int64_t bytes = channel_in(
+            host,
+            "bytes_in",
+            peer,
+            netw::wire::CHANNEL_SESSION_RESYNC
+        );
+        const int64_t frames = channel_in(
+            host,
+            "frames_in_by_channel",
+            peer,
+            netw::wire::CHANNEL_SESSION_RESYNC
+        );
         NETW_CHECK_GT(bytes, limit);
         NETW_CHECK_GE(frames * limit, bytes);
         NETW_CHECK_EQ(held_by(table, successor, peer), SPLIT_ENTITIES);
@@ -2230,7 +2244,9 @@ TEST_CASE(
     uint64_t reported = 0;
     int64_t applies[CLIENTS];
     for (int at = 0; at < CLIENTS; ++at) {
-        applies[at] = spawn_frames_in(table.seat(at), "CONTROL_APPLY");
+        applies[at] = spawn_frames_in(
+            table.seat(at), netw::wire::CHANNEL_CONTROL_APPLY
+        );
         if (at == successor) {
             continue;
         }
@@ -2262,7 +2278,9 @@ TEST_CASE(
             served->get_control_revision()
         );
         NETW_CHECK_EQ(
-            spawn_frames_in(table.seat(at), "CONTROL_APPLY") - applies[at],
+            spawn_frames_in(
+                table.seat(at), netw::wire::CHANNEL_CONTROL_APPLY
+            ) - applies[at],
             int64_t(1)
         );
     }

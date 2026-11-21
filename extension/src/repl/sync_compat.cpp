@@ -8,6 +8,7 @@
 #include "godot/time.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/replication_core.hpp"
+#include "netw/call_args.hpp"
 #include "netw/colors.hpp"
 #include "netw/fault_book.hpp"
 #include "netw/liveness_core.hpp"
@@ -16,7 +17,6 @@
 #include "netw/profile.hpp"
 #include "netw/repl/property_binding.hpp"
 #include "netw/script/model.hpp"
-#include "netw/session/books.hpp"
 #include "netw/session/event_plane.hpp"
 #include "netw/spawn/record.hpp"
 #include "netw/store/validate.hpp"
@@ -25,6 +25,7 @@
 #include "netw/sync_kernel.hpp"
 #include "netw/synchronizers.hpp"
 #include "netw/tree_hook.hpp"
+#include "netw/wire/value_row.hpp"
 
 using namespace godot;
 
@@ -87,16 +88,29 @@ SyncCompat::~SyncCompat() {
     rows.clear();
 }
 
-NetwMultiplayer *SyncCompat::core() const {
-    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
+void SyncCompat::seat(
+    NetwMultiplayer *p_session,
+    Clock *p_clock,
+    NetwLivenessCore *p_liveness
+) {
+    session = p_session;
+    clock_engine = p_clock;
+    liveness_core = p_liveness;
+    hears_entity_live = p_session != nullptr;
 }
 
-void SyncCompat::set_core(Object *p_core, const session::Books *p_books) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_core);
-    NETW_BUG_COND(plane != nullptr && p_books == nullptr);
-    core_id = gd::instance_id(plane);
-    books = plane != nullptr ? p_books : nullptr;
-    hears_entity_live = plane != nullptr;
+#if defined(DEBUG_ENABLED)
+void SyncCompat::seat_profiler(
+    wire::NetworkProfiler *p_profiler,
+    uint32_t *p_outgoing
+) {
+    network_profiler = p_profiler;
+    profiler_outgoing = p_outgoing;
+}
+#endif
+
+void SyncCompat::unseat() {
+    session = nullptr;
 }
 
 void SyncCompat::set_sync_model(NetwSyncModel *p_model) {
@@ -105,14 +119,6 @@ void SyncCompat::set_sync_model(NetwSyncModel *p_model) {
 
 void SyncCompat::set_spawn_book(spawn::Book *p_book) {
     spawn_book = p_book;
-}
-
-void SyncCompat::set_spawn_seams(
-    const Callable &p_adopt,
-    const Callable &p_sweep
-) {
-    adopt_seam = p_adopt;
-    sweep_seam = p_sweep;
 }
 
 void SyncCompat::set_channels(int64_t p_sync, int64_t p_sync_delta) {
@@ -161,12 +167,11 @@ void SyncCompat::drop_row(Consumed *p_row) {
 Error SyncCompat::consume(Node *p_root, Object *p_sync) {
     MultiplayerSynchronizer *sync
         = Object::cast_to<MultiplayerSynchronizer>(p_sync);
-    NetwMultiplayer *plane = core();
-    if (p_root == nullptr || sync == nullptr || plane == nullptr) {
+    if (p_root == nullptr || sync == nullptr || session == nullptr) {
         return ERR_INVALID_PARAMETER;
     }
     const Callable watcher
-        = callable_mp(plane, &NetwMultiplayer::sync_compat_visibility_changed)
+        = callable_mp(session, &NetwMultiplayer::sync_compat_visibility_changed)
               .bind(p_root);
     if (!sync->is_connected(SIG_VISIBILITY_CHANGED, watcher)) {
         sync->connect(SIG_VISIBILITY_CHANGED, watcher);
@@ -193,11 +198,10 @@ Error SyncCompat::consume(Node *p_root, Object *p_sync) {
 Error SyncCompat::consume_remove(Node *p_root, Object *p_sync) {
     MultiplayerSynchronizer *sync
         = Object::cast_to<MultiplayerSynchronizer>(p_sync);
-    NetwMultiplayer *plane = core();
-    if (sync != nullptr && plane != nullptr) {
+    if (sync != nullptr && session != nullptr) {
         const Callable watcher
             = callable_mp(
-                  plane,
+                  session,
                   &NetwMultiplayer::sync_compat_visibility_changed
             )
                   .bind(p_root);
@@ -215,7 +219,7 @@ Error SyncCompat::consume_remove(Node *p_root, Object *p_sync) {
 }
 
 void SyncCompat::on_sync_visibility_changed(int64_t, Node *p_root) {
-    if (core() == nullptr) {
+    if (session == nullptr) {
         return;
     }
     const LocalVector<Consumed *> *held
@@ -227,9 +231,7 @@ void SyncCompat::on_sync_visibility_changed(int64_t, Node *p_root) {
         }
     }
     refresh_interest_intent(p_root);
-    if (sweep_seam.is_valid()) {
-        sweep_seam.call();
-    }
+    session->spawn_schedule_visibility_sweep();
 }
 
 void SyncCompat::refresh_interest_intents() {
@@ -250,8 +252,7 @@ void SyncCompat::refresh_interest_intents() {
 }
 
 void SyncCompat::refresh_interest_intent(Node *p_root) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !plane->is_host() || p_root == nullptr) {
+    if (session == nullptr || !session->is_host() || p_root == nullptr) {
         return;
     }
     const Ref<NetwEntity> entity = NetwEntity::of(p_root);
@@ -262,7 +263,7 @@ void SyncCompat::refresh_interest_intent(Node *p_root) {
     if (entity_root == nullptr) {
         return;
     }
-    PackedInt64Array candidates = plane->interest_known_peers();
+    PackedInt64Array candidates = session->interest_known_peers();
     const int64_t local = local_peer_id();
     if (local != 0 && !candidates.has(local)) {
         candidates.push_back(local);
@@ -273,24 +274,23 @@ void SyncCompat::refresh_interest_intent(Node *p_root) {
             admitted.push_back(candidates[at]);
         }
     }
-    plane->interest_set_entity_intent(entity, admitted);
+    session->interest_set_entity_intent(entity->adopt_in(session), admitted);
 }
 
 void SyncCompat::refresh_row_intent(Consumed *p_row) {
-    NetwMultiplayer *plane = core();
     Node *root = p_row->root_node();
-    if (plane == nullptr || root == nullptr) {
+    if (session == nullptr || root == nullptr) {
         return;
     }
     PackedInt64Array peer_ids;
-    if (plane->is_host()) {
-        peer_ids = plane->interest_known_peers();
+    if (session->is_host()) {
+        peer_ids = session->interest_known_peers();
     } else if (
-        plane->session_get_inner().is_valid()
-        && plane->session_get_inner()->get_multiplayer_peer().is_valid()
+        session->session_get_inner().is_valid()
+        && session->session_get_inner()->get_multiplayer_peer().is_valid()
     ) {
         const PackedInt32Array peers
-            = gd::api_peer_ids(plane->session_get_inner());
+            = gd::api_peer_ids(session->session_get_inner());
         for (int at = 0; at < peers.size(); ++at) {
             peer_ids.push_back(peers[at]);
         }
@@ -315,12 +315,11 @@ void SyncCompat::disconnect_config(Consumed *p_row) {
     if (holds != nullptr && --(*holds) <= 0) {
         config_holds.erase(held);
     }
-    NetwMultiplayer *plane = core();
-    if (cfg == nullptr || plane == nullptr || config_holds.has(held)) {
+    if (cfg == nullptr || session == nullptr || config_holds.has(held)) {
         return;
     }
     const Callable hook
-        = callable_mp(plane, &NetwMultiplayer::sync_compat_config_changed);
+        = callable_mp(session, &NetwMultiplayer::sync_compat_config_changed);
     if (cfg->is_connected(SIG_CHANGED, hook)) {
         cfg->disconnect(SIG_CHANGED, hook);
     }
@@ -343,12 +342,13 @@ void SyncCompat::refresh_row(Consumed *p_row) {
         return;
     }
     disconnect_config(p_row);
-    NetwMultiplayer *plane = core();
-    if (cfg.is_valid() && plane != nullptr) {
+    if (cfg.is_valid() && session != nullptr) {
         p_row->config = wanted;
         config_holds[uint64_t(wanted)] += 1;
-        const Callable hook
-            = callable_mp(plane, &NetwMultiplayer::sync_compat_config_changed);
+        const Callable hook = callable_mp(
+            session,
+            &NetwMultiplayer::sync_compat_config_changed
+        );
         if (!cfg->is_connected(SIG_CHANGED, hook)) {
             cfg->connect(SIG_CHANGED, hook);
         }
@@ -424,7 +424,7 @@ void SyncCompat::poison(
     p_row->poisoned = true;
     MultiplayerSynchronizer *sync = p_row->sync_node();
     fault::raise(
-        core(),
+        session,
         NETW_FAULT_UNSUPPORTED,
         {String("MultiplayerSynchronizer '")
              + (sync != nullptr ? String(sync->get_name()) : String("<freed>"))
@@ -523,10 +523,9 @@ SyncCompat::Consumed *SyncCompat::row_by_ordinal(
 }
 
 void SyncCompat::capture_declaration(Consumed *p_row) {
-    NetwMultiplayer *plane = core();
     Node *root = p_row->root_node();
     MultiplayerSynchronizer *sync = p_row->sync_node();
-    if (plane == nullptr || root == nullptr || sync == nullptr) {
+    if (session == nullptr || root == nullptr || sync == nullptr) {
         return;
     }
     const Ref<NetwEntity> entity = NetwEntity::of(root);
@@ -534,7 +533,7 @@ void SyncCompat::capture_declaration(Consumed *p_row) {
         return;
     }
     const RID rid = entity->get_rid_handle();
-    const int64_t route = books->liveness->route_of(rid);
+    const int64_t route = liveness_core->route_of(rid);
     set_route(p_row, route > 0 ? route : entity->get_route());
     p_row->entity = rid;
     p_row->ordinal_revision = UINT64_MAX;
@@ -606,16 +605,13 @@ void SyncCompat::rows_under(Node *p_owner, LocalVector<Consumed *> &r_rows) {
     );
 }
 
-void SyncCompat::on_entity_live(
-    int64_t p_route,
-    const Ref<NetwEntity> &p_entity
-) {
-    if (p_entity.is_null()) {
+void SyncCompat::on_entity_live(int64_t p_route, const RID &p_entity) {
+    if (!p_entity.is_valid() || session == nullptr) {
         return;
     }
     LocalVector<Consumed *> matched;
-    rows_under(p_entity->get_owner(), matched);
-    const RID handle = p_entity->get_rid_handle();
+    rows_under(session->wrapper_owner(p_entity), matched);
+    const RID handle = p_entity;
     for (Consumed *row : matched) {
         rows_examined += 1;
         Node *root = row->root_node();
@@ -624,7 +620,7 @@ void SyncCompat::on_entity_live(
         }
         const Ref<NetwEntity> found = NetwEntity::of(root);
         if (found.is_valid() && found->get_rid_handle() == handle) {
-            row->entity_at.unref();
+            row->entity_at = RID();
             set_route(row, p_route);
             capture_declaration(row);
         }
@@ -647,13 +643,12 @@ void SyncCompat::prune() {
 }
 
 void SyncCompat::watch_tree() {
-    NetwMultiplayer *plane = core();
     SceneTree *tree = gd::scene_tree();
-    if (tree_watched || plane == nullptr || tree == nullptr) {
+    if (tree_watched || session == nullptr || tree == nullptr) {
         return;
     }
     const Callable heard
-        = callable_mp(plane, &NetwMultiplayer::sync_compat_node_removed);
+        = callable_mp(session, &NetwMultiplayer::sync_compat_node_removed);
     if (!tree->is_connected(SIG_NODE_REMOVED, heard)) {
         tree->connect(SIG_NODE_REMOVED, heard);
     }
@@ -664,7 +659,7 @@ void SyncCompat::forget_nodes(Consumed *p_row) {
     p_row->resident = false;
     p_row->sync_at = nullptr;
     p_row->root_at = nullptr;
-    p_row->entity_at.unref();
+    p_row->entity_at = RID();
 }
 
 void SyncCompat::on_node_removed(Node *p_node) {
@@ -713,13 +708,15 @@ bool SyncCompat::locate(Consumed *p_row) {
     return true;
 }
 
-Ref<NetwEntity> SyncCompat::entity_of(Consumed *p_row) {
+RID SyncCompat::entity_of(Consumed *p_row) {
     if (p_row->resident && p_row->entity_at.is_valid()) {
         if (store::validation_interval() > 0) {
 #if defined(NETW_TESTS)
             store::validation_audit::ledger().checks += 1;
 #endif
-            if (NetwEntity::of(p_row->root_at) != p_row->entity_at) {
+            const Ref<NetwEntity> found = NetwEntity::of(p_row->root_at);
+            if (found.is_null()
+                || found->get_rid_handle() != p_row->entity_at) {
                 store::Miss missed;
                 missed.route = p_row->route;
                 missed.column = StringName("compat_entity");
@@ -729,7 +726,8 @@ Ref<NetwEntity> SyncCompat::entity_of(Consumed *p_row) {
         }
         return p_row->entity_at;
     }
-    const Ref<NetwEntity> entity = NetwEntity::of(p_row->root_at);
+    const Ref<NetwEntity> found = NetwEntity::of(p_row->root_at);
+    const RID entity = found.is_valid() ? found->get_rid_handle() : RID();
     if (p_row->resident) {
         p_row->entity_at = entity;
     }
@@ -737,10 +735,9 @@ Ref<NetwEntity> SyncCompat::entity_of(Consumed *p_row) {
 }
 
 int64_t SyncCompat::local_peer_id() {
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr && plane->session_get_inner().is_valid()
-        && plane->session_get_inner()->get_multiplayer_peer().is_valid()) {
-        return plane->get_unique_id();
+    if (session != nullptr && session->session_get_inner().is_valid()
+        && session->session_get_inner()->get_multiplayer_peer().is_valid()) {
+        return session->get_unique_id();
     }
     return 1;
 }
@@ -755,13 +752,12 @@ bool SyncCompat::synchronizer_verdict(int64_t p_peer_id, Node *p_node) {
 
 PackedInt32Array SyncCompat::recipients_for(
     Consumed *p_row,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_route,
     Node *p_root
 ) {
     PackedInt32Array out;
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return out;
     }
     const int64_t local_id = pump_local_id;
@@ -792,25 +788,26 @@ PackedInt32Array SyncCompat::recipients_for(
     int count = 0;
     const spawn::Record *record = spawn_book->spawned_of(p_route);
     if (record != nullptr) {
-        const RID rid = books->liveness->rid_from_route(int(p_route));
-        if (books->liveness->state_of(rid)
+        const RID rid = liveness_core->rid_from_route(int(p_route));
+        if (liveness_core->state_of(rid)
             != NetwLivenessCore::STATE_LIVE) {
             return out;
         }
         base = record->recipient_list().ptr();
         count = int(record->recipient_list().size());
     } else {
-        listed = plane->rpc_recipients(p_entity);
+        listed = session->rpc_recipients(p_entity);
         base = listed.ptr();
         count = listed.size();
     }
-    const bool filtered = plane->interest_entity_has_filter(p_entity);
+    const RID entity = p_entity;
+    const bool filtered = session->interest_entity_has_filter(entity);
     for (int at = 0; at < count; ++at) {
         const int64_t peer_id = base[at];
         if (peer_id == local_id) {
             continue;
         }
-        if (filtered && !plane->interest_wire_admits(peer_id, p_entity)) {
+        if (filtered && !session->interest_wire_admits(peer_id, entity)) {
             continue;
         }
         const HashMap<int64_t, bool>::ConstIterator intent
@@ -825,9 +822,8 @@ PackedInt32Array SyncCompat::recipients_for(
 
 void SyncCompat::pump() {
     NETW_ZONE_NC("Compat pass", colors::WIRE);
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || plane->session_get_inner().is_null()
-        || plane->session_get_inner()->get_multiplayer_peer().is_null()) {
+    if (session == nullptr || session->session_get_inner().is_null()
+        || session->session_get_inner()->get_multiplayer_peer().is_null()) {
         return;
     }
     const Time *reading = Time::get_singleton();
@@ -836,14 +832,14 @@ void SyncCompat::pump() {
 
     prune();
 
-    if (plane->session_get_role() == NetwMultiplayer::ROLE_NONE) {
+    if (session->session_get_role() == NetwMultiplayer::ROLE_NONE) {
         return;
     }
-    const bool host = plane->is_host();
-    pump_local_id = plane->get_unique_id();
-    pump_server = plane->has_server_role();
+    const bool host = session->is_host();
+    pump_local_id = session->get_unique_id();
+    pump_server = session->has_server_role();
     pump_peers = pump_server ? PackedInt32Array()
-                             : gd::api_peer_ids(plane->session_get_inner());
+                             : gd::api_peer_ids(session->session_get_inner());
 
     LocalVector<Consumed *> &pass = pump_pass;
     pass.clear();
@@ -869,15 +865,13 @@ void SyncCompat::pump() {
         if (row->poisoned) {
             continue;
         }
-        Ref<NetwEntity> entity = entity_of(row);
-        if (entity.is_null() && host && !row->adopt_attempted) {
-            if (adopt_seam.is_valid()) {
-                adopt_seam.call(root);
-            }
+        const RID entity = entity_of(row);
+        if (!entity.is_valid() && host && !row->adopt_attempted) {
+            session->replication_adopt_in_place(root);
             row->adopt_attempted = NetwEntity::of(root).is_valid();
             continue;
         }
-        if (entity.is_null()) {
+        if (!entity.is_valid()) {
             continue;
         }
         if (row->sync_paths.is_empty() && row->watch_paths.is_empty()) {
@@ -910,8 +904,8 @@ void SyncCompat::pump() {
                 row->last_sync_usec = now;
                 NETW_NETWORK_PROFILE(
                     wire::ProfileSubjectScope observation(
-                        *books->profiler_outgoing,
-                        plane->profiler_synchronizer(
+                        *profiler_outgoing,
+                        session->profiler_synchronizer(
                             route,
                             row->sync,
                             row->root,
@@ -921,7 +915,7 @@ void SyncCompat::pump() {
                 );
                 for (int peer = 0; peer < recipients.size(); ++peer) {
                     note_encoded(recipients[peer], route, stock.size());
-                    plane->send_to(
+                    session->send_to(
                         recipients[peer],
                         route,
                         channel_sync,
@@ -946,7 +940,8 @@ void SyncCompat::pump() {
             send_deltas(row, route, recipients);
         }
 
-        watch_book.retain_baselines(row->id, recipients);
+        watch_book
+            .retain_baselines(row->id, recipients.ptr(), recipients.size());
     }
 }
 
@@ -958,7 +953,7 @@ PackedByteArray SyncCompat::encode_sync_frame(
     if (!gather(p_row, p_row->sync_fields, false)) {
         return PackedByteArray();
     }
-    return sync_kernel::encode_volatile(ordinal_of(p_row), gathered);
+    return sync_kernel::encode_volatile(ordinal_of(p_row), gathered, session);
 }
 
 void SyncCompat::poll_watchers(Consumed *p_row) {
@@ -968,7 +963,26 @@ void SyncCompat::poll_watchers(Consumed *p_row) {
         profile::SUBSYSTEM_WIRE
     );
     gather(p_row, p_row->watch_fields, true);
-    watch_book.poll(p_row->id, gathered, gathered_readable);
+    const uint32_t count = uint32_t(gathered.size());
+    watched.resize(count);
+    watched_readable.resize(count);
+    for (uint32_t at = 0; at < count; ++at) {
+        watched_readable[at] = bool(gathered_readable[at]) ? 1 : 0;
+        const Variant value = gathered[at];
+        const Error refusal = wire::value_tail(value, watched[at]);
+        if (refusal != OK) {
+            call_args::report_unsendable(
+                session,
+                vformat(
+                    "Watched property '%s'",
+                    String(p_row->watch_fields[at]->property)
+                ),
+                value,
+                refusal
+            );
+        }
+    }
+    watch_book.poll(p_row->id, watched, watched_readable);
 }
 
 void SyncCompat::send_deltas(
@@ -976,15 +990,14 @@ void SyncCompat::send_deltas(
     int64_t p_route,
     const PackedInt32Array &p_recipients
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !watch_book.is_inited(p_row->id)) {
+    if (session == nullptr || !watch_book.is_inited(p_row->id)) {
         return;
     }
     const int64_t ordinal = ordinal_of(p_row);
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
-            *books->profiler_outgoing,
-            plane->profiler_synchronizer(
+            *profiler_outgoing,
+            session->profiler_synchronizer(
                 p_route,
                 p_row->sync,
                 p_row->root,
@@ -995,19 +1008,27 @@ void SyncCompat::send_deltas(
     for (int at = 0; at < p_recipients.size(); ++at) {
         const int64_t peer_id = p_recipients[at];
         uint64_t mask = 0;
-        Array values;
-        watch_book.mask_for(p_row->id, peer_id, mask, values);
+        LocalVector<wire::TailRef> tails;
+        watch_book.mask_for(p_row->id, peer_id, mask, tails);
         watch_book.commit(p_row->id, peer_id);
         if (mask == 0) {
             continue;
         }
-        const PackedByteArray bytes
-            = sync_kernel::encode_retained(ordinal, int64_t(mask), values);
+        Array values;
+        for (const wire::TailRef &tail : tails) {
+            values.push_back(wire::tail_value(false, tail));
+        }
+        const PackedByteArray bytes = sync_kernel::encode_retained(
+            ordinal,
+            int64_t(mask),
+            values,
+            session
+        );
         if (bytes.is_empty()) {
             continue;
         }
         note_encoded(peer_id, p_route, bytes.size());
-        plane->send_to(
+        session->send_to(
             peer_id,
             p_route,
             channel_sync_delta,
@@ -1021,7 +1042,7 @@ void SyncCompat::send_deltas(
 }
 
 void SyncCompat::note_encoded(int64_t p_peer, int64_t p_route, int64_t p_bytes) {
-    core()->event_record(
+    session->event_record(
         EventPlane::SYNC_ENCODE,
         RID(),
         p_route,
@@ -1044,9 +1065,8 @@ bool SyncCompat::decode_row(
         : sync_kernel::decode_volatile(p_payload, p_columns, decoded);
     r_values = decoded.values;
     const Error verdict = valid ? OK : ERR_INVALID_DATA;
-    NetwMultiplayer *plane = core();
-    const int64_t route = books->liveness->route_of(p_entity);
-    plane->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
+    const int64_t route = liveness_core->route_of(p_entity);
+    session->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
     return valid;
 }
 
@@ -1116,7 +1136,7 @@ void SyncCompat::apply(
 }
 
 void SyncCompat::handle_sync(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
     int64_t p_sender
 ) {
@@ -1125,14 +1145,12 @@ void SyncCompat::handle_sync(
         colors::WIRE,
         profile::SUBSYSTEM_ENTITY,
         "entity %lld",
-        p_entity.is_valid() ? static_cast<long long>(p_entity->get_route())
-                            : 0LL
+        static_cast<long long>(p_entity.get_id())
     );
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || p_entity.is_null()) {
+    if (session == nullptr || !p_entity.is_valid()) {
         return;
     }
-    const int64_t route = books->liveness->route_of(p_entity->get_rid_handle());
+    const int64_t route = liveness_core->route_of(p_entity);
     wire::ReadStream reader(p_payload);
     sync_kernel::VolatileHead head;
     if (!sync_kernel::VolatileHead::wire.run(reader, head)) {
@@ -1145,8 +1163,8 @@ void SyncCompat::handle_sync(
         return;
     }
     refresh_row(row);
-    NETW_NETWORK_PROFILE(books->profiler->name_arrival(
-        plane->profiler_synchronizer(route, row->sync, row->root, row->config)
+    NETW_NETWORK_PROFILE(network_profiler->name_arrival(
+        session->profiler_synchronizer(route, row->sync, row->root, row->config)
     ));
     validate_schema(row, route);
     if (row->poisoned) {
@@ -1162,7 +1180,7 @@ void SyncCompat::handle_sync(
     if (flags != sync_kernel::RESERVED) {
         drops_sync_unknown_flag += 1;
         fault::raise(
-            plane,
+            session,
             NETW_FAULT_MALFORMED_DATAGRAM,
             {String(), String(), String(), p_sender},
             gd::instance_id(sync)
@@ -1172,7 +1190,7 @@ void SyncCompat::handle_sync(
 
     Array values;
     const bool valid = decode_row(
-        p_entity->get_rid_handle(),
+        p_entity,
         p_payload,
         int64_t(row->sync_paths.size()),
         false,
@@ -1195,7 +1213,7 @@ void SyncCompat::handle_sync(
 }
 
 void SyncCompat::handle_sync_delta(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
     int64_t p_sender
 ) {
@@ -1204,14 +1222,12 @@ void SyncCompat::handle_sync_delta(
         colors::WIRE,
         profile::SUBSYSTEM_ENTITY,
         "entity %lld",
-        p_entity.is_valid() ? static_cast<long long>(p_entity->get_route())
-                            : 0LL
+        static_cast<long long>(p_entity.get_id())
     );
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || p_entity.is_null()) {
+    if (session == nullptr || !p_entity.is_valid()) {
         return;
     }
-    const int64_t route = books->liveness->route_of(p_entity->get_rid_handle());
+    const int64_t route = liveness_core->route_of(p_entity);
     wire::ReadStream reader(p_payload);
     sync_kernel::RetainedHead head;
     if (!sync_kernel::RetainedHead::wire.run(reader, head)) {
@@ -1224,8 +1240,8 @@ void SyncCompat::handle_sync_delta(
         return;
     }
     refresh_row(row);
-    NETW_NETWORK_PROFILE(books->profiler->name_arrival(
-        plane->profiler_synchronizer(route, row->sync, row->root, row->config)
+    NETW_NETWORK_PROFILE(network_profiler->name_arrival(
+        session->profiler_synchronizer(route, row->sync, row->root, row->config)
     ));
     validate_schema(row, route);
     if (row->poisoned) {
@@ -1246,7 +1262,7 @@ void SyncCompat::handle_sync_delta(
 
     Array values;
     const bool valid = decode_row(
-        p_entity->get_rid_handle(),
+        p_entity,
         p_payload,
         int64_t(row->watch_paths.size()),
         true,
@@ -1345,8 +1361,7 @@ void SyncCompat::refresh_feed(Consumed *p_row) {
 }
 
 void SyncCompat::feed_interpolation(Consumed *p_row) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
     MultiplayerSynchronizer *sync = p_row->sync_node();
@@ -1364,7 +1379,7 @@ void SyncCompat::feed_interpolation(Consumed *p_row) {
     if (!p_row->feed_any) {
         return;
     }
-    const ClockEngine &clock = *books->clock;
+    const Clock &clock = *clock_engine;
     const int64_t tick = clock.get_configured() ? clock.get_tick() : 0;
     for (uint32_t at = 0; at < p_row->feed_nodes.size(); ++at) {
         Node *node = Object::cast_to<Node>(
@@ -1381,7 +1396,7 @@ void SyncCompat::feed_interpolation(Consumed *p_row) {
         const Ref<NetwInterpolate> spec
             = netw::script::model::get_node_property_interpolator(node, prop);
         if (spec.is_valid()) {
-            plane->display_record(
+            session->display_record(
                 node,
                 prop,
                 node->get(prop),
@@ -1450,11 +1465,10 @@ void SyncCompat::clear_peer(int64_t p_peer_id) {
 }
 
 void SyncCompat::dispose() {
-    NetwMultiplayer *plane = core();
     hears_entity_live = false;
-    if (plane != nullptr) {
+    if (session != nullptr) {
         const Callable heard
-            = callable_mp(plane, &NetwMultiplayer::sync_compat_node_removed);
+            = callable_mp(session, &NetwMultiplayer::sync_compat_node_removed);
         SceneTree *tree = gd::scene_tree();
         if (tree != nullptr && tree->is_connected(SIG_NODE_REMOVED, heard)) {
             tree->disconnect(SIG_NODE_REMOVED, heard);

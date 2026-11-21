@@ -85,10 +85,13 @@ struct Evidence {
     Vector2 beaten;
 };
 
-int64_t stat_of(Object *p_core, const char *p_name) {
-    return int64_t(
-        netw_test::flow_core(p_core)->session_get_stats().get(p_name, 0)
-    );
+constexpr netw::NetwMultiplayer::Stat RETAINED_OUT
+    = netw::NetwMultiplayer::STAT_RETAINED_FRAMES_OUT;
+constexpr netw::NetwMultiplayer::Stat ROWS_OUT
+    = netw::NetwMultiplayer::STAT_ROW_FRAMES_OUT;
+
+int64_t stat_of(Object *p_core, netw::NetwMultiplayer::Stat p_stat) {
+    return netw_test::flow_core(p_core)->stats_get(p_stat);
 }
 
 class FlowRun {
@@ -200,14 +203,14 @@ class FlowRun {
         for (int tick = 0; tick < PHASE; ++tick) {
             drive_pair(p_rig, p_pair);
         }
-        seen.retained_settled = stat_of(p_rig.server(), "retained_frames_out");
+        seen.retained_settled = stat_of(p_rig.server(), RETAINED_OUT);
         for (int tick = 0; tick < PHASE; ++tick) {
             drive_pair(p_rig, p_pair);
         }
-        seen.retained_quiet = stat_of(p_rig.server(), "retained_frames_out");
+        seen.retained_quiet = stat_of(p_rig.server(), RETAINED_OUT);
         p_pair.authored->set(StringName("stunned"), true);
         p_rig.step_ticks(BEAT_TICKS);
-        seen.retained_flipped = stat_of(p_rig.server(), "retained_frames_out");
+        seen.retained_flipped = stat_of(p_rig.server(), RETAINED_OUT);
         seen.mirror_holds_flip
             = bool(p_pair.mirror(0)->get(StringName("stunned")));
     }
@@ -230,23 +233,23 @@ class FlowRun {
         }
         p_rig.step_ticks(HEAL_TICKS);
         seen.healed = others(p_pair);
-        seen.rows_before_quiet = stat_of(author_core, "row_frames_out");
+        seen.rows_before_quiet = stat_of(author_core, ROWS_OUT);
         if (declared.keeps_authoring) {
             author(p_rig, p_pair, QUIET_TICKS);
             seen.last_authored = authored(step - QUIET_TICKS);
         } else {
             p_rig.step_ticks(QUIET_TICKS);
         }
-        seen.rows_after_quiet = stat_of(author_core, "row_frames_out");
+        seen.rows_after_quiet = stat_of(author_core, ROWS_OUT);
     }
 
     void run_heartbeat(LoopbackRig &p_rig, const FlowPair &p_pair) {
         author(p_rig, p_pair, 1);
         p_rig.step_ticks(BEAT_TICKS * 2);
         p_pair.mirror(0)->set(StringName("aim_dir"), Vector2(-7.0, -7.0));
-        const int64_t before = stat_of(p_rig.server(), "row_frames_out");
+        const int64_t before = stat_of(p_rig.server(), ROWS_OUT);
         p_rig.step_ticks(BEAT_TICKS * 2 + HEAL_TICKS);
-        seen.beats = stat_of(p_rig.server(), "row_frames_out") - before;
+        seen.beats = stat_of(p_rig.server(), ROWS_OUT) - before;
         seen.beaten = p_pair.mirror(0)->get(StringName("aim_dir"));
     }
 

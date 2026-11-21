@@ -712,13 +712,17 @@ public:
         stream.varuint(epoch, 3);
         netw::wire::string_field(stream, reason);
         stream.align_verify();
-        pipeline->handle_despawn_frame(stream.to_bytes(), 1);
+        netw::NetwMultiplayer *core
+            = p_client < 0 ? server() : client(p_client);
+        core->spawn_handle_despawn_frame(stream.to_bytes(), 1);
     }
 
     void deliver_spawn(int p_client, const godot::PackedByteArray &p_frame) {
         netw::spawn::Pipeline *pipeline = spawn_plane(p_client);
         if (pipeline != nullptr) {
-            pipeline->handle_spawn_frame(p_frame, 1);
+            netw::NetwMultiplayer *core
+                = p_client < 0 ? server() : client(p_client);
+            core->spawn_handle_spawn_frame(p_frame, 1);
         }
     }
 
@@ -735,9 +739,13 @@ public:
         return client_apis.size();
     }
 
-    netw::ClockEngine &clock_of(netw::NetwMultiplayer *p_core) const {
+    netw::Clock &clock_of(netw::NetwMultiplayer *p_core) const {
+        return Internals::clock_engine(stepped(p_core));
+    }
+
+    netw::NetwMultiplayer *stepped(netw::NetwMultiplayer *p_core) const {
         REQUIRE_MESSAGE(p_core != nullptr, "a clock needs a session to be on");
-        return Internals::clock_engine(p_core);
+        return p_core;
     }
 
     godot::RID client_entity_of(
@@ -1313,9 +1321,9 @@ public:
     void step_ticks(int p_ticks) {
         REQUIRE_MESSAGE(p_ticks >= 0, "a tick count cannot be negative");
         for (int step = 0; step < p_ticks; ++step) {
-            clock_of(server()).force_step(1);
+            Internals::run_ticks(stepped(server()), 1);
             for (int index = 0; index < count(); ++index) {
-                clock_of(client(index)).force_step(1);
+                Internals::run_ticks(stepped(client(index)), 1);
             }
             link->advance_time(tick_period_ms);
             poll_api(server_api);
@@ -1346,26 +1354,26 @@ public:
             p_server_ticks >= 0,
             "a frame tick count cannot be negative"
         );
-        netw::ClockEngine &server_clock = clock_of(server());
+        netw::NetwMultiplayer *host = stepped(server());
         if (p_server_present) {
-            server_clock.begin_tick_loop();
+            Internals::frame_begin(host);
         }
         for (int index = 0; index < count(); ++index) {
-            clock_of(client(index)).begin_tick_loop();
+            Internals::frame_begin(stepped(client(index)));
         }
         if (p_server_present && p_server_ticks > 0) {
-            server_clock.force_step(p_server_ticks);
+            Internals::run_ticks(host, p_server_ticks);
         }
         if (p_client_ticks > 0) {
             for (int index = 0; index < count(); ++index) {
-                clock_of(client(index)).force_step(p_client_ticks);
+                Internals::run_ticks(stepped(client(index)), p_client_ticks);
             }
         }
         if (p_server_present) {
-            server_clock.end_tick_loop();
+            Internals::frame_end(host);
         }
         for (int index = 0; index < count(); ++index) {
-            clock_of(client(index)).end_tick_loop();
+            Internals::frame_end(stepped(client(index)));
         }
         link->advance_time(tick_period_ms);
         poll_api(server_api);

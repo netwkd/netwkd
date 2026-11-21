@@ -231,7 +231,7 @@ TEST_CASE(
     made.layer->remove_viewer(watcher);
     rig.flush_interest();
     rig.pump(10);
-    rig.client(0)->liveness_adopt(stale.ptr());
+    stale->adopt_in(rig.client(0));
     NETW_CHECK_EQ(
         state_of(rig, 0, made.route),
         int64_t(NetwLivenessCore::STATE_ABSENT)

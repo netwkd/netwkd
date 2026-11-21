@@ -35,14 +35,14 @@ bool tree_paused() {
 void server_says_paused(NetwMultiplayer *p_core, bool p_paused) {
     if (p_paused) {
         p_core->session_publish_control(
-            netw::wire::builtin_channel("SESSION_PAUSE"),
+            netw::wire::CHANNEL_SESSION_PAUSE,
             MultiplayerPeer::TARGET_PEER_SERVER,
             netw::session::frame_write(netw::session::SessionReason{String()})
         );
         return;
     }
     p_core->session_publish_control(
-        netw::wire::builtin_channel("SESSION_UNPAUSE"),
+        netw::wire::CHANNEL_SESSION_UNPAUSE,
         MultiplayerPeer::TARGET_PEER_SERVER,
         PackedByteArray()
     );

@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/frame.hpp"
 
 #include <cstring>
@@ -201,10 +203,8 @@ FrameWalk frame_unpack_all(const PackedByteArray &p_framed, int64_t p_from) {
     return walk;
 }
 
-Dictionary frame_spec_records() {
-    Dictionary out;
-    out["FrameHeader"] = FrameHeader::wire.spec_dump();
-    return out;
+std::vector<SpecRecord> frame_spec_rows() {
+    return {{"FrameHeader", field_specs(FrameHeader::wire)}};
 }
 
 } // namespace netw::wire

@@ -62,13 +62,14 @@ bool header_matches(
 
 PackedByteArray reply_with(
     const PackedByteArray &p_header,
-    const Ref<NetwServerInfo> &p_info
+    const Ref<NetwServerInfo> &p_info,
+    NetwMultiplayer *p_session
 ) {
     PackedByteArray buffer = p_header;
     buffer.append_array(
         auth::encode_probe_reply(
             int(auth::ProbeStatus::OK),
-            NetwServerInfo::to_payload(p_info)
+            NetwServerInfo::payload_for(p_info, p_session)
         )
     );
     return buffer;
@@ -98,20 +99,22 @@ PackedByteArray encode_reply(
     uint64_t p_nonce,
     uint64_t p_instance,
     int64_t p_gameplay_port,
-    const Ref<NetwServerInfo> &p_info
+    const Ref<NetwServerInfo> &p_info,
+    NetwMultiplayer *p_session
 ) {
     PackedByteArray head = header(REPLY_BYTES, p_app_tag, p_nonce);
     append_u64(head, p_instance);
     head.push_back(uint8_t(p_gameplay_port & 0xFF));
     head.push_back(uint8_t((p_gameplay_port >> 8) & 0xFF));
-    PackedByteArray whole = reply_with(head, p_info);
+    PackedByteArray whole = reply_with(head, p_info, p_session);
     if (whole.size() <= MAX_DATAGRAM || p_info.is_null()) {
         return whole;
     }
-    const Ref<NetwServerInfo> trimmed
-        = NetwServerInfo::from_payload(NetwServerInfo::to_payload(p_info));
+    const Ref<NetwServerInfo> trimmed = NetwServerInfo::from_payload(
+        NetwServerInfo::payload_for(p_info, p_session)
+    );
     trimmed->set_metadata(Dictionary());
-    return reply_with(head, trimmed);
+    return reply_with(head, trimmed, p_session);
 }
 
 bool decode_reply(

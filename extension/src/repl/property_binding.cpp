@@ -431,10 +431,10 @@ void PropertyBinding::resolve_entity_row(
         );
         const int64_t resolved = p_send->entity_resolve(
             slot,
-            int64_t(r_table.read_value(p_row, uint32_t(at)))
+            int64_t(store::read_value(r_table, p_row, uint32_t(at)))
         );
         if (p_write) {
-            r_table.write_value(p_row, uint32_t(at), resolved);
+            store::write_value(r_table, p_row, uint32_t(at), resolved);
         }
     }
 }
@@ -515,10 +515,6 @@ bool PropertyBinding::retains_arrivals() const {
     return entity.is_valid() && entity->is_claim_running_ahead();
 }
 
-bool PropertyBinding::retains_arrivals(const NetwEntity *p_entity) const {
-    return follows_tenure() && p_entity != nullptr
-        && p_entity->is_claim_running_ahead();
-}
 
 Array PropertyBinding::quantizers_of() const {
     Array out;
@@ -593,9 +589,10 @@ bool PropertyBinding::writes_node(bool p_retained) const {
 
 bool PropertyBinding::writes_node(
     bool p_retained,
-    const NetwEntity *p_entity
+    bool p_claim_running_ahead
 ) const {
-    return (p_retained || write_gate) && !retains_arrivals(p_entity);
+    return (p_retained || write_gate)
+        && !(follows_tenure() && p_claim_running_ahead);
 }
 
 void PropertyBinding::notify_landed(

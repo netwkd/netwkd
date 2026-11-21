@@ -4,6 +4,7 @@
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/game_call.hpp"
 
 using namespace godot;
 
@@ -26,8 +27,13 @@ RID NetwSimulation::entity_rid() const {
 
 void NetwSimulation::write(int p_param, const Variant &p_value) {
     const Ref<NetwEntity> bound = entity();
+    if (bound.is_null()) {
+        return;
+    }
     NetwMultiplayer::sim_write_param(
-        bound.ptr(),
+        bound->home_session(),
+        *bound->get_record(),
+        bound->get_owner(),
         NetwMultiplayer::SimulationParam(p_param),
         p_value
     );
@@ -35,9 +41,18 @@ void NetwSimulation::write(int p_param, const Variant &p_value) {
 
 Variant NetwSimulation::read(int p_param) const {
     const Ref<NetwEntity> bound = entity();
+    const auto param = NetwMultiplayer::SimulationParam(p_param);
+    if (bound.is_null()) {
+        return NetwMultiplayer::sim_read_param(
+            NetwEntityRecord(),
+            nullptr,
+            param
+        );
+    }
     return NetwMultiplayer::sim_read_param(
-        bound.ptr(),
-        NetwMultiplayer::SimulationParam(p_param)
+        *bound->get_record(),
+        bound->get_owner(),
+        param
     );
 }
 
@@ -84,12 +99,26 @@ void NetwSimulation::set_max_restore_ticks(int p_value) {
 
 Callable NetwSimulation::get_network_process() const {
     const Ref<NetwEntity> bound = entity();
-    return NetwMultiplayer::sim_step_of(bound.ptr());
+    if (bound.is_null()) {
+        return Callable();
+    }
+    return NetwMultiplayer::sim_step_of(
+        *bound->get_record(),
+        bound->get_owner()
+    );
 }
 
 void NetwSimulation::set_network_process(const Callable &p_value) {
     const Ref<NetwEntity> bound = entity();
-    NetwMultiplayer::sim_write_step(bound.ptr(), p_value);
+    game_call_declared(p_value, game_calls::SIMULATION_STEP);
+    if (bound.is_null()) {
+        return;
+    }
+    NetwMultiplayer::sim_write_step(
+        bound->home_session(),
+        *bound->get_record(),
+        p_value
+    );
 }
 
 bool NetwSimulation::get_claim_on_contact() const {
@@ -118,7 +147,8 @@ void NetwSimulation::set_physics_driven(bool p_value) {
 
 NetwSimulation::Mode NetwSimulation::get_mode() const {
     const Ref<NetwEntity> bound = entity();
-    NetwMultiplayer *home = NetwMultiplayer::entity_home(bound.ptr());
+    NetwMultiplayer *home
+        = bound.is_valid() ? bound->home_session() : nullptr;
     return home != nullptr ? home->simulation_get_mode(entity_rid())
                            : MODE_NONE;
 }

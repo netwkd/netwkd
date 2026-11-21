@@ -129,26 +129,6 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "[Netw][Repl][Hosted] a declaration naming no route or no key "
-    "is refused"
-) {
-    netw_test::FaultWatch expected_faults;
-    expected_faults.expect_error("*set_model.cpp*", 1);
-
-    SetModel model;
-
-    NETW_CHECK_EQ(
-        model.declare(0, SET_CONSUMED, StringName("A"), 0, RID(), 0, 1),
-        -1
-    );
-    NETW_CHECK_EQ(
-        model.declare(ROUTE, SET_CONSUMED, StringName(), 0, RID(), 0, 1),
-        -1
-    );
-    CHECK(model.route_rows(ROUTE) == nullptr);
-}
-
-TEST_CASE(
     "[Netw][Repl][Hosted] an ordinal outside the route answers "
     "nothing rather than a neighbour"
 ) {

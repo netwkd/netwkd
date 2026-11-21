@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/probe_guard.hpp"
 
 namespace netw {

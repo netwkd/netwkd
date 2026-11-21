@@ -11,7 +11,10 @@ MODULE = "NETW_MODULE"
 PROFILING = "NETW_PROFILING"
 TESTS = "NETW_TESTS"
 
-FAULT_TEXT = ROOT / "src" / "api" / "fault_text.cpp"
+SWITCH_SOURCES = (
+    ROOT / "src" / "api" / "fault_text.cpp",
+    ROOT / "src" / "api" / "replication_core.cpp",
+)
 
 SWITCH_ERROR_FLAGS = {
     "msvc": ["/we4062"],
@@ -26,8 +29,9 @@ def dialect(env):
 
 def source_paths(netw_tests=False):
     """Every translation unit both build entries compile, in a fixed order,
-    apart from FAULT_TEXT, which each entry compiles with SWITCH_ERROR_FLAGS."""
-    paths = sorted(path for path in (ROOT / "src").rglob("*.cpp") if path != FAULT_TEXT)
+    apart from SWITCH_SOURCES, which each entry compiles with
+    SWITCH_ERROR_FLAGS."""
+    paths = sorted(path for path in (ROOT / "src").rglob("*.cpp") if path not in SWITCH_SOURCES)
     paths += [ROOT / "register_types.cpp"]
     if netw_tests:
         paths += sorted((ROOT / "tests").rglob("*.cpp"))

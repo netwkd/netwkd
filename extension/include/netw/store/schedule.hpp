@@ -4,7 +4,7 @@
 
 namespace netw::store {
 
-class World;
+class Store;
 class Table;
 
 enum class RowClass : uint8_t { RESTING, MOVING, INTERACTING, PLAYER };
@@ -21,7 +21,7 @@ float class_weight(RowClass p_class);
 const char *class_name(RowClass p_class);
 
 RowClass row_class(
-    const World &p_world,
+    const Store &p_world,
     const Table &p_table,
     uint32_t p_row,
     int64_t p_tick,
@@ -29,7 +29,7 @@ RowClass row_class(
 );
 
 float importance(
-    const World &p_world,
+    const Store &p_world,
     const Table &p_table,
     uint32_t p_row,
     int64_t p_tick,

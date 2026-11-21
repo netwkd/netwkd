@@ -51,7 +51,7 @@ Mounted mount(
         made.root->set_name(p_stem);
     }
     made.entity.instantiate();
-    NetwMultiplayer::wrapper_attach_to(made.root, made.entity);
+    made.entity->adopt_root(made.root);
     made.entity->set_scene_isolation(
         p_owns_its_world ? int64_t(NetwSceneCore::ISOLATION_OWN_WORLD)
                          : int64_t(NetwSceneCore::ISOLATION_NONE)
@@ -211,10 +211,10 @@ TEST_CASE(
     core.instantiate();
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    REQUIRE(core->liveness_bind(
+    REQUIRE(arena.entity->bind_route(
+        core.ptr(),
         arena.scene,
         Internals::get_liveness_core(core)->reserve_route(),
-        arena.entity,
         arena.root
     ));
     const Ref<netw::NetwSession> session = core->get_session();
@@ -254,7 +254,7 @@ TEST_CASE(
     root->add_child(arena);
     Ref<netw::NetwEntity> seated;
     seated.instantiate();
-    NetwMultiplayer::wrapper_attach_to(arena, seated);
+    seated->adopt_root(arena);
     Internals::adopt_handle(
         seated,
         Internals::get_liveness_core(core)->entity_create()
@@ -280,24 +280,12 @@ TEST_CASE(
 ) {
     Ref<NetwMultiplayer> core;
     core.instantiate();
-    Node *root = memnew(Node);
-    const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    const Mounted annex = mount_plain(core, root, StringName("Annex"));
-
-    Node *body = memnew(Node);
-    arena.root->add_child(body);
-    Ref<netw::NetwEntity> mover;
-    mover.instantiate();
-    NetwMultiplayer::wrapper_attach_to(body, mover);
-
     Ref<netw::NetwPromise> settled;
     settled.instantiate();
-    core->scene_arrive(mover, arena.root, annex.root, settled);
+    core->scene_arrive(settled);
 
     CHECK(settled->get_is_settled());
     NETW_CHECK_EQ(settled->get_code(), int(OK));
-
-    memdelete(root);
 }
 
 TEST_CASE(
@@ -309,10 +297,10 @@ TEST_CASE(
     core.instantiate();
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    REQUIRE(core->liveness_bind(
+    REQUIRE(arena.entity->bind_route(
+        core.ptr(),
         arena.scene,
         Internals::get_liveness_core(core)->reserve_route(),
-        arena.entity,
         arena.root
     ));
     const Ref<netw::NetwScene> scene = core->scene_handle_of(arena.scene);
@@ -357,10 +345,10 @@ TEST_CASE(
     core->set_interest_flush(flushed.callable("flush"));
     Node *root = memnew(Node);
     const Mounted arena = mount_plain(core, root, StringName("Arena"));
-    REQUIRE(core->liveness_bind(
+    REQUIRE(arena.entity->bind_route(
+        core.ptr(),
         arena.scene,
         Internals::get_liveness_core(core)->reserve_route(),
-        arena.entity,
         arena.root
     ));
     const Ref<netw::NetwScene> scene = core->scene_handle_of(arena.scene);
@@ -410,22 +398,22 @@ TEST_CASE(
     root->add_child(arena);
     Ref<netw::NetwEntity> arena_wrapper;
     arena_wrapper.instantiate();
-    NetwMultiplayer::wrapper_attach_to(arena, arena_wrapper);
+    arena_wrapper->adopt_root(arena);
     arena_wrapper->set_declares_scene(true);
     const RID scene = Internals::get_liveness_core(core)->entity_create();
     Internals::adopt_handle(arena_wrapper, scene);
     REQUIRE(Internals::entity_of(core, arena) == scene);
-    REQUIRE(core->liveness_bind(scene, 61, arena_wrapper, arena));
+    REQUIRE(arena_wrapper->bind_route(core.ptr(), scene, 61, arena));
 
     Node *body = memnew(Node);
     arena->add_child(body);
     Ref<netw::NetwEntity> player;
     player.instantiate();
-    NetwMultiplayer::wrapper_attach_to(body, player);
+    player->adopt_root(body);
     const RID mover = Internals::get_liveness_core(core)->entity_create();
     Internals::adopt_handle(player, mover);
     REQUIRE(Internals::entity_of(core, body) == mover);
-    REQUIRE(core->liveness_bind(mover, 62, player, body));
+    REQUIRE(player->bind_route(core.ptr(), mover, 62, body));
     const int64_t host = MultiplayerPeer::TARGET_PEER_SERVER;
     player->set_peer_id(host);
 

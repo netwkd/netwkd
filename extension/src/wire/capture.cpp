@@ -7,6 +7,7 @@
 #include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
+#include "netw/wire/spec_dump.hpp"
 
 using namespace godot;
 
@@ -35,7 +36,7 @@ bool capture_record_next(ReadStream &p_stream, CaptureRecord &r_record) {
 
 Dictionary capture_spec_records() {
     Dictionary out;
-    out["CaptureRecord"] = CaptureRecord::wire.spec_dump();
+    out["CaptureRecord"] = spec_dump(CaptureRecord::wire);
     return out;
 }
 

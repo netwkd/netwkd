@@ -14,6 +14,7 @@
 #include "netw/wire/frame.hpp"
 #include "netw/wire/plan.hpp"
 #include "netw/wire/registry.hpp"
+#include "netw/wire/spec_dump.hpp"
 
 using namespace godot;
 
@@ -114,10 +115,10 @@ Dictionary spec_records() {
     out.merge(frame_spec_records());
     out.merge(spawn::verb_spec_records());
     out.merge(session::frame_spec_records());
-    out.merge(interest::awareness_spec_records());
+    out.merge(awareness_spec_records());
     out.merge(store::Arrays::frame_spec_records());
     out.merge(sync_kernel::frame_spec_records());
-    out.merge(NetwCarrierFrame::spec_records());
+    out.merge(carrier_spec_records());
     out.merge(capture_spec_records());
     out.merge(control_spec_records());
     return out;

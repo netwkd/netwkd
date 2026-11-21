@@ -4,7 +4,7 @@
 		[NetwQuantize] that wraps an angle in radians onto an exact bit count.
 	</brief_description>
 	<description>
-		Compresses a [float] angle into [member bit_count] bits. The angle wraps around, so values near [code]0[/code] and [constant @GDScript.TAU] stay close.
+		Compresses a [float] angle into [member bit_count] bits. The angle wraps around, so values near [code]0[/code] and [constant @GDScript.TAU] stay close. A property reads these settings when it is declared, so set them before.
 		[codeblock]
 		var q := NetwQuantizeAngle.new().bits(8)              # 0 &lt;= angle &lt; TAU
 		var e := NetwQuantizeAngle.new().bits(16).centered()  # -PI &lt; angle &lt;= PI

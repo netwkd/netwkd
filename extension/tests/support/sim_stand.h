@@ -186,7 +186,7 @@ public:
     void step_ticks(int p_ticks) {
         for (int tick = 0; tick < p_ticks; ++tick) {
             for (const godot::Ref<netw::NetwMultiplayer> &api : apis) {
-                Internals::clock_engine(api).force_step(1);
+                Internals::run_ticks(api, 1);
             }
             link->advance_time(1000.0 / double(tickrate));
             for (const godot::Ref<netw::NetwMultiplayer> &api : apis) {

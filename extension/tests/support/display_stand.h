@@ -141,7 +141,7 @@ inline void pump_at(
     int p_offset,
     double p_factor
 ) {
-    netw::ClockEngine &clock = Internals::clock_engine(p_core);
+    netw::Clock &clock = Internals::clock_engine(p_core);
     clock.set_tick(int(p_tick));
     clock.set_display_offset(p_offset);
     clock.set_tick_factor_override(p_factor);

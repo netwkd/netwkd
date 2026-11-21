@@ -10,7 +10,7 @@
 #include "netw/object_port.hpp"
 #include "netw/predict/wiring.hpp"
 #include "netw/slot_ids.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 
 namespace netw {
 
@@ -30,7 +30,7 @@ class NetwLagCompCore {
     godot::LocalVector<Row *> rows;
     godot::HashMap<uint64_t, int64_t> slot_by_entity;
     SlotIds ids;
-    store::World *world = nullptr;
+    store::Store *world = nullptr;
 
     static uint64_t entity_key(const godot::Ref<godot::RefCounted> &p_entity);
 
@@ -52,7 +52,7 @@ public:
     NetwLagCompCore &operator=(const NetwLagCompCore &) = delete;
     ~NetwLagCompCore();
 
-    void seat_world(store::World *p_world) {
+    void seat_world(store::Store *p_world) {
         world = p_world;
     }
 
@@ -108,7 +108,8 @@ public:
         int64_t p_slot,
         int64_t p_tick,
         const godot::Dictionary &p_payload,
-        const predict::FieldCodec &p_source
+        const predict::FieldCodec &p_source,
+        NetwMultiplayer *p_session = nullptr
     );
     godot::Dictionary timeline_sample(int64_t p_slot, int64_t p_tick) const;
     int64_t timeline_sample_tick(int64_t p_slot, int64_t p_tick) const;

@@ -13,13 +13,13 @@
 
 namespace netw {
 
-class NetwEntity;
+class Clock;
 class NetwMultiplayer;
 class NetwPredictionEngine;
 
-namespace session {
-struct Books;
-} // namespace session
+namespace store {
+class Store;
+} // namespace store
 
 namespace predict {
 struct Wiring;
@@ -67,7 +67,7 @@ void draw_ring_rows(
 
 struct RingSource {
     int64_t key = 0;
-    NetwEntity *entity = nullptr;
+    godot::NodePath visual_root;
     int64_t slot = -1;
     godot::Node *owner = nullptr;
 };
@@ -114,7 +114,12 @@ public:
 
     godot::LocalVector<RingSource> sources;
 
-    void sample(const session::Books &p_books, NetwMultiplayer &p_session);
+    void sample(
+        const Clock &p_clock,
+        const store::Store &p_store,
+        NetwPredictionEngine *p_prediction,
+        NetwMultiplayer &p_session
+    );
     const godot::LocalVector<RingRow> &rows() const {
         return sampled;
     }
@@ -128,7 +133,7 @@ private:
         godot::Vector3 simulated;
     };
 
-    struct Clock {
+    struct Now {
         int64_t tick = 0;
         double tick_seconds = 0.0;
     };
@@ -160,11 +165,11 @@ private:
     uint64_t generation = 0;
 
     void read(
-        const session::Books &p_books,
+        const store::Store &p_store,
         NetwMultiplayer &p_session,
         NetwPredictionEngine &p_pool,
         const Candidate &p_candidate,
-        const Clock &p_now
+        const Now &p_now
     );
     void forget_departed();
 };

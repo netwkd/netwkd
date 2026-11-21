@@ -214,7 +214,7 @@ public:
     ) const;
     bool holds(const godot::StringName &p_peer_class) const;
     godot::Array peer_classes() const;
-    godot::Array slots() const;
+    godot::TypedArray<godot::RID> slots() const;
     godot::RID slot_of(const godot::StringName &p_peer_class) const;
     const TransportRow *row(const godot::StringName &p_peer_class) const;
 
@@ -250,7 +250,7 @@ public:
     bool holds(const godot::StringName &p_peer_class) const;
     godot::RID slot_of(const godot::StringName &p_peer_class) const;
     godot::RID slot_of_script(const godot::Ref<godot::Script> &p_script) const;
-    godot::Array slots() const;
+    godot::TypedArray<godot::RID> slots() const;
     godot::Array peer_classes() const;
     void clear();
 

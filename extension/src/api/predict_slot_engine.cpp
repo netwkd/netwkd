@@ -22,7 +22,6 @@
 #include "netw/predict/tick_work.hpp"
 #include "netw/prediction_core.hpp"
 #include "netw/profile.hpp"
-#include "netw/session/books.hpp"
 #include "netw/session/event_plane.hpp"
 #include "netw/sim/row.hpp"
 #include "netw/stage.hpp"
@@ -121,22 +120,59 @@ bool role_drives_island(int p_role) {
         || p_role == NetwPrediction::ROLE_HOST_LOCAL;
 }
 
+Ref<NetwEntity> prediction_entity(const Ref<NetwPrediction> &p_handle) {
+    return p_handle.is_valid() ? p_handle->get_entity() : Ref<NetwEntity>();
+}
+
+Callable released_simulation_step(const Ref<NetwPrediction> &p_handle) {
+    const Ref<NetwEntity> entity = prediction_entity(p_handle);
+    return entity.is_valid()
+        ? NetwMultiplayer::sim_step_of(*entity->get_record(), entity->get_owner())
+        : Callable();
+}
+
 } // namespace
 
 NetwMultiplayer *NetwPredictSlotEngine::core_seated() const {
-    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
-}
-
-NetwMultiplayer *NetwPredictSlotEngine::core() const {
-    return core_seated();
+    return session;
 }
 
 NetwPredictionEngine *NetwPredictSlotEngine::seated_pool() const {
     return pool;
 }
 
-Ref<NetwEntity> NetwPredictSlotEngine::seated_entity() const {
-    return entity;
+bool NetwPredictSlotEngine::is_seated() const {
+#if defined(NETW_TESTS)
+    NETW_BUG_COND_V(
+        record != nullptr && !NetwEntityRecord::is_live(record),
+        false
+    );
+#endif
+    return record != nullptr;
+}
+
+RID NetwPredictSlotEngine::seated_rid() const {
+    return is_seated() ? record->get_handle() : RID();
+}
+
+NetwEntityRecord *NetwPredictSlotEngine::held_record() const {
+    return is_seated() ? record : nullptr;
+}
+
+Node *NetwPredictSlotEngine::seated_node() const {
+    return is_seated() ? Object::cast_to<Node>(gd::object_of(node)) : nullptr;
+}
+
+const NetwEntityRecord &NetwPredictSlotEngine::seated_record() const {
+    static const NetwEntityRecord unseated;
+    NETW_BUG_COND_V(!is_seated(), unseated);
+    return *record;
+}
+
+void NetwPredictSlotEngine::unseat() {
+    record = nullptr;
+    node = ObjectID();
+    decl = nullptr;
 }
 
 int64_t NetwPredictSlotEngine::native_slot() const {
@@ -144,39 +180,44 @@ int64_t NetwPredictSlotEngine::native_slot() const {
 }
 
 NetwPredictSlotEngine *NetwPredictSlotEngine::sibling(
-    const Ref<NetwEntity> &p_member
+    const RID &p_member
 ) const {
     NetwMultiplayer *seated = core_seated();
-    if (seated == nullptr || p_member.is_null()) {
+    if (seated == nullptr || !p_member.is_valid()) {
         return nullptr;
     }
     NetwPredictSlotEngine *const *held
-        = books->slot_engines->getptr(p_member->get_rid_handle().get_id());
+        = predict_engines->getptr(p_member.get_id());
     return held != nullptr ? *held : nullptr;
-}
-
-NetwPredictSlotEngine::Declaration NetwPredictSlotEngine::declaration_of(
-    const Ref<NetwEntity> &p_entity
-) const {
-    Declaration decided;
-    if (p_entity.is_null()) {
-        return decided;
-    }
-    const PropertyBindingPtr state = p_entity->get_state_binding();
-    const PropertyBindingPtr input = p_entity->get_input_binding();
-    decided.state = state != nullptr ? state->id : 0;
-    decided.input = input != nullptr ? input->id : 0;
-    decided.authority = p_entity->is_on_server();
-    decided.controlled_locally = p_entity->get_is_controlled_locally()
-        || (decided.authority
-            && p_entity->steering() == entity::Control::SERVER);
-    return decided;
 }
 
 NetwPredictSlotEngine::Declaration NetwPredictSlotEngine::
     resolved_declaration() const {
-    if (entity.is_valid()) {
-        return declaration_of(entity);
+    if (is_seated()) {
+        Node *owner = seated_node();
+        const PropertyBindingPtr state = session->entity_record_binding(
+            record,
+            owner,
+            repl::SET_RECORD_STATE,
+            seated_rid()
+        );
+        const PropertyBindingPtr input = session->entity_record_binding(
+            record,
+            owner,
+            repl::SET_RECORD_INPUT,
+            seated_rid()
+        );
+        const entity::Control *control = record->get_control();
+        const int64_t local = owner != nullptr ? session->sim_local_peer() : 0;
+        Declaration decided;
+        decided.state = state != nullptr ? state->id : 0;
+        decided.input = input != nullptr ? input->id : 0;
+        decided.authority = session->is_host();
+        decided.controlled_locally = control->controlled_by(local)
+            || control->runs_ahead()
+            || (decided.authority
+                && control->resolve() == entity::Control::SERVER);
+        return decided;
     }
     return declaration;
 }
@@ -231,8 +272,18 @@ int64_t NetwPredictSlotEngine::schedule() const {
     if (seated >= 0) {
         return seated;
     }
-    return handle.is_valid()
-        ? NetwMultiplayer::predict_schedule_of(entity.ptr())
+    if (is_seated()) {
+        return NetwMultiplayer::predict_schedule_of(
+            seated_record(),
+            seated_node()
+        );
+    }
+    const Ref<NetwEntity> entity = prediction_entity(handle);
+    return entity.is_valid()
+        ? NetwMultiplayer::predict_schedule_of(
+              *entity->get_record(),
+              entity->get_owner()
+          )
         : int(NetwSimulation::SCHEDULE_TICK);
 }
 
@@ -246,24 +297,31 @@ bool NetwPredictSlotEngine::ack_advanced() const {
 
 int64_t NetwPredictSlotEngine::route() const {
     NetwMultiplayer *seated = core_seated();
-    if (seated == nullptr || entity.is_null()) {
+    if (seated == nullptr || !is_seated()) {
         return -1;
     }
-    return books->liveness->route_of(entity->get_rid_handle());
+    return liveness_core->route_of(record->get_handle());
 }
 
 void NetwPredictSlotEngine::attach(
     Object *p_iface,
-    const Ref<NetwEntity> &p_entity,
-    const session::Books *p_books
+    NetwEntityRecord *p_record,
+    Node *p_node,
+    const Ref<NetwPrediction> &p_handle,
+    predict::Decl *p_decl,
+    NetwLivenessCore *p_liveness,
+    NetwPredictionEngine *p_prediction,
+    NetwPredictRunner *p_runner,
+    const sim::Rows *p_sims,
+    const HashMap<int64_t, NetwPredictSlotEngine *> *p_engines
 ) {
     NETW_ZONE_NC("Predict attach", colors::PREDICTION);
-    if (p_iface == nullptr || p_entity.is_null()) {
+    if (p_iface == nullptr || p_record == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,
             "Prediction did not attach engine %d to entity %d.",
             int(p_iface != nullptr),
-            int(p_entity.is_valid())
+            int(p_record != nullptr)
         );
         return;
     }
@@ -277,16 +335,17 @@ void NetwPredictSlotEngine::attach(
         );
         return;
     }
-    NETW_BUG_COND(p_books == nullptr);
-    core_id = gd::instance_id(seated);
-    books = p_books;
-    pool = books->prediction;
-    seat = pool != nullptr ? pool->slot_of(p_entity) : -1;
-    entity = p_entity;
-    handle = p_entity->get_prediction();
-    NetwEntityRecord *record
-        = NetwMultiplayer::find_record(seated, p_entity.ptr());
-    decl = record != nullptr ? &record->predict_declaration() : nullptr;
+    session = seated;
+    liveness_core = p_liveness;
+    predict_runner = p_runner;
+    sim_rows = p_sims;
+    predict_engines = p_engines;
+    pool = p_prediction;
+    record = p_record;
+    node = gd::instance_id(p_node);
+    seat = pool != nullptr ? pool->slot_of(record) : -1;
+    handle = p_handle;
+    decl = p_decl;
     if (pool == nullptr || handle.is_null() || decl == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,
@@ -296,7 +355,6 @@ void NetwPredictSlotEngine::attach(
         );
         return;
     }
-    decl->facts.bind_slot(pool, p_entity);
     rewire_on(resolved_declaration());
 }
 
@@ -326,6 +384,7 @@ void NetwPredictSlotEngine::release() {
     pool->set_parts(native_slot(), LocalVector<predict::StatePart>());
     pool->seat_arrivals(native_slot(), feed, nullptr);
     follows_control = false;
+    unseat();
 }
 
 void NetwPredictSlotEngine::refresh_simulation_gate(bool p_force_release) {
@@ -571,7 +630,7 @@ bool NetwPredictSlotEngine::defer_operator_for_witness(
         p_basis,
         p_payload,
         decl->correction_path.is_valid(),
-        NetwMultiplayer::predict_resolve_mode(entity.ptr())
+        NetwMultiplayer::predict_resolve_mode(seated_record(), seated_node())
             == NetwPrediction::MODE_OBSERVE
     );
     if (verdict == NetwPredictionEngine::DEFER_DISPLACED) {
@@ -661,12 +720,12 @@ void NetwPredictSlotEngine::begin_reseed(const predict::WritePlan &p_plan) {
     }
     const int64_t slot = native_slot();
     const int64_t basis = p_plan.basis;
-    const RecoveryPlan staged = plan_of(p_plan);
-    restore(
-        staged.write,
+    restore_row(
+        p_plan.write,
         int(predict::Operator::RESEED),
         basis,
         nullptr,
+        -1,
         true,
         true
     );
@@ -703,15 +762,17 @@ void NetwPredictSlotEngine::send_ack_frame() {
 }
 
 void NetwPredictSlotEngine::receive_relayed_command_frame(
-    const PackedByteArray &p_payload
+    const PackedByteArray &p_payload,
+    int64_t p_sender
 ) {
-    pool->admit_relayed_payload(native_slot(), p_payload);
+    pool->admit_relayed_payload(native_slot(), p_payload, p_sender);
 }
 
 void NetwPredictSlotEngine::receive_command_frame(
-    const PackedByteArray &p_payload
+    const PackedByteArray &p_payload,
+    int64_t p_sender
 ) {
-    pool->admit_command_payload(native_slot(), p_payload);
+    pool->admit_command_payload(native_slot(), p_payload, p_sender);
 }
 
 void NetwPredictSlotEngine::file_command_cell(
@@ -881,12 +942,35 @@ int NetwPredictSlotEngine::declared_correction() const {
 
 int NetwPredictSlotEngine::resolve_correction() const {
     if (decl == nullptr) {
+        const Ref<NetwEntity> entity = prediction_entity(handle);
+        const NetwEntityRecord *record
+            = entity.is_valid() ? entity->get_record() : nullptr;
+        const predict::Decl *released
+            = record != nullptr ? record->find_predict_declaration() : nullptr;
+        if (released != nullptr) {
+            const int64_t slot = native_slot();
+            if (core_seated() == nullptr || slot < 0) {
+                return predict::correction_for_mode(
+                    NetwMultiplayer::predict_resolve_mode(
+                        *record,
+                        entity->get_owner()
+                    )
+                );
+            }
+            return pool->settle_correction(
+                slot,
+                predict::correction_for_mode(released->mode)
+            );
+        }
         return int(CorrectionMode::REPLAY);
     }
     const int64_t slot = native_slot();
     if (core_seated() == nullptr || slot < 0) {
         return predict::correction_for_mode(
-            NetwMultiplayer::predict_resolve_mode(entity.ptr())
+            NetwMultiplayer::predict_resolve_mode(
+                seated_record(),
+                seated_node()
+            )
         );
     }
     return pool->settle_correction(slot, declared_correction());
@@ -899,7 +983,7 @@ void NetwPredictSlotEngine::on_reparented() {
 void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
     NETW_ZONE_NC("Predict rewire", colors::PREDICTION);
     declaration = p_declaration;
-    if (entity.is_null() || entity->get_owner() == nullptr) {
+    if (seated_node() == nullptr) {
         NETW_TRACE(
             sys::PREDICTION,
             "Prediction found no owning node, so it stays unbound."
@@ -965,14 +1049,17 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
     pool->seed_recovery_ledger(slot);
     if (session != nullptr) {
         const int resolved = pool->adopt_declaration(
-            entity,
+            slot,
             state,
             input_binding(),
-            NetwMultiplayer::predict_schedule_of(entity.ptr()),
+            NetwMultiplayer::predict_schedule_of(
+                seated_record(),
+                seated_node()
+            ),
             resolved_role,
             declared_correction(),
-            NetwMultiplayer::sim_snap_restore_of(entity.ptr()),
-            NetwMultiplayer::sim_max_restore_ticks_of(entity.ptr()),
+            NetwMultiplayer::sim_snap_restore_of(seated_record()),
+            NetwMultiplayer::sim_max_restore_ticks_of(seated_record()),
             pool_island(),
             pool->slot_kind(slot).samples_contacts
         );
@@ -997,10 +1084,9 @@ void NetwPredictSlotEngine::rewire_on(const Declaration &p_declaration) {
     }
     pool->seat_arrivals(slot, feed, this);
     if (session != nullptr) {
-        session->display_mark_role_dirty(entity->get_rid_handle());
-        session->sim_announce(entity->get_rid_handle());
-        const sim::Row *selection
-            = books->sims->row_of(entity->get_rid_handle());
+        session->display_mark_role_dirty(seated_rid());
+        session->sim_announce(seated_rid());
+        const sim::Row *selection = sim_rows->row_of(seated_rid());
         pool->follow_relay_subscription(
             slot,
             selection != nullptr && selection->selected_by.count() > 0
@@ -1017,7 +1103,7 @@ void NetwPredictSlotEngine::reconfigure() {
 void NetwPredictSlotEngine::emit_reachability_findings(
     const Array &p_findings
 ) {
-    Node *owner = entity.is_valid() ? entity->get_owner() : nullptr;
+    Node *owner = seated_node();
     const String named = owner != nullptr ? String(owner->get_name())
                                           : String("an entity with no node");
     const uint64_t subject
@@ -1070,11 +1156,11 @@ int NetwPredictSlotEngine::pool_island() const {
         return NetwPredictionEngine::ISLAND_JOINT;
     }
     NetwMultiplayer *session = core_seated();
-    const sim::Row *row = session != nullptr && entity.is_valid()
-        ? books->sims->row_of(entity->get_rid_handle())
+    const sim::Row *row = session != nullptr && is_seated()
+        ? sim_rows->row_of(seated_rid())
         : nullptr;
-    const bool chosen = session != nullptr && entity.is_valid()
-        && session->sim_chooses(entity->get_rid_handle());
+    const bool chosen = session != nullptr && is_seated()
+        && session->sim_chooses(seated_rid());
     const bool selected = row != nullptr && row->selected_by.count() > 0
         && !sim::leads(row->mode);
     if (chosen || selected) {
@@ -1085,8 +1171,8 @@ int NetwPredictSlotEngine::pool_island() const {
 
 sim::Mode NetwPredictSlotEngine::resolved_mode() const {
     NetwMultiplayer *session = core_seated();
-    const sim::Row *row = session != nullptr && entity.is_valid()
-        ? books->sims->row_of(entity->get_rid_handle())
+    const sim::Row *row = session != nullptr && is_seated()
+        ? sim_rows->row_of(seated_rid())
         : nullptr;
     return row != nullptr ? row->mode : sim::Mode::NONE;
 }
@@ -1094,12 +1180,12 @@ sim::Mode NetwPredictSlotEngine::resolved_mode() const {
 int NetwPredictSlotEngine::resolve_axes() {
     const sim::Facts facts = pool->resolution_facts(native_slot(), decl);
     NetwMultiplayer *session = core_seated();
-    if (session == nullptr || entity.is_null()) {
+    if (session == nullptr || !is_seated()) {
         return pool->apply_mode(native_slot(), decl, sim::resolve(facts));
     }
-    const RID seated = entity->get_rid_handle();
+    const RID seated = seated_rid();
     const sim::Mode mode = session->sim_resolve(seated, facts);
-    session->sim_settle_body(entity);
+    session->sim_settle_body_of(seated);
     return pool->apply_mode(native_slot(), decl, mode);
 }
 
@@ -1284,7 +1370,7 @@ void NetwPredictSlotEngine::predict_step(double p_delta, int64_t p_tick) {
 
 void NetwPredictSlotEngine::simulated_step(double p_delta, int64_t p_tick) {
     const int64_t slot = native_slot();
-    if (!pool->predict_command(slot, entity, p_tick)) {
+    if (!pool->predict_command(slot, p_tick)) {
         return;
     }
     const bool joint = pool->rolls_back_together(slot);
@@ -1569,24 +1655,6 @@ void NetwPredictSlotEngine::run_held_recovery() {
     );
 }
 
-RecoveryPlan NetwPredictSlotEngine::plan_of(
-    const predict::WritePlan &p_plan
-) const {
-    return pool->recovery_of(native_slot(), p_plan);
-}
-
-void NetwPredictSlotEngine::close_replayed_entry(int64_t p_index) {
-    const Dictionary solve = pool->close_replayed_entry(
-        native_slot(),
-        p_index,
-        witness_sample(),
-        island_participant_ids()
-    );
-    if (!solve.is_empty()) {
-        maybe_demote_for_breach(p_index, solve);
-    }
-}
-
 bool NetwPredictSlotEngine::is_steppable() const {
     return pool->slot_is_steppable(native_slot());
 }
@@ -1603,12 +1671,9 @@ void NetwPredictSlotEngine::joint_pass(const NetwPredictTiming &p_timing) {
         colors::PREDICTION,
         profile::SUBSYSTEM_PREDICTION
     );
-    const predict::JointPassPlan plan = pool_joint_pass(present);
+    const predict::ReplayPlan plan = pool_joint_pass(present);
     if (plan.floor >= 0) {
-        core_seated()->sim_release_lingering(
-            entity->get_rid_handle(),
-            plan.floor
-        );
+        core_seated()->sim_release_lingering(seated_rid(), plan.floor);
     }
     if (!plan.valid) {
         NETW_TRACE(
@@ -1625,7 +1690,7 @@ void NetwPredictSlotEngine::joint_pass(const NetwPredictTiming &p_timing) {
             members[at]->joint_heal();
         }
     } else {
-        run_joint_pass(plan, members, floor_transition);
+        run_replay(plan, members);
     }
     release_lingering(floor_transition);
     for (uint32_t at = 0; at < members.size(); ++at) {
@@ -1640,16 +1705,16 @@ LocalVector<NetwPredictSlotEngine *> NetwPredictSlotEngine::joint_group() {
     LocalVector<NetwPredictSlotEngine *> out;
     out.push_back(this);
     const int64_t slot = native_slot();
-    const TypedArray<NetwEntity> simulated
+    const LocalVector<RID> simulated
         = pool->roster_list(slot, NetwPredictionEngine::ROSTER_SIMULATED);
-    for (int64_t at = 0; at < simulated.size(); ++at) {
-        append_joint_member(out, simulated[at]);
+    for (const RID &member : simulated) {
+        append_joint_member(out, member);
     }
-    const TypedArray<NetwEntity> lingering
+    const LocalVector<RID> lingering
         = pool->roster_list(slot, NetwPredictionEngine::ROSTER_JOINT_LINGERING);
-    for (int64_t at = 0; at < lingering.size(); ++at) {
-        if (!simulated.has(lingering[at])) {
-            append_joint_member(out, lingering[at]);
+    for (const RID &member : lingering) {
+        if (!simulated.has(member)) {
+            append_joint_member(out, member);
         }
     }
     std::stable_sort(
@@ -1664,11 +1729,8 @@ LocalVector<NetwPredictSlotEngine *> NetwPredictSlotEngine::joint_group() {
 
 void NetwPredictSlotEngine::append_joint_member(
     LocalVector<NetwPredictSlotEngine *> &r_out,
-    const Ref<NetwEntity> &p_member
+    const RID &p_member
 ) {
-    if (p_member.is_null()) {
-        return;
-    }
     NetwPredictSlotEngine *member = sibling(p_member);
     if (member == nullptr || member == this || !member->is_steppable()) {
         NETW_TRACE(
@@ -1688,7 +1750,7 @@ NetwPredictSlotEngine::SteppedIsland NetwPredictSlotEngine::
         return out;
     }
     const NetwMultiplayer::EntitySpace held
-        = host->entity_space_of(seated_entity());
+        = host->entity_space_of(seated_node());
     out.space = held.space;
     out.dimension = held.dimension;
     out.steps = host->predict_space_can_step(held.space, held.dimension);
@@ -1712,12 +1774,44 @@ void NetwPredictSlotEngine::step_island(
     );
 }
 
-void NetwPredictSlotEngine::run_joint_pass(
-    const predict::JointPassPlan &p_plan,
-    const LocalVector<NetwPredictSlotEngine *> &p_members,
-    int64_t p_floor_transition
+void NetwPredictSlotEngine::close_replay_step(
+    const predict::ReplayPlan &p_plan,
+    const predict::ReplayStep &p_step
 ) {
-    NETW_STAGE(ROLLBACK, "Predict joint replay", colors::PREDICTION);
+    const bool fresh = (p_plan.flags & predict::REPLAY_SAMPLES_EACH_CLOSE) != 0;
+    const Dictionary sample = fresh ? witness_sample() : p_plan.sample;
+    const PackedStringArray participants
+        = fresh ? island_participant_ids() : p_plan.participants;
+    Dictionary solve;
+    if ((p_step.flags & predict::STEP_CLOSES_ENTRY) != 0) {
+        solve = pool->close_replayed_entry(
+            p_step.slot,
+            p_step.entry,
+            sample,
+            participants
+        );
+    } else {
+        pool->capture_into_book(p_step.slot, p_step.entry + 1);
+        if ((p_step.flags & predict::STEP_SEALS) != 0) {
+            solve = pool->seal_transition(
+                p_step.slot,
+                p_step.entry,
+                sample,
+                participants
+            );
+        }
+    }
+    if (!solve.is_empty() && (p_plan.flags & predict::REPLAY_DEMOTES) != 0) {
+        maybe_demote_for_breach(p_step.entry, solve);
+    }
+}
+
+void NetwPredictSlotEngine::run_replay(
+    const predict::ReplayPlan &p_plan,
+    const LocalVector<NetwPredictSlotEngine *> &p_members
+) {
+    NETW_STAGE(ROLLBACK, "Predict replay plan", colors::PREDICTION);
+    const bool rebases = (p_plan.flags & predict::REPLAY_REBASES) != 0;
     HashMap<int64_t, NetwPredictSlotEngine *> by_slot;
     for (uint32_t at = 0; at < p_members.size(); ++at) {
         const int64_t seat = p_members[at]->native_slot();
@@ -1727,7 +1821,13 @@ void NetwPredictSlotEngine::run_joint_pass(
     }
     LocalVector<NetwPredictSlotEngine *> stepped;
     LocalVector<predict::StateRow> drawn;
-    for (int at = 0; at < int(p_plan.restores.size()); ++at) {
+    if (!rebases) {
+        for (NetwPredictSlotEngine *member : p_members) {
+            stepped.push_back(member);
+            pool->hold_live_input(member->native_slot());
+        }
+    }
+    for (int at = 0; rebases && at < int(p_plan.restores.size()); ++at) {
         const int64_t restore_slot = p_plan.restores[uint32_t(at)].slot;
         NetwPredictSlotEngine **held = by_slot.getptr(restore_slot);
         if (held == nullptr) {
@@ -1746,7 +1846,7 @@ void NetwPredictSlotEngine::run_joint_pass(
         member->restore_row(
             p_plan.restores[uint32_t(at)].state,
             int(predict::Operator::JOINT_REBASE),
-            p_floor_transition,
+            p_plan.floor,
             this,
             p_plan.restores[uint32_t(at)].entry
         );
@@ -1758,32 +1858,43 @@ void NetwPredictSlotEngine::run_joint_pass(
     LocalVector<int> ran;
     before.resize(stepped.size());
     for (uint32_t at = 0; at < stepped.size(); ++at) {
-        pool->capture_canonical(stepped[at]->native_slot(), before[at]);
+        if (rebases) {
+            pool->capture_canonical(stepped[at]->native_slot(), before[at]);
+        }
         ran.push_back(0);
     }
-    const SteppedIsland island = stepped_island();
+    const SteppedIsland island
+        = p_plan.floor >= 0 ? stepped_island() : SteppedIsland();
     LocalVector<sim::HeldPose> bystanders;
     if (island.steps) {
         LocalVector<RID> replayed;
         for (NetwPredictSlotEngine *member : stepped) {
-            replayed.push_back(member->seated_entity()->get_rid_handle());
+            replayed.push_back(member->seated_rid());
         }
         core_seated()->sim_hold_poses(island.space, replayed, bystanders);
         if (island.stepper.is_valid()) {
-            island.stepper->restore(island.space, p_floor_transition);
+            island.stepper->restore(island.space, p_plan.floor);
         }
     }
-    int64_t open_transition = -1;
-    LocalVector<NetwPredictSlotEngine *> awaiting_step;
-    const auto step_and_close = [&](int64_t p_transition) {
-        step_island(island, p_transition);
-        for (NetwPredictSlotEngine *ran_member : awaiting_step) {
-            ran_member->close_replayed_entry(p_transition);
+    struct Awaiting {
+        NetwPredictSlotEngine *member = nullptr;
+        uint32_t step = 0;
+    };
+    int64_t open_entry = -1;
+    LocalVector<Awaiting> awaiting_step;
+    const auto step_and_close = [&](int64_t p_entry) {
+        step_island(island, p_entry);
+        for (const Awaiting &ran_step : awaiting_step) {
+            ran_step.member->close_replay_step(
+                p_plan,
+                p_plan.steps[ran_step.step]
+            );
         }
         awaiting_step.clear();
     };
+    predict::StateRow read;
     for (int at = 0; at < int(p_plan.steps.size()); ++at) {
-        const predict::JointStep &step = p_plan.steps[uint32_t(at)];
+        const predict::ReplayStep &step = p_plan.steps[uint32_t(at)];
         NetwPredictSlotEngine **held = by_slot.getptr(step.slot);
         if (held == nullptr) {
             NETW_TRACE(
@@ -1794,26 +1905,44 @@ void NetwPredictSlotEngine::run_joint_pass(
             continue;
         }
         NetwPredictSlotEngine *member = *held;
-        const int64_t transition = step.transition;
-        if (open_transition >= 0 && transition != open_transition) {
-            step_and_close(open_transition);
-            if (!island.steps) {
+        if (open_entry >= 0 && step.entry != open_entry) {
+            step_and_close(open_entry);
+            open_entry = -1;
+            if (!island.steps
+                && (p_plan.flags & predict::REPLAY_SETTLES) != 0) {
                 for (NetwPredictSlotEngine *settled : stepped) {
-                    colliders::settle(settled->seated_entity()->get_owner());
+                    colliders::settle(settled->seated_node());
                 }
             }
         }
-        open_transition = transition;
-        member->run_command(
-            step.command,
-            member->tick_delta(),
-            transition,
-            false
-        );
-        if (island.steps) {
-            awaiting_step.push_back(member);
+        const predict::StateRow *command = &step.command;
+        if ((step.flags & predict::STEP_READS_INPUT) != 0) {
+            if (!pool->authored_command(step.slot, step.input_key, read)) {
+                break;
+            }
+            command = &read;
+        }
+        open_entry = step.entry;
+        if ((p_plan.flags & predict::REPLAY_RUNS_THROUGH_SEAT) != 0) {
+            member->run_command(
+                *command,
+                member->tick_delta(),
+                step.tick,
+                false
+            );
         } else {
-            member->close_replayed_entry(transition);
+            pool->run_command(
+                step.slot,
+                *command,
+                pool->tick_delta_of(step.slot),
+                step.tick,
+                false
+            );
+        }
+        if (island.steps) {
+            awaiting_step.push_back({member, uint32_t(at)});
+        } else {
+            member->close_replay_step(p_plan, step);
         }
         for (uint32_t seat = 0; seat < stepped.size(); ++seat) {
             if (stepped[seat] == member) {
@@ -1821,13 +1950,16 @@ void NetwPredictSlotEngine::run_joint_pass(
             }
         }
     }
-    if (open_transition >= 0) {
-        step_and_close(open_transition);
+    if (open_entry >= 0) {
+        step_and_close(open_entry);
     }
     sim::restore_poses(bystanders);
     const int64_t present = p_plan.present;
     for (uint32_t at = 0; at < stepped.size(); ++at) {
         pool->restore_live_input(stepped[at]->native_slot());
+        if (!rebases) {
+            continue;
+        }
         pool->note_replay_depth(stepped[at]->native_slot(), ran[at]);
         stepped[at]->note_joint_writes(before[at]);
         pool->announce_joint_moved(
@@ -1836,7 +1968,10 @@ void NetwPredictSlotEngine::run_joint_pass(
             drawn[at]
         );
     }
-    const int64_t depth = present - p_floor_transition;
+    if (!rebases) {
+        return;
+    }
+    const int64_t depth = present - p_plan.floor;
     NetwPredictStats::Book *stats = &decl->facts;
     Dictionary joint_depth
         = stats->get_dict_fact(NetwPredictStats::FACT_JOINT_DEPTH);
@@ -1885,13 +2020,13 @@ int64_t NetwPredictSlotEngine::ledger_drive_frontier() const {
     return pool->drive_frontier(native_slot());
 }
 
-predict::JointPassPlan NetwPredictSlotEngine::pool_joint_pass(
+predict::ReplayPlan NetwPredictSlotEngine::pool_joint_pass(
     int64_t p_present
 ) {
     const int64_t slot = native_slot();
     if (slot < 0
         || pool->island_of(slot) == NetwPredictionEngine::ISLAND_NONE) {
-        return predict::JointPassPlan();
+        return predict::ReplayPlan();
     }
     return pool->joint_pass(slot, p_present);
 }
@@ -2309,7 +2444,9 @@ void NetwPredictSlotEngine::run_command(
         return;
     }
     pool->apply_command(slot, p_command);
-    const Callable step = NetwMultiplayer::sim_step_of(entity.ptr());
+    const Callable step = is_seated()
+        ? NetwMultiplayer::sim_step_of(seated_record(), seated_node())
+        : released_simulation_step(handle);
     if (step.is_valid()) {
         Array arguments;
         arguments.push_back(p_delta);
@@ -2325,7 +2462,9 @@ void NetwPredictSlotEngine::push_simulate() {
     if (core_seated() != nullptr) {
         pool->set_simulate(
             native_slot(),
-            NetwMultiplayer::sim_step_of(entity.ptr())
+            is_seated()
+                ? NetwMultiplayer::sim_step_of(seated_record(), seated_node())
+                : released_simulation_step(handle)
         );
     }
 }
@@ -2381,24 +2520,24 @@ void NetwPredictSlotEngine::maybe_demote_for_breach(
     );
 }
 
-void NetwPredictSlotEngine::restore(
-    const Dictionary &p_payload,
+void NetwPredictSlotEngine::restore_row(
+    const predict::StateRow &p_state,
     int p_operator,
     int64_t p_basis,
     NetwPredictSlotEngine *p_provenance_owner,
+    int64_t p_entry,
     bool p_evidence_free,
-    bool p_pool_planned,
-    int64_t p_entry
+    bool p_pool_planned
 ) {
     NetwPredictSlotEngine *episode_owner
         = p_provenance_owner != nullptr ? p_provenance_owner : this;
-    if (!pool->apply_restore(
+    if (!pool->apply_restore_row(
             native_slot(),
-            p_payload,
+            p_state,
             p_operator,
             p_basis,
             episode_owner->native_slot(),
-            entity.is_valid() ? entity->get_name() : StringName(),
+            is_seated() ? record->get_entity_id() : StringName(),
             decl->ack_age_ticks,
             decl->correction_threshold,
             p_evidence_free,
@@ -2412,38 +2551,9 @@ void NetwPredictSlotEngine::restore(
     }
 }
 
-void NetwPredictSlotEngine::restore_row(
-    const predict::StateRow &p_state,
-    int p_operator,
-    int64_t p_basis,
-    NetwPredictSlotEngine *p_provenance_owner,
-    int64_t p_entry
-) {
-    NetwPredictSlotEngine *episode_owner
-        = p_provenance_owner != nullptr ? p_provenance_owner : this;
-    if (!pool->apply_restore_row(
-            native_slot(),
-            p_state,
-            p_operator,
-            p_basis,
-            episode_owner->native_slot(),
-            entity.is_valid() ? entity->get_name() : StringName(),
-            decl->ack_age_ticks,
-            decl->correction_threshold,
-            false,
-            false,
-            p_entry
-        )) {
-        NETW_BUG();
-    }
-    if (p_operator != int(predict::Operator::NONE)) {
-        episode_owner->sync_episode();
-    }
-}
-
 void NetwPredictSlotEngine::register_with_loop() {
     NetwMultiplayer *seated = core_seated();
-    NetwPredictRunner *runner = seated != nullptr ? books->runner : nullptr;
+    NetwPredictRunner *runner = seated != nullptr ? predict_runner : nullptr;
     if (runner != nullptr) {
         runner->register_engine(this);
         pool->set_registered(native_slot(), true);
@@ -2454,7 +2564,7 @@ void NetwPredictSlotEngine::register_with_loop() {
 
 void NetwPredictSlotEngine::unregister_from_loop() {
     NetwMultiplayer *seated = core_seated();
-    NetwPredictRunner *runner = seated != nullptr ? books->runner : nullptr;
+    NetwPredictRunner *runner = seated != nullptr ? predict_runner : nullptr;
     const int64_t slot = native_slot();
     if (runner != nullptr) {
         runner->unregister_engine(this);

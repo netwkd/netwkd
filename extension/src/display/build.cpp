@@ -149,9 +149,8 @@ Channel *ensure_state(
     Node *target = split ? visual : p_node;
     state->set_target_obj(target);
 
-    const Ref<NetwEntity> entity = p_runtime->entity();
-    state->set_entity(entity.is_valid() ? entity->get_rid_handle() : RID());
-    state->set_door(p_hooks.display_lane);
+    state->set_entity(p_runtime->entity_rid());
+    state->set_session(p_hooks.session);
 
     History &history = state->display_history();
     history.set_mode(p_spec->get_mode());
@@ -245,7 +244,7 @@ void rebuild_runtime(Runtime *p_runtime, const Hooks &p_hooks) {
     }
     p_runtime->set_rebuild_queued(false);
     Node *owner = p_runtime->owner();
-    if (p_runtime->entity().is_null() || owner == nullptr) {
+    if (owner == nullptr) {
         return;
     }
     p_runtime->clear_channels();
@@ -262,8 +261,6 @@ void rebuild_runtime(Runtime *p_runtime, const Hooks &p_hooks) {
     }
 
     p_runtime->set_pump_mode(netw::display::PUMP_UNRESOLVED);
-    NETW_ZONE_NC("display hooks resolve", colors::INTERP);
-    p_hooks.resolve(p_runtime->entity_rid());
 }
 
 } // namespace netw::display

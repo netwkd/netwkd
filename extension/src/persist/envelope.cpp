@@ -97,7 +97,7 @@ Error validate_row(
             );
             return ERR_INVALID_DATA;
         }
-        const Error checked = SchemaCore::validate_value(
+        const Error checked = SchemaBook::validate_value(
             column->type,
             column->stride,
             p_values[column->key]
@@ -130,7 +130,7 @@ Dictionary seal_record(
 }
 
 Error open_record(
-    const SchemaCore &p_core,
+    const SchemaBook &p_core,
     const RID &p_schema,
     const Dictionary &p_envelope,
     Dictionary &r_values,

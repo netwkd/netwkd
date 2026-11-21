@@ -4565,7 +4565,7 @@ public sealed class Netw : NetwRefCounted
     /// the query found after it returns.
     /// <code>
     /// func fire(request: NetwActionRequest, origin: Vector3, aim: Vector3) -&gt; void:
-    ///     var targets := players.entities.keys()
+    ///     var targets := players.entities
     ///     targets.erase(entity)
     ///     var hit: Dictionary = Netw.rewind(targets, request.view_tick, func() -&gt; Dictionary:
     ///         var ray := PhysicsRayQueryParameters3D.create(

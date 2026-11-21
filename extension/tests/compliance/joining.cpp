@@ -9,9 +9,12 @@ using namespace netw_test;
 
 constexpr const char *LOBBY = R"(
 class Crate extends Node3D:
+	var label := ""
+
 	func _init() -> void:
 		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").state()
+		Netw.configure_property(self, &"label").state()
 
 
 func _init() -> void:
@@ -33,10 +36,12 @@ constexpr int RUNNING = 24;
 World paused_lobby() {
     return World(LOBBY, 1)
         .watch("Crate", "position")
+        .watch("Crate", "label")
         .hear("Session", "paused_changed")
         .hear("Session", "player_left")
         .at(1, spawn("Crate", "Crate"))
         .at(3, set("Crate", "position", Vector3(3, 0, 1)))
+        .at(3, set("Crate", "label", String::utf8("caf\xc3\xa9")))
         .at(5, pause("menu"))
         .at(5, pause("menu"))
         .at(7, join("ana"))

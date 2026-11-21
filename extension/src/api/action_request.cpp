@@ -37,8 +37,8 @@ bool built_async(Node *p_node) {
     if (entity.is_null()) {
         return false;
     }
-    const Ref<NetwMultiplayer> plane = entity->get_multiplayer();
-    return plane.is_valid() && plane->spawn_fn_waits(entity->get_route());
+    const Ref<NetwMultiplayer> session = entity->get_multiplayer();
+    return session.is_valid() && session->spawn_fn_waits(entity->get_route());
 }
 
 } // namespace

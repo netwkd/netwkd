@@ -3,6 +3,7 @@
 #include "netw/predict/compare.hpp"
 #include "netw/predict/wiring.hpp"
 #include "netw/store/table.hpp"
+#include "netw/store/table_value.hpp"
 #include "netw/wire/value_row.hpp"
 
 using namespace godot;
@@ -64,7 +65,7 @@ bool Arrival::read(const FieldCodec &p_codec, StateRow &r_row) const {
     for (int at = 0; at < p_codec.count(); ++at) {
         const int column = column_of(*table, p_codec.keys[uint32_t(at)]);
         if (column >= 0) {
-            r_row.set(at, table->read_value(row, uint32_t(column)));
+            r_row.set(at, store::read_value(*table, row, uint32_t(column)));
         }
     }
     return true;

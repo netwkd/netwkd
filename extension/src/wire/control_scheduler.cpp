@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/control_scheduler.hpp"
 
 #include "netw/colors.hpp"

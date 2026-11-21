@@ -181,7 +181,8 @@ bool write_call_body(
     const godot::Variant &p_method,
     const godot::LocalVector<call_args::Slot> &p_slots,
     const godot::Array &p_quantizers,
-    const godot::Array &p_arg_types
+    const godot::Array &p_arg_types,
+    NetwMultiplayer *p_session
 );
 godot::PackedByteArray token_bytes(const godot::Variant &p_token);
 godot::Variant token_of_bytes(const godot::PackedByteArray &p_bytes);

@@ -444,6 +444,10 @@ bool frame_read(const godot::PackedByteArray &p_bytes, Record &r_record) {
     return stream.bits_remaining() == 0;
 }
 
+constexpr uint64_t PLAYER_ID_MAX = 2147483647;
+
+bool accept_read(const godot::PackedByteArray &bytes, AcceptFrame &r_row);
+
 godot::PackedByteArray roster_write(
     const godot::LocalVector<AcceptFrame> &rows
 );
@@ -479,7 +483,5 @@ bool viewers_read(
     SceneViewersHead &r_head,
     godot::LocalVector<uint64_t> &r_members
 );
-
-godot::Dictionary frame_spec_records();
 
 } // namespace netw::session

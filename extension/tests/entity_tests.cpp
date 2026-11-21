@@ -502,7 +502,8 @@ LawVerdict part_configures(const Stand &p_stand) {
     const Ref<NetwEntity> own = Netw::configure_entity(child);
     own->set_authority(NetwEntity::AUTHORITY_CONTROLLER);
     own->set_replication_priority(3.0);
-    own->get_simulation()->set_claim_on_contact(true);
+    const Ref<netw::NetwSimulation> drafted = own->get_simulation();
+    drafted->set_claim_on_contact(true);
     if (p_stand.part_name != nullptr) {
         own->set_name(p_stand.part_name);
     }
@@ -531,6 +532,8 @@ LawVerdict part_configures(const Stand &p_stand) {
         || holder->get_replication_priority() != priority
     ) {
         verdict = law_broken("the entity lost the part's options");
+    } else if (!p_stand.folds && holder->get_simulation() != drafted) {
+        verdict = law_broken("the entity answers a different part");
     } else if (
         p_stand.part_name != nullptr
         && above->get_name() == StringName(p_stand.part_name)
@@ -540,6 +543,31 @@ LawVerdict part_configures(const Stand &p_stand) {
     root->get_parent()->remove_child(root);
     memdelete(root);
     return verdict;
+}
+
+LawVerdict predicted_without_state(const Stand &) {
+    LoopbackRig rig(1);
+    rig.mount();
+    FaultWatch faults;
+    faults.expect_error("*Ghost*[NW1013]*", 1);
+    Node3D *root = memnew(Node3D);
+    root->set_name("Ghost");
+    root->set_script(netw_test::minted_script(
+        "extends Node3D\nfunc _network_process(_delta):\n\tpass\n"
+    ));
+    const Ref<NetwEntity> entity = Netw::configure_entity(root);
+    const Ref<netw::NetwPrediction> prediction = entity->get_prediction();
+    const bool declared = prediction.is_valid();
+    if (declared) {
+        prediction->set_mode(netw::NetwPrediction::MODE_ROLLBACK);
+    }
+    rig.branch()->add_child(root);
+    root->get_parent()->remove_child(root);
+    memdelete(root);
+    if (!declared) {
+        return law_broken("the body declared no prediction");
+    }
+    return law_held();
 }
 
 LawVerdict named_part_copies(const Stand &) {
@@ -612,6 +640,9 @@ const Row ROWS[] = {
     {"two copies of a car whose wheel part sets a name",
      "the wheels fold into their cars and the name is reported once",
      &named_part_copies},
+    {"a predicted body with no state property entering the tree",
+     "prediction is off and that is reported once",
+     &predicted_without_state},
 };
 
 const Row PART = {

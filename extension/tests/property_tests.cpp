@@ -17,6 +17,7 @@
 #include "godot/node.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/script.hpp"
+#include "godot/spatial_node.hpp"
 #include "godot/variant.hpp"
 #include "netw/api/context.hpp"
 #include "netw/api/despawn_config.hpp"
@@ -38,7 +39,7 @@
 #include "netw/repl/snapshot_frame.hpp"
 #include "netw/schema_model.hpp"
 #include "netw/script/model.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 #include "netw/wire/code_row.hpp"
 #include "netw/wire/plan.hpp"
 #include "netw/wire/registry.hpp"
@@ -327,8 +328,14 @@ PackedByteArray spawn_args(
     const Array &p_types
 ) {
     netw::wire::WriteStream stream;
-    if (!netw::call_args::values_write(stream, p_values, p_quantizers, p_types)
-        || !stream.align_verify()) {
+    const bool written = netw::call_args::values_write(
+        stream,
+        p_values,
+        p_quantizers,
+        p_types,
+        nullptr
+    );
+    if (!written || !stream.align_verify()) {
         return PackedByteArray();
     }
     return stream.to_bytes();
@@ -613,7 +620,11 @@ struct ValueCase {
 LawVerdict values_checked(std::initializer_list<ValueCase> p_cases) {
     for (const ValueCase &check : p_cases) {
         const Error got
-            = SchemaCore::validate_value(check.type, check.stride, check.value);
+            = netw::SchemaBook::validate_value(
+                check.type,
+                check.stride,
+                check.value
+            );
         if (got != check.expected) {
             return law_broken(
                 "type %d stride %d answers %d, not %d",
@@ -725,12 +736,134 @@ LawVerdict missing_property_refused(bool p_written_on_arrival) {
     return law_held();
 }
 
+LawVerdict changed_quantizer_told_once(const World &) {
+    FaultWatch faults;
+    faults.expect_error("*NetwQuantizeScalar*[NW1045]*", 1);
+    const Ref<NetwQuantizeScalar> grid = by_bits(8, -1.0, 1.0);
+    PropertyColumn::create(
+        StringName("speed"),
+        grid,
+        false,
+        NetwMultiplayer::ColumnType(SchemaCore::F64)
+    );
+    grid->bits(8);
+    grid->limits(-1.0, 1.0);
+    if (faults.errors() != 0) {
+        return law_broken("a setting set to its own value was reported");
+    }
+    grid->bits(10);
+    grid->limits(0.0, 2.0);
+    if (faults.errors() != 1) {
+        return law_broken(
+            "two changes were reported %d times",
+            faults.errors()
+        );
+    }
+    return law_held();
+}
+
+LawVerdict changed_transform_part_told_once(const World &) {
+    FaultWatch faults;
+    faults.expect_error("*NetwQuantizeScalar*[NW1045]*", 1);
+    faults.expect_error("*NetwQuantizeTransform3D*[NW1045]*", 1);
+    const Ref<NetwQuantizeScalar> place = by_bits(8, -10.0, 10.0);
+    Ref<NetwQuantizeTransform3D> pose;
+    pose.instantiate();
+    pose->set_origin_quantizer(place);
+    PropertyColumn::create(
+        StringName("pose"),
+        pose,
+        false,
+        NetwMultiplayer::ColumnType(SchemaCore::VARIANT)
+    );
+    pose->set_origin_quantizer(place);
+    place->bits(10);
+    const Ref<NetwQuantizeQuaternion> spin = rotation_of(12);
+    pose->set_rotation_quantizer(spin);
+    pose->set_scale_quantizer(by_bits(8, 0.0, 4.0));
+    pose->set_rotation_quantizer(rotation_of(10));
+    spin->bits(14);
+    if (faults.errors() != 2) {
+        return law_broken(
+            "a changed part, three swapped parts and a part swapped out "
+            "were reported %d times",
+            faults.errors()
+        );
+    }
+    return law_held();
+}
+
 LawVerdict missing_property_lands_nothing(const World &) {
     return missing_property_refused(true);
 }
 
 LawVerdict missing_predicted_property_lands_nothing(const World &) {
     return missing_property_refused(false);
+}
+
+class Tenths : public NetwQuantize {
+public:
+    bool supports_type(Variant::Type p_type) const override {
+        return p_type == Variant::FLOAT;
+    }
+
+    int bit_width(Variant::Type) const override {
+        return 8;
+    }
+
+    int stride(Variant::Type) const override {
+        return 1;
+    }
+
+    int64_t encode(const Variant &p_value, int) const override {
+        return int64_t(std::round(double(p_value) * 10.0));
+    }
+
+    Variant decode(const PackedInt64Array &p_codes, Variant::Type)
+        const override {
+        return double(p_codes[0]) / 10.0;
+    }
+};
+
+LawVerdict custom_quantizer_lands(const World &) {
+    Books books;
+    const DeclaredSet pose = netw_test::declare(books);
+    Ref<Tenths> tenths;
+    tenths.instantiate();
+    pose->bind_column(PropertyColumn::create(
+        StringName("rotation"),
+        tenths,
+        false,
+        NetwMultiplayer::ColumnType(SchemaCore::F32)
+    ));
+    const SchemaRecord &schema = pose->get_volatile_schema();
+    const WirePlan plan = WirePlan::compile(schema);
+    CodeRow row = CodeRow::for_plan(plan);
+    netw::wire::encode_scalar_row(schema, netw::gd::array_of(2.5), row);
+    SnapshotHeader header;
+    header.token = 41;
+    header.revision = 1;
+    header.distance = 0;
+    header.tick = -1;
+    header.reconcile_ack = -1;
+    header.mask = plan.full_mask();
+    const PackedByteArray frame
+        = netw::repl::write_snapshot_row(header, -1, plan, row, nullptr);
+
+    Node2D *node = memnew(Node2D);
+    const PropertyBindingPtr binding = netw_test::bind(pose, node);
+    netw_test::StoreArrival arrival(binding);
+    const bool settled = arrival.settle(frame, -1, false);
+    const double landed = double(arrival.value(StringName("rotation")));
+    memdelete(node);
+    if (!settled || landed != 2.5) {
+        return law_broken(
+            "settled %d, and 2.5 written read %f",
+            int(settled),
+            landed
+        );
+    }
+    return law_held();
 }
 
 const Row CODEC_ROWS[] = {
@@ -752,6 +885,15 @@ const Row CODEC_ROWS[] = {
      "it decodes between -pi and pi, -pi lands on pi, and neighbours across "
      "the seam stay neighbours",
      &centered_angle_range},
+    {"a quantizer a declared property holds, set again and then changed",
+     "setting a value it already has is quiet, and changing it is reported "
+     "once",
+     &changed_quantizer_told_once},
+    {"a Transform3D quantizer a declared property holds, its origin "
+     "quantizer changed, parts swapped, and a swapped out part changed",
+     "the changed part is reported once, the Transform3D once, and the "
+     "part it no longer uses not at all",
+     &changed_transform_part_told_once},
     {"a 12 bit quaternion",
      "the rotation lands within the error the quantizer reports",
      &quaternion_within_error},
@@ -797,6 +939,9 @@ const Row CODEC_ROWS[] = {
     {"the same row for a node whose arrivals prediction writes",
      "nothing lands, nobody is told, and one warning names it",
      &missing_predicted_property_lands_nothing},
+    {"a row of a property a game's own quantizer codes",
+     "the receiver reads the value the sender wrote",
+     &custom_quantizer_lands},
 };
 
 TEST_CASE(
@@ -996,7 +1141,7 @@ LawVerdict law_presets(const Derived &p_run) {
         : PropertySet::STAMP_TICK;
     if (set.get_record() != record || set.get_profile() != PropertySet::STAMPED
         || set.get_cadence() != PropertySet::TICK
-        || set.get_channel() != netw::wire::builtin_channel("SYNC")
+        || set.get_channel() != netw::wire::CHANNEL_SYNC
         || set.get_stamp() != stamp) {
         return law_broken(
             "record %d profile %d cadence %d channel %d stamp %d",

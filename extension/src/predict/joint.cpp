@@ -43,18 +43,21 @@ void JointTrack::clear_cells(int64_t p_newest_state) {
     clear_floors();
 }
 
-JointPassPlan::JointPassPlan(const JointPassPlan &p_other) {
+ReplayPlan::ReplayPlan(const ReplayPlan &p_other) {
     *this = p_other;
 }
 
-JointPassPlan &JointPassPlan::operator=(const JointPassPlan &p_other) {
+ReplayPlan &ReplayPlan::operator=(const ReplayPlan &p_other) {
     if (this == &p_other) {
         return *this;
     }
     copy_values(restores, p_other.restores);
     copy_values(steps, p_other.steps);
+    sample = p_other.sample;
+    participants = p_other.participants;
     floor = p_other.floor;
     present = p_other.present;
+    flags = p_other.flags;
     heal = p_other.heal;
     valid = p_other.valid;
     return *this;

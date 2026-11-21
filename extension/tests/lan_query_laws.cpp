@@ -13,7 +13,8 @@ TEST_CASE(
 ) {
     Ref<netw::NetwServerInfo> info;
     info.instantiate();
-    const PackedByteArray reply = lan::encode_reply(7, 11, 99, 30301, info);
+    const PackedByteArray reply
+        = lan::encode_reply(7, 11, 99, 30301, info, nullptr);
 
     lan::Reply read;
     CHECK(lan::decode_reply(reply, 7, 11, read));

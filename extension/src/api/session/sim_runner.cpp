@@ -41,9 +41,7 @@ void NetwMultiplayer::sim_run(
             colors::PREDICTION,
             profile::SUBSYSTEM_ENTITY,
             "entity %lld",
-            liveness_core.is_valid()
-                ? static_cast<long long>(liveness_core->route_of(entity))
-                : 0LL
+            static_cast<long long>(liveness_core.route_of(entity))
         );
         sim_step(entity, p_phase, p_delta, p_tick);
     }
@@ -60,7 +58,7 @@ NetwSimulation::Schedule NetwMultiplayer::simulation_get_schedule(
         return NetwSimulation::Schedule(engine->schedule());
     }
     const sim::Row *row = sim_rows.row_of(p_entity);
-    const sim::Decl *found = sim_find_declaration(entity.ptr());
+    const sim::Decl *found = entity->get_record()->find_sim_declaration();
     const sim::Declaration undeclared;
     const sim::Declaration &declared = row != nullptr ? row->declaration
         : found != nullptr                            ? found->declaration
@@ -101,19 +99,19 @@ void NetwMultiplayer::sim_step(
     if (predict_engine_for(p_entity) != nullptr) {
         return;
     }
-    const Ref<NetwEntity> entity = entity_get_view(p_entity);
-    if (entity.is_null()) {
+    NetwEntityRecord *record = entity_record(p_entity);
+    if (record == nullptr || entity_get_view(p_entity).is_null()) {
         sim_release_row(p_entity);
         return;
     }
-    Node *owner = entity->get_owner();
+    Node *owner = wrapper_owner(p_entity);
     sim::Row *row = sim_rows.peek(p_entity);
     if (row == nullptr || owner == nullptr || !owner->is_inside_tree()) {
         return;
     }
     const sim::Mode mode = row->bodies.recorded
         ? row->mode
-        : sim_rows.resolve(p_entity, sim_body_facts(entity));
+        : sim_rows.resolve(p_entity, sim_body_facts(*record, owner));
     sim_announce(p_entity);
     if (!sim::executes(mode) || sim_runs_on(*row, owner) != p_phase) {
         return;

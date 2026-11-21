@@ -316,9 +316,9 @@
 			<return type="Variant" />
 			<param index="0" name="entity" type="RID" />
 			<param index="1" name="track" type="StringName" />
-			<param index="2" name="stat" type="StringName" />
+			<param index="2" name="stat" type="int" enum="NetwMultiplayer.TrackStat" />
 			<description>
-				Returns the display diagnostic [param stat] of [param entity], or [code]null[/code] when unknown. Some stats describe one [param track], and the rest ignore it.
+				Returns the display diagnostic [param stat] of [param entity], or [code]null[/code] when it is not displayed. Some stats describe one [param track], and the rest ignore it.
 			</description>
 		</method>
 		<method name="display_reset">
@@ -441,7 +441,7 @@
 			</description>
 		</method>
 		<method name="endpoint_list">
-			<return type="Array" />
+			<return type="RID[]" />
 			<description>
 				Every known endpoint, the ones added with [method endpoint_add] first.
 			</description>
@@ -795,18 +795,12 @@
 				Returns the value of [param param] for [param layer].
 			</description>
 		</method>
-		<method name="interest_layer_get_stats" qualifiers="const">
-			<return type="Dictionary" />
+		<method name="interest_layer_get_stat" qualifiers="const">
+			<return type="int" />
 			<param index="0" name="layer" type="RID" />
+			<param index="1" name="stat" type="int" enum="NetwMultiplayer.LayerStat" />
 			<description>
-				Returns the visibility counters of [param layer].
-				[codeblock lang=text]
-				Dictionary
-				┠╴viewers            int   number of viewers
-				┠╴entities           int   number of entities
-				┠╴visible_edges      int   (entity, peer) pairs that can see each other
-				┖╴transitions_total  int   shows plus hides since the layer was created
-				[/codeblock]
+				Returns the visibility counter [param stat] of [param layer], or [code]0[/code] for an unknown layer.
 			</description>
 		</method>
 		<method name="interest_layer_get_viewers" qualifiers="const">
@@ -1098,26 +1092,12 @@
 				[param bucket_type] must create a [RefCounted]. Returns [code]null[/code] for an unknown peer. The bucket goes when the peer leaves.
 			</description>
 		</method>
-		<method name="peer_get_link_stats" qualifiers="const">
-			<return type="Dictionary" />
+		<method name="peer_get_link_stat" qualifiers="const">
+			<return type="float" />
 			<param index="0" name="peer" type="int" />
+			<param index="1" name="stat" type="int" enum="NetwMultiplayer.LinkStat" />
 			<description>
-				Returns measured connection quality to [param peer], and what this peer's byte budget sends it.
-				[codeblock lang=text]
-				Dictionary
-				┠╴loss           float   share of the last 32 packets lost
-				┠╴rtt            float   round trip time, in seconds
-				┠╴jitter         float   round trip variation, in seconds
-				┠╴reorders       int     packets that arrived out of order
-				┠╴duplicates     int     packets that arrived twice
-				┠╴mode           String  "good", or "bad" while its budget is cut
-				┠╴budget_bits    int     most bits one packet to this peer may use
-				┠╴budget_bytes   int     bytes it may be sent each tick
-				┠╴sent_bytes     int     bytes charged to it since it joined
-				┠╴debt_bytes     int     bytes it was sent past its budget
-				┖╴deferred_rows  int     rows left waiting by the last tick
-				[/codeblock]
-				Losing packets halves [code]budget_bytes[/code] and [code]budget_bits[/code]. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While [code]debt_bytes[/code] is above zero, volatile properties wait, and retained properties and RPCs still go.
+				Returns the measured connection quality [param stat] of [param peer], or what this peer's byte budget sends it. [method NetwSession.link_stat] says how the budget moves.
 			</description>
 		</method>
 		<method name="peer_get_player" qualifiers="const">
@@ -1125,6 +1105,14 @@
 			<param index="0" name="peer" type="int" />
 			<description>
 				Returns the id of the player connected through [param peer], or [code]0[/code] until its join is accepted.
+			</description>
+		</method>
+		<method name="peer_get_traffic" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="peer" type="int" />
+			<param index="1" name="stat" type="int" enum="NetwMultiplayer.Traffic" />
+			<description>
+				Returns the rate [param stat] the session sent to [param peer] or received from it over the last second. A [param peer] of [code]0[/code] counts every peer. [method NetwSession.traffic] says what headers cost.
 			</description>
 		</method>
 		<method name="peer_set_bandwidth">
@@ -1264,9 +1252,9 @@
 			</description>
 		</method>
 		<method name="player_list" qualifiers="const">
-			<return type="PackedInt64Array" />
+			<return type="PackedInt32Array" />
 			<description>
-				Returns the id of every player whose join was accepted. A connected peer that has not joined is not here.
+				Returns the [member NetwPlayer.id] of every player whose join was accepted. A connected peer that has not joined is not here.
 			</description>
 		</method>
 		<method name="player_request_kick">
@@ -1469,7 +1457,7 @@
 			</description>
 		</method>
 		<method name="scene_get_viewers">
-			<return type="PackedInt64Array" />
+			<return type="PackedInt32Array" />
 			<param index="0" name="scene" type="RID" />
 			<description>
 				Returns the [member NetwPlayer.id] of every player who sees [param scene].
@@ -1662,19 +1650,6 @@
 			<return type="int" enum="NetwSession.State" />
 			<description>
 				Returns the [enum NetwSession.State] the session is in, the same as [member NetwSession.state].
-			</description>
-		</method>
-		<method name="session_get_stats">
-			<return type="Dictionary" />
-			<description>
-				Returns every [enum Stat] value, keyed by the lowercase constant name, such as [code]sent_bytes[/code].
-			</description>
-		</method>
-		<method name="session_get_traffic" qualifiers="const">
-			<return type="Dictionary" />
-			<param index="0" name="peer" type="int" />
-			<description>
-				Returns what the session sent to [param peer] and received from it over the last second. [method NetwSession.traffic] lists the keys.
 			</description>
 		</method>
 		<method name="session_is_local_client" qualifiers="const">
@@ -2194,7 +2169,7 @@
 			</description>
 		</method>
 		<method name="transport_list">
-			<return type="Array" />
+			<return type="RID[]" />
 			<description>
 				Every available transport, the registered ones first, then those from a [LobbyDirectory]. Any other [MultiplayerPeer] still works when assigned directly.
 			</description>
@@ -3046,10 +3021,139 @@
 			Counter. Bytes written but never sent, for example because the peer disconnected.
 		</constant>
 		<constant name="STAT_ROW_FRAMES_DEFERRED" value="97" enum="Stat">
-			Counter. Property updates delayed because the bandwidth limit in [method peer_get_link_stats] was reached.
+			Counter. Property updates delayed because the bandwidth limit [constant LINK_STAT_BUDGET_BYTES] was reached.
 		</constant>
 		<constant name="STAT_PREDICT_INSTALLS" value="98" enum="Stat">
 			Counter. Server states written onto entities this peer simulates but does not control.
+		</constant>
+		<constant name="TRACK_STAT_SLEEPING" value="0" enum="TrackStat">
+			A [bool]. Whether the track reached its newest snapshot and holds that value.
+		</constant>
+		<constant name="TRACK_STAT_OFFSET_ARMED" value="1" enum="TrackStat">
+			A [bool]. Whether the track smooths out the jump to the next value it draws.
+		</constant>
+		<constant name="TRACK_STAT_OFFSET_HELD" value="2" enum="TrackStat">
+			A [bool]. Whether the track is still smoothing out a jump.
+		</constant>
+		<constant name="TRACK_STAT_NEWEST_TICK" value="3" enum="TrackStat">
+			An [int]. The tick of the track's newest snapshot, or [code]-1[/code] when it holds none.
+		</constant>
+		<constant name="TRACK_STAT_BUFFER_SIZE" value="4" enum="TrackStat">
+			An [int]. How many snapshots the track holds.
+		</constant>
+		<constant name="TRACK_STAT_CHANNELS" value="5" enum="TrackStat">
+			An [int]. How many properties of the entity are displayed.
+		</constant>
+		<constant name="TRACK_STAT_AMBIGUOUS" value="6" enum="TrackStat">
+			An [int]. How many property names more than one node of the entity declares.
+		</constant>
+		<constant name="TRACK_STAT_PUMPED_FRAMES" value="7" enum="TrackStat">
+			An [int] counter. Frames the entity was displayed.
+		</constant>
+		<constant name="TRACK_STAT_PUMP_MODE" value="8" enum="TrackStat">
+			A [enum NetwDisplay.DisplayPump] value. The same as [member NetwDisplay.pump_mode].
+		</constant>
+		<constant name="TRACK_STAT_STARVATION_TICKS" value="9" enum="TrackStat">
+			An [int]. How many frames in a row playback has run past the newest snapshot.
+		</constant>
+		<constant name="TRACK_STAT_DISPLAY_LAG" value="10" enum="TrackStat">
+			A [float]. The same as [member NetwDisplay.display_lag].
+		</constant>
+		<constant name="TRACK_STAT_ROLE" value="11" enum="TrackStat">
+			A [enum NetwDisplay.DisplayRole] value. How the entity is displayed on this peer, with [constant NetwDisplay.DISPLAY_ROLE_AUTO] resolved.
+		</constant>
+		<constant name="LINK_STAT_RTT" value="0" enum="LinkStat">
+			Round trip time, in seconds.
+		</constant>
+		<constant name="LINK_STAT_JITTER" value="1" enum="LinkStat">
+			Round trip variation, in seconds.
+		</constant>
+		<constant name="LINK_STAT_REORDERS" value="2" enum="LinkStat">
+			Packets that arrived out of order.
+		</constant>
+		<constant name="LINK_STAT_DUPLICATES" value="3" enum="LinkStat">
+			Packets that arrived twice.
+		</constant>
+		<constant name="LINK_STAT_LOSS" value="4" enum="LinkStat">
+			The share of the last 32 packets lost, from [code]0.0[/code] to [code]1.0[/code].
+		</constant>
+		<constant name="LINK_STAT_MODE" value="5" enum="LinkStat">
+			A [enum LinkMode] value. [constant LINK_MODE_BAD] while the peer's budget is cut.
+		</constant>
+		<constant name="LINK_STAT_BUDGET_BITS" value="6" enum="LinkStat">
+			The most bits one packet to the peer may use.
+		</constant>
+		<constant name="LINK_STAT_BUDGET_BYTES" value="7" enum="LinkStat">
+			The bytes the peer may be sent each tick.
+		</constant>
+		<constant name="LINK_STAT_SENT_BYTES" value="8" enum="LinkStat">
+			Bytes charged to the peer since it joined.
+		</constant>
+		<constant name="LINK_STAT_DEBT_BYTES" value="9" enum="LinkStat">
+			Bytes the peer was sent past its budget.
+		</constant>
+		<constant name="LINK_STAT_DEFERRED_ROWS" value="10" enum="LinkStat">
+			Rows left waiting by the last tick.
+		</constant>
+		<constant name="LINK_MODE_GOOD" value="0" enum="LinkMode">
+			The link sends its whole budget.
+		</constant>
+		<constant name="LINK_MODE_BAD" value="1" enum="LinkMode">
+			The link lost packets and its budget is cut.
+		</constant>
+		<constant name="TRAFFIC_SENT_STATE" value="0" enum="Traffic">
+			Bytes a second sent for state and broadcast properties.
+		</constant>
+		<constant name="TRAFFIC_SENT_INPUT" value="1" enum="Traffic">
+			Bytes a second sent for input properties.
+		</constant>
+		<constant name="TRAFFIC_SENT_CALLS" value="2" enum="Traffic">
+			Bytes a second sent for RPCs, signals and actions.
+		</constant>
+		<constant name="TRAFFIC_SENT_SPAWNS" value="3" enum="Traffic">
+			Bytes a second sent for spawns, despawns, control, scenes and joins.
+		</constant>
+		<constant name="TRAFFIC_SENT_UPKEEP" value="4" enum="Traffic">
+			Bytes a second sent for prediction acknowledgements and the clock.
+		</constant>
+		<constant name="TRAFFIC_SENT_HEADERS" value="5" enum="Traffic">
+			Bytes a second sent for packet headers, an estimate for the transport.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_STATE" value="6" enum="Traffic">
+			Bytes a second received for state and broadcast properties.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_INPUT" value="7" enum="Traffic">
+			Bytes a second received for input properties.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_CALLS" value="8" enum="Traffic">
+			Bytes a second received for RPCs, signals and actions.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_SPAWNS" value="9" enum="Traffic">
+			Bytes a second received for spawns, despawns, control, scenes and joins.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_UPKEEP" value="10" enum="Traffic">
+			Bytes a second received for prediction acknowledgements and the clock.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_HEADERS" value="11" enum="Traffic">
+			Bytes a second received for packet headers, an estimate for the transport.
+		</constant>
+		<constant name="TRAFFIC_SENT_PACKETS" value="12" enum="Traffic">
+			Packets a second sent.
+		</constant>
+		<constant name="TRAFFIC_RECEIVED_PACKETS" value="13" enum="Traffic">
+			Packets a second received.
+		</constant>
+		<constant name="LAYER_STAT_VIEWERS" value="0" enum="LayerStat">
+			The number of peers viewing the layer.
+		</constant>
+		<constant name="LAYER_STAT_ENTITIES" value="1" enum="LayerStat">
+			The number of entities in the layer.
+		</constant>
+		<constant name="LAYER_STAT_VISIBLE_EDGES" value="2" enum="LayerStat">
+			The number of entity and peer pairs that can see each other.
+		</constant>
+		<constant name="LAYER_STAT_TRANSITIONS_TOTAL" value="3" enum="LayerStat">
+			Shows plus hides since the layer was created.
 		</constant>
 	</constants>
 </class>

@@ -212,9 +212,8 @@ Error NetwMultiplayer::apply_pending_config(
         }
         predict_awaiting_config.clear();
         for (const RID &entity : waiting) {
-            const Ref<NetwEntity> wrapper = entity_get_view(entity);
-            if (wrapper.is_valid()) {
-                register_prediction(wrapper);
+            if (entity_get_view(entity).is_valid()) {
+                register_prediction(entity);
             }
         }
     }

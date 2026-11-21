@@ -4,7 +4,7 @@
 
 #include "godot/rid.hpp"
 #include "godot/variant.hpp"
-#include "netw/schema_core.hpp"
+#include "netw/schema_book.hpp"
 
 namespace netw::persist {
 
@@ -32,7 +32,7 @@ godot::Dictionary seal_record(
 );
 
 godot::Error open_record(
-    const SchemaCore &p_core,
+    const SchemaBook &p_core,
     const godot::RID &p_schema,
     const godot::Dictionary &p_envelope,
     godot::Dictionary &r_values,

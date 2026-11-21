@@ -10,9 +10,8 @@
 #include "netw/game_call.hpp"
 #include "netw/log.hpp"
 #include "netw/object_port.hpp"
-#include "netw/schema_core.hpp"
+#include "netw/schema_book.hpp"
 #include "netw/script/model.hpp"
-#include "netw/session/books.hpp"
 
 using namespace godot;
 
@@ -142,7 +141,7 @@ bool schema_matches(
 
 RID durable_schema(
     NetwMultiplayer *p_session,
-    SchemaCore &p_schemas,
+    SchemaBook &p_schemas,
     const StringName &p_name,
     const LocalVector<BoundColumn> &p_bound,
     const LocalVector<int> &p_types,
@@ -190,13 +189,9 @@ Bindings::~Bindings() {
     clear();
 }
 
-void Bindings::bind(
-    NetwMultiplayer *p_session,
-    const netw::session::Books *p_books
-) {
-    NETW_BUG_COND(p_session != nullptr && p_books == nullptr);
+void Bindings::bind(NetwMultiplayer *p_session, SchemaBook *p_schemas) {
     session = p_session;
-    books = p_session != nullptr ? p_books : nullptr;
+    schema_core = p_session != nullptr ? p_schemas : nullptr;
 }
 
 Binding *Bindings::at(const RID &p_binding) {
@@ -475,7 +470,7 @@ RID Bindings::compile(Node *p_root) {
     String detail;
     const RID schema = durable_schema(
         session,
-        *books->schemas,
+        *schema_core,
         schema_name,
         bound,
         types,

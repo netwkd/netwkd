@@ -5,6 +5,8 @@
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/object_port.hpp"
+#include "netw/value_variant.hpp"
+#include "netw/wire/spec_dump.hpp"
 
 using namespace godot;
 
@@ -73,74 +75,14 @@ bool Record::encode_header(
     return wire::string_field(p_stream, name);
 }
 
-Ref<NetwEntity> Record::stamp_header(
-    Object *p_node,
-    const Dictionary &p_header,
-    Object *p_session
-) {
-    const Ref<NetwEntity> entity
-        = NetwEntity::ensure(Object::cast_to<Node>(p_node));
-    if (entity.is_null()) {
-        return entity;
-    }
-    entity->set_name(p_header.get(StringName("entity_id"), StringName()));
-    entity->set_peer_id(int64_t(p_header.get(StringName("peer_id"), 0)));
-    NetwMultiplayer *session = Object::cast_to<NetwMultiplayer>(p_session);
-    entity->set_player_id(
-        session != nullptr && session->is_host()
-            ? session->player_incarnation(entity->get_peer_id())
-            : int64_t(p_header.get(StringName("player_id"), 0))
-    );
-    NetwMultiplayer::record_of_wrapper(entity.ptr())
-        ->get_control()
-        ->set_authority(
-            bool(p_header.get(StringName("controller_authority"), false))
-                ? int64_t(NetwEntity::AUTHORITY_CONTROLLER)
-                : int64_t(NetwEntity::AUTHORITY_SERVER)
-        );
-    NetwMultiplayer::control_record(
-        entity.ptr(),
-        int64_t(p_header.get(StringName("controller"), 0))
-    );
-    NetwMultiplayer::control_seed(
-        entity.ptr(),
-        uint64_t(int64_t(p_header.get(StringName("control_revision"), 0))),
-        uint64_t(int64_t(p_header.get(StringName("control_tenure"), 0))),
-        int64_t(p_header.get(StringName("control_hold"), 0))
-    );
-    entity->set_action_spawn_tick(
-        int64_t(p_header.get(StringName("action_spawn_tick"), -1))
-    );
-    entity->set_action_requester(
-        int64_t(p_header.get(StringName("action_requester"), 0))
-    );
-    entity->comp_table().set_wire_hash(
-        int64_t(p_header.get(StringName("wire_hash"), 0))
-    );
-    if (entity->comp_table().get_table_hash() != 0) {
-        entity->comp_table().reconcile(entity->is_on_server());
-    }
-    entity->set_declares_scene(
-        bool(p_header.get(StringName("declares_scene"), false))
-    );
-    entity->set_scene_label(
-        p_header.get(StringName("scene_label"), StringName())
-    );
-    entity->set_route(int64_t(p_header.get(StringName("route"), 0)));
-    if (entity->get_stage() == int64_t(netw::entity::Stage::UNBOUND)) {
-        entity->arm(Object::cast_to<NetwMultiplayer>(p_session));
-    }
-    return entity;
-}
-
 Dictionary verb_spec_records() {
     Dictionary out;
-    out["SpawnVerbHead"] = VerbHead::wire.spec_dump();
-    out["SpawnDescriptorRow"] = DescriptorRow::wire.spec_dump();
+    out["SpawnVerbHead"] = wire::spec_dump(VerbHead::wire);
+    out["SpawnDescriptorRow"] = wire::spec_dump(DescriptorRow::wire);
     return out;
 }
 
-void Record::apply_native_entry(
+bool Record::apply_native_entry(
     Node *p_root,
     const String &p_path,
     const PackedByteArray &p_bytes
@@ -152,14 +94,20 @@ void Record::apply_native_entry(
         target = target->get_node_or_null(names);
     }
     if (target == nullptr) {
-        return;
+        return true;
     }
     port_count_write(target);
+    Variant carried;
+    const bool read = value::decode_packed(p_bytes, carried);
+    if (!read) {
+        carried = Variant();
+    }
     gd::set_indexed(
         target,
         NodePath(":" + path.get_concatenated_subnames()),
-        gd::bytes_to_var(p_bytes)
+        carried
     );
+    return read;
 }
 
 PackedByteArray Record::write_descriptors(

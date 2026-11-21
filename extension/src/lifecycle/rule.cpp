@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/lifecycle/rule.hpp"
 
 #include "godot/utility.hpp"

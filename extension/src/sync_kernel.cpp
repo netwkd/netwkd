@@ -1,6 +1,7 @@
 #include "netw/sync_kernel.hpp"
 
 #include "netw/call_args.hpp"
+#include "netw/wire/spec_dump.hpp"
 
 namespace netw::sync_kernel {
 
@@ -9,11 +10,21 @@ using namespace godot;
 namespace {
 
 template <class Head>
-PackedByteArray row_write(const Head &p_head, const Array &p_values) {
+PackedByteArray row_write(
+    const Head &p_head,
+    const Array &p_values,
+    NetwMultiplayer *p_session
+) {
     wire::WriteStream stream;
     Head staged = p_head;
     if (!Head::wire.run(stream, staged)
-        || !call_args::values_write(stream, p_values, Array(), Array())
+        || !call_args::values_write(
+            stream,
+            p_values,
+            Array(),
+            Array(),
+            p_session
+        )
         || !stream.align_verify()) {
         return PackedByteArray();
     }
@@ -30,11 +41,15 @@ bool row_read(const PackedByteArray &p_payload, Head &r_head, Array &r_values) {
 
 } // namespace
 
-PackedByteArray encode_volatile(int64_t p_ordinal, const Array &p_values) {
+PackedByteArray encode_volatile(
+    int64_t p_ordinal,
+    const Array &p_values,
+    NetwMultiplayer *p_session
+) {
     VolatileHead head;
     head.ordinal = uint64_t(p_ordinal);
     head.flags = uint64_t(RESERVED);
-    return row_write(head, p_values);
+    return row_write(head, p_values, p_session);
 }
 
 bool decode_volatile(
@@ -59,12 +74,13 @@ bool decode_volatile(
 PackedByteArray encode_retained(
     int64_t p_ordinal,
     int64_t p_mask,
-    const Array &p_values
+    const Array &p_values,
+    NetwMultiplayer *p_session
 ) {
     RetainedHead head;
     head.ordinal = uint64_t(p_ordinal);
     head.mask = uint64_t(p_mask);
-    return row_write(head, p_values);
+    return row_write(head, p_values, p_session);
 }
 
 bool decode_retained(
@@ -98,8 +114,8 @@ bool decode_retained(
 
 Dictionary frame_spec_records() {
     Dictionary out;
-    out["SyncVolatileHead"] = VolatileHead::wire.spec_dump();
-    out["SyncRetainedHead"] = RetainedHead::wire.spec_dump();
+    out["SyncVolatileHead"] = wire::spec_dump(VolatileHead::wire);
+    out["SyncRetainedHead"] = wire::spec_dump(RetainedHead::wire);
     return out;
 }
 

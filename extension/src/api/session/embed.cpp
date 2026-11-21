@@ -27,23 +27,13 @@ bool NetwMultiplayer::embed_claim_dispose() {
     return true;
 }
 
-Error NetwMultiplayer::embed_settle() {
+void NetwMultiplayer::embed_settle() {
     NETW_ZONE_NC("embed_settle", colors::SCENE);
     if (embed_phase_value != EMBED_PHASE_DECLARING) {
-        return OK;
+        return;
     }
     embed_set_phase(EMBED_PHASE_SETTLING);
-    ReplicationCore *plane = (get_replication_plane());
-    const Error wired = plane != nullptr ? plane->settle_channels() : OK;
-    if (wired != OK) {
-        NETW_TRACE(
-            sys::SCENE,
-            "The session went live with a built-in channel that has no "
-            "handler."
-        );
-    }
     embed_set_phase(EMBED_PHASE_LIVE);
-    return wired;
 }
 
 Error NetwMultiplayer::embed_poll_transport() {

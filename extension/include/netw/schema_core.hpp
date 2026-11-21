@@ -2,13 +2,11 @@
 
 #include "godot/rid.hpp"
 #include "godot/variant.hpp"
-#include "netw/api/quantize.hpp"
 #include "netw/table/schema_record.hpp"
 
 namespace netw {
 
 using table::SchemaColumn;
-using table::SchemaMigration;
 using table::SchemaRecord;
 
 class SchemaCore {
@@ -57,24 +55,10 @@ public:
         int type,
         int stride
     );
-    void set_column_quantizer(
-        const godot::RID &schema,
-        int column,
-        const godot::Ref<NetwQuantize> &quantizer
-    );
     void set_storage_version(const godot::RID &schema, int version);
-    void add_migration(
-        const godot::RID &schema,
-        int from_version,
-        const godot::Callable &step
-    );
     godot::Error seal(const godot::RID &schema);
 
     int storage_version_of(const godot::RID &schema) const;
-    godot::Callable migration_from(
-        const godot::RID &schema,
-        int from_version
-    ) const;
 
     bool is_valid(const godot::RID &schema) const;
     godot::RID find(const godot::StringName &name) const;
@@ -84,10 +68,6 @@ public:
     godot::StringName column_key(const godot::RID &schema, int column) const;
     int column_type(const godot::RID &schema, int column) const;
     int column_stride(const godot::RID &schema, int column) const;
-    godot::Ref<NetwQuantize> column_quantizer(
-        const godot::RID &schema,
-        int column
-    ) const;
     int find_column(
         const godot::RID &schema,
         const godot::StringName &key
@@ -101,23 +81,14 @@ public:
     void sealed_records(godot::LocalVector<const SchemaRecord *> &r_out) const;
 
     static void open_redeclare(SchemaRecord *record);
+    static void refuse_redeclare(SchemaRecord *record);
     static int append_column(
         SchemaRecord *record,
         const godot::StringName &key,
         int type,
         int stride
     );
-    static void assign_quantizer(
-        SchemaRecord *record,
-        int column,
-        const godot::Ref<NetwQuantize> &quantizer
-    );
     static void assign_storage_version(SchemaRecord *record, int version);
-    static void append_migration(
-        SchemaRecord *record,
-        int from_version,
-        const godot::Callable &step
-    );
     static godot::Error fix(SchemaRecord *record);
     static const SchemaColumn *column_at(
         const SchemaRecord *record,
@@ -126,19 +97,9 @@ public:
 
     static int compute_hash(const SchemaRecord *record);
     static godot::String quantizer_tag(const SchemaColumn *column);
-    static int type_from_variant(int variant_type);
-    static godot::Variant make_storage(int type);
 
-    static int storage_type(int type);
-    static int element_type(int type);
+    static bool is_column_type(int type);
     static bool is_sized(int type);
-
-    static godot::Error validate_value(
-        int type,
-        int stride,
-        const godot::Variant &value
-    );
-    static godot::Error validate_storable(const godot::Variant &value);
 };
 
 } // namespace netw

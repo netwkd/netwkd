@@ -232,9 +232,10 @@ build_sources = sources.get_sources(
     env,
     env["target"] in ["editor", "template_debug"],
 )
-fault_text_env = env.Clone()
-fault_text_env.Append(CCFLAGS=sources.SWITCH_ERROR_FLAGS[sources.dialect(env)])
-build_sources.append(fault_text_env.SharedObject(str(sources.FAULT_TEXT)))
+switch_env = env.Clone()
+switch_env.Append(CCFLAGS=sources.SWITCH_ERROR_FLAGS[sources.dialect(env)])
+for path in sources.SWITCH_SOURCES:
+    build_sources.append(switch_env.SharedObject(str(path)))
 
 if env["target"] in ["editor", "template_debug"]:
     doc_xml = Glob("doc_classes/*.xml")

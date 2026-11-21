@@ -1,15 +1,16 @@
-#include "netw/store/world.hpp"
+#include "netw/sealed.hpp"
+
+#include "netw/store/store.hpp"
 
 using namespace godot;
 
 namespace netw::store {
 
-World::~World() {
+Store::~Store() {
     clear();
 }
 
-void World::clear() {
-    arrays.forget_slots();
+void Store::clear() {
     for (uint32_t at = 0; at < tables.size(); ++at) {
         if (tables[at]->rid.is_valid()) {
             table_names.free(tables[at]->rid);
@@ -19,9 +20,6 @@ void World::clear() {
     tables.clear();
     tables_by_set.clear();
     owner_rows.clear();
-    body_rows.clear();
-    reprobed.clear();
-    residents.clear();
     slot_route.clear();
     slot_epoch.clear();
     slot_gen.clear();
@@ -46,7 +44,7 @@ void World::clear() {
     slot_stamps.clear();
 }
 
-uint32_t World::acquire_slot(int64_t p_route, int64_t p_epoch) {
+uint32_t Store::acquire_slot(int64_t p_route, int64_t p_epoch) {
     uint32_t slot = 0;
     if (!free_slots.is_empty()) {
         slot = free_slots[free_slots.size() - 1];
@@ -79,7 +77,7 @@ uint32_t World::acquire_slot(int64_t p_route, int64_t p_epoch) {
     return slot;
 }
 
-uint32_t World::claim_slot(int64_t p_route, int64_t p_epoch) {
+uint32_t Store::claim_slot(int64_t p_route, int64_t p_epoch) {
     const EntityRef held = find(p_route, p_epoch);
     const uint32_t slot = held.slot != Table::NO_SLOT
         ? held.slot
@@ -88,7 +86,7 @@ uint32_t World::claim_slot(int64_t p_route, int64_t p_epoch) {
     return slot;
 }
 
-void World::release_slot(uint32_t p_slot) {
+void Store::release_slot(uint32_t p_slot) {
     const uint32_t *named = route_slot.getptr(slot_route[p_slot]);
     if (named != nullptr && *named == p_slot) {
         route_slot.erase(slot_route[p_slot]);
@@ -101,7 +99,7 @@ void World::release_slot(uint32_t p_slot) {
     free_slots.push_back(p_slot);
 }
 
-void World::leave_slot(uint32_t p_slot) {
+void Store::leave_slot(uint32_t p_slot) {
     if (p_slot == Table::NO_SLOT) {
         return;
     }
@@ -111,7 +109,7 @@ void World::leave_slot(uint32_t p_slot) {
     }
 }
 
-int64_t World::note_tenure(uint32_t p_slot, uint64_t p_tenure, int64_t p_tick) {
+int64_t Store::note_tenure(uint32_t p_slot, uint64_t p_tenure, int64_t p_tick) {
     if (p_slot >= slot_tenure.size()) {
         return -1;
     }
@@ -124,20 +122,20 @@ int64_t World::note_tenure(uint32_t p_slot, uint64_t p_tenure, int64_t p_tick) {
     return slot_tenure_tick[p_slot];
 }
 
-EntityRef World::enter(int64_t p_route, int64_t p_epoch) {
+EntityRef Store::enter(int64_t p_route, int64_t p_epoch) {
     if (p_route <= 0) {
         return EntityRef();
     }
     return ref_of(claim_slot(p_route, p_epoch));
 }
 
-void World::leave(const EntityRef &p_ref) {
+void Store::leave(const EntityRef &p_ref) {
     if (holds(p_ref)) {
         leave_slot(p_ref.slot);
     }
 }
 
-EntityRef World::find(int64_t p_route, int64_t p_epoch) const {
+EntityRef Store::find(int64_t p_route, int64_t p_epoch) const {
     const uint32_t *held = route_slot.getptr(p_route);
     if (held != nullptr && slot_epoch[*held] == p_epoch) {
         return ref_of(*held);
@@ -145,24 +143,24 @@ EntityRef World::find(int64_t p_route, int64_t p_epoch) const {
     return EntityRef();
 }
 
-bool World::holds(const EntityRef &p_ref) const {
+bool Store::holds(const EntityRef &p_ref) const {
     return p_ref.slot < slot_gen.size() && slot_gen[p_ref.slot] == p_ref.gen
         && slot_route[p_ref.slot] != 0;
 }
 
-void World::bind_predict(uint32_t p_slot, int64_t p_predict) {
+void Store::bind_predict(uint32_t p_slot, int64_t p_predict) {
     if (p_slot < slot_predict.size() && slot_route[p_slot] != 0) {
         slot_predict[p_slot] = p_predict;
     }
 }
 
-void World::bind_lagcomp(uint32_t p_slot, int64_t p_lagcomp) {
+void Store::bind_lagcomp(uint32_t p_slot, int64_t p_lagcomp) {
     if (p_slot < slot_lagcomp.size() && slot_route[p_slot] != 0) {
         slot_lagcomp[p_slot] = p_lagcomp;
     }
 }
 
-EntityRef World::ref_of(uint32_t p_slot) const {
+EntityRef Store::ref_of(uint32_t p_slot) const {
     EntityRef out;
     if (p_slot < slot_gen.size()) {
         out.slot = p_slot;
@@ -171,19 +169,19 @@ EntityRef World::ref_of(uint32_t p_slot) const {
     return out;
 }
 
-int64_t World::route_of(uint32_t p_slot) const {
+int64_t Store::route_of(uint32_t p_slot) const {
     return p_slot < slot_route.size() ? slot_route[p_slot] : 0;
 }
 
-int64_t World::epoch_of(uint32_t p_slot) const {
+int64_t Store::epoch_of(uint32_t p_slot) const {
     return p_slot < slot_epoch.size() ? slot_epoch[p_slot] : 0;
 }
 
-uint32_t World::live_slot_count() const {
+uint32_t Store::live_slot_count() const {
     return slot_route.size() - free_slots.size();
 }
 
-uint32_t World::table_for(
+uint32_t Store::table_for(
     uint64_t p_set,
     Family p_family,
     const table::SchemaRecord &p_schema
@@ -201,6 +199,7 @@ uint32_t World::table_for(
     made->compile(p_schema, p_family);
     made->size_peers(sides.size());
     index = tables.size();
+    made->index = index;
     TableName name;
     name.index = index;
     made->rid = table_names.make_rid(name);
@@ -208,16 +207,15 @@ uint32_t World::table_for(
     return index;
 }
 
-uint32_t World::table_of(const RID &p_rid) const {
+uint32_t Store::table_of(const RID &p_rid) const {
     const TableName *name = table_names.get_or_null(p_rid);
     return name != nullptr ? name->index : Table::NO_SLOT;
 }
 
-RowAddress World::add_row(
+RowAddress Store::add_row(
     uint32_t p_table,
     uint64_t p_owner,
     uint32_t p_lane,
-    uint64_t p_node,
     uint8_t p_comp
 ) {
     Table &held = *tables[p_table];
@@ -225,7 +223,6 @@ RowAddress World::add_row(
     at.table = p_table;
     at.row = held.add_row();
     held.owners[at.row] = p_owner;
-    held.nodes[at.row] = p_node;
     held.comps[at.row] = p_comp;
     held.lanes[at.row] = uint8_t(p_lane);
     OwnerRows *rows = owner_rows.getptr(p_owner);
@@ -236,42 +233,12 @@ RowAddress World::add_row(
     return at;
 }
 
-bool World::probes(uint64_t p_node) const {
-    return body_rows.has(p_node);
-}
-
-void World::count_probe(const Table &p_table, uint32_t p_row, bool p_reads) {
-    if (p_table.body_columns == 0 || !p_table.scalar) {
-        return;
-    }
-    const uint64_t node = p_table.nodes[p_row];
-    uint32_t *probed = body_rows.getptr(node);
-    if (p_reads) {
-        if (probed != nullptr) {
-            *probed += 1;
-            return;
-        }
-        body_rows.insert(node, 1);
-        reprobed.push_back(node);
-        return;
-    }
-    if (probed == nullptr) {
-        return;
-    }
-    if (*probed > 1) {
-        *probed -= 1;
-        return;
-    }
-    body_rows.erase(node);
-    reprobed.push_back(node);
-}
-
-RowAddress World::row_of(uint64_t p_owner, uint32_t p_lane) const {
+RowAddress Store::row_of(uint64_t p_owner, uint32_t p_lane) const {
     const OwnerRows *rows = owner_rows.getptr(p_owner);
     return rows != nullptr ? rows->lane[p_lane] : RowAddress();
 }
 
-void World::place(const RowAddress &p_at, int64_t p_route, int64_t p_epoch) {
+void Store::place(const RowAddress &p_at, int64_t p_route, int64_t p_epoch) {
     Table &held = *tables[p_at.table];
     const uint32_t was = held.slots[p_at.row];
     if (was != Table::NO_SLOT && slot_route[was] == p_route
@@ -295,7 +262,7 @@ void World::place(const RowAddress &p_at, int64_t p_route, int64_t p_epoch) {
     leave_slot(was);
 }
 
-void World::remove_row(const RowAddress &p_at) {
+void Store::remove_row(const RowAddress &p_at) {
     if (!p_at.valid()) {
         return;
     }
@@ -303,9 +270,6 @@ void World::remove_row(const RowAddress &p_at) {
     const uint64_t owner = held.owners[p_at.row];
     const uint32_t lane = held.lanes[p_at.row];
     const uint32_t slot = held.slots[p_at.row];
-    if (held.sources[p_at.row] != uint8_t(Source::NONE)) {
-        count_probe(held, p_at.row, false);
-    }
     close_life(p_at);
     forget_lane(p_at);
     held.touch(p_at.row);
@@ -329,19 +293,60 @@ void World::remove_row(const RowAddress &p_at) {
     leave_slot(slot);
 }
 
-void World::remove_owner(uint64_t p_owner) {
-    for (uint32_t lane = 0; lane < 2; ++lane) {
-        remove_row(row_of(p_owner, lane));
+void Store::note_miss(
+    const Table &p_table,
+    uint32_t p_row,
+    int p_column,
+    const char *p_gate,
+    int64_t p_tick
+) {
+    Miss missed;
+    missed.route = p_table.routes[p_row];
+    missed.slot = p_table.slots[p_row];
+    missed.tick = p_tick;
+    missed.column = p_table.schema.at(p_column)->key;
+    missed.gate = p_gate;
+    if (misses.size() < MISSES_KEPT) {
+        misses.push_back(missed);
     }
+    miss_count += 1;
+    report_miss(missed);
 }
 
-void World::unsource_all() {
+uint32_t Store::sweep(Table &p_table, bool p_wake) {
+    const uint32_t count = p_table.row_count();
+    if (count == 0) {
+        return 0;
+    }
+    if (p_table.sweep_at >= count) {
+        p_table.sweep_at = 0;
+    }
+    const uint32_t from = p_table.sweep_at;
+    const uint32_t share = sweep_share(count);
+    for (uint32_t at = 0; at < share; ++at) {
+        if (p_table.sweep_at >= count) {
+            p_table.sweep_at = 0;
+        }
+        if (p_wake) {
+            p_table.working.set(p_table.sweep_at, true);
+        }
+        p_table.sweep_at += 1;
+    }
+#if defined(NETW_TESTS)
+    if (p_wake) {
+        work.swept += int64_t(share);
+    }
+#endif
+    return from;
+}
+
+void Store::unsource_all() {
     for (uint32_t at = 0; at < tables.size(); ++at) {
         tables[at]->unsourced.fill();
     }
 }
 
-void World::unsource_owner(uint64_t p_owner) {
+void Store::unsource_owner(uint64_t p_owner) {
     for (uint32_t lane = 0; lane < 2; ++lane) {
         const RowAddress at = row_of(p_owner, lane);
         if (at.valid()) {
@@ -351,7 +356,7 @@ void World::unsource_owner(uint64_t p_owner) {
 }
 
 #if defined(NETW_PROFILING) || defined(DEBUG_ENABLED)
-int64_t World::row_bytes() const {
+int64_t Store::row_bytes() const {
     int64_t bytes = held::vector(slot_route) + held::vector(slot_epoch)
         + held::vector(slot_gen) + held::vector(slot_rows)
         + held::vector(slot_weight) + held::vector(slot_marks)
@@ -359,19 +364,18 @@ int64_t World::row_bytes() const {
         + held::vector(slot_predict) + held::vector(slot_lagcomp)
         + held::vector(free_slots) + held::map(route_slot)
         + held::vector(tables) + held::map(tables_by_set)
-        + held::map(owner_rows) + held::map(body_rows) + held::map(lane_rows)
+        + held::map(owner_rows) + held::map(lane_rows)
         + held::vector(live.words) + held::vector(stale.words)
         + held::vector(stale_slots) + held::vector(slot_stamps)
-        + probe.held_bytes() + held::vector(visiting) + residents.held_bytes()
         + held::vector(misses) + held::set(dozing) + held::vector(woken)
-        + held::vector(reprobed) + held::set(watched);
+        + held::set(watched);
     for (const Table *table : tables) {
         bytes += table->held_bytes();
     }
     return bytes;
 }
 
-int64_t World::peer_bytes() const {
+int64_t Store::peer_bytes() const {
     int64_t bytes = held::vector(sides) + held::map(peer_index)
         + held::vector(free_peers);
     for (const PeerSide &side : sides) {
@@ -386,7 +390,7 @@ int64_t World::peer_bytes() const {
     return bytes;
 }
 
-int64_t World::flight_bytes() const {
+int64_t Store::flight_bytes() const {
     int64_t bytes = held::vector(spare_images);
     for (const wire::CodeRow &image : spare_images) {
         bytes += image.held_bytes();

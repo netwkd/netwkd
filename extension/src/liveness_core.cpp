@@ -281,6 +281,32 @@ bool NetwLivenessCore::unbind_route(const RID &entity) {
     return true;
 }
 
+bool NetwLivenessCore::rekey(const RID &from, const RID &to) {
+    const Record *held_record = record_of(from);
+    if (held_record == nullptr) {
+        return true;
+    }
+    const bool standing = records.has(to.get_id());
+    if (!standing && !netw::entity::retain(to)) {
+        return false;
+    }
+    Record moved = *held_record;
+    records.erase(from.get_id());
+    if (moved.route > 0 && rid_from_route(moved.route) == from) {
+        if (standing) {
+            by_route.erase(moved.route);
+        } else {
+            by_route[moved.route] = to;
+        }
+    }
+    if (!standing) {
+        moved.entity = to;
+        records.ensure(to.get_id()) = moved;
+    }
+    netw::entity::release(from);
+    return true;
+}
+
 int NetwLivenessCore::epoch_of(const RID &entity) const {
     const Record *record = record_of(entity);
     return record ? record->epoch : -1;

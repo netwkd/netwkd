@@ -9,6 +9,7 @@ wire_decode.py --capture run.netwcap --verbose      # WIRE.md 21
 
 import argparse
 import json
+import struct
 import sys
 
 MAX_VARINT_BYTES = 10
@@ -807,23 +808,271 @@ CAPTURE_MAGICS_BY_FORMAT = {
         0x98: "DatagramAcked",
         0xB8: "DatagramAckedHeld",
     },
+    24: {
+        0x58: "DatagramReliable",
+        0x78: "DatagramUnreliable",
+        0x98: "DatagramAcked",
+        0xB8: "DatagramAckedHeld",
+    },
 }
 
 REPLY_FAILED_BIT_SINCE = 12
 STRING_CAP = 1023
 
 
+VALUE_SINCE = 24
+VALUE_CAP = 65535
+MAX_VALUE_DEPTH = 16
+MAX_VALUE_ELEMENTS = 65536
+VALUE_NAMES = (
+    "NIL FALSE TRUE INT FLOAT FLOAT32 STRING STRING_NAME NODE_PATH VECTOR2 "
+    "VECTOR2I VECTOR3 VECTOR3I VECTOR4 VECTOR4I QUATERNION COLOR RECT2 RECT2I "
+    "PLANE AABB BASIS TRANSFORM2D TRANSFORM3D PROJECTION ARRAY TYPED_ARRAY "
+    "DICTIONARY TYPED_DICTIONARY BYTES PACKED_INT32 PACKED_INT64 PACKED_FLOAT32 "
+    "PACKED_FLOAT64 PACKED_STRING PACKED_VECTOR2 PACKED_VECTOR3 PACKED_COLOR "
+    "PACKED_VECTOR4"
+).split()
+VALUE_REALS = {9: 2, 11: 3, 13: 4, 15: 4, 16: 4, 17: 4, 19: 4, 20: 6, 21: 9, 22: 6, 23: 12, 24: 16}
+VALUE_INTS = {10: 2, 12: 3, 14: 4, 18: 4}
+VALUE_PACKED = {30: "<i", 31: "<q", 32: "<f", 33: "<d", 35: "<2f", 36: "<3f", 37: "<4f", 38: "<4f"}
+VALUE_KIND = {2: 1, 5: 4, 26: 25, 28: 27}
+
+
+class ValueReader:
+    """One value of WIRE.md 23, refused on every spelling the writer never makes."""
+
+    def __init__(self, data, at=0, end=None):
+        self.data = bytes(data)
+        self.at = at
+        self.end = len(self.data) if end is None else end
+        self.budget = MAX_VALUE_ELEMENTS
+
+    def span(self, size):
+        if size < 0 or self.at + size > self.end:
+            raise Poisoned("a value reads past its end")
+        start = self.at
+        self.at += size
+        return self.data[start : self.at]
+
+    def varuint(self):
+        staged = 0
+        for group in range(MAX_VARINT_BYTES):
+            byte = self.span(1)[0]
+            if group == MAX_VARINT_BYTES - 1 and (byte & 0x7F) > 1:
+                raise Poisoned("a value varuint is past 64 bits")
+            staged |= (byte & 0x7F) << (group * 7)
+            if not byte & 0x80:
+                if group > 0 and (byte & 0x7F) == 0:
+                    raise Poisoned("a value varuint is not canonical")
+                return staged
+        raise Poisoned("a value varuint is past 64 bits")
+
+    def svarint(self):
+        staged = self.varuint()
+        return (staged >> 1) ^ -(staged & 1)
+
+    def tag(self):
+        byte = self.span(1)[0]
+        if byte >= len(VALUE_NAMES):
+            raise Poisoned("value tag %d is past the last" % byte)
+        return byte
+
+    def kind(self, tag):
+        return VALUE_KIND.get(tag, tag)
+
+    def header(self):
+        tag = self.tag()
+        if self.kind(tag) != tag:
+            raise Poisoned("a typed header names %s, which is no kind" % VALUE_NAMES[tag])
+        return tag
+
+    def text(self):
+        raw = self.span(self.varuint())
+        if b"\x00" in raw or raw.startswith(b"\xef\xbb\xbf"):
+            raise Poisoned("value text holds a NUL or a byte order mark")
+        try:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
+            raise Poisoned("value text is not UTF-8")
+
+    def count(self, least):
+        count = self.varuint()
+        if count * least > self.end - self.at:
+            raise Poisoned("a value count is larger than its bytes")
+        return count
+
+    def value(self, depth=0, want=0):
+        if depth > MAX_VALUE_DEPTH:
+            raise Poisoned("a value nests past depth %d" % MAX_VALUE_DEPTH)
+        self.budget -= 1
+        if self.budget < 0:
+            raise Poisoned("a value holds more than %d values" % MAX_VALUE_ELEMENTS)
+        tag = self.tag()
+        if want and self.kind(tag) != want:
+            raise Poisoned("a typed element is %s" % VALUE_NAMES[tag])
+        if tag <= 2:
+            return (None, False, True)[tag]
+        if tag == 3:
+            return self.svarint()
+        if tag == 4:
+            held = struct.unpack("<d", self.span(8))[0]
+            try:
+                narrowed = struct.pack("<d", struct.unpack("<f", struct.pack("<f", held))[0])
+            except OverflowError:
+                narrowed = None
+            if narrowed == struct.pack("<d", held):
+                raise Poisoned("a FLOAT that a FLOAT32 holds exactly")
+            return held
+        if tag == 5:
+            return struct.unpack("<f", self.span(4))[0]
+        if tag in (6, 7):
+            return self.text()
+        if tag == 8:
+            path = self.text()
+            names, _, subnames = path.partition(":")
+            names = names[1:] if names.startswith("/") else names
+            parts = (names.split("/") if names else []) + (subnames.split(":") if ":" in path else [])
+            if any(part == "" for part in parts):
+                raise Poisoned("a NODE_PATH Godot would read as another path")
+            return path
+        if tag in VALUE_REALS:
+            return (VALUE_NAMES[tag], struct.unpack("<%df" % VALUE_REALS[tag], self.span(4 * VALUE_REALS[tag])))
+        if tag in VALUE_INTS:
+            parts = tuple(self.svarint() for _ in range(VALUE_INTS[tag]))
+            if any(part < -(1 << 31) or part >= 1 << 31 for part in parts):
+                raise Poisoned("a %s component is past 32 bits" % VALUE_NAMES[tag])
+            return (VALUE_NAMES[tag], parts)
+        if tag in (25, 26):
+            element = self.header() if tag == 26 else 0
+            if tag == 26 and element == 0:
+                raise Poisoned("a TYPED_ARRAY of NIL")
+            return [self.value(depth + 1, element) for _ in range(self.count(1))]
+        if tag in (27, 28):
+            key_kind = self.header() if tag == 28 else 0
+            value_kind = self.header() if tag == 28 else 0
+            if tag == 28 and key_kind == 0 and value_kind == 0:
+                raise Poisoned("a TYPED_DICTIONARY of no type")
+            pairs = []
+            keys = set()
+            for _ in range(self.count(2)):
+                start = self.at
+                key = self.value(depth + 1, key_kind)
+                if self.data[start : self.at] in keys:
+                    raise Poisoned("a DICTIONARY holds one key twice")
+                keys.add(self.data[start : self.at])
+                pairs.append((key, self.value(depth + 1, value_kind)))
+            return pairs
+        if tag == 29:
+            return self.span(self.varuint())
+        if tag == 34:
+            return [self.text() for _ in range(self.count(1))]
+        layout = VALUE_PACKED[tag]
+        width = struct.calcsize(layout)
+        count = self.count(width)
+        return [struct.unpack(layout, self.span(width)) for _ in range(count)]
+
+
+def read_value(data, at=0, end=None):
+    """One value and the offset just past it."""
+    reader = ValueReader(data, at, end)
+    held = reader.value()
+    return held, reader.at
+
+
+def read_cell(cell, text):
+    """One sized column body of WIRE.md 8, a STRING or a VARIANT cell."""
+    if text:
+        if b"\x00" in cell or cell.startswith(b"\xef\xbb\xbf"):
+            raise Poisoned("cell text holds a NUL or a byte order mark")
+        try:
+            return bytes(cell).decode("utf-8")
+        except UnicodeDecodeError:
+            raise Poisoned("cell text is not UTF-8")
+    held, end = read_value(cell)
+    if end != len(cell):
+        raise Poisoned("a VARIANT cell carries %d bytes past its value" % (len(cell) - end))
+    return held
+
+
+def read_slots(stream):
+    """A section 18 slot list. A quantized slot needs its declaration."""
+    slots = []
+    for _ in range(stream.varuint(2)):
+        kind = stream.int_range(0, 2)
+        if kind == 1:
+            raise Poisoned("a quantized slot reads only against its declaration")
+        if kind == 2:
+            route = stream.varuint(5)
+            comp = stream.bits(8)
+            path = stream.bytes_capped(STRING_CAP).decode("utf-8") if comp == 255 else None
+            slots.append(("NODE_REF", route, comp, path))
+            continue
+        stream.align_verify()
+        at = stream.read // 8
+        held, end = read_value(stream.data, at, min(len(stream.data), at + VALUE_CAP))
+        stream.read = end * 8
+        slots.append(held)
+    return slots
+
+
+def read_token(stream):
+    if stream.bool1():
+        return stream.bits(8)
+    return stream.bytes_capped(STRING_CAP).decode("utf-8")
+
+
+def read_call(payload):
+    """A CALL, SIGNAL or PROPERTY_SYNC payload of WIRE.md 18, with its values."""
+    stream = ReadStream(payload)
+    flags = stream.bits(8)
+    out = {"flags": flags}
+    if flags & 4:
+        out["txn"] = stream.varuint(5)
+    if flags & 3 == 2:
+        out["target"] = stream.bits(32)
+    out["token"] = read_token(stream)
+    out["slots"] = read_slots(stream)
+    stream.align_verify()
+    if stream.remaining():
+        raise Poisoned("a call carries %d bits past its slots" % stream.remaining())
+    return out
+
+
+def read_sync(payload, delta):
+    """A SYNC or SYNC_DELTA payload of WIRE.md 19, with its values."""
+    stream = ReadStream(payload)
+    out = {"ordinal": stream.varuint(5)}
+    out["mask" if delta else "flags"] = stream.varuint(10) if delta else stream.bits(8)
+    out["slots"] = read_slots(stream)
+    stream.align_verify()
+    if stream.remaining():
+        raise Poisoned("a sync carries %d bits past its slots" % stream.remaining())
+    return out
+
+
+def read_member(payload):
+    stream = ReadStream(payload)
+    out = {"token": read_token(stream), "slots": read_slots(stream)}
+    stream.align_verify()
+    if stream.remaining():
+        raise Poisoned("a frame carries %d bits past its slots" % stream.remaining())
+    return out
+
+
 def read_reply(payload, fmt):
     """One REPLY payload, from WIRE.md 18.
 
     From format 12 a reply carries a failed bit. A failed reply carries an
-    Error code and the receiver's reason, and a successful one carries value
-    slots this reader counts but does not decode.
+    Error code and the receiver's reason. From format 24 a successful reply's
+    value slots decode, and before it they are counted.
     """
     stream = ReadStream(payload)
     out = {"txn": stream.varuint(5)}
     if int(fmt) < REPLY_FAILED_BIT_SINCE or not stream.bool1():
         out["failed"] = False
+        if int(fmt) >= VALUE_SINCE:
+            out["slots"] = read_slots(stream)
+            stream.align_verify()
         out["value_bits"] = stream.remaining()
         return out
     out["failed"] = True
@@ -938,13 +1187,26 @@ def capture(path, verbose):
         for frame in walked:
             key = "%d %s" % (frame["channel"], frame["channel_name"])
             lane[key] = lane.get(key, 0) + len(frame["payload"])
-            if frame["channel_name"] != "REPLY":
+            name = frame["channel_name"]
+            valued = int(header.get("format")) >= VALUE_SINCE
+            readers = {"REPLY": lambda p: read_reply(p, header.get("format"))}
+            if valued:
+                readers.update(
+                    {
+                        "CALL": read_call,
+                        "SIGNAL": read_member,
+                        "PROPERTY_SYNC": read_member,
+                        "SYNC": lambda p: read_sync(p, False),
+                        "SYNC_DELTA": lambda p: read_sync(p, True),
+                    }
+                )
+            if name not in readers:
                 continue
             try:
-                frame["reply"] = read_reply(frame["payload"], header.get("format"))
+                frame["reply"] = readers[name](frame["payload"])
             except Poisoned as stopped:
                 errors += 1
-                print("ERROR record %d: a REPLY %s" % (index, stopped))
+                print("ERROR record %d: a %s %s" % (index, name, stopped))
         if verbose:
             print(
                 "  %s peer=%d wall=%dms tick=%s bytes=%d frames=%d"
@@ -1011,6 +1273,32 @@ def self_test(spec_path=None):
             return
         wrong += 1
         print("FAIL %-52s accepted invalid input" % name)
+
+    check(
+        "the 23 Vector2 decodes to its value",
+        read_value(bytes.fromhex("090000c03f000000c0")),
+        (("VECTOR2", (1.5, -2.0)), 9),
+    )
+    check(
+        "the 23 Array decodes to its value",
+        read_value(bytes.fromhex("1902030e06026f6b")),
+        ([7, "ok"], 8),
+    )
+    check("a STRING cell holds UTF-8 with no tag", read_cell(b"caf\xc3\xa9", True), "café")
+    for name, hexed in (
+        ("a tag past the last", "27"),
+        ("an INT in more bytes than it needs", "038100"),
+        ("a FLOAT a FLOAT32 holds", "04000000000000e03f"),
+        ("text holding a NUL", "060100"),
+        ("a TYPED_ARRAY of INT holding a STRING", "2603010600"),
+        ("a DICTIONARY holding one key twice", "1b020302000302 01".replace(" ", "")),
+        ("18 nested arrays", "1901" * 17 + "1900"),
+        ("a NODE_PATH with an empty subname", "0804613a3a62"),
+        ("a TYPED_DICTIONARY of NIL and NIL", "1c000000"),
+    ):
+        rejects("23 refuses %s" % name, lambda h=hexed: read_value(bytes.fromhex(h)))
+    check("17 nested arrays are the deepest held", read_value(bytes.fromhex("1901" * 16 + "1900"))[1], 34)
+    rejects("a VARIANT cell with residue is refused", lambda: read_cell(bytes.fromhex("0000"), False))
 
     got = decode(HAND_BUILT["fields"], HAND_BUILT["bytes"])
     check("the 8.3 reference frame decodes to its values", got, HAND_BUILT["values"])

@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/display/pump_stats.hpp"
 
 #include <algorithm>

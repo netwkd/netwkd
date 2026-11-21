@@ -5,8 +5,10 @@
 #include "netw/colors.hpp"
 #include "netw/log.hpp"
 #include "netw/profile.hpp"
+#include "netw/schema_book.hpp"
 #include "netw/stage.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
+#include "netw/wire/spec_dump.hpp"
 
 using namespace godot;
 
@@ -74,7 +76,7 @@ Variant filled(const uint8_t *p_bytes, int64_t p_count) {
 Variant view_of(const ArrayColumn &p_column, uint32_t p_rows) {
     const int64_t count = int64_t(p_rows) * p_column.stride;
     const uint8_t *at = p_column.bytes.ptr();
-    switch (SchemaCore::storage_type(p_column.type)) {
+    switch (SchemaBook::storage_type(p_column.type)) {
         case Variant::PACKED_FLOAT32_ARRAY:
             return filled<PackedFloat32Array, float>(at, count);
         case Variant::PACKED_FLOAT64_ARRAY:
@@ -94,7 +96,7 @@ Variant view_of(const ArrayColumn &p_column, uint32_t p_rows) {
         case Variant::PACKED_COLOR_ARRAY:
             return filled<PackedColorArray, Color>(at, count);
         default:
-            return SchemaCore::make_storage(p_column.type);
+            return SchemaBook::make_storage(p_column.type);
     }
 }
 
@@ -311,12 +313,13 @@ Error Arrays::declare(const RID &p_table, const table::SchemaRecord *p_schema) {
         column.key = declared->key;
         column.type = declared->type;
         column.stride = declared->stride;
-        column.quantizer = declared->quantizer;
+        column.quantizer
+            = Ref<NetwQuantize>(SchemaBook::quantizer_of(declared->quant));
         column.element_bits = column.quantizer.is_valid()
             ? MAX(1,
                   column.quantizer->bit_width(
                       static_cast<Variant::Type>(
-                          SchemaCore::element_type(column.type)
+                          SchemaBook::element_type(column.type)
                       )
                   ))
             : wire_bits(column.type);
@@ -432,7 +435,7 @@ Error Arrays::write_column(
         return ERR_INVALID_DATA;
     }
     ArrayColumn &column = held->columns[p_column];
-    if (int(p_data.get_type()) != SchemaCore::storage_type(column.type)) {
+    if (int(p_data.get_type()) != SchemaBook::storage_type(column.type)) {
         return ERR_INVALID_DATA;
     }
     column.pending = p_data;
@@ -681,7 +684,7 @@ Error Arrays::replace_rows(
     for (uint32_t at = 0; at < p_columns.size(); ++at) {
         const ArrayColumn &column = held->columns[at];
         if (int(p_columns[at].get_type())
-            != SchemaCore::storage_type(column.type)) {
+            != SchemaBook::storage_type(column.type)) {
             return ERR_INVALID_DATA;
         }
         if (element_count(p_columns[at])
@@ -1288,7 +1291,7 @@ bool Arrays::decode_column(
     const uint32_t step = r_column.element_bytes;
     if (r_column.quantizer.is_valid()) {
         const Variant::Type element = static_cast<Variant::Type>(
-            SchemaCore::element_type(r_column.type)
+            SchemaBook::element_type(r_column.type)
         );
         const int width = r_column.quantizer->bit_width(element);
         const int parts = r_column.quantizer->stride(element);
@@ -1678,7 +1681,7 @@ Dictionary Arrays::counters() const {
 
 Dictionary Arrays::frame_spec_records() {
     Dictionary out;
-    out["TableFrameHead"] = ArrayFrameHead::wire.spec_dump();
+    out["TableFrameHead"] = wire::spec_dump(ArrayFrameHead::wire);
     return out;
 }
 

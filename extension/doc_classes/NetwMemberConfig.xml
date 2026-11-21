@@ -50,7 +50,7 @@
 			<return type="NetwMemberConfig" />
 			<param index="0" name="sig" type="Signal" />
 			<description>
-				Received calls wait for a signal with [param sig]'s name on the receiving [Node]. Only the signal name is stored.
+				Received calls wait for a signal with [param sig]'s name on the receiving [Node]. Only the signal name is stored. A waiting call whose [NetwEntity] leaves the session is dropped and never runs.
 			</description>
 		</method>
 		<method name="interpolate" qualifiers="vararg">

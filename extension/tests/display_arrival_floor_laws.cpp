@@ -78,7 +78,11 @@ struct DelayedGlide {
         NetwNativeTests::display_pump_runtime(
             client(),
             &held,
-            netw::display::capture_timing(&rig.clock_of(client()), FRAME)
+            netw::display::capture_timing(
+                &rig.clock_of(client()),
+                client()->clock_reading(),
+                FRAME
+            )
         );
         const int64_t newest
             = held.channels()[0]->display_history().newest_tick();

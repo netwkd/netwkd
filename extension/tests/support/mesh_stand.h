@@ -376,7 +376,7 @@ public:
         for (int step = 0; step < p_ticks; ++step) {
             for (const godot::Ref<netw::NetwMultiplayer> &session : sessions) {
                 if (session.is_valid()) {
-                    Internals::clock_engine(session).force_step(1);
+                    Internals::run_ticks(session, 1);
                 }
             }
             link->advance_time(tick_period_ms);

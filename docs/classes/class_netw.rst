@@ -902,7 +902,7 @@ Moves every entity in ``entities`` back to ``tick``, calls ``callback``, moves t
 ::
 
     func fire(request: NetwActionRequest, origin: Vector3, aim: Vector3) -> void:
-        var targets := players.entities.keys()
+        var targets := players.entities
         targets.erase(entity)
         var hit: Dictionary = Netw.rewind(targets, request.view_tick, func() -> Dictionary:
             var ray := PhysicsRayQueryParameters3D.create(

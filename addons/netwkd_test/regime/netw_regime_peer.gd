@@ -326,8 +326,14 @@ func _write_summary(exit_kind: String) -> void:
 		"condition": _condition_report(),
 		"clock": _clock_report(),
 		"entities": _entity_snapshots,
-		"stats": api.session_get_stats() if api else { },
-		"traffic": api.session_get_traffic(0) if api else { },
+		"stats": _enum_report(
+			&"Stat",
+			func(stat: int) -> int: return api.stats_get(stat),
+		),
+		"traffic": _enum_report(
+			&"Traffic",
+			func(stat: int) -> float: return api.peer_get_traffic(0, stat),
+		),
 		"instrument_cost": { "tap": { } },
 	}
 	if api and _test_classes:
@@ -414,6 +420,21 @@ func _clock_report() -> Dictionary:
 			NetwClock.CLOCK_MONITOR_RTT_JITTER,
 		),
 	}
+
+
+func _enum_report(enum_name: StringName, read: Callable) -> Dictionary:
+	var out := { }
+	if not api:
+		return out
+	var constants := ClassDB.class_get_enum_constants(
+		&"NetwMultiplayer",
+		enum_name,
+	)
+	for constant in constants:
+		out[constant] = read.call(
+			ClassDB.class_get_integer_constant(&"NetwMultiplayer", constant),
+		)
+	return out
 
 
 # Per-interval rates between consecutive cadence samples, in Hz.

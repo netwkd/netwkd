@@ -25,6 +25,7 @@
 #include "godot/script.hpp"
 #include "godot/spatial_node.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/session.hpp"
 
@@ -506,6 +507,7 @@ TEST_CASE(
 
 using netw::Netw;
 using netw::NetwMultiplayer;
+using netw::NetwSession;
 using netw_test::EntityDecl;
 using netw_test::Internals;
 using netw_test::LoopbackRig;
@@ -607,10 +609,18 @@ struct Wake {
         }
     }
 
-    Dictionary stats(int p_client, int64_t p_peer) const {
+    double link(
+        int p_client,
+        int64_t p_peer,
+        NetwMultiplayer::LinkStat p_stat
+    ) const {
         NetwMultiplayer *api
             = p_client < 0 ? rig.server() : rig.client(p_client);
-        return api->peer_get_link_stats(p_peer);
+        return api->peer_get_link_stat(p_peer, p_stat);
+    }
+
+    int64_t sent_bytes(int64_t p_peer) const {
+        return int64_t(link(-1, p_peer, NetwMultiplayer::LINK_STAT_SENT_BYTES));
     }
 
     LocalVector<double> mirrored_heights(int p_client) const {
@@ -636,10 +646,10 @@ struct Spent {
 
 Spent watch(Wake &r_wake, int64_t p_peer, int p_ticks) {
     Spent out;
-    int64_t before = int64_t(r_wake.stats(-1, p_peer)["sent_bytes"]);
+    int64_t before = r_wake.sent_bytes(p_peer);
     for (int tick = 0; tick < p_ticks; ++tick) {
         r_wake.move(1);
-        const int64_t now = int64_t(r_wake.stats(-1, p_peer)["sent_bytes"]);
+        const int64_t now = r_wake.sent_bytes(p_peer);
         out.most = MAX(out.most, now - before);
         out.total += now - before;
         out.ticks += 1;
@@ -692,27 +702,34 @@ LawVerdict peer_rate(Wake &r_wake) {
 LawVerdict reliable_alone(Wake &r_wake) {
     r_wake.seat_sinks();
     r_wake.move(240);
+    constexpr NetwMultiplayer::LinkStat MODE = NetwMultiplayer::LINK_STAT_MODE;
     for (int client = 0; client < 2; ++client) {
-        const String server_side
-            = r_wake.stats(-1, r_wake.rig.peer_id(client))["mode"];
-        const String client_side = r_wake.stats(client, 1)["mode"];
-        if (server_side != "good" || client_side != "good") {
+        const int server_side
+            = int(r_wake.link(-1, r_wake.rig.peer_id(client), MODE));
+        const int client_side = int(r_wake.link(client, 1, MODE));
+        if (server_side != NetwMultiplayer::LINK_MODE_GOOD
+            || client_side != NetwMultiplayer::LINK_MODE_GOOD) {
             return law_broken(
-                "client %d reads %s and the server reads %s",
+                "client %d reads mode %d and the server reads mode %d",
                 client,
-                client_side.utf8().get_data(),
-                server_side.utf8().get_data()
+                client_side,
+                server_side
             );
         }
     }
     return law_held();
 }
 
-double spent(const Dictionary &p_traffic, const char *p_side) {
-    const Array causes = Dictionary(p_traffic[StringName(p_side)]).values();
+double spent(
+    const Ref<NetwSession> &p_session,
+    int64_t p_peer,
+    NetwMultiplayer::Traffic p_first
+) {
+    constexpr int CAUSES = NetwMultiplayer::TRAFFIC_RECEIVED_STATE
+        - NetwMultiplayer::TRAFFIC_SENT_STATE;
     double total = 0.0;
-    for (int at = 0; at < causes.size(); ++at) {
-        total += double(causes[at]);
+    for (int at = p_first; at < p_first + CAUSES; ++at) {
+        total += p_session->traffic(p_peer, NetwMultiplayer::Traffic(at));
     }
     return total;
 }
@@ -735,13 +752,11 @@ LawVerdict traffic_by_cause(Wake &r_wake) {
     Internals::traffic_advance(server, WINDOW);
     Internals::traffic_advance(client, WINDOW);
 
-    const Dictionary left = Netw::session(r_wake.rig.branch(-1))
-                                ->traffic(r_wake.rig.peer_id(0));
-    const Dictionary arrived = Netw::session(r_wake.rig.branch(0))->traffic();
-    const Dictionary sent = left[StringName("sent")];
-    const Dictionary received = arrived[StringName("received")];
-    const double state = sent[StringName("state")];
-    const double calls = sent[StringName("calls")];
+    const Ref<NetwSession> host = Netw::session(r_wake.rig.branch(-1));
+    const Ref<NetwSession> guest = Netw::session(r_wake.rig.branch(0));
+    const int64_t to = r_wake.rig.peer_id(0);
+    const double state = host->traffic(to, NetwMultiplayer::TRAFFIC_SENT_STATE);
+    const double calls = host->traffic(to, NetwMultiplayer::TRAFFIC_SENT_CALLS);
     if (state <= 0.0 || calls <= 0.0) {
         return law_broken(
             "moving bodies and an RPC read %d state and %d call bytes",
@@ -749,25 +764,45 @@ LawVerdict traffic_by_cause(Wake &r_wake) {
             int(calls)
         );
     }
-    if (double(sent[StringName("input")]) != 0.0) {
+    if (host->traffic(to, NetwMultiplayer::TRAFFIC_SENT_INPUT) != 0.0) {
         return law_broken("a session with no input read input bytes");
     }
-    if (!within_a_twentieth(double(received[StringName("state")]), state)) {
+    const double arrived
+        = guest->traffic(0, NetwMultiplayer::TRAFFIC_RECEIVED_STATE);
+    if (!within_a_twentieth(arrived, state)) {
         return law_broken(
             "%d state bytes left and %d arrived",
             int(state),
-            int(double(received[StringName("state")]))
+            int(arrived)
         );
     }
-    if (!within_a_twentieth(spent(arrived, "received"), spent(left, "sent"))) {
+    const double left_total
+        = spent(host, to, NetwMultiplayer::TRAFFIC_SENT_STATE);
+    const double arrived_total
+        = spent(guest, 0, NetwMultiplayer::TRAFFIC_RECEIVED_STATE);
+    if (!within_a_twentieth(arrived_total, left_total)) {
         return law_broken(
             "%d bytes left and %d arrived",
-            int(spent(left, "sent")),
-            int(spent(arrived, "received"))
+            int(left_total),
+            int(arrived_total)
         );
     }
-    const double packets = left[StringName("sent_packets")];
-    const double headers = sent[StringName("headers")];
+    const Ref<NetwSession> other = Netw::session(r_wake.rig.branch(1));
+    const double sent_bytes = host->stat(NetwMultiplayer::STAT_SENT_BYTES);
+    const double received_bytes
+        = guest->stat(NetwMultiplayer::STAT_RECEIVED_BYTES)
+        + other->stat(NetwMultiplayer::STAT_RECEIVED_BYTES);
+    if (!within_a_twentieth(received_bytes, sent_bytes)) {
+        return law_broken(
+            "the server counted %d bytes sent and its clients %d received",
+            int(sent_bytes),
+            int(received_bytes)
+        );
+    }
+    const double packets
+        = host->traffic(to, NetwMultiplayer::TRAFFIC_SENT_PACKETS);
+    const double headers
+        = host->traffic(to, NetwMultiplayer::TRAFFIC_SENT_HEADERS);
     if (headers <= 0.0 || headers >= packets * UDP_HEADERS) {
         return law_broken(
             "%d loopback packets cost %d header bytes",
@@ -782,11 +817,11 @@ LawVerdict sent_on(Wake &r_wake, int p_expected) {
     const int64_t peer = r_wake.rig.peer_id(0);
     r_wake.move(8);
     const LocalVector<double> before = r_wake.mirrored_heights(0);
-    int64_t left = int64_t(r_wake.stats(-1, peer)["sent_bytes"]);
+    int64_t left = r_wake.sent_bytes(peer);
     int sends = 0;
     for (int tick = 0; tick < TICKRATE; ++tick) {
         r_wake.move(1);
-        const int64_t now = int64_t(r_wake.stats(-1, peer)["sent_bytes"]);
+        const int64_t now = r_wake.sent_bytes(peer);
         sends += now > left ? 1 : 0;
         left = now;
     }
@@ -814,6 +849,38 @@ LawVerdict sent_every_tick(Wake &r_wake) {
     return sent_on(r_wake, TICKRATE);
 }
 
+LawVerdict priority_reaches_scheduler(Wake &r_wake) {
+    NetwMultiplayer *server = r_wake.rig.server();
+    const RID weighted = r_wake.entities[0];
+    const RID owned = r_wake.entities[1];
+    const RID plain = r_wake.entities[2];
+    server->entity_get_view(weighted)->set_replication_priority(4.0);
+    server->entity_get_view(owned)->set_peer_id(r_wake.rig.peer_id(0));
+    server->store_stale_entity(owned);
+    r_wake.move(4);
+    const netw::store::Store &store = Internals::store(server);
+    const float weight = store.weight_of(server->store_slot_of(weighted));
+    const float unset = store.weight_of(server->store_slot_of(plain));
+    if (weight != 4.0f || unset != 1.0f) {
+        return law_broken(
+            "priorities of 4 and 1 reached the scheduler as %f and %f",
+            weight,
+            unset
+        );
+    }
+    const uint8_t mine = store.marks_of(server->store_slot_of(owned));
+    const uint8_t theirs = store.marks_of(server->store_slot_of(plain));
+    if ((mine & netw::store::MARK_PLAYER) == 0
+        || (theirs & netw::store::MARK_PLAYER) != 0) {
+        return law_broken(
+            "a player's entity reads marks %d and a prop %d",
+            int(mine),
+            int(theirs)
+        );
+    }
+    return law_held();
+}
+
 struct WakeRow {
     String label;
     int bodies;
@@ -830,6 +897,9 @@ TEST_CASE(
 ) {
     const WakeRow ROWS[] = {
         {"240 moving bodies, one peer given 64 kbit/s", 240, &peer_rate},
+        {"eight moving bodies, one of priority 4 and one a player's own",
+         8,
+         &priority_reaches_scheduler},
         {"eight moving bodies and a reliable RPC each way every tick",
          8,
          &reliable_alone},

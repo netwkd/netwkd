@@ -12,7 +12,8 @@ namespace Netwkd;
 /// <remarks>
 /// Compresses a [float] angle into <see cref="NetwQuantizeAngle.BitCount"/>
 /// bits. The angle wraps around, so values near <c>0</c> and
-/// <c>@GDScript.TAU</c> stay close.
+/// <c>@GDScript.TAU</c> stay close. A property reads these settings when it is
+/// declared, so set them before.
 /// <code>
 /// var q := NetwQuantizeAngle.new().bits(8)              # 0 &lt;= angle &lt; TAU
 /// var e := NetwQuantizeAngle.new().bits(16).centered()  # -PI &lt; angle &lt;= PI

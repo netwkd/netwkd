@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/wire/registry.hpp"
 
 #include "netw/colors.hpp"
@@ -44,17 +46,6 @@ const ChannelDecl *WireRegistry::find_channel(uint8_t id) const {
         return nullptr;
     }
     return &channels[id];
-}
-
-const ChannelDecl *WireRegistry::find_channel_by_name(
-    const godot::StringName &name
-) const {
-    for (int i = 0; i < MAX_CHANNELS; ++i) {
-        if (registered[i] && channels[i].name == name) {
-            return &channels[i];
-        }
-    }
-    return nullptr;
 }
 
 Delivery WireRegistry::delivery_of(uint8_t id) const {
@@ -129,7 +120,7 @@ WireRegistry WireRegistry::create_default() {
         reg.register_channel(d);
     };
 
-    auto reg_c = [&](uint8_t id,
+    auto reg_c = [&](Channel id,
                      const char *name,
                      ChannelKind kind,
                      Reliability rel,
@@ -156,8 +147,19 @@ WireRegistry WireRegistry::create_default() {
     res(7);
 
     reg_c(
-        2,
+        CHANNEL_ACTION,
         "ACTION",
+        ChannelKind::ROUTED,
+        Reliability::RELIABLE,
+        Freshness::NONE,
+        Delivery::IMMEDIATE,
+        Direction::EITHER,
+        PayloadContract::PLANNED,
+        2
+    );
+    reg_c(
+        CHANNEL_CALL,
+        "CALL",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
@@ -167,48 +169,41 @@ WireRegistry WireRegistry::create_default() {
         1
     );
     reg_c(
-        3,
-        "CALL",
-        ChannelKind::ROUTED,
-        Reliability::RELIABLE,
-        Freshness::NONE,
-        Delivery::IMMEDIATE,
-        Direction::EITHER,
-        PayloadContract::PLANNED
-    );
-    reg_c(
-        4,
+        CHANNEL_REPLY,
         "REPLY",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
         Delivery::IMMEDIATE,
         Direction::EITHER,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
     reg_c(
-        5,
+        CHANNEL_SIGNAL,
         "SIGNAL",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
         Delivery::TICK,
         Direction::EITHER,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
     reg_c(
-        6,
+        CHANNEL_PROPERTY_SYNC,
         "PROPERTY_SYNC",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
         Delivery::TICK,
         Direction::EITHER,
-        PayloadContract::PLANNED
+        PayloadContract::PLANNED,
+        1
     );
 
     reg_c(
-        8,
+        CHANNEL_INTEREST_AWARENESS,
         "INTEREST_AWARENESS",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -219,7 +214,7 @@ WireRegistry WireRegistry::create_default() {
         1
     );
     reg_c(
-        9,
+        CHANNEL_CLOCK_HANDSHAKE,
         "CLOCK_HANDSHAKE",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -229,7 +224,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        10,
+        CHANNEL_CLOCK_HANDSHAKE_REPLY,
         "CLOCK_HANDSHAKE_REPLY",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -239,7 +234,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        11,
+        CHANNEL_CLOCK_PING,
         "CLOCK_PING",
         ChannelKind::SESSION,
         Reliability::UNRELIABLE,
@@ -249,7 +244,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        12,
+        CHANNEL_CLOCK_PONG,
         "CLOCK_PONG",
         ChannelKind::SESSION,
         Reliability::UNRELIABLE,
@@ -261,7 +256,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        13,
+        CHANNEL_LAGCOMP_DENY,
         "LAGCOMP_DENY",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -272,7 +267,7 @@ WireRegistry WireRegistry::create_default() {
         1
     );
     reg_c(
-        14,
+        CHANNEL_SPAWN,
         "SPAWN",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -280,10 +275,10 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
-        5
+        6
     );
     reg_c(
-        15,
+        CHANNEL_DESPAWN,
         "DESPAWN",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -294,7 +289,7 @@ WireRegistry WireRegistry::create_default() {
         2
     );
     reg_c(
-        16,
+        CHANNEL_REPARENT,
         "REPARENT",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -305,7 +300,7 @@ WireRegistry WireRegistry::create_default() {
         2
     );
     reg_c(
-        17,
+        CHANNEL_TABLE,
         "TABLE",
         ChannelKind::KEYED,
         Reliability::UNRELIABLE_ACKED,
@@ -316,7 +311,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        18,
+        CHANNEL_HIDE,
         "HIDE",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -327,27 +322,29 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        19,
+        CHANNEL_SYNC,
         "SYNC",
         ChannelKind::KEYED,
         Reliability::UNRELIABLE_ACKED,
         Freshness::FRESHEST_WINS,
         Delivery::TICK,
         Direction::EITHER,
-        PayloadContract::DELTA
+        PayloadContract::DELTA,
+        1
     );
     reg_c(
-        20,
+        CHANNEL_SYNC_DELTA,
         "SYNC_DELTA",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
         Freshness::NONE,
         Delivery::TICK,
         Direction::EITHER,
-        PayloadContract::DELTA
+        PayloadContract::DELTA,
+        1
     );
     reg_c(
-        21,
+        CHANNEL_CONTROL_REQUEST,
         "CONTROL_REQUEST",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
@@ -358,7 +355,7 @@ WireRegistry WireRegistry::create_default() {
         1
     );
     reg_c(
-        22,
+        CHANNEL_CONTROL_APPLY,
         "CONTROL_APPLY",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
@@ -370,7 +367,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        23,
+        CHANNEL_SESSION_JOIN,
         "SESSION_JOIN",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -378,10 +375,10 @@ WireRegistry WireRegistry::create_default() {
         Delivery::IMMEDIATE,
         Direction::CLIENT_TO_SERVER,
         PayloadContract::PLANNED,
-        3
+        4
     );
     reg_c(
-        24,
+        CHANNEL_SESSION_ACCEPT,
         "SESSION_ACCEPT",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -392,7 +389,7 @@ WireRegistry WireRegistry::create_default() {
         3
     );
     reg_c(
-        25,
+        CHANNEL_SESSION_ROSTER,
         "SESSION_ROSTER",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -403,7 +400,7 @@ WireRegistry WireRegistry::create_default() {
         3
     );
     reg_c(
-        26,
+        CHANNEL_SESSION_PAUSE,
         "SESSION_PAUSE",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -413,7 +410,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        27,
+        CHANNEL_SESSION_UNPAUSE,
         "SESSION_UNPAUSE",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -423,7 +420,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        28,
+        CHANNEL_SESSION_KICKED,
         "SESSION_KICKED",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -433,7 +430,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        31,
+        CHANNEL_SESSION_SHUTDOWN,
         "SESSION_SHUTDOWN",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -443,7 +440,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        32,
+        CHANNEL_SESSION_SCENE_RELEASED,
         "SESSION_SCENE_RELEASED",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -453,7 +450,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        33,
+        CHANNEL_SESSION_KICK_REQUEST,
         "SESSION_KICK_REQUEST",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -465,7 +462,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        35,
+        CHANNEL_PREDICT_COMMAND,
         "PREDICT_COMMAND",
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
@@ -473,10 +470,10 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::OWNER_TO_SERVER,
         PayloadContract::PLANNED,
-        3
+        4
     );
     reg_c(
-        36,
+        CHANNEL_PREDICT_ACK,
         "PREDICT_ACK",
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
@@ -484,10 +481,10 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::SERVER_TO_OWNER,
         PayloadContract::PLANNED,
-        3
+        4
     );
     reg_c(
-        37,
+        CHANNEL_PREDICT_RELAY,
         "PREDICT_RELAY",
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
@@ -495,10 +492,10 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::SERVER_TO_CLIENT,
         PayloadContract::PLANNED,
-        3
+        4
     );
     reg_c(
-        38,
+        CHANNEL_PREDICT_RELAY_REQUEST,
         "PREDICT_RELAY_REQUEST",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
@@ -508,7 +505,7 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
     reg_c(
-        39,
+        CHANNEL_SYNC_ROW,
         "SYNC_ROW",
         ChannelKind::KEYED,
         Reliability::UNRELIABLE_ACKED,
@@ -516,10 +513,10 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::EITHER,
         PayloadContract::DELTA,
-        1
+        2
     );
     reg_c(
-        40,
+        CHANNEL_SYNC_ROW_DELTA,
         "SYNC_ROW_DELTA",
         ChannelKind::ROUTED,
         Reliability::RELIABLE,
@@ -527,11 +524,11 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::EITHER,
         PayloadContract::DELTA,
-        1
+        2
     );
 
     reg_c(
-        41,
+        CHANNEL_SYNC_ROW_WINDOW,
         "SYNC_ROW_WINDOW",
         ChannelKind::KEYED,
         Reliability::UNRELIABLE,
@@ -539,11 +536,11 @@ WireRegistry WireRegistry::create_default() {
         Delivery::TICK,
         Direction::EITHER,
         PayloadContract::PLANNED,
-        1
+        2
     );
 
     reg_c(
-        42,
+        CHANNEL_SESSION_SCENE_VIEWERS,
         "SESSION_SCENE_VIEWERS",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -555,7 +552,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        43,
+        CHANNEL_ROW_CONTROL,
         "ROW_CONTROL",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -567,7 +564,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        44,
+        CHANNEL_ROUTE_LEASE,
         "ROUTE_LEASE",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -578,7 +575,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        45,
+        CHANNEL_LIFECYCLE_DECISION,
         "LIFECYCLE_DECISION",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -590,7 +587,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        46,
+        CHANNEL_CLAIM_IMAGE,
         "CLAIM_IMAGE",
         ChannelKind::ROUTED,
         Reliability::UNRELIABLE,
@@ -601,7 +598,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        47,
+        CHANNEL_SESSION_RESYNC,
         "SESSION_RESYNC",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -612,7 +609,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        48,
+        CHANNEL_LAGCOMP_CONFIRM,
         "LAGCOMP_CONFIRM",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -623,7 +620,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        49,
+        CHANNEL_SESSION_LEAVE,
         "SESSION_LEAVE",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -634,7 +631,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        50,
+        CHANNEL_SESSION_PLAYER_LEFT,
         "SESSION_PLAYER_LEFT",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -645,7 +642,7 @@ WireRegistry WireRegistry::create_default() {
     );
 
     reg_c(
-        51,
+        CHANNEL_SESSION_SPAWN_FAILED,
         "SESSION_SPAWN_FAILED",
         ChannelKind::SESSION,
         Reliability::RELIABLE,
@@ -655,47 +652,35 @@ WireRegistry WireRegistry::create_default() {
         PayloadContract::PLANNED
     );
 
-    auto spends = [&](Cause cause, const char *name) {
-        const ChannelDecl *decl
-            = reg.find_channel_by_name(godot::StringName(name));
-        NETW_BUG_COND(decl == nullptr);
-        reg.channels[decl->id].cause = cause;
+    auto spends = [&](Cause cause, Channel channel) {
+        reg.channels[channel].cause = cause;
     };
-    spends(Cause::STATE, "TABLE");
-    spends(Cause::STATE, "SYNC");
-    spends(Cause::STATE, "SYNC_DELTA");
-    spends(Cause::STATE, "SYNC_ROW");
-    spends(Cause::STATE, "SYNC_ROW_DELTA");
-    spends(Cause::STATE, "PROPERTY_SYNC");
-    spends(Cause::STATE, "CLAIM_IMAGE");
-    spends(Cause::INPUT, "PREDICT_COMMAND");
-    spends(Cause::INPUT, "PREDICT_RELAY");
-    spends(Cause::INPUT, "SYNC_ROW_WINDOW");
-    spends(Cause::CALLS, "ACTION");
-    spends(Cause::CALLS, "CALL");
-    spends(Cause::CALLS, "REPLY");
-    spends(Cause::CALLS, "SIGNAL");
-    spends(Cause::CALLS, "LAGCOMP_DENY");
-    spends(Cause::CALLS, "LAGCOMP_CONFIRM");
-    spends(Cause::UPKEEP, "PREDICT_ACK");
-    spends(Cause::UPKEEP, "PREDICT_RELAY_REQUEST");
-    spends(Cause::UPKEEP, "ROW_CONTROL");
-    spends(Cause::UPKEEP, "CLOCK_HANDSHAKE");
-    spends(Cause::UPKEEP, "CLOCK_HANDSHAKE_REPLY");
-    spends(Cause::UPKEEP, "CLOCK_PING");
-    spends(Cause::UPKEEP, "CLOCK_PONG");
-    spends(Cause::UPKEEP, "SESSION_RESYNC");
+    spends(Cause::STATE, CHANNEL_TABLE);
+    spends(Cause::STATE, CHANNEL_SYNC);
+    spends(Cause::STATE, CHANNEL_SYNC_DELTA);
+    spends(Cause::STATE, CHANNEL_SYNC_ROW);
+    spends(Cause::STATE, CHANNEL_SYNC_ROW_DELTA);
+    spends(Cause::STATE, CHANNEL_PROPERTY_SYNC);
+    spends(Cause::STATE, CHANNEL_CLAIM_IMAGE);
+    spends(Cause::INPUT, CHANNEL_PREDICT_COMMAND);
+    spends(Cause::INPUT, CHANNEL_PREDICT_RELAY);
+    spends(Cause::INPUT, CHANNEL_SYNC_ROW_WINDOW);
+    spends(Cause::CALLS, CHANNEL_ACTION);
+    spends(Cause::CALLS, CHANNEL_CALL);
+    spends(Cause::CALLS, CHANNEL_REPLY);
+    spends(Cause::CALLS, CHANNEL_SIGNAL);
+    spends(Cause::CALLS, CHANNEL_LAGCOMP_DENY);
+    spends(Cause::CALLS, CHANNEL_LAGCOMP_CONFIRM);
+    spends(Cause::UPKEEP, CHANNEL_PREDICT_ACK);
+    spends(Cause::UPKEEP, CHANNEL_PREDICT_RELAY_REQUEST);
+    spends(Cause::UPKEEP, CHANNEL_ROW_CONTROL);
+    spends(Cause::UPKEEP, CHANNEL_CLOCK_HANDSHAKE);
+    spends(Cause::UPKEEP, CHANNEL_CLOCK_HANDSHAKE_REPLY);
+    spends(Cause::UPKEEP, CHANNEL_CLOCK_PING);
+    spends(Cause::UPKEEP, CHANNEL_CLOCK_PONG);
+    spends(Cause::UPKEEP, CHANNEL_SESSION_RESYNC);
 
     return reg;
-}
-
-int64_t builtin_channel(const godot::StringName &name) {
-    static const WireRegistry table = WireRegistry::create_default();
-    const ChannelDecl *decl = table.find_channel_by_name(name);
-    if (decl == nullptr) {
-        NETW_BUG_V(-1);
-    }
-    return int64_t(decl->id);
 }
 
 } // namespace netw::wire

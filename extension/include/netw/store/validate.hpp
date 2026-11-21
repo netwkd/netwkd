@@ -15,7 +15,7 @@ struct Miss {
     const char *gate = "";
 };
 
-void configure();
+void configure(const godot::String &p_setting);
 
 int64_t validation_interval();
 

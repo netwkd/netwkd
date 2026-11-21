@@ -3,8 +3,13 @@
 #include <cstdint>
 
 #include "godot/local_vector.hpp"
-#include "godot/ref_counted.hpp"
-#include "netw/api/schema_core.hpp"
+#include "netw/table/delta_mode.hpp"
+#include "netw/value.hpp"
+#include "netw/wire/tail.hpp"
+
+namespace netw::table {
+class SchemaRecord;
+} // namespace netw::table
 
 namespace netw::wire {
 
@@ -21,6 +26,9 @@ struct ColumnPlan {
     int width = 0;
     int stride = 1;
     bool variable = false;
+    bool text = false;
+    uint8_t value_tag = value::TAG_COUNT;
+    uint8_t element_tags[2] = {value::TAG_COUNT, value::TAG_COUNT};
     DeltaMode delta = DeltaMode::FULL;
     int64_t offset = 0;
 
@@ -31,6 +39,8 @@ struct ColumnPlan {
     bool laddered() const {
         return delta == DeltaMode::LADDER && width >= LADDER_MIN_WIDTH;
     }
+
+    bool mistypes(const TailRef &p_tail) const;
 };
 
 class WirePlan {
@@ -76,5 +86,7 @@ public:
                                     : ((uint64_t(1) << columns.size()) - 1);
     }
 };
+
+bool is_scalar_schema(const SchemaRecord &p_schema, const WirePlan &p_plan);
 
 } // namespace netw::wire

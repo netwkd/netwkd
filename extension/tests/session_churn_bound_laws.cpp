@@ -132,7 +132,7 @@ public:
         for (int index = 0; index < PER_ROUND; ++index) {
             const int route = spawn(held);
             rig.server()->register_rewind(
-                NetwEntity::of(rig.route_node(route))
+                NetwEntity::of(rig.route_node(route))->get_rid_handle()
             );
         }
         rig.step_ticks(6);

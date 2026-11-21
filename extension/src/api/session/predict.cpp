@@ -48,6 +48,7 @@
 #include "netw/session/frames.hpp"
 #include "netw/stage.hpp"
 #include "netw/synchronizers.hpp"
+#include "netw/value_variant.hpp"
 #include "netw/wire/frame.hpp"
 #include "netw/wire/registry.hpp"
 
@@ -93,7 +94,7 @@ void NetwMultiplayer::predict_relay_subscribe(
     send_to(
         MultiplayerPeer::TARGET_PEER_SERVER,
         route,
-        wire::builtin_channel("PREDICT_RELAY_REQUEST"),
+        wire::CHANNEL_PREDICT_RELAY_REQUEST,
         predict::RelayBook::request_bytes(p_subscribed),
         true,
         0,
@@ -101,12 +102,13 @@ void NetwMultiplayer::predict_relay_subscribe(
     );
 }
 
-int64_t NetwMultiplayer::arm_rewind_timeline(const Ref<NetwEntity> &p_entity) {
-    const int64_t slot = lagcomp_core.timeline_slot_of(p_entity);
+int64_t NetwMultiplayer::arm_rewind_timeline(const RID &p_entity) {
+    const Ref<NetwEntity> entity = slot_pinned_entity(p_entity);
+    const int64_t slot = lagcomp_core.timeline_slot_of(entity);
     if (slot < 0) {
         return -1;
     }
-    const repl::PropertyBindingPtr state = p_entity->get_state_binding();
+    const repl::PropertyBindingPtr state = entity->get_state_binding();
     if (state == nullptr || state->get_set() == nullptr) {
         return -1;
     }
@@ -125,19 +127,18 @@ int64_t NetwMultiplayer::arm_rewind_timeline(const Ref<NetwEntity> &p_entity) {
 
 void NetwMultiplayer::record_rewind_parts(
     int64_t p_slot,
-    NetwEntity *p_entity,
+    NetwEntityRecord &p_record,
     const repl::PropertyBindingPtr &p_state,
     int64_t p_tick
 ) {
-    NetwEntityRecord *record = record_of(p_entity);
-    if (record == nullptr || record->get_held_bindings().size() < 2) {
+    if (p_record.get_held_bindings().size() < 2) {
         return;
     }
     if (!lagcomp_core.timeline_owner_bound(p_slot)) {
         lagcomp_core.timeline_bind_owner(p_slot, p_state->node());
     }
     for (const NetwEntityRecord::HeldBinding &held :
-         record->get_held_bindings()) {
+         p_record.get_held_bindings()) {
         repl::PropertyBinding *child = binding_book.live(held.binding);
         if (child == nullptr || child == p_state || child->node() == nullptr) {
             continue;
@@ -158,7 +159,8 @@ void NetwMultiplayer::record_rewind_parts(
             part,
             p_tick,
             child->canonicalize_payload(child->snapshot_payload()),
-            declared->get_codec()
+            declared->get_codec(),
+            this
         );
     }
     lagcomp_core.timeline_prune_parts(p_slot);
@@ -187,7 +189,7 @@ Variant NetwMultiplayer::lagcomp_rewind_of(
         if (wrapper.is_null()) {
             continue;
         }
-        const int64_t slot = arm_rewind_timeline(wrapper);
+        const int64_t slot = arm_rewind_timeline(wrapper->get_rid_handle());
         if (slot >= 0) {
             slots.push_back(slot);
         }
@@ -286,13 +288,14 @@ void NetwMultiplayer::predict_tap_pump() {
         if (entity.is_null()) {
             continue;
         }
-        const predict::Decl *decl = predict_find_declaration(entity.ptr());
+        const predict::Decl *decl
+            = entity->get_record()->find_predict_declaration();
         if (decl == nullptr) {
             continue;
         }
         predict_tap_drain(
             entity->get_name(),
-            native_prediction_slot(entity),
+            native_prediction_slot(entity->get_rid_handle()),
             decl->facts.to_dictionary()
         );
         drained += 1;
@@ -345,7 +348,7 @@ void space_set_active(
 } // namespace
 
 void NetwMultiplayer::warn_pacing_rate_mismatch_once() {
-    const double factor = clock_engine().physics_factor();
+    const double factor = clock_engine().physics_factor(clock_reading());
     if (std::abs(factor - std::round(factor)) < 1e-6) {
         return;
     }
@@ -378,11 +381,11 @@ void NetwMultiplayer::simulation_gate_set(const RID &p_entity, bool p_wanted) {
     if (p_wanted == (index >= 0)) {
         return;
     }
-    ClockEngine &clock = clock_engine();
+    Clock &clock = clock_engine();
     if (p_wanted) {
         GatedBody row;
         row.entity = p_entity;
-        row.held = entity_space_of(entity_get_view(p_entity));
+        row.held = entity_space_of(entity_get_node(p_entity));
         gated_bodies.push_back(row);
         clock.arm_gate();
         predict_gate_arms += 1;
@@ -411,7 +414,7 @@ void NetwMultiplayer::simulation_gate_apply() {
             gated_bodies.remove_at(i);
             continue;
         }
-        const EntitySpace resolved = entity_space_of(wrapper);
+        const EntitySpace resolved = entity_space_of(wrapper->get_owner());
         if (resolved.space != row.held.space) {
             if (!predict_space_is_stepped(row.held.space)) {
                 space_set_active(row.held, true);
@@ -438,7 +441,7 @@ int64_t NetwMultiplayer::simulation_gate_count() const {
 
 void NetwMultiplayer::physics_frame_advance() {
     if (clock_engine().is_simulating()) {
-        physics_frame += 1;
+        simulated_frames += 1;
     }
 }
 
@@ -450,7 +453,7 @@ NetwPredictTiming NetwMultiplayer::tick_timing(
         p_tick,
         p_delta,
         clock_engine().ticktime(),
-        physics_frame,
+        simulated_frames,
         declared_quantum()
     );
 }
@@ -502,7 +505,8 @@ void NetwMultiplayer::predict_reresolve_space(const RID &p_space) {
     for (const KeyValue<int64_t, NetwPredictSlotEngine *> &row :
          predict_engines) {
         const Ref<NetwEntity> seated = wrapper_for_id(row.key);
-        if (seated.is_valid() && entity_space_of(seated).space == p_space) {
+        if (seated.is_valid()
+            && entity_space_of(seated->get_owner()).space == p_space) {
             named.push_back(row.key);
         }
     }
@@ -558,19 +562,14 @@ bool NetwMultiplayer::predict_space_can_step(
         || gd::can_step_space(p_dimension);
 }
 
-bool NetwMultiplayer::predict_entity_can_step(
-    const Ref<NetwEntity> &p_entity
-) const {
-    if (p_entity.is_null()) {
-        return false;
-    }
-    const EntitySpace held = entity_space_of(p_entity);
+bool NetwMultiplayer::predict_entity_can_step(Node *p_node) const {
+    const EntitySpace held = entity_space_of(p_node);
     if (!held.space.is_valid()
         || !predict_space_can_step(held.space, held.dimension)) {
         return false;
     }
     return gd::can_flush_kinematic()
-        || colliders::first_kinematic_body(p_entity->get_owner()) == nullptr;
+        || colliders::first_kinematic_body(p_node) == nullptr;
 }
 
 void NetwMultiplayer::predict_step_space(
@@ -614,12 +613,14 @@ bool NetwMultiplayer::predict_space_has_stepped_member(
         if (member.is_null()) {
             continue;
         }
-        const sim::Decl *simulation = sim_find_declaration(member.ptr());
+        const sim::Decl *simulation
+            = member->get_record()->find_sim_declaration();
         const bool stepped = row.value != nullptr
             && row.value->runs_in_pass(NetwSimulation::SCHEDULE_STEPPED);
         const bool declared = simulation != nullptr
             && simulation->declaration.schedule == sim::Schedule::STEPPED;
-        if ((stepped || declared) && entity_space_of(member).space == p_space) {
+        if ((stepped || declared)
+            && entity_space_of(member->get_owner()).space == p_space) {
             return true;
         }
     }
@@ -820,9 +821,15 @@ void NetwMultiplayer::predict_history_record(
                 at,
                 record_tick,
                 payload,
-                declared->get_codec()
+                declared->get_codec(),
+                this
             );
-            record_rewind_parts(at, entity, state, record_tick);
+            record_rewind_parts(
+                at,
+                *entity->record_in(this),
+                state,
+                record_tick
+            );
         }
         if (engine != nullptr) {
             engine->finalize_recorded_state();
@@ -890,80 +897,47 @@ void NetwMultiplayer::wire_lagcomp_service() {
         );
         return;
     }
-    plane->register_channel(
-        declared_channel("ACTION"),
-        callable_mp(this, &NetwMultiplayer::action_receive_carrier),
-        false
-    );
-    plane->register_channel(
-        declared_channel("PREDICT_COMMAND"),
-        callable_mp(this, &NetwMultiplayer::predict_receive_command_carrier),
-        false
-    );
-    plane->register_channel(
-        declared_channel("PREDICT_ACK"),
-        callable_mp(this, &NetwMultiplayer::predict_receive_ack_carrier),
-        false
-    );
-    plane->register_channel(
-        declared_channel("PREDICT_RELAY"),
-        callable_mp(this, &NetwMultiplayer::predict_receive_relay_carrier),
-        false
-    );
-    plane->register_channel(
-        declared_channel("PREDICT_RELAY_REQUEST"),
-        callable_mp(
-            this,
-            &NetwMultiplayer::predict_receive_relay_request_carrier
-        ),
-        false
-    );
+    lagcomp_wired = true;
 }
 
 void NetwMultiplayer::predict_receive_command_carrier(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
-    int64_t
+    int64_t p_sender
 ) {
     NETW_ZONE_NC("Predict command carrier", colors::PREDICTION);
-    NetwPredictSlotEngine *engine = predict_engine_for(
-        p_entity.is_valid() ? p_entity->get_rid_handle() : RID()
-    );
+    NetwPredictSlotEngine *engine = predict_engine_for(p_entity);
     if (engine != nullptr) {
-        engine->receive_command_frame(p_payload);
+        engine->receive_command_frame(p_payload, p_sender);
     }
 }
 
 void NetwMultiplayer::predict_receive_relay_carrier(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
-    int64_t
+    int64_t p_sender
 ) {
     NETW_ZONE_NC("Predict relay carrier", colors::PREDICTION);
-    NetwPredictSlotEngine *engine = predict_engine_for(
-        p_entity.is_valid() ? p_entity->get_rid_handle() : RID()
-    );
+    NetwPredictSlotEngine *engine = predict_engine_for(p_entity);
     if (engine != nullptr) {
-        engine->receive_relayed_command_frame(p_payload);
+        engine->receive_relayed_command_frame(p_payload, p_sender);
     }
 }
 
 void NetwMultiplayer::predict_receive_ack_carrier(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
     int64_t
 ) {
     NETW_ZONE_NC("Predict ack carrier", colors::PREDICTION);
-    NetwPredictSlotEngine *engine = predict_engine_for(
-        p_entity.is_valid() ? p_entity->get_rid_handle() : RID()
-    );
+    NetwPredictSlotEngine *engine = predict_engine_for(p_entity);
     if (engine != nullptr) {
         engine->receive_ack_frame(p_payload);
     }
 }
 
 void NetwMultiplayer::predict_receive_relay_request_carrier(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
     int64_t p_sender
 ) {
@@ -980,20 +954,20 @@ void NetwMultiplayer::predict_receive_relay_request_carrier(
 }
 
 void NetwMultiplayer::predict_relay_command_frame(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
     int64_t p_author,
     wire::Delivery p_delivery
 ) {
-    if (!is_host() || p_entity.is_null()) {
+    if (!is_host() || !p_entity.is_valid()) {
         return;
     }
-    const RID handle = p_entity->get_rid_handle();
+    const RID handle = p_entity;
     const PackedInt64Array subscribers = relay_peers(int64_t(handle.get_id()));
     if (subscribers.is_empty()) {
         return;
     }
-    const int64_t route = liveness_route_of(p_entity.ptr());
+    const int64_t route = liveness_route_of(slot_pinned_entity(handle).ptr());
     if (route <= 0) {
         NETW_TRACE(
             sys::PREDICTION,
@@ -1005,7 +979,7 @@ void NetwMultiplayer::predict_relay_command_frame(
     if (get_replication_plane() == nullptr) {
         return;
     }
-    const int64_t channel = declared_channel("PREDICT_RELAY");
+    const int64_t channel = wire::CHANNEL_PREDICT_RELAY;
     for (int at = 0; at < subscribers.size(); at++) {
         const int64_t peer = subscribers[at];
         if (peer == p_author || !interest_admits(handle, peer)) {
@@ -1025,34 +999,35 @@ void NetwMultiplayer::predict_relay_command_frame(
 }
 
 void NetwMultiplayer::action_receive_carrier(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     const PackedByteArray &p_payload,
     int64_t p_sender
 ) {
-    if (!is_host() || p_entity.is_null() || p_entity->get_owner() == nullptr) {
+    const Ref<NetwEntity> entity = slot_pinned_entity(p_entity);
+    if (!is_host() || entity.is_null() || entity->get_owner() == nullptr) {
         return;
     }
     if (!lagcomp_configured) {
         fault::raise(
             this,
             NETW_FAULT_ACTION_UNREADY,
-            {String(p_entity->get_owner()->get_name()),
+            {String(entity->get_owner()->get_name()),
              String(),
              String(),
              p_sender},
-            gd::instance_id(p_entity->get_owner())
+            gd::instance_id(entity->get_owner())
         );
         return;
     }
-    if (p_sender != SERVER_PEER && p_sender != p_entity->get_controller()) {
+    if (p_sender != SERVER_PEER && p_sender != entity->get_controller()) {
         fault::raise(
             this,
             NETW_FAULT_RPC_REFUSED,
             {"{Netw.action}",
-             String(p_entity->get_owner()->get_name()),
+             String(entity->get_owner()->get_name()),
              "the server or the controller of the entity",
              p_sender},
-            gd::instance_id(p_entity->get_owner())
+            gd::instance_id(entity->get_owner())
         );
         return;
     }
@@ -1066,13 +1041,14 @@ void NetwMultiplayer::action_receive_carrier(
         return;
     }
     NETW_NETWORK_PROFILE(network_profiler.name_arrival(profiler_member(
-        p_entity->get_route(),
-        wire::builtin_channel("ACTION"),
-        p_entity->get_owner(),
+        entity->get_route(),
+        wire::CHANNEL_ACTION,
+        entity->get_owner(),
         body.method
     )));
-    const Variant carried = gd::bytes_to_var(body.data);
-    if (carried.get_type() != Variant::ARRAY) {
+    Variant carried;
+    if (!value::decode_packed(body.data, carried)
+        || carried.get_type() != Variant::ARRAY) {
         NETW_TRACE(
             sys::PREDICTION,
             "Peer %d sent action arguments that are not an Array.",
@@ -1081,7 +1057,7 @@ void NetwMultiplayer::action_receive_carrier(
         return;
     }
     submit_action(
-        p_entity->get_route(),
+        entity->get_route(),
         body.method,
         body.view_tick,
         Array(carried),
@@ -1125,7 +1101,7 @@ void NetwMultiplayer::effect_deny_action(
         send_to(
             p_requester,
             0,
-            wire::builtin_channel("LAGCOMP_DENY"),
+            wire::CHANNEL_LAGCOMP_DENY,
             session::frame_write(
                 session::DenyKey{p_key, int64_t(p_code), reason}
             ),
@@ -1174,7 +1150,7 @@ void NetwMultiplayer::effect_confirm_action(
     send_to(
         p_requester,
         0,
-        wire::builtin_channel("LAGCOMP_CONFIRM"),
+        wire::CHANNEL_LAGCOMP_CONFIRM,
         session::frame_write(session::ConfirmKey{p_key}),
         true,
         0,
@@ -1212,7 +1188,7 @@ void NetwMultiplayer::before_frame_step() {
 
 void NetwMultiplayer::frame_step() {
     NETW_STAGE(SIMULATION, "Frame step", colors::PREDICTION);
-    const ClockEngine &clock = clock_engine();
+    const Clock &clock = clock_engine();
     if (clock.is_simulating()) {
         sim_run(sim::Schedule::FRAME, clock.ticktime(), clock.get_tick() - 1);
     }
@@ -1317,7 +1293,8 @@ Dictionary NetwMultiplayer::predict_metrics() const {
         if (wrapper.is_null()) {
             continue;
         }
-        const predict::Decl *decl = predict_find_declaration(wrapper.ptr());
+        const predict::Decl *decl
+            = wrapper->get_record()->find_predict_declaration();
         if (decl == nullptr) {
             continue;
         }
@@ -1408,33 +1385,40 @@ void NetwMultiplayer::session_flush_deferred() {
     );
 }
 
-int64_t NetwMultiplayer::native_prediction_slot(
-    const Ref<NetwEntity> &p_entity
-) const {
-    return prediction_engine.slot_of(p_entity);
+int64_t NetwMultiplayer::native_prediction_slot(const RID &p_entity) const {
+    return prediction_engine.slot_of(slot_pinned_entity(p_entity));
 }
 
 void NetwMultiplayer::predict_reconcile_declaration(
-    const Ref<NetwEntity> &p_entity
+    NetwEntityRecord &p_record,
+    Node *p_owner
 ) {
-    if (p_entity.is_null()) {
+    if (!predict_implied(this, p_record, p_owner)) {
         return;
     }
-    if (!predict_implied(p_entity.ptr())) {
-        return;
-    }
-    predict_declare(p_entity->get_rid_handle());
+    predict_declare(p_record.get_handle());
 }
 
-void NetwMultiplayer::predict_readmit(const Ref<NetwEntity> &p_entity) {
-    const RID entity = p_entity->get_rid_handle();
-    if (predict_is_declared(entity) || predict_implied(p_entity.ptr())) {
+void NetwMultiplayer::predict_readmit(
+    NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    const RID entity = p_record.get_handle();
+    if (predict_is_declared(entity)
+        || predict_implied(this, p_record, p_owner)) {
         return;
     }
-    Node *owner = p_entity->get_owner();
-    const String named = owner != nullptr ? String(owner->get_path())
-                                          : String(p_entity->get_name());
-    if (p_entity->get_state_binding() == nullptr) {
+    Node *owner = p_owner;
+    const String named = owner != nullptr
+        ? String(owner->get_path())
+        : String(p_record.get_entity_id());
+    if (entity_record_binding(
+            &p_record,
+            owner,
+            repl::SET_RECORD_STATE,
+            entity
+        )
+        == nullptr) {
         fault::raise(
             this,
             NETW_FAULT_PREDICTION_OFF,
@@ -1455,26 +1439,40 @@ void NetwMultiplayer::predict_readmit(const Ref<NetwEntity> &p_entity) {
 }
 
 bool NetwMultiplayer::predict_lacks_state_rows(
-    const Ref<NetwEntity> &p_entity
-) const {
-    return predict_find_declaration(p_entity.ptr()) != nullptr
-        && sim_simulated(p_entity.ptr())
-        && p_entity->get_state_binding() == nullptr;
+    NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    return p_record.find_predict_declaration() != nullptr
+        && sim_simulated(p_record, p_owner)
+        && entity_record_binding(
+               &p_record,
+               p_owner,
+               repl::SET_RECORD_STATE,
+               p_record.get_handle()
+           ) == nullptr;
 }
 
-bool NetwMultiplayer::predict_implied(const NetwEntity *p_wrapper) {
-    return sim_simulated(p_wrapper)
-        && p_wrapper->get_state_binding() != nullptr;
+bool NetwMultiplayer::predict_implied(
+    NetwMultiplayer *p_core,
+    NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    return sim_simulated(p_record, p_owner) && p_core != nullptr
+        && p_core->entity_record_binding(
+               &p_record,
+               p_owner,
+               repl::SET_RECORD_STATE,
+               p_record.get_handle()
+           ) != nullptr;
 }
 
-void NetwMultiplayer::predict_settle_kind(NetwEntity *p_wrapper) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return;
-    }
+void NetwMultiplayer::predict_settle_kind(
+    NetwEntityRecord &p_record,
+    Node *p_owner
+) {
     const predict::KindDefaults defaults
-        = predict::kind_defaults(sim_physics_driven(p_wrapper));
-    predict::Decl &decl = record->predict_declaration();
+        = predict::kind_defaults(sim_physics_driven(p_record, p_owner));
+    predict::Decl &decl = p_record.predict_declaration();
     if (!decl.wrote_repeat_missing_input) {
         decl.repeat_missing_input = defaults.repeat_missing_input;
     }
@@ -1482,10 +1480,10 @@ void NetwMultiplayer::predict_settle_kind(NetwEntity *p_wrapper) {
         decl.teleport_threshold = defaults.teleport_threshold;
     }
     if (!defaults.restore_extrapolated
-        && record->find_sim_declaration() == nullptr) {
+        && p_record.find_sim_declaration() == nullptr) {
         return;
     }
-    sim::Declaration &declared = record->sim_declaration().declaration;
+    sim::Declaration &declared = p_record.sim_declaration().declaration;
     if (!declared.wrote_restore) {
         declared.restore = defaults.restore_extrapolated
             ? sim::Restore::EXTRAPOLATED
@@ -1493,44 +1491,74 @@ void NetwMultiplayer::predict_settle_kind(NetwEntity *p_wrapper) {
     }
 }
 
-void NetwMultiplayer::register_prediction(const Ref<NetwEntity> &p_entity) {
+void NetwMultiplayer::register_prediction(const RID &p_entity) {
     NETW_ZONE_NC("Predict register", colors::PREDICTION);
-    if (p_entity.is_null()) {
+    const Ref<NetwEntity> wrapper = slot_pinned_entity(p_entity);
+    if (wrapper.is_null()) {
         return;
     }
-    const RID entity = p_entity->get_rid_handle();
+    const RID entity = p_entity;
     if (predict_is_declared(entity)) {
         return;
     }
-    predict_settle_kind(p_entity.ptr());
-    sim_declare(p_entity);
+    predict_settle_kind(*wrapper->get_record(), wrapper->get_owner());
+    sim_declare(entity);
     NetwPredictSlotEngine *engine = memnew(NetwPredictSlotEngine);
     predict_engine_install(entity, engine);
-    prediction_engine.slot_register(p_entity);
-    store_bind_entity(p_entity);
-    const Ref<NetwPrediction> handle = p_entity->get_prediction();
+    const Ref<NetwPrediction> handle = wrapper->get_prediction();
+    prediction_engine.slot_register(
+        *wrapper->get_record(),
+        wrapper->get_owner(),
+        handle.ptr()
+    );
+    store_bind_entity(entity);
     engine->follows_control = handle.is_valid();
-    engine->attach(this, p_entity, &books);
+    NetwEntityRecord *held = wrapper->record_in(this);
+    predict::Decl *decl
+        = held != nullptr ? &held->predict_declaration() : nullptr;
+    if (handle.is_valid() && decl != nullptr) {
+        decl->facts.bind_slot(&prediction_engine, wrapper);
+    }
+    engine->attach(
+        this,
+        wrapper->get_record(),
+        wrapper->get_owner(),
+        handle,
+        decl,
+        &liveness_core,
+        &prediction_engine,
+        &predict_runner,
+        &sim_rows,
+        &predict_engines
+    );
 }
 
-void NetwMultiplayer::unregister_prediction(const Ref<NetwEntity> &p_entity) {
+void NetwMultiplayer::unregister_prediction(const RID &p_entity) {
     NETW_ZONE_NC("Predict unregister", colors::PREDICTION);
-    if (p_entity.is_null()) {
-        return;
-    }
-    const RID entity = p_entity->get_rid_handle();
+    const RID entity = p_entity;
     predict_awaiting_config.erase(entity);
     NetwPredictSlotEngine *engine = predict_engine_release(entity);
     if (engine == nullptr) {
         return;
     }
+    NetwEntityRecord *const record = engine->held_record();
     engine->release();
     sim_release_body(entity, true);
     sim_release_row(entity);
-    sim_tell_mode(p_entity->get_record(), p_entity, sim::Mode::NONE);
-    prediction_engine.slot_unregister(p_entity);
+    sim_tell_mode(*record, entity, sim::Mode::NONE);
+    prediction_engine.slot_unregister(record);
     relay_release(entity.get_id());
     predict_retire(engine);
+}
+
+void NetwMultiplayer::predict_forget(NetwEntityRecord &p_record) {
+    const RID entity = p_record.get_handle();
+    NetwPredictSlotEngine *const *held
+        = predict_engines.getptr(entity.get_id());
+    if (held != nullptr && (*held)->held_record() == &p_record) {
+        unregister_prediction(entity);
+    }
+    prediction_engine.slot_unregister(&p_record);
 }
 
 Error NetwMultiplayer::predict_declare(const RID &p_entity) {
@@ -1554,17 +1582,17 @@ Error NetwMultiplayer::predict_declare(const RID &p_entity) {
     if (required != OK) {
         return required;
     }
-    register_prediction(wrapper);
+    register_prediction(p_entity);
     return OK;
 }
 
 void NetwMultiplayer::predict_undeclare(const RID &p_entity) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_valid()) {
-        NetwEntityRecord *const record = record_of(wrapper.ptr());
+        NetwEntityRecord *const record = wrapper->record_in(this);
         NETW_BUG_COND(record == nullptr);
         record->set_predicted_at_departure(false);
-        unregister_prediction(wrapper);
+        unregister_prediction(p_entity);
     }
 }
 
@@ -1585,7 +1613,12 @@ Error NetwMultiplayer::predict_set_param(
     if (wrapper.is_null()) {
         return ERR_DOES_NOT_EXIST;
     }
-    return predict_write_param(wrapper.ptr(), p_param, p_value);
+    return predict_write_param(
+        wrapper->home_session(),
+        *wrapper->get_record(),
+        p_param,
+        p_value
+    );
 }
 
 Variant NetwMultiplayer::predict_get_param(
@@ -1593,8 +1626,14 @@ Variant NetwMultiplayer::predict_get_param(
     PredictParam p_param
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
-    return wrapper.is_valid() ? predict_read_param(wrapper.ptr(), p_param)
-                              : Variant();
+    if (wrapper.is_null()) {
+        return Variant();
+    }
+    return predict_read_param(
+        *wrapper->get_record(),
+        wrapper->get_owner(),
+        p_param
+    );
 }
 
 void NetwMultiplayer::predict_set_correction_path_callback(
@@ -1603,7 +1642,11 @@ void NetwMultiplayer::predict_set_correction_path_callback(
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_valid()) {
-        predict_write_correction_path(wrapper.ptr(), p_callback);
+        predict_write_correction_path(
+            *wrapper->get_record(),
+            wrapper->get_owner(),
+            p_callback
+        );
     }
 }
 
@@ -1613,14 +1656,18 @@ void NetwMultiplayer::predict_set_input_callback(
 ) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_valid()) {
-        predict_write_input(wrapper.ptr(), p_callback);
+        predict_write_input(
+            *wrapper->get_record(),
+            wrapper->get_owner(),
+            p_callback
+        );
     }
 }
 
 namespace {
 
 bool refuses_dead_callable(
-    const NetwEntity *p_wrapper,
+    const Node *p_owner,
     const Callable &p_value,
     const char *p_member
 ) {
@@ -1631,45 +1678,29 @@ bool refuses_dead_callable(
         nullptr,
         NETW_FAULT_BAD_CALLABLE,
         {String(p_member), String(), String("a method of a live object")},
-        p_wrapper != nullptr ? uint64_t(gd::instance_id(p_wrapper->get_owner()))
-                             : 0
+        uint64_t(gd::instance_id(p_owner))
     );
     return true;
 }
 
 } // namespace
 
-NetwMultiplayer *NetwMultiplayer::entity_home(const NetwEntity *p_wrapper) {
-    return p_wrapper != nullptr ? p_wrapper->home : nullptr;
-}
-
 NetwPredictSlotEngine *NetwMultiplayer::predict_engine_of(
-    const NetwEntity *p_wrapper
+    const NetwMultiplayer *p_home,
+    const NetwEntityRecord &p_record
 ) {
-    NetwMultiplayer *home = entity_home(p_wrapper);
-    return home != nullptr
-        ? home->predict_engine_for(p_wrapper->get_rid_handle())
-        : nullptr;
-}
-
-const predict::Decl *NetwMultiplayer::predict_find_declaration(
-    const NetwEntity *p_wrapper
-) {
-    const NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    return record != nullptr ? record->find_predict_declaration() : nullptr;
+    return p_home != nullptr ? p_home->predict_engine_for(p_record.get_handle())
+                             : nullptr;
 }
 
 Error NetwMultiplayer::predict_write_param(
-    NetwEntity *p_wrapper,
+    NetwMultiplayer *p_home,
+    NetwEntityRecord &p_record,
     PredictParam p_param,
     const Variant &p_value
 ) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr) {
-        return ERR_DOES_NOT_EXIST;
-    }
-    predict::Decl &decl = record->predict_declaration();
-    NetwPredictSlotEngine *engine = predict_engine_of(p_wrapper);
+    predict::Decl &decl = p_record.predict_declaration();
+    NetwPredictSlotEngine *engine = predict_engine_of(p_home, p_record);
     switch (p_param) {
         case PREDICT_PARAM_REPEAT_MISSING_INPUT:
             decl.repeat_missing_input = bool(p_value);
@@ -1680,7 +1711,7 @@ Error NetwMultiplayer::predict_write_param(
             if (engine != nullptr) {
                 engine->reconfigure();
             }
-            engine = predict_engine_of(p_wrapper);
+            engine = predict_engine_of(p_home, p_record);
             if (engine != nullptr) {
                 engine->rewire();
             }
@@ -1728,7 +1759,7 @@ Error NetwMultiplayer::predict_write_param(
             return OK;
         default:
             fault::raise(
-                entity_home(p_wrapper),
+                p_home,
                 NETW_FAULT_BAD_VALUE,
                 {"A prediction setting",
                  vformat("setting %d", int(p_param)),
@@ -1743,10 +1774,11 @@ Error NetwMultiplayer::predict_write_param(
 }
 
 Variant NetwMultiplayer::predict_read_param(
-    const NetwEntity *p_wrapper,
+    const NetwEntityRecord &p_record,
+    Node *p_owner,
     PredictParam p_param
 ) {
-    const predict::Decl *found = predict_find_declaration(p_wrapper);
+    const predict::Decl *found = p_record.find_predict_declaration();
     const predict::Decl fallback;
     const predict::Decl &decl = found != nullptr ? *found : fallback;
     switch (p_param) {
@@ -1769,7 +1801,7 @@ Variant NetwMultiplayer::predict_read_param(
         case PREDICT_PARAM_INPUT_BUFFER_TICKS:
             return decl.input_buffer_ticks;
         case PREDICT_PARAM_ROLLBACK_TOGETHER:
-            return predict_rolls_back_together(p_wrapper);
+            return predict_rolls_back_together(p_record, p_owner);
         case PREDICT_PARAM_WORLD_VERSION:
             return decl.world_version;
         case PREDICT_PARAM_CORRECTION_COUNT:
@@ -1780,75 +1812,64 @@ Variant NetwMultiplayer::predict_read_param(
 }
 
 void NetwMultiplayer::predict_write_correction_path(
-    NetwEntity *p_wrapper,
+    NetwEntityRecord &p_record,
+    Node *p_owner,
     const Callable &p_callback
 ) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr
-        || refuses_dead_callable(
-            p_wrapper,
+    if (refuses_dead_callable(
+            p_owner,
             p_callback,
             "{NetwPrediction.correction_path_clear}"
         )) {
         return;
     }
     game_call_declared(p_callback, game_calls::CORRECTION_PATH_CALL);
-    record->predict_declaration().correction_path = p_callback;
+    p_record.predict_declaration().correction_path = p_callback;
 }
 
 void NetwMultiplayer::predict_write_input(
-    NetwEntity *p_wrapper,
+    NetwEntityRecord &p_record,
+    Node *p_owner,
     const Callable &p_callback
 ) {
-    NetwEntityRecord *record = record_of_wrapper(p_wrapper);
-    if (record == nullptr
-        || refuses_dead_callable(
-            p_wrapper,
+    if (refuses_dead_callable(
+            p_owner,
             p_callback,
             "{NetwPrediction.predict_input}"
         )) {
         return;
     }
     game_call_declared(p_callback, game_calls::PREDICT_INPUT_CALL);
-    record->predict_declaration().input = p_callback;
+    p_record.predict_declaration().input = p_callback;
 }
 
 NetwSimulation::Schedule NetwMultiplayer::predict_schedule_of(
-    const NetwEntity *p_wrapper
+    const NetwEntityRecord &p_record,
+    Node *p_owner
 ) {
-    if (p_wrapper == nullptr) {
-        return NetwSimulation::SCHEDULE_TICK;
-    }
-    const sim::Decl *found = sim_find_declaration(p_wrapper);
+    const sim::Decl *found = p_record.find_sim_declaration();
     const sim::Declaration undeclared;
     const sim::Declaration &declared
         = found != nullptr ? found->declaration : undeclared;
     if (declared.schedule != sim::Schedule::AUTO) {
         return NetwSimulation::Schedule(int(declared.schedule));
     }
-    if (!sim_physics_driven(p_wrapper)) {
+    if (!sim_physics_driven(p_record, p_owner)) {
         return NetwSimulation::SCHEDULE_TICK;
     }
-    NetwMultiplayer *session
-        = NetwMultiplayer::session_holding(p_wrapper->get_owner());
-    return session != nullptr
-            && session->predict_entity_can_step(
-                Ref<NetwEntity>(const_cast<NetwEntity *>(p_wrapper))
-            )
+    NetwMultiplayer *session = NetwMultiplayer::session_holding(p_owner);
+    return session != nullptr && session->predict_entity_can_step(p_owner)
         ? NetwSimulation::SCHEDULE_STEPPED
         : NetwSimulation::SCHEDULE_FRAME;
 }
 
-bool NetwMultiplayer::predict_body_solves(const NetwEntity *p_wrapper) {
-    return sim_physics_driven(p_wrapper);
-}
-
 NetwPrediction::Mode NetwMultiplayer::predict_resolve_mode(
-    const NetwEntity *p_wrapper
+    const NetwEntityRecord &p_record,
+    Node *p_owner
 ) {
-    const bool solves = predict_body_solves(p_wrapper);
-    const int schedule = predict_schedule_of(p_wrapper);
-    const predict::Decl *decl = predict_find_declaration(p_wrapper);
+    const bool solves = sim_physics_driven(p_record, p_owner);
+    const int schedule = predict_schedule_of(p_record, p_owner);
+    const predict::Decl *decl = p_record.find_predict_declaration();
     const int declared
         = decl != nullptr ? decl->mode : int(NetwPrediction::MODE_AUTO);
     return NetwPrediction::Mode(predict::integrable_mode(
@@ -1858,35 +1879,30 @@ NetwPrediction::Mode NetwMultiplayer::predict_resolve_mode(
     ));
 }
 
-bool NetwMultiplayer::predict_rolls_back_together(const NetwEntity *p_wrapper) {
-    const predict::Decl *decl = predict_find_declaration(p_wrapper);
+bool NetwMultiplayer::predict_rolls_back_together(
+    const NetwEntityRecord &p_record,
+    Node *p_owner
+) {
+    const predict::Decl *decl = p_record.find_predict_declaration();
     if (decl != nullptr && decl->wrote_rollback_together) {
         return decl->rollback_together;
     }
-    if (p_wrapper == nullptr
-        || predict_schedule_of(p_wrapper) != NetwSimulation::SCHEDULE_STEPPED
-        || !sim_physics_driven(p_wrapper)) {
+    if (predict_schedule_of(p_record, p_owner)
+            != NetwSimulation::SCHEDULE_STEPPED
+        || !sim_physics_driven(p_record, p_owner)) {
         return false;
     }
-    NetwMultiplayer *session
-        = NetwMultiplayer::session_holding(p_wrapper->get_owner());
-    return session != nullptr
-        && session->predict_entity_can_step(
-            Ref<NetwEntity>(const_cast<NetwEntity *>(p_wrapper))
-        );
+    NetwMultiplayer *session = NetwMultiplayer::session_holding(p_owner);
+    return session != nullptr && session->predict_entity_can_step(p_owner);
 }
 
-void NetwMultiplayer::predict_restate(const NetwEntity *p_wrapper) {
-    NetwPredictSlotEngine *engine = predict_engine_of(p_wrapper);
+void NetwMultiplayer::predict_restate(
+    const NetwMultiplayer *p_home,
+    const NetwEntityRecord &p_record
+) {
+    NetwPredictSlotEngine *engine = predict_engine_of(p_home, p_record);
     if (engine != nullptr) {
         engine->reconfigure();
-    }
-}
-
-void NetwMultiplayer::predict_step_changed(const NetwEntity *p_wrapper) {
-    NetwPredictSlotEngine *engine = predict_engine_of(p_wrapper);
-    if (engine != nullptr) {
-        engine->push_simulate();
     }
 }
 
@@ -1901,14 +1917,15 @@ Error NetwMultiplayer::predict_bind_owner(
     if (p_owner == nullptr) {
         return ERR_INVALID_DATA;
     }
-    if (!prediction_engine.slot_bind_owner(wrapper, p_owner)) {
+    if (!prediction_engine.slot_bind_owner(wrapper->get_record(), p_owner)) {
         return ERR_DOES_NOT_EXIST;
     }
-    const sim::Decl *declared = sim_find_declaration(wrapper.ptr());
+    const sim::Decl *declared = wrapper->get_record()->find_sim_declaration();
     if ((declared == nullptr || !declared->declaration.step.is_valid())
         && p_owner->has_method(StringName("_network_process"))) {
         sim_adopt_step(
-            wrapper.ptr(),
+            wrapper->home_session(),
+            *wrapper->get_record(),
             Callable(p_owner, StringName("_network_process"))
         );
     }
@@ -1918,13 +1935,17 @@ Error NetwMultiplayer::predict_bind_owner(
 void NetwMultiplayer::predict_unbind_owner(const RID &p_entity) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
     if (wrapper.is_valid()) {
-        prediction_engine.slot_unbind_owner(wrapper);
+        prediction_engine.slot_unbind_owner(wrapper->get_record());
     }
 }
 
 void NetwMultiplayer::predict_notify_collision(const RID &p_entity) {
     const Ref<NetwEntity> wrapper = entity_get_view(p_entity);
-    const predict::Decl *decl = predict_find_declaration(wrapper.ptr());
+    if (wrapper.is_null()) {
+        return;
+    }
+    const predict::Decl *decl
+        = wrapper->get_record()->find_predict_declaration();
     if (decl == nullptr) {
         return;
     }
@@ -1944,7 +1965,7 @@ Error NetwMultiplayer::lagcomp_timeline_declare(const RID &p_entity) {
     if (wrapper.is_null()) {
         return ERR_DOES_NOT_EXIST;
     }
-    register_rewind(wrapper);
+    register_rewind(p_entity);
     return OK;
 }
 

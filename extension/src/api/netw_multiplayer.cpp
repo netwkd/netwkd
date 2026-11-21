@@ -132,156 +132,55 @@ NetwMultiplayer::NetwMultiplayer() {
     transport.instantiate();
     transport->set_root_path(NodePath("/root"));
     session_set_inner(transport);
-    liveness_core.instantiate();
-    clock.sink.bind(this);
-    clock.hook_with(
-        [](void *p_context,
-           ClockEngine::Event p_event,
-           const Variant &p_a,
-           const Variant &p_b) {
-            static_cast<NetwMultiplayer *>(p_context)
-                ->clock_event(p_event, p_a, p_b);
-        },
-        this
+    prediction_engine.bind_session(
+        this,
+        &world.clock,
+        &store(),
+        &liveness_core,
+        &binding_book,
+        &sim_rows
     );
-    scene_core.instantiate();
-    display_book.instantiate();
-    books.clock = &clock;
-    books.store = &store_world;
-    books.sets = &set_book;
-    books.bindings = &binding_book;
-    books.liveness = liveness_core.ptr();
-    books.channels = &channel_book;
-    books.prediction = &prediction_engine;
-    books.runner = &predict_runner;
-    books.sims = &sim_rows;
-    books.slot_engines = &predict_engines;
-    books.schemas = &schema_core;
-#if defined(DEBUG_ENABLED)
-    books.profiler = &network_profiler;
-    books.profiler_outgoing = &profiler_outgoing;
-#endif
-#if defined(NETW_TESTS)
-    books.idle = &idle_work;
-#endif
-    prediction_engine.bind_session(this, &books);
-    lagcomp_core.seat_world(&store_world);
-    predict_runner.seat_core(this, &books);
+    lagcomp_core.seat_world(&store());
+    predict_runner.seat_core(this, &prediction_engine);
     sim_rows.seed_with(
         [](void *p_context, sim::Row &r_row) {
             static_cast<NetwMultiplayer *>(p_context)->sim_seed(r_row);
         },
         this
     );
-    store_world.stamp_with(&NetwMultiplayer::store_stamp_thunk, this);
+    store().stamp_with(&NetwMultiplayer::store_stamp_thunk, this);
+    store().session = this;
+    store().arrays = &array_tables;
+    store().pull = &store_pull;
+    array_tables.seat(&store());
+    store_pull.seat(&store());
 
-    display_hooks.sync_intervals
-        = callable_mp(this, &NetwMultiplayer::display_compute_sync_intervals);
-    display_hooks.authors_streams
-        = callable_mp(this, &NetwMultiplayer::display_default_authors_streams);
-    display_hooks.role_reader
-        = callable_mp(this, &NetwMultiplayer::display_default_role);
-    display_hooks.chase_clamp
-        = callable_mp(this, &NetwMultiplayer::display_default_chase_clamp);
-    display_hooks.chase_hook_binder
-        = callable_mp(this, &NetwMultiplayer::display_default_chase_hook);
-    interest_awareness_send
-        = callable_mp(this, &NetwMultiplayer::interest_send_awareness);
-    interest_compat_refresh
-        = callable_mp(this, &NetwMultiplayer::interest_refresh_compat_intents);
-    scene_viewer_edge
-        = callable_mp(this, &NetwMultiplayer::scene_report_viewer);
-    display_hooks.display_lane
-        = callable_mp(this, &NetwMultiplayer::display_lane);
+    display_hooks.session = this;
 
     session_core.announce_to(this);
 
-    gate_channels.spawn = declared_channel("SPAWN");
-    gate_channels.despawn = declared_channel("DESPAWN");
-    gate_channels.hide = declared_channel("HIDE");
-    gate_channels.reparent = declared_channel("REPARENT");
-    gate_channels.table = declared_channel("TABLE");
-    control_channels.kicked = declared_channel("SESSION_KICKED");
-    control_channels.shutdown = declared_channel("SESSION_SHUTDOWN");
-    control_channels.kick_request = declared_channel("SESSION_KICK_REQUEST");
-    control_channels.leave = declared_channel("SESSION_LEAVE");
-    control_channels.player_left = declared_channel("SESSION_PLAYER_LEFT");
-    control_channels.pause = declared_channel("SESSION_PAUSE");
-    control_channels.unpause = declared_channel("SESSION_UNPAUSE");
-    clock_channels.handshake = declared_channel("CLOCK_HANDSHAKE");
-    clock_channels.handshake_reply = declared_channel("CLOCK_HANDSHAKE_REPLY");
-    clock_channels.ping = declared_channel("CLOCK_PING");
-    clock_channels.pong = declared_channel("CLOCK_PONG");
-    scene_released_channel = declared_channel("SESSION_SCENE_RELEASED");
-    spawn_failed_channel = declared_channel("SESSION_SPAWN_FAILED");
-    scene_viewers_channel = declared_channel("SESSION_SCENE_VIEWERS");
-    session_join_channel = declared_channel("SESSION_JOIN");
-    session_accept_channel = declared_channel("SESSION_ACCEPT");
-    session_roster_channel = declared_channel("SESSION_ROSTER");
-    session_resync_channel = declared_channel("SESSION_RESYNC");
-    route_lease_channel = declared_channel("ROUTE_LEASE");
-    lifecycle_decision_channel = declared_channel("LIFECYCLE_DECISION");
-
     interest_flush = callable_mp(this, &NetwMultiplayer::interest_flush_sink);
-
-    channel_book.register_protocol(
-        scene_released_channel,
-        callable_mp(this, &NetwMultiplayer::scene_receive_released_frame)
-    );
-    channel_book.register_protocol(
-        spawn_failed_channel,
-        callable_mp(this, &NetwMultiplayer::spawn_receive_failed_frame)
-    );
-    channel_book.register_protocol(
-        scene_viewers_channel,
-        callable_mp(this, &NetwMultiplayer::scene_receive_viewers_frame)
-    );
-    channel_book.register_protocol(
-        session_join_channel,
-        callable_mp(this, &NetwMultiplayer::session_receive_join)
-    );
-    channel_book.register_protocol(
-        session_accept_channel,
-        callable_mp(this, &NetwMultiplayer::session_receive_accept)
-    );
-    channel_book.register_protocol(
-        session_roster_channel,
-        callable_mp(this, &NetwMultiplayer::session_receive_roster)
-    );
-    channel_book.register_protocol(
-        session_resync_channel,
-        callable_mp(this, &NetwMultiplayer::session_receive_resync)
-    );
-    channel_book.register_protocol(
-        route_lease_channel,
-        callable_mp(this, &NetwMultiplayer::liveness_receive_lease)
-    );
-    channel_book.register_protocol(
-        lifecycle_decision_channel,
-        callable_mp(this, &NetwMultiplayer::lifecycle_receive_decision)
-    );
-    const uint8_t control[] = {
-        control_channels.pause,
-        control_channels.unpause,
-        control_channels.kicked,
-        control_channels.shutdown,
-        control_channels.kick_request,
-        control_channels.leave,
-        control_channels.player_left,
-    };
-    for (const uint8_t &channel : control) {
-        channel_book.register_protocol(
-            channel,
-            callable_mp(this, &NetwMultiplayer::session_receive_control)
-                .bind(channel)
-        );
-    }
 
     connect_core.bind_session(this);
 
     ReplicationCore *plane = memnew(ReplicationCore);
     replication_owner = plane;
-    plane->install(this, &books);
+    plane->install(
+        this,
+        &world.clock,
+        &store(),
+        &liveness_core,
+        &channel_book,
+        &binding_book,
+        &set_book,
+        &prediction_engine
+    );
+#if defined(DEBUG_ENABLED)
+    plane->seat_profiler(&network_profiler, &profiler_outgoing);
+#endif
+#if defined(NETW_TESTS)
+    plane->seat_idle(&idle_work);
+#endif
     plane->get_sync_model()->attach_book(&binding_book);
 
     scene_install();
@@ -340,66 +239,6 @@ void NetwMultiplayer::embed_dispose() {
     session_clear_roster();
     player_clear();
     announce_drop();
-}
-
-void NetwMultiplayer::clock_event(
-    ClockEngine::Event p_event,
-    const Variant &p_a,
-    const Variant &p_b
-) {
-    const double delta = p_a;
-    const int64_t tick = p_b;
-    switch (p_event) {
-        case ClockEngine::EVENT_BEFORE_TICK:
-            if (views.clock_handle.is_valid()) {
-                views.clock_handle->announce_before_tick(delta, tick);
-            }
-            return;
-        case ClockEngine::EVENT_ON_TICK:
-            tick_step(delta, tick);
-            if (clock_sweeps_effects) {
-                clock_sweep_effects(delta, tick);
-            }
-            if (spawn::Pipeline *pipeline = spawn_plane()) {
-                if (pipeline->reveals_action_gates()) {
-                    spawn_on_action_reveal_tick(delta, tick);
-                }
-                if (pipeline->awaits_unadded()) {
-                    pipeline->report_unadded(clock.get_ticks_run());
-                }
-            }
-            return;
-        case ClockEngine::EVENT_AFTER_TICK:
-            if (display_session_bound) {
-                display_on_clock_tick(delta, tick);
-            }
-            session_on_clock_tick(delta, tick);
-            if (views.clock_handle.is_valid()) {
-                views.clock_handle->announce_ticked(delta, tick);
-            }
-            return;
-        case ClockEngine::EVENT_BEFORE_TICK_LOOP:
-            before_frame_step();
-            return;
-        case ClockEngine::EVENT_AFTER_TICK_LOOP:
-            frame_step();
-            return;
-        case ClockEngine::EVENT_SYNCHRONIZED:
-            if (views.clock_handle.is_valid()) {
-                Announcement row;
-                row.kind = AnnouncementKind::SYNCHRONIZED;
-                announce(row);
-            }
-            return;
-        case ClockEngine::EVENT_STABILITY_CHANGED:
-            return;
-    }
-}
-
-uint8_t NetwMultiplayer::declared_channel(const char *p_name) const {
-    const wire::ChannelDecl *decl
-        = channels.find_channel_by_name(StringName(p_name));
-    return decl ? decl->id : 0;
 }
 
 NetwMultiplayer::PlayerRow *NetwMultiplayer::player_row(int64_t p_peer) {
@@ -534,9 +373,9 @@ TypedArray<NetwPlayer> NetwMultiplayer::player_joined_all() {
     return out;
 }
 
-PackedInt64Array NetwMultiplayer::player_list() const {
+PackedInt32Array NetwMultiplayer::player_list() const {
     const LocalVector<session::AcceptFrame> joins = session_accepted_joins();
-    PackedInt64Array out;
+    PackedInt32Array out;
     for (uint32_t at = 0; at < joins.size(); ++at) {
         const int64_t player = peer_get_player(joins[at].peer_id);
         if (player != 0) {
@@ -611,8 +450,8 @@ TypedArray<NetwEntity> NetwMultiplayer::player_entities_held(
     if (!is_host() && !player_is_active(p_player_id)) {
         return held;
     }
-    entity_slots.each([&](uint64_t, const EntitySlot &p_slot) {
-        const Ref<NetwEntity> &entity = p_slot.live;
+    views.entities.each([&](uint64_t, const session::EntityView &p_view) {
+        const Ref<NetwEntity> &entity = p_view.live;
         if (entity.is_valid() && entity->get_owner() != nullptr
             && entity->get_peer_id() == p_peer
             && entity->get_player_id() == p_player_id
@@ -635,8 +474,9 @@ TypedArray<NetwEntity> NetwMultiplayer::player_entities_held(
     return held;
 }
 
-bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
-    if (session_settings.return_window <= 0.0 || p_entity == nullptr
+bool NetwMultiplayer::player_keep_entity(const RID &p_entity, int64_t p_peer) {
+    const Ref<NetwEntity> view = slot_pinned_entity(p_entity);
+    if (session_settings.return_window <= 0.0 || view.is_null()
         || !is_host() || p_peer == get_unique_id()) {
         return false;
     }
@@ -649,29 +489,31 @@ bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
         && leaving->leave_reason != NetwPlayer::LEAVE_STEPPED_AWAY) {
         return false;
     }
-    const int64_t route = p_entity->get_route();
+    const NetwEntityRecord *const record = view->get_record();
+    const int64_t route = record->get_route();
     spawn::Pipeline *spawns = spawn_plane();
     if (spawns != nullptr && spawns->get_spawn_book()->has_armed(route)) {
         return false;
     }
-    const bool owned = p_entity->get_peer_id() == p_peer;
+    const bool owned = record->get_peer_id() == p_peer;
     KeptEntity kept;
     kept.player_id = leaving->incarnation;
     kept.account = leaving->account;
     kept.deadline_msec = int64_t(Time::get_singleton()->get_ticks_msec())
         + int64_t(session_settings.return_window * 1000.0);
     kept.owned = owned;
-    kept.controlled = p_entity->get_controller() == p_peer;
+    kept.controlled
+        = entity::Control::public_peer(record->get_control()->resolve())
+        == p_peer;
     kept.despawns = owned
-        || p_entity->get_on_controller_disconnect()
+        || record->get_control()->get_on_disconnect()
             == NetwEntity::DISCONNECT_DESPAWN;
-    const RID handle = p_entity->get_rid_handle();
-    kept_entities[handle.get_id()] = kept;
+    kept_entities[p_entity.get_id()] = kept;
     if (!owned) {
         control_revert_to_server(p_entity, p_peer);
         return true;
     }
-    const RID standing = scene_of(handle);
+    const RID standing = scene_of(p_entity);
     spawn::Record *issued = spawns != nullptr
         ? spawns->get_spawn_book()->spawned_of(route)
         : nullptr;
@@ -679,7 +521,7 @@ bool NetwMultiplayer::player_keep_entity(NetwEntity *p_entity, int64_t p_peer) {
         issued->set_peer_id(0);
     }
     control_revert_to_server(p_entity, p_peer);
-    membership_drop_entity_in(handle, standing, p_peer);
+    membership_drop_entity_in(p_entity, standing, p_peer);
     return true;
 }
 
@@ -715,7 +557,7 @@ void NetwMultiplayer::player_hand_back(int64_t p_peer) {
         if (!kept.owned) {
             if (driver != controller || kept.despawns) {
                 control_reassign(
-                    entity.ptr(),
+                    entity->get_rid_handle(),
                     entity->get_peer_id(),
                     entity->get_player_id(),
                     driver
@@ -729,8 +571,13 @@ void NetwMultiplayer::player_hand_back(int64_t p_peer) {
         if (issued != nullptr) {
             issued->set_peer_id(p_peer);
         }
-        control_reassign(entity.ptr(), p_peer, returning->incarnation, driver);
-        membership_place_entity(entity);
+        control_reassign(
+            entity->get_rid_handle(),
+            p_peer,
+            returning->incarnation,
+            driver
+        );
+        membership_place_entity(entity->get_rid_handle());
         scene_adopt_entity(entity->get_rid_handle());
     }
 }
@@ -775,7 +622,7 @@ void NetwMultiplayer::player_tell_kept(int64_t p_peer) {
     for (const KeyValue<uint64_t, KeptEntity> &kept : kept_entities) {
         const Ref<NetwEntity> entity = wrapper_for_id(int64_t(kept.key));
         if (kept.value.despawns && entity.is_valid()) {
-            control_restate(entity.ptr(), p_peer);
+            control_restate(entity->get_rid_handle(), p_peer);
         }
     }
 }
@@ -830,7 +677,7 @@ bool NetwMultiplayer::membership_destination_foreign(Node *p_owner) const {
     }
     for (Node *above = p_owner->get_parent(); above != nullptr;
          above = above->get_parent()) {
-        const RID held = handle_of_wrapper(wrapper_at(above).ptr());
+        const RID held = entity_at_or_above(above);
         if (!held.is_valid()) {
             continue;
         }
@@ -839,12 +686,13 @@ bool NetwMultiplayer::membership_destination_foreign(Node *p_owner) const {
     return false;
 }
 
-void NetwMultiplayer::membership_place_entity(const Ref<NetwEntity> &p_entity) {
-    if (!is_host() || p_entity.is_null()) {
+void NetwMultiplayer::membership_place_entity(const RID &p_entity) {
+    const NetwEntityRecord *record = entity_record(p_entity);
+    if (!is_host() || record == nullptr) {
         return;
     }
-    const int64_t peer = p_entity->get_peer_id();
-    const RID handle = p_entity->get_rid_handle();
+    const int64_t peer = record->get_peer_id();
+    const RID handle = p_entity;
     if (peer == 0 || !handle.is_valid()) {
         return;
     }
@@ -861,7 +709,7 @@ void NetwMultiplayer::membership_place_entity(const Ref<NetwEntity> &p_entity) {
         fault::raise(
             this,
             NETW_FAULT_UNSUPPORTED,
-            {vformat("Entity %d", int(p_entity->get_route())),
+            {vformat("Entity %d", int(record->get_route())),
              "a move under another {MultiplayerViewport}",
              "a despawn here and a spawn in the other viewport"}
         );
@@ -872,7 +720,7 @@ void NetwMultiplayer::membership_place_entity(const Ref<NetwEntity> &p_entity) {
             sys::SCENE,
             "Route %d is in a scene that peer %d is not in, so nothing "
             "watches it.",
-            int(p_entity->get_route()),
+            int(record->get_route()),
             int(peer)
         );
         scene = RID();
@@ -890,20 +738,18 @@ void NetwMultiplayer::membership_place_entity(const Ref<NetwEntity> &p_entity) {
     membership_settle();
 }
 
-void NetwMultiplayer::membership_drop_entity(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
+void NetwMultiplayer::membership_drop_entity(
+    const RID &p_entity,
+    int64_t p_peer
+) {
+    if (!p_entity.is_valid() || p_peer == 0) {
         return;
     }
-    const RID handle = p_entity->get_rid_handle();
-    const int64_t peer = p_entity->get_peer_id();
-    if (!handle.is_valid() || peer == 0) {
-        return;
-    }
-    const int64_t entity = membership_entity_id(handle);
+    const int64_t entity = membership_entity_id(p_entity);
     LocalVector<RID> standing;
-    scene_membership.scenes_of_entity(peer, entity, standing);
+    scene_membership.scenes_of_entity(p_peer, entity, standing);
     for (uint32_t at = 0; at < standing.size(); ++at) {
-        scene_membership.entity_exit(peer, standing[at], entity);
+        scene_membership.entity_exit(p_peer, standing[at], entity);
     }
     membership_settle();
 }
@@ -1019,7 +865,7 @@ void NetwMultiplayer::membership_audit() {
         return;
     }
     LocalVector<NetwEntityRecord *> held;
-    entity_slots.each([&held](uint64_t, const EntitySlot &p_slot) {
+    world.entities.each([&held](uint64_t, const EntityRow &p_slot) {
         if (NetwEntityRecord *record = p_slot.routed_record()) {
             held.push_back(record);
         }
@@ -1220,13 +1066,13 @@ void NetwMultiplayer::player_request_kick(
     const PackedByteArray payload
         = session::frame_write(session::KickRequest{player, p_reason});
     if (is_server()) {
-        session_publish_control(control_channels.kick_request, 1, payload);
+        session_publish_control(wire::CHANNEL_SESSION_KICK_REQUEST, 1, payload);
         return;
     }
     send_to(
         MultiplayerPeer::TARGET_PEER_SERVER,
         0,
-        control_channels.kick_request,
+        wire::CHANNEL_SESSION_KICK_REQUEST,
         payload,
         true,
         0,
@@ -1258,7 +1104,7 @@ void NetwMultiplayer::player_note_leave(
         send_to(
             peers[at],
             0,
-            control_channels.player_left,
+            wire::CHANNEL_SESSION_PLAYER_LEFT,
             payload,
             true,
             0,
@@ -1406,10 +1252,6 @@ NodePath NetwMultiplayer::relative_path(Object *p_source, Object *p_target) {
     return source->get_path_to(target);
 }
 
-void NetwMultiplayer::set_scene_viewer_edge(const Callable &p_edge) {
-    scene_viewer_edge = p_edge;
-}
-
 int NetwMultiplayer::service_row(Object *p_type) const {
     const ObjectID wanted = gd::instance_id(p_type);
     for (uint32_t at = 0; at < views.services.size(); at++) {
@@ -1543,25 +1385,25 @@ bool NetwMultiplayer::session_publish_control(
     const bool from_server = p_sender == SERVER_PEER;
     session::SessionReason stated;
     const bool states_reason = session::frame_read(p_payload, stated);
-    if (p_channel == control_channels.pause) {
+    if (p_channel == wire::CHANNEL_SESSION_PAUSE) {
         if (from_server && states_reason) {
             session_apply_pause(true, stated.reason);
         }
         return true;
     }
-    if (p_channel == control_channels.unpause) {
+    if (p_channel == wire::CHANNEL_SESSION_UNPAUSE) {
         if (from_server && p_payload.is_empty()) {
             session_apply_pause(false, String());
         }
         return true;
     }
-    if (p_channel == control_channels.kicked) {
+    if (p_channel == wire::CHANNEL_SESSION_KICKED) {
         if (from_server && states_reason) {
             session_note_exit(enums::NetwSession::KICKED, stated.reason);
         }
         return true;
     }
-    if (p_channel == control_channels.shutdown) {
+    if (p_channel == wire::CHANNEL_SESSION_SHUTDOWN) {
         if (from_server && states_reason) {
             session_note_exit(
                 enums::NetwSession::SERVER_SHUTDOWN,
@@ -1571,7 +1413,7 @@ bool NetwMultiplayer::session_publish_control(
         }
         return true;
     }
-    if (p_channel == control_channels.kick_request) {
+    if (p_channel == wire::CHANNEL_SESSION_KICK_REQUEST) {
         session::KickRequest asked;
         if (is_host() && session::frame_read(p_payload, asked)) {
             Announcement row;
@@ -1583,7 +1425,7 @@ bool NetwMultiplayer::session_publish_control(
         }
         return true;
     }
-    if (p_channel == control_channels.leave) {
+    if (p_channel == wire::CHANNEL_SESSION_LEAVE) {
         session::SessionLeave leaving;
         if (is_host() && p_sender != get_unique_id()
             && session::frame_read(p_payload, leaving)) {
@@ -1591,7 +1433,7 @@ bool NetwMultiplayer::session_publish_control(
         }
         return true;
     }
-    if (p_channel == control_channels.player_left) {
+    if (p_channel == wire::CHANNEL_SESSION_PLAYER_LEFT) {
         session::PlayerLeft left;
         if (from_server && !is_host() && session::frame_read(p_payload, left)) {
             session_receive_player_left(left);
@@ -1690,7 +1532,8 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
         case AnnouncementKind::ENTITY_ENTERED:
         case AnnouncementKind::ENTITY_EXITED: {
             const Ref<NetwEntity> entity = slot_pinned_entity(p_row.entity);
-            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            const Ref<NetwScene> scene
+                = views.pinned_scene_of(p_row.scene.get_id());
             const bool present = p_row.kind == AnnouncementKind::ENTITY_ENTERED;
             if (entity.is_valid() && scene.is_valid()) {
                 scene->announce_entity(entity, present);
@@ -1701,14 +1544,16 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
             announce_unpin(p_row);
         } break;
         case AnnouncementKind::SCENE_REMOVED: {
-            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            const Ref<NetwScene> scene
+                = views.pinned_scene_of(p_row.scene.get_id());
             if (session.is_valid() && scene.is_valid()) {
                 session->announce_scene_removed(scene);
             }
             announce_unpin(p_row);
         } break;
         case AnnouncementKind::SCENE_READY: {
-            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            const Ref<NetwScene> scene
+                = views.pinned_scene_of(p_row.scene.get_id());
             if (session.is_valid()) {
                 session->announce_scene_ready(scene);
             }
@@ -1718,8 +1563,8 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
             const Ref<NetwPlayer> player = player_view(p_row.player);
             if (player.is_valid()) {
                 player->announce_scene_changed(
-                    slot_pinned_scene(p_row.scene),
-                    slot_pinned_scene(p_row.scene_to)
+                    views.pinned_scene_of(p_row.scene.get_id()),
+                    views.pinned_scene_of(p_row.scene_to.get_id())
                 );
             }
             announce_unpin(p_row);
@@ -1773,7 +1618,8 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
         } break;
         case AnnouncementKind::VIEWER_ENTERED:
         case AnnouncementKind::VIEWER_EXITED: {
-            const Ref<NetwScene> scene = slot_pinned_scene(p_row.scene);
+            const Ref<NetwScene> scene
+                = views.pinned_scene_of(p_row.scene.get_id());
             const Ref<NetwPlayer> player = player_view(p_row.player);
             if (scene.is_valid() && player.is_valid()) {
                 scene->announce_viewer(
@@ -1797,7 +1643,9 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
         case AnnouncementKind::PERSIST_LOADED:
         case AnnouncementKind::PERSIST_SAVED: {
             const Ref<NetwEntity> entity = slot_pinned_entity(p_row.entity);
-            entity_emit(entity.ptr(), p_row);
+            if (entity.is_valid()) {
+                entity->emit_announcement(p_row);
+            }
             announce_unpin(p_row);
         } break;
         case AnnouncementKind::DATABASE_FAILED: {
@@ -1973,7 +1821,7 @@ void NetwMultiplayer::session_fail_join(
     send_to(
         peer,
         0,
-        session_join_channel,
+        wire::CHANNEL_SESSION_JOIN,
         auth::encode_refused(int64_t(p_error), p_reason),
         true,
         0,
@@ -1990,7 +1838,7 @@ void NetwMultiplayer::session_turn_peer_away(
         send_to(
             p_peer,
             0,
-            control_channels.kicked,
+            wire::CHANNEL_SESSION_KICKED,
             session::frame_write(session::SessionReason{p_reason}),
             true,
             0,
@@ -2205,9 +2053,9 @@ void NetwMultiplayer::session_clear_disconnected_peer(int64_t p_peer) {
 }
 
 void NetwMultiplayer::session_clear_link_delivery(int64_t p_peer) {
-    forget_peer_seqs(p_peer);
-    clock_exchange.forget_peer(p_peer);
-    liveness_core->abandon_lease(int(p_peer));
+    world.wire.seq_book.forget_peer(p_peer);
+    world.clock.exchange.forget_peer(p_peer);
+    liveness_core.abandon_lease(int(p_peer));
     ReplicationCore *plane = (get_replication_plane());
     if (plane != nullptr) {
         plane->clear_peer(p_peer);
@@ -2564,7 +2412,7 @@ void NetwMultiplayer::session_publish_admitted(
         send_to(
             p_sender,
             0,
-            session_roster_channel,
+            wire::CHANNEL_SESSION_ROSTER,
             join_roster.roster_frame(p_sender),
             true,
             0,
@@ -2575,7 +2423,7 @@ void NetwMultiplayer::session_publish_admitted(
             send_to(
                 p_sender,
                 0,
-                control_channels.pause,
+                wire::CHANNEL_SESSION_PAUSE,
                 session::frame_write(
                     session::SessionReason{session_pause_reason}
                 ),
@@ -2622,7 +2470,7 @@ void NetwMultiplayer::session_send_accept(
     send_to(
         p_destination,
         0,
-        session_accept_channel,
+        wire::CHANNEL_SESSION_ACCEPT,
         session_accept_payload(p_row, p_destination),
         true,
         0,
@@ -2638,7 +2486,7 @@ void NetwMultiplayer::session_receive_accept(
         return;
     }
     session::AcceptFrame accepted;
-    if (!session::frame_read(p_payload, accepted)) {
+    if (!session::accept_read(p_payload, accepted)) {
         NETW_TRACE(
             sys::SESSION,
             "A join acceptance that did not decode fully was ignored."
@@ -2745,7 +2593,7 @@ void NetwMultiplayer::session_announce_entered() {
     transfer_installed = TransferInstall();
     spawner_session_entered();
     scene_on_session_entered();
-    if (clock_handshakes_on_enter) {
+    if (world.clock.get_handshakes_on_enter()) {
         clock_start_handshake();
     }
     Announcement row;
@@ -2774,6 +2622,7 @@ void NetwMultiplayer::session_announce_ended() {
     }
     session_apply_pause(false, String());
     spawner_session_ended();
+    rpc_drop_deferred_calls();
     liveness_settle_clear_session();
     interest_session_ended();
     session_settle_clear_state();
@@ -2781,7 +2630,10 @@ void NetwMultiplayer::session_announce_ended() {
     session_set_role(ROLE_NONE);
     scene_on_session_reclaimed();
     if (spawn::Pipeline *pipeline = spawn_plane()) {
-        pipeline->free_session_nodes();
+        const LocalVector<ObjectID> nodes = pipeline->end_session_nodes();
+        for (const ObjectID &id : nodes) {
+            free_returned(Variant(gd::instance_from_id(id)), Variant());
+        }
     }
     scene_player_display_invalidate();
     callable_mp(this, &NetwMultiplayer::session_announce_exited)
@@ -3800,7 +3652,7 @@ PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
     const session_decl::Resolved declared
         = declaration_slots.resolve(this, session_decl::KIND_SERVER_INFO);
     if (declared.state == session_decl::ABSENT) {
-        return NetwServerInfo::to_payload(base);
+        return NetwServerInfo::payload_for(base, this);
     }
     if (declared.state != session_decl::READY) {
         declaration_slots.report_unresolved(
@@ -3814,7 +3666,7 @@ PackedByteArray NetwMultiplayer::probe_reply_payload(bool &r_answered) {
     Array args;
     args.push_back(base);
     game_call(declared.callable, args, game_calls::SERVER_INFO_HANDLER);
-    return NetwServerInfo::to_payload(base);
+    return NetwServerInfo::payload_for(base, this);
 }
 
 void NetwMultiplayer::session_answer_probe(int64_t p_peer) {
@@ -4042,7 +3894,7 @@ void NetwMultiplayer::session_pause(const String &p_reason) {
         return;
     }
     session_broadcast_control(
-        control_channels.pause,
+        wire::CHANNEL_SESSION_PAUSE,
         session::frame_write(session::SessionReason{p_reason})
     );
 }
@@ -4052,7 +3904,7 @@ void NetwMultiplayer::session_unpause() {
         fault::raise(this, NETW_FAULT_SERVER_ONLY, {"{NetwSession.unpause}"});
         return;
     }
-    session_broadcast_control(control_channels.unpause, PackedByteArray());
+    session_broadcast_control(wire::CHANNEL_SESSION_UNPAUSE, PackedByteArray());
 }
 
 bool NetwMultiplayer::session_is_paused() const {
@@ -4069,7 +3921,7 @@ void NetwMultiplayer::session_notify_shutdown(const String &p_reason) {
         return;
     }
     session_broadcast_control(
-        control_channels.shutdown,
+        wire::CHANNEL_SESSION_SHUTDOWN,
         session::frame_write(session::SessionReason{p_reason})
     );
 }
@@ -4101,6 +3953,25 @@ bool NetwMultiplayer::is_tearing_down(ObjectID p_session) {
 }
 
 NetwMultiplayer::~NetwMultiplayer() {
+    prediction_engine.bind_session(
+        nullptr,
+        &world.clock,
+        &store(),
+        &liveness_core,
+        &binding_book,
+        &sim_rows
+    );
+    predict_runner.seat_core(nullptr, &prediction_engine);
+    for (const KeyValue<int64_t, NetwPredictSlotEngine *> &row :
+         predict_engines) {
+        row.value->session = nullptr;
+    }
+    for (NetwPredictSlotEngine *engine : predict_retired) {
+        engine->session = nullptr;
+    }
+    if (replication_owner != nullptr) {
+        replication_owner->unseat();
+    }
     forget_torn_down_sessions();
     sessions_tearing_down().push_back(uint64_t(gd::instance_id(this)));
     tree_forget_session(this);
@@ -4122,6 +3993,7 @@ NetwMultiplayer::~NetwMultiplayer() {
     lagcomp_release();
     declaration_slots.release();
     if (replication_owner != nullptr) {
+        replication_owner->release_spawn_builds();
         memdelete(replication_owner);
         replication_owner = nullptr;
     }
@@ -4166,9 +4038,12 @@ void NetwMultiplayer::session_on_clock_tick(double, int64_t p_tick) {
 #if defined(NETW_PROFILING)
 void NetwMultiplayer::profile_book_bytes() const {
     NETW_ZONE_NC("Memory sample", colors::SESSION);
-    NETW_PLOT(profile::names::MEMORY_STORE_ROWS, store_world.row_bytes());
-    NETW_PLOT(profile::names::MEMORY_PEER_ROWS, store_world.peer_bytes());
-    NETW_PLOT(profile::names::MEMORY_PEER_FLIGHTS, store_world.flight_bytes());
+    NETW_PLOT(
+        profile::names::MEMORY_STORE_ROWS,
+        store().row_bytes() + store_pull.held_bytes()
+    );
+    NETW_PLOT(profile::names::MEMORY_PEER_ROWS, store().peer_bytes());
+    NETW_PLOT(profile::names::MEMORY_PEER_FLIGHTS, store().flight_bytes());
     int64_t transitions = 0;
     int64_t inputs = 0;
     int64_t journal = 0;
@@ -4178,10 +4053,7 @@ void NetwMultiplayer::profile_book_bytes() const {
     NETW_PLOT(profile::names::MEMORY_PREDICT_INPUTS, inputs);
     NETW_PLOT(profile::names::MEMORY_PREDICT_JOURNAL, journal);
     NETW_PLOT(profile::names::MEMORY_PREDICT_SLOTS, slots);
-    NETW_PLOT(
-        profile::names::MEMORY_DISPLAY,
-        display_book.is_valid() ? display_book->held_bytes() : int64_t(0)
-    );
+    NETW_PLOT(profile::names::MEMORY_DISPLAY, display_book.held_bytes());
     NETW_PLOT(profile::names::MEMORY_BINDINGS, binding_book.held_bytes());
     NETW_PLOT(profile::names::MEMORY_SETS, set_book_bytes());
     NETW_PLOT(profile::names::MEMORY_ENTITIES, entity_bytes());
@@ -4201,13 +4073,17 @@ int64_t NetwMultiplayer::set_book_bytes() const {
 }
 
 int64_t NetwMultiplayer::entity_bytes() const {
-    int64_t bytes = held::map(entity_book)
-        + entity_slots.held_bytes([](const EntitySlot &p_slot) {
+    int64_t bytes = held::map(views.node_entities)
+        + world.entities.held_bytes([](const EntityRow &p_slot) {
+              return p_slot.record != nullptr ? p_slot.record->held_bytes()
+                                              : int64_t(0);
+          })
+        + views.entities.held_bytes([](const session::EntityView &p_view) {
               const int64_t object = int64_t(sizeof(NetwEntity));
-              int64_t owned = p_slot.live.is_valid() ? object : 0;
-              owned += p_slot.retired.is_valid() ? object : 0;
-              if (p_slot.record != nullptr) {
-                  owned += p_slot.record->held_bytes();
+              int64_t owned = p_view.live.is_valid() ? object : 0;
+              owned += p_view.retired.is_valid() ? object : 0;
+              if (p_view.holder != nullptr) {
+                  owned += p_view.holder->held_part_bytes();
               }
               return owned;
           });
@@ -4248,7 +4124,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
         = poll_delta(Time::get_singleton()->get_ticks_usec());
     session_poll_admissions(int64_t(Time::get_singleton()->get_ticks_msec()));
     connect_core.on_poll(frame_delta);
-    traffic_advance(frame_delta);
+    world.wire.advance_traffic(frame_delta, packet_overhead());
     const Error err = embed_poll_transport();
     session_poll_shutdown();
     session_poll_server_shutdown();
@@ -4259,9 +4135,9 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
         session_close_peer();
     }
     SceneLoads::shared().poll(engine->get_process_frames());
-    if (spawn::Pipeline *spawning = spawn_plane()) {
-        spawning->retry_build_parked();
-        spawning->sweep_pending_spawns();
+    if (spawn_plane() != nullptr) {
+        spawn_retry_builds();
+        spawn_sweep_pending();
     }
     const bool clocked = clock_engine().get_configured();
     if (!clocked) {
@@ -4271,7 +4147,7 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
     if (!clocked) {
         scene_presentation_warn_split();
     }
-    clock_engine().count_poll();
+    clock_engine().count_poll(clock_reading());
     if (config_is_consumed(session_decl::KIND_CLOCK_CONFIG)) {
         clock_attach_pump();
     }
@@ -4444,7 +4320,7 @@ RID NetwMultiplayer::endpoint_find(
     return connect_core.target_find(p_transport, p_address);
 }
 
-Array NetwMultiplayer::endpoint_list() {
+TypedArray<RID> NetwMultiplayer::endpoint_list() {
     return connect_core.list().list();
 }
 
@@ -4736,10 +4612,10 @@ RID NetwMultiplayer::transport_find_script(const Ref<Script> &p_type) const {
     );
 }
 
-Array NetwMultiplayer::transport_list() {
-    Array held = connect_core.registry().slots();
+TypedArray<RID> NetwMultiplayer::transport_list() {
+    TypedArray<RID> held = connect_core.registry().slots();
     Array named = connect_core.registry().peer_classes();
-    const Array stock = connect::TransportBook::shared().slots();
+    const TypedArray<RID> stock = connect::TransportBook::shared().slots();
     const Array stock_named = connect::TransportBook::shared().peer_classes();
     for (int64_t at = 0; at < stock.size(); at++) {
         if (named.has(stock_named[at])) {
@@ -5190,24 +5066,24 @@ void NetwMultiplayer::set_peer_ids(const PackedInt32Array &p_peer_ids) {
     peer_ids = p_peer_ids;
 }
 
-Ref<NetwLivenessCore> NetwMultiplayer::get_liveness_core() const {
-    return liveness_core;
+NetwLivenessCore *NetwMultiplayer::get_liveness_core() {
+    return &liveness_core;
 }
 
-Ref<NetwSceneCore> NetwMultiplayer::get_scene_core() const {
-    return scene_core;
+NetwSceneCore *NetwMultiplayer::get_scene_core() {
+    return &scene_core;
 }
 
 bool NetwMultiplayer::scene_is_live(const RID &p_scene) const {
-    return scene_core->is_live(p_scene);
+    return scene_core.is_live(p_scene);
 }
 
 JoinRoster &NetwMultiplayer::join_book() {
     return join_roster;
 }
 
-Ref<display::Book> NetwMultiplayer::get_display_book() const {
-    return display_book;
+display::Book *NetwMultiplayer::get_display_book() {
+    return &display_book;
 }
 
 NetwChannelBook *NetwMultiplayer::get_channel_book() {
@@ -5246,7 +5122,7 @@ PackedByteArray clock_rate_frame(int p_tickrate) {
 } // namespace
 
 void NetwMultiplayer::clock_set_mismatch_action(MismatchAction p_action) {
-    clock_mismatch_action = p_action;
+    world.clock.set_mismatch_action(Clock::Mismatch(p_action));
 }
 
 void NetwMultiplayer::clock_request_handshake() {
@@ -5255,7 +5131,7 @@ void NetwMultiplayer::clock_request_handshake() {
     send_to(
         SERVER_PEER,
         0,
-        clock_channels.handshake,
+        wire::CHANNEL_CLOCK_HANDSHAKE,
         clock_rate_frame(clock_engine().get_tickrate()),
         true,
         0,
@@ -5264,33 +5140,34 @@ void NetwMultiplayer::clock_request_handshake() {
 }
 
 void NetwMultiplayer::clock_owe_ping(bool p_forces) {
-    clock_exchange.owe_ping(p_forces);
+    world.clock.exchange.owe_ping(p_forces);
 }
 
 bool NetwMultiplayer::clock_ping_waits() const {
-    return clock_exchange.ping_waits();
+    return world.clock.exchange.ping_waits();
 }
 
 void NetwMultiplayer::clock_board(int64_t p_now_ms, bool p_upkeep_rides) {
+    NetwCarrierBuffers &carrier = world.wire.carrier;
     const auto batch_leaves = [&](int64_t p_peer) {
         return !p_upkeep_rides
             || (carrier.pending(p_peer, false) > 0
                 && !carrier.rides(p_peer, p_now_ms));
     };
-    const PackedInt64Array asking = clock_exchange.peers_asking();
+    const PackedInt64Array asking = world.clock.exchange.peers_asking();
     for (int at = 0; at < asking.size(); ++at) {
         const bool leaves = batch_leaves(asking[at]);
-        if (!clock_exchange.pong_boards(asking[at], p_now_ms, leaves)) {
+        if (!world.clock.exchange.pong_boards(asking[at], p_now_ms, leaves)) {
             continue;
         }
         session::ClockPong pong
-            = clock_exchange.take_pong(asking[at], clock_wall_usec());
+            = world.clock.exchange.take_pong(asking[at], clock_wall_usec());
         pong.tick = uint64_t(clock_engine().get_tick()) & 0xFFFFFFFF;
         pong.phase = uint64_t(clock_engine().tick_phase() * 255.0) & 0xFF;
         send_to(
             asking[at],
             0,
-            clock_channels.pong,
+            wire::CHANNEL_CLOCK_PONG,
             session::frame_write(pong),
             false,
             0,
@@ -5299,7 +5176,8 @@ void NetwMultiplayer::clock_board(int64_t p_now_ms, bool p_upkeep_rides) {
         );
     }
     const bool batch_waits = carrier.pending(SERVER_PEER, false) > 0;
-    if (clock_exchange.ping_boards(p_now_ms, !p_upkeep_rides || batch_waits)) {
+    const bool ping_leaves = !p_upkeep_rides || batch_waits;
+    if (world.clock.exchange.ping_boards(p_now_ms, ping_leaves)) {
         clock_board_ping();
     }
 }
@@ -5309,8 +5187,10 @@ void NetwMultiplayer::clock_board_ping() {
     send_to(
         SERVER_PEER,
         0,
-        clock_channels.ping,
-        session::frame_write(clock_exchange.take_ping(clock_wall_usec())),
+        wire::CHANNEL_CLOCK_PING,
+        session::frame_write(
+            world.clock.exchange.take_ping(clock_wall_usec())
+        ),
         false,
         0,
         String(),
@@ -5336,7 +5216,7 @@ void NetwMultiplayer::clock_receive_handshake(
     send_to(
         p_sender,
         0,
-        clock_channels.handshake_reply,
+        wire::CHANNEL_CLOCK_HANDSHAKE_REPLY,
         clock_rate_frame(clock_engine().get_tickrate()),
         true,
         0,
@@ -5361,17 +5241,21 @@ void NetwMultiplayer::clock_receive_handshake_reply(
         return;
     }
     const int server_tickrate = int(answered.tickrate);
-    if (server_tickrate != clock_engine().get_tickrate()) {
-        if (clock_mismatch_action == MISMATCH_ACTION_DISCONNECT) {
+    switch (clock_engine().tickrate_verdict(server_tickrate)) {
+        case Clock::RATE_AGREES:
+            break;
+        case Clock::RATE_DISCONNECTS:
             if (effective_peer.is_valid()) {
                 effective_peer->close();
             }
-        } else if (clock_mismatch_action == MISMATCH_ACTION_SIGNAL) {
+            break;
+        case Clock::RATE_SIGNALS: {
             Announcement row;
             row.kind = AnnouncementKind::TICKRATE_MISMATCH;
             row.server_tickrate = server_tickrate;
             announce(row);
-        } else {
+        } break;
+        case Clock::RATE_WARNS:
             fault::raise(
                 this,
                 NETW_FAULT_PEER_MISMATCH,
@@ -5380,7 +5264,7 @@ void NetwMultiplayer::clock_receive_handshake_reply(
                  String("NetwClockConfig.tickrate"),
                  SERVER_PEER}
             );
-        }
+            break;
     }
     clock_owe_ping(true);
 }
@@ -5393,7 +5277,7 @@ void NetwMultiplayer::clock_receive_ping(
     if (!is_host() || !session::frame_read(p_payload, ping)) {
         return;
     }
-    clock_exchange.hear_ping(p_sender, ping, clock_wall_usec());
+    world.clock.exchange.hear_ping(p_sender, ping, clock_wall_usec());
 }
 
 void NetwMultiplayer::clock_receive_pong(
@@ -5404,20 +5288,7 @@ void NetwMultiplayer::clock_receive_pong(
     if (p_sender != SERVER_PEER || !session::frame_read(p_payload, pong)) {
         return;
     }
-    const uint32_t server_tick = uint32_t(pong.tick);
-    const double server_phase = double(pong.phase) / 255.0;
-    const double sample
-        = ClockExchange::round_trip_seconds(pong, clock_wall_usec());
-    clock_engine()
-        .handle_pong(sample, int(server_tick), server_phase, !is_host());
-}
-
-void NetwMultiplayer::set_display_role_resolver(const Callable &p_resolver) {
-    display_hooks.resolve_role = p_resolver;
-}
-
-void NetwMultiplayer::set_display_chase_clamp(const Callable &p_clamp) {
-    display_hooks.chase_clamp = p_clamp;
+    clock_ingest_pong(pong, clock_wall_usec(), !is_host());
 }
 
 void NetwMultiplayer::set_display_spec_override(
@@ -5435,20 +5306,11 @@ int NetwMultiplayer::display_spec_asks() const {
     return display_hooks.spec_asks;
 }
 
-void NetwMultiplayer::set_display_lane(const Callable &p_lane) {
-    display_hooks.display_lane = p_lane;
-}
-
-void NetwMultiplayer::set_display_sync_intervals(const Callable &p_compute) {
-    display_hooks.sync_intervals = p_compute;
-}
-
-void NetwMultiplayer::set_display_authors_streams(const Callable &p_authors) {
-    display_hooks.authors_streams = p_authors;
-}
-
 int NetwMultiplayer::declared_quantum() const {
-    return MAX(1, int(Math::round(clock_engine().physics_factor())));
+    return MAX(
+        1,
+        int(Math::round(clock_engine().physics_factor(clock_reading())))
+    );
 }
 
 NetwMultiplayer::SessionState NetwMultiplayer::
@@ -5538,11 +5400,12 @@ void NetwMultiplayer::halt_release() {
 
 int64_t NetwMultiplayer::structure_ops_outstanding() const {
     int64_t outstanding = 0;
-    entity_slots.each([&outstanding](uint64_t, const EntitySlot &p_slot) {
-        if (p_slot.owner.is_null()) {
+    world.entities.each([&outstanding](uint64_t, const EntityRow &p_slot) {
+        if (p_slot.node == 0) {
             return;
         }
-        Node *owner = Object::cast_to<Node>(gd::object_of(p_slot.owner));
+        Node *owner
+            = Object::cast_to<Node>(gd::object_of(ObjectID(p_slot.node)));
         const Ref<NetwEntity> entity = NetwEntity::of(owner);
         if (entity.is_valid()) {
             outstanding += int64_t(entity->structure_ops_outstanding());
@@ -5552,8 +5415,7 @@ int64_t NetwMultiplayer::structure_ops_outstanding() const {
 }
 
 int64_t NetwMultiplayer::route_floor() const {
-    const Ref<NetwLivenessCore> liveness = get_liveness_core();
-    return liveness.is_valid() ? int64_t(liveness->route_floor()) : 0;
+    return int64_t(liveness_core.route_floor());
 }
 
 bool NetwMultiplayer::has_server_role() const {
@@ -5565,33 +5427,6 @@ bool NetwMultiplayer::session_is_local_client() const {
     return current == ROLE_CLIENT || current == ROLE_LISTEN_SERVER;
 }
 
-int64_t NetwMultiplayer::get_sent_packets() const {
-    return sent_packets;
-}
-
-int64_t NetwMultiplayer::get_sent_bytes() const {
-    return sent_bytes;
-}
-
-int64_t NetwMultiplayer::get_received_packets() const {
-    return received_packets;
-}
-
-int64_t NetwMultiplayer::get_received_bytes() const {
-    return received_bytes;
-}
-
-int64_t NetwMultiplayer::get_state_acks_out() const {
-    return state_acks_out;
-}
-
-int64_t NetwMultiplayer::get_state_acks_in() const {
-    return state_acks_in;
-}
-
-int64_t NetwMultiplayer::get_standalone_acks_out() const {
-    return standalone_acks_out;
-}
 
 void NetwMultiplayer::auth_relay_authenticating(int64_t p_peer) {
     if (p_peer == SERVER_PEER) {
@@ -5630,7 +5465,7 @@ void NetwMultiplayer::clock_apply_config(const Ref<NetwClockConfig> &p_config) {
     if (p_config.is_null()) {
         return;
     }
-    ClockEngine &clock = clock_engine();
+    Clock &clock = clock_engine();
     clock.set_tickrate(int(p_config->get_tickrate()));
     const int64_t ticks = p_config->get_tickrate();
     const int64_t sends = p_config->get_send_rate();
@@ -5677,7 +5512,7 @@ void NetwMultiplayer::clock_apply_config(const Ref<NetwClockConfig> &p_config) {
     clock.set_use_physics_interpolation(
         p_config->get_use_physics_interpolation()
     );
-    clock.set_sync_mode(ClockEngine::SyncMode(p_config->get_sync_mode()));
+    clock.set_sync_mode(Clock::SyncMode(p_config->get_sync_mode()));
     clock.set_panic_snap_threshold(int(p_config->get_panic_snap_threshold()));
     clock.set_stretch_nudge_factor(p_config->get_stretch_nudge_factor());
     clock.set_display_offset(int(p_config->get_display_offset()));
@@ -5800,26 +5635,27 @@ int64_t NetwMultiplayer::linger_pumps(double p_seconds) const {
     const double rate = clock_engine().get_configured()
         ? double(clock_engine().get_tickrate())
         : POLL_PUMP_RATE;
-    return ClockEngine::pumps_for(p_seconds, rate);
+    return Clock::pumps_for(p_seconds, rate);
 }
 
 bool NetwMultiplayer::action_gate_arm(
     int64_t p_route,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_display_tick
 ) {
-    if (p_entity.is_null()) {
+    const Ref<NetwEntity> entity = entity_get_view(p_entity);
+    if (entity.is_null()) {
         return false;
     }
-    const int64_t requester = p_entity->get_action_requester();
+    const int64_t requester = entity->get_action_requester();
     if (requester != 0 && has_multiplayer_peer()
         && requester == get_unique_id()) {
         return false;
     }
     return action_gates.arm(
         p_route,
-        p_entity->get_owner(),
-        p_entity->get_action_spawn_tick(),
+        entity->get_owner(),
+        entity->get_action_spawn_tick(),
         p_display_tick
     );
 }
@@ -6247,7 +6083,11 @@ void NetwMultiplayer::session_submit_request(const JoinRequest &p_request) {
     }
     const int64_t proven = is_host() ? mine : int64_t(SERVER_PEER);
     if (session_has_proof(proven)) {
-        sending.proof_bytes = gd::var_to_bytes(link_handshakes[proven].proofs);
+        sending.proof_bytes = call_args::value_bytes(
+            link_handshakes[proven].proofs,
+            String("The admission proof"),
+            this
+        );
         if (sending.proof_bytes.size() > 16383) {
             session_fail_own_join(
                 proven,
@@ -6274,7 +6114,7 @@ void NetwMultiplayer::session_submit_request(const JoinRequest &p_request) {
     send_to(
         SERVER_PEER,
         0,
-        session_join_channel,
+        wire::CHANNEL_SESSION_JOIN,
         sending.serialize(),
         true,
         0,
@@ -6363,7 +6203,9 @@ Ref<NetwPromise> NetwMultiplayer::session_close_peer() {
         if (waits) {
             session_send_leave(session_leave_returning);
         }
-        session_transition(SESSION_STATE_DISCONNECTING);
+        if (session_get_stored_state() == SESSION_STATE_ONLINE) {
+            session_transition(SESSION_STATE_DISCONNECTING);
+        }
         return session_close_client(waits);
     }
     const bool shuts_down = inner.is_valid() && effective_peer.is_valid()
@@ -6484,7 +6326,7 @@ void NetwMultiplayer::session_send_leave(bool p_returning) {
     send_to(
         SERVER_PEER,
         0,
-        control_channels.leave,
+        wire::CHANNEL_SESSION_LEAVE,
         session::frame_write(leaving),
         true,
         0,
@@ -6719,14 +6561,6 @@ int64_t NetwMultiplayer::rpc_get_relay_sender() const {
     return dispatching_sender;
 }
 
-int64_t NetwMultiplayer::peer_ack(int64_t p_peer) const {
-    return seq_book.peer_ack(p_peer);
-}
-
-void NetwMultiplayer::clear_seq_books() {
-    seq_book.clear();
-}
-
 bool NetwMultiplayer::connect_once(
     Signal p_signal,
     const Callable &p_callback,
@@ -6757,15 +6591,15 @@ bool NetwMultiplayer::disconnect_once(
 void NetwMultiplayer::clear_flat_family_state() {
     layer_forget_all();
     scene_clear_pending_facets();
-    store_world.arrays.clear_session();
+    array_tables.clear_session();
     display_clear_declarations();
 }
 
 void NetwMultiplayer::clear_session_state() {
     turned_away_peers.clear();
     display_last_timing.reset();
-    clear_seq_books();
-    clock_exchange.clear();
+    world.wire.seq_book.clear();
+    world.clock.exchange.clear();
     ReplicationCore *plane = (get_replication_plane());
     if (plane != nullptr) {
         plane->clear_session();
@@ -6775,7 +6609,7 @@ void NetwMultiplayer::clear_session_state() {
     clear_flat_family_state();
 }
 
-SchemaCore *NetwMultiplayer::get_schema_core() {
+SchemaBook *NetwMultiplayer::get_schema_core() {
     return &schema_core;
 }
 
@@ -6784,12 +6618,13 @@ void NetwMultiplayer::clear_roster() {
     player_clear();
 }
 
-int64_t NetwMultiplayer::register_rewind(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
+int64_t NetwMultiplayer::register_rewind(const RID &p_entity) {
+    const Ref<NetwEntity> wrapper = slot_pinned_entity(p_entity);
+    if (wrapper.is_null()) {
         return -1;
     }
     const int64_t slot
-        = lagcomp_core.timeline_register(p_entity, LagBook::DEFAULT_WINDOW);
+        = lagcomp_core.timeline_register(wrapper, LagBook::DEFAULT_WINDOW);
     store_bind_entity(p_entity);
     return slot;
 }
@@ -6844,8 +6679,8 @@ void NetwMultiplayer::peer_forget(int64_t p_peer) {
         player_publish_left(player_id, reason);
     }
     player_forget(player_id);
-    attribution.forget_peer(p_peer);
-    traffic.forget_peer(p_peer);
+    world.wire.attribution.forget_peer(p_peer);
+    world.wire.traffic.forget_peer(p_peer);
 }
 
 int64_t NetwMultiplayer::peer_get_player(int64_t p_peer) const {
@@ -6943,13 +6778,13 @@ void NetwMultiplayer::spawn_async_returned(
     uint64_t p_plane,
     int64_t p_serial
 ) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(
+    NetwMultiplayer *session = Object::cast_to<NetwMultiplayer>(
         gd::instance_from_id(ObjectID(p_plane))
     );
     spawn::Pipeline *pipeline
-        = plane != nullptr ? plane->spawn_plane() : nullptr;
+        = session != nullptr ? session->spawn_plane() : nullptr;
     if (pipeline == nullptr
-        || !pipeline->spawn_async_returned(p_value, p_serial)) {
+        || !session->spawn_pending_returned(p_value, p_serial)) {
         free_returned(p_value, Variant());
     }
 }
@@ -6961,12 +6796,11 @@ void NetwMultiplayer::spawn_async_failed(
     uint64_t p_plane,
     int64_t p_serial
 ) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(
+    NetwMultiplayer *session = Object::cast_to<NetwMultiplayer>(
         gd::instance_from_id(ObjectID(p_plane))
     );
-    if (spawn::Pipeline *pipeline
-        = plane != nullptr ? plane->spawn_plane() : nullptr) {
-        pipeline->spawn_async_failed(p_code, p_detail, p_serial);
+    if (session != nullptr && session->spawn_plane() != nullptr) {
+        session->spawn_pending_failed(p_code, p_detail, p_serial);
     }
 }
 
@@ -6977,13 +6811,19 @@ void NetwMultiplayer::spawn_build_returned(
     int64_t p_route,
     int64_t p_serial
 ) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(
+    NetwMultiplayer *session = Object::cast_to<NetwMultiplayer>(
         gd::instance_from_id(ObjectID(p_plane))
     );
     spawn::Pipeline *pipeline
-        = plane != nullptr ? plane->spawn_plane() : nullptr;
-    if (pipeline == nullptr
-        || !pipeline->build_returned(p_value, p_route, p_serial)) {
+        = session != nullptr ? session->spawn_plane() : nullptr;
+    if (pipeline == nullptr) {
+        free_returned(p_value, Variant());
+        return;
+    }
+    spawn::Ops ops;
+    const bool held = pipeline->build_returned(p_value, p_route, p_serial, ops);
+    session->spawn_act(ops);
+    if (!held) {
         free_returned(p_value, Variant());
     }
 }
@@ -6996,12 +6836,14 @@ void NetwMultiplayer::spawn_build_failed(
     int64_t p_route,
     int64_t p_serial
 ) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(
+    NetwMultiplayer *session = Object::cast_to<NetwMultiplayer>(
         gd::instance_from_id(ObjectID(p_plane))
     );
     if (spawn::Pipeline *pipeline
-        = plane != nullptr ? plane->spawn_plane() : nullptr) {
-        pipeline->build_failed(p_detail, p_route, p_serial);
+        = session != nullptr ? session->spawn_plane() : nullptr) {
+        spawn::Ops ops;
+        pipeline->build_failed(p_detail, p_route, p_serial, ops);
+        session->spawn_act(ops);
     }
 }
 

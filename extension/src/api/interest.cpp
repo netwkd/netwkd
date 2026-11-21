@@ -23,8 +23,11 @@ void NetwInterest::bind(NetwEntity *p_entity) {
     if (!root->is_inside_tree()) {
         return;
     }
-    if (NetwMultiplayer *session = core()) {
-        session->interest_activate(entity());
+    NetwMultiplayer *session = core();
+    NetwEntityRecord *held
+        = session != nullptr ? p_entity->record_in(session) : nullptr;
+    if (held != nullptr) {
+        session->interest_activate(p_entity->get_rid_handle(), *held);
     }
 }
 
@@ -47,7 +50,7 @@ NetwMultiplayer *NetwInterest::attached_core() const {
     if (session == nullptr || bound.is_null()) {
         return nullptr;
     }
-    session->liveness_adopt(bound.ptr());
+    bound->adopt_in(session);
     return session->entity_get_view(bound->get_rid_handle()).is_valid()
         ? session
         : nullptr;
@@ -56,7 +59,7 @@ NetwMultiplayer *NetwInterest::attached_core() const {
 interest::Facet *NetwInterest::facet() const {
     const Ref<NetwEntity> bound = entity();
     NetwEntityRecord *const record
-        = NetwMultiplayer::record_of_wrapper(bound.ptr());
+        = bound.is_valid() ? bound->get_record() : nullptr;
     return record != nullptr ? &record->get_interest_facet() : nullptr;
 }
 

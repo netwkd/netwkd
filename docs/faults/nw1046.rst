@@ -1,0 +1,19 @@
+:github_url: hide
+
+.. _fault_nw1046:
+
+NW1046. A peer sent a value that could not be read
+==================================================
+
+Checked in every build, on the peer that receives the spawn. Reported once
+for each peer and each value.
+
+A spawn carries the custom data passed to
+:ref:`MultiplayerSpawner.spawn <class_MultiplayerSpawner_method_spawn>` and
+the starting value of each property a
+:ref:`MultiplayerSynchronizer <class_MultiplayerSynchronizer>` sends on
+spawn. When one of these values cannot be read, the node still spawns and
+that value is null. This happens when two peers run different netwkd
+versions, or when the packet was changed on the way.
+
+Run the same netwkd version on every peer.

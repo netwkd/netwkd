@@ -18,25 +18,43 @@
 #include "netw/repl/property_set.hpp"
 #include "netw/repl/sync_model.hpp"
 #include "netw/replication_send.hpp"
-#include "netw/store/world.hpp"
+#include "netw/store/store.hpp"
 #include "netw/sync_progress.hpp"
 
 namespace netw::session {
-struct Books;
+struct IdleWork;
 } // namespace netw::session
+
+namespace netw::wire {
+class NetworkProfiler;
+} // namespace netw::wire
 
 namespace netw {
 
+class Clock;
+class NetwLivenessCore;
 class NetwMultiplayer;
+class NetwPredictionEngine;
 
 class SyncPipeline {
     friend class NetwMultiplayer;
 
 private:
-    godot::ObjectID core_id;
-    const session::Books *books = nullptr;
+    NetwMultiplayer *session = nullptr;
+    Clock *clock_engine = nullptr;
+    store::Store *store_world = nullptr;
+    NetwLivenessCore *liveness_core = nullptr;
+    repl::BindingBook *binding_rows = nullptr;
+    repl::SetBook *set_book = nullptr;
+    NetwPredictionEngine *prediction_engine = nullptr;
+#if defined(DEBUG_ENABLED)
+    wire::NetworkProfiler *network_profiler = nullptr;
+    uint32_t *profiler_outgoing = nullptr;
+#endif
+#if defined(NETW_TESTS)
+    session::IdleWork *idle_work = nullptr;
+#endif
     bool hears_entity_live = false;
-    godot::ObjectID api_id;
     NetwSyncModel *sync_model = nullptr;
     ReplicationSend row_sender;
     bool row_sender_armed = false;
@@ -74,18 +92,16 @@ private:
     void store_admit(const repl::PropertyBindingPtr &p_binding);
     void store_place(const repl::PropertyBindingPtr &p_binding);
     godot::LocalVector<repl::PropertyBindingPtr> bindings_of_entity(
-        const godot::Ref<NetwEntity> &p_entity
+        const godot::RID &p_entity
     ) const;
     bool binding_belongs_to(
         const repl::PropertyBindingPtr &p_binding,
-        const godot::Ref<NetwEntity> &p_entity
+        const godot::RID &p_entity
     ) const;
     godot::LocalVector<repl::PropertyBindingPtr> entity_bindings_checked(
-        const godot::Ref<NetwEntity> &p_entity
+        const godot::RID &p_entity
     ) const;
     godot::HashMap<int64_t, int64_t> contract_hashes;
-
-    godot::Callable tap_seam;
 
     int64_t channel_row = 0;
     int64_t channel_row_window = 0;
@@ -139,9 +155,6 @@ private:
     void hold_resources(godot::Node *p_node);
     void release_resources(const godot::Node *p_node);
 
-    NetwMultiplayer *core() const;
-    godot::Object *api() const;
-
 #if defined(NETW_TESTS)
 public:
     ReplicationSend *row_send_under_test() {
@@ -166,11 +179,8 @@ private:
     void prune_derived();
     void prune_node(uint64_t p_key);
     void watch_tree();
-    void recapture_entity(const godot::Ref<NetwEntity> &p_entity);
-    void on_entity_live(
-        int64_t p_route,
-        const godot::Ref<NetwEntity> &p_entity
-    );
+    void recapture_entity(const godot::RID &p_entity);
+    void on_entity_live(int64_t p_route, const godot::RID &p_entity);
     void on_route_retired(int64_t p_route);
     void settle_entity_column(int64_t p_route, bool p_live);
 
@@ -187,7 +197,7 @@ private:
     void register_state_timeline(godot::Node *p_node);
     void reconcile_state_timeline(godot::Node *p_node);
     void reconcile_dropped_state_timelines();
-    bool holds_state_binding(const godot::Ref<NetwEntity> &p_entity) const;
+    bool holds_state_binding(const godot::RID &p_entity) const;
 
     godot::Dictionary resolve_send(
         godot::Node *p_node,
@@ -200,7 +210,7 @@ private:
         bool p_reliable
     );
     void apply_row(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         int64_t p_ordinal,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender,
@@ -228,8 +238,25 @@ public:
 
     void note_node_removed(godot::Node *p_node);
     ReplicationSend *row_send();
-    void set_core(godot::Object *p_core, const session::Books *p_books);
-    void set_api(godot::Object *p_api);
+    void seat(
+        NetwMultiplayer *p_session,
+        Clock *p_clock,
+        store::Store *p_store,
+        NetwLivenessCore *p_liveness,
+        repl::BindingBook *p_bindings,
+        repl::SetBook *p_sets,
+        NetwPredictionEngine *p_prediction
+    );
+#if defined(DEBUG_ENABLED)
+    void seat_profiler(
+        wire::NetworkProfiler *p_profiler,
+        uint32_t *p_outgoing
+    );
+#endif
+#if defined(NETW_TESTS)
+    void seat_idle(session::IdleWork *p_idle);
+#endif
+    void unseat();
     void set_sync_model(NetwSyncModel *p_model);
     void set_channels(
         int64_t p_row,
@@ -239,7 +266,6 @@ public:
         int64_t p_property,
         int64_t p_signal
     );
-    void set_tap_seam(const godot::Callable &p_tap);
 
     void register_derived(godot::Node *p_node);
     godot::Error register_property_set(godot::Node *p_node, uint64_t p_set);
@@ -306,21 +332,21 @@ public:
     );
 
     void handle_derived_row(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         int64_t p_ordinal,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender,
         int64_t p_channel
     );
     void handle_window_row(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         int64_t p_ordinal,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender,
         int64_t p_channel
     );
     void handle_retained_row(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         int64_t p_ordinal,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender,
@@ -328,25 +354,25 @@ public:
     );
 
     godot::Variant encode_prop_val(
-        const godot::Ref<NetwEntity> &p_entity,
+        const NetwEntityRecord *p_record,
         godot::Node *p_node,
         const godot::StringName &p_property
     );
     godot::Variant encode_signal_val(
-        const godot::Ref<NetwEntity> &p_entity,
+        const NetwEntityRecord *p_record,
         godot::Node *p_node,
         const godot::StringName &p_signal
     );
 
     void handle_property_sync(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         godot::Node *p_comp_node,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender,
         int64_t p_comp
     );
     void handle_signal(
-        const godot::Ref<NetwEntity> &p_entity,
+        const godot::RID &p_entity,
         godot::Node *p_comp_node,
         const godot::PackedByteArray &p_payload,
         int64_t p_sender

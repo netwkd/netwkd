@@ -260,6 +260,115 @@ TEST_CASE(
     CHECK(seen.faults.size() == 2);
 }
 
+constexpr const char *COMPASS = R"(
+class Dial extends Node3D:
+	var heading := 0.0
+
+	func _init() -> void:
+		Netw.configure_entity(self)
+		Netw.configure_property(self, &"heading").state() \
+				.quantize(NetwQuantizeAngle.new().bits(8).centered())
+)";
+
+constexpr double HALF_STEP = Math_PI / 256.0;
+
+LawVerdict near_heading(
+    const Seen &p_seen,
+    int p_peer,
+    const char *p_name,
+    double p_heading
+) {
+    const Sight *held = p_seen.sight(p_peer, p_name, p_seen.ticks);
+    if (held == nullptr) {
+        return law_broken("%s holds no '%s'", who(p_peer).c_str(), p_name);
+    }
+    const double heading = held->facts.get("heading", Variant());
+    if (Math::abs(heading - p_heading) > HALF_STEP) {
+        return law_broken(
+            "%s reads '%s' heading %f, more than %f from %f",
+            who(p_peer).c_str(),
+            p_name,
+            heading,
+            HALF_STEP,
+            p_heading
+        );
+    }
+    return law_held();
+}
+
+TEST_CASE(
+    "[Netw][Compliance] S10 an angle property arrives within its "
+    "declared precision"
+) {
+    const Seen seen = World(COMPASS, 2)
+                          .watch("Bow", "heading")
+                          .watch("Stern", "heading")
+                          .at(1, spawn("Dial", "Bow"))
+                          .at(1, spawn("Dial", "Stern"))
+                          .at(4, set("Bow", "heading", 1.0))
+                          .at(4, set("Stern", "heading", -2.9))
+                          .run(16);
+    for (const int client : {0, 1}) {
+        NETW_HOLDS(near_heading(seen, client, "Bow", 1.0));
+        NETW_HOLDS(near_heading(seen, client, "Stern", -2.9));
+    }
+    NETW_HOLDS(quiet(seen));
+}
+
+constexpr const char *CRANE = R"(
+class Hook extends Node3D:
+	var targets: Array[Node] = []
+	var sides: Array[Side] = []
+	var label := ""
+
+	func _init() -> void:
+		Netw.configure_entity(self)
+		Netw.configure_property(self, &"position").state()
+		Netw.configure_property(self, &"targets").state()
+		Netw.configure_property(self, &"sides").state()
+		Netw.configure_property(self, &"label").state()
+
+	func mark() -> void:
+		label = char(0xFEFF) + "hook"
+		sides = [SIDE_LEFT, SIDE_RIGHT]
+)";
+
+TEST_CASE(
+    "[Netw][Compliance] S11 a property typed so the wire cannot carry it "
+    "is refused where it is declared, a value the wire cannot carry is sent "
+    "as null with one fault, and the rest of its row still arrives"
+) {
+    const Seen seen = World(CRANE, 2)
+                          .watch("Hook", "position")
+                          .watch("Hook", "label")
+                          .watch("Hook", "sides")
+                          .at(1, spawn("Hook", "Hook"))
+                          .at(4, set("Hook", "position", Vector3(3, 1, 2)))
+                          .at(4, call("Hook", "mark"))
+                          .run(16);
+    for (const int client : {0, 1}) {
+        NETW_HOLDS(reads(seen, client, "Hook", "position", Vector3(3, 1, 2)));
+        NETW_HOLDS(reads(seen, client, "Hook", "label", String()));
+        NETW_HOLDS(reads(
+            seen,
+            client,
+            "Hook",
+            "sides",
+            Array::make(SIDE_LEFT, SIDE_RIGHT)
+        ));
+    }
+    int raised = 0;
+    int refused = 0;
+    for (const String &fault : seen.faults) {
+        raised += fault.contains("[NW1019]");
+        refused += fault.contains("'targets'") && fault.contains("[NW1020]");
+    }
+    CHECK(raised >= 1);
+    CHECK(raised <= 2);
+    CHECK(refused >= 1);
+    CHECK(seen.faults.size() == raised + refused);
+}
+
 } // namespace ComplianceSpawning
 
 #endif

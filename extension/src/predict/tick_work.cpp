@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/predict/tick_work.hpp"
 
 #if defined(NETW_TESTS)

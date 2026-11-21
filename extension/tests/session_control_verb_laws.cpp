@@ -26,12 +26,7 @@ Ref<NetwMultiplayer> authority() {
 }
 
 int64_t kick_request_channel() {
-    const netw::wire::WireRegistry registry
-        = netw::wire::WireRegistry::create_default();
-    const netw::wire::ChannelDecl *decl
-        = registry.find_channel_by_name(StringName("SESSION_KICK_REQUEST"));
-    REQUIRE(decl != nullptr);
-    return int64_t(decl->id);
+    return int64_t(netw::wire::CHANNEL_SESSION_KICK_REQUEST);
 }
 
 TEST_CASE(

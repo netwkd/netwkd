@@ -270,7 +270,7 @@ public:
     godot::Ref<LocalMultiplayerPeer> create_client_peer();
     godot::Ref<LocalMultiplayerPeer> get_server_peer();
     godot::Ref<LocalMultiplayerPeer> get_client_peer();
-    godot::Array get_client_peers() const;
+    godot::TypedArray<LocalMultiplayerPeer> get_client_peers() const;
 
     void set_server_app_id(const godot::StringName &p_app_id);
     godot::StringName get_server_app_id() const;

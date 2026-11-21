@@ -12,7 +12,9 @@ freed the session, a read only schema, a scene's own interest layer, a config
 passed to ``object_configuration_add``, a directory with no friends list, a
 transport that moves the server under link conditions, an interpolator
 on a value inside a resource, such as ``stats:health``, and a property
-that holds an Object declared with ``Netw.configure_property``.
+declared with ``Netw.configure_property`` whose type cannot be sent. That
+type is an ``Object``, an ``RID``, a ``Callable``, a ``Signal``, or an
+``Array`` or ``Dictionary`` typed to a class.
 
 The call was ignored. The log line names the call and the case.
 

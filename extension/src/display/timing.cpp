@@ -1,15 +1,21 @@
+#include "netw/sealed.hpp"
+
 #include "netw/display/timing.hpp"
 
 namespace netw::display {
 
-Timing capture_timing(const ClockEngine *p_clock, double p_frame_delta) {
+Timing capture_timing(
+    const Clock *p_clock,
+    const Clock::Reading &p_now,
+    double p_frame_delta
+) {
     Timing timing;
     if (p_clock == nullptr) {
         return timing;
     }
     timing.tick = p_clock->get_tick();
     timing.display_tick = p_clock->display_tick();
-    timing.tick_factor = p_clock->tick_factor();
+    timing.tick_factor = p_clock->tick_factor(p_now);
     timing.ticktime = p_clock->ticktime();
     timing.display_offset = p_clock->get_display_offset();
     timing.recommended_display_offset = p_clock->recommended_display_offset();

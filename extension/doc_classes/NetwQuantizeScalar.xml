@@ -4,7 +4,7 @@
 		[NetwQuantize] for a number, or each axis of a [Vector2] or [Vector3], within a range.
 	</brief_description>
 	<description>
-		Values between [member min_limit] and [member max_limit] are rounded to [member resolution_step]. Set the precision with [method bits] or with [method step].
+		Values between [member min_limit] and [member max_limit] are rounded to [member resolution_step]. Set the precision with [method bits] or with [method step]. A property reads these settings when it is declared, so set them before.
 		[codeblock]
 		var q := NetwQuantizeScalar.new().limits(-2048.0, 2048.0).bits(19)
 		# the same

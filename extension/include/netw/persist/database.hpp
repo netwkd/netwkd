@@ -13,7 +13,7 @@
 #include "netw/table/schema_record.hpp"
 
 namespace netw {
-class SchemaCore;
+class SchemaBook;
 } // namespace netw
 
 namespace netw::persist {
@@ -75,7 +75,7 @@ class Databases {
 
     mutable godot::RID_PtrOwner<Instance> instances;
     godot::HashMap<godot::StringName, godot::RID> by_name;
-    SchemaCore *schemas = nullptr;
+    SchemaBook *schemas = nullptr;
     godot::Callable on_settled;
     godot::Callable on_connected;
     int queue_limit = 4096;
@@ -116,7 +116,7 @@ public:
     ~Databases();
 
     void bind(
-        SchemaCore *p_schemas,
+        SchemaBook *p_schemas,
         const godot::Callable &p_settled,
         const godot::Callable &p_connected
     );

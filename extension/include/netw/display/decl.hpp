@@ -56,6 +56,21 @@ enum TimelineMode {
     TIMELINE_MODE_MAX = 2,
 };
 
+enum TrackStat {
+    TRACK_SLEEPING = 0,
+    TRACK_OFFSET_ARMED = 1,
+    TRACK_OFFSET_HELD = 2,
+    TRACK_NEWEST_TICK = 3,
+    TRACK_BUFFER_SIZE = 4,
+    TRACK_CHANNELS = 5,
+    TRACK_AMBIGUOUS = 6,
+    TRACK_PUMPED_FRAMES = 7,
+    TRACK_PUMP_MODE = 8,
+    TRACK_STARVATION_TICKS = 9,
+    TRACK_DISPLAY_LAG = 10,
+    TRACK_ROLE = 11,
+};
+
 struct Decl {
     godot::NodePath visual_root;
     int32_t display_role = ROLE_AUTO;
@@ -72,8 +87,6 @@ struct Decl {
     double max_arrival_lag = 24.0;
     bool enable_smart_dilation = true;
 
-    godot::Error set_param(int param, const godot::Variant &value);
-    godot::Variant get_param(int param) const;
     int pump_for(int role) const;
 };
 

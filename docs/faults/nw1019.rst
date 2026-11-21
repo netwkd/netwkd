@@ -5,24 +5,50 @@
 NW1019. A value cannot be sent
 ==============================
 
-Reported as an error when a property or column holds a value that cannot be
-sent, such as an ``Object`` or a value of the wrong type.
+Reported as an error when a property, a column, an RPC argument, an action
+argument, a join argument or a spawn value holds a value that cannot be
+sent. Null or nothing was sent in its place, and the log line names the
+value, what it holds and what to use.
 
-Null or nothing was sent in its place. The log line names the property, the
-value and what to use.
+A value may hold null, bool, int, float, text, every vector, rect, plane,
+basis, transform and color type, Array, Dictionary and every packed array.
+An RPC argument may also be a node with a ``NetwEntity`` that is spawned on
+the network, which is sent as its address. A null ``Object`` or a freed node
+is sent as null with no error. Each of these is reported and sent as null.
+
+- an ``Object``, or a node that is not spawned on the network
+- a node with no entity, as an RPC argument
+- an ``RID``, a ``Callable`` or a ``Signal``
+- text holding a NUL, opening with a byte order mark or holding a character
+  UTF-8 cannot hold
+- an ``Array`` or ``Dictionary`` typed to a class, even an empty one
+- an ``Array`` or ``Dictionary`` holding any of the above, which sends the
+  whole container as null
+- nesting deeper than 16 levels, or more than 65,536 elements in one value
+- a value of the wrong type for its column
+
+A value whose bytes pass 65,535 is not sent at all, and is reported as
+NW0032 instead. A property whose declared type cannot be sent is refused
+when it is declared, and is reported as NW1020.
 
 .. code-block:: gdscript
 
-    var target: Node
+    var targets: Array = []
 
     func _init() -> void:
-        Netw.configure_property(self, &"target").broadcast()
+        Netw.configure_property(self, &"targets").broadcast()
+
+    func aim_at(target: Node) -> void:
+        targets.append(target)
 
 Send the object's data or its node path, or the type the schema declares.
 
 .. code-block:: gdscript
 
-    var target_path: NodePath
+    var target_paths: Array[NodePath] = []
 
     func _init() -> void:
-        Netw.configure_property(self, &"target_path").broadcast()
+        Netw.configure_property(self, &"target_paths").broadcast()
+
+    func aim_at(target: Node) -> void:
+        target_paths.append(target.get_path())

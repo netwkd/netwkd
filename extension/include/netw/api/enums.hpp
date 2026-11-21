@@ -4,7 +4,7 @@
 #include "netw/api/member_config.hpp"
 #include "netw/api/schema_core.hpp"
 #include "netw/api/session_stats.hpp"
-#include "netw/clock_engine.hpp"
+#include "netw/clock.hpp"
 #include "netw/connect/creation.hpp"
 #include "netw/display/decl.hpp"
 #include "netw/interest/engine.hpp"
@@ -44,20 +44,22 @@ struct NetwMultiplayer {
     };
 
     enum ClockParam {
-        CLOCK_PARAM_TICKRATE = 0,
-        CLOCK_PARAM_SYNC_MODE = 1,
-        CLOCK_PARAM_MAX_TICKS_PER_FRAME = 3,
-        CLOCK_PARAM_STALL_THRESHOLD = 4,
-        CLOCK_PARAM_PANIC_SNAP_THRESHOLD = 5,
-        CLOCK_PARAM_STRETCH_NUDGE_FACTOR = 6,
-        CLOCK_PARAM_DISPLAY_OFFSET = 7,
-        CLOCK_PARAM_LEAD_TICKS = 8,
-        CLOCK_PARAM_JITTER_MULTIPLIER = 9,
-        CLOCK_PARAM_JITTER_WINDOW = 10,
-        CLOCK_PARAM_JITTER_STABILITY_THRESHOLD = 11,
-        CLOCK_PARAM_USE_PHYSICS_INTERPOLATION = 12,
-        CLOCK_PARAM_MANUAL_TICK = 14,
-        CLOCK_PARAM_TICK_FACTOR_OVERRIDE = 15,
+        CLOCK_PARAM_TICKRATE = Clock::PARAM_TICKRATE,
+        CLOCK_PARAM_SYNC_MODE = Clock::PARAM_SYNC_MODE,
+        CLOCK_PARAM_MAX_TICKS_PER_FRAME = Clock::PARAM_MAX_TICKS_PER_FRAME,
+        CLOCK_PARAM_STALL_THRESHOLD = Clock::PARAM_STALL_THRESHOLD,
+        CLOCK_PARAM_PANIC_SNAP_THRESHOLD = Clock::PARAM_PANIC_SNAP_THRESHOLD,
+        CLOCK_PARAM_STRETCH_NUDGE_FACTOR = Clock::PARAM_STRETCH_NUDGE_FACTOR,
+        CLOCK_PARAM_DISPLAY_OFFSET = Clock::PARAM_DISPLAY_OFFSET,
+        CLOCK_PARAM_LEAD_TICKS = Clock::PARAM_LEAD_TICKS,
+        CLOCK_PARAM_JITTER_MULTIPLIER = Clock::PARAM_JITTER_MULTIPLIER,
+        CLOCK_PARAM_JITTER_WINDOW = Clock::PARAM_JITTER_WINDOW,
+        CLOCK_PARAM_JITTER_STABILITY_THRESHOLD
+        = Clock::PARAM_JITTER_STABILITY_THRESHOLD,
+        CLOCK_PARAM_USE_PHYSICS_INTERPOLATION
+        = Clock::PARAM_USE_PHYSICS_INTERPOLATION,
+        CLOCK_PARAM_MANUAL_TICK = Clock::PARAM_MANUAL_TICK,
+        CLOCK_PARAM_TICK_FACTOR_OVERRIDE = Clock::PARAM_TICK_FACTOR_OVERRIDE,
     };
 
     enum LayerParam {
@@ -186,6 +188,64 @@ struct NetwMultiplayer {
 #undef NETW_SESSION_STAT_ENUM
             STAT_COUNT,
     };
+
+    enum TrackStat {
+        TRACK_STAT_SLEEPING = display::TRACK_SLEEPING,
+        TRACK_STAT_OFFSET_ARMED = display::TRACK_OFFSET_ARMED,
+        TRACK_STAT_OFFSET_HELD = display::TRACK_OFFSET_HELD,
+        TRACK_STAT_NEWEST_TICK = display::TRACK_NEWEST_TICK,
+        TRACK_STAT_BUFFER_SIZE = display::TRACK_BUFFER_SIZE,
+        TRACK_STAT_CHANNELS = display::TRACK_CHANNELS,
+        TRACK_STAT_AMBIGUOUS = display::TRACK_AMBIGUOUS,
+        TRACK_STAT_PUMPED_FRAMES = display::TRACK_PUMPED_FRAMES,
+        TRACK_STAT_PUMP_MODE = display::TRACK_PUMP_MODE,
+        TRACK_STAT_STARVATION_TICKS = display::TRACK_STARVATION_TICKS,
+        TRACK_STAT_DISPLAY_LAG = display::TRACK_DISPLAY_LAG,
+        TRACK_STAT_ROLE = display::TRACK_ROLE,
+    };
+
+    enum LinkStat {
+        LINK_STAT_RTT = 0,
+        LINK_STAT_JITTER = 1,
+        LINK_STAT_REORDERS = 2,
+        LINK_STAT_DUPLICATES = 3,
+        LINK_STAT_LOSS = 4,
+        LINK_STAT_MODE = 5,
+        LINK_STAT_BUDGET_BITS = 6,
+        LINK_STAT_BUDGET_BYTES = 7,
+        LINK_STAT_SENT_BYTES = 8,
+        LINK_STAT_DEBT_BYTES = 9,
+        LINK_STAT_DEFERRED_ROWS = 10,
+    };
+
+    enum LinkMode {
+        LINK_MODE_GOOD = 0,
+        LINK_MODE_BAD = 1,
+    };
+
+    enum Traffic {
+        TRAFFIC_SENT_STATE = 0,
+        TRAFFIC_SENT_INPUT = 1,
+        TRAFFIC_SENT_CALLS = 2,
+        TRAFFIC_SENT_SPAWNS = 3,
+        TRAFFIC_SENT_UPKEEP = 4,
+        TRAFFIC_SENT_HEADERS = 5,
+        TRAFFIC_RECEIVED_STATE = 6,
+        TRAFFIC_RECEIVED_INPUT = 7,
+        TRAFFIC_RECEIVED_CALLS = 8,
+        TRAFFIC_RECEIVED_SPAWNS = 9,
+        TRAFFIC_RECEIVED_UPKEEP = 10,
+        TRAFFIC_RECEIVED_HEADERS = 11,
+        TRAFFIC_SENT_PACKETS = 12,
+        TRAFFIC_RECEIVED_PACKETS = 13,
+    };
+
+    enum LayerStat {
+        LAYER_STAT_VIEWERS = 0,
+        LAYER_STAT_ENTITIES = 1,
+        LAYER_STAT_VISIBLE_EDGES = 2,
+        LAYER_STAT_TRANSITIONS_TOTAL = 3,
+    };
 };
 
 struct NetwSchema {
@@ -257,28 +317,28 @@ struct NetwSession {
 
 struct NetwClock {
     enum SyncMode {
-        SYNC_MODE_SNAP = ClockEngine::SYNC_SNAP,
-        SYNC_MODE_STRETCH = ClockEngine::SYNC_STRETCH,
+        SYNC_MODE_SNAP = Clock::SYNC_SNAP,
+        SYNC_MODE_STRETCH = Clock::SYNC_STRETCH,
     };
 
     enum MismatchAction {
-        MISMATCH_ACTION_WARN = 0,
-        MISMATCH_ACTION_DISCONNECT = 1,
-        MISMATCH_ACTION_SIGNAL = 2,
+        MISMATCH_ACTION_WARN = Clock::MISMATCH_WARN,
+        MISMATCH_ACTION_DISCONNECT = Clock::MISMATCH_DISCONNECT,
+        MISMATCH_ACTION_SIGNAL = Clock::MISMATCH_SIGNAL,
     };
 
     enum ClockMonitor {
-        CLOCK_MONITOR_RTT = 0,
-        CLOCK_MONITOR_RTT_AVG = 1,
-        CLOCK_MONITOR_RTT_JITTER = 2,
-        CLOCK_MONITOR_ONE_WAY_LATENCY = 3,
-        CLOCK_MONITOR_TICKTIME = 4,
-        CLOCK_MONITOR_TICK_ACCUMULATOR = 5,
-        CLOCK_MONITOR_PHYSICS_FRAMES = 6,
-        CLOCK_MONITOR_POLLS = 7,
-        CLOCK_MONITOR_WALL_SECONDS = 8,
-        CLOCK_MONITOR_PHYSICS_HZ = 9,
-        CLOCK_MONITOR_POLL_HZ = 10,
+        CLOCK_MONITOR_RTT = Clock::MONITOR_RTT,
+        CLOCK_MONITOR_RTT_AVG = Clock::MONITOR_RTT_AVG,
+        CLOCK_MONITOR_RTT_JITTER = Clock::MONITOR_RTT_JITTER,
+        CLOCK_MONITOR_ONE_WAY_LATENCY = Clock::MONITOR_ONE_WAY_LATENCY,
+        CLOCK_MONITOR_TICKTIME = Clock::MONITOR_TICKTIME,
+        CLOCK_MONITOR_TICK_ACCUMULATOR = Clock::MONITOR_TICK_ACCUMULATOR,
+        CLOCK_MONITOR_PHYSICS_FRAMES = Clock::MONITOR_PHYSICS_FRAMES,
+        CLOCK_MONITOR_POLLS = Clock::MONITOR_POLLS,
+        CLOCK_MONITOR_WALL_SECONDS = Clock::MONITOR_WALL_SECONDS,
+        CLOCK_MONITOR_PHYSICS_HZ = Clock::MONITOR_PHYSICS_HZ,
+        CLOCK_MONITOR_POLL_HZ = Clock::MONITOR_POLL_HZ,
     };
 };
 
@@ -424,3 +484,8 @@ VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::WritePolicy);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::ColumnParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::PropertySetParam);
 VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::Stat);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::TrackStat);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::LinkStat);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::LinkMode);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::Traffic);
+VARIANT_ENUM_CAST(netw::enums::NetwMultiplayer::LayerStat);

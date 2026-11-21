@@ -24,41 +24,15 @@ using repl::PropertySet;
 
 namespace {
 
-struct RowChannels {
-    uint8_t row = 0;
-    uint8_t delta = 0;
-    uint8_t window = 0;
-};
-
-const RowChannels &row_channels() {
-    static const RowChannels channels = []() {
-        const wire::WireRegistry registry
-            = wire::WireRegistry::create_default();
-        RowChannels made;
-        const wire::ChannelDecl *row
-            = registry.find_channel_by_name("SYNC_ROW");
-        const wire::ChannelDecl *delta
-            = registry.find_channel_by_name("SYNC_ROW_DELTA");
-        const wire::ChannelDecl *window
-            = registry.find_channel_by_name("SYNC_ROW_WINDOW");
-        made.row = row != nullptr ? uint8_t(row->id) : 0;
-        made.delta = delta != nullptr ? uint8_t(delta->id) : 0;
-        made.window = window != nullptr ? uint8_t(window->id) : 0;
-        return made;
-    }();
-    return channels;
-}
-
 void follow_set(store::Table &r_table, const PropertySet *p_set) {
-    const RowChannels &channels = row_channels();
     r_table.heartbeat = p_set->heartbeat;
     r_table.window = uint32_t(p_set->window > 0 ? p_set->window : 1);
     if (r_table.family == store::Family::RETAINED) {
-        r_table.channel = channels.delta;
+        r_table.channel = wire::CHANNEL_SYNC_ROW_DELTA;
     } else if (r_table.family == store::Family::WINDOW) {
-        r_table.channel = channels.window;
+        r_table.channel = wire::CHANNEL_SYNC_ROW_WINDOW;
     } else {
-        r_table.channel = channels.row;
+        r_table.channel = wire::CHANNEL_SYNC_ROW;
     }
 }
 
@@ -76,7 +50,7 @@ struct SourceImage {
 };
 
 SourceImage source_image(
-    const store::World &p_world,
+    const store::Store &p_world,
     const store::Table &p_table,
     uint32_t p_row
 ) {
@@ -143,10 +117,14 @@ void NetwMultiplayer::store_admit(const PropertyBindingPtr &p_binding) {
             continue;
         }
         const uint32_t table
-            = store_world.table_for(set_id, families[lane], *lanes[lane]);
-        store_world.table(table).resolve_ports(node);
-        follow_set(store_world.table(table), set);
-        store_world.add_row(
+            = store().table_for(set_id, families[lane], *lanes[lane]);
+        store::resolve_ports(
+            store().table(table),
+            store_pull.residents.rows(table),
+            node
+        );
+        follow_set(store().table(table), set);
+        store_pull.add_row(
             table,
             owner,
             lane,
@@ -166,34 +144,39 @@ void NetwMultiplayer::store_place(const PropertyBindingPtr &p_binding) {
     const int64_t route = p_binding->route;
     const int64_t epoch = route > 0 ? liveness_route_epoch(route) : 0;
     for (uint32_t lane = 0; lane < 2; ++lane) {
-        const store::RowAddress at = store_world.row_of(owner, lane);
+        const store::RowAddress at = store().row_of(owner, lane);
         if (at.valid()) {
-            store_world.place(at, route, epoch);
+            store().place(at, route, epoch);
             store_bind(at);
         }
     }
 }
 
 void NetwMultiplayer::store_bind(const store::RowAddress &p_at) {
-    const store::Table &table = store_world.table(p_at.table);
+    const store::Table &table = store().table(p_at.table);
     const uint32_t slot = table.slots[p_at.row];
     if (slot == store::Table::NO_SLOT) {
         return;
     }
-    store_bind_entity(wrapper_for_route(table.routes[p_at.row]));
+    const RID entity
+        = liveness_core.rid_from_route(int(table.routes[p_at.row]));
+    if (entity_get_view(entity).is_valid()) {
+        store_bind_entity(entity);
+    }
 }
 
-void NetwMultiplayer::store_bind_entity(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
+void NetwMultiplayer::store_bind_entity(const RID &p_entity) {
+    const Ref<NetwEntity> view = slot_pinned_entity(p_entity);
+    if (view.is_null()) {
         return;
     }
-    const int64_t predicted = prediction_engine.slot_of(p_entity);
-    const int64_t rewound = lagcomp_core.timeline_slot_of(p_entity);
+    const int64_t predicted = prediction_engine.slot_of(view);
+    const int64_t rewound = lagcomp_core.timeline_slot_of(view);
     if (predicted < 0 && rewound < 0) {
         return;
     }
     const uint32_t slot = store_slot_of(p_entity);
-    const store::EntityRef held = store_world.ref_of(slot);
+    const store::EntityRef held = store().ref_of(slot);
     if (predicted >= 0) {
         if (slot == store::Table::NO_SLOT) {
             prediction_engine.unbind_store(predicted);
@@ -214,11 +197,10 @@ void NetwMultiplayer::store_sources(
     NetwSyncModel *p_model,
     ReplicationSend *p_send,
     uint32_t p_table,
-    const Callable &p_bind,
     int64_t p_tick
 ) {
     NETW_ZONE_NC("Store sources", colors::TABLE);
-    store::Table &table = store_world.table(p_table);
+    store::Table &table = store().table(p_table);
     NETW_ZONE_TEXT_F("table %u %s", p_table, store::family_name(table.family));
     store_walk.clear();
     for (uint32_t word = 0; word < table.unsourced.words.size(); ++word) {
@@ -244,11 +226,11 @@ void NetwMultiplayer::store_sources(
             static_cast<long long>(table.routes[row.row])
         );
         table.working.set(row.row, true);
-        if (store_source_row(p_model, p_send, row, p_bind, p_tick)) {
+        if (store_source_row(p_model, p_send, row, p_tick)) {
             table.unsourced.set(row.row, true);
         }
     }
-    const int64_t every = store_world.validate_every;
+    const int64_t every = store().validate_every;
     if (every > 0 && p_tick >= 0 && p_tick % every == 0) {
         NETW_ZONE_NC("Store sources audit", colors::TABLE);
         uint32_t walked = 0;
@@ -257,7 +239,7 @@ void NetwMultiplayer::store_sources(
                 walked += 1;
                 continue;
             }
-            store_source_check(p_model, p_send, {p_table, row}, p_bind, p_tick);
+            store_source_check(p_model, p_send, {p_table, row}, p_tick);
         }
     }
     p_model->note_offers(
@@ -270,22 +252,22 @@ void NetwMultiplayer::store_source_check(
     NetwSyncModel *p_model,
     ReplicationSend *p_send,
     const store::RowAddress &p_at,
-    const Callable &p_bind,
     int64_t p_tick
 ) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
 #if defined(NETW_TESTS)
     store::validation_audit::ledger().checks += 1;
 #endif
-    const SourceImage was = source_image(store_world, table, p_at.row);
-    const Node *node
-        = Object::cast_to<Node>(gd::object_of(ObjectID(table.nodes[p_at.row])));
+    const SourceImage was = source_image(store(), table, p_at.row);
+    const Node *node = Object::cast_to<Node>(gd::object_of(
+        ObjectID(store_pull.residents.node_of(p_at.table, p_at.row))
+    ));
     const bool unpulled = node != nullptr
         && node->get_multiplayer_authority() != table.authorities[p_at.row];
-    const bool stays = store_source_row(p_model, p_send, p_at, p_bind, p_tick);
+    const bool stays = store_source_row(p_model, p_send, p_at, p_tick);
     const char *drift = stays
         ? "quiet"
-        : source_drift(was, source_image(store_world, table, p_at.row));
+        : source_drift(was, source_image(store(), table, p_at.row));
     if (stays) {
         table.unsourced.set(p_at.row, true);
     }
@@ -298,8 +280,8 @@ void NetwMultiplayer::store_source_check(
     missed.tick = p_tick;
     missed.column = StringName(drift);
     missed.gate = "sources";
-    store_world.misses.push_back(missed);
-    store_world.miss_count += 1;
+    store().misses.push_back(missed);
+    store().miss_count += 1;
     store::report_miss(missed);
 }
 
@@ -307,25 +289,24 @@ bool NetwMultiplayer::store_source_row(
     NetwSyncModel *p_model,
     ReplicationSend *p_send,
     const store::RowAddress &p_at,
-    const Callable &p_bind,
     int64_t p_tick
 ) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
     const uint32_t row = p_at.row;
     const uint64_t owner = table.owners[row];
     PropertyBinding *binding = binding_book.live(owner);
     if (binding == nullptr) {
-        store_world.set_source(p_at, store::Source::NONE);
+        store_pull.set_source(p_at, store::Source::NONE);
         store_clear_row(p_at);
         table.set_offer(row, store::Table::OFFER_NONE);
         return false;
     }
     const bool primary
-        = table.lanes[row] == 0 || !store_world.row_of(owner, 0).valid();
+        = table.lanes[row] == 0 || !store().row_of(owner, 0).valid();
     Node *node = binding->node();
     if (node == nullptr) {
         sync_flush.skips_invalid_node += primary ? 1 : 0;
-        store_world.set_source(p_at, store::Source::NONE);
+        store_pull.set_source(p_at, store::Source::NONE);
         store_clear_row(p_at);
         table.set_offer(row, store::Table::OFFER_NONE);
         return true;
@@ -333,18 +314,18 @@ bool NetwMultiplayer::store_source_row(
     const Ref<NetwEntity> entity = NetwEntity::of(node);
     if (entity.is_null()) {
         sync_flush.skips_no_entity += primary ? 1 : 0;
-        store_world.set_source(p_at, store::Source::NONE);
+        store_pull.set_source(p_at, store::Source::NONE);
         store_clear_row(p_at);
         table.set_offer(row, store::Table::OFFER_NONE);
         return true;
     }
-    if (entity_left_tree(entity.ptr())) {
-        store_world.set_source(p_at, store::Source::NONE);
+    if (entity_left_tree(entity->get_rid_handle(), entity->get_owner())) {
+        store_pull.set_source(p_at, store::Source::NONE);
         table.set_offer(row, store::Table::OFFER_NONE);
         return true;
     }
-    if (binding->route <= 0 && p_bind.is_valid()) {
-        p_bind.call(int64_t(binding->id));
+    if (binding->route <= 0) {
+        sync_pipeline_bind_declaration(int64_t(binding->id));
     }
     const int64_t route = binding->route;
     const repl::SetRow *declared = route > 0
@@ -357,7 +338,7 @@ bool NetwMultiplayer::store_source_row(
         : nullptr;
     if (declared == nullptr) {
         sync_flush.skips_no_route += primary ? 1 : 0;
-        store_world.set_source(p_at, store::Source::NONE);
+        store_pull.set_source(p_at, store::Source::NONE);
         store_clear_row(p_at);
         table.set_offer(row, store::Table::OFFER_NONE);
         return true;
@@ -365,13 +346,14 @@ bool NetwMultiplayer::store_source_row(
     table.comps[row] = uint8_t(binding->comp);
     const int64_t epoch = liveness_route_epoch(route);
     if (table.routes[row] != route
-        || store_world.epoch_of(table.slots[row]) != epoch) {
-        store_world.place(p_at, route, epoch);
+        || store().epoch_of(table.slots[row]) != epoch) {
+        store().place(p_at, route, epoch);
         store_bind(p_at);
     }
     const int64_t ordinal = declared->ordinal;
-    store_world.name_lane(p_at, uint8_t(ordinal));
-    const bool interacting = store_mark(table.slots[row], entity, p_tick);
+    store().name_lane(p_at, uint8_t(ordinal));
+    const bool interacting
+        = store_mark(table.slots[row], *entity->get_record(), p_tick);
     const int32_t held_authority = node->get_multiplayer_authority();
     table.authorities[row] = held_authority;
     const int64_t authority
@@ -384,11 +366,11 @@ bool NetwMultiplayer::store_source_row(
         entity->steering()
     );
     const store::Source source = store_source(table, row, binding, authors);
-    store_world.set_source(p_at, source);
+    store_pull.set_source(p_at, source);
     const bool external = binding->input_fed;
     const bool server_audience
         = declared->audience == repl::SET_AUDIENCE_SERVER_ONLY;
-    store_admit_row(p_send, p_at, entity, server_audience);
+    store_admit_row(p_send, p_at, entity->get_rid_handle(), server_audience);
     const bool admitted = store_admits_any(p_at);
     uint8_t offer = store::Table::OFFER_NONE;
     if (primary) {
@@ -418,7 +400,7 @@ void NetwMultiplayer::store_stamp_thunk(
 }
 
 void NetwMultiplayer::store_stamp_row(uint32_t p_table, uint32_t p_row) {
-    store::Table &table = store_world.table(p_table);
+    store::Table &table = store().table(p_table);
     PropertyBinding *binding = binding_book.live(table.owners[p_row]);
     const PropertySet *set = binding != nullptr ? binding->get_set() : nullptr;
     if (set == nullptr) {
@@ -426,11 +408,6 @@ void NetwMultiplayer::store_stamp_row(uint32_t p_table, uint32_t p_row) {
     }
     const int64_t authored = binding->authored_tick;
     const int64_t tick = authored >= 0 ? authored : table.stamp_tick;
-    const bool primary = table.lanes[p_row] == 0
-        || !store_world.row_of(table.owners[p_row], 0).valid();
-    if (primary && store_tap.is_valid()) {
-        store_tap.call(int64_t(binding->id), table.routes[p_row], tick);
-    }
     follow_set(table, set);
     if (table.family == store::Family::RETAINED) {
         table.frame_ticks[p_row] = -1;
@@ -450,7 +427,7 @@ void NetwMultiplayer::store_resource_route(int64_t p_route) {
         = plane->derived_group(p_route);
     for (const PropertyBindingPtr &binding : bindings) {
         if (binding != nullptr) {
-            store_world.unsource_owner(binding->id);
+            store().unsource_owner(binding->id);
         }
     }
 }
@@ -464,8 +441,8 @@ void NetwMultiplayer::store_work_route(int64_t p_route) {
         = plane->derived_group(p_route);
     for (const PropertyBindingPtr &binding : bindings) {
         if (binding != nullptr) {
-            store_world.mark_working(store_world.row_of(binding->id, 0));
-            store_world.mark_working(store_world.row_of(binding->id, 1));
+            store().mark_working(store().row_of(binding->id, 0));
+            store().mark_working(store().row_of(binding->id, 1));
         }
     }
 }
@@ -482,38 +459,32 @@ void NetwMultiplayer::store_restate(uint64_t p_binding, int64_t p_peer) {
     }
 }
 
-void NetwMultiplayer::store_resource_entity(NetwEntity *p_entity) {
-    if (p_entity == nullptr) {
-        return;
-    }
-    const int64_t live = liveness_route_of(p_entity);
-    const int64_t route = live > 0 ? live : p_entity->get_route();
-    store_world.stale_route(route);
+void NetwMultiplayer::store_resource_entity(
+    const NetwEntityRecord &p_record
+) {
+    const int64_t live = liveness_core.route_of(p_record.get_handle());
+    const int64_t route = live > 0 ? live : p_record.get_route();
+    store().stale_route(route);
     store_resource_route(route);
 }
 
 bool NetwMultiplayer::store_mark(
     uint32_t p_slot,
-    const Ref<NetwEntity> &p_entity,
+    const NetwEntityRecord &p_record,
     int64_t p_tick
 ) {
-    store_world.set_weight(
-        p_slot,
-        float(p_entity->get_record()->get_replication_priority())
-    );
-    const int64_t changed = store_world.note_tenure(
-        p_slot,
-        p_entity->get_control_tenure(),
-        p_tick
-    );
+    const entity::Control *control = p_record.get_control();
+    store().set_weight(p_slot, float(p_record.get_replication_priority()));
+    const int64_t changed
+        = store().note_tenure(p_slot, control->tenure, p_tick);
     const int64_t second = int64_t(clock_engine().get_tickrate());
-    const bool interacting = p_entity->is_claim_pending()
-        || int64_t(p_entity->get_hold()) != 0
+    const bool interacting = control->claims_pending()
+        || control->hold != 0
         || (changed >= 0 && p_tick - changed < (second > 0 ? second : 60));
-    store_world.set_marks(
+    store().set_marks(
         p_slot,
         uint8_t(
-            (p_entity->get_is_player() ? store::MARK_PLAYER : 0)
+            (p_record.get_peer_id() != 0 ? store::MARK_PLAYER : 0)
             | (interacting ? store::MARK_INTERACTING : 0)
         )
     );
@@ -533,9 +504,9 @@ store::Source NetwMultiplayer::store_source(
 }
 
 bool NetwMultiplayer::store_admits_any(const store::RowAddress &p_at) const {
-    const store::Table &table = store_world.table(p_at.table);
+    const store::Table &table = store().table(p_at.table);
     for (uint32_t peer = 0; peer < table.peers.size(); ++peer) {
-        if (store_world.peer_joined(peer)
+        if (store().peer_joined(peer)
             && table.peers[peer].admitted.get(p_at.row)) {
             return true;
         }
@@ -578,77 +549,77 @@ void NetwMultiplayer::store_refresh() {
             }
         }
         if (local != SERVER_PEER) {
-            all = store_world.peer_of(int(SERVER_PEER)) == store::Table::NO_SLOT
+            all = store().peer_of(int(SERVER_PEER)) == store::Table::NO_SLOT
                 || all;
-            store_world.peer_join(int(SERVER_PEER));
+            store().peer_join(int(SERVER_PEER));
         }
     }
     for (uint32_t at = 0; at < store_roster.size(); ++at) {
-        const uint32_t index = store_world.peer_join(store_roster[at]);
-        all = store_world.set_reachable(index, true) || all;
+        const uint32_t index = store().peer_join(store_roster[at]);
+        all = store().set_reachable(index, true) || all;
     }
-    for (uint32_t index = 0; index < store_world.peer_capacity(); ++index) {
-        if (!store_world.peer_reachable(index)) {
+    for (uint32_t index = 0; index < store().peer_capacity(); ++index) {
+        if (!store().peer_reachable(index)) {
             continue;
         }
-        const int id = store_world.peer_id(index);
+        const int id = store().peer_id(index);
         bool listed = false;
         for (uint32_t at = 0; at < store_roster.size() && !listed; ++at) {
             listed = store_roster[at] == id;
         }
         if (!listed) {
-            all = store_world.set_reachable(index, false) || all;
+            all = store().set_reachable(index, false) || all;
         }
     }
     LocalVector<int32_t> routes;
-    if (liveness_core.is_valid() && liveness_core->take_moved(routes)) {
+    if (liveness_core.take_moved(routes)) {
         all = true;
     }
     for (uint32_t at = 0; at < routes.size(); ++at) {
-        store_world.stale_route(routes[at]);
+        store().stale_route(routes[at]);
         store_resource_route(routes[at]);
     }
     store_note_interest();
     if (all) {
-        store_world.stale_all();
-        store_world.unsource_all();
+        store().stale_all();
+        store().unsource_all();
     }
-    store_world.take_stale(store_pending);
+    store().take_stale(store_pending);
     for (uint32_t at = 0; at < store_pending.size(); ++at) {
         const uint32_t slot = store_pending[at];
-        const int64_t route = store_world.route_of(slot);
+        const int64_t route = store().route_of(slot);
         if (route <= 0) {
-            store_world.settle_slot(slot);
+            store().settle_slot(slot);
             continue;
         }
         const Ref<NetwEntity> entity = wrapper_for_route(route);
-        if (entity.is_null() && store_world.arrays.holds_route(route)) {
+        if (entity.is_null() && array_tables.holds_route(route)) {
             store_evaluate_nodeless(slot);
             continue;
         }
         if (entity.is_null()) {
-            store_world.keep_stale(slot);
+            store().keep_stale(slot);
             continue;
         }
-        store_evaluate_slot(slot, entity);
+        store_evaluate_slot(slot, entity->get_rid_handle());
     }
 }
 
 void NetwMultiplayer::store_evaluate_nodeless(uint32_t p_slot) {
-    store_world.set_live(p_slot, true);
-    for (uint32_t peer = 0; peer < store_world.peer_capacity(); ++peer) {
-        if (store_world.peer_joined(peer)) {
-            store_world.see(p_slot, peer, true);
-            store_world.hold(p_slot, peer, true);
+    store().set_live(p_slot, true);
+    for (uint32_t peer = 0; peer < store().peer_capacity(); ++peer) {
+        if (store().peer_joined(peer)) {
+            store().see(p_slot, peer, true);
+            store().hold(p_slot, peer, true);
         }
     }
-    store_world.settle_slot(p_slot);
+    store().settle_slot(p_slot);
 }
 
 void NetwMultiplayer::store_note_interest() {
     LocalVector<int64_t> keys;
     if (interest_engine.take_moved(keys)) {
-        store_world.stale_all();
+        store().stale_all();
     }
     for (uint32_t at = 0; at < keys.size(); ++at) {
         store_stale_key(keys[at]);
@@ -656,63 +627,57 @@ void NetwMultiplayer::store_note_interest() {
 }
 
 void NetwMultiplayer::store_stale_key(int64_t p_key) {
-    store_stale_entity(wrapper_for_id(p_key));
+    const Ref<NetwEntity> entity = wrapper_for_id(p_key);
+    store_stale_entity(entity.is_valid() ? entity->get_rid_handle() : RID());
 }
 
-void NetwMultiplayer::store_stale_entity(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
-        return;
-    }
-    const int64_t route = liveness_route_of(p_entity.ptr());
+void NetwMultiplayer::store_stale_entity(const RID &p_entity) {
+    const int64_t route = liveness_core.route_of(p_entity);
     if (route > 0) {
-        store_world.stale_route(route);
+        store().stale_route(route);
     }
 }
 
 void NetwMultiplayer::store_evaluate_slot(
     uint32_t p_slot,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) {
     const bool live = p_entity.is_valid()
-        && liveness_state_of(p_entity.ptr())
-            == int64_t(NetwLivenessCore::STATE_LIVE);
-    store_world.set_live(p_slot, live);
+        && entity_get_state(p_entity) == ENTITY_STATE_LIVE;
+    store().set_live(p_slot, live);
     const bool filtered
         = p_entity.is_valid() && interest_entity_has_filter(p_entity);
     spawn::Pipeline *spawns = spawn_plane();
     spawn::Book *book = spawns != nullptr ? spawns->get_spawn_book() : nullptr;
     const spawn::Record *record = book != nullptr
-        ? book->spawned_of(store_world.route_of(p_slot))
+        ? book->spawned_of(store().route_of(p_slot))
         : nullptr;
-    for (uint32_t peer = 0; peer < store_world.peer_capacity(); ++peer) {
-        if (!store_world.peer_joined(peer)) {
+    for (uint32_t peer = 0; peer < store().peer_capacity(); ++peer) {
+        if (!store().peer_joined(peer)) {
             continue;
         }
-        const int64_t id = int64_t(store_world.peer_id(peer));
+        const int64_t id = int64_t(store().peer_id(peer));
         const bool visible = p_entity.is_valid()
             && (!filtered || interest_wire_admits(id, p_entity));
-        store_world.see(p_slot, peer, visible);
-        store_world.hold(
+        store().see(p_slot, peer, visible);
+        store().hold(
             p_slot,
             peer,
             record == nullptr || record->has_recipient(int(id))
         );
     }
-    store_world.settle_slot(p_slot);
-    store_resource_route(store_world.route_of(p_slot));
+    store().settle_slot(p_slot);
+    store_resource_route(store().route_of(p_slot));
 }
 
-uint32_t NetwMultiplayer::store_slot_of(const Ref<NetwEntity> &p_entity) const {
-    if (p_entity.is_null()) {
-        return store::Table::NO_SLOT;
-    }
-    const int64_t route = liveness_route_of(p_entity.ptr());
+uint32_t NetwMultiplayer::store_slot_of(const RID &p_entity) const {
+    const int64_t route = liveness_core.route_of(p_entity);
     if (route <= 0) {
         return store::Table::NO_SLOT;
     }
-    const uint32_t slot = store_world.slot_of_route(route);
+    const uint32_t slot = store().slot_of_route(route);
     if (slot == store::Table::NO_SLOT
-        || store_world.epoch_of(slot) != liveness_route_epoch(route)) {
+        || store().epoch_of(slot) != liveness_route_epoch(route)) {
         return store::Table::NO_SLOT;
     }
     return slot;
@@ -721,21 +686,21 @@ uint32_t NetwMultiplayer::store_slot_of(const Ref<NetwEntity> &p_entity) const {
 void NetwMultiplayer::store_admit_row(
     ReplicationSend *p_send,
     const store::RowAddress &p_at,
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     bool p_server_audience
 ) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
     const uint32_t slot = table.slots[p_at.row];
     if (slot == store::Table::NO_SLOT) {
         store_clear_row(p_at);
         return;
     }
-    if (store_world.slot_stale(slot)) {
+    if (store().slot_stale(slot)) {
         store_evaluate_slot(slot, p_entity);
     }
     const uint8_t audience
         = p_server_audience ? uint8_t(store::Table::SERVER_AUDIENCE) : 0;
-    const uint64_t stamp = store_world.slot_stamp(slot);
+    const uint64_t stamp = store().slot_stamp(slot);
     uint8_t &flags = table.flags[p_at.row];
     if (table.admit_stamps[p_at.row] == stamp
         && (flags & store::Table::SERVER_AUDIENCE) == audience) {
@@ -748,17 +713,17 @@ void NetwMultiplayer::store_admit_row(
     lane.route = table.routes[p_at.row];
     lane.ordinal = table.ordinals[p_at.row];
     lane.family = wire::StreamFamily(uint8_t(table.family));
-    for (uint32_t peer = 0; peer < store_world.peer_capacity(); ++peer) {
-        if (!store_world.peer_joined(peer)) {
+    for (uint32_t peer = 0; peer < store().peer_capacity(); ++peer) {
+        if (!store().peer_joined(peer)) {
             continue;
         }
-        const int64_t id = int64_t(store_world.peer_id(peer));
+        const int64_t id = int64_t(store().peer_id(peer));
         const bool admitted = p_server_audience
             ? id == SERVER_PEER && local != SERVER_PEER
-            : id != local && store_world.reaches(slot, peer)
-                && store_world.holds_copy(slot, peer);
+            : id != local && store().reaches(slot, peer)
+                && store().holds_copy(slot, peer);
         const bool was = table.peers[peer].admitted.get(p_at.row);
-        store_world.admit(p_at, peer, admitted);
+        store().admit(p_at, peer, admitted);
         if (was && !admitted && p_send != nullptr) {
             p_send->hide(id, lane);
         }
@@ -766,11 +731,11 @@ void NetwMultiplayer::store_admit_row(
 }
 
 void NetwMultiplayer::store_clear_row(const store::RowAddress &p_at) {
-    store::Table &table = store_world.table(p_at.table);
+    store::Table &table = store().table(p_at.table);
     table.admit_stamps[p_at.row] = 0;
-    for (uint32_t peer = 0; peer < store_world.peer_capacity(); ++peer) {
-        if (store_world.peer_joined(peer)) {
-            store_world.admit(p_at, peer, false);
+    for (uint32_t peer = 0; peer < store().peer_capacity(); ++peer) {
+        if (store().peer_joined(peer)) {
+            store().admit(p_at, peer, false);
         }
     }
 }
@@ -778,9 +743,9 @@ void NetwMultiplayer::store_clear_row(const store::RowAddress &p_at) {
 PackedInt32Array NetwMultiplayer::store_reach(uint32_t p_slot) const {
     PackedInt32Array out;
     for (uint32_t at = 0; at < store_roster.size(); ++at) {
-        const uint32_t peer = store_world.peer_of(store_roster[at]);
+        const uint32_t peer = store().peer_of(store_roster[at]);
         if (peer != store::Table::NO_SLOT
-            && store_world.reaches(p_slot, peer)) {
+            && store().reaches(p_slot, peer)) {
             out.push_back(store_roster[at]);
         }
     }

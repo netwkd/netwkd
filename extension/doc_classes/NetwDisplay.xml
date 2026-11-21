@@ -42,9 +42,9 @@
 		<method name="get_track_stat" qualifiers="const">
 			<return type="Variant" />
 			<param index="0" name="property" type="StringName" />
-			<param index="1" name="stat" type="StringName" />
+			<param index="1" name="stat" type="int" enum="NetwMultiplayer.TrackStat" />
 			<description>
-				Returns the display diagnostic [param stat] of [param property], or [code]null[/code] for an unknown stat. An empty [param property] reads the whole entity.
+				Returns the display diagnostic [param stat] of [param property], or [code]null[/code] while the entity is not displayed. An empty [param property] reads the whole entity.
 			</description>
 		</method>
 		<method name="reset">

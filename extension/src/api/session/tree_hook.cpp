@@ -179,7 +179,7 @@ void NetwMultiplayer::tree_forget_session(NetwMultiplayer *p_session) {
     hook.removals.erase(p_session);
     hook.booked.erase(p_session);
     for (const KeyValue<uint64_t, Ref<NetwEntity>> &held :
-         p_session->entity_book) {
+         p_session->views.node_entities) {
         Node *node = Object::cast_to<Node>(gd::object_of(ObjectID(held.key)));
         if (node == nullptr) {
             continue;
@@ -191,14 +191,14 @@ void NetwMultiplayer::tree_forget_session(NetwMultiplayer *p_session) {
                 | tree::MARK_ENTITY
         );
     }
-    p_session->entity_book.clear();
+    p_session->views.node_entities.clear();
 }
 
 Ref<NetwEntity> NetwMultiplayer::tree_booked(uint64_t p_node) {
     const TreeHook &hook = tree_hook();
     for (uint32_t at = 0; at < hook.booked.size(); ++at) {
         const Ref<NetwEntity> *held
-            = hook.booked[at]->entity_book.getptr(p_node);
+            = hook.booked[at]->views.node_entities.getptr(p_node);
         if (held != nullptr) {
             return *held;
         }
@@ -206,43 +206,28 @@ Ref<NetwEntity> NetwMultiplayer::tree_booked(uint64_t p_node) {
     return Ref<NetwEntity>();
 }
 
-NetwMultiplayer *NetwMultiplayer::tree_adopt(
-    Node *p_node,
-    const Ref<NetwEntity> &p_entity,
-    NetwMultiplayer *p_session
-) {
-    NetwMultiplayer *session
-        = p_session != nullptr ? p_session : session_holding(p_node);
-    if (session == nullptr) {
-        return nullptr;
-    }
+void NetwMultiplayer::tree_adopt(Node *p_node, NetwMultiplayer *p_session) {
     const uint64_t id = uint64_t(p_node->get_instance_id());
     TreeHook &hook = tree_hook();
-    if (!hook.booked.has(session)) {
-        hook.booked.push_back(session);
+    if (!hook.booked.has(p_session)) {
+        hook.booked.push_back(p_session);
     }
-    session->entity_book.insert(id, p_entity);
     p_node->remove_meta(wrapper_meta());
     set_marks(
         id,
         (marks_of(id) & uint16_t(~tree::MARK_ENTITY)) | tree::MARK_BOOKED
     );
-    return session;
 }
 
-void NetwMultiplayer::tree_release(
-    Node *p_node,
-    const Ref<NetwEntity> &p_entity
-) {
+void NetwMultiplayer::tree_release(Node *p_node) {
     const uint64_t id = uint64_t(p_node->get_instance_id());
-    p_node->set_meta(wrapper_meta(), p_entity);
     set_marks(
         id,
         (marks_of(id) & uint16_t(~tree::MARK_BOOKED)) | tree::MARK_ENTITY
     );
     TreeHook &hook = tree_hook();
     for (uint32_t at = 0; at < hook.booked.size(); ++at) {
-        hook.booked[at]->entity_book.erase(id);
+        hook.booked[at]->views.node_entities.erase(id);
     }
 }
 
@@ -265,7 +250,7 @@ void NetwMultiplayer::tree_node_added(Node *p_node) {
             NetwEntity *watcher
                 = Object::cast_to<NetwEntity>(gd::object_of(ObjectID(*entity)));
             if (watcher != nullptr) {
-                NetwMultiplayer::control_descendant_entered(watcher, p_node);
+                watcher->project_control_descendant(p_node);
             }
         }
     }
@@ -291,9 +276,9 @@ void NetwMultiplayer::tree_marked_entered(
         NetwMultiplayer *branch = session_holding(p_node);
         if (entity.is_valid()) {
             if (entity->belongs_to(branch)) {
-                tree_adopt(p_node, entity, branch);
+                entity->book_root(p_node, branch);
             }
-            entity_tree_entered(entity.ptr());
+            entity->tree_entered();
         }
     }
     const uint16_t due
@@ -328,13 +313,13 @@ void NetwMultiplayer::tree_node_removed(Node *p_node) {
     if ((marked & tree::MARK_BOOKED) != 0) {
         const Ref<NetwEntity> booked = tree_booked(id);
         if (booked.is_valid()) {
-            entity_tree_exiting(booked.ptr());
-            tree_release(p_node, booked);
+            booked->tree_exiting();
+            booked->release_root(p_node);
         }
     } else if ((marked & tree::MARK_ENTITY) != 0) {
         const Ref<NetwEntity> carried = meta_entity(p_node);
         if (carried.is_valid()) {
-            entity_tree_exiting(carried.ptr());
+            carried->tree_exiting();
         }
     }
     if ((marked & tree::MARK_DERIVED_EXIT) != 0) {

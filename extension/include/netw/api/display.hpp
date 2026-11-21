@@ -54,7 +54,7 @@ public:
     NetwDisplay::DisplayPump get_pump_mode() const;
     godot::Variant get_track_stat(
         const godot::StringName &p_property,
-        const godot::StringName &p_stat
+        NetwMultiplayer::TrackStat p_stat
     ) const;
     int64_t displayed_authoring_tick() const;
     void reset();

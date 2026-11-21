@@ -1,6 +1,6 @@
 #pragma once
 
-#include "netw/clock_engine.hpp"
+#include "netw/clock.hpp"
 
 namespace netw::display {
 
@@ -15,6 +15,10 @@ struct Timing {
     double frame_ticks = 0.0;
 };
 
-Timing capture_timing(const ClockEngine *p_clock, double p_frame_delta);
+Timing capture_timing(
+    const Clock *p_clock,
+    const Clock::Reading &p_now,
+    double p_frame_delta
+);
 
 } // namespace netw::display

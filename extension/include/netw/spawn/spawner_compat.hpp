@@ -18,27 +18,20 @@ namespace netw::spawn {
 
 class SpawnerCompat {
 private:
-    godot::ObjectID core_id;
+    NetwMultiplayer *session = nullptr;
     SpawnerRoster roster;
     godot::HashMap<int64_t, godot::Variant> custom_args;
     godot::HashMap<int64_t, godot::Callable> originals;
-    godot::Callable booked_reader;
-    godot::Callable arm_consumed;
     int64_t drops_uncaptured_custom = 0;
 
-    NetwMultiplayer *core() const;
     godot::Node *session_root() const;
     void wrap_when_ready(
         godot::MultiplayerSpawner *p_spawner,
-        NetwMultiplayer *p_plane
+        NetwMultiplayer *p_session
     );
 
 public:
-    void set_core(godot::Object *p_core);
-    void set_spawn_seams(
-        const godot::Callable &p_booked_reader,
-        const godot::Callable &p_arm_consumed
-    );
+    void seat(NetwMultiplayer *p_session);
     SpawnerRoster &get_roster() {
         return roster;
     }

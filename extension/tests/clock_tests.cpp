@@ -46,6 +46,13 @@ void clock_world(LoopbackRig &p_rig, int p_rate) {
     p_rig.declare_world(world);
 }
 
+void hear_pong(NetwMultiplayer *p_client, int64_t p_tick, double p_phase) {
+    netw::session::ClockPong pong;
+    pong.tick = uint64_t(p_tick);
+    pong.phase = uint64_t(p_phase * 255.0);
+    p_client->clock_ingest_pong(pong, 0, true);
+}
+
 NetwMultiplayer *fresh_client(LoopbackRig &p_rig, int p_client = 0) {
     NetwMultiplayer *client = p_rig.client(p_client);
     client->clock_set_synchronized(false);
@@ -187,8 +194,8 @@ LawVerdict snap_takes_the_whole_correction(const Stand &) {
         100
     );
     for (NetwMultiplayer *client : {snap, stretch}) {
-        client->clock_ingest_pong(0.0, 100, 0.0, true);
-        client->clock_ingest_pong(0.0, 150, 0.0, true);
+        hear_pong(client, 100, 0.0);
+        hear_pong(client, 150, 0.0);
     }
     if (snap->clock_get_tick() != 150) {
         return law_broken("snap reached tick %d", int(snap->clock_get_tick()));
@@ -210,7 +217,7 @@ LawVerdict snap_takes_the_whole_correction(const Stand &) {
         NetwMultiplayer::CLOCK_PARAM_PANIC_SNAP_THRESHOLD,
         2
     );
-    stretch->clock_ingest_pong(0.0, 400, 0.0, true);
+    hear_pong(stretch, 400, 0.0);
     stretch->clock_physics_step(0.0);
     if (stretch->clock_get_tick() != 400) {
         return law_broken(
@@ -236,11 +243,11 @@ LawVerdict gated_hitch_leaves_no_debt(const Stand &) {
     }
 
     int server_tick = 100;
-    hitched->clock_ingest_pong(0.0, server_tick, 0.0, true);
+    hear_pong(hitched, server_tick, 0.0);
     for (int frame = 0; frame < 120; ++frame) {
         hitched->clock_physics_step(step);
         server_tick += frame == 20 ? 11 : 1;
-        hitched->clock_ingest_pong(0.0, server_tick, 0.0, true);
+        hear_pong(hitched, server_tick, 0.0);
     }
     const int64_t gap = std::abs(server_tick - hitched->clock_get_tick());
     const double owed = hitched->clock_get_monitor(
@@ -255,7 +262,7 @@ LawVerdict gated_hitch_leaves_no_debt(const Stand &) {
     }
 
     server_tick = 100;
-    jittered->clock_ingest_pong(0.0, server_tick, 0.25, true);
+    hear_pong(jittered, server_tick, 0.25);
     int skipped = 0;
     for (int frame = 0; frame < 600; ++frame) {
         const int64_t before = jittered->clock_get_tick();
@@ -263,7 +270,7 @@ LawVerdict gated_hitch_leaves_no_debt(const Stand &) {
         skipped += jittered->clock_get_tick() - before > 1 ? 1 : 0;
         server_tick += 1;
         const int flip = (frame / 60) % 2;
-        jittered->clock_ingest_pong(0.0, server_tick + flip, 0.25, true);
+        hear_pong(jittered, server_tick + flip, 0.25);
     }
     if (skipped != 0) {
         return law_broken("one tick of jitter skipped %d ticks", skipped);
@@ -292,9 +299,30 @@ LawVerdict only_a_following_client_is_synchronized(const Stand &) {
         return law_broken("a client that heard no pong read synchronized");
     }
 
-    client->clock_ingest_pong(0.0, 40, 0.0, true);
+    hear_pong(client, 40, 0.0);
     if (!client_clock->get_is_synchronized()) {
         return law_broken("a client that heard a pong read unsynchronized");
+    }
+    return law_held();
+}
+
+LawVerdict batched_sender_leads_further(const Stand &) {
+    LoopbackRig every(1);
+    clock_world(every, 30);
+    LoopbackRig batched(1);
+    batched.declare_world(WorldDecl().clocked(30).sending(10));
+    NetwMultiplayer *each_tick = fresh_client(every);
+    NetwMultiplayer *third_tick = fresh_client(batched);
+
+    hear_pong(each_tick, 40, 0.0);
+    hear_pong(third_tick, 40, 0.0);
+    const int64_t lead
+        = third_tick->clock_get_tick() - each_tick->clock_get_tick();
+    if (lead != 2) {
+        return law_broken(
+            "a client sending every third tick led by %d more ticks",
+            int(lead)
+        );
     }
     return law_held();
 }
@@ -336,12 +364,45 @@ LawVerdict clock_announces_its_edges(const Stand &) {
         );
     }
 
-    client->clock_ingest_pong(0.0, 40, 0.0, true);
-    client->clock_ingest_pong(0.0, 41, 0.0, true);
+    hear_pong(client, 40, 0.0);
+    hear_pong(client, 41, 0.0);
     if (heard.count(synchronized) != 1) {
         return law_broken(
             "two pongs emitted synchronized %d times",
             heard.count(synchronized)
+        );
+    }
+    return law_held();
+}
+
+LawVerdict a_step_inside_a_tick_adds_one(const Stand &) {
+    LoopbackRig rig(1);
+    rig.mount();
+    clock_world(rig, EXACT_RATE);
+    const Ref<netw::NetwSession> session = Netw::session(rig.branch(0));
+    if (session.is_null()) {
+        return law_broken("a mounted session answered no handle");
+    }
+    NetwMultiplayer *client = rig.client(0);
+    const Ref<NetwClock> clock = session->get_clock();
+    clock->connect(
+        StringName("ticked"),
+        Callable(clock.ptr(), StringName("step")).bind(1).unbind(2),
+        Object::CONNECT_ONE_SHOT
+    );
+    const int64_t start = client->clock_get_tick();
+
+    client->clock_physics_step(TICK * 3.0);
+    const int64_t ran = client->clock_get_tick() - start;
+    const double owed = client->clock_get_monitor(
+        NetwMultiplayer::CLOCK_MONITOR_TICK_ACCUMULATOR
+    );
+
+    if (ran != 4 || owed >= TICK) {
+        return law_broken(
+            "a three tick frame that stepped once ran %d ticks and owed %f",
+            int(ran),
+            owed
         );
     }
     return law_held();
@@ -375,10 +436,18 @@ const Row ROWS[] = {
      "the server's clock reads synchronized and the client's reads so only "
      "after a pong",
      &only_a_following_client_is_synchronized},
+    {"two clients hearing the same pong, one sending every tick and one "
+     "every third tick",
+     "the batched client runs two ticks further ahead, so its last input "
+     "of a batch still reaches the server in time",
+     &batched_sender_leads_further},
     {"a client's clock that runs one tick, then hears two pongs",
      "its NetwClock emits before_tick then ticked with that tick, and "
      "synchronized once",
      &clock_announces_its_edges},
+    {"a three tick frame whose first tick steps the clock once",
+     "it runs four ticks and owes nothing after",
+     &a_step_inside_a_tick_adds_one},
 };
 
 TEST_CASE(

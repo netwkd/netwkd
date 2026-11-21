@@ -7,6 +7,7 @@
 #include "godot/node.hpp"
 #include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
+#include "netw/predict/engine.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 
@@ -110,7 +111,9 @@ struct Streaming {
     }
 
     bool addresses(int64_t p_peer) const {
-        return rig.server()->rpc_recipients(body()).has(int32_t(p_peer));
+        const Ref<NetwEntity> held = body();
+        const RID entity = held.is_valid() ? held->get_rid_handle() : RID();
+        return rig.server()->rpc_recipients(entity).has(int32_t(p_peer));
     }
 
     bool streams() {
@@ -143,6 +146,26 @@ TEST_CASE(
     CHECK_FALSE(world.addresses(departing));
     CHECK_FALSE(world.rosters(departing));
     NETW_CHECK_EQ(world.rig.refused_sends_at_server(), 0);
+}
+
+TEST_CASE("[Netw][Session][SceneTree] a departing node stops routing input") {
+    Streaming world;
+    const Ref<NetwEntity> entity = world.body();
+    REQUIRE(entity.is_valid());
+    Node *const body = entity->get_owner();
+    REQUIRE(body != nullptr);
+    REQUIRE(body->get_parent() == world.arena);
+    auto *const pool = world.rig.prediction_pool();
+    const int64_t slot = Internals::seat(pool, entity);
+    REQUIRE(slot >= 0);
+    CHECK(pool->lane_route(slot) == world.route);
+
+    world.arena->remove_child(body);
+    const int64_t departing = pool->lane_route(slot);
+    world.arena->add_child(body);
+    Internals::unseat(pool, entity);
+
+    CHECK(departing == -1);
 }
 
 TEST_CASE(

@@ -24,6 +24,8 @@ namespace netw::gd {
 
 godot::Variant instantiate_class(const godot::StringName &p_class);
 
+bool names_a_class(const godot::StringName &p_name);
+
 } // namespace netw::gd
 
 namespace netw {

@@ -100,15 +100,12 @@ Node3D *plain_node(Node *p_parent, const char *p_name) {
 int64_t frames_in(
     NetwMultiplayer *p_session,
     int64_t p_from,
-    const char *p_name
+    netw::wire::Channel p_channel
 ) {
     const Dictionary rows
         = p_session->attribution_snapshot()["frames_in_by_channel"];
     const Dictionary channels = rows.get(p_from, Dictionary());
-    return int64_t(channels.get(
-        int64_t(netw::wire::builtin_channel(StringName(p_name))),
-        0
-    ));
+    return int64_t(channels.get(int64_t(p_channel), 0));
 }
 
 int64_t counter_of(NetwMultiplayer *p_session, const char *p_name) {
@@ -289,11 +286,13 @@ TEST_CASE(
     stage.rig.session()->purge_packets_from(author_peer);
     stage.rig.release(-1);
     stage.rig.release(0);
-    const int64_t control_in = frames_in(session, author_peer, "ROW_CONTROL");
+    const int64_t control_in
+        = frames_in(session, author_peer, netw::wire::CHANNEL_ROW_CONTROL);
     stage.write_ticks(SETTLE_TICKS);
 
     NETW_CHECK_GT(
-        frames_in(session, author_peer, "ROW_CONTROL") - control_in,
+        frames_in(session, author_peer, netw::wire::CHANNEL_ROW_CONTROL)
+            - control_in,
         int64_t(0)
     );
     CHECK(NetwEntity::of(stage.cube_on(0))->has_structure_ops());

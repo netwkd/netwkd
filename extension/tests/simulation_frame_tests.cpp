@@ -30,6 +30,7 @@ class Puck extends RigidBody2D:
 	var height: float:
 		get:
 			return position.y
+	var heard := -1
 
 	func _init() -> void:
 		contact_monitor = true
@@ -39,7 +40,11 @@ class Puck extends RigidBody2D:
 		add_child(hull)
 		var entity := Netw.configure_entity(self)
 		entity.simulation.remote_mode = NetwSimulation.REMOTE_MODE_PROXY
+		entity.simulation.mode_changed.connect(_on_mode_changed)
 		Netw.configure_property(self, &"position").broadcast()
+
+	func _on_mode_changed(_previous: int, now: int) -> void:
+		heard = now
 
 
 class Kit:
@@ -329,7 +334,8 @@ World yard() {
         .watch("Pusher", "sleeping")
         .watch("Tug", "asleep")
         .watch("Puck", "height")
-        .watch("Puck", "mode");
+        .watch("Puck", "mode")
+        .watch("Puck", "heard");
     const char *spawned[] = {
         "Car", "Ball", "Pusher", "Mark", "Tug", "Peg", "Puck"
     };
@@ -579,6 +585,8 @@ TEST_CASE(
     NETW_HOLDS(reads(seen, DRIVER, "Car", "frozen", true, SETTLED));
     NETW_HOLDS(glides(seen, RIDER, "Car", "x", SETTLED, END, STEP));
     NETW_HOLDS(reads(seen, DRIVER, "Puck", "mode", PROXY, SETTLED));
+    NETW_HOLDS(reads(seen, DRIVER, "Puck", "heard", PROXY, SETTLED));
+    NETW_HOLDS(reads(seen, RIDER, "Puck", "heard", AUTHORITY, SETTLED));
     for (int peer = SERVER; peer < PEERS - 1; ++peer) {
         NETW_HOLDS(rests(seen, peer, "Puck", LANDED, END));
     }

@@ -9,17 +9,14 @@
 #include "godot/object.hpp"
 #include "godot/spatial_node.hpp"
 #include "godot/viewport.hpp"
-#include "netw/api/display.hpp"
-#include "netw/api/entity.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/prediction.hpp"
-#include "netw/clock_engine.hpp"
+#include "netw/clock.hpp"
 #include "netw/diag/hints.hpp"
 #include "netw/predict/engine.hpp"
 #include "netw/predict/wiring.hpp"
-#include "netw/session/books.hpp"
+#include "netw/store/store.hpp"
 #include "netw/store/table.hpp"
-#include "netw/store/world.hpp"
 
 using namespace godot;
 
@@ -251,14 +248,16 @@ void draw_ring_rows(const LocalVector<RingRow> &p_rows, Drawing &r_drawing) {
 }
 
 void PredictionRings::sample(
-    const session::Books &p_books,
+    const Clock &p_clock,
+    const store::Store &p_store,
+    NetwPredictionEngine *p_prediction,
     NetwMultiplayer &p_session
 ) {
     ++generation;
     sampled.clear();
     cameras.clear();
     candidates.clear();
-    NetwPredictionEngine *pool = p_books.prediction;
+    NetwPredictionEngine *pool = p_prediction;
     if (pool == nullptr) {
         forget_departed();
         return;
@@ -289,23 +288,23 @@ void PredictionRings::sample(
         candidates.push_back(made);
     }
     keep_nearest_per_world(candidates, ENTITY_CAP);
-    const ClockEngine &clock = *p_books.clock;
-    const Clock now{
+    const Clock &clock = p_clock;
+    const Now now{
         clock.get_tick(),
         1.0 / double(MAX(1, clock.get_tickrate())),
     };
     for (const Candidate &each : candidates) {
-        read(p_books, p_session, *pool, each, now);
+        read(p_store, p_session, *pool, each, now);
     }
     forget_departed();
 }
 
 void PredictionRings::read(
-    const session::Books &p_books,
+    const store::Store &p_store,
     NetwMultiplayer &p_session,
     NetwPredictionEngine &p_pool,
     const Candidate &p_candidate,
-    const Clock &p_now
+    const Now &p_now
 ) {
     NetwPredictionEngine *const pool = &p_pool;
     const RingSource &source = sources[p_candidate.source];
@@ -334,12 +333,8 @@ void PredictionRings::read(
     }
     if (!entry.visual_resolved) {
         entry.visual_resolved = true;
-        const Ref<NetwDisplay> display = source.entity != nullptr
-            ? source.entity->get_display()
-            : Ref<NetwDisplay>();
-        Node *visual
-            = display.is_valid() && !display->get_visual_root().is_empty()
-            ? owner->get_node_or_null(display->get_visual_root())
+        Node *visual = !source.visual_root.is_empty()
+            ? owner->get_node_or_null(source.visual_root)
             : nullptr;
         entry.visual
             = visual != nullptr ? uint64_t(visual->get_instance_id()) : 0;
@@ -395,14 +390,14 @@ void PredictionRings::read(
             );
         }
         const store::RowAddress at = entry.has_store
-            ? p_books.store->row_of(entry.store_owner, entry.store_lane)
+            ? p_store.row_of(entry.store_owner, entry.store_lane)
             : store::RowAddress();
         if (at.valid()) {
-            const store::Table &table = p_books.store->table(at.table);
+            const store::Table &table = p_store.table(at.table);
             Vector3 server;
             if (table.sources[at.row] == uint8_t(store::Source::REMOTE)
                 && point_of(
-                    table.read_value(at.row, entry.store_column),
+                    store::read_value(table, at.row, entry.store_column),
                     server
                 )) {
                 row.server

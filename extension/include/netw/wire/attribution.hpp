@@ -4,11 +4,11 @@
 
 #include "godot/local_vector.hpp"
 #include "godot/templates.hpp"
-#include "godot/variant.hpp"
-#include "netw/wire/profiler.hpp"
 #include "netw/wire/registry.hpp"
 
 namespace netw::wire {
+
+constexpr uint32_t NO_SUBJECT = UINT32_MAX;
 
 struct Attribution {
     int64_t peer = 0;
@@ -19,7 +19,7 @@ struct Attribution {
     int64_t bits = 0;
     int64_t column = -1;
 #if defined(DEBUG_ENABLED)
-    uint32_t subject = NetworkProfiler::NONE;
+    uint32_t subject = NO_SUBJECT;
     uint32_t epoch = 0;
 #endif
 };
@@ -184,7 +184,28 @@ public:
         Refusal p_refusal
     ) const;
 
-    godot::Dictionary snapshot() const;
+    const godot::HashMap<uint64_t, int64_t> &bytes_out_rows() const {
+        return bytes_out;
+    }
+    const godot::HashMap<uint64_t, int64_t> &bytes_in_rows() const {
+        return bytes_in;
+    }
+    const godot::HashMap<int64_t, int64_t> &route_out_rows() const {
+        return route_out;
+    }
+    const godot::HashMap<int64_t, int64_t> &route_in_rows() const {
+        return route_in;
+    }
+    const godot::HashMap<uint64_t, int64_t> &frames_in_rows() const {
+        return frames_by_peer_channel_in;
+    }
+    const godot::HashMap<uint64_t, int64_t> &refusal_rows() const {
+        return refusals;
+    }
+    const godot::HashMap<uint64_t, int64_t> &column_rows() const {
+        return column_bits;
+    }
+
     void clear();
 };
 

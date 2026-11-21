@@ -1,3 +1,4 @@
+#include "support/internals.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
@@ -50,7 +51,7 @@ TEST_CASE(
     Node *node = memnew(Node);
 
     const Ref<NetwEntity> entity
-        = Record::stamp_header(node, a_header(), nullptr);
+        = NetwEntity::stamp_header(node, a_header(), nullptr);
 
     REQUIRE(entity.is_valid());
     NETW_CHECK_EQ(entity->get_route(), int64_t(12));
@@ -71,11 +72,12 @@ TEST_CASE(
     "stamps that field's absent value rather than keeping the old one"
 ) {
     Node *node = memnew(Node);
-    Record::stamp_header(node, a_header(), nullptr);
+    NetwEntity::stamp_header(node, a_header(), nullptr);
 
     Dictionary sparse;
     sparse[StringName("route")] = int64_t(12);
-    const Ref<NetwEntity> entity = Record::stamp_header(node, sparse, nullptr);
+    const Ref<NetwEntity> entity
+        = NetwEntity::stamp_header(node, sparse, nullptr);
 
     REQUIRE(entity.is_valid());
     NETW_CHECK_EQ(entity->get_action_spawn_tick(), int64_t(-1));
@@ -83,7 +85,7 @@ TEST_CASE(
     CHECK_FALSE(entity->get_declares_scene());
     CHECK(bool(String(entity->get_scene_label()) == String()));
 
-    CHECK(Record::stamp_header(nullptr, a_header(), nullptr).is_null());
+    CHECK(NetwEntity::stamp_header(nullptr, a_header(), nullptr).is_null());
     memdelete(node);
 }
 
@@ -97,9 +99,10 @@ TEST_CASE(
     child->set_name("child");
     root->add_child(child);
 
-    const PackedByteArray here = netw::gd::var_to_bytes(Vector2(4, 5));
-    const PackedByteArray there = netw::gd::var_to_bytes(Vector2(6, 7));
-    const PackedByteArray lost = netw::gd::var_to_bytes(Vector2(8, 9));
+    using netw_test::Internals;
+    const PackedByteArray here = Internals::value_packed(Vector2(4, 5));
+    const PackedByteArray there = Internals::value_packed(Vector2(6, 7));
+    const PackedByteArray lost = Internals::value_packed(Vector2(8, 9));
 
     Record::apply_native_entry(root, ":position", here);
     Record::apply_native_entry(root, "child:position", there);

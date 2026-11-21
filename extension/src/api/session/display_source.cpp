@@ -15,7 +15,7 @@ RID NetwMultiplayer::scene_shown_derive() {
     if (scene_presented().is_valid()) {
         return scene_presented();
     }
-    const Array live = scene_core->live_scenes();
+    const Array live = scene_core.live_scenes();
     return live.size() == 1 ? RID(live[0]) : RID();
 }
 

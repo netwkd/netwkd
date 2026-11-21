@@ -142,15 +142,15 @@ RID NetwMultiplayer::database_declare(
     }
     const ObjectID scope
         = p_scope != nullptr ? gd::instance_id(p_scope) : ObjectID();
-    for (const DatabaseDeclaration &held : database_declarations) {
+    for (const DatabaseDecl &held : database_declarations) {
         if (held.name == p_name && held.scope == scope
             && held.config == p_config) {
             return made;
         }
     }
-    LocalVector<DatabaseDeclaration> kept;
+    LocalVector<DatabaseDecl> kept;
     kept.reserve(database_declarations.size() + 1);
-    for (const DatabaseDeclaration &held : database_declarations) {
+    for (const DatabaseDecl &held : database_declarations) {
         const bool freed
             = held.scope.is_valid() && gd::object_of(held.scope) == nullptr;
         const bool replaced = held.name == p_name && held.scope == scope;
@@ -158,7 +158,7 @@ RID NetwMultiplayer::database_declare(
             kept.push_back(held);
         }
     }
-    DatabaseDeclaration fresh;
+    DatabaseDecl fresh;
     fresh.name = p_name;
     fresh.scope = scope;
     fresh.config = p_config;
@@ -187,7 +187,7 @@ RID NetwMultiplayer::database_find(const StringName &p_name) {
 }
 
 bool NetwMultiplayer::database_declaration_live(
-    const DatabaseDeclaration &p_held
+    const DatabaseDecl &p_held
 ) const {
     if (!p_held.scope.is_valid()) {
         return true;
@@ -252,9 +252,9 @@ Error NetwMultiplayer::database_backend_of(
 ) {
     r_backend = Ref<NetwDatabaseBackend>();
     const StringName name = databases.name_of(p_database);
-    const DatabaseDeclaration *latest = nullptr;
-    const DatabaseDeclaration *chosen = nullptr;
-    for (const DatabaseDeclaration &held : database_declarations) {
+    const DatabaseDecl *latest = nullptr;
+    const DatabaseDecl *chosen = nullptr;
+    for (const DatabaseDecl &held : database_declarations) {
         if (held.name != name) {
             continue;
         }
@@ -281,7 +281,7 @@ Error NetwMultiplayer::database_backend_of(
             return ERR_ALREADY_EXISTS;
         }
     }
-    const DatabaseDeclaration *used = chosen != nullptr ? chosen : latest;
+    const DatabaseDecl *used = chosen != nullptr ? chosen : latest;
     if (used != nullptr) {
         r_backend = used->config->get_backend();
     }
@@ -515,7 +515,7 @@ Error NetwMultiplayer::database_batch_erase(
 persist::Bindings *NetwMultiplayer::get_bindings() {
     if (!bindings_bound) {
         bindings_bound = true;
-        bindings.bind(this, &books);
+        bindings.bind(this, &schema_core);
     }
     return &bindings;
 }
@@ -537,10 +537,11 @@ Ref<NetwEntity> NetwMultiplayer::persist_heard_entity(
         ? Object::cast_to<Node>(gd::object_of(held->root))
         : nullptr;
     const Ref<NetwEntity> entity = NetwEntity::resolve(root);
-    const NetwEntityRecord *record = record_of(entity.ptr());
+    const NetwEntityRecord *record
+        = entity.is_valid() ? entity->record_in(this) : nullptr;
     const Ref<NetwPersistence> view = record != nullptr
         ? Ref<NetwPersistence>(
-              record->minted_part(NetwEntityRecord::PART_PERSISTENCE)
+              entity->minted_part(NetwEntityRecord::PART_PERSISTENCE)
           )
         : Ref<NetwPersistence>();
     return view.is_valid() ? entity : Ref<NetwEntity>();
@@ -736,10 +737,13 @@ void NetwMultiplayer::persist_publish(const RID &p_binding) {
     plane->publish(root);
     const Ref<NetwEntity> entity = NetwEntity::resolve(root);
     if (entity.is_valid()) {
-        sync_pipeline_recapture_entity(entity);
+        sync_pipeline_recapture_entity(entity->get_rid_handle());
         display_reset(entity->get_rid_handle());
         if (gd::instance_id(root) != persist_enrolling) {
-            predict_reconcile_declaration(entity);
+            predict_reconcile_declaration(
+                *entity->get_record(),
+                entity->get_owner()
+            );
         }
     }
     spawn_schedule_visibility_sweep();
@@ -1367,7 +1371,7 @@ Ref<NetwPromise> NetwMultiplayer::table_save(
     }
     const SchemaRecord *schema
         = schema_core.record_of(table_get_schema(p_table));
-    if (!store_world.arrays.is_valid(p_table) || schema == nullptr
+    if (!array_tables.is_valid(p_table) || schema == nullptr
         || !schema->sealed) {
         return NetwPromise::rejected(
             ERR_DOES_NOT_EXIST,
@@ -1453,7 +1457,7 @@ Ref<NetwPromise> NetwMultiplayer::table_load(
             "a peer holding no session authority loads no table"
         ));
     }
-    if (!store_world.arrays.is_valid(p_table)) {
+    if (!array_tables.is_valid(p_table)) {
         return NetwPromise::resolved(table_load_failure(
             ERR_DOES_NOT_EXIST,
             "this handle names no table in this session"
@@ -1471,7 +1475,7 @@ Ref<NetwPromise> NetwMultiplayer::table_load(
     asked->when_settled(callable_mp(this, &NetwMultiplayer::persist_table_read)
                             .bind(
                                 p_table,
-                                store_world.arrays.revision(p_table),
+                                array_tables.revision(p_table),
                                 asked,
                                 answer,
                                 tenure,
@@ -1531,7 +1535,7 @@ void NetwMultiplayer::persist_table_read(
         p_answer->resolve(table_load_failure(opened, detail));
         return;
     }
-    if (store_world.arrays.revision(p_table) != p_revision) {
+    if (array_tables.revision(p_table) != p_revision) {
         p_answer->resolve(table_load_failure(
             ERR_BUSY,
             "the table committed new rows while its snapshot was read, "
@@ -1544,7 +1548,7 @@ void NetwMultiplayer::persist_table_read(
     for (int at = 0; at < ids.size(); ++at) {
         routes.set(at, liveness_reserve_route());
     }
-    const Error replaced = store_world.arrays.replace_rows(
+    const Error replaced = array_tables.replace_rows(
         p_table,
         routes,
         columns,
@@ -1574,8 +1578,8 @@ void NetwMultiplayer::persist_table_retire(
 ) {
     PackedInt64Array retiring;
     for (int at = 0; at < p_routes.size(); ++at) {
-        if (store_world.arrays.row_of(p_table, p_routes[at]) < 0
-            && !store_world.arrays.holds_elsewhere(p_table, p_routes[at])) {
+        if (array_tables.row_of(p_table, p_routes[at]) < 0
+            && !array_tables.holds_elsewhere(p_table, p_routes[at])) {
             retiring.push_back(p_routes[at]);
         }
     }

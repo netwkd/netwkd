@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/predict/journal.hpp"
 
 namespace netw::predict {

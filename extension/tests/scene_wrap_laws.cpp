@@ -35,10 +35,10 @@ Ref<NetwEntity> bind(const Ref<NetwMultiplayer> &p_core, Node *p_node) {
     wrapper.instantiate();
     const RID handle = Internals::get_liveness_core(p_core)->entity_create();
     wrapper->stamp_multiplayer(p_core);
-    REQUIRE(p_core->liveness_bind(
+    REQUIRE(wrapper->bind_route(
+        p_core.ptr(),
         handle,
         Internals::get_liveness_core(p_core)->reserve_route(),
-        wrapper,
         p_node
     ));
     wrapper->set_owner(p_node);

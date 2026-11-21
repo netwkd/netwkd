@@ -61,19 +61,6 @@
 				Returns [code]true[/code] when updates for [param entity] are sent to [param peer_id], considering every layer. It answers as [method NetwMultiplayer.interest_is_visible] does.
 			</description>
 		</method>
-		<method name="monitor_snapshot" qualifiers="const">
-			<return type="Dictionary" />
-			<description>
-				Returns counts for this layer.
-				[codeblock lang=text]
-				Dictionary
-				┠╴viewers            int   number of viewers
-				┠╴entities           int   number of entities
-				┠╴visible_edges      int   (entity, peer) pairs that can see each other
-				┖╴transitions_total  int   shows plus hides since the layer was created
-				[/codeblock]
-			</description>
-		</method>
 		<method name="remove_entity">
 			<return type="bool" />
 			<param index="0" name="entity" type="NetwEntity" />
@@ -96,10 +83,14 @@
 				Sets [member policy]. Returns [code]false[/code] when it did not change.
 			</description>
 		</method>
-		<method name="viewer_ids" qualifiers="const">
-			<return type="Array" />
+		<method name="stat" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="stat" type="int" enum="NetwMultiplayer.LayerStat" />
 			<description>
-				Returns the viewer peer ids.
+				Returns the visibility counter [param stat] of this layer.
+				[codeblock]
+				var edges := layer.stat(NetwMultiplayer.LAYER_STAT_VISIBLE_EDGES)
+				[/codeblock]
 			</description>
 		</method>
 	</methods>
@@ -118,8 +109,8 @@
 			[/codeblock]
 			If the result holds anything that is not an entity of this session, the layer does not change that frame.
 		</member>
-		<member name="entities" type="Dictionary" setter="" getter="get_entities">
-			The entities in the layer, as keys. On a client, only the ones it sees. Returns a copy, so use [method add_entity] and [method remove_entity] to change it.
+		<member name="entities" type="NetwEntity[]" setter="" getter="get_entities">
+			The entities in the layer. On a client, only the ones it sees. Returns a copy, so use [method add_entity] and [method remove_entity] to change it.
 		</member>
 		<member name="layer_id" type="StringName" setter="" getter="get_layer_id">
 			The name of the layer.
@@ -127,8 +118,8 @@
 		<member name="policy" type="int" setter="set_policy" getter="get_policy" enum="NetwInterestLayer.LayerPolicy">
 			Whether [member viewers] are the peers that see the entities, or the ones that do not.
 		</member>
-		<member name="viewers" type="Dictionary" setter="" getter="get_viewers">
-			The viewer peer ids, as keys. Returns a copy, so use [method add_viewer] and [method remove_viewer] to change it.
+		<member name="viewers" type="PackedInt32Array" setter="" getter="get_viewers">
+			The viewer peer ids. Returns a copy, so use [method add_viewer] and [method remove_viewer] to change it.
 		</member>
 	</members>
 	<signals>

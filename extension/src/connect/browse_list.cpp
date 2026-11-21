@@ -174,8 +174,8 @@ bool BrowseList::remove(const RID &p_target) {
     return true;
 }
 
-Array BrowseList::list() const {
-    Array out;
+TypedArray<RID> BrowseList::list() const {
+    TypedArray<RID> out;
     for (uint32_t at = 0; at < caller_rows.size(); at++) {
         out.push_back(caller_rows[at]);
     }

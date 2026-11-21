@@ -19,7 +19,7 @@ NetwQuantizeAngle
 Description
 -----------
 
-Compresses a :godot:`float` angle into :ref:`bit_count<class_NetwQuantizeAngle_property_bit_count>` bits. The angle wraps around, so values near ``0`` and :godot:`@GDScript.TAU <@GDScript#class_@GDScript_constant_TAU>` stay close.
+Compresses a :godot:`float` angle into :ref:`bit_count<class_NetwQuantizeAngle_property_bit_count>` bits. The angle wraps around, so values near ``0`` and :godot:`@GDScript.TAU <@GDScript#class_@GDScript_constant_TAU>` stay close. A property reads these settings when it is declared, so set them before.
 
 ::
 

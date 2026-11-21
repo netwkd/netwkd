@@ -12,6 +12,7 @@
 #include "netw/predict/sensors.hpp"
 #include "netw/profile.hpp"
 #include "netw/project.hpp"
+#include "netw/value_variant.hpp"
 
 using namespace godot;
 
@@ -20,7 +21,6 @@ namespace netw {
 constexpr int CAUSAL_FAMILY_COUNT = 3;
 
 constexpr uint32_t FNV_OFFSET = 2166136261u;
-constexpr uint32_t FNV_PRIME = 16777619u;
 
 constexpr double TAU = 6.2831853071795864769252867666;
 
@@ -97,19 +97,12 @@ static bool diverged(
     return false;
 }
 
-static int64_t fnv1a(const PackedByteArray &bytes) {
-    uint32_t hash = FNV_OFFSET;
-    for (int i = 0; i < bytes.size(); i++) {
-        hash = (hash ^ uint32_t(uint8_t(bytes[i]))) * FNV_PRIME;
-    }
-    const int64_t folded = int64_t(hash);
-    return hash >= 0x80000000u ? folded - 0x100000000LL : folded;
+static int64_t folded(uint32_t hash) {
+    const int64_t widened = int64_t(hash);
+    return hash >= 0x80000000u ? widened - 0x100000000LL : widened;
 }
 
-static void append_in_key_text_order(
-    const Dictionary &source,
-    PackedByteArray &bytes
-) {
+static uint32_t mix_in_key_text_order(const Dictionary &source, uint32_t hash) {
     PackedStringArray names;
     const Array keys = source.keys();
     for (int i = 0; i < keys.size(); i++) {
@@ -119,16 +112,15 @@ static void append_in_key_text_order(
 
     for (int i = 0; i < names.size(); i++) {
         const StringName key = StringName(names[i]);
-        bytes.append_array(gd::var_to_bytes(key));
-        bytes.append_array(gd::var_to_bytes(source[key]));
+        hash = value::hash_variant(hash, key);
+        hash = value::hash_variant(hash, source[key]);
     }
+    return hash;
 }
 
 static int64_t fingerprint_of(const Dictionary &source) {
     NETW_ZONE_NC("NetwPredict fingerprint", colors::PREDICTION);
-    PackedByteArray bytes;
-    append_in_key_text_order(source, bytes);
-    return fnv1a(bytes);
+    return folded(mix_in_key_text_order(source, FNV_OFFSET));
 }
 
 Judgement prediction_core::judge(
@@ -341,9 +333,8 @@ int64_t prediction_core::environment_digest(
     const Dictionary &samples
 ) {
     NETW_ZONE_NC("NetwPredict environment_digest", colors::PREDICTION);
-    PackedByteArray bytes = gd::var_to_bytes(epoch);
-    append_in_key_text_order(samples, bytes);
-    return fnv1a(bytes);
+    const uint32_t hash = value::hash_variant(FNV_OFFSET, epoch);
+    return folded(mix_in_key_text_order(samples, hash));
 }
 
 Dictionary prediction_core::delta_direction(

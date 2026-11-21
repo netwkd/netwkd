@@ -12,7 +12,6 @@ class NetwChannelBook {
     struct Row {
         godot::Callable handler;
         bool defers = false;
-        bool protocol = false;
     };
 
     godot::HashMap<int64_t, Row> rows;
@@ -26,15 +25,9 @@ public:
         bool defers
     );
 
-    bool register_protocol(int64_t channel, const godot::Callable &handler);
-
     bool unregister_channel(int64_t channel);
 
     godot::Callable handler_of(int64_t channel) const;
-
-    godot::Callable protocol_handler_of(int64_t channel) const;
-
-    godot::Error settle_protocol() const;
 
     bool defers(int64_t channel) const;
 

@@ -4,6 +4,7 @@
 #include "netw/log.hpp"
 #include "netw/predict/journal.hpp"
 #include "netw/profile.hpp"
+#include "netw/wire/spec_dump.hpp"
 #include "netw/wire/stream.hpp"
 #include "netw/wire/value_row.hpp"
 
@@ -154,10 +155,10 @@ bool serialize_row(
     for (uint32_t column = 0; column < p_plan.column_count(); ++column) {
         const wire::ColumnPlan &slot = p_plan.column(column);
         if (slot.variable) {
-            Variant value
-                = Stream::is_reading ? Variant() : p_row.read_value(column);
-            if (!wire::carry_value(p_stream, value)
-                || (Stream::is_reading && !p_row.write_value(column, value))) {
+            wire::TailRef tail
+                = Stream::is_reading ? wire::TailRef() : p_row.tail(column);
+            if (!wire::carry_tail(p_stream, slot, tail)
+                || (Stream::is_reading && !p_row.write_tail(column, tail))) {
                 return false;
             }
             continue;
@@ -562,11 +563,11 @@ bool reader_consumed(ReadStream &p_reader) {
 
 Dictionary spec_records() {
     Dictionary out;
-    out["CommandHeader"] = CommandHeader::wire.spec_dump();
-    out["AckHeader"] = AckHeader::wire.spec_dump();
-    out["CommandEvidence"] = command_evidence_prefix.spec_dump();
-    out["AckVerdict"] = ack_verdict.spec_dump();
-    out["AckDetail"] = ack_detail.spec_dump();
+    out["CommandHeader"] = wire::spec_dump(CommandHeader::wire);
+    out["AckHeader"] = wire::spec_dump(AckHeader::wire);
+    out["CommandEvidence"] = wire::spec_dump(command_evidence_prefix);
+    out["AckVerdict"] = wire::spec_dump(ack_verdict);
+    out["AckDetail"] = wire::spec_dump(ack_detail);
     return out;
 }
 
@@ -598,7 +599,8 @@ PackedByteArray encode_command(
 bool decode_command(
     const PackedByteArray &p_bytes,
     const wire::WirePlan &p_input_plan,
-    CommandFrame &r_frame
+    CommandFrame &r_frame,
+    int *r_mistyped
 ) {
     NETW_ZONE_NC("Predict wire command decode", colors::PREDICTION);
     if (p_bytes.is_empty() || !p_input_plan.valid()) {
@@ -609,6 +611,17 @@ bool decode_command(
     if (!serialize_command(reader, staged, p_input_plan)
         || !reader_consumed(reader)) {
         return false;
+    }
+    for (const wire::CodeRow &payload : staged.payloads) {
+        for (uint32_t at = 0; at < p_input_plan.column_count(); ++at) {
+            const wire::ColumnPlan &slot = p_input_plan.column(at);
+            if (slot.variable && slot.mistypes(payload.tail(at))) {
+                if (r_mistyped != nullptr) {
+                    *r_mistyped = int(at);
+                }
+                return false;
+            }
+        }
     }
     r_frame = staged;
     return true;
@@ -679,8 +692,10 @@ bool decode_relay_request(const PackedByteArray &p_bytes, bool &r_subscribed) {
 }
 
 bool is_lane(uint8_t p_channel) {
-    return p_channel == CHANNEL_COMMAND || p_channel == CHANNEL_ACK
-        || p_channel == CHANNEL_RELAY || p_channel == CHANNEL_RELAY_REQUEST;
+    return p_channel == wire::CHANNEL_PREDICT_COMMAND
+        || p_channel == wire::CHANNEL_PREDICT_ACK
+        || p_channel == wire::CHANNEL_PREDICT_RELAY
+        || p_channel == wire::CHANNEL_PREDICT_RELAY_REQUEST;
 }
 
 godot::Error admit_frame(

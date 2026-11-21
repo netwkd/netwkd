@@ -1,4 +1,5 @@
 #include "support/directory_stubs.h"
+#include "support/fault_log.h"
 #include "support/minted_script.h"
 #include "support/netw_cells.h"
 
@@ -268,7 +269,11 @@ LawVerdict session_left(const Stand &) {
     if (lobby.directory->leave_calls != 0) {
         return law_broken("the client left before session_leave");
     }
-    lobby.api->session_leave();
+    {
+        netw_test::FaultWatch leaving;
+        leaving.expect_error("*bug in netwkd*", 0);
+        lobby.api->session_leave();
+    }
 
     if (left_by_host != 1 || lobby.directory->leave_calls != 1) {
         return law_broken(

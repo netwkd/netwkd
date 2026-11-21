@@ -175,6 +175,12 @@ TEST_CASE(
 
     host->set_transfer(NetwEntity::TRANSFER_REQUESTABLE);
     host->set_control_handler(callable_mp_static(&deny_every_request));
+    Internals::control_seed(
+        host.ptr(),
+        host->get_control_revision() + 1,
+        host->get_control_tenure(),
+        host->get_hold()
+    );
 
     const Ref<NetwPromise> denied = entity_at(rig, route, 1)->claim_control();
     rig.pump(10);
@@ -183,6 +189,7 @@ TEST_CASE(
     NETW_CHECK_EQ(denied->get_code(), ERR_BUSY);
     CHECK(denied->get_detail() == String("hands full"));
     NETW_CHECK_EQ(host->get_controller(), represented);
+    NETW_CHECK_EQ(entity_at(rig, route, 1)->get_controller(), represented);
     NETW_CHECK_EQ(rig.route_node(route, -1)->get_multiplayer_authority(), 1);
 
     host->set_control_handler(Callable());
@@ -234,7 +241,7 @@ Error deliver_apply(
         NetwMultiplayer::frame_pack(
             p_route,
             0,
-            netw::wire::builtin_channel("CONTROL_APPLY"),
+            netw::wire::CHANNEL_CONTROL_APPLY,
             netw::session::frame_write(p_applied),
             String()
         ),

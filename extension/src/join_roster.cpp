@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/join_roster.hpp"
 
 #include "netw/peer_rename.hpp"

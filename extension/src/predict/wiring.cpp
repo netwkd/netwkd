@@ -4,9 +4,10 @@
 
 #include "netw/predict/compare.hpp"
 
-#include "netw/api/schema_core.hpp"
 #include "netw/colors.hpp"
 #include "netw/profile.hpp"
+#include "netw/schema_book.hpp"
+#include "netw/value_variant.hpp"
 #include "netw/wire/code_row.hpp"
 #include "netw/wire/stream.hpp"
 #include "netw/wire/value_row.hpp"
@@ -27,8 +28,9 @@ void FieldCodec::append(
     table::SchemaColumn column;
     column.key = p_key;
     column.type = p_column_type >= 0 ? p_column_type
-                                     : SchemaCore::type_from_variant(p_type);
-    column.quantizer = p_quantizer;
+                                     : SchemaBook::type_from_variant(p_type);
+    column.quant = SchemaBook::spec_of(p_quantizer, column.type);
+    column.value_tag = uint8_t(value::kind_of_type(p_type));
     schema.columns.push_back(column);
     schema.sealed = false;
 }
@@ -50,12 +52,12 @@ bool FieldCodec::holds(int p_field, const Variant &p_value) const {
     }
     const table::SchemaColumn &column = *schema.at(p_field);
     const Variant::Type expected
-        = Variant::Type(SchemaCore::element_type(column.type));
+        = Variant::Type(SchemaBook::element_type(column.type));
     if (p_value.get_type() != expected) {
         return false;
     }
-    return column.quantizer.is_null()
-        || column.quantizer->supports_type(expected);
+    const Ref<NetwQuantize> &quantizer = quantizers[uint32_t(p_field)];
+    return quantizer.is_null() || quantizer->supports_type(expected);
 }
 
 void FieldCodec::clear() {
@@ -64,61 +66,6 @@ void FieldCodec::clear() {
     types.clear();
     schema = table::SchemaRecord();
     plan = wire::WirePlan();
-}
-
-PackedByteArray canonical_bytes(
-    const FieldCodec &p_codec,
-    const Dictionary &p_payload
-) {
-    NETW_ZONE_LEAF(
-        "Predict canonical bytes",
-        colors::PREDICTION,
-        profile::SUBSYSTEM_PREDICTION
-    );
-    wire::CodeRow row = wire::CodeRow::for_plan(p_codec.plan);
-    wire::WriteStream stream;
-    uint64_t count = 0;
-    for (int at = 0; at < p_codec.count(); ++at) {
-        count += p_payload.has(p_codec.keys[at]) ? 1 : 0;
-    }
-    if (count == 0 || !stream.varuint(count, 2)) {
-        return PackedByteArray();
-    }
-    for (int at = 0; at < p_codec.count(); ++at) {
-        if (!p_payload.has(p_codec.keys[at])) {
-            continue;
-        }
-        const Variant value = p_payload[p_codec.keys[at]];
-        bool coded = p_codec.holds(at, value)
-            && wire::encode_scalar_column(
-                         *p_codec.schema.at(at),
-                         p_codec.plan.column(uint32_t(at)),
-                         uint32_t(at),
-                         value,
-                         row
-            );
-        if (!stream.bool1(coded)) {
-            return PackedByteArray();
-        }
-        if (!coded) {
-            Variant carried = value;
-            if (!wire::carry_value(stream, carried)) {
-                return PackedByteArray();
-            }
-            continue;
-        }
-        const wire::ColumnPlan &slot = p_codec.plan.column(uint32_t(at));
-        for (int element = 0; element < slot.stride; ++element) {
-            uint64_t code = row.read(slot, element);
-            if (!stream.bits(code, slot.width)) {
-                return PackedByteArray();
-            }
-        }
-    }
-    if (!stream.align_verify()) {
-        return PackedByteArray();
-    }
-    return stream.to_bytes();
 }
 
 namespace {
@@ -237,7 +184,7 @@ bool codes_agree(
         const wire::ColumnPlan &theirs = p_plan.column(at);
         if (StringName(p_keys[int(at)]) != p_codec.keys[at]
             || wire_column.key != own.key || wire_column.type != own.type
-            || wire_column.quantizer != own.quantizer || mine.variable
+            || wire_column.quant.object != own.quant.object || mine.variable
             || theirs.variable || mine.width != theirs.width
             || mine.stride != theirs.stride || mine.offset != theirs.offset) {
             return false;
@@ -248,7 +195,8 @@ bool codes_agree(
 
 Dictionary canonicalize(
     const FieldCodec &p_codec,
-    const Dictionary &p_payload
+    const Dictionary &p_payload,
+    NetwMultiplayer *p_session
 ) {
     NETW_ZONE_LEAF(
         "Predict canonicalize",
@@ -270,7 +218,14 @@ Dictionary canonicalize(
         const table::SchemaColumn &column = *p_codec.schema.at(at);
         const wire::ColumnPlan &slot = p_codec.plan.column(uint32_t(at));
         Variant decoded;
-        if (wire::encode_scalar_column(column, slot, uint32_t(at), value, row)
+        if (wire::encode_scalar_column(
+                column,
+                slot,
+                uint32_t(at),
+                value,
+                row,
+                p_session
+            )
             && wire::decode_scalar_column(
                 column,
                 slot,

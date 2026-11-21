@@ -19,10 +19,6 @@
 #include "netw/spawn/spawner_compat.hpp"
 #include "netw/wire/registry.hpp"
 
-namespace netw::session {
-struct Books;
-} // namespace netw::session
-
 namespace netw {
 
 class NetwMultiplayer;
@@ -31,43 +27,13 @@ class ReplicationCore {
     friend class NetwMultiplayer;
 
 private:
-    struct Channels {
-        int64_t table = 0;
-        int64_t spawn = 0;
-        int64_t despawn = 0;
-        int64_t hide = 0;
-        int64_t reparent = 0;
-        int64_t call = 0;
-        int64_t reply = 0;
-        int64_t control_request = 0;
-        int64_t control_apply = 0;
-        int64_t claim_image = 0;
-        bool control_requests_ordered = true;
-        int64_t property_sync = 0;
-        int64_t signal = 0;
-        int64_t sync = 0;
-        int64_t sync_delta = 0;
-        int64_t sync_row = 0;
-        int64_t sync_row_delta = 0;
-        int64_t sync_row_window = 0;
-        int64_t row_control = 0;
-        int64_t predict_command = 0;
-        int64_t predict_ack = 0;
-        int64_t predict_relay = 0;
-        int64_t predict_relay_request = 0;
-        int64_t action = 0;
-        int64_t clock_handshake = 0;
-        int64_t clock_handshake_reply = 0;
-        int64_t clock_ping = 0;
-        int64_t clock_pong = 0;
-        int64_t interest_awareness = 0;
-        int64_t lagcomp_deny = 0;
-        int64_t lagcomp_confirm = 0;
-    };
-
-    godot::ObjectID core_id;
-    godot::ObjectID api_id;
-    const session::Books *books = nullptr;
+    NetwMultiplayer *session = nullptr;
+    Clock *clock_engine = nullptr;
+    store::Store *store_world = nullptr;
+    NetwLivenessCore *liveness_core = nullptr;
+#if defined(DEBUG_ENABLED)
+    wire::NetworkProfiler *network_profiler = nullptr;
+#endif
 
     NetwChannelBook *channels = nullptr;
     godot::LocalVector<godot::ObjectID> control_waiting;
@@ -78,10 +44,8 @@ private:
     spawn::SpawnerCompat spawner_compat;
     SyncCompat sync_compat;
 
-    Channels ids;
+    bool control_requests_ordered = true;
 
-    NetwMultiplayer *core() const;
-    godot::Object *api() const;
     godot::Error finish_receive_pass(
         int64_t p_frames,
         godot::Error p_verdict,
@@ -96,6 +60,21 @@ private:
         int64_t p_sender,
         bool p_reliable,
         int64_t p_seq
+    );
+    void receive_protocol(
+        NetwMultiplayer *p_session,
+        wire::Channel p_channel,
+        const godot::PackedByteArray &p_payload,
+        int64_t p_sender
+    );
+    void receive_routed(
+        NetwMultiplayer *p_session,
+        wire::Channel p_channel,
+        const godot::Ref<NetwEntity> &p_entity,
+        godot::Node *p_node,
+        int64_t p_comp,
+        const godot::PackedByteArray &p_payload,
+        int64_t p_sender
     );
     void dispatch_reply(
         const godot::PackedByteArray &p_payload,
@@ -127,13 +106,30 @@ private:
         const godot::PackedByteArray &p_payload,
         int64_t p_sender
     );
-    void resolve_channel_ids();
 
 public:
     ReplicationCore();
 
-    void install(godot::Object *p_api, const session::Books *p_books);
-    void set_tap_seam(const godot::Callable &p_tap);
+    void install(
+        NetwMultiplayer *p_session,
+        Clock *p_clock,
+        store::Store *p_store,
+        NetwLivenessCore *p_liveness,
+        NetwChannelBook *p_channels,
+        repl::BindingBook *p_bindings,
+        repl::SetBook *p_sets,
+        NetwPredictionEngine *p_prediction
+    );
+#if defined(DEBUG_ENABLED)
+    void seat_profiler(
+        wire::NetworkProfiler *p_profiler,
+        uint32_t *p_outgoing
+    );
+#endif
+#if defined(NETW_TESTS)
+    void seat_idle(session::IdleWork *p_idle);
+#endif
+    void unseat();
 
     NetwSyncModel *get_sync_model() {
         return &sync_model;
@@ -151,14 +147,6 @@ public:
         return &sync_compat;
     }
     bool get_is_applying_remote_frame() const;
-
-    void register_channel(
-        int64_t p_channel,
-        const godot::Callable &p_handler,
-        bool p_defer_when_unknown
-    );
-    void register_protocol(int64_t p_channel, const godot::Callable &p_handler);
-    godot::Error settle_channels();
 
     repl::PropertyBindingPtr derived_binding(
         godot::Node *p_node,
@@ -251,6 +239,10 @@ public:
 
     void clear_session();
     void clear_route(int64_t p_route);
+    void release_spawn_builds();
+    void clear_spawn_parks();
+    void release_spawn_route(int64_t p_route);
+    void act_spawn_rows(spawn::Ops &r_ops);
     void clear_peer(int64_t p_peer_id);
     void dispose();
     godot::Dictionary counters() const;

@@ -7,6 +7,7 @@
 #include "godot/hash_map.hpp"
 #include "godot/local_vector.hpp"
 #include "godot/object.hpp"
+#include "netw/wire/attribution.hpp"
 #include "netw/wire/registry.hpp"
 
 namespace netw::wire {
@@ -39,7 +40,7 @@ struct ReplyKeyHasher {
 
 class NetworkProfiler {
 public:
-    static constexpr uint32_t NONE = UINT32_MAX;
+    static constexpr uint32_t NONE = NO_SUBJECT;
     static constexpr uint32_t SKIP = UINT32_MAX - 1;
     static constexpr uint32_t SUBJECT_LIMIT = 8192;
     static constexpr uint16_t SET_CHANNEL = 257;

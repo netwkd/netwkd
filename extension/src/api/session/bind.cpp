@@ -75,10 +75,6 @@ void NetwMultiplayer::_bind_methods() {
         DEFVAL(0.0)
     );
     ClassDB::bind_method(
-        D_METHOD("session_get_stats"),
-        &NetwMultiplayer::session_get_stats
-    );
-    ClassDB::bind_method(
         D_METHOD("stats_get", "stat"),
         &NetwMultiplayer::stats_get
     );
@@ -423,12 +419,12 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::table_load
     );
     ClassDB::bind_method(
-        D_METHOD("peer_get_link_stats", "peer"),
-        &NetwMultiplayer::peer_get_link_stats
+        D_METHOD("peer_get_link_stat", "peer", "stat"),
+        &NetwMultiplayer::peer_get_link_stat
     );
     ClassDB::bind_method(
-        D_METHOD("session_get_traffic", "peer"),
-        &NetwMultiplayer::session_get_traffic
+        D_METHOD("peer_get_traffic", "peer", "stat"),
+        &NetwMultiplayer::peer_get_traffic
     );
     ClassDB::bind_method(
         D_METHOD("peer_set_bandwidth", "peer", "kbps"),
@@ -748,6 +744,49 @@ void NetwMultiplayer::_bind_methods() {
 #define NETW_SESSION_STAT_BIND(m_name, m_key) BIND_ENUM_CONSTANT(STAT_##m_name);
     NETW_SESSION_STAT_TABLE(NETW_SESSION_STAT_BIND)
 #undef NETW_SESSION_STAT_BIND
+    BIND_ENUM_CONSTANT(TRACK_STAT_SLEEPING);
+    BIND_ENUM_CONSTANT(TRACK_STAT_OFFSET_ARMED);
+    BIND_ENUM_CONSTANT(TRACK_STAT_OFFSET_HELD);
+    BIND_ENUM_CONSTANT(TRACK_STAT_NEWEST_TICK);
+    BIND_ENUM_CONSTANT(TRACK_STAT_BUFFER_SIZE);
+    BIND_ENUM_CONSTANT(TRACK_STAT_CHANNELS);
+    BIND_ENUM_CONSTANT(TRACK_STAT_AMBIGUOUS);
+    BIND_ENUM_CONSTANT(TRACK_STAT_PUMPED_FRAMES);
+    BIND_ENUM_CONSTANT(TRACK_STAT_PUMP_MODE);
+    BIND_ENUM_CONSTANT(TRACK_STAT_STARVATION_TICKS);
+    BIND_ENUM_CONSTANT(TRACK_STAT_DISPLAY_LAG);
+    BIND_ENUM_CONSTANT(TRACK_STAT_ROLE);
+    BIND_ENUM_CONSTANT(LINK_STAT_RTT);
+    BIND_ENUM_CONSTANT(LINK_STAT_JITTER);
+    BIND_ENUM_CONSTANT(LINK_STAT_REORDERS);
+    BIND_ENUM_CONSTANT(LINK_STAT_DUPLICATES);
+    BIND_ENUM_CONSTANT(LINK_STAT_LOSS);
+    BIND_ENUM_CONSTANT(LINK_STAT_MODE);
+    BIND_ENUM_CONSTANT(LINK_STAT_BUDGET_BITS);
+    BIND_ENUM_CONSTANT(LINK_STAT_BUDGET_BYTES);
+    BIND_ENUM_CONSTANT(LINK_STAT_SENT_BYTES);
+    BIND_ENUM_CONSTANT(LINK_STAT_DEBT_BYTES);
+    BIND_ENUM_CONSTANT(LINK_STAT_DEFERRED_ROWS);
+    BIND_ENUM_CONSTANT(LINK_MODE_GOOD);
+    BIND_ENUM_CONSTANT(LINK_MODE_BAD);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_STATE);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_INPUT);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_CALLS);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_SPAWNS);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_UPKEEP);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_HEADERS);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_STATE);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_INPUT);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_CALLS);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_SPAWNS);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_UPKEEP);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_HEADERS);
+    BIND_ENUM_CONSTANT(TRAFFIC_SENT_PACKETS);
+    BIND_ENUM_CONSTANT(TRAFFIC_RECEIVED_PACKETS);
+    BIND_ENUM_CONSTANT(LAYER_STAT_VIEWERS);
+    BIND_ENUM_CONSTANT(LAYER_STAT_ENTITIES);
+    BIND_ENUM_CONSTANT(LAYER_STAT_VISIBLE_EDGES);
+    BIND_ENUM_CONSTANT(LAYER_STAT_TRANSITIONS_TOTAL);
     ADD_SIGNAL(
         MethodInfo("peer_authenticating", PropertyInfo(Variant::INT, "id"))
     );
@@ -853,8 +892,8 @@ void NetwMultiplayer::_bind_methods() {
         &NetwMultiplayer::interest_layer_has_entity
     );
     ClassDB::bind_method(
-        D_METHOD("interest_layer_get_stats", "layer"),
-        &NetwMultiplayer::interest_layer_get_stats
+        D_METHOD("interest_layer_get_stat", "layer", "stat"),
+        &NetwMultiplayer::interest_layer_get_stat
     );
     ClassDB::bind_method(
         D_METHOD("interest_join", "entity", "layer"),

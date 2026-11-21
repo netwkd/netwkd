@@ -8,21 +8,18 @@
 #include "netw/display/spec_row.hpp"
 #include "netw/display/timing.hpp"
 
+namespace netw {
+class NetwMultiplayer;
+} // namespace netw
+
 namespace netw::display {
 
 struct Hooks {
-    godot::Callable resolve_role;
-    godot::Callable chase_clamp;
+    NetwMultiplayer *session = nullptr;
     godot::LocalVector<SpecRow> spec_override;
     bool spec_override_armed = false;
     mutable int spec_asks = 0;
-    godot::Callable display_lane;
-    godot::Callable sync_intervals;
-    godot::Callable authors_streams;
-    godot::Callable role_reader;
-    godot::Callable chase_hook_binder;
 
-    void resolve(const godot::RID &p_entity) const;
     double clamp_for(const godot::RID &p_entity) const;
     godot::LocalVector<SpecRow> specs_of(godot::Node *p_owner) const;
     void compute_sync_intervals(const godot::RID &p_entity) const;

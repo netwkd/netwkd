@@ -2,11 +2,15 @@
 
 #include <cstdint>
 
+#include "godot/local_vector.hpp"
 #include "godot/variant.hpp"
 #include "netw/wire/describe.hpp"
-#if defined(DEBUG_ENABLED)
-#include "netw/wire/attribution.hpp"
-#endif
+
+namespace netw::wire {
+
+struct Attribution;
+
+} // namespace netw::wire
 
 namespace netw {
 
@@ -82,8 +86,6 @@ struct NetwCarrierFrame {
     }
 
     static NetwCarrierFrame read(const godot::PackedByteArray &p_packet);
-
-    static godot::Dictionary spec_records();
 
     int64_t kind = FOREIGN;
     int64_t seq = 0;

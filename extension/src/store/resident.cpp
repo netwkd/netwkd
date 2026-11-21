@@ -53,6 +53,43 @@ NodeCell Residents::derive_object(Object *p_object) {
     return cell;
 }
 
+int64_t Residents::held_bytes() const {
+    int64_t bytes = netw::held::set(held) + netw::held::vector(tables);
+    for (const ResidentRows &table : tables) {
+        bytes += netw::held::vector(table.nodes)
+            + netw::held::vector(table.cells)
+            + netw::held::vector(table.scripts);
+    }
+    return bytes;
+}
+
+ResidentRows &Residents::rows(uint32_t p_table) {
+    if (p_table >= tables.size()) {
+        tables.resize(p_table + 1);
+    }
+    return tables[p_table];
+}
+
+void Residents::add_row(uint32_t p_table, uint64_t p_node) {
+    ResidentRows &table = rows(p_table);
+    table.nodes.push_back(p_node);
+    table.cells.push_back(NodeCell());
+    table.scripts.push_back(0);
+}
+
+void Residents::swap_remove(uint32_t p_table, uint32_t p_row) {
+    ResidentRows &table = rows(p_table);
+    const uint32_t last = table.nodes.size() - 1;
+    if (p_row != last) {
+        table.nodes[p_row] = table.nodes[last];
+        table.cells[p_row] = table.cells[last];
+        table.scripts[p_row] = table.scripts[last];
+    }
+    table.nodes.resize(last);
+    table.cells.resize(last);
+    table.scripts.resize(last);
+}
+
 void Residents::watch(bool p_watching) {
     if (watching == p_watching) {
         return;

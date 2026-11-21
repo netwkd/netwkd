@@ -1,3 +1,5 @@
+#include "netw/sealed.hpp"
+
 #include "netw/interest/relay.hpp"
 
 using namespace godot;
@@ -17,46 +19,21 @@ Awareness Awareness::layer_edge(
     const StringName &layer_id,
     int kind
 ) {
-    Array raw;
-    raw.push_back(route);
-    raw.push_back(layer_id);
-    raw.push_back(int64_t(kind));
     Awareness edge;
-    from_array(raw, edge);
+    if (admits(route, layer_id, int64_t(kind))) {
+        edge.route = route;
+        edge.layer_id = layer_id;
+        edge.kind = int32_t(kind);
+    }
     return edge;
 }
 
-bool Awareness::from_array(const Variant &raw, Awareness &r_edge) {
-    if (raw.get_type() != Variant::ARRAY) {
-        return false;
-    }
-    const Array row = raw;
-    if (row.size() != 3) {
-        return false;
-    }
-    if (row[0].get_type() != Variant::INT
-        || row[1].get_type() != Variant::STRING_NAME
-        || row[2].get_type() != Variant::INT) {
-        return false;
-    }
-    const int64_t row_route = row[0];
-    const StringName row_layer = row[1];
-    const int64_t row_kind = row[2];
-    if (row_route <= 0 || row_layer.is_empty() || !is_kind(row_kind)) {
-        return false;
-    }
-    r_edge.route = row_route;
-    r_edge.layer_id = row_layer;
-    r_edge.kind = int32_t(row_kind);
-    return true;
-}
-
-Array Awareness::to_array() const {
-    Array out;
-    out.push_back(route);
-    out.push_back(layer_id);
-    out.push_back(int64_t(kind));
-    return out;
+bool Awareness::admits(
+    int64_t route,
+    const StringName &layer_id,
+    int64_t kind
+) {
+    return route > 0 && !layer_id.is_empty() && is_kind(kind);
 }
 
 namespace {
@@ -85,18 +62,14 @@ Awareness awareness_of(const AwarenessEdge &edge) {
 
 } // namespace
 
-PackedByteArray awareness_encode(const Array &edges) {
+PackedByteArray awareness_encode(const LocalVector<Awareness> &edges) {
     wire::WriteStream stream;
     uint64_t count = uint64_t(edges.size());
     if (!stream.varuint(count, EDGE_COUNT_BYTES)) {
         return PackedByteArray();
     }
-    for (int at = 0; at < edges.size(); ++at) {
-        Awareness source;
-        if (!Awareness::from_array(edges[at], source)) {
-            return PackedByteArray();
-        }
-        AwarenessEdge edge = edge_of(source);
+    for (uint32_t at = 0; at < edges.size(); ++at) {
+        AwarenessEdge edge = edge_of(edges[at]);
         if (!AwarenessEdge::wire.run(stream, edge)) {
             return PackedByteArray();
         }
@@ -132,21 +105,15 @@ bool awareness_decode(
     return true;
 }
 
-Dictionary awareness_spec_records() {
-    Dictionary out;
-    out["AwarenessEdge"] = AwarenessEdge::wire.spec_dump();
-    return out;
-}
-
 void Relay::append(int64_t peer_id, const Awareness &edge) {
     if (edge.route <= 0) {
         return;
     }
     if (!pending.has(peer_id)) {
-        pending.insert(peer_id, Array());
+        pending.insert(peer_id, LocalVector<Awareness>());
         peer_order.push_back(peer_id);
     }
-    pending[peer_id].push_back(edge.to_array());
+    pending[peer_id].push_back(edge);
 }
 
 PackedInt64Array Relay::targets() const {
@@ -157,13 +124,14 @@ PackedInt64Array Relay::targets() const {
     return out;
 }
 
-Array Relay::wire_for(int64_t peer_id) const {
-    Array out;
-    const HashMap<int64_t, Array>::ConstIterator found = pending.find(peer_id);
+LocalVector<Awareness> Relay::wire_for(int64_t peer_id) const {
+    LocalVector<Awareness> out;
+    const HashMap<int64_t, LocalVector<Awareness>>::ConstIterator found
+        = pending.find(peer_id);
     if (!found) {
         return out;
     }
-    out.append_array(found->value);
+    out = found->value;
     return out;
 }
 

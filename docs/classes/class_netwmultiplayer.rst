@@ -172,7 +172,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`int`                                           | :ref:`display_get_tick<class_NetwMultiplayer_method_display_get_tick>`\ (\ entity\: :godot:`RID`\ )                                                                                                                                                                              |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Variant`                                       | :ref:`display_get_track_stat<class_NetwMultiplayer_method_display_get_track_stat>`\ (\ entity\: :godot:`RID`, track\: :godot:`StringName`, stat\: :godot:`StringName`\ )                                                                                                         |
+   | :godot:`Variant`                                       | :ref:`display_get_track_stat<class_NetwMultiplayer_method_display_get_track_stat>`\ (\ entity\: :godot:`RID`, track\: :godot:`StringName`, stat\: :ref:`TrackStat<enum_NetwMultiplayer_TrackStat>`\ )                                                                            |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                 | :ref:`display_reset<class_NetwMultiplayer_method_display_reset>`\ (\ entity\: :godot:`RID`\ )                                                                                                                                                                                    |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -200,7 +200,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                  | :ref:`endpoint_join<class_NetwMultiplayer_method_endpoint_join>`\ (\ endpoint\: :godot:`RID`, settings\: :godot:`Dictionary` = {}\ )                                                                                                                                             |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Array`                                         | :ref:`endpoint_list<class_NetwMultiplayer_method_endpoint_list>`\ (\ )                                                                                                                                                                                                           |
+   | :godot:`Array`\[:godot:`RID`\]                         | :ref:`endpoint_list<class_NetwMultiplayer_method_endpoint_list>`\ (\ )                                                                                                                                                                                                           |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                 | :ref:`endpoint_probe<class_NetwMultiplayer_method_endpoint_probe>`\ (\ endpoint\: :godot:`RID`\ )                                                                                                                                                                                |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -274,7 +274,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Variant`                                       | :ref:`interest_layer_get_param<class_NetwMultiplayer_method_interest_layer_get_param>`\ (\ layer\: :godot:`RID`, param\: :ref:`LayerParam<enum_NetwMultiplayer_LayerParam>`\ ) |const|                                                                                           |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                                    | :ref:`interest_layer_get_stats<class_NetwMultiplayer_method_interest_layer_get_stats>`\ (\ layer\: :godot:`RID`\ ) |const|                                                                                                                                                       |
+   | :godot:`int`                                           | :ref:`interest_layer_get_stat<class_NetwMultiplayer_method_interest_layer_get_stat>`\ (\ layer\: :godot:`RID`, stat\: :ref:`LayerStat<enum_NetwMultiplayer_LayerStat>`\ ) |const|                                                                                                |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`PackedInt32Array`                              | :ref:`interest_layer_get_viewers<class_NetwMultiplayer_method_interest_layer_get_viewers>`\ (\ layer\: :godot:`RID`\ ) |const|                                                                                                                                                   |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -324,9 +324,11 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Variant`                                       | :ref:`peer_get_bucket<class_NetwMultiplayer_method_peer_get_bucket>`\ (\ peer\: :godot:`int`, bucket_type\: :godot:`Variant`\ )                                                                                                                                                  |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                                    | :ref:`peer_get_link_stats<class_NetwMultiplayer_method_peer_get_link_stats>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                                                                                                  |
+   | :godot:`float`                                         | :ref:`peer_get_link_stat<class_NetwMultiplayer_method_peer_get_link_stat>`\ (\ peer\: :godot:`int`, stat\: :ref:`LinkStat<enum_NetwMultiplayer_LinkStat>`\ ) |const|                                                                                                             |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`int`                                           | :ref:`peer_get_player<class_NetwMultiplayer_method_peer_get_player>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                                                                                                          |
+   +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+   | :godot:`float`                                         | :ref:`peer_get_traffic<class_NetwMultiplayer_method_peer_get_traffic>`\ (\ peer\: :godot:`int`, stat\: :ref:`Traffic<enum_NetwMultiplayer_Traffic>`\ ) |const|                                                                                                                   |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                 | :ref:`peer_set_bandwidth<class_NetwMultiplayer_method_peer_set_bandwidth>`\ (\ peer\: :godot:`int`, kbps\: :godot:`int`\ )                                                                                                                                                       |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -364,7 +366,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Error <@GlobalScope#enum_@globalscope_Error>`  | :ref:`player_kick<class_NetwMultiplayer_method_player_kick>`\ (\ player\: :godot:`int`, reason\: :godot:`String` = ""\ )                                                                                                                                                         |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`PackedInt64Array`                              | :ref:`player_list<class_NetwMultiplayer_method_player_list>`\ (\ ) |const|                                                                                                                                                                                                       |
+   | :godot:`PackedInt32Array`                              | :ref:`player_list<class_NetwMultiplayer_method_player_list>`\ (\ ) |const|                                                                                                                                                                                                       |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                 | :ref:`player_request_kick<class_NetwMultiplayer_method_player_request_kick>`\ (\ player\: :godot:`int`, reason\: :godot:`String` = ""\ )                                                                                                                                         |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -410,7 +412,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Node`                                          | :ref:`scene_get_root<class_NetwMultiplayer_method_scene_get_root>`\ (\ scene\: :godot:`RID`\ ) |const|                                                                                                                                                                           |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`PackedInt64Array`                              | :ref:`scene_get_viewers<class_NetwMultiplayer_method_scene_get_viewers>`\ (\ scene\: :godot:`RID`\ )                                                                                                                                                                             |
+   | :godot:`PackedInt32Array`                              | :ref:`scene_get_viewers<class_NetwMultiplayer_method_scene_get_viewers>`\ (\ scene\: :godot:`RID`\ )                                                                                                                                                                             |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Node`                                          | :ref:`scene_get_world<class_NetwMultiplayer_method_scene_get_world>`\ (\ scene\: :godot:`RID`\ ) |const|                                                                                                                                                                         |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -455,10 +457,6 @@ Methods
    | :ref:`NetwServerInfo<class_NetwServerInfo>`            | :ref:`session_get_server_info<class_NetwMultiplayer_method_session_get_server_info>`\ (\ ) |const|                                                                                                                                                                               |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`State<enum_NetwSession_State>`                   | :ref:`session_get_state<class_NetwMultiplayer_method_session_get_state>`\ (\ ) |const|                                                                                                                                                                                           |
-   +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                                    | :ref:`session_get_stats<class_NetwMultiplayer_method_session_get_stats>`\ (\ )                                                                                                                                                                                                   |
-   +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                                    | :ref:`session_get_traffic<class_NetwMultiplayer_method_session_get_traffic>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                                                                                                  |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`bool`                                          | :ref:`session_is_local_client<class_NetwMultiplayer_method_session_is_local_client>`\ (\ ) |const|                                                                                                                                                                               |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -570,7 +568,7 @@ Methods
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                  | :ref:`transport_host<class_NetwMultiplayer_method_transport_host>`\ (\ transport\: :godot:`RID`, settings\: :godot:`Dictionary` = {}\ )                                                                                                                                          |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Array`                                         | :ref:`transport_list<class_NetwMultiplayer_method_transport_list>`\ (\ )                                                                                                                                                                                                         |
+   | :godot:`Array`\[:godot:`RID`\]                         | :ref:`transport_list<class_NetwMultiplayer_method_transport_list>`\ (\ )                                                                                                                                                                                                         |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                 | :ref:`transport_publish_targets<class_NetwMultiplayer_method_transport_publish_targets>`\ (\ transport\: :godot:`RID`, targets\: :godot:`Array`\[:godot:`Dictionary`\]\ )                                                                                                        |
    +--------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -2719,7 +2717,7 @@ Counter. Bytes written but never sent, for example because the peer disconnected
 
 :ref:`Stat<enum_NetwMultiplayer_Stat>` **STAT_ROW_FRAMES_DEFERRED** = ``97``
 
-Counter. Property updates delayed because the bandwidth limit in :ref:`peer_get_link_stats()<class_NetwMultiplayer_method_peer_get_link_stats>` was reached.
+Counter. Property updates delayed because the bandwidth limit :ref:`LINK_STAT_BUDGET_BYTES<class_NetwMultiplayer_constant_LINK_STAT_BUDGET_BYTES>` was reached.
 
 .. _class_NetwMultiplayer_constant_STAT_PREDICT_INSTALLS:
 
@@ -2728,6 +2726,400 @@ Counter. Property updates delayed because the bandwidth limit in :ref:`peer_get_
 :ref:`Stat<enum_NetwMultiplayer_Stat>` **STAT_PREDICT_INSTALLS** = ``98``
 
 Counter. Server states written onto entities this peer simulates but does not control.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _enum_NetwMultiplayer_TrackStat:
+
+.. rst-class:: classref-enumeration
+
+enum **TrackStat**: :ref:`🔗<enum_NetwMultiplayer_TrackStat>`
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_SLEEPING:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_SLEEPING** = ``0``
+
+A :godot:`bool`. Whether the track reached its newest snapshot and holds that value.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_OFFSET_ARMED:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_OFFSET_ARMED** = ``1``
+
+A :godot:`bool`. Whether the track smooths out the jump to the next value it draws.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_OFFSET_HELD:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_OFFSET_HELD** = ``2``
+
+A :godot:`bool`. Whether the track is still smoothing out a jump.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_NEWEST_TICK:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_NEWEST_TICK** = ``3``
+
+An :godot:`int`. The tick of the track's newest snapshot, or ``-1`` when it holds none.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_BUFFER_SIZE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_BUFFER_SIZE** = ``4``
+
+An :godot:`int`. How many snapshots the track holds.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_CHANNELS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_CHANNELS** = ``5``
+
+An :godot:`int`. How many properties of the entity are displayed.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_AMBIGUOUS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_AMBIGUOUS** = ``6``
+
+An :godot:`int`. How many property names more than one node of the entity declares.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_PUMPED_FRAMES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_PUMPED_FRAMES** = ``7``
+
+An :godot:`int` counter. Frames the entity was displayed.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_PUMP_MODE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_PUMP_MODE** = ``8``
+
+A :ref:`DisplayPump<enum_NetwDisplay_DisplayPump>` value. The same as :ref:`NetwDisplay.pump_mode<class_NetwDisplay_property_pump_mode>`.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_STARVATION_TICKS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_STARVATION_TICKS** = ``9``
+
+An :godot:`int`. How many frames in a row playback has run past the newest snapshot.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_DISPLAY_LAG:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_DISPLAY_LAG** = ``10``
+
+A :godot:`float`. The same as :ref:`NetwDisplay.display_lag<class_NetwDisplay_property_display_lag>`.
+
+.. _class_NetwMultiplayer_constant_TRACK_STAT_ROLE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`TrackStat<enum_NetwMultiplayer_TrackStat>` **TRACK_STAT_ROLE** = ``11``
+
+A :ref:`DisplayRole<enum_NetwDisplay_DisplayRole>` value. How the entity is displayed on this peer, with :ref:`NetwDisplay.DISPLAY_ROLE_AUTO<class_NetwDisplay_constant_DISPLAY_ROLE_AUTO>` resolved.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _enum_NetwMultiplayer_LinkStat:
+
+.. rst-class:: classref-enumeration
+
+enum **LinkStat**: :ref:`🔗<enum_NetwMultiplayer_LinkStat>`
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_RTT:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_RTT** = ``0``
+
+Round trip time, in seconds.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_JITTER:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_JITTER** = ``1``
+
+Round trip variation, in seconds.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_REORDERS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_REORDERS** = ``2``
+
+Packets that arrived out of order.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_DUPLICATES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_DUPLICATES** = ``3``
+
+Packets that arrived twice.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_LOSS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_LOSS** = ``4``
+
+The share of the last 32 packets lost, from ``0.0`` to ``1.0``.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_MODE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_MODE** = ``5``
+
+A :ref:`LinkMode<enum_NetwMultiplayer_LinkMode>` value. :ref:`LINK_MODE_BAD<class_NetwMultiplayer_constant_LINK_MODE_BAD>` while the peer's budget is cut.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_BUDGET_BITS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_BUDGET_BITS** = ``6``
+
+The most bits one packet to the peer may use.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_BUDGET_BYTES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_BUDGET_BYTES** = ``7``
+
+The bytes the peer may be sent each tick.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_SENT_BYTES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_SENT_BYTES** = ``8``
+
+Bytes charged to the peer since it joined.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_DEBT_BYTES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_DEBT_BYTES** = ``9``
+
+Bytes the peer was sent past its budget.
+
+.. _class_NetwMultiplayer_constant_LINK_STAT_DEFERRED_ROWS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkStat<enum_NetwMultiplayer_LinkStat>` **LINK_STAT_DEFERRED_ROWS** = ``10``
+
+Rows left waiting by the last tick.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _enum_NetwMultiplayer_LinkMode:
+
+.. rst-class:: classref-enumeration
+
+enum **LinkMode**: :ref:`🔗<enum_NetwMultiplayer_LinkMode>`
+
+.. _class_NetwMultiplayer_constant_LINK_MODE_GOOD:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkMode<enum_NetwMultiplayer_LinkMode>` **LINK_MODE_GOOD** = ``0``
+
+The link sends its whole budget.
+
+.. _class_NetwMultiplayer_constant_LINK_MODE_BAD:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LinkMode<enum_NetwMultiplayer_LinkMode>` **LINK_MODE_BAD** = ``1``
+
+The link lost packets and its budget is cut.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _enum_NetwMultiplayer_Traffic:
+
+.. rst-class:: classref-enumeration
+
+enum **Traffic**: :ref:`🔗<enum_NetwMultiplayer_Traffic>`
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_STATE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_STATE** = ``0``
+
+Bytes a second sent for state and broadcast properties.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_INPUT:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_INPUT** = ``1``
+
+Bytes a second sent for input properties.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_CALLS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_CALLS** = ``2``
+
+Bytes a second sent for RPCs, signals and actions.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_SPAWNS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_SPAWNS** = ``3``
+
+Bytes a second sent for spawns, despawns, control, scenes and joins.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_UPKEEP:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_UPKEEP** = ``4``
+
+Bytes a second sent for prediction acknowledgements and the clock.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_HEADERS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_HEADERS** = ``5``
+
+Bytes a second sent for packet headers, an estimate for the transport.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_STATE:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_STATE** = ``6``
+
+Bytes a second received for state and broadcast properties.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_INPUT:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_INPUT** = ``7``
+
+Bytes a second received for input properties.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_CALLS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_CALLS** = ``8``
+
+Bytes a second received for RPCs, signals and actions.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_SPAWNS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_SPAWNS** = ``9``
+
+Bytes a second received for spawns, despawns, control, scenes and joins.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_UPKEEP:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_UPKEEP** = ``10``
+
+Bytes a second received for prediction acknowledgements and the clock.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_HEADERS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_HEADERS** = ``11``
+
+Bytes a second received for packet headers, an estimate for the transport.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_SENT_PACKETS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_SENT_PACKETS** = ``12``
+
+Packets a second sent.
+
+.. _class_NetwMultiplayer_constant_TRAFFIC_RECEIVED_PACKETS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`Traffic<enum_NetwMultiplayer_Traffic>` **TRAFFIC_RECEIVED_PACKETS** = ``13``
+
+Packets a second received.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _enum_NetwMultiplayer_LayerStat:
+
+.. rst-class:: classref-enumeration
+
+enum **LayerStat**: :ref:`🔗<enum_NetwMultiplayer_LayerStat>`
+
+.. _class_NetwMultiplayer_constant_LAYER_STAT_VIEWERS:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LayerStat<enum_NetwMultiplayer_LayerStat>` **LAYER_STAT_VIEWERS** = ``0``
+
+The number of peers viewing the layer.
+
+.. _class_NetwMultiplayer_constant_LAYER_STAT_ENTITIES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LayerStat<enum_NetwMultiplayer_LayerStat>` **LAYER_STAT_ENTITIES** = ``1``
+
+The number of entities in the layer.
+
+.. _class_NetwMultiplayer_constant_LAYER_STAT_VISIBLE_EDGES:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LayerStat<enum_NetwMultiplayer_LayerStat>` **LAYER_STAT_VISIBLE_EDGES** = ``2``
+
+The number of entity and peer pairs that can see each other.
+
+.. _class_NetwMultiplayer_constant_LAYER_STAT_TRANSITIONS_TOTAL:
+
+.. rst-class:: classref-enumeration-constant
+
+:ref:`LayerStat<enum_NetwMultiplayer_LayerStat>` **LAYER_STAT_TRANSITIONS_TOTAL** = ``3``
+
+Shows plus hides since the layer was created.
 
 .. rst-class:: classref-section-separator
 
@@ -3361,9 +3753,9 @@ Returns the tick ``entity`` is displayed at, or ``-1`` when it is not interpolat
 
 .. rst-class:: classref-method
 
-:godot:`Variant` **display_get_track_stat**\ (\ entity\: :godot:`RID`, track\: :godot:`StringName`, stat\: :godot:`StringName`\ ) :ref:`🔗<class_NetwMultiplayer_method_display_get_track_stat>`
+:godot:`Variant` **display_get_track_stat**\ (\ entity\: :godot:`RID`, track\: :godot:`StringName`, stat\: :ref:`TrackStat<enum_NetwMultiplayer_TrackStat>`\ ) :ref:`🔗<class_NetwMultiplayer_method_display_get_track_stat>`
 
-Returns the display diagnostic ``stat`` of ``entity``, or ``null`` when unknown. Some stats describe one ``track``, and the rest ignore it.
+Returns the display diagnostic ``stat`` of ``entity``, or ``null`` when it is not displayed. Some stats describe one ``track``, and the rest ignore it.
 
 .. rst-class:: classref-item-separator
 
@@ -3552,7 +3944,7 @@ The flat form of :ref:`NetwConnection.join()<class_NetwConnection_method_join>`.
 
 .. rst-class:: classref-method
 
-:godot:`Array` **endpoint_list**\ (\ ) :ref:`🔗<class_NetwMultiplayer_method_endpoint_list>`
+:godot:`Array`\[:godot:`RID`\] **endpoint_list**\ (\ ) :ref:`🔗<class_NetwMultiplayer_method_endpoint_list>`
 
 Every known endpoint, the ones added with :ref:`endpoint_add()<class_NetwMultiplayer_method_endpoint_add>` first.
 
@@ -4091,21 +4483,13 @@ Returns the value of ``param`` for ``layer``.
 
 ----
 
-.. _class_NetwMultiplayer_method_interest_layer_get_stats:
+.. _class_NetwMultiplayer_method_interest_layer_get_stat:
 
 .. rst-class:: classref-method
 
-:godot:`Dictionary` **interest_layer_get_stats**\ (\ layer\: :godot:`RID`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_interest_layer_get_stats>`
+:godot:`int` **interest_layer_get_stat**\ (\ layer\: :godot:`RID`, stat\: :ref:`LayerStat<enum_NetwMultiplayer_LayerStat>`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_interest_layer_get_stat>`
 
-Returns the visibility counters of ``layer``.
-
-.. code:: text
-
-    Dictionary
-    ┠╴viewers            int   number of viewers
-    ┠╴entities           int   number of entities
-    ┠╴visible_edges      int   (entity, peer) pairs that can see each other
-    ┖╴transitions_total  int   shows plus hides since the layer was created
+Returns the visibility counter ``stat`` of ``layer``, or ``0`` for an unknown layer.
 
 .. rst-class:: classref-item-separator
 
@@ -4500,30 +4884,13 @@ Returns an instance of ``bucket_type`` stored for ``peer``, created on first use
 
 ----
 
-.. _class_NetwMultiplayer_method_peer_get_link_stats:
+.. _class_NetwMultiplayer_method_peer_get_link_stat:
 
 .. rst-class:: classref-method
 
-:godot:`Dictionary` **peer_get_link_stats**\ (\ peer\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_peer_get_link_stats>`
+:godot:`float` **peer_get_link_stat**\ (\ peer\: :godot:`int`, stat\: :ref:`LinkStat<enum_NetwMultiplayer_LinkStat>`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_peer_get_link_stat>`
 
-Returns measured connection quality to ``peer``, and what this peer's byte budget sends it.
-
-.. code:: text
-
-    Dictionary
-    ┠╴loss           float   share of the last 32 packets lost
-    ┠╴rtt            float   round trip time, in seconds
-    ┠╴jitter         float   round trip variation, in seconds
-    ┠╴reorders       int     packets that arrived out of order
-    ┠╴duplicates     int     packets that arrived twice
-    ┠╴mode           String  "good", or "bad" while its budget is cut
-    ┠╴budget_bits    int     most bits one packet to this peer may use
-    ┠╴budget_bytes   int     bytes it may be sent each tick
-    ┠╴sent_bytes     int     bytes charged to it since it joined
-    ┠╴debt_bytes     int     bytes it was sent past its budget
-    ┖╴deferred_rows  int     rows left waiting by the last tick
-
-\ Losing packets halves ``budget_bytes`` and ``budget_bits``. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While ``debt_bytes`` is above zero, volatile properties wait, and retained properties and RPCs still go.
+Returns the measured connection quality ``stat`` of ``peer``, or what this peer's byte budget sends it. :ref:`NetwSession.link_stat()<class_NetwSession_method_link_stat>` says how the budget moves.
 
 .. rst-class:: classref-item-separator
 
@@ -4536,6 +4903,18 @@ Returns measured connection quality to ``peer``, and what this peer's byte budge
 :godot:`int` **peer_get_player**\ (\ peer\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_peer_get_player>`
 
 Returns the id of the player connected through ``peer``, or ``0`` until its join is accepted.
+
+.. rst-class:: classref-item-separator
+
+----
+
+.. _class_NetwMultiplayer_method_peer_get_traffic:
+
+.. rst-class:: classref-method
+
+:godot:`float` **peer_get_traffic**\ (\ peer\: :godot:`int`, stat\: :ref:`Traffic<enum_NetwMultiplayer_Traffic>`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_peer_get_traffic>`
+
+Returns the rate ``stat`` the session sent to ``peer`` or received from it over the last second. A ``peer`` of ``0`` counts every peer. :ref:`NetwSession.traffic()<class_NetwSession_method_traffic>` says what headers cost.
 
 .. rst-class:: classref-item-separator
 
@@ -4776,9 +5155,9 @@ Removes the player whose id is ``player`` from the session and disconnects their
 
 .. rst-class:: classref-method
 
-:godot:`PackedInt64Array` **player_list**\ (\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_player_list>`
+:godot:`PackedInt32Array` **player_list**\ (\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_player_list>`
 
-Returns the id of every player whose join was accepted. A connected peer that has not joined is not here.
+Returns the :ref:`NetwPlayer.id<class_NetwPlayer_property_id>` of every player whose join was accepted. A connected peer that has not joined is not here.
 
 .. rst-class:: classref-item-separator
 
@@ -5083,7 +5462,7 @@ Returns the node ``scene`` was declared on, or ``null``.
 
 .. rst-class:: classref-method
 
-:godot:`PackedInt64Array` **scene_get_viewers**\ (\ scene\: :godot:`RID`\ ) :ref:`🔗<class_NetwMultiplayer_method_scene_get_viewers>`
+:godot:`PackedInt32Array` **scene_get_viewers**\ (\ scene\: :godot:`RID`\ ) :ref:`🔗<class_NetwMultiplayer_method_scene_get_viewers>`
 
 Returns the :ref:`NetwPlayer.id<class_NetwPlayer_property_id>` of every player who sees ``scene``.
 
@@ -5388,30 +5767,6 @@ Returns a copy of :ref:`NetwSessionConfig.server_info<class_NetwSessionConfig_pr
 :ref:`State<enum_NetwSession_State>` **session_get_state**\ (\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_session_get_state>`
 
 Returns the :ref:`State<enum_NetwSession_State>` the session is in, the same as :ref:`NetwSession.state<class_NetwSession_property_state>`.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwMultiplayer_method_session_get_stats:
-
-.. rst-class:: classref-method
-
-:godot:`Dictionary` **session_get_stats**\ (\ ) :ref:`🔗<class_NetwMultiplayer_method_session_get_stats>`
-
-Returns every :ref:`Stat<enum_NetwMultiplayer_Stat>` value, keyed by the lowercase constant name, such as ``sent_bytes``.
-
-.. rst-class:: classref-item-separator
-
-----
-
-.. _class_NetwMultiplayer_method_session_get_traffic:
-
-.. rst-class:: classref-method
-
-:godot:`Dictionary` **session_get_traffic**\ (\ peer\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwMultiplayer_method_session_get_traffic>`
-
-Returns what the session sent to ``peer`` and received from it over the last second. :ref:`NetwSession.traffic()<class_NetwSession_method_traffic>` lists the keys.
 
 .. rst-class:: classref-item-separator
 
@@ -6203,7 +6558,7 @@ The flat form of :ref:`NetwConnection.host()<class_NetwConnection_method_host>`.
 
 .. rst-class:: classref-method
 
-:godot:`Array` **transport_list**\ (\ ) :ref:`🔗<class_NetwMultiplayer_method_transport_list>`
+:godot:`Array`\[:godot:`RID`\] **transport_list**\ (\ ) :ref:`🔗<class_NetwMultiplayer_method_transport_list>`
 
 Every available transport, the registered ones first, then those from a :ref:`LobbyDirectory<class_LobbyDirectory>`. Any other :godot:`MultiplayerPeer` still works when assigned directly.
 

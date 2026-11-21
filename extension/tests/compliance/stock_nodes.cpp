@@ -237,6 +237,34 @@ TEST_CASE(
     NETW_HOLDS(golden(seen, "G9"));
 }
 
+constexpr const char *DIAL = R"(
+class Dial extends Node3D:
+	var tuned := 0.0
+
+	func _init() -> void:
+		Netw.configure_entity(self)
+
+	@rpc("authority", "call_remote", "reliable")
+	func tune(frequency: float) -> void:
+		tuned = frequency
+
+	func broadcast() -> void:
+		tune.rpc(0.1)
+)";
+
+World dial() {
+    return World(DIAL, 1)
+        .watch("Dial", "tuned")
+        .at(1, spawn("Dial", "Dial"))
+        .at(4, call("Dial", "broadcast"));
+}
+
+TEST_CASE("[Netw][Compliance] G10 an RPC's float argument arrives exact") {
+    const Seen seen = dial().run(8);
+    NETW_HOLDS(reads(seen, FIRST, "Dial", "tuned", 0.1));
+    NETW_HOLDS(quiet(seen));
+}
+
 World tiller() {
     const Step hand = call("Level", "hand_helm_to", Array::make("cy"));
     return World("worlds/tiller.tscn", 1)

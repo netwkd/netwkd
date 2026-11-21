@@ -5,6 +5,7 @@
 #include "godot/class_db.hpp"
 #include "godot/scene_tree.hpp"
 #include "godot/utility.hpp"
+#include "netw/api/control_script.hpp"
 #include "netw/api/interpolate.hpp"
 #include "netw/api/member_config.hpp"
 #include "netw/api/netw_multiplayer.hpp"
@@ -20,7 +21,7 @@
 #include "netw/property_set_builder.hpp"
 #include "netw/repl/snapshot_frame.hpp"
 #include "netw/script/model.hpp"
-#include "netw/session/books.hpp"
+#include "netw/session/idle_work.hpp"
 #include "netw/session/event_plane.hpp"
 #include "netw/subsystems.hpp"
 #include "netw/sync_authoring.hpp"
@@ -43,6 +44,17 @@ const int LANE_WINDOW = 1;
 const int LANE_RETAINED = 2;
 
 constexpr int INTERPOLATED_LIMIT = 64;
+
+int64_t steering_of(const NetwMultiplayer *p_session, const RID &p_entity) {
+    const NetwEntityRecord *record = p_session->entity_record(p_entity);
+    if (record == nullptr) {
+        const Ref<NetwEntity> wrapper
+            = p_session->wrapper_for_id(int64_t(p_entity.get_id()));
+        NETW_BUG_COND_V(wrapper.is_null(), entity::Control::SERVER);
+        record = wrapper->get_record();
+    }
+    return record->get_control()->resolve();
+}
 
 uint64_t interpolated_mask(
     PropertyBinding *p_binding,
@@ -95,24 +107,43 @@ struct ReceiveAllocations {
 
 } // namespace
 
-NetwMultiplayer *SyncPipeline::core() const {
-    return Object::cast_to<NetwMultiplayer>(gd::instance_from_id(core_id));
+void SyncPipeline::seat(
+    NetwMultiplayer *p_session,
+    Clock *p_clock,
+    store::Store *p_store,
+    NetwLivenessCore *p_liveness,
+    repl::BindingBook *p_bindings,
+    repl::SetBook *p_sets,
+    NetwPredictionEngine *p_prediction
+) {
+    session = p_session;
+    clock_engine = p_clock;
+    store_world = p_store;
+    liveness_core = p_liveness;
+    binding_rows = p_bindings;
+    set_book = p_sets;
+    prediction_engine = p_prediction;
+    hears_entity_live = p_session != nullptr;
 }
 
-Object *SyncPipeline::api() const {
-    return gd::instance_from_id(api_id);
+#if defined(DEBUG_ENABLED)
+void SyncPipeline::seat_profiler(
+    wire::NetworkProfiler *p_profiler,
+    uint32_t *p_outgoing
+) {
+    network_profiler = p_profiler;
+    profiler_outgoing = p_outgoing;
 }
+#endif
 
-void SyncPipeline::set_core(Object *p_core, const session::Books *p_books) {
-    NetwMultiplayer *plane = Object::cast_to<NetwMultiplayer>(p_core);
-    NETW_BUG_COND(plane != nullptr && p_books == nullptr);
-    core_id = gd::instance_id(plane);
-    books = plane != nullptr ? p_books : nullptr;
-    hears_entity_live = plane != nullptr;
+#if defined(NETW_TESTS)
+void SyncPipeline::seat_idle(session::IdleWork *p_idle) {
+    idle_work = p_idle;
 }
+#endif
 
-void SyncPipeline::set_api(Object *p_api) {
-    api_id = gd::instance_id(p_api);
+void SyncPipeline::unseat() {
+    session = nullptr;
 }
 
 void SyncPipeline::set_sync_model(NetwSyncModel *p_model) {
@@ -135,15 +166,10 @@ void SyncPipeline::set_channels(
     channel_signal = p_signal;
 }
 
-void SyncPipeline::set_tap_seam(const Callable &p_tap) {
-    tap_seam = p_tap;
-}
-
 ReplicationSend *SyncPipeline::row_send() {
-    NetwMultiplayer *plane = core();
-    if (!row_sender_armed && plane != nullptr) {
+    if (!row_sender_armed && session != nullptr) {
         row_sender_armed = true;
-        row_sender.watch_store(books->store);
+        row_sender.watch_store(store_world);
     }
     return &row_sender;
 }
@@ -155,8 +181,7 @@ store::Landing SyncPipeline::decode_row(
     const PackedByteArray &p_payload,
     bool p_windowed
 ) {
-    NetwMultiplayer *plane = core();
-    const int64_t route = books->liveness->route_of(p_entity);
+    const int64_t route = liveness_core->route_of(p_entity);
     NETW_ZONE_LEAF_F(
         "Row decode",
         colors::CODEC,
@@ -165,7 +190,7 @@ store::Landing SyncPipeline::decode_row(
         static_cast<long long>(route)
     );
     NETW_ZONE_VALUE(p_payload.size());
-    const store::Landing landed = books->store->receive(
+    const store::Landing landed = store_world->receive(
         p_at,
         int(p_sender),
         p_payload,
@@ -174,7 +199,7 @@ store::Landing SyncPipeline::decode_row(
     );
     const Error verdict
         = landed == store::Landing::ACCEPTED ? OK : ERR_INVALID_DATA;
-    plane->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
+    session->event_record(EventPlane::SYNC_DECODE, p_entity, route, 0, verdict);
     return landed;
 }
 
@@ -189,7 +214,7 @@ void SyncPipeline::register_derived(Node *p_node) {
         return;
     }
     hold_resources(p_node);
-    Object *shell = api();
+    Object *shell = session;
     const uint64_t state = property_set_builder::from_node(
         p_node,
         PropertySet::RECORD_STATE,
@@ -218,8 +243,7 @@ void SyncPipeline::register_derived(Node *p_node) {
 }
 
 PropertySet *SyncPipeline::set_of(uint64_t p_set) const {
-    NetwMultiplayer *plane = core();
-    return plane != nullptr ? books->sets->get(p_set) : nullptr;
+    return session != nullptr ? set_book->get(p_set) : nullptr;
 }
 
 Error SyncPipeline::register_property_set(Node *p_node, uint64_t p_set) {
@@ -229,7 +253,7 @@ Error SyncPipeline::register_property_set(Node *p_node, uint64_t p_set) {
     }
     NETW_ZONE_NC("SyncPipeline register property set", colors::WIRE);
     NETW_ZONE_VALUE(bindings.size());
-    repl::BindingBook &book = *books->bindings;
+    repl::BindingBook &book = *binding_rows;
     PropertyBinding *held = nullptr;
     if (const LocalVector<uint64_t> *same = node_bindings(p_node)) {
         for (uint32_t at = 0; at < same->size(); ++at) {
@@ -262,7 +286,7 @@ Error SyncPipeline::register_property_set(Node *p_node, uint64_t p_set) {
                 declared->get_record()
             );
         }
-        core()->predict_rebind_replaced(replaced);
+        session->predict_rebind_replaced(replaced);
         return OK;
     }
     PropertyBinding *created = book.create(p_set, p_node);
@@ -280,8 +304,7 @@ void SyncPipeline::queue_prediction_contract_check(
     const PropertySet *p_state,
     const PropertySet *p_input
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || p_state == nullptr || p_input == nullptr
+    if (session == nullptr || p_state == nullptr || p_input == nullptr
         || p_state->columns.is_empty() || p_input->columns.is_empty()) {
         return;
     }
@@ -300,9 +323,9 @@ void SyncPipeline::queue_prediction_contract_check(
         return;
     }
     contract_hashes[instance_id] = config_hash;
-    plane->session_defer(
+    session->session_defer(
         callable_mp(
-            plane,
+            session,
             &NetwMultiplayer::sync_pipeline_report_missing_prediction_component
         )
             .bind(p_node, config_hash),
@@ -334,7 +357,7 @@ void SyncPipeline::report_missing_prediction_component(
         return;
     }
     fault::raise(
-        core(),
+        session,
         NETW_FAULT_INPUT_UNPREDICTED,
         {contract_subject_name(node)},
         gd::instance_id(node)
@@ -349,17 +372,16 @@ String SyncPipeline::contract_subject_name(Node *p_node) {
 }
 
 void SyncPipeline::register_state_timeline(Node *p_node) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !plane->is_host()) {
+    if (session == nullptr || !session->is_host()) {
         return;
     }
     const Ref<NetwEntity> entity = NetwEntity::of(p_node);
     if (entity.is_valid()) {
-        plane->lagcomp_timeline_declare(plane->liveness_adopt(entity.ptr()));
+        session->lagcomp_timeline_declare(entity->adopt_in(session));
     }
 }
 
-bool SyncPipeline::holds_state_binding(const Ref<NetwEntity> &p_entity) const {
+bool SyncPipeline::holds_state_binding(const RID &p_entity) const {
     NETW_ZONE_NC("SyncPipeline holds state binding", colors::WIRE);
     NETW_ZONE_VALUE(bindings.size());
     for (uint32_t at = 0; at < bindings.size(); ++at) {
@@ -367,7 +389,7 @@ bool SyncPipeline::holds_state_binding(const Ref<NetwEntity> &p_entity) const {
         if (held->get_set()->get_record() != PropertySet::RECORD_STATE) {
             continue;
         }
-        if (NetwEntity::of(held->node()) == p_entity) {
+        if (binding_belongs_to(held, p_entity)) {
             return true;
         }
     }
@@ -375,31 +397,28 @@ bool SyncPipeline::holds_state_binding(const Ref<NetwEntity> &p_entity) const {
 }
 
 void SyncPipeline::reconcile_state_timeline(Node *p_node) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !plane->is_host()) {
+    if (session == nullptr || !session->is_host()) {
         return;
     }
     const Ref<NetwEntity> entity = NetwEntity::of(p_node);
-    if (entity.is_null() || holds_state_binding(entity)) {
+    if (entity.is_null() || holds_state_binding(entity->get_rid_handle())) {
         return;
     }
-    plane->lagcomp_timeline_undeclare(entity->get_rid_handle());
+    session->lagcomp_timeline_undeclare(entity->get_rid_handle());
 }
 
 void SyncPipeline::reconcile_dropped_state_timelines() {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !plane->is_host()) {
+    if (session == nullptr || !session->is_host()) {
         state_binding_dropped.clear();
         return;
     }
     for (uint32_t at = 0; at < state_binding_dropped.size(); ++at) {
         const RID entity = state_binding_dropped[at];
-        const Ref<NetwEntity> wrapper
-            = Object::cast_to<NetwEntity>(plane->entity_get_view(entity).ptr());
-        if (wrapper.is_null() || holds_state_binding(wrapper)) {
+        if (session->entity_get_view(entity).is_null()
+            || holds_state_binding(entity)) {
             continue;
         }
-        plane->lagcomp_timeline_undeclare(entity);
+        session->lagcomp_timeline_undeclare(entity);
     }
     state_binding_dropped.clear();
 }
@@ -422,8 +441,7 @@ PropertyBindingPtr SyncPipeline::derived_binding(
 }
 
 repl::BindingBook *SyncPipeline::binding_book() const {
-    NetwMultiplayer *plane = core();
-    return plane != nullptr ? books->bindings : nullptr;
+    return session != nullptr ? binding_rows : nullptr;
 }
 
 PropertyBinding *SyncPipeline::live(uint64_t p_binding) const {
@@ -439,7 +457,8 @@ LocalVector<SyncPipeline::IndexedBinding> *SyncPipeline::held_by(
     }
     NetwEntity *entity
         = Object::cast_to<NetwEntity>(gd::object_of(ObjectID(p_entity)));
-    NetwEntityRecord *record = NetwMultiplayer::find_record(core(), entity);
+    NetwEntityRecord *record
+        = entity != nullptr ? entity->record_in(session) : nullptr;
     return record != nullptr ? &record->get_held_bindings() : nullptr;
 }
 
@@ -448,7 +467,7 @@ void SyncPipeline::seat_record(PropertyBinding *p_binding) {
     const Ref<NetwEntity> entity = NetwEntity::of(node);
     const PropertySet *set = p_binding->get_set();
     NetwEntityRecord *record
-        = NetwMultiplayer::find_record(core(), entity.ptr());
+        = entity.is_valid() ? entity->record_in(session) : nullptr;
     if (record == nullptr || set == nullptr || entity->get_owner() != node) {
         return;
     }
@@ -462,7 +481,8 @@ void SyncPipeline::unseat_record(
     NetwEntity *entity = p_entity != 0
         ? Object::cast_to<NetwEntity>(gd::object_of(ObjectID(p_entity)))
         : NetwEntity::of(p_binding->node()).ptr();
-    NetwEntityRecord *record = NetwMultiplayer::find_record(core(), entity);
+    NetwEntityRecord *record
+        = entity != nullptr ? entity->record_in(session) : nullptr;
     const PropertySet *set = p_binding->get_set();
     if (record == nullptr || set == nullptr
         || record->get_record_binding(set->get_record()) != p_binding->id) {
@@ -495,7 +515,7 @@ void SyncPipeline::hold_resources(Node *p_node) {
             const Ref<NetwPropertyConfig> config = configs[path];
             if (config.is_valid() && config->get_declared_type() < 0) {
                 fault::raise(
-                    core(),
+                    session,
                     NETW_FAULT_RESOURCE_MISSING,
                     {String(path),
                      String(p_node->get_name()),
@@ -514,7 +534,7 @@ void SyncPipeline::hold_resources(Node *p_node) {
         for (const ResourceHolder &held : holders) {
             if (held.path == path && held.entity != holder) {
                 fault::raise(
-                    core(),
+                    session,
                     NETW_FAULT_RESOURCE_SHARED,
                     {String(path), held.name, String(named->get_name())},
                     node
@@ -575,14 +595,13 @@ void SyncPipeline::watch_tree() {
     if (tree_watched) {
         return;
     }
-    NetwMultiplayer *plane = core();
     SceneTree *tree = gd::scene_tree();
-    if (plane == nullptr || tree == nullptr) {
+    if (session == nullptr || tree == nullptr) {
         return;
     }
     tree_watched = true;
-    NetwMultiplayer::tree_watch_removals(plane);
-    books->store->residents.watch(true);
+    NetwMultiplayer::tree_watch_removals(session);
+    store_world->pull->residents.watch(true);
     for (uint32_t at = 0; at < bindings.size(); ++at) {
         Node *node = live(bindings[at])->node();
         if (node == nullptr || !node->is_inside_tree()) {
@@ -677,12 +696,11 @@ void SyncPipeline::replace_binding(uint32_t p_at, PropertyBinding *p_binding) {
 }
 
 void SyncPipeline::retire(uint64_t p_binding) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
-    books->store->remove_owner(p_binding);
-    books->bindings->retire(p_binding);
+    store_world->pull->remove_owner(p_binding);
+    binding_rows->retire(p_binding);
 }
 
 void SyncPipeline::remove_binding(uint32_t p_at) {
@@ -708,20 +726,19 @@ void SyncPipeline::remove_binding(uint32_t p_at) {
 }
 
 void SyncPipeline::clear_bindings() {
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr) {
-        books->store->clear();
+    if (session != nullptr) {
+        store_world->pull->clear();
         for (const uint64_t held : bindings) {
-            books->bindings->retire(held);
+            binding_rows->retire(held);
         }
-        books->bindings->clear_nodes();
+        binding_rows->clear_nodes();
     }
     for (const uint64_t entity_key : binding_entities) {
         NetwEntity *entity = entity_key != 0
             ? Object::cast_to<NetwEntity>(gd::object_of(ObjectID(entity_key)))
             : nullptr;
         if (NetwEntityRecord *record
-            = NetwMultiplayer::find_record(plane, entity)) {
+            = entity != nullptr ? entity->record_in(session) : nullptr) {
             record->forget_bindings();
         }
     }
@@ -754,11 +771,13 @@ uint32_t SyncPipeline::binding_position(
 }
 
 LocalVector<PropertyBindingPtr> SyncPipeline::bindings_of_entity(
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) const {
     static const LocalVector<IndexedBinding> none;
+    NetwEntityRecord *record
+        = session != nullptr ? session->entity_record(p_entity) : nullptr;
     const LocalVector<IndexedBinding> *own
-        = held_by(uint64_t(p_entity->get_instance_id()));
+        = record != nullptr ? &record->get_held_bindings() : nullptr;
     const LocalVector<IndexedBinding> &left = own != nullptr ? *own : none;
     const LocalVector<IndexedBinding> &right = loose_bindings;
     LocalVector<PropertyBindingPtr> out;
@@ -803,9 +822,8 @@ void SyncPipeline::capture_declaration_key(
 }
 
 void SyncPipeline::bind_declaration(const PropertyBindingPtr &p_binding) {
-    NetwMultiplayer *plane = core();
     Node *node = p_binding->node();
-    if (plane == nullptr || node == nullptr || sync_model == nullptr) {
+    if (session == nullptr || node == nullptr || sync_model == nullptr) {
         return;
     }
     const Ref<NetwEntity> entity = NetwEntity::of(node);
@@ -816,7 +834,7 @@ void SyncPipeline::bind_declaration(const PropertyBindingPtr &p_binding) {
         capture_declaration_key(p_binding);
     }
     const RID rid = entity->get_rid_handle();
-    int64_t route = books->liveness->route_of(rid);
+    int64_t route = liveness_core->route_of(rid);
     if (route <= 0) {
         route = entity->get_route();
     }
@@ -846,16 +864,14 @@ void SyncPipeline::bind_declaration(const PropertyBindingPtr &p_binding) {
 }
 
 void SyncPipeline::store_admit(const PropertyBindingPtr &p_binding) {
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr) {
-        plane->store_admit(p_binding);
+    if (session != nullptr) {
+        session->store_admit(p_binding);
     }
 }
 
 void SyncPipeline::store_place(const PropertyBindingPtr &p_binding) {
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr) {
-        plane->store_place(p_binding);
+    if (session != nullptr) {
+        session->store_place(p_binding);
     }
 }
 
@@ -879,8 +895,8 @@ void SyncPipeline::drop_declaration(const PropertyBindingPtr &p_binding) {
     store_place(p_binding);
 }
 
-void SyncPipeline::recapture_entity(const Ref<NetwEntity> &p_entity) {
-    if (p_entity.is_null()) {
+void SyncPipeline::recapture_entity(const RID &p_entity) {
+    if (!p_entity.is_valid()) {
         return;
     }
     NETW_ZONE_NC("SyncPipeline recapture entity", colors::WIRE);
@@ -895,19 +911,18 @@ void SyncPipeline::recapture_entity(const Ref<NetwEntity> &p_entity) {
 
 bool SyncPipeline::binding_belongs_to(
     const PropertyBindingPtr &p_binding,
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) const {
     Node *node = p_binding->node();
     if (node == nullptr) {
         return false;
     }
     const Ref<NetwEntity> found = NetwEntity::of(node);
-    return found.is_valid()
-        && found->get_rid_handle() == p_entity->get_rid_handle();
+    return found.is_valid() && found->get_rid_handle() == p_entity;
 }
 
 LocalVector<PropertyBindingPtr> SyncPipeline::entity_bindings_checked(
-    const Ref<NetwEntity> &p_entity
+    const RID &p_entity
 ) const {
     LocalVector<PropertyBindingPtr> matched;
     const LocalVector<PropertyBindingPtr> candidates
@@ -939,10 +954,7 @@ LocalVector<PropertyBindingPtr> SyncPipeline::entity_bindings_checked(
     return matched;
 }
 
-void SyncPipeline::on_entity_live(
-    int64_t p_route,
-    const Ref<NetwEntity> &p_entity
-) {
+void SyncPipeline::on_entity_live(int64_t p_route, const RID &p_entity) {
     NETW_ZONE_NC("SyncPipeline on entity live", colors::WIRE);
     if (p_entity.is_valid()) {
         const LocalVector<PropertyBindingPtr> matched
@@ -990,19 +1002,12 @@ void SyncPipeline::settle_entity_column(int64_t p_route, bool p_live) {
 void SyncPipeline::pump(int64_t p_tick) {
     NETW_ZONE_NC("Sync pump", colors::WIRE);
     NETW_ZONE_VALUE(p_tick);
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || sync_model == nullptr) {
+    if (session == nullptr || sync_model == nullptr) {
         return;
     }
     prune_derived();
-    plane->sync_pump_rows(
-        sync_model,
-        row_send(),
-        p_tick,
-        callable_mp(plane, &NetwMultiplayer::sync_pipeline_bind_declaration),
-        tap_seam
-    );
-    if (!books->clock->is_send_tick()) {
+    session->sync_pump_rows(sync_model, row_send(), p_tick);
+    if (!clock_engine->is_send_tick()) {
         return;
     }
     flush_rows();
@@ -1010,11 +1015,10 @@ void SyncPipeline::pump(int64_t p_tick) {
 }
 
 void SyncPipeline::flush_rows() {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
-    plane->sync_flush_rows(
+    session->sync_flush_rows(
         row_send(),
         channel_row,
         channel_row_window,
@@ -1023,11 +1027,10 @@ void SyncPipeline::flush_rows() {
 }
 
 void SyncPipeline::flush_row_control() {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || !row_sender_armed) {
+    if (session == nullptr || !row_sender_armed) {
         return;
     }
-    plane->row_control_flush(row_send(), channel_row_control);
+    session->row_control_flush(row_send(), channel_row_control);
 }
 
 void SyncPipeline::open_carrier_batch(
@@ -1053,7 +1056,7 @@ void SyncPipeline::commit_pending_masked(int64_t p_peer_id, int64_t p_seq) {
                 .commit(p_peer_id, p_seq, *rows, carrier_frames, carrier_bits)
         && p_seq >= 0) {
         fault::raise(
-            core(),
+            session,
             NETW_FAULT_LIMIT_EXCEEDED,
             {String("Tracking packets for delivery"),
              vformat("packet %d", int(p_seq)),
@@ -1082,14 +1085,15 @@ void SyncPipeline::note_peer_ack(
     if (!row_sender_armed) {
         return;
     }
-    NetwMultiplayer *plane = core();
+    const DatagramSeqBook *seqs
+        = session != nullptr ? &session->wire().seq_book : nullptr;
     row_sender.acknowledge(
         p_peer_id,
         p_acked_seq,
         p_history,
-        plane != nullptr ? plane->link_round_trip_ms(p_peer_id) : 0.0,
-        plane != nullptr ? plane->link_jitter_ms(p_peer_id) : 0.0,
-        plane != nullptr ? plane->session_elapsed_ms() : 0
+        seqs != nullptr ? seqs->round_trip_ms(p_peer_id) : 0.0,
+        seqs != nullptr ? seqs->round_trip_jitter_ms(p_peer_id) : 0.0,
+        session != nullptr ? session->session_elapsed_ms() : 0
     );
 }
 
@@ -1098,12 +1102,11 @@ Dictionary SyncPipeline::resolve_send(
     const StringName &p_member
 ) {
     Dictionary out;
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return out;
     }
     const NetwMultiplayer::CallTarget target
-        = plane->call_target(p_node, p_member);
+        = session->call_target(p_node, p_member);
     if (target.code == ERR_UNAVAILABLE) {
         sends_dropped_not_live += 1;
         return out;
@@ -1112,14 +1115,14 @@ Dictionary SyncPipeline::resolve_send(
         sends_dropped_unroutable += 1;
         return out;
     }
-    const Ref<NetwEntity> &entity = target.entity;
     const int64_t route = target.route;
-    const int64_t comp = entity->comp_of(p_node);
-    out[StringName("entity")] = entity;
+    const int64_t comp
+        = NetwEntity::comp_in(*target.record, target.owner, p_node);
+    out[StringName("entity")] = target.entity;
     out[StringName("route")] = route;
     out[StringName("comp")] = comp;
     out[StringName("path")] = comp == 255
-        ? String(entity->relative_path(entity->get_owner(), p_node))
+        ? String(NetwMultiplayer::relative_path(target.owner, p_node))
         : String();
     return out;
 }
@@ -1130,19 +1133,18 @@ void SyncPipeline::send_entity_event(
     const PackedByteArray &p_payload,
     bool p_reliable
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
-    const Ref<NetwEntity> entity = p_frame[StringName("entity")];
+    const RID entity = p_frame[StringName("entity")];
     const PackedInt32Array recipients = NetwSyncModel::event_recipients(
-        plane->has_server_role(),
-        plane->get_unique_id(),
+        session->has_server_role(),
+        session->get_unique_id(),
         0,
-        plane->rpc_recipients(entity)
+        session->rpc_recipients(entity)
     );
     for (int at = 0; at < recipients.size(); ++at) {
-        plane->send_to(
+        session->send_to(
             recipients[at],
             int64_t(p_frame[StringName("route")]),
             p_channel,
@@ -1164,8 +1166,7 @@ Array SyncPipeline::gather_stage() {
 
 void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
     NETW_ZONE_NC("SyncPipeline send property", colors::WIRE);
-    NetwMultiplayer *plane = core();
-    if (p_node == nullptr || plane == nullptr) {
+    if (p_node == nullptr || session == nullptr) {
         return;
     }
     const Dictionary frame = resolve_send(p_node, p_property);
@@ -1174,7 +1175,7 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
     }
     if (!gd::has_property(p_node, p_property)) {
         fault::raise(
-            plane,
+            session,
             NETW_FAULT_UNKNOWN_NAME,
             {String("{Netw.sync_property}"),
              String(p_node->get_name()),
@@ -1186,11 +1187,11 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
     const Ref<NetwPropertyConfig> opt
         = netw::script::model::get_declared_property_config(p_node, p_property);
     if (opt.is_null()) {
-        const int64_t local_id = plane->get_unique_id();
-        if (!plane->is_host()
+        const int64_t local_id = session->get_unique_id();
+        if (!session->is_host()
             && local_id != p_node->get_multiplayer_authority()) {
             fault::raise(
-                plane,
+                session,
                 NETW_FAULT_UNKNOWN_NAME,
                 {String("{Netw.sync_property}"),
                  String(p_node->get_name()),
@@ -1209,10 +1210,11 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
     }
 
     wire::WriteStream stream;
-    const Ref<NetwEntity> entity = frame[StringName("entity")];
+    const NetwEntityRecord *record
+        = session->entity_record(frame[StringName("entity")]);
     if (!netw::script::model::write_token(
             stream,
-            encode_prop_val(entity, p_node, p_property)
+            encode_prop_val(record, p_node, p_property)
         )) {
         return;
     }
@@ -1231,15 +1233,15 @@ void SyncPipeline::send_property(Node *p_node, const StringName &p_property) {
     types.push_back(
         netw::script::model::get_node_property_type(p_node, p_property)
     );
-    if (!call_args::values_write(stream, values, quantizers, types, plane)
+    if (!call_args::values_write(stream, values, quantizers, types, session)
         || !stream.align_verify()) {
         return;
     }
 
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
-            *books->profiler_outgoing,
-            plane->profiler_member(
+            *profiler_outgoing,
+            session->profiler_member(
                 int64_t(frame[StringName("route")]),
                 set->get_channel(),
                 p_node,
@@ -1261,13 +1263,12 @@ void SyncPipeline::send_signal(
     const Array &p_args
 ) {
     NETW_ZONE_NC("SyncPipeline send signal", colors::WIRE);
-    NetwMultiplayer *plane = core();
-    if (p_node == nullptr || plane == nullptr) {
+    if (p_node == nullptr || session == nullptr) {
         return;
     }
     if (!p_node->has_signal(p_signal)) {
         fault::raise(
-            plane,
+            session,
             NETW_FAULT_UNKNOWN_NAME,
             {String("{Netw.emit}"),
              String(p_node->get_name()),
@@ -1288,11 +1289,11 @@ void SyncPipeline::send_signal(
             = opt->get_transfer_mode() == NetwMemberConfig::TRANSFER_RELIABLE;
         call_local = opt->get_is_call_local();
     } else {
-        const int64_t local_id = plane->get_unique_id();
-        if (!plane->is_host()
+        const int64_t local_id = session->get_unique_id();
+        if (!session->is_host()
             && local_id != p_node->get_multiplayer_authority()) {
             fault::raise(
-                plane,
+                session,
                 NETW_FAULT_UNKNOWN_NAME,
                 {String("{Netw.emit}"),
                  String(p_node->get_name()),
@@ -1315,21 +1316,22 @@ void SyncPipeline::send_signal(
     }
 
     wire::WriteStream stream;
-    const Ref<NetwEntity> entity = frame[StringName("entity")];
+    const NetwEntityRecord *record
+        = session->entity_record(frame[StringName("entity")]);
     const Array quantizers = opt.is_valid() ? opt->get_quantizers() : Array();
     const Array types = script.is_valid()
         ? netw::script::model::get_signal_arg_types(script, p_signal)
         : Array();
     if (!netw::script::model::write_token(
             stream,
-            encode_signal_val(entity, p_node, p_signal)
+            encode_signal_val(record, p_node, p_signal)
         )
         || !netw::call_args::values_write(
             stream,
             p_args,
             quantizers,
             types,
-            plane
+            session
         )
         || !stream.align_verify()) {
         return;
@@ -1337,8 +1339,8 @@ void SyncPipeline::send_signal(
 
     NETW_NETWORK_PROFILE(
         wire::ProfileSubjectScope observation(
-            *books->profiler_outgoing,
-            plane->profiler_member(
+            *profiler_outgoing,
+            session->profiler_member(
                 int64_t(frame[StringName("route")]),
                 channel_signal,
                 p_node,
@@ -1350,7 +1352,7 @@ void SyncPipeline::send_signal(
 }
 
 Variant SyncPipeline::encode_prop_val(
-    const Ref<NetwEntity> &p_entity,
+    const NetwEntityRecord *p_record,
     Node *p_node,
     const StringName &p_property
 ) {
@@ -1358,8 +1360,8 @@ Variant SyncPipeline::encode_prop_val(
     if (p_node != nullptr) {
         script = p_node->get_script();
     }
-    if (script.is_valid() && p_entity.is_valid()) {
-        if (!p_entity->comp_table().get_poisoned()) {
+    if (script.is_valid() && p_record != nullptr) {
+        if (!p_record->get_comp_table().get_poisoned()) {
             const int64_t pid
                 = netw::script::model::get_property_id(script, p_property);
             if (pid > 0) {
@@ -1371,7 +1373,7 @@ Variant SyncPipeline::encode_prop_val(
 }
 
 Variant SyncPipeline::encode_signal_val(
-    const Ref<NetwEntity> &p_entity,
+    const NetwEntityRecord *p_record,
     Node *p_node,
     const StringName &p_signal
 ) {
@@ -1379,8 +1381,8 @@ Variant SyncPipeline::encode_signal_val(
     if (p_node != nullptr) {
         script = p_node->get_script();
     }
-    if (script.is_valid() && p_entity.is_valid()) {
-        if (!p_entity->comp_table().get_poisoned()) {
+    if (script.is_valid() && p_record != nullptr) {
+        if (!p_record->get_comp_table().get_poisoned()) {
             const int64_t sid
                 = netw::script::model::get_signal_id(script, p_signal);
             if (sid > 0) {
@@ -1417,17 +1419,16 @@ void SyncPipeline::reset_stream_of(int p_peer, uint64_t p_token) {
 }
 
 void SyncPipeline::reset_stray(int p_peer, uint64_t p_token) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
     const int64_t interval = wire::repair_interval_ms(
-        int64_t(plane->link_round_trip_ms(int64_t(p_peer)))
+        int64_t(session->wire().seq_book.round_trip_ms(int64_t(p_peer)))
     );
     if (!row_send()->reader_book().answers_stray(
             p_peer,
             p_token,
-            plane->session_elapsed_ms(),
+            session->session_elapsed_ms(),
             interval
         )) {
         return;
@@ -1479,12 +1480,11 @@ void SyncPipeline::close_datagram() {
         due.push_back(held);
     }
     held_deliveries.clear();
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
-    store::World &world = *books->store;
-    NetwPredictionEngine *const predictor = books->prediction;
+    store::Store &world = *store_world;
+    NetwPredictionEngine *const predictor = prediction_engine;
     for (const HeldDelivery &held : due) {
         const store::RowAddress at = world.row_of(held.binding, 0);
         if (!at.valid()) {
@@ -1535,26 +1535,25 @@ void SyncPipeline::apply_payload(
 }
 
 void SyncPipeline::apply_row(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_ordinal,
     const PackedByteArray &p_payload,
     int64_t p_sender,
     int64_t p_channel,
     int p_lane
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || sync_model == nullptr || p_entity.is_null()) {
+    if (session == nullptr || sync_model == nullptr || !p_entity.is_valid()) {
         return;
     }
 #if defined(NETW_TESTS)
-    const ReceiveAllocations counted(books->idle);
+    const ReceiveAllocations counted(idle_work);
 #endif
-    const int64_t route = books->liveness->route_of(p_entity->get_rid_handle());
-    if (!plane->is_host() && p_sender == SERVER_PEER && p_ordinal >= 0
+    const int64_t route = liveness_core->route_of(p_entity);
+    if (!session->is_host() && p_sender == SERVER_PEER && p_ordinal >= 0
         && sync_model->binding_of(route, p_ordinal) != nullptr
         && !sync_model->admits_schema(route, p_ordinal)) {
-        Node *node = p_entity->get_owner();
-        plane->session_leave_for_schema(
+        Node *node = session->wrapper_owner(p_entity);
+        session->session_leave_for_schema(
             node != nullptr ? String(node->get_name()) : String()
         );
         return;
@@ -1564,14 +1563,14 @@ void SyncPipeline::apply_row(
         route,
         p_ordinal,
         p_sender,
-        p_entity->steering(),
+        steering_of(session, p_entity),
         &schema_dropped
     );
     if (binding == nullptr) {
         if (schema_dropped) {
-            Node *dropped = p_entity->get_owner();
+            Node *dropped = session->wrapper_owner(p_entity);
             fault::raise(
-                plane,
+                session,
                 NETW_FAULT_PEER_MISMATCH,
                 {String("an update for '")
                      + (dropped != nullptr ? String(dropped->get_name())
@@ -1583,7 +1582,7 @@ void SyncPipeline::apply_row(
                 uint64_t(gd::instance_id(dropped))
             );
         }
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::UNBOUND
@@ -1597,7 +1596,7 @@ void SyncPipeline::apply_row(
         ? repl::name_snapshot_window(p_payload, named)
         : repl::name_snapshot_row(p_payload, named);
     if (!readable) {
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::MALFORMED
@@ -1608,14 +1607,14 @@ void SyncPipeline::apply_row(
     const bool known = book.names(int(p_sender), named.token, addressed);
     const bool names_this_lane = known && addressed.route == route
         && addressed.ordinal == uint8_t(p_ordinal);
-    store::World &world = *books->store;
+    store::Store &world = *store_world;
     const store::RowAddress at
         = world.row_of(binding->id, p_lane == LANE_RETAINED ? 1 : 0);
     if (!names_this_lane || !at.valid()) {
         if (!known) {
             reset_stray(int(p_sender), named.token);
         }
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::UNBOUND
@@ -1623,7 +1622,7 @@ void SyncPipeline::apply_row(
         return;
     }
     if (!book.admits_row(int(p_sender), named.token, named.revision)) {
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::STALE
@@ -1650,7 +1649,7 @@ void SyncPipeline::apply_row(
                 accepted
             );
         }
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::STALE
@@ -1666,7 +1665,7 @@ void SyncPipeline::apply_row(
         } else {
             reset_stream_of(int(p_sender), named.token);
         }
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::BASELINE_UNKNOWN
@@ -1674,7 +1673,7 @@ void SyncPipeline::apply_row(
         return;
     }
     if (admission != store::Landing::ACCEPTED) {
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::MALFORMED
@@ -1684,7 +1683,7 @@ void SyncPipeline::apply_row(
     const bool retained = p_lane == LANE_RETAINED;
     store::Table &table = world.table(at.table);
     if (!binding->admits_arrival(table.schema, p_ordinal, retained)) {
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             wire::Refusal::MALFORMED
@@ -1692,7 +1691,7 @@ void SyncPipeline::apply_row(
         return;
     }
     const store::Landing landed = decode_row(
-        p_entity->get_rid_handle(),
+        p_entity,
         at,
         p_sender,
         p_payload,
@@ -1702,7 +1701,7 @@ void SyncPipeline::apply_row(
         if (landed == store::Landing::BASELINE_UNKNOWN) {
             row_send()->note_baseline_drop();
         }
-        plane->attribution_note_refusal(
+        session->wire().attribution.note_refusal(
             p_sender,
             p_channel,
             landed == store::Landing::BASELINE_UNKNOWN
@@ -1716,7 +1715,7 @@ void SyncPipeline::apply_row(
     binding->settle_arrival();
     const uint32_t slot = table.slots[at.row];
     const int64_t predicted = retained ? -1 : world.predict_of(slot);
-    NetwPredictionEngine *const predictor = books->prediction;
+    NetwPredictionEngine *const predictor = prediction_engine;
     const predict::Listener listener = predicted < 0
         ? predict::Listener::NONE
         : predictor->listener_for(predicted, world.ref_of(slot), binding);
@@ -1729,7 +1728,8 @@ void SyncPipeline::apply_row(
             arrival.whole
         );
     }
-    plane->store_received(binding, at, retained, p_lane == LANE_ROW, p_sender);
+    session
+        ->store_received(binding, at, retained, p_lane == LANE_ROW, p_sender);
     if (!retained) {
         binding->notify_landed(table, at.row);
     }
@@ -1748,7 +1748,7 @@ void SyncPipeline::apply_row(
     );
     sync_model->note_row_applied();
 #if defined(NETW_TESTS)
-    books->idle->received_rows += 1;
+    idle_work->received_rows += 1;
 #endif
     const store::RowAddress landed_at
         = world.row_of(binding->id, p_lane == LANE_RETAINED ? 1 : 0);
@@ -1765,7 +1765,7 @@ void SyncPipeline::apply_row(
 }
 
 void SyncPipeline::handle_derived_row(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_ordinal,
     const PackedByteArray &p_payload,
     int64_t p_sender,
@@ -1775,7 +1775,7 @@ void SyncPipeline::handle_derived_row(
 }
 
 void SyncPipeline::handle_window_row(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_ordinal,
     const PackedByteArray &p_payload,
     int64_t p_sender,
@@ -1785,7 +1785,7 @@ void SyncPipeline::handle_window_row(
 }
 
 void SyncPipeline::handle_retained_row(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     int64_t p_ordinal,
     const PackedByteArray &p_payload,
     int64_t p_sender,
@@ -1805,8 +1805,7 @@ void SyncPipeline::feed_derived_interpolation(
     const PropertyBindingPtr &p_binding,
     const store::RowAddress &p_at
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return;
     }
     if (p_binding->get_set()->get_audience() != PropertySet::AUDIENCE_PUBLIC) {
@@ -1816,13 +1815,13 @@ void SyncPipeline::feed_derived_interpolation(
     if (node == nullptr || !p_at.valid()) {
         return;
     }
-    const store::Table &table = books->store->table(p_at.table);
+    const store::Table &table = store_world->table(p_at.table);
     const bool authoring
         = p_binding->get_set()->get_stamp() != PropertySet::STAMP_NONE
         && table.family != store::Family::RETAINED;
     int64_t tick = table.received_ticks[p_at.row];
     if (!authoring) {
-        const ClockEngine &clock = *books->clock;
+        const Clock &clock = *clock_engine;
         tick = clock.get_configured() ? clock.get_tick() : 0;
     }
     const uint64_t owner = p_binding->id;
@@ -1836,7 +1835,7 @@ void SyncPipeline::feed_derived_interpolation(
         }
         const StringName &key = table.schema.at(column)->key;
         if (column < INTERPOLATED_LIMIT
-            && plane->display_record_followed(
+            && session->display_record_followed(
                 route,
                 tick,
                 authoring,
@@ -1849,10 +1848,10 @@ void SyncPipeline::feed_derived_interpolation(
         const Ref<NetwInterpolate> spec
             = netw::script::model::get_node_property_interpolator(node, key);
         if (spec.is_valid()) {
-            plane->display_record(
+            session->display_record(
                 node,
                 key,
-                table.read_value(p_at.row, uint32_t(column)),
+                store::read_value(table, p_at.row, uint32_t(column)),
                 tick,
                 spec,
                 authoring,
@@ -1895,18 +1894,16 @@ void SyncPipeline::clear_session() {
     progress.clear();
     row_sender = ReplicationSend();
     row_sender_armed = false;
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr) {
-        books->store->clear_peers();
-        books->prediction->release_bindings();
+    if (session != nullptr) {
+        store_world->clear_peers();
+        prediction_engine->release_bindings();
     }
 }
 
 void SyncPipeline::clear_route(int64_t p_route) {
     progress.clear_route(p_route);
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr) {
-        plane->carrier_close_route(p_route);
+    if (session != nullptr) {
+        session->wire().carrier.close_route(p_route);
     }
     if (row_sender_armed) {
         row_sender.close_route(p_route);
@@ -1928,9 +1925,8 @@ void SyncPipeline::clear_peer(int64_t p_peer_id) {
     if (row_sender_armed) {
         row_sender.forget_peer(p_peer_id);
     }
-    NetwMultiplayer *plane = core();
-    if (plane != nullptr) {
-        books->store->forget_sender(int(p_peer_id));
+    if (session != nullptr) {
+        store_world->forget_sender(int(p_peer_id));
     }
 }
 
@@ -1939,11 +1935,10 @@ void SyncPipeline::dispose() {
 }
 
 Dictionary SyncPipeline::counters() const {
-    NetwMultiplayer *plane = core();
     const Dictionary model_stats
         = sync_model != nullptr ? sync_model->stats() : Dictionary();
     const Dictionary flush_stats
-        = plane != nullptr ? plane->sync_flush_stats() : Dictionary();
+        = session != nullptr ? session->sync_flush_stats() : Dictionary();
     Dictionary out;
     out[StringName("sends_dropped_unroutable")] = sends_dropped_unroutable;
     out[StringName("sends_dropped_not_live")] = sends_dropped_not_live;
@@ -1991,14 +1986,13 @@ Dictionary SyncPipeline::counters() const {
 }
 
 void SyncPipeline::handle_property_sync(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     Node *p_comp_node,
     const PackedByteArray &p_payload,
     int64_t p_sender,
     int64_t p_comp
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || p_comp_node == nullptr || p_entity.is_null()) {
+    if (session == nullptr || p_comp_node == nullptr || !p_entity.is_valid()) {
         return;
     }
     wire::ReadStream reader(p_payload);
@@ -2021,12 +2015,14 @@ void SyncPipeline::handle_property_sync(
         return;
     }
 
-    NETW_NETWORK_PROFILE(books->profiler->name_arrival(plane->profiler_member(
-        books->liveness->route_of(p_entity->get_rid_handle()),
-        channel_property,
-        p_comp_node,
-        prop
-    )));
+    NETW_NETWORK_PROFILE(
+        network_profiler->name_arrival(session->profiler_member(
+            liveness_core->route_of(p_entity),
+            channel_property,
+            p_comp_node,
+            prop
+        ))
+    );
     const Ref<NetwPropertyConfig> opt
         = netw::script::model::get_declared_property_config(p_comp_node, prop);
     PropertySet declared;
@@ -2059,11 +2055,11 @@ void SyncPipeline::handle_property_sync(
             int(opt->get_write_policy()),
             p_sender,
             int64_t(p_comp_node->get_multiplayer_authority()),
-            p_entity->steering()
+            steering_of(session, p_entity)
         )) {
         writes_refused += 1;
         fault::raise(
-            plane,
+            session,
             NETW_FAULT_WRITE_REFUSED,
             {String(prop), String(p_comp_node->get_name()), String(), p_sender},
             gd::instance_id(p_comp_node)
@@ -2087,7 +2083,7 @@ void SyncPipeline::handle_property_sync(
     if (!interpolators.is_empty()) {
         const Ref<NetwInterpolate> spec = interpolators[0];
         if (spec.is_valid()) {
-            plane->display_record(
+            session->display_record(
                 p_comp_node,
                 prop,
                 value,
@@ -2098,17 +2094,17 @@ void SyncPipeline::handle_property_sync(
         }
     }
 
-    if (plane->has_server_role()) {
+    if (session->has_server_role()) {
         const int64_t route
-            = books->liveness->route_of(p_entity->get_rid_handle());
+            = liveness_core->route_of(p_entity);
         const PackedInt32Array recipients = NetwSyncModel::event_recipients(
             true,
-            plane->get_unique_id(),
+            session->get_unique_id(),
             p_sender,
-            plane->rpc_recipients(p_entity)
+            session->rpc_recipients(p_entity)
         );
         for (int at = 0; at < recipients.size(); ++at) {
-            plane->send_to(
+            session->send_to(
                 recipients[at],
                 route,
                 channel_property,
@@ -2122,13 +2118,12 @@ void SyncPipeline::handle_property_sync(
 }
 
 void SyncPipeline::handle_signal(
-    const Ref<NetwEntity> &p_entity,
+    const RID &p_entity,
     Node *p_comp_node,
     const PackedByteArray &p_payload,
     int64_t p_sender
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || p_comp_node == nullptr || p_entity.is_null()) {
+    if (session == nullptr || p_comp_node == nullptr || !p_entity.is_valid()) {
         return;
     }
     wire::ReadStream reader(p_payload);
@@ -2149,12 +2144,14 @@ void SyncPipeline::handle_signal(
         return;
     }
 
-    NETW_NETWORK_PROFILE(books->profiler->name_arrival(plane->profiler_member(
-        books->liveness->route_of(p_entity->get_rid_handle()),
-        channel_signal,
-        p_comp_node,
-        signal_name
-    )));
+    NETW_NETWORK_PROFILE(
+        network_profiler->name_arrival(session->profiler_member(
+            liveness_core->route_of(p_entity),
+            channel_signal,
+            p_comp_node,
+            signal_name
+        ))
+    );
     const Ref<NetwMemberConfig> opt = script.is_valid()
         ? netw::script::model::get_signal_config(script, signal_name)
         : Ref<NetwMemberConfig>();
@@ -2176,15 +2173,15 @@ void SyncPipeline::handle_signal(
     if (p_sender != SERVER_PEER && opt.is_null()) {
         return;
     }
-    if (!entity::Control::script_admits(
+    if (!entity::script_admits(
             p_comp_node,
             signal_name,
             true,
             p_sender,
-            p_entity->steering()
+            steering_of(session, p_entity)
         )) {
         fault::raise(
-            plane,
+            session,
             NETW_FAULT_WRITE_REFUSED,
             {String(signal_name),
              String(p_comp_node->get_name()),
@@ -2202,17 +2199,17 @@ void SyncPipeline::handle_signal(
     call_args.append_array(args);
     Callable(p_comp_node, StringName("emit_signal")).callv(call_args);
 
-    if (plane->has_server_role()) {
+    if (session->has_server_role()) {
         const int64_t route
-            = books->liveness->route_of(p_entity->get_rid_handle());
+            = liveness_core->route_of(p_entity);
         const PackedInt32Array recipients = NetwSyncModel::event_recipients(
             true,
-            plane->get_unique_id(),
+            session->get_unique_id(),
             p_sender,
-            plane->rpc_recipients(p_entity)
+            session->rpc_recipients(p_entity)
         );
         for (int at = 0; at < recipients.size(); ++at) {
-            plane->send_to(
+            session->send_to(
                 recipients[at],
                 route,
                 channel_signal,
@@ -2230,8 +2227,7 @@ void SyncPipeline::record_interpolated_signal_args(
     const Array &p_args,
     const Ref<NetwMemberConfig> &p_opt
 ) {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr || p_opt.is_null()
+    if (session == nullptr || p_opt.is_null()
         || p_opt->get_interpolators().is_empty()) {
         return;
     }
@@ -2243,7 +2239,7 @@ void SyncPipeline::record_interpolated_signal_args(
             || at >= p_args.size()) {
             continue;
         }
-        plane->display_record(
+        session->display_record(
             p_comp_node,
             spec->get_target(),
             p_args[at],
@@ -2263,15 +2259,14 @@ Error SyncPipeline::apply_one_value(const Array &p_values) {
 }
 
 int64_t SyncPipeline::receive_tick() const {
-    NetwMultiplayer *plane = core();
-    if (plane == nullptr) {
+    if (session == nullptr) {
         return 0;
     }
-    const ClockEngine &clock = *books->clock;
+    const Clock &clock = *clock_engine;
     if (clock.get_configured()) {
         return clock.get_tick();
     }
-    return plane->get_frame_counter();
+    return session->get_frame_counter();
 }
 
 } // namespace netw

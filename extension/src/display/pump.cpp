@@ -5,6 +5,7 @@
 
 #include "netw/api/interpolate.hpp"
 #include "netw/api/member_config.hpp"
+#include "netw/api/netw_multiplayer.hpp"
 #include "netw/colors.hpp"
 #include "netw/display/channel.hpp"
 #include "netw/display/decl.hpp"
@@ -22,17 +23,11 @@ using namespace godot;
 
 namespace netw::display {
 
-void Hooks::resolve(const RID &p_entity) const {
-    if (resolve_role.is_valid()) {
-        resolve_role.call(p_entity);
-    }
-}
-
 double Hooks::clamp_for(const RID &p_entity) const {
-    if (!chase_clamp.is_valid()) {
+    if (session == nullptr) {
         return INFINITY;
     }
-    return double(chase_clamp.call(p_entity));
+    return session->display_default_chase_clamp(p_entity);
 }
 
 static void append_argument_specs(
@@ -122,28 +117,28 @@ LocalVector<SpecRow> Hooks::specs_of(Node *p_owner) const {
 }
 
 void Hooks::compute_sync_intervals(const RID &p_entity) const {
-    if (sync_intervals.is_valid()) {
-        sync_intervals.call(p_entity);
+    if (session != nullptr) {
+        session->display_compute_sync_intervals(p_entity);
     }
 }
 
 bool Hooks::authors(const RID &p_entity) const {
-    if (!authors_streams.is_valid()) {
+    if (session == nullptr) {
         return false;
     }
-    return authors_streams.call(p_entity);
+    return session->display_default_authors_streams(p_entity);
 }
 
 int Hooks::role_of(const RID &p_entity, bool p_authors_streams) const {
-    if (!role_reader.is_valid()) {
+    if (session == nullptr) {
         return netw::display::ROLE_DISABLED;
     }
-    return role_reader.call(p_entity, p_authors_streams);
+    return session->display_default_role(p_entity, p_authors_streams);
 }
 
 void Hooks::chase_hook(const RID &p_entity, bool p_bind) const {
-    if (chase_hook_binder.is_valid()) {
-        chase_hook_binder.call(p_entity, p_bind);
+    if (session != nullptr) {
+        session->display_default_chase_hook(p_entity, p_bind);
     }
 }
 
@@ -462,11 +457,9 @@ bool pump_runtime(
         "entity %lld",
         static_cast<long long>(p_runtime->get_route())
     );
-    if (p_runtime->get_pump_mode() == netw::display::PUMP_UNRESOLVED) {
-        if (p_runtime->owner() == nullptr) {
-            return false;
-        }
-        p_hooks.resolve(p_runtime->entity_rid());
+    if (p_runtime->get_pump_mode() == netw::display::PUMP_UNRESOLVED
+        && p_runtime->owner() == nullptr) {
+        return false;
     }
     switch (p_runtime->get_pump_mode()) {
         case netw::display::PUMP_DISABLED:

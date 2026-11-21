@@ -126,7 +126,7 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwPromise<class_NetwPromise>`                 | :ref:`leave<class_NetwSession_method_leave>`\ (\ )                                                                                                                                    |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                                   | :ref:`link_stats<class_NetwSession_method_link_stats>`\ (\ peer\: :godot:`int`\ ) |const|                                                                                             |
+   | :godot:`float`                                        | :ref:`link_stat<class_NetwSession_method_link_stat>`\ (\ peer\: :godot:`int`, stat\: :ref:`LinkStat<enum_NetwMultiplayer_LinkStat>`\ ) |const|                                        |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | |void|                                                | :ref:`pause<class_NetwSession_method_pause>`\ (\ reason\: :godot:`String` = ""\ )                                                                                                     |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -150,7 +150,7 @@ Methods
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :ref:`NetwTable<class_NetwTable>`                     | :ref:`table<class_NetwSession_method_table>`\ (\ name\: :godot:`StringName`\ ) |const|                                                                                                |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-   | :godot:`Dictionary`                                   | :ref:`traffic<class_NetwSession_method_traffic>`\ (\ peer\: :godot:`int` = 0\ ) |const|                                                                                               |
+   | :godot:`float`                                        | :ref:`traffic<class_NetwSession_method_traffic>`\ (\ peer\: :godot:`int`, stat\: :ref:`Traffic<enum_NetwMultiplayer_Traffic>`\ ) |const|                                              |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
    | :godot:`Error <@GlobalScope#enum_@globalscope_Error>` | :ref:`transfer_server<class_NetwSession_method_transfer_server>`\ (\ player\: :ref:`NetwPlayer<class_NetwPlayer>`\ )                                                                  |
    +-------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -869,30 +869,19 @@ Leaves the session. The server saves its entity rows first, and stays online if 
 
 ----
 
-.. _class_NetwSession_method_link_stats:
+.. _class_NetwSession_method_link_stat:
 
 .. rst-class:: classref-method
 
-:godot:`Dictionary` **link_stats**\ (\ peer\: :godot:`int`\ ) |const| :ref:`🔗<class_NetwSession_method_link_stats>`
+:godot:`float` **link_stat**\ (\ peer\: :godot:`int`, stat\: :ref:`LinkStat<enum_NetwMultiplayer_LinkStat>`\ ) |const| :ref:`🔗<class_NetwSession_method_link_stat>`
 
-Measured connection quality to ``peer``, and what this peer's byte budget sends it.
+The measured connection quality ``stat`` of ``peer``, or what this peer's byte budget sends it.
 
-.. code:: text
+::
 
-    Dictionary
-    ┠╴loss           float   share of the last 32 packets lost
-    ┠╴rtt            float   round trip time, in seconds
-    ┠╴jitter         float   round trip variation, in seconds
-    ┠╴reorders       int     packets that arrived out of order
-    ┠╴duplicates     int     packets that arrived twice
-    ┠╴mode           String  "good", or "bad" while its budget is cut
-    ┠╴budget_bits    int     most bits one packet to this peer may use
-    ┠╴budget_bytes   int     bytes it may be sent each tick
-    ┠╴sent_bytes     int     bytes charged to it since it joined
-    ┠╴debt_bytes     int     bytes it was sent past its budget
-    ┖╴deferred_rows  int     rows left waiting by the last tick
+    var rtt := session.link_stat(peer, NetwMultiplayer.LINK_STAT_RTT)
 
-\ Losing packets halves ``budget_bytes`` and ``budget_bits``. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While ``debt_bytes`` is above zero, volatile properties wait, and retained properties and RPCs still go.
+\ Losing packets halves :ref:`NetwMultiplayer.LINK_STAT_BUDGET_BYTES<class_NetwMultiplayer_constant_LINK_STAT_BUDGET_BYTES>` and :ref:`NetwMultiplayer.LINK_STAT_BUDGET_BITS<class_NetwMultiplayer_constant_LINK_STAT_BUDGET_BITS>`. Each round trip without loss adds back an eighth of the configured budget, stopping an eighth short of the rate that lost packets for the next minute. While :ref:`NetwMultiplayer.LINK_STAT_DEBT_BYTES<class_NetwMultiplayer_constant_LINK_STAT_DEBT_BYTES>` is above zero, volatile properties wait, and retained properties and RPCs still go.
 
 .. rst-class:: classref-item-separator
 
@@ -1065,25 +1054,15 @@ The table of the schema declared as ``name`` with :ref:`Netw.configure_schema()<
 
 .. rst-class:: classref-method
 
-:godot:`Dictionary` **traffic**\ (\ peer\: :godot:`int` = 0\ ) |const| :ref:`🔗<class_NetwSession_method_traffic>`
+:godot:`float` **traffic**\ (\ peer\: :godot:`int`, stat\: :ref:`Traffic<enum_NetwMultiplayer_Traffic>`\ ) |const| :ref:`🔗<class_NetwSession_method_traffic>`
 
-What the session sent to ``peer`` and received from it over the last second, in bytes a second. ``0`` counts every peer.
+The rate ``stat`` the session sent to ``peer`` or received from it over the last second. A ``peer`` of ``0`` counts every peer.
 
-.. code:: text
+::
 
-    Dictionary
-    ┠╴sent                Dictionary  bytes a second sent, by cause
-    ┃ ┠╴state             float       state and broadcast properties
-    ┃ ┠╴input             float       input properties
-    ┃ ┠╴calls             float       RPCs, signals and actions
-    ┃ ┠╴spawns            float       spawns, despawns, control, scenes and joins
-    ┃ ┠╴upkeep            float       prediction acknowledgements and the clock
-    ┃ ┖╴headers           float       packet headers, an estimate for the transport
-    ┠╴received            Dictionary  the same causes, received
-    ┠╴sent_packets        float       packets a second sent
-    ┖╴received_packets    float       packets a second received
+    var calls := session.traffic(peer, NetwMultiplayer.TRAFFIC_SENT_CALLS)
 
-\ Every packet costs ``headers`` before it carries anything, so sending fewer packets saves the most. A local session has no transport, so its ``headers`` count only the session's own packet header. The transport's own keepalive is not counted.
+\ Every packet costs :ref:`NetwMultiplayer.TRAFFIC_SENT_HEADERS<class_NetwMultiplayer_constant_TRAFFIC_SENT_HEADERS>` before it carries anything, so sending fewer packets saves the most. A local session has no transport, so its headers count only the session's own packet header. The transport's own keepalive is not counted.
 
 .. rst-class:: classref-item-separator
 

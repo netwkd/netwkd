@@ -71,13 +71,7 @@ public:
         godot::Dictionary &r_header
     );
 
-    static godot::Ref<NetwEntity> stamp_header(
-        godot::Object *p_node,
-        const godot::Dictionary &p_header,
-        godot::Object *p_session
-    );
-
-    static void apply_native_entry(
+    static bool apply_native_entry(
         godot::Node *p_root,
         const godot::String &p_path,
         const godot::PackedByteArray &p_bytes
