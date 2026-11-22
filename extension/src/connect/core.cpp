@@ -743,7 +743,24 @@ void ConnectCore::announce_end(
                 callable_mp_static(&heard_through_failed)
             );
         }
-        p_ended.promise->reject(p_error, p_reason);
+        settle_attempt(p_ended.promise, p_error, p_reason);
+    }
+}
+
+void ConnectCore::settle_attempt(
+    const Ref<NetwPromise> &p_promise,
+    Error p_error,
+    const String &p_reason
+) {
+    if (p_promise.is_null()) {
+        return;
+    }
+    if (session != nullptr) {
+        session->connection_settle_attempt(p_promise, p_error, p_reason);
+    } else if (p_error == OK) {
+        p_promise->resolve(int64_t(OK));
+    } else {
+        p_promise->reject(p_error, p_reason);
     }
 }
 
@@ -856,9 +873,7 @@ void ConnectCore::on_session_online() {
         );
     }
     announce_join_address();
-    if (outcome.is_valid()) {
-        outcome->resolve(int64_t(OK));
-    }
+    settle_attempt(outcome, OK, String());
 }
 
 void ConnectCore::on_transport_failed() {
@@ -1207,6 +1222,10 @@ void ConnectCore::on_poll(double p_delta) {
     if (running_steps) {
         return;
     }
+    const Ref<NetwMultiplayer> keep(session);
+    if (keep.is_valid()) {
+        keep->step_enter();
+    }
     running_steps = true;
     while (!starts.is_empty()) {
         const Error settled = session != nullptr
@@ -1298,6 +1317,9 @@ void ConnectCore::on_poll(double p_delta) {
         step = take_ready(this);
     }
     running_steps = false;
+    if (keep.is_valid()) {
+        keep->step_leave();
+    }
 }
 
 Transport *ConnectCore::make_transport(const StringName &p_peer_class) {

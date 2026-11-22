@@ -114,7 +114,10 @@ public sealed class NetwLinkConditions : NetwRefCounted
             373806689UL);
 
     /// <summary>
-    /// Chance to drop an unreliable packet or delay a reliable packet.
+    /// Chance to drop an unreliable packet or delay a reliable packet. A lost
+    /// reliable packet arrives after <see cref="NetwLinkConditions.LatencyMs"/>
+    /// plus the larger of 30 ms and twice
+    /// <see cref="NetwLinkConditions.LatencyMs"/>.
     /// </summary>
     public double LossChance
     {

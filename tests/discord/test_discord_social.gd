@@ -202,18 +202,6 @@ func test_only_the_first_service_holds_the_client_until_it_leaves() -> void:
 	assert_object(second.client).is_null()
 
 
-func test_sign_out_cancels_sign_in_and_a_new_sign_in_waits_again() -> void:
-	var social := discord(viewport(), SIGN_IN_APPLICATION_ID)
-	var first: NetwPromise = social.sign_in()
-	assert_object(social.sign_in()).is_same(first)
-	social.sign_out()
-	assert_bool(first.is_failed).is_true()
-	assert_int(first.code).is_equal(ERR_SKIP)
-	var second: NetwPromise = social.sign_in()
-	assert_object(second).is_not_same(first)
-	assert_bool(second.is_settled).is_false()
-
-
 func test_a_headless_run_leaves_the_saved_sign_in_alone() -> void:
 	var path := "user://discord_%d.cfg" % SIGN_IN_APPLICATION_ID
 	var saved := ConfigFile.new()

@@ -584,9 +584,13 @@ public sealed class NetwConnection : NetwRefCounted
 
     /// <summary>
     /// Settles with <c>@GlobalScope.ERR_ALREADY_IN_USE</c> while the session is
-    /// online. Invalid <see cref="NetwSessionConfig"/>,
-    /// <see cref="NetwClockConfig"/> or <see cref="NetwLagCompensationConfig"/>
-    /// settings reject the promise before a peer is created.
+    /// online. A <c>role</c> setting of
+    /// <see cref="NetwSession.RoleEnum.DedicatedServer"/> hosts a dedicated
+    /// server, and it wins over the role from
+    /// <see cref="Netw.ConfigureSession"/> for this session. Invalid
+    /// <see cref="NetwSessionConfig"/>, <see cref="NetwClockConfig"/> or
+    /// <see cref="NetwLagCompensationConfig"/> settings reject the promise
+    /// before a peer is created.
     /// </summary>
     public NetwPromise Host(
         Variant transport,

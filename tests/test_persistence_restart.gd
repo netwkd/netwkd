@@ -1,5 +1,5 @@
 class_name TestPersistenceRestart
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const WRITER := "res://tests/support/persistence_restart_writer.gd"
 

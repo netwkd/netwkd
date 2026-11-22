@@ -5,6 +5,7 @@ on:
     branches: [main, total-native]
     paths:
       - "addons/netwkd/**/*.gd"
+      - "addons/netwkd_test/**/*.gd"
       - "extension/**"
       - "ci/**"
       - "docs/**"
@@ -15,6 +16,7 @@ on:
     branches: [main, total-native]
     paths:
       - "addons/netwkd/**/*.gd"
+      - "addons/netwkd_test/**/*.gd"
       - "extension/**"
       - "ci/**"
       - "docs/**"

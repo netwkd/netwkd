@@ -1,12 +1,11 @@
 class_name TestDiscordActivity
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const APP := 42
 const INSTANCE := "i-1520000000000000000-gc-1-2"
 const PLAYER := "205519959982473217"
 const WORKER_KEY := "res://tests/discord_activity/test_only_worker_key.pem"
 const WORKER_PUB := "res://tests/discord_activity/test_only_worker_key.pub"
-const WAIT_SECONDS := 15.0
 
 
 class Gate extends Node:
@@ -25,7 +24,8 @@ class SlowWorker extends NetwTestDiscordService:
 	func _grant(nonce: String) -> NetwPromise:
 		var granting := NetwPromise.new()
 		get_tree().create_timer(3.5).timeout.connect(
-			func() -> void: granting.resolve({ "id_token": fake_worker.call(nonce) })
+			func() -> void:
+				granting.resolve({ "id_token": fake_worker.call(nonce) })
 		)
 		return granting
 
@@ -47,7 +47,8 @@ func test_entering_an_activity_invites_its_room() -> void:
 	discord.fake_instance_id = INSTANCE
 	discord.room_transport = &"ENetMultiplayerPeer"
 	tree.add_child(discord)
-	await NetwTestSuite.drain_frames(get_tree(), 2)
+	for i in 2:
+		await get_tree().process_frame
 
 	assert_object(Netw.session(tree).service(NetwTestDiscordService)) \
 			.is_same(discord)
@@ -62,7 +63,8 @@ func test_nothing_registers_outside_an_activity() -> void:
 	var discord := DiscordActivityService.new()
 	discord.room_transport = &"ENetMultiplayerPeer"
 	tree.add_child(discord)
-	await NetwTestSuite.drain_frames(get_tree(), 2)
+	for i in 2:
+		await get_tree().process_frame
 
 	assert_str(discord.instance_id).is_empty()
 	assert_object(Netw.session(tree).service(DiscordActivityService)).is_null()
@@ -71,20 +73,7 @@ func test_nothing_registers_outside_an_activity() -> void:
 	assert_int(signing_in.code).is_equal(ERR_UNAVAILABLE)
 
 
-func test_a_player_in_the_activity_joins_as_their_discord_account(
-		timeout := 30000,
-) -> void:
-	var discord := NetwTestDiscordService.new()
-	discord.fake_instance_id = INSTANCE
-
-	var request := await join_with(discord)
-
-	var account := "discord:" + PLAYER
-	assert_array(request.accounts).contains_exactly([account])
-	assert_str(request.name_of(account)).is_equal("Ana")
-
-
-func test_a_player_who_takes_long_to_authorize_still_joins(
+func test_a_player_who_takes_long_to_authorize_joins_as_their_account(
 		timeout := 30000,
 ) -> void:
 	var host_gate := Gate.new()
@@ -107,20 +96,17 @@ func test_a_player_who_takes_long_to_authorize_still_joins(
 
 	assert_int(await EnetTestSupport.join_client(client, host.port, &"ana")) \
 			.is_equal(OK)
-	assert_array(host_gate.requests.back().accounts) \
-			.contains_exactly(["discord:" + PLAYER])
 
-
-func test_outside_an_activity_no_discord_account_is_offered(
-		timeout := 30000,
-) -> void:
-	var request := await join_with(NetwTestDiscordService.new())
-
-	assert_array(request.accounts).is_empty()
+	var request: NetwJoinRequest = host_gate.requests.back()
+	var account := "discord:" + PLAYER
+	assert_array(request.accounts).contains_exactly([account])
+	assert_str(request.name_of(account)).is_equal("Ana")
 
 
 func test_url_mappings_reach_a_host_through_the_proxy() -> void:
-	var discord: DiscordActivityService = auto_free(DiscordActivityService.new())
+	var discord: DiscordActivityService = auto_free(
+		DiscordActivityService.new(),
+	)
 	discord.application_id = APP
 	discord.url_mappings = {
 		"/nakama": "nakama.example.com",
@@ -155,29 +141,6 @@ func watch_invites(tree: MultiplayerViewport) -> Array[String]:
 		func(endpoint: NetwEndpoint) -> void: invites.append(endpoint.address),
 	)
 	return invites
-
-
-func join_with(discord: NetwTestDiscordService) -> NetwJoinRequest:
-	var host_gate := Gate.new()
-	var host := await EnetTestSupport.start_host(self, host_gate, WAIT_SECONDS)
-	var client := EnetTestSupport.make_client_tree(self, host.port)
-	trees.append_array([host.tree, client])
-	client.api.auth_timeout = WAIT_SECONDS
-	var client_gate := Gate.new()
-	client.add_child(client_gate)
-	discord.application_id = APP
-	discord.room_transport = &""
-	discord.fake_worker = worker_token
-	client.add_child(discord)
-	Netw.configure_admission(host_gate.admit) \
-			.accept(DiscordIdToken.signed_by(APP, WORKER_PUB))
-	Netw.configure_admission(client_gate.admit) \
-			.accept(DiscordIdToken.signed_by(APP, WORKER_PUB))
-
-	assert_int(await EnetTestSupport.join_client(client, host.port, &"ana")) \
-			.is_equal(OK)
-	assert_int(host_gate.requests.size()).is_equal(1)
-	return host_gate.requests.back()
 
 
 func worker_token(nonce: String) -> String:

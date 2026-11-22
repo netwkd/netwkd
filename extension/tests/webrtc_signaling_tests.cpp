@@ -1,8 +1,10 @@
+#include "support/fault_log.h"
 #include "support/netw_cells.h"
 #include "support/netw_test.h"
 
 #include <cstdint>
 
+#include "godot/local_vector.hpp"
 #include "godot/variant.hpp"
 #include "netw/connect/room_board.hpp"
 #include "netw/connect/signaler.hpp"
@@ -12,6 +14,7 @@ namespace TestNetwWebRTCSignaling {
 
 using namespace godot;
 using netw::connect::board_hash_of;
+using netw::connect::RoomBoard;
 using netw::connect::RoomCard;
 using netw::connect::TargetRow;
 using netw::connect::TrackerSignaler;
@@ -183,6 +186,28 @@ LawVerdict not_a_card(const Stand &) {
     return law_held();
 }
 
+LawVerdict quiet_offline_browse(const Stand &) {
+    netw_test::FaultWatch watch;
+    RoomBoard board;
+    board.set_trackers(unreachable_tracker());
+    board.browse();
+    LocalVector<TargetRow> listed;
+    bool ended = false;
+    for (int64_t frame = 0; frame < 4 && !ended; frame++) {
+        board.poll(1.0, frame * 11000000, frame);
+        ended = board.take_listing(listed);
+    }
+    board.close();
+
+    if (!ended || listed.size() != 0) {
+        return law_broken("the browse did not end with an empty list");
+    }
+    if (watch.warnings_containing("[NW1000]") != 0) {
+        return law_broken("a browse nobody asked for printed NW1000");
+    }
+    return law_held();
+}
+
 LawVerdict turn_filter(const Stand &) {
     if (WebRTCTransport::is_url_supported_native("turns:relay.example:443")
         || WebRTCTransport::is_url_supported_native(
@@ -245,6 +270,9 @@ const Row ROWS[] = {
     {"an announce that is not a room card",
      "a query or a card with no room hash is refused",
      &not_a_card},
+    {"a lobby browse that reaches no tracker",
+     "it ends with an empty list and prints no warning",
+     &quiet_offline_browse},
     {"a TURN url the native stack cannot dial",
      "TLS and TCP relays are dropped, a server left empty goes, and a kept "
      "relay keeps its credentials",

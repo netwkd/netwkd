@@ -150,6 +150,7 @@
 			<param index="1" name="settings" type="Dictionary" default="{}" />
 			<description>
 				Settles with [constant @GlobalScope.ERR_ALREADY_IN_USE] while the session is online.
+				A [code]role[/code] setting of [constant NetwSession.ROLE_DEDICATED_SERVER] hosts a dedicated server, and it wins over the role from [method Netw.configure_session] for this session.
 				Invalid [NetwSessionConfig], [NetwClockConfig] or [NetwLagCompensationConfig] settings reject the promise before a peer is created.
 			</description>
 		</method>

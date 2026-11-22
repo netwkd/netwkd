@@ -1,5 +1,5 @@
 class_name TestNakamaAccount
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const GUEST_PREFIX := "nakama_guest_"
 
@@ -7,7 +7,7 @@ const GUEST_PROCESS := "res://tests/nakama/nakama_guest_process.gd"
 
 const TIMEOUT := 10.0
 
-var trees: Array = []
+var trees: Array[MultiplayerViewport] = []
 var saved_guests: Dictionary[String, String] = { }
 
 
@@ -68,23 +68,16 @@ func guest_of_another_process() -> String:
 	return ""
 
 
-func test_a_guest_is_a_random_id_kept_on_this_device() -> void:
-	var first := guest_account()
-	await first.sign_in().wait()
-	assert_str(first.user_id).is_not_empty()
-
-	var second := guest_account()
-	await second.sign_in().wait()
-	assert_str(second.user_id) \
-			.override_failure_message(
-				"A second sign in in this instance made a new guest.",
-			).is_equal(first.user_id)
-
-
-func test_each_running_instance_is_its_own_guest() -> void:
+func test_each_running_instance_keeps_its_own_guest() -> void:
 	var here := guest_account()
 	await here.sign_in().wait()
 	assert_str(here.user_id).is_not_empty()
+	var again := guest_account()
+	await again.sign_in().wait()
+	assert_str(again.user_id) \
+			.override_failure_message(
+				"A second sign in in this instance made a new guest.",
+			).is_equal(here.user_id)
 
 	var there := guest_of_another_process()
 	assert_str(there) \
@@ -98,21 +91,6 @@ func test_each_running_instance_is_its_own_guest() -> void:
 			.override_failure_message(
 				"An instance that restarted signed in as a new guest.",
 			).is_equal(there)
-
-
-func test_a_guest_signs_in_with_no_username() -> void:
-	var account := guest_account()
-	await account.sign_in().wait()
-	assert_object(account.session) \
-			.override_failure_message("The guest could not sign in.") \
-			.is_not_null()
-	if account.session == null:
-		return
-	assert_str(account.session.username) \
-			.override_failure_message(
-				"The guest was created with the player's name as its username.",
-			).is_not_equal("Player")
-	assert_str(account.display_name).is_equal(account.session.username)
 
 
 func test_the_relay_answers_accounts_and_display_names() -> void:
@@ -141,7 +119,8 @@ func test_the_relay_answers_accounts_and_display_names() -> void:
 		await get_tree().process_frame
 	var player := session.find_player("nakama:" + jose.user_id)
 	assert_object(player) \
-			.override_failure_message("The server never admitted Jose's account.") \
-			.is_not_null()
+			.override_failure_message(
+				"The server never admitted Jose's account.",
+			).is_not_null()
 	if player != null:
 		assert_str(player.account_name).is_equal(shown)

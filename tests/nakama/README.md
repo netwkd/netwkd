@@ -1,8 +1,7 @@
 # Local Nakama for live tests
 
 Spins up Nakama + Postgres so the env-gated live transport/storage tests have a
-real server to talk to. The offline *shape* tests (API-drift checks) need none
-of this — they only require the Nakama addon files to be present.
+real server to talk to. `test_nakama_database.gd` needs none of this.
 
 ## Start / stop
 

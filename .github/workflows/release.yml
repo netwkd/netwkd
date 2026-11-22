@@ -98,10 +98,12 @@ jobs:
           set -eu
           core="$(find dist -maxdepth 1 -name 'netwkd-*.zip' -print -quit)"
           steam="$(find dist -maxdepth 1 -name 'netwkd_steam-*.zip' -print -quit)"
+          kit="$(find dist -maxdepth 1 -name 'netwkd_test-*.zip' -print -quit)"
           test -n "$core"
           test -n "$steam"
+          test -n "$kit"
           python3 ci/test.py --godot "${{ steps.engine.outputs.binary }}" \
-            consumer --zip "$core" --zip "$steam"
+            consumer --zip "$core" --zip "$steam" --zip "$kit"
 
       - name: Upload The Inventory
         uses: actions/upload-artifact@v4
@@ -225,6 +227,7 @@ jobs:
                   `- ${readme("netwkd_steam")} adds Steam. GodotSteam is included.`,
                   `- ${readme("netwkd_discord")} adds Discord. Get Discord's own library from its developer portal.`,
                   `- ${readme("netwkd_nakama")} adds Nakama. The Nakama Godot client is included.`,
+                  `- ${readme("netwkd_test")} tests a game with a server and its clients in one process.`,
                   "",
                   notes,
                 ].join("\n"),

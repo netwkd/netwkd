@@ -2,6 +2,7 @@
 
 #include "godot/json.hpp"
 #include "netw/connect/tracker_client.hpp"
+#include "netw/fault_book.hpp"
 #include "netw/log.hpp"
 
 using namespace godot;
@@ -197,6 +198,18 @@ void TrackerSignaler::poll(
                     sys::TRANSPORT,
                     "No signaling tracker could be reached."
                 );
+                if (is_server) {
+                    fault::raise(
+                        nullptr,
+                        NETW_FAULT_LINK_FAILED,
+                        {"the WebRTC connection",
+                         String(),
+                         vformat(
+                             "every signaling tracker (%s)",
+                             tracker->unreachable_trackers()
+                         )}
+                    );
+                }
                 SignalerEvent none;
                 none.kind = SignalerEvent::UNREACHABLE;
                 publish(none);

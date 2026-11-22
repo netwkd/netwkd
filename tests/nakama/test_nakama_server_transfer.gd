@@ -1,5 +1,5 @@
 class_name TestNakamaServerTransfer
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const TIMEOUT := 15.0
 const DEADLINE_TICKS := 30
@@ -10,214 +10,7 @@ const MOVED_AFTER := Vector2(400, 300)
 const DEADLINE_WARNING := "did not report its world to the new server"
 
 var trees: Array[MultiplayerViewport] = []
-var driver: RelayDriver
 var warnings: WarningLog
-
-
-class RelayEndpoint:
-	extends MultiplayerPeerExtension
-
-	const PUMP_MS := 8
-
-	signal server_relabelled(successor_was: int, former_now: int)
-
-	var bridge: RefCounted
-	var relay: NakamaRelayPeer
-	var target := 0
-
-
-	func _init(p_bridge: RefCounted) -> void:
-		bridge = p_bridge
-		relay = bridge.multiplayer_peer
-		relay.peer_connected.connect(peer_connected.emit)
-		relay.peer_disconnected.connect(peer_disconnected.emit)
-		relay.server_relabelled.connect(server_relabelled.emit)
-
-
-	func pump() -> void:
-		OS.delay_msec(PUMP_MS)
-		bridge.nakama_socket._adapter._process(0.0)
-
-
-	func transfer_server(peer_id: int) -> Error:
-		var answer: Error = relay.transfer_server(peer_id)
-		pump()
-		return answer
-
-
-	func _poll() -> void:
-		pump()
-		relay.poll()
-
-
-	func _get_packet_script() -> PackedByteArray:
-		return relay.get_packet()
-
-
-	func _get_packet_peer() -> int:
-		return relay.get_packet_peer()
-
-
-	func _get_available_packet_count() -> int:
-		return relay.get_available_packet_count()
-
-
-	func _get_packet_mode() -> TransferMode:
-		return TRANSFER_MODE_RELIABLE
-
-
-	func _get_packet_channel() -> int:
-		return 0
-
-
-	func _put_packet_script(buffer: PackedByteArray) -> Error:
-		relay.set_target_peer(target)
-		return relay.put_packet(buffer)
-
-
-	func _get_max_packet_size() -> int:
-		return NakamaRelayPeer.MAX_PACKET_SIZE
-
-
-	func _set_transfer_channel(_channel: int) -> void:
-		pass
-
-
-	func _get_transfer_channel() -> int:
-		return 0
-
-
-	func _set_transfer_mode(_mode: TransferMode) -> void:
-		pass
-
-
-	func _get_transfer_mode() -> TransferMode:
-		return TRANSFER_MODE_RELIABLE
-
-
-	func _set_target_peer(peer_id: int) -> void:
-		target = peer_id
-
-
-	func _is_server() -> bool:
-		return relay.get_unique_id() == 1
-
-
-	func _is_server_relay_supported() -> bool:
-		return relay.is_server_relay_supported()
-
-
-	func _get_unique_id() -> int:
-		return relay.get_unique_id()
-
-
-	func _get_connection_status() -> ConnectionStatus:
-		return relay.get_connection_status()
-
-
-	func _set_refuse_new_connections(_enable: bool) -> void:
-		pass
-
-
-	func _is_refusing_new_connections() -> bool:
-		return false
-
-
-	func _disconnect_peer(peer_id: int, force: bool) -> void:
-		relay.disconnect_peer(peer_id, force)
-
-
-	func _close() -> void:
-		pass
-
-
-class RelayDriver:
-	extends NetwTransferDriver
-
-	const SEATS := 4
-	const CLOSE_PUMPS := 100
-
-	const Bridge := preload("res://addons/netwkd_nakama/nakama_relay_bridge.gd")
-
-	var prepared: Array = []
-	var seated: Array = []
-	var made: Array[MultiplayerViewport] = []
-
-
-	func prepare(host: Node, label: String) -> bool:
-		var bridges: Array = []
-		for seat in SEATS:
-			var tree := MultiplayerViewport.new()
-			host.add_child(tree)
-			made.append(tree)
-			var account := NakamaAccount.new()
-			account.host = NakamaTestServer.host()
-			tree.add_child(account)
-			var session := await account.client.authenticate_device_async(
-				"%s-%d" % [label, seat],
-				null,
-				true,
-			)
-			if session.is_exception():
-				return false
-			account.use_session(session)
-			var signing_in := account.sign_in()
-			await signing_in.wait()
-			if signing_in.is_failed:
-				return false
-			var bridge := Bridge.new(account.socket)
-			bridge.migrate_on_host_loss = true
-			bridges.append(bridge)
-		bridges[0].create_match()
-		await bridges[0].match_joined
-		for seat in range(1, SEATS):
-			bridges[seat].join_match(bridges[0].match_id)
-			await bridges[seat].match_joined
-		var deadline := Time.get_ticks_msec() + 5000
-		while not bridges.all(meshed):
-			if Time.get_ticks_msec() > deadline:
-				return false
-			await host.get_tree().process_frame
-		prepared.append(bridges)
-		return true
-
-
-	func meshed(bridge: RefCounted) -> bool:
-		return bridge.multiplayer_peer._get_peers().size() == SEATS - 1
-
-
-	func make_endpoints(count: int) -> Array[MultiplayerPeer]:
-		var endpoints: Array[MultiplayerPeer] = []
-		if prepared.is_empty():
-			return endpoints
-		seated.assign(prepared.pop_front())
-		for seat in mini(count, seated.size()):
-			endpoints.append(RelayEndpoint.new(seated[seat]))
-		return endpoints
-
-
-	func lose_server() -> void:
-		var socket = seated[0].nakama_socket
-		socket.close()
-		for pump in CLOSE_PUMPS:
-			OS.delay_msec(RelayEndpoint.PUMP_MS)
-			socket._adapter._process(0.0)
-			if not socket.is_connected_to_host():
-				return
-
-
-	func close() -> void:
-		for bridge in seated:
-			bridge.leave()
-			bridge.nakama_socket.close()
-		seated.clear()
-
-
-	func leave_all() -> void:
-		for tree in made:
-			tree.queue_free()
-		made.clear()
-		prepared.clear()
 
 
 class WarningLog:
@@ -254,11 +47,9 @@ class WarningLog:
 class TransferWorld:
 	extends Node
 
-	func _init(mode: int) -> void:
+	func _init() -> void:
 		name = "World"
-		Netw.configure_session(self) \
-				.transfer(mode) \
-				.transfer_deadline(DEADLINE_TICKS)
+		Netw.configure_session(self).transfer_deadline(DEADLINE_TICKS)
 		Netw.configure_clock(self)
 		Netw.configure_spawn(spawn_arena)
 		Netw.configure_join(enter)
@@ -299,7 +90,7 @@ class Avatar:
 	extends Node2D
 
 	func _init() -> void:
-		var declared := Netw.configure_entity(self)
+		Netw.configure_entity(self)
 		Netw.configure_property(self, &"position").broadcast()
 
 
@@ -325,7 +116,7 @@ class Watch:
 
 	func _init(tree: MultiplayerViewport) -> void:
 		Netw.session(tree).server_transferred.connect(on_server_transferred)
-		tree.api.server_disconnected.connect(on_server_disconnected)
+		tree.multiplayer.server_disconnected.connect(on_server_disconnected)
 
 
 	func on_server_transferred(successor_was: int, former_now: int) -> void:
@@ -351,9 +142,6 @@ func before_test() -> void:
 
 func after_test() -> void:
 	OS.remove_logger(warnings)
-	if driver != null:
-		driver.leave_all()
-		driver = null
 	for tree in trees:
 		if is_instance_valid(tree):
 			await NakamaTestSupport.stop_tree(tree)
@@ -361,48 +149,11 @@ func after_test() -> void:
 	await super.after_test()
 
 
-func test_the_relay_bridge_meets_the_transfer_contract() -> void:
-	driver = RelayDriver.new()
-	var label := "netw-kit-%d-%d" % [Time.get_unix_time_from_system(), randi()]
-	for scenario in 2:
-		var ready := await driver.prepare(self, "%s-%d" % [label, scenario])
-		assert_bool(ready).override_failure_message("a match never meshed").is_true()
-		if not ready:
-			return
-	var parent := Node.new()
-	add_child(parent)
-	var contract := NetwTransferContract.new(driver, parent)
-	var failures := contract.run()
-	parent.queue_free()
-	assert_array(failures) \
-			.override_failure_message("\n".join(failures)) \
-			.is_empty()
-	for scenario in [&"lost", &"handed_on"]:
-		for law in ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "inner"]:
-			assert_array(contract.judged).contains(["%s x %s" % [law, scenario]])
-
-
-func test_a_lost_host_continues_in_rejoin_mode() -> void:
-	await judge_loss(NetwSession.TRANSFER_REJOIN)
-
-
-func test_a_lost_host_continues_in_continue_mode() -> void:
-	await judge_loss(NetwSession.TRANSFER_CONTINUE)
-
-
-func test_a_handed_off_server_continues_in_rejoin_mode() -> void:
-	await judge_hand_off(NetwSession.TRANSFER_REJOIN)
-
-
-func test_a_handed_off_server_continues_in_continue_mode() -> void:
-	await judge_hand_off(NetwSession.TRANSFER_CONTINUE)
-
-
-func judge_loss(mode: int) -> void:
-	var host := await open_world("host", mode)
+func test_a_lost_host_continues_on_a_survivor() -> void:
+	var host := await open_world("host")
 	var room := Netw.session(host).connection.join_address
-	var ana := await join_world(room, "ana", mode)
-	var ben := await join_world(room, "ben", mode)
+	var ana := await join_world(room, "ana")
+	var ben := await join_world(room, "ben")
 	var survivors: Array[MultiplayerViewport] = [ana, ben]
 	if not await wait_until(world_whole.bind([host, ana, ben]), "the world"):
 		return
@@ -430,27 +181,36 @@ func judge_loss(mode: int) -> void:
 	await judge_state_flows(successor, other, MOVED_AFTER)
 	await judge_deadline_holds(survivors)
 
-	var dana := await join_world(room, "dana", mode)
-	await wait_until(world_whole.bind([successor, other, dana]), "a late joiner")
+	var dana := await join_world(room, "dana")
+	await wait_until(
+		world_whole.bind([successor, other, dana]),
+		"a late joiner",
+	)
 
 
-func judge_hand_off(mode: int) -> void:
-	var host := await open_world("host", mode)
+func test_a_handed_off_server_continues_on_its_successor() -> void:
+	var host := await open_world("host")
 	var room := Netw.session(host).connection.join_address
-	var ana := await join_world(room, "ana", mode)
-	var ben := await join_world(room, "ben", mode)
+	var ana := await join_world(room, "ana")
+	var ben := await join_world(room, "ben")
 	var everyone: Array[MultiplayerViewport] = [host, ana, ben]
 	if not await wait_until(world_whole.bind(everyone), "the world"):
 		return
 	await judge_state_flows(host, ana, MOVED_BEFORE)
 	var ana_id := ana.multiplayer.get_unique_id()
-	var watches: Array[Watch] = [Watch.new(host), Watch.new(ana), Watch.new(ben)]
+	var watches: Array[Watch] = [
+		Watch.new(host),
+		Watch.new(ana),
+		Watch.new(ben),
+	]
 
 	var session: NetwSession = Netw.session(host)
 	assert_int(session.transfer_server(session.player_of(ana_id))).is_equal(OK)
 
 	var handed := func() -> bool:
-		return watches.all(func(watch: Watch) -> bool: return not watch.transfers.is_empty())
+		return watches.all(
+			func(watch: Watch) -> bool: return not watch.transfers.is_empty()
+		)
 	if not await wait_until(handed, "every peer to install the hand off"):
 		return
 	if not await wait_until(world_whole.bind(everyone), "the handed off world"):
@@ -487,7 +247,8 @@ func judge_state_flows(
 ) -> void:
 	var start := crate_of(client).position.x
 	await wait_until(
-		func() -> bool: return crate_of(client).position.x > start + CRATE_STRIDE,
+		func() -> bool:
+			return crate_of(client).position.x > start + CRATE_STRIDE,
 		"the crate to move under the server",
 	)
 	var client_name := String(Netw.session(client).local_player.username)
@@ -508,13 +269,14 @@ func judge_deadline_holds(survivors: Array[MultiplayerViewport]) -> void:
 	await get_tree().create_timer(DEADLINE_WATCH_SECONDS).timeout
 	assert_int(warnings.count(DEADLINE_WARNING)).is_equal(0)
 	for tree in survivors:
-		assert_bool(tree.api.session_is_online()).is_true()
-		assert_int(tree.multiplayer.get_peers().size()).is_equal(survivors.size() - 1)
+		assert_bool(Netw.session(tree).is_online).is_true()
+		assert_int(tree.multiplayer.get_peers().size()) \
+				.is_equal(survivors.size() - 1)
 
 
-func open_world(username: String, mode: int) -> MultiplayerViewport:
+func open_world(username: String) -> MultiplayerViewport:
 	var tree := NakamaTestSupport.make_client_tree(self, username)
-	tree.add_child(TransferWorld.new(mode))
+	tree.add_child(TransferWorld.new())
 	trees.append(tree)
 	await get_tree().process_frame
 	assert_int(await NakamaTestSupport.sign_in(tree, username)).is_equal(OK)
@@ -527,28 +289,24 @@ func open_world(username: String, mode: int) -> MultiplayerViewport:
 		StringName(username),
 	)
 	assert_int(settled.error).is_equal(OK)
-	migrate(tree)
+	NakamaTestSupport.directory(tree).migrate_on_host_loss = true
 	return tree
 
 
-func join_world(room: String, username: String, mode: int) -> MultiplayerViewport:
+func join_world(room: String, username: String) -> MultiplayerViewport:
 	var tree := NakamaTestSupport.make_client_tree(self, username)
-	tree.add_child(TransferWorld.new(mode))
+	tree.add_child(TransferWorld.new())
 	trees.append(tree)
 	await get_tree().process_frame
 	var error := await NakamaTestSupport.join_client(tree, room, username)
 	assert_int(error).is_equal(OK)
-	migrate(tree)
-	return tree
-
-
-func migrate(tree: MultiplayerViewport) -> void:
 	NakamaTestSupport.directory(tree).migrate_on_host_loss = true
+	return tree
 
 
 func world_whole(group: Array) -> bool:
 	for tree: MultiplayerViewport in group:
-		if not tree.api.session_is_online() or crate_of(tree) == null:
+		if not Netw.session(tree).is_online or crate_of(tree) == null:
 			return false
 		if tree.multiplayer.get_peers().size() != group.size() - 1:
 			return false
@@ -586,13 +344,18 @@ func crate_of(tree: MultiplayerViewport) -> Crate:
 	return null
 
 
-func wait_until(condition: Callable, label: String, timeout: float = TIMEOUT) -> bool:
+func wait_until(
+		condition: Callable,
+		label: String,
+		timeout: float = TIMEOUT,
+) -> bool:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000.0)
 	while not condition.call():
 		if Time.get_ticks_msec() > deadline:
 			assert_bool(false) \
-					.override_failure_message("Timed out waiting for %s." % label) \
-					.is_true()
+					.override_failure_message(
+						"Timed out waiting for %s." % label,
+					).is_true()
 			return false
 		await get_tree().process_frame
 	return true

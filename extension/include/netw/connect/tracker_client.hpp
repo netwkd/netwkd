@@ -40,6 +40,9 @@ public:
         return sockets.size() > 0;
     }
     godot::PackedInt64Array open_sockets() const;
+    godot::String unreachable_trackers() const {
+        return godot::String(", ").join(failures);
+    }
 
     int64_t subscribe();
     void unsubscribe(int64_t p_token);
@@ -53,6 +56,7 @@ private:
         godot::Ref<godot::RefCounted> peer;
         godot::String url;
         int64_t connect_usec = 0;
+        int64_t lookup = -1;
         bool opened = false;
     };
 
@@ -73,6 +77,7 @@ private:
     bool reported_unreachable = false;
 
     int index_of_socket(int64_t p_id) const;
+    void open_resolved(Socket &r_socket);
     void note_failure(const godot::String &p_url, const char *p_reason);
     void record(const TrackerEvent &p_event);
     void trim();

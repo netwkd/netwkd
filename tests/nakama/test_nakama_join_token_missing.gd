@@ -1,10 +1,10 @@
 class_name TestNakamaJoinTokenMissing
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const KEY := "res://tests/nakama/join_token/test_only_join_key.pub"
 const WAIT_MS := 15000
-const _ERROR_SCRUBBER := preload(
-	"res://addons/netwkd_test/gdunit4/gdunit_error_scrubber.gd"
+const ERROR_SCRUBBER := preload(
+	"res://tests/support/gdunit_error_scrubber.gd"
 )
 
 
@@ -63,20 +63,21 @@ func test_a_server_without_the_module_lets_the_player_join_unproven(
 	var peer := ENetMultiplayerPeer.new()
 	peer.create_client("127.0.0.1", host.port)
 	Netw.prepare_join(client_gate, &"player")
-	client.api.multiplayer_peer = peer
+	client.multiplayer.multiplayer_peer = peer
+	var session := Netw.session(client)
 	var started := Time.get_ticks_msec()
-	while client.api.player_get_local() == 0 \
+	while session.local_player == null \
 			and Time.get_ticks_msec() - started < WAIT_MS:
 		await get_tree().process_frame
 
-	assert_object(Netw.session(client).local_player) \
+	assert_object(session.local_player) \
 			.override_failure_message("The player was not let in.") \
 			.is_not_null()
 	assert_int(host_gate.requests.size()).is_equal(1)
 	if not host_gate.requests.is_empty():
 		assert_array(host_gate.requests[0].accounts).is_empty()
 	assert_int(
-		await _ERROR_SCRUBBER.erase_matching(
+		await ERROR_SCRUBBER.erase_matching(
 			["Install addons/netwkd_nakama/server"],
 		),
 	).override_failure_message(

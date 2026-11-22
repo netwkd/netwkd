@@ -1,12 +1,12 @@
 extends CharacterBody2D
 
-var _exploding := false
+var exploding := false
 
 
 @rpc("call_local")
 func exploded(by_who: int) -> void:
-	if _exploding:
+	if exploding:
 		return
-	_exploding = true
+	exploding = true
 	$"../../Score".increase_score(Netw.session(self).player_of(by_who))
 	$"AnimationPlayer".play(&"explode")

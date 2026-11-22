@@ -54,4 +54,40 @@ inline godot::LocalVector<LocalAddress> local_interface_addresses() {
     return out;
 }
 
+enum LookupState {
+    LOOKUP_WAITING,
+    LOOKUP_DONE,
+    LOOKUP_FAILED,
+};
+
+inline int64_t queue_lookup(const godot::String &p_host) {
+    godot::IP *ip = godot::IP::get_singleton();
+    if (ip == nullptr) {
+        return -1;
+    }
+    return int64_t(ip->resolve_hostname_queue_item(p_host));
+}
+
+inline LookupState lookup_state(int64_t p_id) {
+    godot::IP *ip = godot::IP::get_singleton();
+    if (ip == nullptr || p_id < 0) {
+        return LOOKUP_FAILED;
+    }
+    const int status = int(ip->get_resolve_item_status(int32_t(p_id)));
+    if (status == int(godot::IP::RESOLVER_STATUS_WAITING)) {
+        return LOOKUP_WAITING;
+    }
+    if (status == int(godot::IP::RESOLVER_STATUS_DONE)) {
+        return LOOKUP_DONE;
+    }
+    return LOOKUP_FAILED;
+}
+
+inline void erase_lookup(int64_t p_id) {
+    godot::IP *ip = godot::IP::get_singleton();
+    if (ip != nullptr && p_id >= 0) {
+        ip->erase_resolve_item(int32_t(p_id));
+    }
+}
+
 } // namespace netw::gd

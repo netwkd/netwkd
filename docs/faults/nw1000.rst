@@ -6,7 +6,8 @@ NW1000. A link to a peer or service failed
 ==========================================
 
 Reported as a warning when a transport, tracker, signing key or peer cannot
-be reached or refuses a packet.
+be reached or refuses a packet. A lobby list that cannot reach its trackers
+shows no lobbies and reports nothing.
 
 What the call set out to do did not happen. The log line names the peer or
 service and the step that failed.

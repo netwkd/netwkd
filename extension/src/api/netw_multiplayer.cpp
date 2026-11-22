@@ -1683,6 +1683,13 @@ void NetwMultiplayer::announce_dispatch(const Announcement &p_row) {
                 connection->announce_failed(p_row.code, p_row.reason);
             }
         } break;
+        case AnnouncementKind::ATTEMPT_SETTLED: {
+            if (p_row.code == OK) {
+                p_row.promise->resolve(int64_t(OK));
+            } else {
+                p_row.promise->reject(Error(p_row.code), p_row.reason);
+            }
+        } break;
         case AnnouncementKind::JOIN_ADDRESS_CHANGED: {
             if (connection.is_valid()) {
                 connection->announce_join_address_changed(p_row.reason);
@@ -2063,6 +2070,7 @@ void NetwMultiplayer::session_clear_link_delivery(int64_t p_peer) {
 }
 
 void NetwMultiplayer::session_teardown_online() {
+    hosted_role.reset();
     session_transition(SESSION_STATE_DISCONNECTING);
     session_transition(SESSION_STATE_OFFLINE);
 }
@@ -4098,6 +4106,13 @@ int64_t NetwMultiplayer::entity_bytes() const {
 }
 #endif
 
+void NetwMultiplayer::step_leave() {
+    --step_depth;
+    announce_flush();
+    effect_drain();
+    predict_free_retired();
+}
+
 Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
     NETW_FRAME(profile::names::POLL_FRAME);
     NETW_STAGE(OTHER, "Network poll", colors::SESSION);
@@ -4107,7 +4122,8 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
     }
     NETW_NETWORK_PROFILE(profiler_poll());
     const Ref<NetwMultiplayer> keep(this);
-    ++step_depth;
+    ++poll_depth;
+    step_enter();
     embed_settle_on_first_poll();
     if (!transfer_called) {
         transfer_gone.clear();
@@ -4159,12 +4175,10 @@ Error NetwMultiplayer::NETW_API_VIRTUAL(poll)() {
         plane->on_poll();
     }
     sink_verdict(display_pump(display_delta()), 0);
-    --step_depth;
-    announce_flush();
-    effect_drain();
-    predict_free_retired();
+    step_leave();
     NETW_HINTS(diag_poll());
     NETW_STAGE_FLUSH();
+    --poll_depth;
     return err;
 }
 
@@ -4500,7 +4514,31 @@ Ref<NetwPromise> NetwMultiplayer::transport_host(
     const RID &p_transport,
     const Dictionary &p_settings
 ) {
-    return connect_core.host(p_transport, p_settings);
+    const Variant named = p_settings.get("role", Variant());
+    const bool serves = named.get_type() == Variant::INT
+        && (int64_t(named) == ROLE_DEDICATED_SERVER
+            || int64_t(named) == ROLE_LISTEN_SERVER);
+    if (named.get_type() != Variant::NIL && !serves) {
+        fault::raise(
+            this,
+            NETW_FAULT_BAD_VALUE,
+            {"{NetwConnection.host}",
+             vformat("role %s", String(named)),
+             "{NetwSession.ROLE_DEDICATED_SERVER} or "
+             "{NetwSession.ROLE_LISTEN_SERVER}"}
+        );
+    }
+    Dictionary passed = p_settings.duplicate();
+    passed.erase("role");
+    const Ref<NetwPromise> outcome = connect_core.host(p_transport, passed);
+    if (outcome->get_is_failed()) {
+        return outcome;
+    }
+    hosted_role.reset();
+    if (serves) {
+        hosted_role = Role(int64_t(named));
+    }
+    return outcome;
 }
 
 void NetwMultiplayer::transport_cancel_attempt() {
@@ -4551,6 +4589,22 @@ bool NetwMultiplayer::connection_announce_failed(
     row.reason = p_reason;
     announce(row);
     return heard;
+}
+
+void NetwMultiplayer::connection_settle_attempt(
+    const Ref<NetwPromise> &p_promise,
+    Error p_error,
+    const String &p_reason
+) {
+    if (p_error != OK) {
+        hosted_role.reset();
+    }
+    Announcement row;
+    row.kind = AnnouncementKind::ATTEMPT_SETTLED;
+    row.promise = p_promise;
+    row.code = int64_t(p_error);
+    row.reason = p_reason;
+    announce(row);
 }
 
 void NetwMultiplayer::connection_announce_join_address(
@@ -6553,6 +6607,9 @@ void NetwMultiplayer::session_apply_auth_config() {
 }
 
 NetwMultiplayer::Role NetwMultiplayer::session_get_authored_role() const {
+    if (hosted_role.has_value()) {
+        return *hosted_role;
+    }
     const int64_t named = session_settings.desired_role;
     if (named < ROLE_NONE || named > ROLE_LISTEN_SERVER) {
         return ROLE_LISTEN_SERVER;

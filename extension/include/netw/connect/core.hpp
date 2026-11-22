@@ -243,6 +243,11 @@ private:
         godot::Error p_error,
         const godot::String &p_reason
     );
+    void settle_attempt(
+        const godot::Ref<NetwPromise> &p_promise,
+        godot::Error p_error,
+        const godot::String &p_reason
+    );
     void tick_attempt(double p_delta);
     void announce_join_address();
     godot::RID release_live();

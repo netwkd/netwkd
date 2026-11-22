@@ -1,5 +1,5 @@
 class_name TestRocketLeagueRegime
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const SCENE := "res://tests/regime/rocket_league_regime_main.tscn"
 const STARTUP_LEAD := 6.0

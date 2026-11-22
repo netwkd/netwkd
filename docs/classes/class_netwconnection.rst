@@ -557,6 +557,8 @@ Returns the listed :ref:`NetwEndpoint<class_NetwEndpoint>` for ``transport`` and
 
 Settles with :godot:`@GlobalScope.ERR_ALREADY_IN_USE <@GlobalScope#class_@GlobalScope_constant_ERR_ALREADY_IN_USE>` while the session is online.
 
+A ``role`` setting of :ref:`NetwSession.ROLE_DEDICATED_SERVER<class_NetwSession_constant_ROLE_DEDICATED_SERVER>` hosts a dedicated server, and it wins over the role from :ref:`Netw.configure_session()<class_Netw_method_configure_session>` for this session.
+
 Invalid :ref:`NetwSessionConfig<class_NetwSessionConfig>`, :ref:`NetwClockConfig<class_NetwClockConfig>` or :ref:`NetwLagCompensationConfig<class_NetwLagCompensationConfig>` settings reject the promise before a peer is created.
 
 .. rst-class:: classref-item-separator

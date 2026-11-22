@@ -1451,6 +1451,7 @@ private:
     void announce_drain();
     void announce_dispatch(const Announcement &p_row);
     int step_depth = 0;
+    int poll_depth = 0;
     int action_handler_depth = 0;
     void announce_entity_edge(
         const godot::RID &p_scene,
@@ -1474,6 +1475,11 @@ private:
         const godot::String &p_reason
     );
     void connection_announce_join_address(const godot::String &p_address);
+    void connection_settle_attempt(
+        const godot::Ref<NetwPromise> &p_promise,
+        godot::Error p_error,
+        const godot::String &p_reason
+    );
 
     bool host_join_waits_startup = false;
     int session_exit_reason = -1;
@@ -1637,6 +1643,7 @@ private:
         double return_window = 0.0;
     };
     SessionSettings session_settings;
+    std::optional<Role> hosted_role;
     godot::Ref<NetwClockConfig> clock_fallback;
     godot::ObjectID clock_fallback_source;
     bool clock_pump_attached = false;
@@ -4961,6 +4968,13 @@ public:
     );
     bool is_inside_step() const {
         return step_depth > 0;
+    }
+    void step_enter() {
+        ++step_depth;
+    }
+    void step_leave();
+    bool is_polling() const {
+        return poll_depth > 0;
     }
 
     godot::Ref<NetwScene> entity_scene_facet(

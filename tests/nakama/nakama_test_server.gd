@@ -6,11 +6,13 @@ const HOST_SETTING := "netwkd/tests/nakama_host"
 
 const HOST_ENV := "NAKAMA_TEST_HOST"
 
-const SKIP_REASON := "Live Nakama tests need a server: set the netwkd/tests/nakama_host " \
-		+ "project setting (or NAKAMA_TEST_HOST) and start " \
+const SKIP_REASON := (
+		"Live Nakama tests need a server: set the netwkd/tests/nakama_host "
+		+ "project setting (or NAKAMA_TEST_HOST) and start "
 		+ "tests/nakama/docker-compose.yml."
+)
 
-const _PROBE_TIMEOUT_MS := 500
+const PROBE_TIMEOUT_MS := 500
 
 
 static func host() -> String:
@@ -24,14 +26,14 @@ static func unavailable() -> bool:
 	var target := host()
 	if target.is_empty():
 		return true
-	return not _reachable(target, DEFAULT_PORT)
+	return not reachable(target, DEFAULT_PORT)
 
 
-static func _reachable(target: String, port: int) -> bool:
+static func reachable(target: String, port: int) -> bool:
 	var tcp := StreamPeerTCP.new()
 	if tcp.connect_to_host(target, port) != OK:
 		return false
-	var deadline := Time.get_ticks_msec() + _PROBE_TIMEOUT_MS
+	var deadline := Time.get_ticks_msec() + PROBE_TIMEOUT_MS
 	while Time.get_ticks_msec() < deadline:
 		tcp.poll()
 		match tcp.get_status():

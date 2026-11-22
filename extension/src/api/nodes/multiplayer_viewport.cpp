@@ -19,6 +19,27 @@ bool in_editor() {
     return engine != nullptr && engine->is_editor_hint();
 }
 
+void drop_placeholder(
+    const Ref<MultiplayerAPI> &p_placeholder,
+    const NodePath &p_path
+) {
+    SceneTree *tree = gd::scene_tree();
+    if (tree == nullptr) {
+        return;
+    }
+    const Ref<MultiplayerAPI> mounted = tree->get_multiplayer(p_path);
+    if (mounted == p_placeholder) {
+        tree->set_multiplayer(Ref<MultiplayerAPI>(), p_path);
+    }
+}
+
+void release_api_peer(const Ref<NetwMultiplayer> &p_api) {
+    if (p_api->has_multiplayer_peer()) {
+        p_api->get_multiplayer_peer()->close();
+        p_api->peer_assign(Ref<MultiplayerPeer>());
+    }
+}
+
 } // namespace
 
 MultiplayerViewport::MultiplayerViewport() {
@@ -89,9 +110,19 @@ void MultiplayerViewport::register_path() {
 
 void MultiplayerViewport::unregister_path() {
     const NodePath mounted = api->session_get_inner()->get_root_path();
-    if (!mounted.is_empty()) {
-        get_tree()->set_multiplayer(Ref<MultiplayerAPI>(), mounted);
+    if (mounted.is_empty()) {
+        return;
     }
+    if (!api->is_polling()) {
+        get_tree()->set_multiplayer(Ref<MultiplayerAPI>(), mounted);
+        return;
+    }
+    Ref<SceneMultiplayer> placeholder;
+    placeholder.instantiate();
+    get_tree()->set_multiplayer(placeholder, mounted);
+    callable_mp_static(&drop_placeholder)
+        .bind(placeholder, mounted)
+        .call_deferred();
 }
 
 void MultiplayerViewport::follow_rename() {
@@ -106,10 +137,14 @@ void MultiplayerViewport::follow_rename() {
 }
 
 void MultiplayerViewport::release_peer() {
-    if (api.is_valid() && api->has_multiplayer_peer()) {
-        api->get_multiplayer_peer()->close();
-        api->peer_assign(Ref<MultiplayerPeer>());
+    if (api.is_null()) {
+        return;
     }
+    if (api->is_polling()) {
+        callable_mp_static(&release_api_peer).bind(api).call_deferred();
+        return;
+    }
+    release_api_peer(api);
 }
 
 void MultiplayerViewport::exiting() {

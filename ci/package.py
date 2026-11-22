@@ -44,6 +44,7 @@ PACKAGES = {
         "addons": [Path("addons") / "netwkd_nakama", Path("addons") / "com.heroiclabs.nakama"],
         "vendors": [],
     },
+    "netwkd_test": {"addons": [Path("addons") / "netwkd_test"], "vendors": []},
 }
 
 

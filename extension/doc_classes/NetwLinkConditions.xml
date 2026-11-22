@@ -77,7 +77,7 @@
 			One-way delay in milliseconds.
 		</member>
 		<member name="loss_chance" type="float" setter="set_loss_chance" getter="get_loss_chance" default="0.0">
-			Chance to drop an unreliable packet or delay a reliable packet.
+			Chance to drop an unreliable packet or delay a reliable packet. A lost reliable packet arrives after [member latency_ms] plus the larger of 30 ms and twice [member latency_ms].
 		</member>
 		<member name="reorder_chance" type="float" setter="set_reorder_chance" getter="get_reorder_chance" default="0.0">
 			Chance to delay an unreliable packet by one physics tick.

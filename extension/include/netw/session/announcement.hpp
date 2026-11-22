@@ -5,6 +5,7 @@
 #include "godot/object.hpp"
 #include "godot/rid.hpp"
 #include "godot/variant.hpp"
+#include "netw/api/promise.hpp"
 
 namespace netw::session {
 
@@ -49,6 +50,7 @@ enum class AnnouncementKind : uint8_t {
     PERSIST_LOADED,
     PERSIST_SAVED,
     DATABASE_FAILED,
+    ATTEMPT_SETTLED,
 };
 
 struct Announcement {
@@ -76,6 +78,7 @@ struct Announcement {
     godot::String reason;
     godot::Error refusal = godot::OK;
     godot::Dictionary report;
+    godot::Ref<NetwPromise> promise;
 };
 
 } // namespace netw::session

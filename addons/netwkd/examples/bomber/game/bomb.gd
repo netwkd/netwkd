@@ -18,7 +18,7 @@ func explode() -> void:
 
 	for p: Object in in_area:
 		if p.has_method(&"exploded"):
-			if p.get(&"_exploding") == true:
+			if p.get(&"exploding") == true:
 				continue
 			# Checks if there is wall in between bomb and the object.
 			var world_state := get_world_2d().direct_space_state

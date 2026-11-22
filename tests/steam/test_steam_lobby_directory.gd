@@ -1,14 +1,9 @@
 class_name TestSteamLobbyDirectory
-extends NetwTestSuite
+extends GdUnitTestSuite
 
-func test_recognizes_steam_peer_class() -> void:
+func test_a_steam_peer_joins_through_a_lobby_id() -> void:
 	var directory := SteamLobbyDirectory.new()
 	assert_str(directory._peer_class()).is_equal("SteamMultiplayerPeer")
-	directory.free()
-
-
-func test_address_form_names_the_lobby_id() -> void:
-	var directory := SteamLobbyDirectory.new()
 	assert_str(directory.address_label).is_equal("Lobby ID")
 	assert_bool(directory.address_help.is_empty()).is_false()
 	assert_bool(directory.supports(LobbyDirectory.CAPABILITY_INVITES)).is_true()

@@ -142,7 +142,7 @@ One-way delay in milliseconds.
 - |void| **set_loss_chance**\ (\ value\: :godot:`float`\ )
 - :godot:`float` **get_loss_chance**\ (\ )
 
-Chance to drop an unreliable packet or delay a reliable packet.
+Chance to drop an unreliable packet or delay a reliable packet. A lost reliable packet arrives after :ref:`latency_ms<class_NetwLinkConditions_property_latency_ms>` plus the larger of 30 ms and twice :ref:`latency_ms<class_NetwLinkConditions_property_latency_ms>`.
 
 .. rst-class:: classref-item-separator
 

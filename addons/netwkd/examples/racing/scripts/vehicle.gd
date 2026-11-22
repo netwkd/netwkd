@@ -30,8 +30,6 @@ const DISPLAY_SMOOTH := 0.05
 @onready var engine_sound: AudioStreamPlayer3D = $Container/EngineSound
 @onready var impact_sound: AudioStreamPlayer3D = $Container/ImpactSound
 
-# Networking
-
 @onready var entity := NetwEntity.of(self)
 
 var pressed := {

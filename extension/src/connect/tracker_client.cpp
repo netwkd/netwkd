@@ -1,5 +1,6 @@
 #include "netw/connect/tracker_client.hpp"
 
+#include "godot/ip.hpp"
 #include "godot/json.hpp"
 #include "godot/project_settings.hpp"
 #include "godot/variant.hpp"
@@ -35,25 +36,54 @@ String tracker_key(const PackedStringArray &p_urls) {
     return key;
 }
 
+static String url_host(const String &p_url) {
+    String rest = p_url;
+    const int64_t scheme = rest.find("://");
+    if (scheme >= 0) {
+        rest = rest.substr(scheme + 3);
+    }
+    const int64_t fragment = rest.find("#");
+    if (fragment >= 0) {
+        rest = rest.substr(0, fragment);
+    }
+    const int64_t path = rest.find("/");
+    if (path >= 0) {
+        rest = rest.substr(0, path);
+    }
+    const int64_t credentials = rest.find("@");
+    if (credentials >= 0) {
+        rest = rest.substr(credentials + 1);
+    }
+    if (rest.begins_with("[")) {
+        return String();
+    }
+    const int64_t port = rest.rfind(":");
+    if (port >= 0) {
+        rest = rest.substr(0, port);
+    }
+    return rest.to_lower();
+}
+
 Error TrackerClient::connect_to(const PackedStringArray &p_urls) {
     close();
     reported_unreachable = false;
     failures.clear();
     for (int64_t at = 0; at < p_urls.size(); at++) {
-        const String url = p_urls[at];
-        Ref<RefCounted> peer = gd::new_web_socket();
-        if (peer.is_null()) {
-            continue;
-        }
-        if (gd::web_socket_connect(peer, url) != OK) {
-            note_failure(url, "refused to open");
-            continue;
-        }
         Socket opening;
+        opening.peer = gd::new_web_socket();
+        if (opening.peer.is_null()) {
+            continue;
+        }
         opening.id = next_socket_id++;
-        opening.peer = peer;
-        opening.url = url;
-        sockets.push_back(opening);
+        opening.url = p_urls[at];
+        const String host = url_host(opening.url);
+        if (!host.is_empty() && !host.is_valid_ip_address()) {
+            opening.lookup = gd::queue_lookup(host);
+        }
+        open_resolved(opening);
+        if (opening.peer.is_valid()) {
+            sockets.push_back(opening);
+        }
     }
     if (sockets.size() == 0) {
         return ERR_CANT_CONNECT;
@@ -74,6 +104,19 @@ void TrackerClient::poll(int64_t p_now_usec, int64_t p_frame) {
         Socket &socket = sockets[at];
         if (socket.connect_usec == 0) {
             socket.connect_usec = p_now_usec;
+        }
+        if (socket.lookup >= 0) {
+            open_resolved(socket);
+        }
+        if (socket.lookup >= 0
+            && p_now_usec - socket.connect_usec > CONNECT_TIMEOUT_USEC) {
+            note_failure(socket.url, "timed out");
+            gd::erase_lookup(socket.lookup);
+            socket.lookup = -1;
+            socket.peer.unref();
+        }
+        if (socket.lookup >= 0 || socket.peer.is_null()) {
+            continue;
         }
         gd::web_socket_poll(socket.peer);
         const int state = gd::web_socket_state(socket.peer);
@@ -147,16 +190,6 @@ void TrackerClient::poll(int64_t p_now_usec, int64_t p_frame) {
 
     if (sockets.size() == 0 && !any_opened && !reported_unreachable) {
         reported_unreachable = true;
-        fault::raise(
-            nullptr,
-            NETW_FAULT_LINK_FAILED,
-            {"the WebRTC connection",
-             String(),
-             vformat(
-                 "every signaling tracker (%s)",
-                 String(", ").join(failures)
-             )}
-        );
         TrackerEvent none;
         none.kind = TrackerEvent::UNREACHABLE;
         record(none);
@@ -190,6 +223,26 @@ void TrackerClient::send(int64_t p_socket, const Dictionary &p_message) {
         sockets[at].peer,
         JSON::stringify(p_message, "", true, false)
     );
+}
+
+void TrackerClient::open_resolved(Socket &r_socket) {
+    if (r_socket.lookup >= 0) {
+        const gd::LookupState state = gd::lookup_state(r_socket.lookup);
+        if (state == gd::LOOKUP_WAITING) {
+            return;
+        }
+        gd::erase_lookup(r_socket.lookup);
+        r_socket.lookup = -1;
+        if (state == gd::LOOKUP_FAILED) {
+            note_failure(r_socket.url, "closed before opening");
+            r_socket.peer.unref();
+            return;
+        }
+    }
+    if (gd::web_socket_connect(r_socket.peer, r_socket.url) != OK) {
+        note_failure(r_socket.url, "refused to open");
+        r_socket.peer.unref();
+    }
 }
 
 void TrackerClient::note_failure(const String &p_url, const char *p_reason) {
@@ -305,6 +358,7 @@ void TrackerClient::trim() {
 
 void TrackerClient::close() {
     for (int64_t at = 0; at < int64_t(sockets.size()); at++) {
+        gd::erase_lookup(sockets[at].lookup);
         gd::web_socket_close(sockets[at].peer);
     }
     sockets.clear();

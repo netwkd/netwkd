@@ -38,7 +38,7 @@ report/godot/push_error=true
 hooks/session_hooks=Dictionary[String, bool]({
 "res://addons/gdUnit4/src/core/hooks/GdUnitHtmlReporterTestSessionHook.gd": true,
 "res://addons/gdUnit4/src/core/hooks/GdUnitXMLReporterTestSessionHook.gd": true,
-"res://addons/netwkd_test/gdunit4/session_hook.gd": true
+"res://tests/support/session_hook.gd": true
 })
 settings/test/test_lookup_folder="tests"
 

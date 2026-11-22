@@ -1,5 +1,5 @@
 class_name TestNakamaParty
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const PORT := 17350
 const TIMEOUT := 15.0
@@ -11,8 +11,8 @@ var invites: Dictionary[MultiplayerViewport, Array] = { }
 @warning_ignore("unused_parameter")
 func before(
 		do_skip = OS.get_environment("NAKAMA_JOIN_TOKEN_HOST").is_empty(),
-		skip_reason = "Start tests/nakama/join_token/docker-compose.yml and set "
-		+ "NAKAMA_JOIN_TOKEN_HOST.",
+		skip_reason = "Start tests/nakama/join_token/docker-compose.yml "
+		+ "and set NAKAMA_JOIN_TOKEN_HOST.",
 ) -> void:
 	pass
 
@@ -62,7 +62,10 @@ func partied(leader: MultiplayerViewport, friend: MultiplayerViewport) -> void:
 		func(from: String) -> void: invited_by.append(from),
 	)
 	party_of(leader).invite(id_of(friend))
-	await settle(func() -> bool: return not invited_by.is_empty(), "the invitation")
+	await settle(
+		func() -> bool: return not invited_by.is_empty(),
+		"the invitation",
+	)
 	assert_array(invited_by).contains_exactly([id_of(leader)])
 	party_of(friend).join(id_of(leader))
 	await settle(
@@ -95,7 +98,10 @@ func test_a_join_request_is_answered_by_an_invitation() -> void:
 	)
 
 	party_of(mia).join(id_of(valeria))
-	await settle(func() -> bool: return not asked.is_empty(), "the join request")
+	await settle(
+		func() -> bool: return not asked.is_empty(),
+		"the join request",
+	)
 	assert_array(party_of(valeria).join_requests).contains_exactly([id_of(mia)])
 	party_of(valeria).invite(id_of(mia))
 
@@ -120,7 +126,10 @@ func test_members_follow_the_leader_into_a_relay_match() -> void:
 		&"valeria",
 	)
 	assert_int(hosted.error).is_equal(OK)
-	await settle(func() -> bool: return not invites[jose].is_empty(), "the follow")
+	await settle(
+		func() -> bool: return not invites[jose].is_empty(),
+		"the follow",
+	)
 	var endpoint: NetwEndpoint = invites[jose][0]
 	assert_str(endpoint.address) \
 			.is_equal(Netw.session(valeria).connection.join_address)

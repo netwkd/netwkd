@@ -11,6 +11,7 @@
 #include "godot/time.hpp"
 #include "netw/api/connection.hpp"
 #include "netw/api/context.hpp"
+#include "netw/api/endpoint.hpp"
 #include "netw/api/loopback.hpp"
 #include "netw/api/netw_multiplayer.hpp"
 #include "netw/api/nodes/multiplayer_viewport.hpp"
@@ -23,6 +24,7 @@ using namespace godot;
 using netw::MultiplayerViewport;
 using netw::Netw;
 using netw::NetwConnection;
+using netw::NetwEndpoint;
 using netw::NetwMultiplayer;
 using netw::NetwPromise;
 using netw::NetwSession;
@@ -300,6 +302,119 @@ LawVerdict settings_layers(const Stand &) {
     return law_held();
 }
 
+constexpr const char *FREER = R"(extends RefCounted
+
+var world: Node
+
+func on_joined(_answer: Variant) -> void:
+	world.free()
+
+func on_changed() -> void:
+	if is_instance_valid(world):
+		world.free()
+)";
+
+MultiplayerViewport *seat(Node *p_world, const char *p_name) {
+    MultiplayerViewport *made = memnew(MultiplayerViewport);
+    made->set_name(StringName(p_name));
+    p_world->add_child(made);
+    return made;
+}
+
+Ref<NetwConnection> connection_of(Node *p_node) {
+    return Netw::session(p_node)->get_connection();
+}
+
+LawVerdict free_when_joined(const Stand &) {
+    Node *world = memnew(Node);
+    MultiplayerViewport *host = seat(world, "Host");
+    MultiplayerViewport *client = seat(world, "Client");
+    netw::gd::scene_root()->add_child(world);
+    const uint64_t world_id = world->get_instance_id();
+    const Ref<RefCounted> freer = netw_test::minted_script(FREER)->call("new");
+    freer->set(StringName("world"), world);
+
+    const StringName local("LocalMultiplayerPeer");
+    connection_of(host)->host(local, Dictionary());
+    const Ref<NetwConnection> joining = connection_of(client);
+    const Ref<NetwPromise> outcome
+        = joining->join(joining->add(local, String(), String()), Dictionary());
+    outcome->then(Callable(freer.ptr(), StringName("on_joined")));
+
+    for (int at = 0; at < 240 && ObjectDB::get_instance(world_id); ++at) {
+        (at % 2 == 0 ? host : client)->get_api()->poll();
+    }
+    if (ObjectDB::get_instance(world_id) != nullptr) {
+        memdelete(world);
+        return law_broken("the join never settled");
+    }
+    if (!outcome->get_is_completed()) {
+        return law_broken("the promise settled %d", int(outcome->get_code()));
+    }
+    return law_held();
+}
+
+LawVerdict free_when_probed(const Stand &) {
+    Node *world = memnew(Node);
+    MultiplayerViewport *host = seat(world, "Host");
+    MultiplayerViewport *client = seat(world, "Client");
+    netw::gd::scene_root()->add_child(world);
+    const uint64_t world_id = world->get_instance_id();
+    const Ref<RefCounted> freer = netw_test::minted_script(FREER)->call("new");
+    freer->set(StringName("world"), world);
+
+    const StringName local("LocalMultiplayerPeer");
+    connection_of(host)->host(local, Dictionary());
+    for (int at = 0; at < 8; ++at) {
+        host->get_api()->poll();
+    }
+    const Ref<NetwEndpoint> endpoint
+        = connection_of(client)->add(local, String(), String());
+    endpoint->connect(
+        StringName("changed"),
+        Callable(freer.ptr(), StringName("on_changed"))
+    );
+    endpoint->probe();
+
+    if (ObjectDB::get_instance(world_id) != nullptr) {
+        memdelete(world);
+        return law_broken("the probe never answered");
+    }
+    return law_held();
+}
+
+LawVerdict host_dedicated(const Stand &) {
+    Node *world = memnew(Node);
+    MultiplayerViewport *host = seat(world, "Host");
+    netw::gd::scene_root()->add_child(world);
+    const Ref<NetwSession> session = Netw::session(host);
+    Dictionary settings;
+    settings["role"] = int64_t(NetwSession::ROLE_DEDICATED_SERVER);
+
+    const Ref<NetwPromise> outcome = session->get_connection()->host(
+        StringName("LocalMultiplayerPeer"),
+        settings
+    );
+    for (int at = 0; at < 60 && !outcome->get_is_settled(); ++at) {
+        host->get_api()->poll();
+    }
+    const int64_t role = int64_t(session->get_role());
+    const int64_t players = session->get_players().size();
+    host->get_api()->set_multiplayer_peer(Ref<MultiplayerPeer>());
+    memdelete(world);
+
+    if (!outcome->get_is_completed()) {
+        return law_broken("the promise settled %d", int(outcome->get_code()));
+    }
+    if (role != int64_t(NetwSession::ROLE_DEDICATED_SERVER)) {
+        return law_broken("the session hosts with role %d", int(role));
+    }
+    if (players != 0) {
+        return law_broken("the server seats %d players", int(players));
+    }
+    return law_held();
+}
+
 String &served_address() {
     static String held;
     return held;
@@ -390,6 +505,15 @@ const Row ROWS[] = {
     {"a server that came up by joining a lobby",
      "server and client advertise the lobby's join address",
      &lobby_join_address},
+    {"a game frees the host and the client when the client's join settles",
+     "the poll that settled the join returns and the promise reads OK",
+     &free_when_joined},
+    {"a game frees the host and the client when an endpoint probe answers",
+     "the probe call returns after the game freed both",
+     &free_when_probed},
+    {"a game hosts with the role setting ROLE_DEDICATED_SERVER",
+     "the session hosts as a dedicated server and seats no player of its own",
+     &host_dedicated},
 };
 
 TEST_CASE(

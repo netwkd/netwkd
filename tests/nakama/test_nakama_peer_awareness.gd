@@ -1,9 +1,9 @@
 class_name TestNakamaPeerAwareness
-extends NetwTestSuite
+extends GdUnitTestSuite
 
-const _TIMEOUT := 10.0
+const TIMEOUT := 10.0
 
-var _trees: Array = []
+var trees: Array[MultiplayerViewport] = []
 
 
 @warning_ignore("unused_parameter")
@@ -15,150 +15,62 @@ func before(
 
 
 func after_test() -> void:
-	for tree in _trees.duplicate():
+	for tree in trees:
 		if is_instance_valid(tree):
 			await NakamaTestSupport.stop_tree(tree)
-	_trees.clear()
+	trees.clear()
 	await super.after_test()
-
-
-func test_peers_and_rosters_see_each_other() -> void:
-	var host := await NakamaTestSupport.start_host(self, "host")
-	var host_tree := host.tree as MultiplayerViewport
-	_track(host_tree)
-
-	var client_a := NakamaTestSupport.make_client_tree(self, "alice")
-	var client_b := NakamaTestSupport.make_client_tree(self, "bruno")
-	_track(client_a)
-	_track(client_b)
-
-	var client_a_err := await _join(client_a, host.room, "alice")
-	var client_b_err := await _join(client_b, host.room, "bruno")
-	assert_int(client_a_err).is_equal(OK)
-	assert_int(client_b_err).is_equal(OK)
-
-	await _await(
-		func() -> bool:
-			return _all_trees_see_all(host_tree, client_a, client_b),
-		"all Nakama peers to see each other",
-	)
-
-	for tree in [host_tree, client_a, client_b]:
-		assert_int(tree.multiplayer.get_peers().size()).is_equal(2)
-		assert_int(tree.api.player_list().size()).is_equal(3)
 
 
 func test_disconnect_propagates_to_remaining_peers() -> void:
 	var host := await NakamaTestSupport.start_host(self, "host")
-	var host_tree := host.tree as MultiplayerViewport
-	_track(host_tree)
+	var host_tree: MultiplayerViewport = host.tree
+	var alice := NakamaTestSupport.make_client_tree(self, "alice")
+	var bruno := NakamaTestSupport.make_client_tree(self, "bruno")
+	trees.assign([host_tree, alice, bruno])
+	assert_int(await NakamaTestSupport.join_client(alice, host.room, "alice")) \
+			.is_equal(OK)
+	assert_int(await NakamaTestSupport.join_client(bruno, host.room, "bruno")) \
+			.is_equal(OK)
+	await wait_for(
+		func() -> bool: return trees.all(sees_everyone),
+		"all Nakama peers to connect",
+	)
 
-	var client_a := NakamaTestSupport.make_client_tree(self, "alice")
-	var client_b := NakamaTestSupport.make_client_tree(self, "bruno")
-	_track(client_a)
-	_track(client_b)
-
-	var client_a_err := await _join(client_a, host.room, "alice")
-	var client_b_err := await _join(client_b, host.room, "bruno")
-	assert_int(client_a_err).is_equal(OK)
-	assert_int(client_b_err).is_equal(OK)
-
-	await _await(
+	var alice_id := alice.multiplayer.get_unique_id()
+	trees.erase(alice)
+	await NakamaTestSupport.stop_tree(alice)
+	await wait_for(
 		func() -> bool:
-			return _all_trees_see_all(host_tree, client_a, client_b),
-		"all Nakama peers to connect before disconnect",
+			return not host_tree.multiplayer.get_peers().has(alice_id) \
+					and not bruno.multiplayer.get_peers().has(alice_id) \
+					and Netw.session(host_tree).players.size() == 2,
+		"the remaining peers to drop the client that left",
 	)
 
-	var client_a_id := client_a.multiplayer.get_unique_id()
-	_trees.erase(client_a)
-	await NakamaTestSupport.stop_tree(client_a)
-
-	await _await(
-		func() -> bool:
-			return _client_was_dropped(host_tree, client_b, client_a_id),
-		"remaining peers to drop disconnected client",
+	var server_lost: Array[bool] = [false]
+	bruno.multiplayer.server_disconnected.connect(
+		func() -> void: server_lost[0] = true,
 	)
-
-	var client_b_saw_server_disconnect := [false]
-	client_b.api.server_disconnected.connect(
-		func() -> void:
-			client_b_saw_server_disconnect[0] = true,
-	)
-
-	_trees.erase(host_tree)
+	trees.erase(host_tree)
 	await NakamaTestSupport.stop_tree(host_tree)
-
-	await _await(
+	await wait_for(
 		func() -> bool:
-			return _server_disconnect_seen(client_b, client_b_saw_server_disconnect),
-		"client to observe host disconnect",
+			return server_lost[0] or not Netw.session(bruno).is_online,
+		"the client to see the host leave",
 	)
 
 
-func _join(client: MultiplayerViewport, room: String, username: String) -> Error:
-	return await NakamaTestSupport.join_client(client, room, username)
+func sees_everyone(tree: MultiplayerViewport) -> bool:
+	return Netw.session(tree).is_online \
+			and tree.multiplayer.get_peers().size() == 2 \
+			and Netw.session(tree).players.size() == 3
 
 
-func _track(tree: MultiplayerViewport) -> void:
-	_trees.append(tree)
-
-
-func _await(
-		cond: Callable,
-		label: String,
-		timeout: float = _TIMEOUT,
-) -> void:
-	var deadline := get_tree().create_timer(timeout)
-	while deadline.time_left > 0.0:
-		if cond.call():
-			return
+func wait_for(condition: Callable, label: String) -> void:
+	var deadline := get_tree().create_timer(TIMEOUT)
+	while deadline.time_left > 0.0 and not condition.call():
 		await get_tree().process_frame
-	assert_bool(cond.call()) \
+	assert_bool(condition.call()) \
 			.override_failure_message("Timed out waiting for %s." % label) \
 			.is_true()
-
-
-func _sees_all(tree: MultiplayerViewport) -> bool:
-	return tree.api.session_is_online() \
-			and tree.multiplayer.get_peers().size() == 2 \
-			and _joined_count(tree) == 3
-
-
-func _all_trees_see_all(
-		host_tree: MultiplayerViewport,
-		client_a: MultiplayerViewport,
-		client_b: MultiplayerViewport,
-) -> bool:
-	return _sees_all(host_tree) \
-			and _sees_all(client_a) \
-			and _sees_all(client_b)
-
-
-func _client_was_dropped(
-		host_tree: MultiplayerViewport,
-		client_b: MultiplayerViewport,
-		client_a_id: int,
-) -> bool:
-	return not _has_peer(host_tree, client_a_id) \
-			and not _has_peer(client_b, client_a_id) \
-			and _joined_count(host_tree) == 2
-
-
-func _server_disconnect_seen(
-		client_b: MultiplayerViewport,
-		client_b_saw_server_disconnect: Array,
-) -> bool:
-	return client_b_saw_server_disconnect[0] \
-			or not client_b.api.session_is_online()
-
-
-func _has_peer(tree: MultiplayerViewport, peer_id: int) -> bool:
-	if not is_instance_valid(tree) or tree.multiplayer == null:
-		return false
-	return tree.multiplayer.get_peers().has(peer_id)
-
-
-func _joined_count(tree: MultiplayerViewport) -> int:
-	if not is_instance_valid(tree):
-		return 0
-	return tree.api.player_list().size()

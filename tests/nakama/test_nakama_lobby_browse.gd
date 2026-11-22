@@ -1,11 +1,10 @@
 class_name TestNakamaLobbyBrowse
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const TIMEOUT := 12.0
 
-var trees: Array = []
+var trees: Array[MultiplayerViewport] = []
 var run_uid := ""
-var sdk: Script
 
 
 class ReadyBrowser:
@@ -15,11 +14,12 @@ class ReadyBrowser:
 		Netw.session(self).connection.browsing = true
 
 
+@warning_ignore("unused_parameter")
 func before(
 		do_skip = NakamaTestServer.unavailable(),
 		skip_reason = NakamaTestServer.SKIP_REASON,
 ) -> void:
-	sdk = load("res://addons/com.heroiclabs.nakama/Nakama.gd")
+	pass
 
 
 func before_test() -> void:
@@ -66,8 +66,9 @@ func test_public_lobby_round_trips_then_clears_on_leave() -> void:
 	await NakamaTestSupport.stop_tree(host_tree)
 
 	assert_int(find_lobby(await browse_lobbies(browse_dir), "Valeria's Game")) \
-			.override_failure_message("Lobby still listed after the host left.") \
-			.is_equal(-1)
+			.override_failure_message(
+				"Lobby still listed after the host left.",
+			).is_equal(-1)
 
 
 func test_private_lobby_is_unlisted_but_joinable() -> void:
@@ -91,8 +92,9 @@ func test_private_lobby_is_unlisted_but_joinable() -> void:
 	browse_dir._join_lobby(match_id)
 	var join_peer := await await_peer(browse_dir)
 	assert_object(join_peer) \
-			.override_failure_message("PRIVATE lobby not joinable by match id.") \
-			.is_not_null()
+			.override_failure_message(
+				"PRIVATE lobby not joinable by match id.",
+			).is_not_null()
 
 
 func test_browsing_from_a_ready_callback_signs_in_a_guest_and_lists() -> void:
@@ -105,9 +107,14 @@ func test_browsing_from_a_ready_callback_signs_in_a_guest_and_lists() -> void:
 	dir.browser_tag = run_uid
 	tree.add_child(dir)
 	tree.add_child(ReadyBrowser.new())
-	var listed := [false]
+	var listed: Array[bool] = [false]
 	dir.lobby_list_published.connect(
-		func(_addresses, _names, _infos) -> void: listed[0] = true,
+		func(
+				_addresses: PackedStringArray,
+				_names: PackedStringArray,
+				_infos: Array[NetwServerInfo],
+		) -> void:
+			listed[0] = true,
 		CONNECT_ONE_SHOT,
 	)
 	trees.append(tree)
@@ -126,8 +133,8 @@ func host_lobby(dir: LobbyDirectory, settings: Dictionary) -> MultiplayerPeer:
 
 
 func await_peer(dir: LobbyDirectory) -> MultiplayerPeer:
-	var answer: Array = [null]
-	var settled := [false]
+	var answer: Array[MultiplayerPeer] = [null]
+	var settled: Array[bool] = [false]
 	dir.lobby_peer_ready.connect(
 		func(peer: MultiplayerPeer) -> void:
 			answer[0] = peer
@@ -146,7 +153,8 @@ func await_peer(dir: LobbyDirectory) -> MultiplayerPeer:
 func make_directory(username: String) -> NakamaLobbyDirectory:
 	var tree := NakamaTestSupport.make_client_tree(self, username)
 	trees.append(tree)
-	await NetwTestSuite.drain_frames(get_tree(), 2)
+	for i in 2:
+		await get_tree().process_frame
 	await NakamaTestSupport.sign_in(tree, "%s-%s" % [run_uid, username])
 	var dir := NakamaTestSupport.directory(tree)
 	dir.browser_tag = run_uid
@@ -159,7 +167,7 @@ func browse_lobbies(dir: NakamaLobbyDirectory) -> Dictionary:
 		"names": PackedStringArray(),
 		"infos": [] as Array[NetwServerInfo],
 	}
-	var done := [false]
+	var done: Array[bool] = [false]
 	dir.lobby_list_published.connect(
 		func(
 				addresses: PackedStringArray,

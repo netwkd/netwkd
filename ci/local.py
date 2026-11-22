@@ -99,6 +99,8 @@ PROFILES = {
             "dist/netwkd-*.zip",
             "--zip-glob",
             "dist/netwkd_steam-*.zip",
+            "--zip-glob",
+            "dist/netwkd_test-*.zip",
         ],
     ],
 }

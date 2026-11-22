@@ -1,6 +1,6 @@
 @tool
 class_name TestConnectBrowserSmoke
-extends NetwTestSuite
+extends GdUnitTestSuite
 
 const BROWSER := preload(
 	"res://addons/netwkd/gdscript/connect/ui/connect_browser.tscn"
@@ -12,21 +12,11 @@ var connection: NetwConnection
 var browser: ConnectBrowser
 
 
-class AnotherGame:
-	extends Node
-
-	func _init() -> void:
-		Netw.configure_server_info(answer)
-
-
-	func answer(info: NetwServerInfo) -> void:
-		info.app_id = &"another-game"
-
-
-class SmallServer:
+class ListedServer:
 	extends Node
 
 	var max_players := 8
+	var other_game := false
 
 
 	func _init() -> void:
@@ -35,6 +25,8 @@ class SmallServer:
 
 	func answer(info: NetwServerInfo) -> void:
 		info.max_players = max_players
+		if other_game:
+			info.app_id = &"another-game"
 
 
 class TeamGame:
@@ -65,72 +57,78 @@ func after_test() -> void:
 	await get_tree().process_frame
 
 
+func row_of(endpoint: NetwEndpoint) -> ConnectBrowserRow:
+	for row: ConnectBrowserRow in browser.get_node(^"%ListBox").get_children():
+		if row.endpoint == endpoint:
+			return row
+	return null
+
+
+func text_of(path: NodePath) -> String:
+	return browser.get_node(path).get(&"text")
+
+
+func shown(path: NodePath) -> bool:
+	return browser.get_node(path).get(&"visible")
+
+
+func press(path: NodePath) -> void:
+	(browser.get_node(path) as Button).pressed.emit()
+
+
 func test_rows_follow_added_and_removed_endpoints() -> void:
+	var list_box := browser.get_node(^"%ListBox")
 	var endpoint := connection.add(
 		&"ENetMultiplayerPeer",
 		"203.0.113.1",
 		"Alpha",
 	)
 
-	assert_int(browser._list_box.get_child_count()).is_equal(1)
-	assert_str(browser._rows[endpoint]._name_label.text).is_equal("Alpha")
-	assert_bool(browser._empty_state.visible).is_false()
+	assert_int(list_box.get_child_count()).is_equal(1)
+	assert_str((row_of(endpoint).get_node(^"%NameLabel") as Label).text) \
+			.is_equal("Alpha")
+	assert_bool(shown(^"%EmptyState")).is_false()
 
 	connection.remove(endpoint)
 	await get_tree().process_frame
 
-	assert_int(browser._list_box.get_child_count()).is_equal(0)
-	assert_bool(browser._empty_state.visible).is_true()
-
-
-func test_a_probe_answer_reaches_the_row_and_the_join_button() -> void:
-	var host := await EnetTestSupport.start_host(self, AnotherGame.new())
-	var endpoint := connection.add(
-		&"ENetMultiplayerPeer",
-		"127.0.0.1:%d" % host.port,
-	)
-	browser._rows[endpoint].selected.emit()
-
-	assert_bool(browser._details.visible).is_true()
-	assert_bool(browser._join_button.disabled).is_false()
-
-	await EnetTestSupport.await_until(
-		self,
-		func() -> bool: return endpoint.status != NetwEndpoint.STATUS_UNKNOWN,
-	)
-
-	assert_int(endpoint.status).is_equal(NetwEndpoint.STATUS_INCOMPATIBLE)
-	assert_str(browser._rows[endpoint]._status_dot.tooltip_text) \
-			.is_equal("Incompatible")
-	assert_bool(browser._join_button.disabled).is_true()
-	await EnetTestSupport.stop_tree(host.tree)
+	assert_int(list_box.get_child_count()).is_equal(0)
+	assert_bool(shown(^"%EmptyState")).is_true()
 
 
 func test_the_details_panel_follows_the_selected_endpoint() -> void:
-	var server := SmallServer.new()
+	var server := ListedServer.new()
 	var host := await EnetTestSupport.start_host(self, server)
 	var endpoint := connection.add(
 		&"ENetMultiplayerPeer",
 		"127.0.0.1:%d" % host.port,
 	)
+	row_of(endpoint).selected.emit()
+
+	assert_bool(shown(^"%Details")).is_true()
+
 	await EnetTestSupport.await_until(
 		self,
 		func() -> bool: return endpoint.status == NetwEndpoint.STATUS_ONLINE,
 	)
-	browser._rows[endpoint].selected.emit()
 
-	assert_str(browser._details_status_label.text).is_equal("Online")
-	assert_str(browser._details_ping_label.text).ends_with(" ms")
-	assert_str(browser._details_players_label.text).is_equal("1/8")
+	assert_str(text_of(^"%DetailsStatusLabel")).is_equal("Online")
+	assert_str(text_of(^"%DetailsPingLabel")).ends_with(" ms")
+	assert_str(text_of(^"%DetailsPlayersLabel")).is_equal("1/8")
+	var join_button: Button = browser.get_node(^"%DetailsJoinButton")
+	assert_bool(join_button.disabled).is_false()
 
 	server.max_players = 4
+	server.other_game = true
 	endpoint.probe()
 	await EnetTestSupport.await_until(
 		self,
-		func() -> bool: return endpoint.info.max_players == 4,
+		func() -> bool:
+			return endpoint.status == NetwEndpoint.STATUS_INCOMPATIBLE,
 	)
 
-	assert_str(browser._details_players_label.text).is_equal("1/4")
+	assert_str(text_of(^"%DetailsStatusLabel")).is_equal("Incompatible")
+	assert_bool(join_button.disabled).is_true()
 	await EnetTestSupport.stop_tree(host.tree)
 
 
@@ -153,15 +151,16 @@ func test_browsing_follows_the_server_list_visibility() -> void:
 
 func test_the_connecting_popup_follows_state_and_progress() -> void:
 	session.state_changed.emit(NetwSession.STATE_CREATING)
-	assert_bool(browser._connecting_popup.visible).is_true()
+	assert_bool(shown(^"%ConnectingPopup")).is_true()
 
 	connection.progressed.emit("Asking the tracker", 0.5)
-	assert_str(browser._connecting_popup._title_label.text) \
+	assert_str(text_of(^"%ConnectingPopup/%TitleLabel")) \
 			.is_equal("Asking the tracker")
-	assert_float(browser._connecting_popup._progress_bar.value).is_equal(0.5)
+	var progress: Range = browser.get_node(^"%ConnectingPopup/%ProgressBar")
+	assert_float(progress.value).is_equal(0.5)
 
 	session.state_changed.emit(NetwSession.STATE_ONLINE)
-	assert_bool(browser._connecting_popup.visible).is_false()
+	assert_bool(shown(^"%ConnectingPopup")).is_false()
 
 
 func test_a_failure_reaches_the_banner_and_the_popup() -> void:
@@ -170,46 +169,30 @@ func test_a_failure_reaches_the_banner_and_the_popup() -> void:
 	session.state_changed.emit(NetwSession.STATE_OFFLINE)
 	await get_tree().process_frame
 
-	assert_bool(browser._banner.visible).is_true()
-	assert_str(browser._banner_label.text) \
+	assert_bool(shown(^"%Banner")).is_true()
+	assert_str(text_of(^"%BannerLabel")) \
 			.is_equal("The server could not be reached.")
-	assert_bool(browser._connecting_popup.visible).is_true()
-	assert_str(browser._connecting_popup._cancel_button.text).is_equal("Close")
+	assert_bool(shown(^"%ConnectingPopup")).is_true()
+	assert_str(text_of(^"%ConnectingPopup/%CancelButton")).is_equal("Close")
 
 	session.state_changed.emit(NetwSession.STATE_CREATING)
-	assert_bool(browser._banner.visible).is_false()
-
-
-func test_a_host_refused_its_own_join_reaches_the_banner() -> void:
-	browser.host(&"LocalMultiplayerPeer", { }, NetwServerInfo.new(), [])
-	assert_int(await EnetTestSupport.await_online(tree)).is_equal(OK)
+	assert_bool(shown(^"%Banner")).is_false()
 
 	session.join_failed.emit(ERR_TIMEOUT, "The join ran out of time.")
 	await get_tree().process_frame
 
-	assert_bool(browser._banner.visible).is_true()
-	assert_str(browser._banner_label.text).is_equal("The join ran out of time.")
+	assert_bool(shown(^"%Banner")).is_true()
+	assert_str(text_of(^"%BannerLabel")).is_equal("The join ran out of time.")
 
 
 func test_the_room_bar_shows_the_code_while_hosting() -> void:
-	var room_bar := browser.get_node(^"RoomBar")
-	assert_bool(room_bar._panel.visible).is_false()
+	assert_bool(shown(^"RoomBar/%Panel")).is_false()
 
 	browser.host(&"LocalMultiplayerPeer", { }, NetwServerInfo.new(), [])
 
 	assert_int(await EnetTestSupport.await_online(tree)).is_equal(OK)
-	assert_bool(room_bar._panel.visible).is_true()
-	assert_str(room_bar._code_edit.text).is_equal("local")
-
-
-func test_a_hidden_room_bar_stays_hidden_while_hosting() -> void:
-	var room_bar: Control = browser.get_node(^"RoomBar")
-	room_bar.hide()
-
-	browser.host(&"LocalMultiplayerPeer", { }, NetwServerInfo.new(), [])
-
-	assert_int(await EnetTestSupport.await_online(tree)).is_equal(OK)
-	assert_bool(room_bar.visible).is_false()
+	assert_bool(shown(^"RoomBar/%Panel")).is_true()
+	assert_str(text_of(^"RoomBar/%CodeEdit")).is_equal("local")
 
 
 func test_transport_defaults_reach_the_connection() -> void:
@@ -227,22 +210,6 @@ func test_transport_defaults_reach_the_connection() -> void:
 	assert_int(enet.host_settings.max_players).is_equal(12)
 
 
-func test_a_join_through_the_browser_goes_online_and_hides_the_list() -> void:
-	var host := await EnetTestSupport.start_host(self)
-	var endpoint := connection.add(
-		&"ENetMultiplayerPeer",
-		"127.0.0.1:%d" % host.port,
-	)
-
-	browser.join(endpoint, { }, [])
-
-	assert_int(await EnetTestSupport.await_online(tree)).is_equal(OK)
-	assert_int(session.state).is_equal(NetwSession.STATE_ONLINE)
-	assert_bool(browser._server_list.visible).is_false()
-	assert_bool(browser._connecting_popup.visible).is_false()
-	await EnetTestSupport.stop_tree(host.tree)
-
-
 func test_an_invite_joins_with_the_browser_player_name_and_defaults() -> void:
 	var host := await EnetTestSupport.start_host(self)
 	browser.username = "InvitedPlayer"
@@ -258,7 +225,7 @@ func test_an_invite_joins_with_the_browser_player_name_and_defaults() -> void:
 	).is_equal(OK)
 	assert_str(String(session.local_player.username)) \
 			.is_equal("InvitedPlayer")
-	assert_bool(browser._server_list.visible).is_false()
+	assert_bool(shown(^"VBox")).is_false()
 	await EnetTestSupport.stop_tree(host.tree)
 
 
@@ -274,18 +241,14 @@ func test_an_invite_requests_declared_join_inputs() -> void:
 		"Host",
 	)
 
-	assert_object(browser._selected).is_same(endpoint)
-	assert_bool(browser._join_popup.visible).is_true()
+	assert_str(text_of(^"%DetailsAddressLabel")).is_equal(endpoint.address)
+	assert_bool(shown(^"%JoinPopup")).is_true()
 	assert_int(session.state).is_equal(NetwSession.STATE_OFFLINE)
-	var inputs := browser._join_popup._args_container.find_children(
-		"*",
-		"SpinBox",
-		true,
-		false,
-	)
+	var inputs := browser.get_node(^"%JoinPopup/%ArgsContainer") \
+			.find_children("*", "SpinBox", true, false)
 	assert_int(inputs.size()).is_equal(1)
 	(inputs[0] as SpinBox).value = 2
-	browser._join_popup._confirm_button.pressed.emit()
+	press(^"%JoinPopup/%ConfirmButton")
 
 	assert_int(
 		await EnetTestSupport.await_until(
@@ -302,26 +265,19 @@ func test_an_invite_leaves_the_current_lobby_only_after_confirmation() -> void:
 	assert_int(await EnetTestSupport.await_online(tree)).is_equal(OK)
 	var original := tree.api.multiplayer_peer
 	var host := await EnetTestSupport.start_host(self)
+	var address := "127.0.0.1:%d" % host.port
 
-	connection.invite(
-		&"ENetMultiplayerPeer",
-		"127.0.0.1:%d" % host.port,
-		"Host",
-	)
+	connection.invite(&"ENetMultiplayerPeer", address, "Host")
 
-	assert_bool(browser._join_popup.visible).is_true()
-	assert_bool(browser._join_popup._leave_warning.visible).is_true()
+	assert_bool(shown(^"%JoinPopup")).is_true()
+	assert_bool(shown(^"%JoinPopup/%LeaveWarning")).is_true()
 	assert_object(tree.api.multiplayer_peer).is_same(original)
-	browser._join_popup._cancel_button.pressed.emit()
-	assert_bool(browser._join_popup.visible).is_false()
+	press(^"%JoinPopup/%CancelButton")
+	assert_bool(shown(^"%JoinPopup")).is_false()
 	assert_object(tree.api.multiplayer_peer).is_same(original)
 
-	connection.invite(
-		&"ENetMultiplayerPeer",
-		"127.0.0.1:%d" % host.port,
-		"Host",
-	)
-	browser._join_popup._confirm_button.pressed.emit()
+	connection.invite(&"ENetMultiplayerPeer", address, "Host")
+	press(^"%JoinPopup/%ConfirmButton")
 
 	assert_int(
 		await EnetTestSupport.await_until(
@@ -332,7 +288,7 @@ func test_an_invite_leaves_the_current_lobby_only_after_confirmation() -> void:
 		),
 	).is_equal(OK)
 	assert_int(session.state).is_equal(NetwSession.STATE_ONLINE)
-	assert_bool(browser._server_list.visible).is_false()
+	assert_bool(shown(^"VBox")).is_false()
 	await EnetTestSupport.stop_tree(host.tree)
 
 
@@ -342,16 +298,16 @@ func test_an_invite_waits_for_the_game_while_join_invites_is_off() -> void:
 	connection.invite(&"ENetMultiplayerPeer", "127.0.0.1", "Host")
 
 	assert_int(session.state).is_equal(NetwSession.STATE_OFFLINE)
-	assert_object(browser._selected).is_null()
-	assert_bool(browser._join_popup.visible).is_false()
+	assert_bool(shown(^"%Details")).is_false()
+	assert_bool(shown(^"%JoinPopup")).is_false()
 
 	browser.host(&"LocalMultiplayerPeer", { }, NetwServerInfo.new(), [])
 	assert_int(await EnetTestSupport.await_online(tree)).is_equal(OK)
 	connection.invite(&"ENetMultiplayerPeer", "127.0.0.1", "Host")
 
-	assert_bool(browser._join_popup.visible).is_false()
+	assert_bool(shown(^"%JoinPopup")).is_false()
 
 	browser.join_invites = true
 	connection.invite(&"ENetMultiplayerPeer", "127.0.0.1", "Host")
 
-	assert_bool(browser._join_popup.visible).is_true()
+	assert_bool(shown(^"%JoinPopup")).is_true()

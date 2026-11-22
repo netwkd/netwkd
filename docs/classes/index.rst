@@ -156,28 +156,6 @@ Testing
     :maxdepth: 1
     :name: toc-class-ref-testing
 
-    class_addons--netwkd_test--gdunit4--gdunit_awaiter.gd
-    class_addons--netwkd_test--gdunit4--gdunit_error_scrubber.gd
-    class_enettestsupport
-    class_framelockstepstepper
-    class_nakamatestsupport
-    class_netwgameharness
-    class_netwharnesssession
-    class_netwharnesssession.backendadapter
-    class_netwharnesssession.loopbackadapter
-    class_netwlink
-    class_netwlink.netwlinkmulti
-    class_networdinarysetup
-    class_networdinarysetup.outcome
-    class_netwprocessrig
-    class_netwregimepeer
-    class_netwregimethrottle
-    class_netwscenerunner
-    class_netwtestdiscordservice
-    class_netwtestsessionhook
-    class_netwtestsuite
-    class_netwtransfercontract
-    class_netwtransferdriver
-    class_netwwaiter
-    class_webrtctestsupport
+    class_netwtestgame
+    class_netwtestpeer
 

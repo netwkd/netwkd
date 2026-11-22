@@ -19,8 +19,7 @@ using namespace godot;
 using netw::LocalLoopbackSession;
 using netw::LocalMultiplayerPeer;
 
-const char *CONTRACT_PATH
-    = "res://addons/netwkd_test/transfer/transfer_contract.gd";
+const char *CONTRACT_PATH = "res://tests/support/transfer/transfer_contract.gd";
 
 const char *DRIVER_SOURCE = R"(extends NetwTransferDriver
 

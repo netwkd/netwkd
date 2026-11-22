@@ -140,6 +140,31 @@ func _init() -> void:
 \tquit(0 if ok and examples > 0 and broken.is_empty() else 1)
 """
 
+GAME_PROBE = """extends SceneTree
+
+const MAIN := preload("res://addons/netwkd/examples/whiteboard/main.tscn")
+
+
+func _initialize() -> void:
+\tawait process_frame
+\tvar game := NetwTestGame.new(MAIN)
+\troot.add_child(game)
+
+\tvar ada := await game.host(&"ada")
+\tif ada == null:
+\t\tquit(1)
+\t\treturn
+
+\tvar bob := await game.join(&"bob")
+\tif bob == null:
+\t\tquit(1)
+\t\treturn
+
+\tgame.free()
+\tprint("GAME hosted=%s joined=%s" % [ada.username, bob.username])
+\tquit()
+"""
+
 
 def _without(root: str, skipped: str) -> list[str]:
     """Paths under `root` that together cover everything but `skipped`."""
@@ -319,6 +344,17 @@ def lane_consumer(godot: str, *, archives: list[Path], workspace: Path, timeout:
         timeout=timeout,
         lane="consumer",
     )
+
+    if (workspace / "addons" / "netwkd_test").is_dir():
+        game_probe = workspace / "game_probe.gd"
+        game_probe.write_text(GAME_PROBE, encoding="utf-8")
+        _godot(
+            godot,
+            ["--headless", "--path", str(workspace), "--script", str(game_probe)],
+            log=TMP / "consumer-game.log",
+            timeout=timeout,
+            lane="consumer",
+        )
     return 0
 
 
