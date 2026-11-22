@@ -90,7 +90,9 @@ func test_a_proxy_uses_relayed_turn_rate_for_its_tire_trails() -> void:
 	own.linear_speed = 1.0
 	own.acceleration = 1.0
 	own.angular_speed = 4.0
-	await game.run(4)
+	await game.until(
+		func() -> bool: return absf(watcher_view.angular_speed - 4.0) < 0.01,
+	)
 	watcher_view.effect_body(0.2)
 	watcher_view.effect_trails()
 

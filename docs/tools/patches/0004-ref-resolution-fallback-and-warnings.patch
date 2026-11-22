@@ -13,7 +13,7 @@
 +                            # An unqualified ref defaults target_class_name to the
 +                            # current class. If the symbol isn't found locally, the
 +                            # fallback path below retargets to the first engine
-+                            # ancestor and emits a valid :godot: link — so the
++                            # ancestor and emits a valid :godot: link, so the
 +                            # "unresolved" warning would describe a problem the
 +                            # fallback handles silently. Qualified refs
 +                            # (e.g. [member Foo.bar]) still warn, since the

@@ -2,7 +2,7 @@
 
 Defines a single ``:godot:`` role used by RST emitted from ``make_rst.py`` (and
 hand-written prose) to link to ``docs.godotengine.org``. Centralising URL
-construction here keeps ``make_rst.py`` close to upstream — the patches only
+construction here keeps ``make_rst.py`` close to upstream. The patches only
 need to emit role syntax, not URLs.
 
 Syntax::
@@ -15,7 +15,7 @@ The fragment, when provided, is used verbatim. Callers are responsible for
 producing fragments that match Godot's URL scheme (e.g. ``class_node_method_get_parent``).
 
 If Godot ever changes the docs URL scheme, edit ``DOCS_BASE`` (and the slug
-rule, if needed) — nothing else.
+rule, if needed) and nothing else.
 """
 
 from __future__ import annotations

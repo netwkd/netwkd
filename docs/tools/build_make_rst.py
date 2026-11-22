@@ -61,7 +61,7 @@ def check() -> int:
         shutil.copy(VENDOR, scratch)
         _apply_patches(scratch)
         if not OUTPUT.is_file():
-            print(f"ERROR: {OUTPUT} does not exist — run build_make_rst.py", file=sys.stderr)
+            print(f"ERROR: {OUTPUT} does not exist. Run build_make_rst.py", file=sys.stderr)
             return 1
         if not filecmp.cmp(scratch, OUTPUT, shallow=False):
             print(

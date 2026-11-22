@@ -31,7 +31,7 @@
 +
 +# Engine-class shim: when a referenced symbol is not in our local XML set (e.g.
 +# Node, Resource, Variant, Error), emit a `:godot:` role. URL construction lives
-+# in docs/_extensions/godot_xref.py — keep this helper minimal so the diff against
++# in docs/_extensions/godot_xref.py. Keep this helper minimal so the diff against
 +# upstream stays small.
 +def godot_external_link(display_text: str, class_name: str, fragment: str = "") -> str:
 +    target = class_name if not fragment else f"{class_name}#{fragment}"

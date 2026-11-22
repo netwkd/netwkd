@@ -63,7 +63,7 @@ def main() -> None:
         sys.stderr.write(result.stderr.decode("utf-8", errors="replace"))
         sys.exit("diff failed")
     if result.returncode == 0:
-        sys.exit("vendor and working file are identical — nothing to do.")
+        sys.exit("vendor and working file are identical, nothing to do.")
 
     stdout = result.stdout.decode("utf-8")
     lines = stdout.splitlines(keepends=True)
@@ -95,7 +95,7 @@ def main() -> None:
             if lo <= start < hi:
                 chosen.append(hunk)
         if not chosen:
-            print(f"  (skip) {fname} — no hunks in [{lo}, {hi})")
+            print(f"  (skip) {fname}, no hunks in [{lo}, {hi})")
             continue
         p = PATCHES_DIR / fname
         with p.open("w", encoding="utf-8", newline="\n") as f:

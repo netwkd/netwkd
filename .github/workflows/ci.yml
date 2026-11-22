@@ -113,7 +113,7 @@ jobs:
         shell: bash
         run: python3 ci/test.py --godot "${{ steps.engine.outputs.binary }}" native
 
-      - name: Hold The Descriptors To The Prose
+      - name: Check The Wire Spec
         if: always()
         shell: bash
         run: |

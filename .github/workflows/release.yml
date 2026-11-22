@@ -60,7 +60,7 @@ jobs:
           name: netwkd-addon
           path: dist
 
-      - name: Hold The Candidate To Its Profile
+      - name: Check The Release Inventory
         id: gate
         shell: bash
         env:
@@ -133,7 +133,7 @@ jobs:
           name: netwkd-addon
           path: dist
 
-      - name: Hold The Candidate To Its Profile Again
+      - name: Recheck The Release Inventory
         shell: bash
         run: |
           set -eu

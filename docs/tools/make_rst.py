@@ -112,7 +112,7 @@ CLASS_GROUPS_BASE: dict[str, str] = {
 
 # Engine-class shim: when a referenced symbol is not in our local XML set (e.g.
 # Node, Resource, Variant, Error), emit a `:godot:` role. URL construction lives
-# in docs/_extensions/godot_xref.py — keep this helper minimal so the diff against
+# in docs/_extensions/godot_xref.py. Keep this helper minimal so the diff against
 # upstream stays small.
 def godot_external_link(display_text: str, class_name: str, fragment: str = "") -> str:
     target = class_name if not fragment else f"{class_name}#{fragment}"
@@ -2355,7 +2355,7 @@ def format_text_block(
                             # An unqualified ref defaults target_class_name to the
                             # current class. If the symbol isn't found locally, the
                             # fallback path below retargets to the first engine
-                            # ancestor and emits a valid :godot: link — so the
+                            # ancestor and emits a valid :godot: link, so the
                             # "unresolved" warning would describe a problem the
                             # fallback handles silently. Qualified refs
                             # (e.g. [member Foo.bar]) still warn, since the
